@@ -74,29 +74,26 @@ namespace
     {
         ALFontFaceKey a{ "x.ttf", 0, 14.f, 96.f, 96.f, EFontHinting::DEFAULT, 0 };
         ALFontFaceKey b = a;
-        UNSCOPED_INFO("identical keys equal");
         CHECK(a == b);
-        UNSCOPED_INFO("identical keys hash equal");
         CHECK(hash_value(a) == hash_value(b));
 
         b.point_size = 18.f;
-        UNSCOPED_INFO("differing point_size keys not equal");
+        UNSCOPED_INFO("point_size differs");
         CHECK_FALSE(a == b);
         b = a;  b.face_index = 1;
-        UNSCOPED_INFO("differing face_index keys not equal");
+        UNSCOPED_INFO("face_index differs");
         CHECK_FALSE(a == b);
         b = a;  b.var_axes.wght = 600.f; b.var_axes.wght_set = true;
-        UNSCOPED_INFO("differing wght keys not equal");
+        UNSCOPED_INFO("wght differs");
         CHECK_FALSE(a == b);
         b = a;  b.hinting = EFontHinting::FORCE_AUTOHINT;
-        UNSCOPED_INFO("differing hinting keys not equal");
+        UNSCOPED_INFO("hinting differs");
         CHECK_FALSE(a == b);
         b = a;  b.flags = LLFontGL::BOLD;
-        UNSCOPED_INFO("differing flags keys not equal");
+        UNSCOPED_INFO("flags differ");
         CHECK_FALSE(a == b);
     }
 
-    // hasColrV1: Noto-COLRv1 yes, DejaVuSans no.
     TEST_CASE_METHOD(alfontface_data, "ALFontFace: hasColrV1 is true for Noto-COLRv1 and false for DejaVuSans", "[ALFontFace]")
     {
         const std::string noto = std::string(kFontDir) + "Noto-COLRv1.ttf";
@@ -106,14 +103,9 @@ namespace
 
         LLPointer<ALFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
         LLPointer<ALFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
-        {
-            INFO("both faces valid");
-            CHECK(nf->isValid());
-            CHECK(df->isValid());
-        }
-        UNSCOPED_INFO("Noto-COLRv1 hasColrV1");
+        CHECK(nf->isValid());
+        CHECK(df->isValid());
         CHECK(nf->hasColrV1());
-        UNSCOPED_INFO("DejaVuSans !hasColrV1");
         CHECK_FALSE(df->hasColrV1());
     }
 
@@ -128,9 +120,7 @@ namespace
 
         LLPointer<ALFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
         LLPointer<ALFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
-        UNSCOPED_INFO("Noto-COLRv1 hasColor");
         CHECK(nf->hasColor());
-        UNSCOPED_INFO("DejaVuSans !hasColor");
         CHECK_FALSE(df->hasColor());
     }
 
@@ -146,9 +136,7 @@ namespace
 
         LLPointer<ALFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
         LLPointer<ALFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
-        UNSCOPED_INFO("Noto-COLRv1 !hasSvg");
         CHECK_FALSE(nf->hasSvg());
-        UNSCOPED_INFO("DejaVuSans !hasSvg");
         CHECK_FALSE(df->hasSvg());
     }
 
@@ -168,14 +156,9 @@ namespace
 
         LLPointer<ALFontFace> def = gFontManagerp->getOrCreateFace(k_default);
         LLPointer<ALFontFace> bld = gFontManagerp->getOrCreateFace(k_bold);
-        {
-            INFO("both loaded");
-            CHECK(def->isValid());
-            CHECK(bld->isValid());
-        }
-        UNSCOPED_INFO("wght unset -> wghtAxisSet=false");
+        CHECK(def->isValid());
+        CHECK(bld->isValid());
         CHECK_FALSE(def->wghtAxisSet());
-        UNSCOPED_INFO("wght=600 on variable face -> wghtAxisSet=true");
         CHECK(bld->wghtAxisSet());
     }
 
@@ -190,9 +173,7 @@ namespace
             SKIP("DejaVuSans + DejaVuSansMono required");
         LLPointer<ALFontFace> m = gFontManagerp->getOrCreateFace(makeKey(mono));
         LLPointer<ALFontFace> p = gFontManagerp->getOrCreateFace(makeKey(prop));
-        UNSCOPED_INFO("Mono isFixedWidth");
         CHECK(m->isFixedWidth());
-        UNSCOPED_INFO("Prop !isFixedWidth");
         CHECK_FALSE(p->isFixedWidth());
     }
 
@@ -208,14 +189,13 @@ namespace
 
         const U32 g_a       = f->getCharGlyphIndex(L'A');
         const U32 g_a_again = f->getCharGlyphIndex(L'A');
-        UNSCOPED_INFO("'A' has a glyph");
         CHECK(g_a != 0u);
-        UNSCOPED_INFO("repeat 'A' lookup hits cache (same value)");
+        UNSCOPED_INFO("a repeat lookup hits the cache");
         CHECK(g_a == g_a_again);
-        UNSCOPED_INFO("absent codepoint -> 0");
+        UNSCOPED_INFO("an absent codepoint");
         CHECK(f->getCharGlyphIndex(0xE000) == 0u);
         // Cache the miss too — second call should also be 0.
-        UNSCOPED_INFO("absent codepoint cached miss is also 0");
+        UNSCOPED_INFO("the cached miss");
         CHECK(f->getCharGlyphIndex(0xE000) == 0u);
     }
 
@@ -231,9 +211,8 @@ namespace
 
         LLPointer<ALFontFace> a = gFontManagerp->getOrCreateFace(makeKey(path));
         LLPointer<ALFontFace> b = gFontManagerp->getOrCreateFace(makeKey(path));
-        UNSCOPED_INFO("a == b (shared face)");
         REQUIRE(a.get() == b.get());
-        UNSCOPED_INFO("refcount >= 3 (cache + a + b)");
+        UNSCOPED_INFO("refs held by the cache and a and b");
         CHECK(a->getNumRefs() >= 3);
 
         ALFontFace* raw = a.get();
@@ -246,7 +225,7 @@ namespace
         // pointer (cache hit), not a freshly-loaded face.
         LLPointer<ALFontFace> c = gFontManagerp->getOrCreateFace(makeKey(path));
         UNSCOPED_INFO("cache kept face alive after both refs dropped");
-        REQUIRE(c.get() == raw);
+        CHECK(c.get() == raw);
     }
 
     // resetBitmapCache clears atlas state without destroying the face.
@@ -257,15 +236,12 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(makeKey(path));
-        UNSCOPED_INFO("face valid before reset");
         CHECK(f->isValid());
         f->resetBitmapCache();
-        UNSCOPED_INFO("face still valid after resetBitmapCache");
         CHECK(f->isValid());
         UNSCOPED_INFO("cmap survives reset");
         CHECK(f->getCharGlyphIndex(L'A') != 0u);
-        UNSCOPED_INFO("bitmap cache pointer still present");
-        REQUIRE(f->getBitmapCache() != nullptr);
+        CHECK(f->getBitmapCache() != nullptr);
     }
 
     // paletteIndex() is computed at load time from LLFontGL::sUseDarkEmojiPalette
@@ -295,7 +271,7 @@ namespace
                 CHECK(f->isValid());
             }
             pi_default = f->paletteIndex();
-            UNSCOPED_INFO("paletteIndex defaults to 0 with dark=false");
+            UNSCOPED_INFO("loaded with dark=false");
             CHECK(pi_default == 0u);
         }
         // Drop our ref; collectGarbage evicts since cache holds the only ref.
@@ -323,7 +299,6 @@ namespace
         if (pi_dark == 0)
             SKIP("font has no FT_PALETTE_FOR_DARK_BACKGROUND palette");
 
-        UNSCOPED_INFO("dark=true selected a non-zero palette index");
         CHECK(pi_dark != 0u);
     }
 
@@ -341,12 +316,8 @@ namespace
         k.var_axes.wght = 600.f;
         k.var_axes.wght_set = true;
         LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
-        {
-            INFO("face loaded");
-            REQUIRE(f.notNull());
-            CHECK(f->isValid());
-        }
-        UNSCOPED_INFO("non-variable face leaves wghtAxisSet=false");
+        REQUIRE(f.notNull());
+        CHECK(f->isValid());
         CHECK_FALSE(f->wghtAxisSet());
     }
 
@@ -367,20 +338,14 @@ namespace
         k_600.var_axes.wght = 600.f;
         k_600.var_axes.wght_set = true;
 
-        UNSCOPED_INFO("k_400 != k_600");
         CHECK_FALSE(k_400 == k_600);
-        UNSCOPED_INFO("hash differs by weight");
         CHECK(hash_value(k_400) != hash_value(k_600));
 
         LLPointer<ALFontFace> f400 = gFontManagerp->getOrCreateFace(k_400);
         LLPointer<ALFontFace> f600 = gFontManagerp->getOrCreateFace(k_600);
-        {
-            INFO("both faces valid");
-            CHECK(f400->isValid());
-            CHECK(f600->isValid());
-        }
-        UNSCOPED_INFO("distinct weights produce distinct face entries");
-        REQUIRE(f400.get() != f600.get());
+        CHECK(f400->isValid());
+        CHECK(f600->isValid());
+        CHECK(f400.get() != f600.get());
     }
 
     // ital/wdth/slnt axis plumbing: distinct ALFontVarAxes values must
@@ -406,42 +371,29 @@ namespace
         k_slnt.var_axes.slnt     = -12.f;
         k_slnt.var_axes.slnt_set = true;
 
-        UNSCOPED_INFO("default != ital");
         CHECK_FALSE(k_default == k_ital);
-        UNSCOPED_INFO("default != wdth");
         CHECK_FALSE(k_default == k_wdth);
-        UNSCOPED_INFO("default != slnt");
         CHECK_FALSE(k_default == k_slnt);
-        UNSCOPED_INFO("ital != wdth");
         CHECK_FALSE(k_ital == k_wdth);
-        UNSCOPED_INFO("wdth != slnt");
         CHECK_FALSE(k_wdth == k_slnt);
-        UNSCOPED_INFO("default hash differs from ital");
         CHECK(hash_value(k_default) != hash_value(k_ital));
-        UNSCOPED_INFO("default hash differs from wdth");
         CHECK(hash_value(k_default) != hash_value(k_wdth));
-        UNSCOPED_INFO("default hash differs from slnt");
         CHECK(hash_value(k_default) != hash_value(k_slnt));
 
         // Identical axis values produce equal keys + equal hashes.
         ALFontFaceKey k_ital_dup = makeKey(path);
         k_ital_dup.var_axes.ital     = 1.f;
         k_ital_dup.var_axes.ital_set = true;
-        UNSCOPED_INFO("ital == ital_dup");
         CHECK(k_ital == k_ital_dup);
-        UNSCOPED_INFO("ital hash matches dup");
         CHECK(hash_value(k_ital) == hash_value(k_ital_dup));
 
         // Cache identity round-trips through the face manager.
         LLPointer<ALFontFace> fd = gFontManagerp->getOrCreateFace(k_default);
         LLPointer<ALFontFace> fi = gFontManagerp->getOrCreateFace(k_ital);
-        {
-            INFO("both faces valid");
-            CHECK(fd->isValid());
-            CHECK(fi->isValid());
-        }
-        UNSCOPED_INFO("distinct ital settings produce distinct face entries");
-        REQUIRE(fd.get() != fi.get());
+        CHECK(fd->isValid());
+        CHECK(fi->isValid());
+        UNSCOPED_INFO("distinct ital settings are distinct cached faces");
+        CHECK(fd.get() != fi.get());
     }
 
     // Faces that don't expose the requested axis leave the matching
@@ -464,16 +416,10 @@ namespace
         k.var_axes.slnt_set = true;
 
         LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
-        {
-            INFO("face loaded");
-            REQUIRE(f.notNull());
-            CHECK(f->isValid());
-        }
-        UNSCOPED_INFO("DejaVu lacks ital axis -> italAxisSet false");
+        REQUIRE(f.notNull());
+        CHECK(f->isValid());
         CHECK_FALSE(f->italAxisSet());
-        UNSCOPED_INFO("DejaVu lacks wdth axis -> wdthAxisSet false");
         CHECK_FALSE(f->wdthAxisSet());
-        UNSCOPED_INFO("DejaVu lacks slnt axis -> slntAxisSet false");
         CHECK_FALSE(f->slntAxisSet());
     }
 
@@ -485,35 +431,31 @@ namespace
     {
         ALFontVarAxes a;
         ALFontVarAxes b;
-        UNSCOPED_INFO("default ctor equal");
         CHECK(a == b);
 
         // Differing values with *_set=false still equal.
         b.ital = 0.5f;
         b.wdth = 99.f;
         b.slnt = -3.f;
-        UNSCOPED_INFO("unset values are ignored in equality");
+        UNSCOPED_INFO("unset values are ignored");
         CHECK(a == b);
 
         // Once a set flag flips, value differences matter.
         a.ital_set = true; a.ital = 1.f;
         b.ital_set = true; b.ital = 0.5f;
-        UNSCOPED_INFO("set ital with different values is not equal");
+        UNSCOPED_INFO("ital set on both with different values");
         CHECK_FALSE(a == b);
         b.ital = 1.f;
-        UNSCOPED_INFO("set ital with matching values is equal");
+        UNSCOPED_INFO("ital set on both with the same value");
         CHECK(a == b);
     }
 
-    // initClass is idempotent — repeat calls don't replace gFontManagerp.
     TEST_CASE_METHOD(llfontfreetype_data, "LLFontFreetype: initClass is idempotent and keeps the same gFontManagerp", "[LLFontFreetype]")
     {
-        UNSCOPED_INFO("gFontManagerp non-null after init");
         REQUIRE(gFontManagerp != nullptr);
         LLFontManager* before = gFontManagerp;
         LLFontManager::initClass(); // second call: no-op
-        UNSCOPED_INFO("gFontManagerp unchanged on repeat initClass");
-        REQUIRE(gFontManagerp == before);
+        CHECK(gFontManagerp == before);
     }
 
     // getOrCreateFace returns the same face for equal keys; differing
@@ -528,37 +470,23 @@ namespace
         LLPointer<ALFontFace> a = gFontManagerp->getOrCreateFace(makeKey(path, 14.f));
         LLPointer<ALFontFace> b = gFontManagerp->getOrCreateFace(makeKey(path, 14.f));
         LLPointer<ALFontFace> c = gFontManagerp->getOrCreateFace(makeKey(path, 18.f));
-        {
-            INFO("face a loaded");
-            REQUIRE(a.notNull());
-            CHECK(a->isValid());
-        }
-        {
-            INFO("face b loaded");
-            REQUIRE(b.notNull());
-            CHECK(b->isValid());
-        }
-        {
-            INFO("face c loaded");
-            REQUIRE(c.notNull());
-            CHECK(c->isValid());
-        }
-        UNSCOPED_INFO("equal keys -> same face pointer");
-        REQUIRE(a.get() == b.get());
-        UNSCOPED_INFO("different point_size -> distinct face");
-        REQUIRE(a.get() != c.get());
+        REQUIRE(a.notNull());
+        CHECK(a->isValid());
+        REQUIRE(b.notNull());
+        CHECK(b->isValid());
+        REQUIRE(c.notNull());
+        CHECK(c->isValid());
+        CHECK(a.get() == b.get());
+        CHECK(a.get() != c.get());
     }
 
-    // loadFace on a real file returns true and populates getName.
     TEST_CASE_METHOD(llfontfreetype_data, "LLFontFreetype: loadFace on a real file succeeds and getName is its path", "[LLFontFreetype]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("loadFace succeeded");
         REQUIRE(ft.notNull());
-        UNSCOPED_INFO("getName matches filename");
         CHECK(ft->getName() == path);
     }
 
@@ -570,7 +498,6 @@ namespace
         const bool ok = ft->loadFace("does/not/exist.ttf",
                                      14.f, 96.f, 96.f, true, 0,
                                      EFontHinting::DEFAULT, 0);
-        UNSCOPED_INFO("loadFace returns false on missing file");
         CHECK_FALSE(ok);
         // Don't deref ft beyond this — destructor must run cleanly.
         ft = nullptr;
@@ -587,19 +514,16 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
         const U32 a1 = ft->getCharGlyphIndex(L'A');
         const U32 a2 = ft->getCharGlyphIndex(L'A');
-        UNSCOPED_INFO("'A' has a non-zero glyph index");
         CHECK(a1 != 0u);
-        UNSCOPED_INFO("repeated lookup returns same value (cache hit)");
+        UNSCOPED_INFO("a repeat lookup hits the cache");
         CHECK(a1 == a2);
         // U+E000 is in the BMP private-use area — DejaVuSans doesn't
         // populate it; getCharGlyphIndex must return 0 (cached miss
         // is meaningful — it lets the renderer fall through to
         // fallbacks without re-walking the cmap).
-        UNSCOPED_INFO("PUA codepoint has glyph index 0");
         CHECK(ft->getCharGlyphIndex(0xE000) == 0u);
     }
 
@@ -616,16 +540,11 @@ namespace
 
         LLPointer<LLFontFreetype> dv = loadFt(dejavu);
         LLPointer<LLFontFreetype> nt = loadFt(noto);
-        {
-            INFO("both loaded");
-            REQUIRE(dv.notNull());
-            REQUIRE(nt.notNull());
-        }
-        UNSCOPED_INFO("DejaVuSans covers 'a'");
+        REQUIRE(dv.notNull());
+        REQUIRE(nt.notNull());
         CHECK(dv->faceHasGlyph(L'a'));
-        UNSCOPED_INFO("Noto-COLRv1 lacks U+FE0F");
         CHECK_FALSE(nt->faceHasGlyph(0xFE0F));
-        UNSCOPED_INFO("Noto-COLRv1 covers ZWJ (U+200D)");
+        UNSCOPED_INFO("U+200D is ZWJ");
         CHECK(nt->faceHasGlyph(0x200D));
     }
 
@@ -643,14 +562,11 @@ namespace
                                              14.f, -1, EFontHinting::DEFAULT);
         LLPointer<LLFontFreetype> b = loadFt(path, /*is_fallback=*/true,
                                              14.f, -1, EFontHinting::FORCE_AUTOHINT);
-        {
-            INFO("both loaded");
-            REQUIRE(a.notNull());
-            REQUIRE(b.notNull());
-        }
-        UNSCOPED_INFO("DEFAULT hinting -> useSubpixelPen=false");
+        REQUIRE(a.notNull());
+        REQUIRE(b.notNull());
+        UNSCOPED_INFO("DEFAULT hinting");
         CHECK_FALSE(a->useSubpixelPen());
-        UNSCOPED_INFO("FORCE_AUTOHINT on non-color font -> useSubpixelPen=true");
+        UNSCOPED_INFO("FORCE_AUTOHINT on a font without color");
         CHECK(b->useSubpixelPen());
 
         // A color font (Noto-COLRv1) with FORCE_AUTOHINT still reports
@@ -660,9 +576,8 @@ namespace
         {
             LLPointer<LLFontFreetype> c = loadFt(colr, true, 14.f, -1,
                                                  EFontHinting::FORCE_AUTOHINT);
-            UNSCOPED_INFO("Noto-COLRv1 loaded");
             REQUIRE(c.notNull());
-            UNSCOPED_INFO("color font -> useSubpixelPen=false even with FORCE_AUTOHINT");
+            UNSCOPED_INFO("FORCE_AUTOHINT on a color font");
             CHECK_FALSE(c->useSubpixelPen());
         }
     }
@@ -678,17 +593,13 @@ namespace
 
         LLPointer<LLFontFreetype> m = loadFt(mono);
         LLPointer<LLFontFreetype> p = loadFt(prop);
-        UNSCOPED_INFO("Mono is fixed-width");
         CHECK(m->isFixedWidth());
-        UNSCOPED_INFO("Prop is not fixed-width");
         CHECK_FALSE(p->isFixedWidth());
-        UNSCOPED_INFO("ligatures default off on Mono");
+        UNSCOPED_INFO("ligatures default off");
         CHECK_FALSE(m->getAllowMonospaceLigatures());
         m->setAllowMonospaceLigatures(true);
-        UNSCOPED_INFO("ligatures-on toggle takes effect");
         CHECK(m->getAllowMonospaceLigatures());
         m->setAllowMonospaceLigatures(false);
-        UNSCOPED_INFO("ligatures-off toggle takes effect");
         CHECK_FALSE(m->getAllowMonospaceLigatures());
     }
 
@@ -703,9 +614,7 @@ namespace
 
         LLPointer<LLFontFreetype> n = loadFt(normal);
         LLPointer<LLFontFreetype> b = loadFt(bold);
-        UNSCOPED_INFO("normal style has no BOLD bit");
         CHECK((n->getStyle() & LLFontGL::BOLD) == 0);
-        UNSCOPED_INFO("bold file sets BOLD bit");
         CHECK((b->getStyle() & LLFontGL::BOLD) != 0);
     }
 
@@ -724,32 +633,26 @@ namespace
         LLPointer<LLFontFreetype> head = loadFt(dejavu);
         LLPointer<LLFontFreetype> cjk  = loadFt(han);
         LLPointer<LLFontFreetype> emo  = loadFt(emoji);
-        {
-            INFO("all three loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(cjk.notNull());
-            REQUIRE(emo.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(cjk.notNull());
+        REQUIRE(emo.notNull());
         head->addFallbackFont(cjk);
         head->addFallbackFont(emo);
 
         U32 idx = 0;
         // ASCII 'a' lives in the head's cmap → head wins.
-        UNSCOPED_INFO("'a' resolves to head");
-        REQUIRE(head->selectShapingFace(L'a', idx) == head.get());
-        UNSCOPED_INFO("head produced a non-zero glyph for 'a'");
+        CHECK(head->selectShapingFace(L'a', idx) == head.get());
+        UNSCOPED_INFO("the head's glyph for 'a'");
         CHECK(idx != 0u);
 
         // U+4F60 你 lives in SourceHanSans, not in DejaVuSans → CJK fallback.
         idx = 0;
-        UNSCOPED_INFO("CJK codepoint resolves to SourceHanSans fallback");
-        REQUIRE(head->selectShapingFace(0x4F60, idx) == cjk.get());
+        CHECK(head->selectShapingFace(0x4F60, idx) == cjk.get());
 
         // U+1F525 (fire emoji) lives in Noto-COLRv1, not in either text
         // face → emoji fallback wins.
         idx = 0;
-        UNSCOPED_INFO("emoji codepoint resolves to Noto-COLRv1 fallback");
-        REQUIRE(head->selectShapingFace(0x1F525, idx) == emo.get());
+        CHECK(head->selectShapingFace(0x1F525, idx) == emo.get());
     }
 
     // mShapingFaceResolution caches selectShapingFace decisions; adding
@@ -765,36 +668,32 @@ namespace
 
         LLPointer<LLFontFreetype> head = loadFt(dejavu);
         LLPointer<LLFontFreetype> emo  = loadFt(emoji);
-        {
-            INFO("both loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(emo.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(emo.notNull());
 
         // First lookup, no fallback registered. 'a' resolves to head;
         // emoji resolves to head with idx=0 (no fallback covers it).
         U32 idx_a1 = 0, idx_e1 = 0;
         const LLFontFreetype* a1 = head->selectShapingFace(L'a', idx_a1);
         const LLFontFreetype* e1 = head->selectShapingFace(0x1F525, idx_e1);
-        UNSCOPED_INFO("'a' first resolution -> head");
-        REQUIRE(a1 == head.get());
-        UNSCOPED_INFO("emoji first resolution -> head (no fallback)");
-        REQUIRE(e1 == head.get());
-        UNSCOPED_INFO("emoji on plain head produced glyph 0");
-        CHECK(idx_e1 == 0u);
+        CHECK(a1 == head.get());
+        {
+            INFO("emoji with no fallback yet");
+            CHECK(e1 == head.get());
+            CHECK(idx_e1 == 0u);
+        }
 
         // Second lookup hits the cache and returns the same pointer.
         U32 idx_a2 = 0;
-        UNSCOPED_INFO("repeat 'a' lookup hits cache");
-        REQUIRE(head->selectShapingFace(L'a', idx_a2) == head.get());
+        UNSCOPED_INFO("a repeat lookup hits the cache");
+        CHECK(head->selectShapingFace(L'a', idx_a2) == head.get());
 
         // Add the emoji fallback. The cache must invalidate so the next
         // emoji lookup re-runs the walker through the new chain.
         head->addFallbackFont(emo);
 
         U32 idx_e2 = 0;
-        UNSCOPED_INFO("after addFallbackFont, emoji re-resolves to fallback");
-        REQUIRE(head->selectShapingFace(0x1F525, idx_e2) == emo.get());
+        CHECK(head->selectShapingFace(0x1F525, idx_e2) == emo.get());
     }
 
     // Functor gating: a fallback whose char_functor returns false for
@@ -809,11 +708,8 @@ namespace
 
         LLPointer<LLFontFreetype> head = loadFt(dejavu);
         LLPointer<LLFontFreetype> emo  = loadFt(emoji);
-        {
-            INFO("both loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(emo.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(emo.notNull());
 
         // Functor accepts only emoji-range codepoints; rejects ASCII.
         // If TwemojiSVG happens to carry ASCII outlines, the functor
@@ -822,11 +718,11 @@ namespace
         head->addFallbackFont(emo, pictograph_only);
 
         U32 idx = 0;
-        UNSCOPED_INFO("'a' resolves to head despite Twemoji ASCII coverage");
-        REQUIRE(head->selectShapingFace(L'a', idx) == head.get());
+        UNSCOPED_INFO("the functor rejects 'a' for Twemoji");
+        CHECK(head->selectShapingFace(L'a', idx) == head.get());
         // Functor allows emoji range, so emoji codepoints route to Twemoji.
         idx = 0;
-        UNSCOPED_INFO("emoji codepoint passes functor and resolves to Twemoji");
-        REQUIRE(head->selectShapingFace(0x1F525, idx) == emo.get());
+        UNSCOPED_INFO("the functor passes the emoji to Twemoji");
+        CHECK(head->selectShapingFace(0x1F525, idx) == emo.get());
     }
 }

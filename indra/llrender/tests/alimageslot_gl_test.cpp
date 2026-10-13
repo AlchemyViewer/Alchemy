@@ -119,16 +119,14 @@ namespace
 
         // Compute in use and two R32F targets with a mip level beyond the first, or the case skipped where the
         // context has no images.
-        void setUp()
+        void require_targets()
         {
             if (!ll_test::contextHasCompute())
             {
                 SKIP("the context has no compute");
             }
             LLRender::sCompute = true;
-            UNSCOPED_INFO("target allocates");
             REQUIRE(mTarget.allocate(SIZE, SIZE, GL_R32F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_MANUAL));
-            UNSCOPED_INFO("other target allocates");
             REQUIRE(mOther.allocate(SIZE, SIZE, GL_RGBA16F));
         }
 
@@ -144,56 +142,42 @@ namespace
     // issues one call, and unbind returns the unit to texture 0 once.
     TEST_CASE_METHOD(alimageslot_data, "alimageslot_gl: a bind reaches GL as stated and only a change issues a call", "[alimageslot_gl]")
     {
-        setUp();
+        require_targets();
         ALImageSlot* slot = gGL.getImageSlot(2);
-        UNSCOPED_INFO("the slot is its unit");
         CHECK(slot->getIndex() == 2);
 
         U32 binds = ALImageSlot::sImageBinds;
-        UNSCOPED_INFO("bound");
         CHECK(slot->bind(&mTarget, 0, ALImageSlot::READ_WRITE, 1));
-        UNSCOPED_INFO("one call");
+        UNSCOPED_INFO("the bind issues one call");
         CHECK(ALImageSlot::sImageBinds == binds + 1);
         UnitState state = unitState(2);
-        UNSCOPED_INFO("GL holds the texture");
         CHECK(state.mTexture == (GLint)mTarget.getTexture());
-        UNSCOPED_INFO("at its level");
         CHECK(state.mLevel == 1);
-        UNSCOPED_INFO("not layered");
         CHECK(state.mLayered == GL_FALSE);
-        UNSCOPED_INFO("read-write");
         CHECK(state.mAccess == GL_READ_WRITE);
         UNSCOPED_INFO("at the target's own format");
         CHECK(state.mFormat == GL_R32F);
-        UNSCOPED_INFO("the slot says so");
         CHECK(slot->getCurrTexture() == mTarget.getTexture());
 
         binds = ALImageSlot::sImageBinds;
-        UNSCOPED_INFO("bound again");
         CHECK(slot->bind(&mTarget, 0, ALImageSlot::READ_WRITE, 1));
         UNSCOPED_INFO("the same bind issues nothing");
         CHECK(ALImageSlot::sImageBinds == binds);
 
-        UNSCOPED_INFO("another access");
         CHECK(slot->bind(&mTarget, 0, ALImageSlot::READ_ONLY, 1));
         UNSCOPED_INFO("a new access issues one call");
         CHECK(ALImageSlot::sImageBinds == binds + 1);
-        UNSCOPED_INFO("GL holds the new access");
         CHECK(unitState(2).mAccess == GL_READ_ONLY);
 
-        UNSCOPED_INFO("another level");
         CHECK(slot->bind(&mTarget, 0, ALImageSlot::READ_ONLY, 0));
         UNSCOPED_INFO("a new level issues one call");
         CHECK(ALImageSlot::sImageBinds == binds + 2);
-        UNSCOPED_INFO("GL holds the new level");
         CHECK(unitState(2).mLevel == 0);
 
-        UNSCOPED_INFO("another texture");
         CHECK(slot->bind(&mOther, 0, ALImageSlot::READ_ONLY, 0));
         UNSCOPED_INFO("a new texture issues one call");
         CHECK(ALImageSlot::sImageBinds == binds + 3);
         state = unitState(2);
-        UNSCOPED_INFO("GL holds the other texture");
         CHECK(state.mTexture == (GLint)mOther.getTexture());
         UNSCOPED_INFO("at its own format");
         CHECK(state.mFormat == GL_RGBA16F);
@@ -201,25 +185,20 @@ namespace
         slot->unbind();
         UNSCOPED_INFO("unbind issues one call");
         CHECK(ALImageSlot::sImageBinds == binds + 4);
-        UNSCOPED_INFO("GL holds no texture");
         CHECK(unitState(2).mTexture == 0);
-        UNSCOPED_INFO("nor does the slot");
         CHECK(slot->getCurrTexture() == 0u);
         slot->unbind();
         UNSCOPED_INFO("unbinding nothing issues nothing");
         CHECK(ALImageSlot::sImageBinds == binds + 4);
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A unit changed behind LLRender's back is put back by refreshState, every part of it.
     TEST_CASE_METHOD(alimageslot_data, "alimageslot_gl: refreshState puts back every part of a unit changed behind its back", "[alimageslot_gl]")
     {
-        setUp();
-        UNSCOPED_INFO("bound");
+        require_targets();
         CHECK(gGL.getImageSlot(3)->bind(&mTarget, 0, ALImageSlot::WRITE_ONLY, 1));
-        UNSCOPED_INFO("other bound");
         CHECK(gGL.getImageSlot(4)->bind(&mOther, 0, ALImageSlot::READ_ONLY));
 
         glBindImageTexture(3, 0, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R8);
@@ -230,23 +209,21 @@ namespace
         gGL.refreshState();
 
         UnitState state = unitState(3);
-        UNSCOPED_INFO("the texture put back");
-        CHECK(state.mTexture == (GLint)mTarget.getTexture());
-        UNSCOPED_INFO("its level put back");
-        CHECK(state.mLevel == 1);
-        UNSCOPED_INFO("its access put back");
-        CHECK(state.mAccess == GL_WRITE_ONLY);
-        UNSCOPED_INFO("its format put back");
-        CHECK(state.mFormat == GL_R32F);
+        {
+            INFO("unit 3 put back");
+            CHECK(state.mTexture == (GLint)mTarget.getTexture());
+            CHECK(state.mLevel == 1);
+            CHECK(state.mAccess == GL_WRITE_ONLY);
+            CHECK(state.mFormat == GL_R32F);
+        }
         state = unitState(4);
-        UNSCOPED_INFO("the other texture put back");
-        CHECK(state.mTexture == (GLint)mOther.getTexture());
-        UNSCOPED_INFO("its access put back");
-        CHECK(state.mAccess == GL_READ_ONLY);
-        UNSCOPED_INFO("its format put back");
-        CHECK(state.mFormat == GL_RGBA16F);
+        {
+            INFO("unit 4 put back");
+            CHECK(state.mTexture == (GLint)mOther.getTexture());
+            CHECK(state.mAccess == GL_READ_ONLY);
+            CHECK(state.mFormat == GL_RGBA16F);
+        }
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -255,12 +232,10 @@ namespace
     // the viewer's way, through LLImageGL's deferred delete, reaches it.
     TEST_CASE_METHOD(alimageslot_data, "alimageslot_gl: forgetTextures drops only the units that held a deleted name", "[alimageslot_gl]")
     {
-        setUp();
+        require_targets();
         ALImageSlot* slot = gGL.getImageSlot(1);
         ALImageSlot* kept = gGL.getImageSlot(5);
-        UNSCOPED_INFO("bound");
         CHECK(slot->bind(&mTarget, 0, ALImageSlot::READ_ONLY));
-        UNSCOPED_INFO("other bound");
         CHECK(kept->bind(&mOther, 0, ALImageSlot::READ_ONLY));
 
         const U32 name = mTarget.getTexture();
@@ -271,7 +246,6 @@ namespace
         CHECK(kept->getCurrTexture() == mOther.getTexture());
 
         const U32 binds = ALImageSlot::sImageBinds;
-        UNSCOPED_INFO("bound again");
         CHECK(slot->bind(&mTarget, 0, ALImageSlot::READ_ONLY));
         UNSCOPED_INFO("the forgotten name is bound, not skipped");
         CHECK(ALImageSlot::sImageBinds == binds + 1);
@@ -289,10 +263,8 @@ namespace
         CHECK(unitState(5).mTexture == 0);
         UNSCOPED_INFO("the live one stays");
         CHECK(slot->getCurrTexture() == name);
-        UNSCOPED_INFO("the deleted name is gone");
         CHECK(glIsTexture(other) == GL_FALSE);
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -301,59 +273,45 @@ namespace
     // with a linear format, and a volume, bind.
     TEST_CASE_METHOD(alimageslot_data, "alimageslot_gl: sRGB and depth textures and units past the slots are refused", "[alimageslot_gl]")
     {
-        setUp();
+        require_targets();
         ALImageSlot* slot = gGL.getImageSlot(6);
-        UNSCOPED_INFO("bound");
         CHECK(slot->bind(&mTarget, 0, ALImageSlot::READ_ONLY));
         const U32 binds = ALImageSlot::sImageBinds;
 
         LLPointer<LLImageRaw> raw = new LLImageRaw(4, 4, 4);
         std::memset(raw->getData(), 0x80, 4 * 4 * 4);
         LLPointer<LLImageGL> srgb = new LLImageGL(raw, false);
-        UNSCOPED_INFO("an image's texture is sRGB");
         CHECK(srgb->getStorageInternalFormat() == (S32)GL_SRGB8_ALPHA8);
-        UNSCOPED_INFO("sRGB refused");
         CHECK_FALSE(slot->bind(srgb.get(), ALImageSlot::READ_ONLY));
 
         LLRenderTarget depth;
-        UNSCOPED_INFO("depth target allocates");
         REQUIRE(depth.allocate(SIZE, SIZE, 0, true));
-        UNSCOPED_INFO("depth refused");
         CHECK_FALSE(slot->bindManual(depth.getDepth(), 0, false, 0, ALImageSlot::READ_ONLY,
                                                   GL_DEPTH_COMPONENT24));
         depth.release();
 
-        UNSCOPED_INFO("past the slots refused");
         CHECK_FALSE(gGL.getImageSlot(AL_NUM_IMAGE_SLOTS)->bind(&mTarget, 0, ALImageSlot::READ_ONLY));
 
         UNSCOPED_INFO("nothing issued");
         CHECK(ALImageSlot::sImageBinds == binds);
         UNSCOPED_INFO("the unit unchanged");
         CHECK(unitState(6).mTexture == (GLint)mTarget.getTexture());
-        UNSCOPED_INFO("and the slot");
+        UNSCOPED_INFO("nor the slot");
         CHECK(slot->getCurrTexture() == mTarget.getTexture());
 
         LLPointer<LLImageGL> linear = new LLImageGL(4, 4, 4, false);
         linear->setExplicitFormat(GL_RGBA8, GL_RGBA);
-        UNSCOPED_INFO("linear image created");
-        CHECK(linear->createGLTexture(0, raw.get()));
-        UNSCOPED_INFO("linear bound");
+        REQUIRE(linear->createGLTexture(0, raw.get()));
         CHECK(slot->bind(linear.get(), ALImageSlot::READ_ONLY));
         UnitState state = unitState(6);
-        UNSCOPED_INFO("GL holds the image");
         CHECK(state.mTexture == (GLint)linear->getTexName());
-        UNSCOPED_INFO("at RGBA8");
         CHECK(state.mFormat == GL_RGBA8);
-        UNSCOPED_INFO("one layer");
         CHECK(state.mLayered == GL_FALSE);
 
         LLPointer<ALTexture3D> volume = new ALTexture3D();
-        UNSCOPED_INFO("volume allocates");
-        CHECK(volume->allocate(4, 4, 4, GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT, nullptr));
-        UNSCOPED_INFO("volume bound");
+        REQUIRE(volume->allocate(4, 4, 4, GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT, nullptr));
         CHECK(slot->bind(volume.get(), ALImageSlot::WRITE_ONLY));
         state = unitState(6);
-        UNSCOPED_INFO("GL holds the volume");
         CHECK(state.mTexture == (GLint)volume->getGLName());
         UNSCOPED_INFO("every slice");
         CHECK(state.mLayered == GL_TRUE);
@@ -361,7 +319,6 @@ namespace
         CHECK(state.mFormat == GL_RGBA16F);
         slot->unbind();
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -370,13 +327,13 @@ namespace
     // did, and both come back changed exactly, past what a float could carry.
     TEST_CASE_METHOD(alimageslot_data, "alimageslot_gl: a kernel changes R32UI target and image texels exactly", "[alimageslot_gl]")
     {
-        setUp();
+        require_targets();
         constexpr U32 W = 13;
         constexpr U32 H = 7;
 
         const GLuint cs = ll_test::compileTestShader(GL_COMPUTE_SHADER, kUintKernel);
         UNSCOPED_INFO("kernel compiles");
-        CHECK(cs != 0);
+        REQUIRE(cs != 0);
         mKernel = glCreateProgram();
         glAttachShader(mKernel, cs);
         glLinkProgram(mKernel);
@@ -384,10 +341,9 @@ namespace
         GLint linked = GL_FALSE;
         glGetProgramiv(mKernel, GL_LINK_STATUS, &linked);
         UNSCOPED_INFO("kernel links");
-        CHECK(linked == GL_TRUE);
+        REQUIRE(linked == GL_TRUE);
 
-        UNSCOPED_INFO("R32UI target allocates");
-        CHECK(mUint.allocate(W, H, GL_R32UI));
+        REQUIRE(mUint.allocate(W, H, GL_R32UI));
         mUint.bindTarget();
         gGL.setClearColor(LLColor4(5.f, 0.f, 0.f, 0.f));
         mUint.clear();
@@ -395,9 +351,7 @@ namespace
 
         ALImageSlot* slot = gGL.getImageSlot(0);
         glUseProgram(mKernel);
-        UNSCOPED_INFO("target bound");
         CHECK(slot->bind(&mUint, 0, ALImageSlot::READ_WRITE));
-        UNSCOPED_INFO("as R32UI");
         CHECK(unitState(0).mFormat == GL_R32UI);
         glDispatchCompute((W + 7) / 8, (H + 7) / 8, 1);
         gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
@@ -410,11 +364,8 @@ namespace
         }
         LLPointer<LLImageGL> image = new LLImageGL(W, H, 1, /*usemipmaps=*/false);
         image->setExplicitFormat(GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
-        UNSCOPED_INFO("R32UI image created");
-        CHECK(image->createGLTexture(0, reinterpret_cast<const U8*>(values.data())));
-        UNSCOPED_INFO("image bound");
+        REQUIRE(image->createGLTexture(0, reinterpret_cast<const U8*>(values.data())));
         CHECK(slot->bind(image.get(), ALImageSlot::READ_WRITE));
-        UNSCOPED_INFO("as R32UI too");
         CHECK(unitState(0).mFormat == GL_R32UI);
         glDispatchCompute((W + 7) / 8, (H + 7) / 8, 1);
         gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
@@ -426,15 +377,13 @@ namespace
         {
             for (U32 x = 0; x < W; ++x)
             {
-                const std::string at = " at " + std::to_string(x) + "," + std::to_string(y);
+                CAPTURE(x, y);
                 const size_t i = (size_t)y * W + x;
-                UNSCOPED_INFO("target" + at);
                 REQUIRE(target[i] == 5u * 3u + x + y * 100u);
-                UNSCOPED_INFO("image" + at);
+                UNSCOPED_INFO("the image");
                 REQUIRE(held[i] == values[i] * 3u + x + y * 100u);
             }
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }

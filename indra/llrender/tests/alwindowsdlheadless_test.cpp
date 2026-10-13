@@ -57,9 +57,7 @@ namespace
     TEST_CASE_METHOD(alwindowsdlheadless_data, "ALWindowSDLHeadless: the fixture's window is the hidden backend at the size asked for", "[ALWindowSDLHeadless]")
     {
         LLWindow* window = gl().window();
-        UNSCOPED_INFO("a window");
         REQUIRE(window != nullptr);
-        UNSCOPED_INFO("the hidden backend was asked for");
         CHECK(LLWindowManager::getBackend() == ALWindowBackend::Hidden);
         // createWindow would have returned null on an invalid one; what is
         // left to see is the SDL window behind it.
@@ -67,11 +65,8 @@ namespace
         REQUIRE(window->getPlatformWindow() != nullptr);
 
         LLCoordWindow size;
-        UNSCOPED_INFO("the size can be read");
         REQUIRE(window->getSize(&size));
-        UNSCOPED_INFO("width as asked");
         CHECK(size.mX == ll_test::HeadlessGL::WIDTH);
-        UNSCOPED_INFO("height as asked");
         CHECK(size.mY == ll_test::HeadlessGL::HEIGHT);
     }
 
@@ -84,7 +79,6 @@ namespace
         LLWindow* window = gl().window();
 
         void* shared = window->createSharedContext();
-        UNSCOPED_INFO("a shared context was made");
         REQUIRE(shared != nullptr);
 
         GLuint name = 0;
@@ -107,7 +101,6 @@ namespace
         });
         worker.join();
 
-        UNSCOPED_INFO("the worker's GL calls raised no error");
         CHECK(worker_error == (GLenum)GL_NO_ERROR);
         UNSCOPED_INFO("the worker made a texture");
         CHECK(name != 0);
@@ -124,18 +117,16 @@ namespace
         glBindTexture(GL_TEXTURE_2D, prior);
         UNSCOPED_INFO("with the storage the worker gave it");
         CHECK(width == 1);
-        UNSCOPED_INFO("and no error on this side");
+        UNSCOPED_INFO("no error on the main context");
         CHECK(glGetError() == (GLenum)GL_NO_ERROR);
 
         glDeleteTextures(1, &name);
     }
 
-    // A shared context nobody bound is still a shared context to destroy.
     TEST_CASE_METHOD(alwindowsdlheadless_data, "ALWindowSDLHeadless: a shared context nobody bound can still be destroyed", "[ALWindowSDLHeadless]")
     {
         LLWindow* window = gl().window();
         void* shared = window->createSharedContext();
-        UNSCOPED_INFO("a shared context was made");
         REQUIRE(shared != nullptr);
         window->destroySharedContext(shared);
         UNSCOPED_INFO("the main context is untouched");

@@ -119,9 +119,10 @@ namespace
             return b;
         }
 
-        static void ensureNear(const std::string& what, F32 actual, F32 expected)
+        static void require_near(const std::string& what, F32 actual, F32 expected)
         {
-            UNSCOPED_INFO(what + ": " + std::to_string(actual) + " vs " + std::to_string(expected));
+            INFO(what);
+            CAPTURE(actual, expected);
             REQUIRE(fabsf(actual - expected) < 1e-3f);
         }
     };
@@ -139,20 +140,20 @@ namespace
         });
         UNSCOPED_INFO("unrotated, one quad");
         REQUIRE(flat.count == (size_t)6);
-        ensureNear("unrotated left", flat.min_x, 10.f);
-        ensureNear("unrotated right", flat.max_x, 19.f);
-        ensureNear("unrotated bottom", flat.min_y, 20.f);
-        ensureNear("unrotated top", flat.max_y, 29.f);
+        require_near("unrotated left", flat.min_x, 10.f);
+        require_near("unrotated right", flat.max_x, 19.f);
+        require_near("unrotated bottom", flat.min_y, 20.f);
+        require_near("unrotated top", flat.max_y, 29.f);
 
         const Bounds turned = boundsOf([&]() {
             gl_draw_scaled_rotated_image(10, 20, 9, 9, 90.f, texture.get());
         });
         UNSCOPED_INFO("turned, one quad");
         REQUIRE(turned.count == (size_t)6);
-        ensureNear("turned left", turned.min_x, flat.min_x);
-        ensureNear("turned right", turned.max_x, flat.max_x);
-        ensureNear("turned bottom", turned.min_y, flat.min_y);
-        ensureNear("turned top", turned.max_y, flat.max_y);
+        require_near("turned left", turned.min_x, flat.min_x);
+        require_near("turned right", turned.max_x, flat.max_x);
+        require_near("turned bottom", turned.min_y, flat.min_y);
+        require_near("turned top", turned.max_y, flat.max_y);
     }
 
     // The turn is a turn: at a quarter turn a wide image stands tall, and
@@ -167,11 +168,12 @@ namespace
         UNSCOPED_INFO("one quad");
         REQUIRE(turned.count == (size_t)6);
         // Centre (14, 21); half extents swap to (1, 4).
-        ensureNear("left", turned.min_x, 13.f);
-        ensureNear("right", turned.max_x, 15.f);
-        ensureNear("bottom", turned.min_y, 17.f);
-        ensureNear("top", turned.max_y, 25.f);
+        require_near("left", turned.min_x, 13.f);
+        require_near("right", turned.max_x, 15.f);
+        require_near("bottom", turned.min_y, 17.f);
+        require_near("top", turned.max_y, 25.f);
     }
+
     // Rectangles added to one batch are one draw, where gl_rect_2d makes
     // a draw of each; and they are the same rectangles.
     TEST_CASE_METHOD(llrender2dutils_data, "llrender2dutils_gl: gl_rect_2d_in_batch draws the same rectangles as gl_rect_2d in one draw", "[llrender2dutils_gl]")
@@ -218,10 +220,10 @@ namespace
             gl_rect_2d_in_batch(40, 60, 50, 55, LLColor4::white);
             gGL.end();
         });
-        ensureNear("left", b.min_x, 10.f);
-        ensureNear("right", b.max_x, 50.f);
-        ensureNear("bottom", b.min_y, 25.f);
-        ensureNear("top", b.max_y, 60.f);
+        require_near("left", b.min_x, 10.f);
+        require_near("right", b.max_x, 50.f);
+        require_near("bottom", b.min_y, 25.f);
+        require_near("top", b.max_y, 60.f);
     }
 
     // A rect's outline covers the pixels just inside its edges, and
@@ -260,8 +262,8 @@ namespace
                         const U8   red    = rgba[(static_cast<size_t>(y) * W + x) * 4];
                         if ((red == 255) != edge)
                         {
-                            FAIL("at " + std::to_string(x) + "," + std::to_string(y) + " of the outline at " + std::to_string(rect.mLeft) + "," +
-                                 std::to_string(rect.mBottom) + ", scaled " + std::to_string(scale) + ": " + std::to_string(red));
+                            CAPTURE(rect.mLeft, rect.mBottom, scale, x, y, edge, static_cast<int>(red));
+                            FAIL("a pixel off the outline is lit or one on it is not");
                         }
                     }
                 }

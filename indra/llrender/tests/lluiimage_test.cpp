@@ -121,9 +121,8 @@ namespace
         }
 
         // A recording's bounds are the image's size, from the origin.
-        static void ensureExtent(const std::vector<LLVector3>& verts, F32 width, F32 height)
+        static void require_extent(const std::vector<LLVector3>& verts, F32 width, F32 height)
         {
-            UNSCOPED_INFO("the recording holds vertices");
             REQUIRE_FALSE(verts.empty());
             F32 min_x = verts[0].mV[VX];
             F32 max_x = min_x;
@@ -136,13 +135,9 @@ namespace
                 min_y = llmin(min_y, v.mV[VY]);
                 max_y = llmax(max_y, v.mV[VY]);
             }
-            UNSCOPED_INFO("starts at the origin in x");
             REQUIRE(min_x == 0.f);
-            UNSCOPED_INFO("starts at the origin in y");
             REQUIRE(min_y == 0.f);
-            UNSCOPED_INFO("spans the width");
             REQUIRE(max_x == width);
-            UNSCOPED_INFO("spans the height");
             REQUIRE(max_y == height);
         }
     };
@@ -195,7 +190,7 @@ namespace
         const std::vector<LLVector3> verts = ll_test::UIImageProbe::positions(*image);
         UNSCOPED_INFO("a plain image is one quad");
         REQUIRE(verts.size() == (size_t)6);
-        ensureExtent(verts, 8.f, 6.f);
+        require_extent(verts, 8.f, 6.f);
     }
 
     // The nine-slice path works out its own placement from the UI offset, so
@@ -214,6 +209,6 @@ namespace
         const std::vector<LLVector3> verts = ll_test::UIImageProbe::positions(*image);
         UNSCOPED_INFO("nine slices are eighteen triangles");
         REQUIRE(verts.size() == (size_t)54);
-        ensureExtent(verts, 32.f, 24.f);
+        require_extent(verts, 32.f, 24.f);
     }
 }

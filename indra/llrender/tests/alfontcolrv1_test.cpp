@@ -65,10 +65,9 @@ namespace
 {
     using namespace ll_test;
 
-    // Each test_group<>::object spins up a fresh fixture for every test<N>,
-    // so init/cleanup the font manager once per test rather than once per
-    // process. Cheaper than tracking init state and matches the test-
-    // isolation model TUT expects.
+    // Each case gets a fresh fixture, so init/cleanup the font manager
+    // once per test rather than once per process. Cheaper than tracking
+    // init state and keeps each case isolated from the others.
     struct alfontcolrv1_data
     {
         alfontcolrv1_data()
@@ -90,13 +89,10 @@ namespace
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
-        UNSCOPED_INFO("paintGlyph(null hb_font) returns false");
-        REQUIRE_FALSE(painter.paintGlyph(nullptr, /*glyph_index=*/0,
+        CHECK_FALSE(painter.paintGlyph(nullptr, /*glyph_index=*/0,
                                    /*point_size=*/14.f, fg,
                                    /*palette_index=*/0, result));
-        UNSCOPED_INFO("Result.mBitmap stays null on failure");
-        REQUIRE(result.mBitmap == nullptr);
-        UNSCOPED_INFO("Result.mWidth stays zero on failure");
+        CHECK(result.mBitmap == nullptr);
         CHECK(result.mWidth == 0);
     }
 
@@ -112,14 +108,9 @@ namespace
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        {
-            INFO("Noto-COLRv1 loaded");
-            REQUIRE(face.notNull());
-            CHECK(face->isValid());
-        }
-        UNSCOPED_INFO("Noto-COLRv1 hasColrV1 == true");
+        REQUIRE(face.notNull());
+        CHECK(face->isValid());
         CHECK(face->hasColrV1());
-        UNSCOPED_INFO("Noto-COLRv1 hasColor == true (general flag)");
         CHECK(face->hasColor());
     }
 
@@ -135,12 +126,8 @@ namespace
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        {
-            INFO("Inter loaded");
-            REQUIRE(face.notNull());
-            CHECK(face->isValid());
-        }
-        UNSCOPED_INFO("Inter hasColrV1 == false");
+        REQUIRE(face.notNull());
+        CHECK(face->isValid());
         CHECK_FALSE(face->hasColrV1());
     }
 
@@ -158,43 +145,30 @@ namespace
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        {
-            INFO("face loaded");
-            REQUIRE(face.notNull());
-            CHECK(face->isValid());
-        }
-        UNSCOPED_INFO("face has COLRv1");
+        REQUIRE(face.notNull());
+        CHECK(face->isValid());
         CHECK(face->hasColrV1());
 
         hb_font_t* hb_font = face->getHbFont();
-        UNSCOPED_INFO("hb_font available");
         REQUIRE(hb_font != nullptr);
 
         // Resolve the fire emoji's glyph index via the cmap. Avoids hardcoding
         // a glyph_id that could shift across font versions.
         const hb_codepoint_t fire_cp = 0x1F525;
         hb_codepoint_t       fire_gid = 0;
-        {
-            INFO("cmap maps U+1F525 to a glyph");
-            CHECK(hb_font_get_nominal_glyph(hb_font, fire_cp, &fire_gid));
-            CHECK(fire_gid != 0);
-        }
+        CHECK(hb_font_get_nominal_glyph(hb_font, fire_cp, &fire_gid));
+        CHECK(fire_gid != 0);
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
         const bool ok = painter.paintGlyph(hb_font, fire_gid, /*point_size=*/14.f,
                                            fg, /*palette_index=*/0, result);
-        UNSCOPED_INFO("paintGlyph succeeded");
         CHECK(ok);
-        {
-            INFO("painter produced bitmap");
-            REQUIRE(result.mBitmap != nullptr);
-            CHECK(result.mWidth > 0);
-            CHECK(result.mHeight > 0);
-            CHECK(result.mPitch != 0);
-        }
-        UNSCOPED_INFO("painter drew non-zero alpha somewhere");
+        REQUIRE(result.mBitmap != nullptr);
+        CHECK(result.mWidth > 0);
+        CHECK(result.mHeight > 0);
+        CHECK(result.mPitch != 0);
         CHECK(anyAlpha(result.mBitmap, result.mWidth, result.mHeight, result.mPitch));
     }
 
@@ -211,17 +185,12 @@ namespace
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        {
-            INFO("face loaded");
-            REQUIRE(face.notNull());
-            CHECK(face->isValid());
-        }
+        REQUIRE(face.notNull());
+        CHECK(face->isValid());
 
         // ZWJ should resolve to a real glyph (cmap entry present).
-        UNSCOPED_INFO("Noto cmap has ZWJ glyph");
         CHECK(face->getCharGlyphIndex(0x200D) != 0u);
         // VS-16 should NOT — shape_sub_run keys VS-16 stripping on this.
-        UNSCOPED_INFO("Noto cmap has no VS-16 glyph");
         CHECK(face->getCharGlyphIndex(0xFE0F) == 0u);
     }
 
@@ -239,13 +208,9 @@ namespace
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        {
-            INFO("face loaded");
-            REQUIRE(face.notNull());
-            CHECK(face->isValid());
-        }
+        REQUIRE(face.notNull());
+        CHECK(face->isValid());
         hb_font_t* hb_font = face->getHbFont();
-        UNSCOPED_INFO("hb_font available");
         REQUIRE(hb_font != nullptr);
 
         ALFontColrV1Painter painter;
@@ -257,11 +222,8 @@ namespace
         const bool ok = painter.paintGlyph(hb_font,
                                            /*glyph_index=*/0xFFFFFFFE,
                                            14.f, fg, 0, result);
-        UNSCOPED_INFO("paintGlyph on out-of-range glyph index fails cleanly");
         CHECK_FALSE(ok);
-        UNSCOPED_INFO("result.mBitmap stays null on out-of-range");
-        REQUIRE(result.mBitmap == nullptr);
-        UNSCOPED_INFO("result.mWidth zero on out-of-range");
+        CHECK(result.mBitmap == nullptr);
         CHECK(result.mWidth == 0);
     }
 
@@ -279,11 +241,8 @@ namespace
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        {
-            INFO("face loaded");
-            REQUIRE(face.notNull());
-            CHECK(face->isValid());
-        }
+        REQUIRE(face.notNull());
+        CHECK(face->isValid());
         hb_font_t* hb_font = face->getHbFont();
 
         // Two distinct emoji: fire (U+1F525) and red heart (U+2764).
@@ -302,23 +261,15 @@ namespace
 
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result r1, r2;
-        UNSCOPED_INFO("first paintGlyph (fire) succeeded");
         REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
-        {
-            INFO("first painter produced bitmap");
-            REQUIRE(r1.mBitmap != nullptr);
-            CHECK(r1.mWidth > 0);
-            CHECK(r1.mHeight > 0);
-        }
+        REQUIRE(r1.mBitmap != nullptr);
+        CHECK(r1.mWidth > 0);
+        CHECK(r1.mHeight > 0);
 
-        UNSCOPED_INFO("second paintGlyph (heart) succeeded on same painter");
         REQUIRE(painter.paintGlyph(hb_font, heart, 14.f, fg, 0, r2));
-        {
-            INFO("second painter produced bitmap");
-            REQUIRE(r2.mBitmap != nullptr);
-            CHECK(r2.mWidth > 0);
-            CHECK(r2.mHeight > 0);
-        }
+        REQUIRE(r2.mBitmap != nullptr);
+        CHECK(r2.mWidth > 0);
+        CHECK(r2.mHeight > 0);
     }
 
     // 2-em-square surface fallback (88585ff86d): a glyph with no
@@ -341,11 +292,8 @@ namespace
         }
 
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
-        {
-            INFO("face loaded");
-            REQUIRE(face.notNull());
-            CHECK(face->isValid());
-        }
+        REQUIRE(face.notNull());
+        CHECK(face->isValid());
         hb_font_t* hb_font = face->getHbFont();
 
         hb_codepoint_t fire = 0;
@@ -357,7 +305,6 @@ namespace
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
-        UNSCOPED_INFO("paintGlyph succeeded");
         REQUIRE(painter.paintGlyph(hb_font, fire, point_size, fg, 0, result));
         // Surface dimensions are on the order of point_size — the
         // ClipBox / FT-extents path produces a bitmap whose width and
@@ -366,16 +313,10 @@ namespace
         // the lower bound; a regression that ballooned to 2× the
         // 2-em square (32×32 fallback for 14pt) would fail the upper
         // bound (~3× point_size).
-        {
-            INFO("surface width is in a reasonable range for 14pt");
-            CHECK(result.mWidth >= 4);
-            CHECK(result.mWidth <= (S32)(point_size * 4.f));
-        }
-        {
-            INFO("surface height is in a reasonable range for 14pt");
-            CHECK(result.mHeight >= 4);
-            CHECK(result.mHeight <= (S32)(point_size * 4.f));
-        }
+        CHECK(result.mWidth >= 4);
+        CHECK(result.mWidth <= (S32)(point_size * 4.f));
+        CHECK(result.mHeight >= 4);
+        CHECK(result.mHeight <= (S32)(point_size * 4.f));
     }
 
     // (Test 9 removed: pinned the mForegroundOnly flag on the painter
@@ -407,14 +348,10 @@ namespace
         // them away.
         constexpr F32 ps = 32.f;
         const LLColor4U fg(255, 255, 255, 255);
-        UNSCOPED_INFO("paintGlyph succeeded");
         REQUIRE(painter.paintGlyph(hb_font, fire, ps, fg, 0, result));
-        {
-            INFO("painter produced bitmap");
-            REQUIRE(result.mBitmap != nullptr);
-            CHECK(result.mWidth > 0);
-            CHECK(result.mHeight > 0);
-        }
+        REQUIRE(result.mBitmap != nullptr);
+        CHECK(result.mWidth > 0);
+        CHECK(result.mHeight > 0);
 
         std::set<U32> distinct;  // packed BGR (alpha excluded)
         for (S32 y = 0; y < result.mHeight; ++y)
@@ -432,8 +369,7 @@ namespace
         }
         // Fire emoji has at minimum a yellow body + orange gradient +
         // red highlights; >= 3 distinct triples is a conservative bound.
-        UNSCOPED_INFO("fire emoji produces >= 3 distinct RGB triples (gradient)");
-        REQUIRE(distinct.size() >= 3);
+        CHECK(distinct.size() >= 3);
     }
 
     // palette_index argument propagates to hb_font_paint_glyph: paint
@@ -459,17 +395,13 @@ namespace
 
         ALFontColrV1Painter painter_a, painter_b;
         ALFontColrV1Painter::Result r0, r1;
-        UNSCOPED_INFO("palette=0 paintGlyph succeeded");
         REQUIRE(painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0, r0));
-        UNSCOPED_INFO("palette=1 paintGlyph succeeded");
         REQUIRE(painter_b.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/1, r1));
-        {
-            INFO("both produced bitmaps");
-            REQUIRE(r0.mBitmap);
-            REQUIRE(r1.mBitmap);
-            CHECK(r0.mWidth == r1.mWidth);
-            CHECK(r0.mHeight == r1.mHeight);
-        }
+        REQUIRE(r0.mBitmap);
+        REQUIRE(r1.mBitmap);
+        // The comparison below walks r1 at r0's size.
+        REQUIRE(r0.mWidth == r1.mWidth);
+        REQUIRE(r0.mHeight == r1.mHeight);
 
         // Compare bytes — if the font has only one palette, hb resolves
         // both calls against palette 0 and the bitmaps match. Skip in
@@ -493,7 +425,6 @@ namespace
         if (!any_diff)
             SKIP("Noto-COLRv1 ships only one CPAL palette");
 
-        UNSCOPED_INFO("palette swap changed at least one painted pixel");
         CHECK(any_diff);
     }
 
@@ -517,20 +448,13 @@ namespace
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
-        UNSCOPED_INFO("paintGlyph(format=Gray) succeeded");
         REQUIRE(painter.paintGlyph(hb_font, fire, /*point_size=*/14.f, fg,
                                   /*palette=*/0,
                                   ALFontColrV1Painter::OutputFormat::Gray,
                                   result));
-        UNSCOPED_INFO("Result.mFormat == Gray");
-        CHECK((S32)result.mFormat ==
-                      (S32)ALFontColrV1Painter::OutputFormat::Gray);
-        {
-            INFO("Gray output has positive dims");
-            CHECK(result.mWidth > 0);
-            CHECK(result.mHeight > 0);
-        }
-        UNSCOPED_INFO("Gray pitch is width (tightly packed single channel)");
+        CHECK((S32)result.mFormat == (S32)ALFontColrV1Painter::OutputFormat::Gray);
+        CHECK(result.mWidth > 0);
+        CHECK(result.mHeight > 0);
         CHECK(result.mPitch == result.mWidth);
 
         bool any_nonzero = false;
@@ -542,7 +466,6 @@ namespace
                 if (row[x] != 0) { any_nonzero = true; break; }
             }
         }
-        UNSCOPED_INFO("Gray output has at least one non-zero coverage pixel");
         CHECK(any_nonzero);
     }
 
@@ -570,7 +493,6 @@ namespace
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result rgba_r, gray_r;
         const LLColor4U fg(255, 255, 255, 255);
-        UNSCOPED_INFO("BGRA paint succeeded");
         REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, rgba_r));
         // Stash the BGRA bytes — the next paintGlyph call invalidates
         // mBitmap (it points back into mStaging which we overwrite below).
@@ -579,14 +501,12 @@ namespace
         const S32 bgra_w = rgba_r.mWidth, bgra_h = rgba_r.mHeight;
         const S32 bgra_pitch = rgba_r.mPitch;
 
-        UNSCOPED_INFO("Gray paint succeeded");
         REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0,
                                   ALFontColrV1Painter::OutputFormat::Gray,
                                   gray_r));
-        UNSCOPED_INFO("Gray and BGRA produce same width");
-        CHECK(gray_r.mWidth == bgra_w);
-        UNSCOPED_INFO("Gray and BGRA produce same height");
-        CHECK(gray_r.mHeight == bgra_h);
+        // The comparison below walks the Gray bitmap at the BGRA size.
+        REQUIRE(gray_r.mWidth == bgra_w);
+        REQUIRE(gray_r.mHeight == bgra_h);
 
         S32 mismatches = 0;
         for (S32 y = 0; y < bgra_h; ++y)
@@ -609,7 +529,6 @@ namespace
                     ++mismatches;
             }
         }
-        UNSCOPED_INFO("every Gray byte matches the hybrid fold formula");
         CHECK(mismatches == 0);
     }
 
@@ -669,8 +588,7 @@ namespace
                     if (r == 0 && g == 0 && b == 0 && a > 200)
                     {
                         const U32 expected_floor = (a * 38u) >> 8;
-                        UNSCOPED_INFO("Gray byte at saturated-black palette pixel "
-                               "≥ alpha*floor (no crush to zero)");
+                        CAPTURE(cp, x, y);
                         REQUIRE((U32)gray_row[x] + 1u >= expected_floor);
                         return;
                     }
@@ -700,19 +618,14 @@ namespace
         ALFontColrV1Painter painter_a, painter_b;
         ALFontColrV1Painter::Result r_zero, r_huge;
         const LLColor4U fg(255, 255, 255, 255);
-        UNSCOPED_INFO("palette=0 paint succeeded");
         REQUIRE(painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0u, r_zero));
-        UNSCOPED_INFO("palette=99 paint succeeded (clamps to 0)");
         REQUIRE(painter_b.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/99u, r_huge));
-        UNSCOPED_INFO("clamped result has same width");
         CHECK(r_huge.mWidth == r_zero.mWidth);
-        UNSCOPED_INFO("clamped result has same height");
-        CHECK(r_huge.mHeight == r_zero.mHeight);
-        UNSCOPED_INFO("clamped result has same pitch");
-        CHECK(r_huge.mPitch == r_zero.mPitch);
+        // The memcmp below reads r_huge for r_zero's pitch times height.
+        REQUIRE(r_huge.mHeight == r_zero.mHeight);
+        REQUIRE(r_huge.mPitch == r_zero.mPitch);
 
         const size_t bytes = (size_t)r_zero.mPitch * r_zero.mHeight;
-        UNSCOPED_INFO("clamped result is byte-identical to palette=0");
         CHECK(std::memcmp(r_zero.mBitmap, r_huge.mBitmap, bytes) == 0);
     }
 
@@ -733,20 +646,15 @@ namespace
         // mutate its ppem without affecting the face cache shared with
         // other tests in this group.
         hb_font_t* shared = face->getHbFont();
-        UNSCOPED_INFO("shared hb_font available");
         REQUIRE(shared != nullptr);
         hb_face_t* hb_face = hb_font_get_face(shared);
         hb_font_t* hb_font = hb_font_create(hb_face);
-        UNSCOPED_INFO("derived hb_font allocated");
         REQUIRE(hb_font != nullptr);
         hb_font_set_ppem(hb_font, 0, 0);
         unsigned px = 1, py = 1;
         hb_font_get_ppem(hb_font, &px, &py);
-        {
-            INFO("ppem really is unset on derived font");
-            CHECK(px == 0);
-            CHECK(py == 0);
-        }
+        CHECK(px == 0);
+        CHECK(py == 0);
 
         // Pick a glyph by index — without a scale set, the cmap query
         // through hb_font_get_nominal_glyph may not work as expected, so
@@ -776,11 +684,8 @@ namespace
         // failure mode we're protecting against.
         if (ok)
         {
-            {
-                INFO("fallback path produced a sized bitmap");
-                CHECK(result.mWidth > 0);
-                CHECK(result.mHeight > 0);
-            }
+            CHECK(result.mWidth > 0);
+            CHECK(result.mHeight > 0);
         }
         hb_font_destroy(hb_font);
     }
@@ -807,23 +712,19 @@ namespace
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result r;
         const LLColor4U fg(255, 255, 255, 255);
-        UNSCOPED_INFO("paintGlyph succeeded");
         REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r));
-        {
-            INFO("bitmap valid");
-            REQUIRE(r.mBitmap);
-            CHECK(r.mWidth >= 4);
-            CHECK(r.mHeight >= 4);
-        }
+        REQUIRE(r.mBitmap);
+        // The loops below read row mHeight-1 and column mWidth-1.
+        REQUIRE(r.mWidth >= 4);
+        REQUIRE(r.mHeight >= 4);
 
         // First row, last row.
         for (S32 x = 0; x < r.mWidth; ++x)
         {
             const U8* top    = r.mBitmap                              + x*4;
             const U8* bottom = r.mBitmap + (ptrdiff_t)(r.mHeight-1)*r.mPitch + x*4;
-            UNSCOPED_INFO("top row alpha is zero");
+            CAPTURE(x);
             REQUIRE((S32)top[3] == 0);
-            UNSCOPED_INFO("bottom row alpha is zero");
             REQUIRE((S32)bottom[3] == 0);
         }
         // First column, last column.
@@ -831,9 +732,8 @@ namespace
         {
             const U8* left  = r.mBitmap + (ptrdiff_t)y*r.mPitch                + 0*4;
             const U8* right = r.mBitmap + (ptrdiff_t)y*r.mPitch + (r.mWidth-1)*4;
-            UNSCOPED_INFO("left col alpha is zero");
+            CAPTURE(y);
             REQUIRE((S32)left[3] == 0);
-            UNSCOPED_INFO("right col alpha is zero");
             REQUIRE((S32)right[3] == 0);
         }
     }

@@ -107,12 +107,10 @@ namespace
             REQUIRE(mProgram.mapAttributes());
             glDeleteShader(vs);
             glDeleteShader(fs);
-            UNSCOPED_INFO("grid program maps");
             REQUIRE(mProgram.mapUniforms());
             UNSCOPED_INFO("the grid program has no vertex inputs");
             REQUIRE(mProgram.mAttributeMask == 0U);
 
-            UNSCOPED_INFO("target allocates");
             REQUIRE(mTarget.allocate(W, H, GL_RGBA8));
             mTarget.bindTarget();
             gGL.setClearColor(LLColor4::black);
@@ -161,7 +159,6 @@ namespace
         setUp();
         gGL.loadMatrix(grid(0.f));
         gGL.drawArraysInstanced(LLRender::TRIANGLE_STRIP, 0, 4, 3);
-        UNSCOPED_INFO("cells covered");
         CHECK(covered() == 0x7U);
     }
 

@@ -102,7 +102,7 @@ namespace
         }
 
         // A program that draws a point and declares no inputs, bound, for the indirect draws.
-        void setUpProgram()
+        void require_program()
         {
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kFragment);
@@ -118,9 +118,7 @@ namespace
             const bool linked = mProgram.mapAttributes();
             glDeleteShader(vs);
             glDeleteShader(fs);
-            UNSCOPED_INFO("program links");
             REQUIRE(linked);
-            UNSCOPED_INFO("program maps");
             REQUIRE(mProgram.mapUniforms());
             mProgram.bind();
         }
@@ -139,15 +137,10 @@ namespace
         std::vector<U32> expected = pattern(WORDS, 1000u);
         {
             ALGPUBuffer buffer;
-            UNSCOPED_INFO("allocates");
             REQUIRE(buffer.allocate(WORDS * sizeof(U32), ALGPUBuffer::DYNAMIC, expected.data(), "words (test)"));
-            UNSCOPED_INFO("allocated");
             CHECK(buffer.isAllocated());
-            UNSCOPED_INFO("its size");
             REQUIRE(buffer.size() == size_t(WORDS * sizeof(U32)));
-            UNSCOPED_INFO("its flags");
             CHECK(buffer.getFlags() == U32(ALGPUBuffer::DYNAMIC));
-            UNSCOPED_INFO("accounted");
             CHECK(ALGPUBuffer::sBytesAllocated == before + WORDS * sizeof(U32));
             UNSCOPED_INFO("holds its data");
             CHECK(readAll(buffer) == expected);
@@ -164,18 +157,14 @@ namespace
             CHECK(readAll(buffer) == expected);
 
             std::vector<U32> part(4, 0u);
-            UNSCOPED_INFO("reads at an offset");
             REQUIRE(buffer.read(42 * sizeof(U32), part.data(), part.size() * sizeof(U32)));
-            UNSCOPED_INFO("the words there");
             CHECK(part == std::vector<U32>(expected.begin() + 42, expected.begin() + 46));
 
             buffer.clear(7u);
-            UNSCOPED_INFO("whole clear");
             CHECK(readAll(buffer) == std::vector<U32>(WORDS, 7u));
         }
         UNSCOPED_INFO("destruction returns what it accounted");
         CHECK(ALGPUBuffer::sBytesAllocated == before);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -188,9 +177,7 @@ namespace
         std::vector<U32> expected(WORDS, 0u);
         ALGPUBuffer source;
         ALGPUBuffer target;
-        UNSCOPED_INFO("source allocates");
         REQUIRE(source.allocate(WORDS * sizeof(U32), 0, source_words.data(), "source (test)"));
-        UNSCOPED_INFO("target allocates");
         REQUIRE(target.allocate(WORDS * sizeof(U32), 0, expected.data(), "target (test)"));
 
         target.copyFrom(source, 4 * sizeof(U32), 32 * sizeof(U32), 10 * sizeof(U32));
@@ -202,16 +189,13 @@ namespace
         std::copy(expected.begin() + 32, expected.begin() + 42, expected.begin());
         UNSCOPED_INFO("copied within one");
         CHECK(readAll(target) == expected);
-        UNSCOPED_INFO("the source untouched");
         CHECK(readAll(source) == source_words);
 
         if (clearsOnGPU())
         {
             target.clear(0xA5A5A5A5u);
-            UNSCOPED_INFO("a static buffer clears");
             CHECK(readAll(target) == std::vector<U32>(WORDS, 0xA5A5A5A5u));
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -223,37 +207,29 @@ namespace
         const std::vector<U32> words = pattern(WORDS, 9u);
 
         ALGPUBuffer first;
-        UNSCOPED_INFO("allocates");
         REQUIRE(first.allocate(WORDS * sizeof(U32), 0, words.data(), "first (test)"));
         first.release();
-        UNSCOPED_INFO("released");
         CHECK_FALSE(first.isAllocated());
-        UNSCOPED_INFO("no size");
-        REQUIRE(first.size() == size_t(0));
-        UNSCOPED_INFO("no name");
+        CHECK(first.size() == size_t(0));
         CHECK(first.getGLName() == 0u);
         UNSCOPED_INFO("accounting returned");
         CHECK(ALGPUBuffer::sBytesAllocated == before);
 
-        UNSCOPED_INFO("allocates again");
-        CHECK(first.allocate(WORDS * sizeof(U32), 0, words.data(), "first (test)"));
+        REQUIRE(first.allocate(WORDS * sizeof(U32), 0, words.data(), "first (test)"));
         const U32 name = first.getGLName();
         ALGPUBuffer moved(std::move(first));
         {
             INFO("the source is empty");
             CHECK_FALSE(first.isAllocated());
-            REQUIRE(first.size() == 0);
+            CHECK(first.size() == 0);
             CHECK(first.getGLName() == 0);
         }
-        UNSCOPED_INFO("the target took the name");
         CHECK(moved.getGLName() == name);
-        UNSCOPED_INFO("and the store");
         CHECK(readAll(moved) == words);
         UNSCOPED_INFO("accounted once");
         CHECK(ALGPUBuffer::sBytesAllocated == before + WORDS * sizeof(U32));
 
         ALGPUBuffer other;
-        UNSCOPED_INFO("other allocates");
         REQUIRE(other.allocate(2 * WORDS * sizeof(U32), 0, nullptr, "other (test)"));
         other = std::move(moved);
         {
@@ -261,9 +237,7 @@ namespace
             CHECK_FALSE(moved.isAllocated());
             CHECK(moved.getGLName() == 0);
         }
-        UNSCOPED_INFO("the assigned took the name");
         CHECK(other.getGLName() == name);
-        UNSCOPED_INFO("and the store");
         CHECK(readAll(other) == words);
         UNSCOPED_INFO("its own store released");
         CHECK(ALGPUBuffer::sBytesAllocated == before + WORDS * sizeof(U32));
@@ -271,7 +245,6 @@ namespace
         other.release();
         UNSCOPED_INFO("all returned");
         CHECK(ALGPUBuffer::sBytesAllocated == before);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -280,13 +253,12 @@ namespace
     // same name is bound rather than taken for bound already.
     TEST_CASE_METHOD(algpubuffer_data, "algpubuffer_gl: LLRender keeps an indirect draw's buffer bound and rebinds when it must", "[algpubuffer_gl]")
     {
-        setUpProgram();
+        require_program();
         ALDrawArraysIndirectCommand command;
         command.mCount = 1;
         command.mInstanceCount = 1;
 
         ALGPUBuffer first;
-        UNSCOPED_INFO("allocates");
         REQUIRE(first.allocate(sizeof(command), 0, &command, "draw (test)"));
         gGL.drawArraysIndirect(LLRender::POINTS, first, 0);
         UNSCOPED_INFO("bound for the draw");
@@ -301,7 +273,7 @@ namespace
         gGL.drawArraysIndirect(LLRender::POINTS, first, 0);
         UNSCOPED_INFO("bound again after refreshState");
         CHECK(indirectBinding() == (GLint)first.getGLName());
-        UNSCOPED_INFO("no GL error after refreshState");
+        UNSCOPED_INFO("after refreshState");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
 
         const U32 name = first.getGLName();
@@ -309,7 +281,6 @@ namespace
         UNSCOPED_INFO("deleting it unbound it");
         CHECK(indirectBinding() == 0);
         ALGPUBuffer second;
-        UNSCOPED_INFO("another allocates");
         REQUIRE(second.allocate(sizeof(command), 0, &command, "draw again (test)"));
         if (second.getGLName() != name)
         {
@@ -318,7 +289,6 @@ namespace
         gGL.drawArraysIndirect(LLRender::POINTS, second, 0);
         UNSCOPED_INFO("the reused name is bound");
         CHECK(indirectBinding() == (GLint)second.getGLName());
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -330,23 +300,19 @@ namespace
         ALGPUBuffer readback;
         ALGPUBuffer stream;
         ALGPUBuffer check;
-        UNSCOPED_INFO("readback allocates");
         REQUIRE(readback.allocate(WORDS * sizeof(U32), ALGPUBuffer::READBACK, nullptr, "readback (test)"));
-        UNSCOPED_INFO("stream allocates");
         REQUIRE(stream.allocate(WORDS * sizeof(U32), ALGPUBuffer::STREAM, nullptr, "stream (test)"));
-        UNSCOPED_INFO("check allocates");
         REQUIRE(check.allocate(WORDS * sizeof(U32), 0, nullptr, "check (test)"));
         UNSCOPED_INFO("readback mapped where persistent maps resolve");
-        REQUIRE((readback.getMapped() != nullptr) == persistent);
-        UNSCOPED_INFO("stream too");
-        REQUIRE((stream.getMapped() != nullptr) == persistent);
+        CHECK((readback.getMapped() != nullptr) == persistent);
+        UNSCOPED_INFO("stream mapped where persistent maps resolve");
+        CHECK((stream.getMapped() != nullptr) == persistent);
 
         const std::vector<U32> words = pattern(WORDS, 300u);
         stream.upload(0, words.data(), words.size() * sizeof(U32));
         check.copyFrom(stream, 0, 0, WORDS * sizeof(U32));
         UNSCOPED_INFO("the GPU sees the stream's upload");
         CHECK(readAll(check) == words);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -357,12 +323,9 @@ namespace
         constexpr U32 SLOTS = 3;
         constexpr U32 COUNT = 16;
         ALGPUBuffer source;
-        UNSCOPED_INFO("source allocates");
         REQUIRE(source.allocate(WORDS * sizeof(U32), ALGPUBuffer::DYNAMIC, nullptr, "source (test)"));
         ALGPUReadback readback;
-        UNSCOPED_INFO("readback allocates");
         REQUIRE(readback.allocate(COUNT * sizeof(U32), SLOTS, "readback (test)"));
-        UNSCOPED_INFO("a slot's size");
         CHECK(readback.getSlotSize() == size_t(COUNT * sizeof(U32)));
 
         std::vector<U32> result(COUNT, 0u);
@@ -372,23 +335,21 @@ namespace
         {
             const std::vector<U32> words = pattern(WORDS, 1000u * (i + 1));
             source.upload(0, words.data(), words.size() * sizeof(U32));
-            UNSCOPED_INFO("request " + std::to_string(i));
+            CAPTURE(i);
             REQUIRE(readback.request(source, 8 * sizeof(U32), COUNT * sizeof(U32)));
         }
-        UNSCOPED_INFO("every slot pending");
         CHECK(readback.getPending() == SLOTS);
         UNSCOPED_INFO("a request past them refused");
         CHECK_FALSE(readback.request(source, 0, COUNT * sizeof(U32)));
 
         for (U32 i = 0; i < SLOTS; ++i)
         {
-            UNSCOPED_INFO("collect " + std::to_string(i));
+            CAPTURE(i);
             REQUIRE(readback.collect(result.data(), result.size() * sizeof(U32), true));
             const std::vector<U32> words = pattern(WORDS, 1000u * (i + 1));
-            UNSCOPED_INFO("result " + std::to_string(i) + " is what the source held at its request");
+            UNSCOPED_INFO("what the source held at its request");
             REQUIRE(result == std::vector<U32>(words.begin() + 8, words.begin() + 8 + COUNT));
         }
-        UNSCOPED_INFO("none pending");
         CHECK(readback.getPending() == 0u);
         UNSCOPED_INFO("nothing more to collect");
         REQUIRE_FALSE(readback.collect(result.data(), result.size() * sizeof(U32), true));
@@ -396,14 +357,12 @@ namespace
         // A request made, its copy finished: collect gives it without waiting.
         const std::vector<U32> last = pattern(WORDS, 7u);
         source.upload(0, last.data(), last.size() * sizeof(U32));
-        UNSCOPED_INFO("one more request");
         CHECK(readback.request(source, 0, COUNT * sizeof(U32)));
         glFinish();
         UNSCOPED_INFO("a finished copy is collected without waiting");
         REQUIRE(readback.collect(result.data(), result.size() * sizeof(U32)));
         UNSCOPED_INFO("and holds the source");
         CHECK(result == std::vector<U32>(last.begin(), last.begin() + COUNT));
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -414,12 +373,9 @@ namespace
         constexpr U32 REGIONS = 3;
         constexpr U32 COUNT = 10;
         ALGPUStream stream;
-        UNSCOPED_INFO("stream allocates");
         REQUIRE(stream.allocate(COUNT * sizeof(U32), REGIONS, "stream (test)"));
-        UNSCOPED_INFO("a region's size");
         CHECK(stream.getRegionSize() == size_t(COUNT * sizeof(U32)));
         ALGPUBuffer check;
-        UNSCOPED_INFO("check allocates");
         REQUIRE(check.allocate(COUNT * sizeof(U32), 0, nullptr, "check (test)"));
 
         const size_t alignment = gGLManager.mShaderStorageBufferOffsetAlignment > 0
@@ -428,18 +384,16 @@ namespace
         std::vector<size_t> offsets;
         for (U32 frame = 0; frame < 2 * REGIONS; ++frame)
         {
+            CAPTURE(frame);
             U8* region = stream.map();
-            UNSCOPED_INFO("a region to write");
             REQUIRE(region != nullptr);
             const std::vector<U32> words = pattern(COUNT, 100u * (frame + 1));
             memcpy(region, words.data(), words.size() * sizeof(U32));
             const size_t offset = stream.publish(words.size() * sizeof(U32));
-            UNSCOPED_INFO("frame " + std::to_string(frame) + " at an aligned offset");
             REQUIRE(offset % alignment == 0);
             offsets.push_back(offset);
 
             check.copyFrom(stream.getBuffer(), offset, 0, COUNT * sizeof(U32));
-            UNSCOPED_INFO("frame " + std::to_string(frame) + " reaches the GPU");
             REQUIRE(readAll(check) == words);
         }
         for (U32 frame = 0; frame < REGIONS; ++frame)
@@ -452,7 +406,6 @@ namespace
             UNSCOPED_INFO("the ring wraps to the same region");
             REQUIRE(offsets[frame + REGIONS] == offsets[frame]);
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }

@@ -642,15 +642,13 @@ namespace
         void setUpShaders()
         {
             UNSCOPED_INFO("the test's names follow the product's");
-            REQUIRE(mShaders.mReservedUniforms.size() ==
-                          size_t(LLShaderMgr::END_RESERVED_UNIFORMS));
+            REQUIRE(mShaders.mReservedUniforms.size() == size_t(LLShaderMgr::END_RESERVED_UNIFORMS));
             for (const char* name : kTestReservedNames)
             {
                 mShaders.mReservedUniforms.push_back(name);
             }
             UNSCOPED_INFO("the test's blocks follow the product's");
-            REQUIRE(mShaders.mReservedStorageBlocks.size() ==
-                          size_t(LLShaderMgr::END_RESERVED_STORAGE_BLOCKS));
+            REQUIRE(mShaders.mReservedStorageBlocks.size() == size_t(LLShaderMgr::END_RESERVED_STORAGE_BLOCKS));
             for (const auto& block : kTestStorageBlocks)
             {
                 mShaders.mReservedStorageBlocks.push_back({ block.first, block.second });
@@ -658,7 +656,7 @@ namespace
             for (const auto& object : kStubObjects)
             {
                 S32 level = 1;
-                UNSCOPED_INFO(std::string("compiled ") + object.first);
+                CAPTURE(object.first);
                 REQUIRE(mShaders.loadShaderFile(object.first, level, object.second) != 0);
             }
         }
@@ -697,9 +695,7 @@ namespace
             const bool linked = mShader.mapAttributes();
             glDeleteShader(vs);
             glDeleteShader(fs);
-            UNSCOPED_INFO("program links");
             REQUIRE(linked);
-            UNSCOPED_INFO("program maps");
             REQUIRE(mShader.mapUniforms());
             mShader.bind();
         }
@@ -738,42 +734,45 @@ namespace
 
         // What the program holds at a uniform, as GL reads it back, against what a check expects of its first
         // components. Floats are compared by their bits, so a check is exact.
-        void ensureInts(const std::string& what, const char* name, std::initializer_list<GLint> expected) const
+        void require_ints(const std::string& what, const char* name, std::initializer_list<GLint> expected) const
         {
+            INFO(what);
             std::array<GLint, 4> held = {};
             glGetUniformiv(mShader.mProgramObject, location(name), held.data());
-            size_t i = 0;
+            size_t component = 0;
             for (const GLint value : expected)
             {
-                UNSCOPED_INFO(what + ", component " + std::to_string(i));
-                REQUIRE(held[i] == value);
-                ++i;
+                CAPTURE(component);
+                REQUIRE(held[component] == value);
+                ++component;
             }
         }
 
-        void ensureUints(const std::string& what, const char* name, std::initializer_list<GLuint> expected) const
+        void require_uints(const std::string& what, const char* name, std::initializer_list<GLuint> expected) const
         {
+            INFO(what);
             std::array<GLuint, 4> held = {};
             glGetUniformuiv(mShader.mProgramObject, location(name), held.data());
-            size_t i = 0;
+            size_t component = 0;
             for (const GLuint value : expected)
             {
-                UNSCOPED_INFO(what + ", component " + std::to_string(i));
-                REQUIRE(held[i] == value);
-                ++i;
+                CAPTURE(component);
+                REQUIRE(held[component] == value);
+                ++component;
             }
         }
 
-        void ensureFloats(const std::string& what, const char* name, std::initializer_list<F32> expected) const
+        void require_floats(const std::string& what, const char* name, std::initializer_list<F32> expected) const
         {
+            INFO(what);
             std::array<F32, 4> held = {};
             glGetUniformfv(mShader.mProgramObject, location(name), held.data());
-            size_t i = 0;
+            size_t component = 0;
             for (const F32 value : expected)
             {
-                UNSCOPED_INFO(what + ", component " + std::to_string(i) + " bits");
-                REQUIRE(std::bit_cast<U32>(held[i]) == std::bit_cast<U32>(value));
-                ++i;
+                CAPTURE(component);
+                REQUIRE(std::bit_cast<U32>(held[component]) == std::bit_cast<U32>(value));
+                ++component;
             }
         }
 
@@ -801,30 +800,29 @@ namespace
 
         mShader.uniform1i(LLShaderMgr::MULTI_LIGHT_COUNT, BIG);
         mShader.uniform1i(LLShaderMgr::MULTI_LIGHT_COUNT, BIG + 1);
-        ensureInts("int", "light_count", { BIG + 1 });
+        require_ints("int", "light_count", { BIG + 1 });
 
         const GLint first[4]  = { BIG,     -BIG,     BIG, BIG };
         const GLint second[4] = { BIG,     -BIG,     BIG, BIG + 1 };
         const GLint third[4]  = { BIG + 1, -BIG - 1, BIG, BIG + 1 };
         mShader.uniform4iv(LLShaderMgr::SUN_UP_FACTOR, 1, first);
-        ensureInts("ivec4", "sun_up_factor", { BIG, -BIG, BIG, BIG });
+        require_ints("ivec4", "sun_up_factor", { BIG, -BIG, BIG, BIG });
         mShader.uniform4iv(LLShaderMgr::SUN_UP_FACTOR, 1, second);
-        ensureInts("ivec4, w alone changed", "sun_up_factor", { BIG, -BIG, BIG, BIG + 1 });
+        require_ints("ivec4, w alone changed", "sun_up_factor", { BIG, -BIG, BIG, BIG + 1 });
         mShader.uniform4iv(LLShaderMgr::SUN_UP_FACTOR, 1, third);
-        ensureInts("ivec4, x and y changed", "sun_up_factor", { BIG + 1, -BIG - 1, BIG, BIG + 1 });
+        require_ints("ivec4, x and y changed", "sun_up_factor", { BIG + 1, -BIG - 1, BIG, BIG + 1 });
 
         mShader.uniform1ui(LLShaderMgr::FRAME_ID, (GLuint)BIG);
         mShader.uniform1ui(LLShaderMgr::FRAME_ID, (GLuint)BIG + 1);
-        ensureUints("uint", "uFrameId", { (GLuint)BIG + 1 });
+        require_uints("uint", "uFrameId", { (GLuint)BIG + 1 });
 
         // The sharpening constants are floats' bits. 1.0's and the next float up's are both 1065353216 as floats.
         const GLuint one[4]  = { 0x3F800000u, 0x3F800000u, 0x3F800000u, 0x3F800000u };
         const GLuint next[4] = { 0x3F800000u, 0x3F800000u, 0x3F800000u, 0x3F800001u };
         mShader.uniform4uiv(LLShaderMgr::CAS_PARAM_0, 1, one);
         mShader.uniform4uiv(LLShaderMgr::CAS_PARAM_0, 1, next);
-        ensureUints("uvec4, w alone changed", "cas_param_0", { 0x3F800000u, 0x3F800000u, 0x3F800000u, 0x3F800001u });
+        require_uints("uvec4, w alone changed", "cas_param_0", { 0x3F800000u, 0x3F800000u, 0x3F800000u, 0x3F800001u });
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -836,52 +834,51 @@ namespace
 
         mShader.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0.25f, 0.5f, 0.75f, 1.f);
         mShader.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0.25f, 0.5f, 0.75f, 0.5f);
-        ensureFloats("vec4 B", "color", { 0.25f, 0.5f, 0.75f, 0.5f });
+        require_floats("vec4 B", "color", { 0.25f, 0.5f, 0.75f, 0.5f });
         const F32 color[4] = { 0.25f, 0.5f, 0.75f, 1.f };
         mShader.uniform4fv(LLShaderMgr::DIFFUSE_COLOR, 1, color);
-        ensureFloats("vec4 A again", "color", { 0.25f, 0.5f, 0.75f, 1.f });
+        require_floats("vec4 A again", "color", { 0.25f, 0.5f, 0.75f, 1.f });
 
         mShader.uniform3f(LLShaderMgr::DEFERRED_SUN_DIR, 0.f, 0.5f, 1.f);
         const F32 sun[3] = { 0.f, 0.5f, 0.25f };
         mShader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, sun);
-        ensureFloats("vec3 B", "sun_dir", { 0.f, 0.5f, 0.25f });
+        require_floats("vec3 B", "sun_dir", { 0.f, 0.5f, 0.25f });
         mShader.uniform3f(LLShaderMgr::DEFERRED_SUN_DIR, 0.f, 0.5f, 1.f);
-        ensureFloats("vec3 A again", "sun_dir", { 0.f, 0.5f, 1.f });
+        require_floats("vec3 A again", "sun_dir", { 0.f, 0.5f, 1.f });
 
         mShader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, 640.f, 480.f);
         const F32 res[2] = { 640.f, 360.f };
         mShader.uniform2fv(LLShaderMgr::DEFERRED_SCREEN_RES, 1, res);
-        ensureFloats("vec2 B", "screen_res", { 640.f, 360.f });
+        require_floats("vec2 B", "screen_res", { 640.f, 360.f });
         mShader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, 640.f, 480.f);
-        ensureFloats("vec2 A again", "screen_res", { 640.f, 480.f });
+        require_floats("vec2 A again", "screen_res", { 640.f, 480.f });
 
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.25f);
         const F32 intensity = 0.5f;
         mShader.uniform1fv(LLShaderMgr::ENVIRONMENT_INTENSITY, 1, &intensity);
-        ensureFloats("float B", "env_intensity", { 0.5f });
+        require_floats("float B", "env_intensity", { 0.5f });
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.25f);
-        ensureFloats("float A again", "env_intensity", { 0.25f });
+        require_floats("float A again", "env_intensity", { 0.25f });
 
         const GLint ivec_a[4] = { 1, 2, 3, 4 };
         const GLint ivec_b[4] = { 1, 2, 3, 5 };
         mShader.uniform4iv(LLShaderMgr::SUN_UP_FACTOR, 1, ivec_a);
         mShader.uniform4iv(LLShaderMgr::SUN_UP_FACTOR, 1, ivec_b);
         mShader.uniform4iv(LLShaderMgr::SUN_UP_FACTOR, 1, ivec_a);
-        ensureInts("ivec4 A again", "sun_up_factor", { 1, 2, 3, 4 });
+        require_ints("ivec4 A again", "sun_up_factor", { 1, 2, 3, 4 });
 
         mShader.uniform1i(LLShaderMgr::MULTI_LIGHT_COUNT, 3);
         const GLint count = 4;
         mShader.uniform1iv(LLShaderMgr::MULTI_LIGHT_COUNT, 1, &count);
-        ensureInts("int B", "light_count", { 4 });
+        require_ints("int B", "light_count", { 4 });
         mShader.uniform1i(LLShaderMgr::MULTI_LIGHT_COUNT, 3);
-        ensureInts("int A again", "light_count", { 3 });
+        require_ints("int A again", "light_count", { 3 });
 
         mShader.uniform1ui(LLShaderMgr::FRAME_ID, 7u);
         mShader.uniform1ui(LLShaderMgr::FRAME_ID, 8u);
         mShader.uniform1ui(LLShaderMgr::FRAME_ID, 7u);
-        ensureUints("uint A again", "uFrameId", { 7u });
+        require_uints("uint A again", "uFrameId", { 7u });
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -897,20 +894,19 @@ namespace
 
         glUniform1f(loc, 5.f);
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.f);
-        ensureFloats("the first set uploads, a zero too", "env_intensity", { 0.f });
+        require_floats("the first set uploads, a zero too", "env_intensity", { 0.f });
 
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.5f);
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.5f);
-        ensureFloats("set twice", "env_intensity", { 0.5f });
+        require_floats("set twice", "env_intensity", { 0.5f });
 
         glUniform1f(loc, 2.f);
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.5f);
-        ensureFloats("the value last uploaded is not uploaded again", "env_intensity", { 2.f });
+        require_floats("the value last uploaded is not uploaded again", "env_intensity", { 2.f });
 
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.75f);
-        ensureFloats("a new value replaces it", "env_intensity", { 0.75f });
+        require_floats("a new value replaces it", "env_intensity", { 0.75f });
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -921,20 +917,18 @@ namespace
         setUp();
         const GLint before = location("color");
         mShader.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0.25f, 0.5f, 0.75f, 1.f);
-        ensureFloats("set before the relink", "color", { 0.25f, 0.5f, 0.75f, 1.f });
+        require_floats("set before the relink", "color", { 0.25f, 0.5f, 0.75f, 1.f });
 
-        UNSCOPED_INFO("program relinks");
         CHECK(mShader.link());
         if (location("color") != before)
         {
             SKIP("the relink moved the uniform, so a stale slot would not be consulted");
         }
-        ensureFloats("the relink reset it", "color", { 0.f, 0.f, 0.f, 0.f });
+        require_floats("the relink reset it", "color", { 0.f, 0.f, 0.f, 0.f });
 
         mShader.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0.25f, 0.5f, 0.75f, 1.f);
-        ensureFloats("set again after the relink", "color", { 0.25f, 0.5f, 0.75f, 1.f });
+        require_floats("set again after the relink", "color", { 0.25f, 0.5f, 0.75f, 1.f });
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -946,32 +940,30 @@ namespace
         const GLint before = location("color");
         mShader.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0.25f, 0.5f, 0.75f, 1.f);
         mShader.setMinimumAlpha(0.5f);
-        ensureFloats("colour on the old program", "color", { 0.25f, 0.5f, 0.75f, 1.f });
-        ensureFloats("minimum alpha on the old program", "minimum_alpha", { 0.5f });
+        require_floats("colour on the old program", "color", { 0.25f, 0.5f, 0.75f, 1.f });
+        require_floats("minimum alpha on the old program", "minimum_alpha", { 0.5f });
 
         const GLuint fresh = linkRaw();
         UNSCOPED_INFO("the new program links");
-        CHECK(fresh != 0);
+        REQUIRE(fresh != 0);
         LLGLSLShader::unbind();
         const GLuint old = mShader.mProgramObject;
         mShader.mProgramObject = fresh;
         forget_program_samplers(old);
         glDeleteProgram(old);
-        UNSCOPED_INFO("the new program maps");
         CHECK(mShader.mapUniforms());
         mShader.bind();
         if (location("color") != before)
         {
             SKIP("the new program put the uniform elsewhere, so a stale slot would not be consulted");
         }
-        ensureFloats("the new program starts at 0", "color", { 0.f, 0.f, 0.f, 0.f });
+        require_floats("the new program starts at 0", "color", { 0.f, 0.f, 0.f, 0.f });
 
         mShader.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0.25f, 0.5f, 0.75f, 1.f);
-        ensureFloats("colour set again", "color", { 0.25f, 0.5f, 0.75f, 1.f });
+        require_floats("colour set again", "color", { 0.25f, 0.5f, 0.75f, 1.f });
         mShader.setMinimumAlpha(0.5f);
-        ensureFloats("minimum alpha set again", "minimum_alpha", { 0.5f });
+        require_floats("minimum alpha set again", "minimum_alpha", { 0.5f });
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -983,21 +975,20 @@ namespace
         setUp();
 
         mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
-        ensureInts("true by int", "uGrainAnimate", { 1 });
+        require_ints("true by int", "uGrainAnimate", { 1 });
         mShader.uniform1f(LLShaderMgr::GRAIN_ANIMATE, 0.f);
-        ensureInts("false by float", "uGrainAnimate", { 0 });
+        require_ints("false by float", "uGrainAnimate", { 0 });
         mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
-        ensureInts("true by int again", "uGrainAnimate", { 1 });
+        require_ints("true by int again", "uGrainAnimate", { 1 });
 
         // Read at run time, so nothing folds the sign of the zero away.
         volatile U32 sign_bit = 0x80000000u;
         const F32 negative_zero = std::bit_cast<F32>(static_cast<U32>(sign_bit));
         mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, INT_MIN);
-        ensureInts("true by INT_MIN", "uGrainAnimate", { 1 });
+        require_ints("true by INT_MIN", "uGrainAnimate", { 1 });
         mShader.uniform1f(LLShaderMgr::GRAIN_ANIMATE, negative_zero);
-        ensureInts("false by -0.0, the same bits", "uGrainAnimate", { 0 });
+        require_ints("false by -0.0, the same bits", "uGrainAnimate", { 0 });
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1009,13 +1000,12 @@ namespace
 
         mShader.uniform1i(LLShaderMgr::MULTI_LIGHT_COUNT, 3);
         mShader.uniform1i(light_count, 4);
-        ensureInts("by name", "light_count", { 4 });
+        require_ints("by name", "light_count", { 4 });
         mShader.uniform1i(LLShaderMgr::MULTI_LIGHT_COUNT, 3);
-        ensureInts("by index after the name", "light_count", { 3 });
+        require_ints("by index after the name", "light_count", { 3 });
         mShader.uniform1i(light_count, 4);
-        ensureInts("by name after the index", "light_count", { 4 });
+        require_ints("by name after the index", "light_count", { 4 });
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1027,19 +1017,18 @@ namespace
 
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.5f);
         mShader.fastUniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.25f);
-        ensureFloats("fast float", "env_intensity", { 0.25f });
+        require_floats("fast float", "env_intensity", { 0.25f });
         mShader.uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, 0.5f);
-        ensureFloats("cached float after the fast one", "env_intensity", { 0.5f });
+        require_floats("cached float after the fast one", "env_intensity", { 0.5f });
 
         const F32 a[4] = { 0.25f, 0.5f, 0.75f, 1.f };
         const F32 b[4] = { 1.f, 0.75f, 0.5f, 0.25f };
         mShader.uniform4fv(LLShaderMgr::SPECULAR_COLOR, 1, a);
         mShader.fastUniform4fv(LLShaderMgr::SPECULAR_COLOR, 1, b);
-        ensureFloats("fast vec4", "specular_color", { 1.f, 0.75f, 0.5f, 0.25f });
+        require_floats("fast vec4", "specular_color", { 1.f, 0.75f, 0.5f, 0.25f });
         mShader.uniform4fv(LLShaderMgr::SPECULAR_COLOR, 1, a);
-        ensureFloats("cached vec4 after the fast one", "specular_color", { 0.25f, 0.5f, 0.75f, 1.f });
+        require_floats("cached vec4 after the fast one", "specular_color", { 0.25f, 0.5f, 0.75f, 1.f });
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1055,19 +1044,18 @@ namespace
         const F32 two_again[8] = { 1.f, 1.f, 1.f, 1.f,   0.25f, 0.25f, 0.25f, 0.25f };
 
         mShader.uniform4fv(LLShaderMgr::LIGHT_DIFFUSE, 1, single);
-        ensureFloats("element 0 alone", "light_diffuse[0]", { 0.25f, 0.5f, 0.75f, 1.f });
+        require_floats("element 0 alone", "light_diffuse[0]", { 0.25f, 0.5f, 0.75f, 1.f });
         mShader.uniform4fv(LLShaderMgr::LIGHT_DIFFUSE, 2, two);
-        ensureFloats("element 0 by the array", "light_diffuse[0]", { 1.f, 1.f, 1.f, 1.f });
-        ensureFloats("element 1 by the array", "light_diffuse[1]", { 0.5f, 0.5f, 0.5f, 0.5f });
+        require_floats("element 0 by the array", "light_diffuse[0]", { 1.f, 1.f, 1.f, 1.f });
+        require_floats("element 1 by the array", "light_diffuse[1]", { 0.5f, 0.5f, 0.5f, 0.5f });
         mShader.uniform4fv(LLShaderMgr::LIGHT_DIFFUSE, 1, single);
-        ensureFloats("element 0 alone again", "light_diffuse[0]", { 0.25f, 0.5f, 0.75f, 1.f });
+        require_floats("element 0 alone again", "light_diffuse[0]", { 0.25f, 0.5f, 0.75f, 1.f });
 
         mShader.uniform4fv(LLShaderMgr::LIGHT_DIFFUSE, 2, two);
         mShader.uniform4fv(LLShaderMgr::LIGHT_DIFFUSE, 2, two_again);
-        ensureFloats("element 1 by an array whose element 0 did not change", "light_diffuse[1]",
-                     { 0.25f, 0.25f, 0.25f, 0.25f });
+        require_floats("element 1 by an array whose element 0 did not change", "light_diffuse[1]",
+                       { 0.25f, 0.25f, 0.25f, 0.25f });
 
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1081,26 +1069,17 @@ namespace
         }
         for (U32 i = 0; i < 3; ++i)
         {
-            UNSCOPED_INFO("work group count " + std::to_string(i));
+            CAPTURE(i);
             REQUIRE(gGLManager.mMaxComputeWorkGroupCount[i] >= 65535);
         }
-        UNSCOPED_INFO("work group size x");
         CHECK(gGLManager.mMaxComputeWorkGroupSize[0] >= 1024);
-        UNSCOPED_INFO("work group size y");
         CHECK(gGLManager.mMaxComputeWorkGroupSize[1] >= 1024);
-        UNSCOPED_INFO("work group size z");
         CHECK(gGLManager.mMaxComputeWorkGroupSize[2] >= 64);
-        UNSCOPED_INFO("invocations");
         CHECK(gGLManager.mMaxComputeWorkGroupInvocations >= 1024);
-        UNSCOPED_INFO("shared memory");
         CHECK(gGLManager.mMaxComputeSharedMemorySize >= 32768);
-        UNSCOPED_INFO("image units");
         CHECK(gGLManager.mMaxImageUnits >= 8);
-        UNSCOPED_INFO("compute storage blocks");
         CHECK(gGLManager.mMaxComputeShaderStorageBlocks >= 8);
-        UNSCOPED_INFO("storage bindings");
         CHECK(gGLManager.mMaxShaderStorageBufferBindings >= 8);
-        UNSCOPED_INFO("storage block size");
         CHECK(gGLManager.mMaxShaderStorageBlockSize >= (S64(1) << 27));
         const S32 alignment = gGLManager.mShaderStorageBufferOffsetAlignment;
         {
@@ -1108,7 +1087,6 @@ namespace
             CHECK(alignment > 0);
             CHECK((alignment & (alignment - 1)) == 0);
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1119,32 +1097,24 @@ namespace
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: createShader builds a compute program that reaches each index once", "[llglslshader_gl]")
     {
         setUpCompute();
-        UNSCOPED_INFO("a compute stage at GLSL 4.30");
         CHECK(compiledVersion(mShaders, "test/countC.glsl", GL_COMPUTE_SHADER, 0) == std::string("#version 430"));
-        UNSCOPED_INFO("count program builds");
-        CHECK(buildProgram(mCompute, "count (test)", { { "test/countC.glsl", GL_COMPUTE_SHADER } }));
-        UNSCOPED_INFO("it is compute");
+        REQUIRE(buildProgram(mCompute, "count (test)", { { "test/countC.glsl", GL_COMPUTE_SHADER } }));
         CHECK(mCompute.isCompute());
         UNSCOPED_INFO("it holds no object once linked");
-        REQUIRE(attachedNames(mCompute.mProgramObject).empty());
+        CHECK(attachedNames(mCompute.mProgramObject).empty());
 
-        UNSCOPED_INFO("local size x");
         CHECK(mCompute.mComputeLocalSize[0] == 64u);
-        UNSCOPED_INFO("local size y");
         CHECK(mCompute.mComputeLocalSize[1] == 1u);
-        UNSCOPED_INFO("local size z");
         CHECK(mCompute.mComputeLocalSize[2] == 1u);
         UNSCOPED_INFO("the table gives its block a point");
         CHECK(mShaders.getStorageBlockBinding(TEST_COUNTS) >= 0);
         UNSCOPED_INFO("its block is at the table's point");
-        CHECK(mCompute.getStorageBinding(TEST_COUNTS) ==
-                      mShaders.getStorageBlockBinding(TEST_COUNTS));
+        CHECK(mCompute.getStorageBinding(TEST_COUNTS) == mShaders.getStorageBlockBinding(TEST_COUNTS));
 
         // 15.6 groups' worth, in a buffer with room for 17.
         constexpr U32 COUNT = 1000;
         constexpr U32 WORDS = 17 * 64;
-        UNSCOPED_INFO("counts allocate");
-        CHECK(mBuffers[0].allocate(WORDS * sizeof(U32), 0, nullptr, "counts (test)"));
+        REQUIRE(mBuffers[0].allocate(WORDS * sizeof(U32), 0, nullptr, "counts (test)"));
         mBuffers[0].clear();
 
         mCompute.bind();
@@ -1155,11 +1125,9 @@ namespace
         const std::vector<U32> hits = readWords(mBuffers[0], WORDS);
         for (U32 i = 0; i < WORDS; ++i)
         {
-            UNSCOPED_INFO("index " + std::to_string(i) + (i < COUNT ? " once" : " untouched"));
-            REQUIRE(hits[i] ==
-                          (i < COUNT ? 1u : 0u));
+            CAPTURE(i);
+            REQUIRE(hits[i] == (i < COUNT ? 1u : 0u));
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1176,29 +1144,24 @@ namespace
         }
         const std::string usual = gGLManager.mGLSLVersionMinor >= 20 ? "#version 420" : "#version 400";
 
-        UNSCOPED_INFO("ordinary program builds");
         CHECK(buildProgram(mDraw, "ladder (test)",
-                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/solidF.glsl", GL_FRAGMENT_SHADER } }));
-        UNSCOPED_INFO("an ordinary stage at the usual version");
+                           { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/solidF.glsl", GL_FRAGMENT_SHADER } }));
         CHECK(compiledVersion(mShaders, "test/solidF.glsl", GL_FRAGMENT_SHADER, 0) == usual);
         size_t shared = 0;
         for (const auto& stage : mShaders.mShaderObjects)
         {
             for (const auto& object : stage)
             {
-                UNSCOPED_INFO(object.first + " at the usual version");
+                CAPTURE(object.first);
                 REQUIRE(firstSourceLine(object.second) == usual);
                 ++shared;
             }
         }
-        UNSCOPED_INFO("the three shared objects");
         CHECK(shared == size_t(3));
 
         if (ll_test::contextHasCompute())
         {
-            UNSCOPED_INFO("a stage asking for 4.30 at 4.30");
-            CHECK(compiledVersion(mShaders, "test/solidF.glsl", GL_FRAGMENT_SHADER, 430) ==
-                          std::string("#version 430"));
+            CHECK(compiledVersion(mShaders, "test/solidF.glsl", GL_FRAGMENT_SHADER, 430) == std::string("#version 430"));
             if (gGLManager.mMaxVertexShaderStorageBlocks >= 1)
             {
                 const std::initializer_list<std::pair<std::string, GLenum>> reader =
@@ -1230,7 +1193,6 @@ namespace
         CHECK_FALSE(compute_built);
         UNSCOPED_INFO("no program asking for 4.30 below it");
         CHECK_FALSE(raised_built);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1241,17 +1203,13 @@ namespace
         setUpCompute();
         constexpr U32 W = 37;
         constexpr U32 H = 23;
-        UNSCOPED_INFO("R32F target allocates");
-        CHECK(mTargets[0].allocate(W, H, GL_R32F));
-        UNSCOPED_INFO("RGBA16F target allocates");
-        CHECK(mTargets[1].allocate(W, H, GL_RGBA16F));
+        REQUIRE(mTargets[0].allocate(W, H, GL_R32F));
+        REQUIRE(mTargets[1].allocate(W, H, GL_RGBA16F));
         UNSCOPED_INFO("output target allocates");
-        CHECK(mTargets[2].allocate(W, H, GL_RGBA32F));
-        UNSCOPED_INFO("store program builds");
-        CHECK(buildProgram(mCompute, "image store (test)", { { "test/imageStoreC.glsl", GL_COMPUTE_SHADER } }));
-        UNSCOPED_INFO("sample program builds");
-        CHECK(buildProgram(mDraw, "image sample (test)",
-                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/sampleF.glsl", GL_FRAGMENT_SHADER } }));
+        REQUIRE(mTargets[2].allocate(W, H, GL_RGBA32F));
+        REQUIRE(buildProgram(mCompute, "image store (test)", { { "test/imageStoreC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mDraw, "image sample (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/sampleF.glsl", GL_FRAGMENT_SHADER } }));
 
         const S32 r32f_unit = mCompute.getImageUnit(TEST_IMAGE_R32F);
         const S32 rgba_unit = mCompute.getImageUnit(TEST_IMAGE_RGBA16F);
@@ -1259,7 +1217,6 @@ namespace
         CHECK(r32f_unit >= 0);
         UNSCOPED_INFO("RGBA16F image has a unit");
         CHECK(rgba_unit >= 0);
-        UNSCOPED_INFO("the units differ");
         CHECK(r32f_unit != rgba_unit);
 
         mCompute.bind();
@@ -1278,17 +1235,12 @@ namespace
         {
             for (U32 x = 0; x < W; ++x)
             {
-                const std::string at = " at " + std::to_string(x) + "," + std::to_string(y);
+                CAPTURE(x, y);
                 const size_t i = (size_t)y * W + x;
-                UNSCOPED_INFO("R32F" + at);
                 REQUIRE(r32f[i] == F32(x * 1000 + y));
-                UNSCOPED_INFO("RGBA16F r" + at);
                 REQUIRE(rgba[i * 4 + 0] == F32(x) * 0.125f);
-                UNSCOPED_INFO("RGBA16F g" + at);
                 REQUIRE(rgba[i * 4 + 1] == F32(y) * 0.125f);
-                UNSCOPED_INFO("RGBA16F b" + at);
                 REQUIRE(rgba[i * 4 + 2] == 0.25f);
-                UNSCOPED_INFO("RGBA16F a" + at);
                 REQUIRE(rgba[i * 4 + 3] == 1.f);
             }
         }
@@ -1296,11 +1248,11 @@ namespace
         LLGLDisable blend(GL_BLEND);
         for (U32 source = 0; source < 2; ++source)
         {
+            INFO("sampling the " << (source ? "RGBA16F" : "R32F") << " target");
             mTargets[2].bindTarget();
             gGL.setClearColor(LLColor4::transparent);
             mTargets[2].clear();
             mDraw.bind();
-            UNSCOPED_INFO("source bound");
             REQUIRE(mDraw.bindTexture(TEST_SOURCE_MAP, &mTargets[source], ALSamplers::PointClamp) >= 0);
             gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
             const std::vector<F32> drawn = readBoundTarget(W, H, 4, GL_RGBA);
@@ -1311,8 +1263,7 @@ namespace
             {
                 for (U32 x = 0; x < W; ++x)
                 {
-                    const std::string at = (source ? " RGBA16F" : " R32F") + std::string(" sampled at ")
-                                         + std::to_string(x) + "," + std::to_string(y);
+                    CAPTURE(x, y);
                     const size_t i = ((size_t)y * W + x) * 4;
                     const F32 expected[4] =
                     {
@@ -1323,13 +1274,12 @@ namespace
                     };
                     for (U32 c = 0; c < 4; ++c)
                     {
-                        UNSCOPED_INFO("component " + std::to_string(c) + at);
+                        CAPTURE(c);
                         REQUIRE(drawn[i + c] == expected[c]);
                     }
                 }
             }
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1351,16 +1301,13 @@ namespace
         // One vertex a point, no instances yet, then room for every id.
         std::vector<U32> list(4 + COUNT, 0u);
         list[0] = 1u;
-        UNSCOPED_INFO("list allocates");
         REQUIRE(mBuffers[0].allocate(list.size() * sizeof(U32), 0, list.data(), "compaction (test)"));
         UNSCOPED_INFO("output target allocates");
-        CHECK(mTargets[0].allocate(SIDE, SIDE, GL_R32F));
-        UNSCOPED_INFO("compaction builds");
-        CHECK(buildProgram(mCompute, "compaction (test)", { { "test/compactC.glsl", GL_COMPUTE_SHADER } }));
-        UNSCOPED_INFO("draw builds");
-        CHECK(buildProgram(mDraw, "compaction draw (test)",
-                            { { "test/compactV.glsl", GL_VERTEX_SHADER }, { "test/compactF.glsl", GL_FRAGMENT_SHADER } },
-                            430));
+        REQUIRE(mTargets[0].allocate(SIDE, SIDE, GL_R32F));
+        REQUIRE(buildProgram(mCompute, "compaction (test)", { { "test/compactC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mDraw, "compaction draw (test)",
+                             { { "test/compactV.glsl", GL_VERTEX_SHADER }, { "test/compactF.glsl", GL_FRAGMENT_SHADER } },
+                             430));
         const S32 point = mShaders.getStorageBlockBinding(TEST_DRAW_LIST);
         UNSCOPED_INFO("the kernel's list at the table's point");
         CHECK(mCompute.getStorageBinding(TEST_DRAW_LIST) == point);
@@ -1388,13 +1335,11 @@ namespace
         for (U32 id = 0; id < SIDE * SIDE; ++id)
         {
             const bool kept = id < COUNT && id % 3 == 0;
-            UNSCOPED_INFO("id " + std::to_string(id) + (kept ? " drawn" : " not drawn"));
-            REQUIRE(drawn[id] ==
-                          (kept ? F32(id + 1) : 0.f));
+            CAPTURE(id, kept);
+            REQUIRE(drawn[id] == (kept ? F32(id + 1) : 0.f));
         }
         UNSCOPED_INFO("instances counted");
         CHECK(readWords(mBuffers[0], 2)[1] == KEPT);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1404,14 +1349,10 @@ namespace
     {
         setUpCompute();
         const std::vector<U32> zeros(8, 0u);
-        UNSCOPED_INFO("command buffer allocates");
-        CHECK(mBuffers[0].allocate(8 * sizeof(U32), 0, zeros.data(), "dispatch (test)"));
-        UNSCOPED_INFO("counts allocate");
-        CHECK(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "counts (test)"));
-        UNSCOPED_INFO("writer builds");
-        CHECK(buildProgram(mCompute, "dispatch writer (test)", { { "test/indirectWriteC.glsl", GL_COMPUTE_SHADER } }));
-        UNSCOPED_INFO("counter builds");
-        CHECK(buildProgram(mCompute2, "dispatch counter (test)", { { "test/indirectCountC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(mBuffers[0].allocate(8 * sizeof(U32), 0, zeros.data(), "dispatch (test)"));
+        REQUIRE(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "counts (test)"));
+        REQUIRE(buildProgram(mCompute, "dispatch writer (test)", { { "test/indirectWriteC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mCompute2, "dispatch counter (test)", { { "test/indirectCountC.glsl", GL_COMPUTE_SHADER } }));
 
         mCompute.bind();
         mCompute.uniform1i(TEST_COUNT, 5);
@@ -1439,7 +1380,6 @@ namespace
         CHECK(hits[2] == 2u);
         UNSCOPED_INFO("groups in z");
         CHECK(hits[3] == 1u);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1448,8 +1388,7 @@ namespace
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: storage blocks declared out of the table's order still take its points", "[llglslshader_gl]")
     {
         setUpCompute();
-        UNSCOPED_INFO("remap builds");
-        CHECK(buildProgram(mCompute, "block remap (test)", { { "test/remapC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mCompute, "block remap (test)", { { "test/remapC.glsl", GL_COMPUTE_SHADER } }));
         const S32 first = mShaders.getStorageBlockBinding(TEST_BLOCK_FIRST);
         UNSCOPED_INFO("the first block at its point");
         CHECK(mCompute.getStorageBinding(TEST_BLOCK_FIRST) == first);
@@ -1461,10 +1400,8 @@ namespace
         CHECK(mCompute.getStorageBinding(TEST_STORAGE_END) == -1);
 
         const std::vector<U32> zeros(4, 0u);
-        UNSCOPED_INFO("a allocates");
-        CHECK(mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "a (test)"));
-        UNSCOPED_INFO("b allocates");
-        CHECK(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "b (test)"));
+        REQUIRE(mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "a (test)"));
+        REQUIRE(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "b (test)"));
 
         mCompute.bind();
         mCompute.bindStorageBuffer(TEST_BLOCK_FIRST, mBuffers[0]);
@@ -1485,7 +1422,6 @@ namespace
         CHECK(readWords(mBuffers[0], 1)[0] == 222u);
         UNSCOPED_INFO("swapped, b holds the first block");
         CHECK(readWords(mBuffers[1], 1)[0] == 111u);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1495,8 +1431,7 @@ namespace
     {
         setUpCompute();
         constexpr U32 SIDE = 16;
-        UNSCOPED_INFO("units builds");
-        CHECK(buildProgram(mCompute, "image units (test)", { { "test/imageUnitsC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mCompute, "image units (test)", { { "test/imageUnitsC.glsl", GL_COMPUTE_SHADER } }));
         UNSCOPED_INFO("the first reserved image first");
         CHECK(mCompute.getImageUnit(TEST_IMAGE_A) == 0);
         UNSCOPED_INFO("the second reserved image second");
@@ -1508,14 +1443,10 @@ namespace
         UNSCOPED_INFO("nor a texture unit");
         CHECK(mCompute.getTextureChannel(TEST_IMAGE_A) == -1);
 
-        UNSCOPED_INFO("a allocates");
-        CHECK(mTargets[0].allocate(SIDE, SIDE, GL_R32F));
-        UNSCOPED_INFO("b allocates");
-        CHECK(mTargets[1].allocate(SIDE, SIDE, GL_R32F));
+        REQUIRE(mTargets[0].allocate(SIDE, SIDE, GL_R32F));
+        REQUIRE(mTargets[1].allocate(SIDE, SIDE, GL_R32F));
         mCompute.bind();
-        UNSCOPED_INFO("a bound");
         CHECK(mCompute.bindImage(TEST_IMAGE_A, &mTargets[0], ALImageSlot::WRITE_ONLY) == 0);
-        UNSCOPED_INFO("b bound");
         CHECK(mCompute.bindImage(TEST_IMAGE_B, &mTargets[1], ALImageSlot::WRITE_ONLY) == 1);
         mCompute.dispatchThreads(SIDE, SIDE);
         gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
@@ -1526,12 +1457,12 @@ namespace
         const std::vector<F32> b = readTexture<F32>(mTargets[1].getTexture(), SIDE, SIDE, 1, GL_RED, GL_FLOAT);
         for (U32 i = 0; i < SIDE * SIDE; ++i)
         {
-            UNSCOPED_INFO("a holds image A at " + std::to_string(i));
+            CAPTURE(i);
+            UNSCOPED_INFO("a holds image A");
             REQUIRE(a[i] == 1.f);
-            UNSCOPED_INFO("b holds image B at " + std::to_string(i));
+            UNSCOPED_INFO("b holds image B");
             REQUIRE(b[i] == 2.f);
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1542,13 +1473,10 @@ namespace
         setUpCompute();
         constexpr U32 W = 13;
         constexpr U32 H = 7;
-        UNSCOPED_INFO("sample builds");
-        CHECK(buildProgram(mCompute, "uint sample (test)", { { "test/uintSampleC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mCompute, "uint sample (test)", { { "test/uintSampleC.glsl", GL_COMPUTE_SHADER } }));
         const S32 float_unit = mCompute.getTextureChannel(LLShaderMgr::DIFFUSE_MAP);
         const S32 uint_unit = mCompute.getTextureChannel(TEST_UINT_MAP);
-        UNSCOPED_INFO("the float sampler first");
         CHECK(float_unit == 0);
-        UNSCOPED_INFO("the unsigned one after it");
         CHECK(uint_unit == 1);
 
         std::vector<U32> values(W * H);
@@ -1558,20 +1486,14 @@ namespace
         }
         mUintImage = new LLImageGL(W, H, 1, /*usemipmaps=*/false);
         mUintImage->setExplicitFormat(GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
-        UNSCOPED_INFO("R32UI image created");
-        CHECK(mUintImage->createGLTexture(0, reinterpret_cast<const U8*>(values.data())));
-        UNSCOPED_INFO("RGBA8 target allocates");
-        CHECK(mTargets[1].allocate(W, H, GL_RGBA8));
-        UNSCOPED_INFO("out allocates");
-        CHECK(mBuffers[0].allocate(W * H * sizeof(U32), 0, nullptr, "uint sample (test)"));
+        REQUIRE(mUintImage->createGLTexture(0, reinterpret_cast<const U8*>(values.data())));
+        REQUIRE(mTargets[1].allocate(W, H, GL_RGBA8));
+        REQUIRE(mBuffers[0].allocate(W * H * sizeof(U32), 0, nullptr, "uint sample (test)"));
         mBuffers[0].clear(0xFFFFFFFFu);
 
         mCompute.bind();
         mCompute.uniform1i(TEST_COUNT, 1);
-        UNSCOPED_INFO("float texture bound");
-        CHECK(mCompute.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mTargets[1], ALSamplers::PointClamp) ==
-                      float_unit);
-        UNSCOPED_INFO("unsigned texture bound");
+        CHECK(mCompute.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mTargets[1], ALSamplers::PointClamp) == float_unit);
         CHECK(gGL.getTextureSlot((U32)uint_unit)->bindSampled(mUintImage.get(), ALSamplers::PointClamp));
         mCompute.bindStorageBuffer(TEST_COUNTS, mBuffers[0]);
         mCompute.dispatchThreads(W, H);
@@ -1581,10 +1503,9 @@ namespace
         const std::vector<U32> read = readWords(mBuffers[0], W * H);
         for (U32 i = 0; i < W * H; ++i)
         {
-            UNSCOPED_INFO("texel " + std::to_string(i));
+            CAPTURE(i);
             REQUIRE(read[i] == values[i]);
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1597,23 +1518,18 @@ namespace
         setUpShaders();
         constexpr U32 W = 11;
         constexpr U32 H = 6;
-        UNSCOPED_INFO("R32UI target allocates");
-        CHECK(mTargets[0].allocate(W, H, GL_R32UI));
-        UNSCOPED_INFO("RG16I target allocates");
-        CHECK(mTargets[1].allocate(W, H, GL_RG16I));
+        REQUIRE(mTargets[0].allocate(W, H, GL_R32UI));
+        REQUIRE(mTargets[1].allocate(W, H, GL_RG16I));
         UNSCOPED_INFO("output target allocates");
-        CHECK(mTargets[2].allocate(W, H, GL_RGBA32UI));
-        UNSCOPED_INFO("its signed attachment");
-        CHECK(mTargets[2].addColorAttachment(GL_RGBA32I));
-        UNSCOPED_INFO("unsigned writer builds");
-        CHECK(buildProgram(mDraw, "uint write (test)",
-                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/uintWriteF.glsl", GL_FRAGMENT_SHADER } }));
-        UNSCOPED_INFO("signed writer builds");
-        CHECK(buildProgram(mDraw2, "int write (test)",
-                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intWriteF.glsl", GL_FRAGMENT_SHADER } }));
-        UNSCOPED_INFO("reader builds");
-        CHECK(buildProgram(mDraw3, "integer sample (test)",
-                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
+        REQUIRE(mTargets[2].allocate(W, H, GL_RGBA32UI));
+        UNSCOPED_INFO("the output's signed attachment");
+        REQUIRE(mTargets[2].addColorAttachment(GL_RGBA32I));
+        REQUIRE(buildProgram(mDraw, "uint write (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/uintWriteF.glsl", GL_FRAGMENT_SHADER } }));
+        REQUIRE(buildProgram(mDraw2, "int write (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intWriteF.glsl", GL_FRAGMENT_SHADER } }));
+        REQUIRE(buildProgram(mDraw3, "integer sample (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
         UNSCOPED_INFO("the unsigned sampler has a unit");
         CHECK(mDraw3.getTextureChannel(TEST_UINT_MAP) >= 0);
         UNSCOPED_INFO("the signed sampler has a unit");
@@ -1630,14 +1546,13 @@ namespace
 
         mTargets[2].bindTarget();
         mDraw3.bind();
-        UNSCOPED_INFO("unsigned source bound");
         CHECK(mDraw3.bindTexture(TEST_UINT_MAP, &mTargets[0]) >= 0);
-        UNSCOPED_INFO("signed source bound");
         CHECK(mDraw3.bindTexture(TEST_INT_MAP, &mTargets[1]) >= 0);
 
         // Read off GL, since a driver may read an integer texture under a filtering sampler texel by texel anyway.
         for (const S32 uniform : { (S32)TEST_UINT_MAP, (S32)TEST_INT_MAP })
         {
+            INFO((uniform == TEST_UINT_MAP ? "the unsigned source's sampler" : "the signed source's sampler"));
             glActiveTexture(GL_TEXTURE0 + mDraw3.getTextureChannel(uniform));
             GLint sampler = 0;
             glGetIntegerv(GL_SAMPLER_BINDING, &sampler);
@@ -1645,12 +1560,8 @@ namespace
             GLint mag_filter = 0;
             glGetSamplerParameteriv((GLuint)sampler, GL_TEXTURE_MIN_FILTER, &min_filter);
             glGetSamplerParameteriv((GLuint)sampler, GL_TEXTURE_MAG_FILTER, &mag_filter);
-            const std::string which = uniform == TEST_UINT_MAP ? "the unsigned source's" : "the signed source's";
-            UNSCOPED_INFO(which + " sampler magnifies by the nearest texel");
             REQUIRE((U32)mag_filter == (U32)GL_NEAREST);
-            UNSCOPED_INFO(which + " sampler minifies by the nearest texel");
-            REQUIRE((U32)min_filter ==
-                          (U32)GL_NEAREST_MIPMAP_NEAREST);
+            REQUIRE((U32)min_filter == (U32)GL_NEAREST_MIPMAP_NEAREST);
         }
         glActiveTexture(GL_TEXTURE0 + gGL.getCurrentTexUnitIndex());
         // And the debug validator, which checks every sampler a draw reads, finds nothing to say -- where a filtering
@@ -1681,20 +1592,18 @@ namespace
         {
             for (U32 x = 0; x < W; ++x)
             {
-                const std::string at = " at " + std::to_string(x) + "," + std::to_string(y);
+                CAPTURE(x, y);
                 const size_t i = ((size_t)y * W + x) * 4;
                 const U32 uint_expected[4] = { 0x01000001u + y * 1000u + x, 0u, 0u, 1u };
                 const S32 int_expected[4] = { -1 - (S32)x, (S32)y * 300 - 1000, 0, 1 };
                 for (U32 c = 0; c < 4; ++c)
                 {
-                    UNSCOPED_INFO("unsigned component " + std::to_string(c) + at);
+                    CAPTURE(c);
                     REQUIRE(uints[i + c] == uint_expected[c]);
-                    UNSCOPED_INFO("signed component " + std::to_string(c) + at);
                     REQUIRE(ints[i + c] == int_expected[c]);
                 }
             }
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1710,7 +1619,7 @@ namespace
         setUpShaders();
         constexpr U32 SIDE = 4;
         UNSCOPED_INFO("output target allocates");
-        CHECK(mTargets[0].allocate(SIDE, SIDE, GL_RGBA32F));
+        REQUIRE(mTargets[0].allocate(SIDE, SIDE, GL_RGBA32F));
 
         const auto& fragments = mShaders.mShaderObjects[LLShaderMgr::STAGE_FRAGMENT];
         const auto found = fragments.find("deferred/globalF.glsl");
@@ -1725,10 +1634,11 @@ namespace
         };
         const U32 live = LLShaderMgr::sLiveObjects;
 
-        // What `program` draws, every pixel the colour the stub passes through.
+        // That `program` draws every pixel the colour the stub passes through.
         LLGLDisable blend(GL_BLEND);
-        auto ensureDraws = [&](const std::string& what, LLGLSLShader& program)
+        auto require_draws = [&](const std::string& what, LLGLSLShader& program)
         {
+            INFO(what);
             mTargets[0].bindTarget();
             gGL.setClearColor(LLColor4::transparent);
             mTargets[0].clear();
@@ -1740,19 +1650,17 @@ namespace
             const F32 expected[4] = { 0.25f, 0.5f, 0.75f, 1.f };
             for (size_t i = 0; i < drawn.size(); ++i)
             {
-                UNSCOPED_INFO(what + ", component " + std::to_string(i));
+                CAPTURE(i);
                 REQUIRE(drawn[i] == expected[i % 4]);
             }
         };
 
-        UNSCOPED_INFO("A builds");
-        CHECK(buildProgram(mDraw, "shared A (test)", files));
-        UNSCOPED_INFO("B builds");
-        CHECK(buildProgram(mDraw2, "shared B (test)", files));
+        REQUIRE(buildProgram(mDraw, "shared A (test)", files));
+        REQUIRE(buildProgram(mDraw2, "shared B (test)", files));
         UNSCOPED_INFO("A holds no object once linked");
-        REQUIRE(attachedNames(mDraw.mProgramObject).empty());
+        CHECK(attachedNames(mDraw.mProgramObject).empty());
         UNSCOPED_INFO("nor does B");
-        REQUIRE(attachedNames(mDraw2.mProgramObject).empty());
+        CHECK(attachedNames(mDraw2.mProgramObject).empty());
         UNSCOPED_INFO("their own objects deleted");
         CHECK(LLShaderMgr::sLiveObjects == live);
         UNSCOPED_INFO("a program's own stage is not shared");
@@ -1761,7 +1669,7 @@ namespace
         CHECK(glIsShader(shared) == GL_TRUE);
         UNSCOPED_INFO("not even flagged for deletion");
         CHECK_FALSE(flaggedForDeletion(shared));
-        ensureDraws("A draws", mDraw);
+        require_draws("A draws", mDraw);
 
         mDraw.unload();
         UNSCOPED_INFO("unloading A leaves the shared object");
@@ -1769,16 +1677,15 @@ namespace
         glValidateProgram(mDraw2.mProgramObject);
         GLint valid = GL_FALSE;
         glGetProgramiv(mDraw2.mProgramObject, GL_VALIDATE_STATUS, &valid);
-        UNSCOPED_INFO("B validates");
         CHECK(valid == GL_TRUE);
-        ensureDraws("B draws", mDraw2);
+        require_draws("B draws", mDraw2);
 
         mDraw2.unload();
-        UNSCOPED_INFO("C builds afterwards");
-        CHECK(buildProgram(mDraw3, "shared C (test)", files));
+        UNSCOPED_INFO("C builds after A and B are gone");
+        REQUIRE(buildProgram(mDraw3, "shared C (test)", files));
         UNSCOPED_INFO("C holds no object once linked");
-        REQUIRE(attachedNames(mDraw3.mProgramObject).empty());
-        ensureDraws("C draws", mDraw3);
+        CHECK(attachedNames(mDraw3.mProgramObject).empty());
+        require_draws("C draws", mDraw3);
 
         // Without the shared object to call into, the stage cannot link, at any class.
         UNSCOPED_INFO("D does not link");
@@ -1790,7 +1697,7 @@ namespace
         const GLuint loose = mShaders.loadShaderFile("test/solidF.glsl", level, GL_FRAGMENT_SHADER);
         UNSCOPED_INFO("an object no program holds");
         CHECK((loose != 0 && glIsShader(loose) == GL_TRUE));
-        UNSCOPED_INFO("counted live");
+        UNSCOPED_INFO("the loose object counted live");
         CHECK(LLShaderMgr::sLiveObjects == live + 1);
 
         size_t held = 0;
@@ -1810,8 +1717,7 @@ namespace
         CHECK(glIsShader(shared) == GL_FALSE);
         UNSCOPED_INFO("none counted live");
         CHECK(LLShaderMgr::sLiveObjects == live + 1 - (U32)held);
-        ensureDraws("C still draws", mDraw3);
-        UNSCOPED_INFO("no GL error");
+        require_draws("C still draws", mDraw3);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1823,10 +1729,8 @@ namespace
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a buffer bound once at a block's point serves every program after it", "[llglslshader_gl]")
     {
         setUpCompute();
-        UNSCOPED_INFO("first-only builds");
-        CHECK(buildProgram(mCompute, "first only (test)", { { "test/firstOnlyC.glsl", GL_COMPUTE_SHADER } }));
-        UNSCOPED_INFO("first-and-counts builds");
-        CHECK(buildProgram(mCompute2, "first and counts (test)", { { "test/firstAndCountsC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mCompute, "first only (test)", { { "test/firstOnlyC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mCompute2, "first and counts (test)", { { "test/firstAndCountsC.glsl", GL_COMPUTE_SHADER } }));
         const S32 first = mShaders.getStorageBlockBinding(TEST_BLOCK_FIRST);
         const S32 counts = mShaders.getStorageBlockBinding(TEST_COUNTS);
         UNSCOPED_INFO("the first program's block at the table's point");
@@ -1837,10 +1741,8 @@ namespace
         CHECK(first != counts);
 
         const std::vector<U32> zeros(4, 0u);
-        UNSCOPED_INFO("first allocates");
-        CHECK(mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "first (test)"));
-        UNSCOPED_INFO("counts allocate");
-        CHECK(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "counts (test)"));
+        REQUIRE(mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "first (test)"));
+        REQUIRE(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "counts (test)"));
 
         mCompute.bind();
         gGL.bindStorageBuffer((U32)first, mBuffers[0]);
@@ -1877,7 +1779,6 @@ namespace
         const size_t alignment = (size_t)gGLManager.mShaderStorageBufferOffsetAlignment;
         const size_t offset = (16 + alignment - 1) / alignment * alignment;
         ALGPUBuffer wide;
-        UNSCOPED_INFO("wide allocates");
         REQUIRE(wide.allocate(offset + 4 * sizeof(U32), 0, nullptr, "wide (test)"));
         wide.clear();
         mCompute.bind();
@@ -1894,7 +1795,6 @@ namespace
         wide.release();
         UNSCOPED_INFO("a released buffer leaves its point empty");
         CHECK(gGL.getStorageBuffer((U32)first) == 0u);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1904,10 +1804,8 @@ namespace
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a block array takes consecutive points and binds buffers by element", "[llglslshader_gl]")
     {
         setUpCompute();
-        UNSCOPED_INFO("array program builds");
-        CHECK(buildProgram(mCompute, "block array (test)", { { "test/blockArrayC.glsl", GL_COMPUTE_SHADER } }));
-        UNSCOPED_INFO("second-element program builds");
-        CHECK(buildProgram(mCompute2, "block array one (test)", { { "test/blockArrayOneC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mCompute, "block array (test)", { { "test/blockArrayC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mCompute2, "block array one (test)", { { "test/blockArrayOneC.glsl", GL_COMPUTE_SHADER } }));
         const S32 base = mShaders.getStorageBlockBinding(TEST_BLOCK_ARRAY);
         UNSCOPED_INFO("the table gives the array a point");
         CHECK(base >= 0);
@@ -1918,14 +1816,11 @@ namespace
         UNSCOPED_INFO("no element 2");
         CHECK(mCompute.getStorageBinding(TEST_BLOCK_ARRAY, 2) == -1);
         UNSCOPED_INFO("the second-element program's element 1 there too");
-        CHECK(mCompute2.getStorageBinding(TEST_BLOCK_ARRAY, 1) ==
-                      base + 1);
+        CHECK(mCompute2.getStorageBinding(TEST_BLOCK_ARRAY, 1) == base + 1);
 
         const std::vector<U32> zeros(4, 0u);
-        UNSCOPED_INFO("a allocates");
-        CHECK(mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "element 0 (test)"));
-        UNSCOPED_INFO("b allocates");
-        CHECK(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "element 1 (test)"));
+        REQUIRE(mBuffers[0].allocate(4 * sizeof(U32), 0, zeros.data(), "element 0 (test)"));
+        REQUIRE(mBuffers[1].allocate(4 * sizeof(U32), 0, zeros.data(), "element 1 (test)"));
 
         mCompute.bind();
         mCompute.bindStorageBuffer(TEST_BLOCK_ARRAY, mBuffers[0], 0);
@@ -1942,7 +1837,6 @@ namespace
         CHECK(readWords(mBuffers[1], 1)[0] == 33u);
         UNSCOPED_INFO("and not element 0's");
         CHECK(readWords(mBuffers[0], 1)[0] == 11u);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1953,8 +1847,7 @@ namespace
     {
         setUpCompute();
         constexpr U32 SIDE = 8;
-        UNSCOPED_INFO("image array builds");
-        CHECK(buildProgram(mCompute, "image array (test)", { { "test/imageArrayC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(buildProgram(mCompute, "image array (test)", { { "test/imageArrayC.glsl", GL_COMPUTE_SHADER } }));
         UNSCOPED_INFO("element 0 first");
         CHECK(mCompute.getImageUnit(TEST_IMAGES, 0) == 0);
         UNSCOPED_INFO("element 1 next");
@@ -1964,15 +1857,12 @@ namespace
 
         for (U32 i = 0; i < 3; ++i)
         {
-            UNSCOPED_INFO("target allocates");
+            CAPTURE(i);
             REQUIRE(mTargets[i].allocate(SIDE, SIDE, GL_R32F));
         }
         mCompute.bind();
-        UNSCOPED_INFO("A bound");
         CHECK(mCompute.bindImage(TEST_IMAGE_A, &mTargets[0], ALImageSlot::WRITE_ONLY) == 2);
-        UNSCOPED_INFO("element 0 bound");
         CHECK(mCompute.bindImage(TEST_IMAGES, &mTargets[1], ALImageSlot::WRITE_ONLY, 0, 0, 0) == 0);
-        UNSCOPED_INFO("element 1 bound");
         CHECK(mCompute.bindImage(TEST_IMAGES, &mTargets[2], ALImageSlot::WRITE_ONLY, 0, 0, 1) == 1);
         mCompute.dispatchThreads(SIDE, SIDE);
         gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
@@ -1985,11 +1875,10 @@ namespace
             const std::vector<F32> held = readTexture<F32>(mTargets[t].getTexture(), SIDE, SIDE, 1, GL_RED, GL_FLOAT);
             for (U32 i = 0; i < SIDE * SIDE; ++i)
             {
-                UNSCOPED_INFO("target " + std::to_string(t) + " at " + std::to_string(i));
+                CAPTURE(t, i);
                 REQUIRE(held[i] == expected[t]);
             }
         }
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -1999,12 +1888,9 @@ namespace
     {
         setUpCompute();
         constexpr U32 SIDE = 4;
-        UNSCOPED_INFO("signed image builds");
-        CHECK(buildProgram(mCompute, "int image (test)", { { "test/imageIntC.glsl", GL_COMPUTE_SHADER } }));
-        UNSCOPED_INFO("float target allocates");
-        CHECK(mTargets[0].allocate(SIDE, SIDE, GL_R32F));
-        UNSCOPED_INFO("signed target allocates");
-        CHECK(mTargets[1].allocate(SIDE, SIDE, GL_R32I));
+        REQUIRE(buildProgram(mCompute, "int image (test)", { { "test/imageIntC.glsl", GL_COMPUTE_SHADER } }));
+        REQUIRE(mTargets[0].allocate(SIDE, SIDE, GL_R32F));
+        REQUIRE(mTargets[1].allocate(SIDE, SIDE, GL_R32I));
 
         mCompute.bind();
         gDebugGL = true;
@@ -2022,7 +1908,6 @@ namespace
         CHECK_FALSE(float_valid);
         UNSCOPED_INFO("over a signed format it passes");
         CHECK(signed_valid);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -2036,12 +1921,10 @@ namespace
         {
             SKIP("the context has no stencil texturing");
         }
-        UNSCOPED_INFO("unsigned reader builds");
-        CHECK(buildProgram(mDraw, "stencil read (test)",
-                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
-        UNSCOPED_INFO("float reader builds");
-        CHECK(buildProgram(mDraw2, "depth read (test)",
-                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/sampleF.glsl", GL_FRAGMENT_SHADER } }));
+        REQUIRE(buildProgram(mDraw, "stencil read (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/intSampleF.glsl", GL_FRAGMENT_SHADER } }));
+        REQUIRE(buildProgram(mDraw2, "depth read (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/sampleF.glsl", GL_FRAGMENT_SHADER } }));
 
         GLuint texture = 0;
         glGenTextures(1, &texture);
@@ -2078,7 +1961,6 @@ namespace
         CHECK(validates(mDraw2, TEST_SOURCE_MAP, GL_DEPTH_COMPONENT));
 
         glDeleteTextures(1, &texture);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -2088,9 +1970,8 @@ namespace
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: every kind of sampler takes a texture unit in reserved order", "[llglslshader_gl]")
     {
         setUpShaders();
-        UNSCOPED_INFO("sampler types build");
-        CHECK(buildProgram(mDraw, "sampler types (test)",
-                            { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/samplerTypesF.glsl", GL_FRAGMENT_SHADER } }));
+        REQUIRE(buildProgram(mDraw, "sampler types (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/samplerTypesF.glsl", GL_FRAGMENT_SHADER } }));
         UNSCOPED_INFO("the array first");
         CHECK(mDraw.getTextureChannel(TEST_SAMPLERS) == 0);
         UNSCOPED_INFO("the array texture after its two units");
@@ -2107,7 +1988,6 @@ namespace
         CHECK(units[0] == 0);
         UNSCOPED_INFO("its second at the next");
         CHECK(units[1] == 1);
-        UNSCOPED_INFO("no GL error");
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }

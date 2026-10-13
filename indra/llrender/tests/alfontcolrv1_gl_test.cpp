@@ -72,29 +72,20 @@ namespace
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
         REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
-        UNSCOPED_INFO("getGlyphInfo returned an entry for fire emoji");
         REQUIRE(gi != nullptr);
-        UNSCOPED_INFO("delivered glyph type is Color (COLRv1 raster)");
         CHECK((S32)gi->mGlyphType == (S32)EFontGlyphType::Color);
-        UNSCOPED_INFO("glyph has positive width");
         CHECK(gi->mWidth   > 0);
-        UNSCOPED_INFO("glyph has positive height");
         CHECK(gi->mHeight  > 0);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        UNSCOPED_INFO("bitmap cache present");
         REQUIRE(cache != nullptr);
-        UNSCOPED_INFO("Color atlas allocated at least one sheet");
         CHECK(cache->getNumBitmaps(EFontGlyphType::Color) >= 1u);
 
         LLImageGL* page = cache->getImageGL(EFontGlyphType::Color, 0);
-        UNSCOPED_INFO("Color sheet 0 LLImageGL present");
         REQUIRE(page != nullptr);
-        UNSCOPED_INFO("Color sheet 0 has a live GL texture name");
         CHECK(page->getTexName() != 0);
     }
 
@@ -108,22 +99,17 @@ namespace
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
         REQUIRE(ft.notNull());
 
         const llwchar fire    = 0x1F525;
         const llwchar heart   = 0x2764;
         const llwchar rocket  = 0x1F680;
 
-        UNSCOPED_INFO("fire glyph allocated");
         REQUIRE(ft->getGlyphInfo(fire,   EFontGlyphType::Color) != nullptr);
-        UNSCOPED_INFO("heart glyph allocated");
         REQUIRE(ft->getGlyphInfo(heart,  EFontGlyphType::Color) != nullptr);
-        UNSCOPED_INFO("rocket glyph allocated");
         REQUIRE(ft->getGlyphInfo(rocket, EFontGlyphType::Color) != nullptr);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        UNSCOPED_INFO("three Color glyphs share a single Color atlas sheet");
         CHECK(cache->getNumBitmaps(EFontGlyphType::Color) == 1u);
     }
 
@@ -137,17 +123,13 @@ namespace
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
         REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* first  = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
         LLFontGlyphInfo* second = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
-        UNSCOPED_INFO("first lookup non-null");
         REQUIRE(first  != nullptr);
-        UNSCOPED_INFO("second lookup non-null");
         REQUIRE(second != nullptr);
-        UNSCOPED_INFO("repeat lookup returns same LLFontGlyphInfo pointer");
-        REQUIRE(first == second);
+        CHECK(first == second);
     }
 
     // Color atlas generation counter advances on the first emoji
@@ -161,18 +143,15 @@ namespace
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
         REQUIRE(ft.notNull());
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
         const S32 gen_before = cache->getCacheGeneration();
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Color);
-        UNSCOPED_INFO("glyph allocated");
         REQUIRE(gi != nullptr);
 
         const S32 gen_after = cache->getCacheGeneration();
-        UNSCOPED_INFO("cache generation advanced after Color rasterize");
         CHECK(gen_after > gen_before);
     }
 
@@ -201,14 +180,10 @@ namespace
         ALFontColrV1Painter painter;
         ALFontColrV1Painter::Result r1, r2;
         const LLColor4U fg(255, 255, 255, 255);
-        UNSCOPED_INFO("first paintGlyph succeeded");
         REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
         const S32 w1 = r1.mWidth, h1 = r1.mHeight;
-        UNSCOPED_INFO("second paintGlyph (same glyph) succeeded");
         REQUIRE(painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r2));
-        UNSCOPED_INFO("repeat paint width matches");
         CHECK(r2.mWidth == w1);
-        UNSCOPED_INFO("repeat paint height matches");
         CHECK(r2.mHeight == h1);
     }
 
@@ -224,28 +199,19 @@ namespace
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
         REQUIRE(ft.notNull());
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, EFontGlyphType::Grayscale);
-        UNSCOPED_INFO("Grayscale lookup returns an entry");
         REQUIRE(gi != nullptr);
-        UNSCOPED_INFO("delivered glyph type is Grayscale (LA atlas)");
         CHECK((S32)gi->mGlyphType == (S32)EFontGlyphType::Grayscale);
-        UNSCOPED_INFO("Grayscale glyph has positive width");
         CHECK(gi->mWidth  > 0);
-        UNSCOPED_INFO("Grayscale glyph has positive height");
         CHECK(gi->mHeight > 0);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        UNSCOPED_INFO("bitmap cache present");
         REQUIRE(cache != nullptr);
-        UNSCOPED_INFO("Grayscale atlas allocated at least one sheet");
         CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
         LLImageGL* page = cache->getImageGL(EFontGlyphType::Grayscale, 0);
-        UNSCOPED_INFO("Grayscale sheet 0 LLImageGL present");
         REQUIRE(page != nullptr);
-        UNSCOPED_INFO("Grayscale sheet 0 has a live GL texture name");
         CHECK(page->getTexName() != 0);
     }
 
@@ -265,7 +231,6 @@ namespace
         LLFontGL::sForceMonochromeEmoji = true;
 
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded as head");
         REQUIRE(ft.notNull());
 
         // Simulate the render-call selector at llfontgl.cpp:560 with
@@ -275,13 +240,10 @@ namespace
                 ? EFontGlyphType::Grayscale : EFontGlyphType::Color;
         UNSCOPED_INFO("force-mono toggle downgrades Color to Grayscale at "
                       "the request layer");
-        CHECK((S32)requested ==
-                      (S32)EFontGlyphType::Grayscale);
+        CHECK((S32)requested == (S32)EFontGlyphType::Grayscale);
 
         LLFontGlyphInfo* gi = ft->getGlyphInfo(0x1F525, requested);
-        UNSCOPED_INFO("Grayscale lookup under force-mono returns an entry");
         REQUIRE(gi != nullptr);
-        UNSCOPED_INFO("Grayscale path landed in Grayscale atlas");
         CHECK((S32)gi->mGlyphType == (S32)EFontGlyphType::Grayscale);
 
         LLFontGL::sForceMonochromeEmoji = saved;

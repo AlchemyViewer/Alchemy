@@ -47,7 +47,7 @@ namespace
 
     // GL-backed group: monospace shaping ends up rendering glyphs through
     // getGlyphInfoByIndex → renderAndCreateGlyph → atlas → gGL.bind on
-    // the test 3 (kerning) path. Wrapped in a separate fixture that
+    // the kerning path (the GPOS case below). Wrapped in a separate fixture that
     // pulls in the headless GL context so the rasterizer can
     // satisfy the bind.
     struct alfontshaping_gl_data
@@ -69,36 +69,25 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSansMono.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        UNSCOPED_INFO("DejaVuSansMono loaded");
         REQUIRE(ft.notNull());
-        UNSCOPED_INFO("DejaVuSansMono is fixed-width");
         CHECK(ft->isFixedWidth());
-        UNSCOPED_INFO("monospace ligatures default off");
         CHECK_FALSE(ft->getAllowMonospaceLigatures());
 
         const Text s = text('A','B');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("AB produces 2 glyphs through HB strict-mono path");
         REQUIRE(out.size() == 2u);
-        {
-            INFO("each shaped glyph has positive advance");
-            CHECK(out[0].x_advance > 0.f);
-            CHECK(out[1].x_advance > 0.f);
-        }
-        UNSCOPED_INFO("strict-mono: A and B advances are equal");
+        CHECK(out[0].x_advance > 0.f);
+        CHECK(out[1].x_advance > 0.f);
         CHECK(out[0].x_advance == out[1].x_advance);
         // HB output for monospace ASCII matches FT mXAdvance bit-exact
         // under the strict feature plan (verified by the long-line
-        // probe in test 20).
-        UNSCOPED_INFO("strict-mono glyph[0] advance == ft->getXAdvance('A')");
+        // cell-alignment probe in alfontshaping_test.cpp).
         CHECK(out[0].x_advance == ft->getXAdvance(L'A'));
         // Strict-mono path also forces zero positioning offsets, since
         // monospace ASCII triggers no GPOS adjustments under the
         // feature plan (kern, mark, mkmk all suppressed for ASCII).
-        UNSCOPED_INFO("strict-mono glyph[0] x_offset is zero");
         CHECK(out[0].x_offset == 0.f);
-        UNSCOPED_INFO("strict-mono glyph[0] y_offset is zero");
         CHECK(out[0].y_offset == 0.f);
     }
 
@@ -112,23 +101,16 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSansMono.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        UNSCOPED_INFO("DejaVuSansMono loaded");
         REQUIRE(ft.notNull());
         ft->setAllowMonospaceLigatures(true);
-        UNSCOPED_INFO("ligatures-on toggle applied");
         CHECK(ft->getAllowMonospaceLigatures());
 
         const Text s = text('A','V'); // AV is a classic kerned pair
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("AV produces 2 glyphs through HB");
         REQUIRE(out.size() == 2u);
-        {
-            INFO("each shaped glyph has positive advance");
-            CHECK(out[0].x_advance > 0.f);
-            CHECK(out[1].x_advance > 0.f);
-        }
-        UNSCOPED_INFO("HB-monospace-with-ligatures: A and V advances are equal");
+        CHECK(out[0].x_advance > 0.f);
+        CHECK(out[1].x_advance > 0.f);
         CHECK(out[0].x_advance == out[1].x_advance);
     }
 
@@ -145,7 +127,6 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         // Try a handful of classic kerned pairs; pick the first that
@@ -181,7 +162,6 @@ namespace
         if (!found_kerned)
             SKIP("DejaVuSans lacks a measurable Latin kern pair");
 
-        UNSCOPED_INFO("at least one Latin kern pair fired through HB GPOS");
         CHECK(found_kerned);
     }
 }

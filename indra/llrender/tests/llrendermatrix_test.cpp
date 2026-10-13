@@ -36,7 +36,6 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cstring>
-#include <sstream>
 
 namespace
 {
@@ -67,28 +66,26 @@ namespace
     };
 
     // Every element within tolerance of the larger magnitude, or of one.
-    void ensure_matrix_close(const std::string& what, const LLMatrix4a& actual, const LLMatrix4a& expected, F32 tolerance)
+    void require_matrix_close(const std::string& what, const LLMatrix4a& actual, const LLMatrix4a& expected, F32 tolerance)
     {
+        INFO(what);
         const F32* a = actual.getF32ptr();
         const F32* e = expected.getF32ptr();
         for (S32 i = 0; i < 16; ++i)
         {
             const F32 scale = llmax(1.f, fabsf(a[i]), fabsf(e[i]));
-            std::ostringstream msg;
-            msg << what << " at element " << i << ": " << a[i] << " vs " << e[i];
-            UNSCOPED_INFO(msg.str().c_str());
+            CAPTURE(i);
             REQUIRE_THAT(a[i], Catch::Matchers::WithinAbs(e[i], tolerance * scale));
         }
     }
 
-    void ensure_vector_close(const std::string& what, const LLVector4a& actual, const LLVector4a& expected, F32 tolerance)
+    void require_vector_close(const std::string& what, const LLVector4a& actual, const LLVector4a& expected, F32 tolerance)
     {
+        INFO(what);
         for (S32 i = 0; i < 3; ++i)
         {
             const F32 scale = llmax(1.f, fabsf(actual[i]), fabsf(expected[i]));
-            std::ostringstream msg;
-            msg << what << " at lane " << i << ": " << actual[i] << " vs " << expected[i];
-            UNSCOPED_INFO(msg.str().c_str());
+            CAPTURE(i);
             REQUIRE_THAT(actual[i], Catch::Matchers::WithinAbs(expected[i], tolerance * scale));
         }
     }
@@ -141,15 +138,14 @@ namespace
         expected *= s;
         expected *= t;
         expected *= LLMatrix4(M_ROWS);
-        ensure_matrix_close("the stack after translate, scale, rotate, mult", gGL.getModelviewMatrix(), LLMatrix4a(expected), 1e-5f);
+        require_matrix_close("the stack after translate, scale, rotate, mult", gGL.getModelviewMatrix(), LLMatrix4a(expected), 1e-5f);
 
         // push copies, pop restores
         gGL.pushMatrix();
         gGL.loadIdentity();
-        UNSCOPED_INFO("loadIdentity");
         CHECK(gGL.getModelviewMatrix() == LLMatrix4a::identity());
         gGL.popMatrix();
-        ensure_matrix_close("popMatrix restores", gGL.getModelviewMatrix(), LLMatrix4a(expected), 1e-5f);
+        require_matrix_close("popMatrix restores", gGL.getModelviewMatrix(), LLMatrix4a(expected), 1e-5f);
 
         // the modes are separate stacks
         gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -157,24 +153,20 @@ namespace
         CHECK(gGL.getProjectionMatrix() == LLMatrix4a::identity());
     }
 
-    // ortho on the stack and the projection helpers, in both depth conventions.
     TEST_CASE_METHOD(llrendermatrix_data, "llrendermatrix: the projection helpers and gGL.ortho under forward and reverse-Z", "[llrendermatrix]")
     {
         for (bool reverse : { false, true })
         {
             LLRender::sReverseZ = reverse;
-            const std::string when = reverse ? " under reverse-Z" : " forward";
+            CAPTURE(reverse);
 
             const LLMatrix4a ortho = LLMatrix4a::ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f);
             const LLMatrix4a persp = LLMatrix4a::perspective(1.1f, 1.777f, 0.25f, 1024.f);
             const LLMatrix4a expected_ortho = reverse ? reversed_z(ortho) : ortho;
             const LLMatrix4a expected_persp = reverse ? reversed_z(persp) : persp;
 
-            UNSCOPED_INFO("al_ortho" + when);
             REQUIRE(same_bytes(al_ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f), expected_ortho));
-            UNSCOPED_INFO("al_perspective" + when);
             REQUIRE(same_bytes(al_perspective(1.1f, 1.777f, 0.25f, 1024.f), expected_persp));
-            UNSCOPED_INFO("al_reverse_z_transform" + when);
             REQUIRE(same_bytes(al_reverse_z_transform(persp), reversed_z(persp)));
 
             // a reversed projection puts the near plane at window 1 and the
@@ -182,9 +174,9 @@ namespace
             LLVector4a near_clip, far_clip;
             expected_persp.transform4(LLVector4a(0.f, 0.f, -0.25f, 1.f), near_clip);
             expected_persp.transform4(LLVector4a(0.f, 0.f, -1024.f, 1.f), far_clip);
-            UNSCOPED_INFO(("near plane depth" + when).c_str());
+            UNSCOPED_INFO("near plane depth");
             REQUIRE_THAT(near_clip[2] / near_clip[3], Catch::Matchers::WithinAbs(reverse ? 1.f : -1.f, 1e-5f));
-            UNSCOPED_INFO(("far plane depth" + when).c_str());
+            UNSCOPED_INFO("far plane depth");
             REQUIRE_THAT(far_clip[2] / far_clip[3], Catch::Matchers::WithinAbs(reverse ? 0.f : 1.f, 1e-5f));
 
             gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -192,7 +184,7 @@ namespace
             gGL.ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f);
             LLMatrix4a expected_stack;
             expected_stack.setMul(expected_ortho, LLMatrix4a(M_ROWS));
-            ensure_matrix_close("gGL.ortho applies ahead of the stack" + when, gGL.getProjectionMatrix(), expected_stack, 1e-5f);
+            require_matrix_close("gGL.ortho applies ahead of the stack", gGL.getProjectionMatrix(), expected_stack, 1e-5f);
             gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_MODELVIEW);
 
@@ -203,20 +195,17 @@ namespace
 
             const LLVector4a win = al_project(obj, mv, expected_persp, viewport);
             const LLVector4a expected_win = reverse ? alprojection::project_zo(obj, mv, expected_persp, viewport) : alprojection::project(obj, mv, expected_persp, viewport);
-            ensure_vector_close("al_project" + when, win, expected_win, 1e-6f);
-            {
-                INFO("window depth is in [0, 1]" + when);
-                REQUIRE(win[2] >= 0.f);
-                REQUIRE(win[2] <= 1.f);
-            }
+            require_vector_close("al_project", win, expected_win, 1e-6f);
+            REQUIRE(win[2] >= 0.f);
+            REQUIRE(win[2] <= 1.f);
 
             const LLVector4a back = al_unproject(win, mv, expected_persp, viewport);
-            ensure_vector_close("al_unproject of al_project" + when, back, obj, 5e-4f);
+            require_vector_close("al_unproject of al_project", back, obj, 5e-4f);
 
             LLMatrix4a inverse;
             inverse.setMul(mv, expected_persp);
             inverse.invert();
-            ensure_vector_close("al_unproject through the inverse" + when, al_unproject(win, inverse, viewport), back, 1e-6f);
+            require_vector_close("al_unproject through the inverse", al_unproject(win, inverse, viewport), back, 1e-6f);
         }
     }
 
@@ -254,13 +243,14 @@ namespace
             suffix.setColumn<2>(cplane);
             LLMatrix4a expected;
             expected.setMul(persp, suffix);
-            ensure_matrix_close("oblique projection", gGL.getProjectionMatrix(), expected, 1e-5f);
+            require_matrix_close("oblique projection", gGL.getProjectionMatrix(), expected, 1e-5f);
 
             // only the depth column moved
             for (S32 column : { 0, 1, 3 })
             {
                 for (S32 row = 0; row < 4; ++row)
                 {
+                    CAPTURE(column, row);
                     UNSCOPED_INFO("the other columns are the projection's");
                     REQUIRE(gGL.getProjectionMatrix().mMatrix[row][column] == persp.mMatrix[row][column]);
                 }

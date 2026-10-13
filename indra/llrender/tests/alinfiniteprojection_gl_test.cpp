@@ -145,7 +145,6 @@ namespace
             glDeleteShader(fs);
             GLint linked = GL_FALSE;
             glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
-            UNSCOPED_INFO("program links");
             REQUIRE(linked == GL_TRUE);
 
             glGenVertexArrays(1, &mVAO);
@@ -160,7 +159,6 @@ namespace
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mDepth, 0);
             glDrawBuffer(GL_NONE);
             glReadBuffer(GL_NONE);
-            UNSCOPED_INFO("complete");
             REQUIRE((U32)glCheckFramebufferStatus(GL_FRAMEBUFFER) == (U32)GL_FRAMEBUFFER_COMPLETE);
 
             glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
@@ -206,20 +204,17 @@ namespace
     TEST_CASE_METHOD(alinfiniteprojection_data, "alinfiniteprojection_gl: the infinite matrix stores near over distance and its far end is floored", "[alinfiniteprojection_gl]")
     {
         const LLMatrix4a proj = infinite();
-        UNSCOPED_INFO("infinite");
         CHECK(al_projection_is_infinite(proj));
         UNSCOPED_INFO("finite reversed is not");
         CHECK_FALSE(al_projection_is_infinite(al_perspective(FOV, 1.f, NEAR_PLANE, 1024.f)));
-        UNSCOPED_INFO("ortho is not");
         CHECK_FALSE(al_projection_is_infinite(al_ortho(-1.f, 1.f, -1.f, 1.f, 0.f, 10.f)));
 
         for (F32 dist : DISTANCES)
         {
+            CAPTURE(dist);
             LLVector4a clip;
             proj.transform4(LLVector4a(0.f, 0.f, -dist, 1.f), clip);
-            UNSCOPED_INFO("clip z is the near plane");
             REQUIRE(clip[2] == NEAR_PLANE);
-            UNSCOPED_INFO("clip w is the distance");
             REQUIRE(clip[3] == dist);
         }
 
@@ -229,7 +224,6 @@ namespace
         inv.transform4(LLVector4a(0.f, 0.f, 0.f, 1.f), far_point);
         UNSCOPED_INFO("cleared depth unprojects to w = 0");
         CHECK(fabsf(far_point[3]) < 1e-12f);
-        UNSCOPED_INFO("floored to MAX_RECONSTRUCT_DISTANCE");
         CHECK_THAT(reconstruct(inv, 0.f), ll_test::WithinBits(MAX_RECONSTRUCT_DISTANCE, 8));
 
         // The floor leaves a finite projection alone: its cleared depth still reconstructs at its far plane.
@@ -237,18 +231,13 @@ namespace
         inv_finite.invert();
         LLVector4a raw;
         inv_finite.transform4(LLVector4a(0.f, 0.f, 0.f, 1.f), raw);
-        UNSCOPED_INFO("finite far untouched by the floor");
         CHECK(reconstruct(inv_finite, 0.f) == -raw[2] / raw[3]);
-        UNSCOPED_INFO("finite far is about 1024 m");
         CHECK(fabsf(-raw[2] / raw[3] - 1024.f) < 1.f);
 
         LLRender::sReverseZ = false;
         const LLMatrix4a forward = al_perspective(FOV, 1.f, NEAR_PLANE, std::numeric_limits<F32>::infinity());
-        {
-            INFO("forward falls back to a finite plane");
-            CHECK_FALSE(al_projection_is_infinite(forward));
-            CHECK(std::isfinite(forward.getColumn<2>()[2]));
-        }
+        CHECK_FALSE(al_projection_is_infinite(forward));
+        CHECK(std::isfinite(forward.getColumn<2>()[2]));
         LLRender::sReverseZ = true;
     }
 
@@ -265,16 +254,15 @@ namespace
         for (size_t i = 0; i < std::size(DISTANCES); ++i)
         {
             const F32 dist = DISTANCES[i];
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, dist);
             const F32 d = centreDepth();
-            UNSCOPED_INFO("drawn at " + at);
+            UNSCOPED_INFO("drawn");
             REQUIRE(d > 0.f);
-            UNSCOPED_INFO("stored depth at " + at);
             REQUIRE(fabsf(d - oracle_depth[i]) <= oracle_depth[i] * 1e-6f);
             const F64 err = fabs((F64)reconstruct(inv, d) - dist);
-            UNSCOPED_INFO("round trip at " + at + ": " + std::to_string(err * 1000.0) + " mm");
+            UNSCOPED_INFO("round trip error " << err * 1000.0 << " mm");
             REQUIRE(err <= bound(dist, d));
         }
 
@@ -283,7 +271,6 @@ namespace
         draw(proj, 1.0e6f);
         UNSCOPED_INFO("1000 km is not clipped");
         CHECK(centreDepth() > 0.f);
-        UNSCOPED_INFO("no GL error");
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -295,7 +282,7 @@ namespace
 
         for (F32 dist : DISTANCES)
         {
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             const F32 gap = (F32)(4.0 * depthStep(NEAR_PLANE / dist)) + (std::nextafter(dist, 2.f * dist) - dist);
             const F32 nearer = dist - gap;
 
@@ -304,16 +291,15 @@ namespace
             const F32 d_far = centreDepth();
             draw(proj, nearer);
             const F32 d_near = centreDepth();
-            UNSCOPED_INFO("nearer drawn second wins at " + at);
+            UNSCOPED_INFO("nearer drawn second wins");
             REQUIRE(d_near > d_far);
 
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, nearer);
             draw(proj, dist);
-            UNSCOPED_INFO("farther drawn second loses at " + at);
+            UNSCOPED_INFO("farther drawn second loses");
             REQUIRE(centreDepth() == d_near);
         }
-        UNSCOPED_INFO("no GL error");
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -327,7 +313,7 @@ namespace
         LLRender::sReverseZ = true;
         for (S32 i = 0; i < 16; ++i)
         {
-            UNSCOPED_INFO("same as the old fixed plane");
+            CAPTURE(i);
             REQUIRE(forward.getF32ptr()[i] == legacy.getF32ptr()[i]);
         }
         LLVector4a clip;
@@ -370,17 +356,16 @@ namespace
 
         for (F32 dist : { 1000.f, 100000.f, MAX_RECONSTRUCT_DISTANCE })
         {
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, dist);
-            UNSCOPED_INFO("geometry at " + at + " stores more than the far plane");
+            UNSCOPED_INFO("geometry stores more than the far plane");
             REQUIRE(centreDepth() > 0.f);
-            UNSCOPED_INFO("the sky stays behind geometry at " + at);
+            UNSCOPED_INFO("the sky stays behind geometry");
             REQUIRE(sky_samples() == (GLuint)0);
         }
 
         glDeleteQueries(1, &query);
-        UNSCOPED_INFO("no GL error");
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -414,10 +399,10 @@ namespace
 
         for (F32 dist : { 1.f, 1000.f, 100000.f, MAX_RECONSTRUCT_DISTANCE })
         {
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, dist);
-            UNSCOPED_INFO("haze over all of the geometry at " + at);
+            UNSCOPED_INFO("haze over all of the geometry");
             REQUIRE(haze_samples() == (GLuint)(SIZE * SIZE));
         }
 
@@ -430,7 +415,6 @@ namespace
         CHECK(haze_samples() == (GLuint)(SIZE * SIZE / 2));
 
         glDeleteQueries(1, &query);
-        UNSCOPED_INFO("no GL error");
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -465,12 +449,12 @@ namespace
 
         for (F32 dist : { 1.f, 1000.f, 100000.f, MAX_RECONSTRUCT_DISTANCE })
         {
-            const std::string at = std::to_string((S32)dist) + " m";
+            CAPTURE(dist);
             glClear(GL_DEPTH_BUFFER_BIT);
             draw(proj, dist);
-            UNSCOPED_INFO("all lit over geometry at " + at);
+            UNSCOPED_INFO("all lit over geometry");
             REQUIRE(samples(GL_GREATER) == (GLuint)(SIZE * SIZE));
-            UNSCOPED_INFO("no sky over geometry at " + at);
+            UNSCOPED_INFO("no sky over geometry");
             REQUIRE(samples(GL_EQUAL) == (GLuint)0);
         }
 
@@ -487,7 +471,6 @@ namespace
         CHECK(lit + sky == (GLuint)(SIZE * SIZE));
 
         glDeleteQueries(1, &query);
-        UNSCOPED_INFO("no GL error");
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }

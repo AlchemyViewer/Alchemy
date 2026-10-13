@@ -93,27 +93,26 @@ namespace
         const Text s = text('a','b','c');
 
         ALFontShaping::shapeRun(/*root_face=*/nullptr, s, 0, s.size(), out);
-        UNSCOPED_INFO("null root face -> empty output");
-        REQUIRE(out.empty());
+        UNSCOPED_INFO("null root face");
+        CHECK(out.empty());
 
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         ALFontShaping::shapeRun(ft, s, /*begin=*/2, /*end=*/2, out);
-        UNSCOPED_INFO("begin == end -> empty output");
-        REQUIRE(out.empty());
+        UNSCOPED_INFO("begin == end");
+        CHECK(out.empty());
 
         ALFontShaping::shapeRun(ft, s, /*begin=*/3, /*end=*/2, out);
-        UNSCOPED_INFO("begin > end -> empty output");
-        REQUIRE(out.empty());
+        UNSCOPED_INFO("begin > end");
+        CHECK(out.empty());
 
         ALFontShaping::shapeRun(ft, s, /*begin=*/0, /*end=*/99, out);
-        UNSCOPED_INFO("end > size -> empty output");
-        REQUIRE(out.empty());
+        UNSCOPED_INFO("end > size");
+        CHECK(out.empty());
     }
 
     // ASCII through a proportional Latin font: 1 glyph per codepoint,
@@ -134,32 +133,24 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         const Text s = text('a','b','c');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("3 glyphs for 'abc'");
         REQUIRE(out.size() == 3u);
 
         for (const auto& g : out)
         {
-            UNSCOPED_INFO("each glyph has a face");
             REQUIRE(g.face != nullptr);
-            UNSCOPED_INFO("each glyph has a glyph_id");
             REQUIRE(g.glyph_id != 0u);
-            UNSCOPED_INFO("each glyph has a positive x_advance");
             REQUIRE(g.x_advance > 0.f);
         }
         // Identity check: the shape's glyph_id for each ASCII char
         // must match the face's cmap-direct lookup. A regression that
         // bound HB to the wrong face would produce ids that disagree.
-        UNSCOPED_INFO("glyph[0] id matches cmap('a')");
         CHECK(out[0].glyph_id == ft->getCharGlyphIndex(L'a'));
-        UNSCOPED_INFO("glyph[1] id matches cmap('b')");
         CHECK(out[1].glyph_id == ft->getCharGlyphIndex(L'b'));
-        UNSCOPED_INFO("glyph[2] id matches cmap('c')");
         CHECK(out[2].glyph_id == ft->getCharGlyphIndex(L'c'));
     }
 
@@ -173,7 +164,6 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         const Text s = text('X','Y','a','b','c');
@@ -181,17 +171,13 @@ namespace
         const size_t end   = s.at(5);
         std::vector<ALShapedGlyph> shape_run_out;
         ALFontShaping::shapeRun(ft, s, begin, end, shape_run_out);
-        UNSCOPED_INFO("shapeRun produced 3 glyphs");
         REQUIRE(shape_run_out.size() == 3u);
         // 'a' starts where the slice does.
-        UNSCOPED_INFO("shapeRun cluster[0] is an original-string offset");
         CHECK(shape_run_out[0].cluster == (S32)begin);
 
         const auto& shape_line_out = ALFontShaping::shapeLine(ft, s, begin, end);
-        UNSCOPED_INFO("shapeLine produced 3 glyphs");
         REQUIRE(shape_line_out.size() == 3u);
         // shapeLine clusters are slice-local: 'a' is at slice offset 0.
-        UNSCOPED_INFO("shapeLine cluster[0] is slice-local offset 0");
         CHECK(shape_line_out[0].cluster == 0);
     }
 
@@ -206,7 +192,6 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         const Text s = text('h','e','l','l','o');
@@ -215,15 +200,12 @@ namespace
 
         std::vector<ALShapedGlyph> second;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), second);
-        UNSCOPED_INFO("cache hit produces same glyph count");
         REQUIRE(second.size() == first.size());
         for (size_t i = 0; i < first.size(); ++i)
         {
-            UNSCOPED_INFO("cache hit: same glyph_id");
+            CAPTURE(i);
             REQUIRE(second[i].glyph_id == first[i].glyph_id);
-            UNSCOPED_INFO("cache hit: same cluster");
             REQUIRE(second[i].cluster == first[i].cluster);
-            UNSCOPED_INFO("cache hit: same x_advance");
             REQUIRE(second[i].x_advance == first[i].x_advance);
         }
     }
@@ -246,18 +228,13 @@ namespace
 
         LLPointer<LLFontFreetype> a = loadFt(a_path);
         LLPointer<LLFontFreetype> b = loadFt(b_path);
-        {
-            INFO("both faces loaded");
-            REQUIRE(a.notNull());
-            REQUIRE(b.notNull());
-        }
+        REQUIRE(a.notNull());
+        REQUIRE(b.notNull());
 
         const Text s = text('a','b');
         const auto& a_first  = ALFontShaping::shapeLine(a, s, 0, s.size());
         const auto& b_first  = ALFontShaping::shapeLine(b, s, 0, s.size());
-        UNSCOPED_INFO("a shape non-empty");
         REQUIRE_FALSE(a_first.empty());
-        UNSCOPED_INFO("b shape non-empty");
         REQUIRE_FALSE(b_first.empty());
         const void* a_addr0 = a_first.data();
         const void* b_addr0 = b_first.data();
@@ -265,7 +242,7 @@ namespace
         // Hit A again: cache hit returns same storage address.
         const auto& a_second = ALFontShaping::shapeLine(a, s, 0, s.size());
         UNSCOPED_INFO("A cache hit: same backing storage");
-        REQUIRE(a_second.data() == a_addr0);
+        CHECK(a_second.data() == a_addr0);
 
         ALFontShaping::clearCacheForFace(a);
 
@@ -274,12 +251,11 @@ namespace
         // address by the allocator after clear is implementation-
         // defined and not part of the contract.)
         const auto& a_after = ALFontShaping::shapeLine(a, s, 0, s.size());
-        UNSCOPED_INFO("A re-shape produces output");
-        REQUIRE_FALSE(a_after.empty());
+        CHECK_FALSE(a_after.empty());
 
         const auto& b_after = ALFontShaping::shapeLine(b, s, 0, s.size());
         UNSCOPED_INFO("B cache survived clearCacheForFace(A)");
-        REQUIRE(b_after.data() == b_addr0);
+        CHECK(b_after.data() == b_addr0);
     }
 
     // ZWJ heart-on-fire: U+2764 U+200D U+1F525 must collapse to a
@@ -292,17 +268,14 @@ namespace
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded");
         REQUIRE(ft.notNull());
 
         // U+2764 (heart) U+200D (ZWJ) U+1F525 (fire)
         const Text s = text(0x2764, 0x200D, 0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("heart-on-fire shaped to non-empty output");
         REQUIRE_FALSE(out.empty());
-        UNSCOPED_INFO("heart-on-fire ZWJ ligated to a single glyph");
-        REQUIRE(out.size() == 1u);
+        CHECK(out.size() == 1u);
     }
 
     // VS-16 strip path: shaping U+2764 U+FE0F through Noto-COLRv1
@@ -315,13 +288,11 @@ namespace
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded");
         REQUIRE(ft.notNull());
 
         // Sanity: confirm VS-16 is genuinely absent from this font's
         // cmap (otherwise the strip path doesn't fire and the test
         // verifies nothing useful).
-        UNSCOPED_INFO("Noto-COLRv1 cmap lacks U+FE0F");
         CHECK(ft->getCharGlyphIndex(0xFE0F) == 0u);
 
         const Text with_vs    = text(0x2764, 0xFE0F);
@@ -332,13 +303,11 @@ namespace
         ALFontShaping::shapeRun(ft, with_vs,    0, with_vs.size(),    with_out);
         ALFontShaping::shapeRun(ft, without_vs, 0, without_vs.size(), without_out);
 
-        UNSCOPED_INFO("with-VS and without-VS produce same glyph count");
         REQUIRE(with_out.size() == without_out.size());
-        UNSCOPED_INFO("with-VS produced at least one glyph");
         REQUIRE_FALSE(with_out.empty());
         for (size_t i = 0; i < with_out.size(); ++i)
         {
-            UNSCOPED_INFO("with-VS glyph_id matches without-VS");
+            CAPTURE(i);
             REQUIRE(with_out[i].glyph_id == without_out[i].glyph_id);
         }
     }
@@ -359,12 +328,10 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         const Text s = text('h','i');
         const auto& first = ALFontShaping::shapeLine(ft, s, 0, s.size());
-        UNSCOPED_INFO("shape produced output");
         REQUIRE_FALSE(first.empty());
         UNSCOPED_INFO("first shape leaves one entry");
         CHECK(ALFontShaping::cacheSize() == 1u);
@@ -378,24 +345,22 @@ namespace
         // Cache hit: same storage AND the entry count stays at one.
         const auto& second = ALFontShaping::shapeLine(ft, s, 0, s.size());
         UNSCOPED_INFO("cache hit storage is stable");
-        REQUIRE(second.data() == addr0);
+        CHECK(second.data() == addr0);
         UNSCOPED_INFO("cache hit doesn't add an entry");
         CHECK(ALFontShaping::cacheSize() == 1u);
 
         ALFontShaping::clearCache();
-        UNSCOPED_INFO("clearCache empties the LRU");
         CHECK(ALFontShaping::cacheSize() == 0u);
 
         // Miss: re-shape repopulates the cache. Output content is
         // identical (shaping is deterministic given the same face +
         // codepoints); the cache state is what changed.
         const auto& after = ALFontShaping::shapeLine(ft, s, 0, s.size());
-        UNSCOPED_INFO("post-clear rebuild produced output");
         REQUIRE_FALSE(after.empty());
         UNSCOPED_INFO("post-clear miss repopulated to one entry");
         CHECK(ALFontShaping::cacheSize() == 1u);
-        UNSCOPED_INFO("post-clear shape is content-identical");
-        REQUIRE(after.size() == first_size);
+        UNSCOPED_INFO("post-clear shape has as many glyphs as the first");
+        CHECK(after.size() == first_size);
     }
 
     // Multi-hop shape run: ASCII + CJK + Emoji through a head (DejaVu)
@@ -414,12 +379,9 @@ namespace
         LLPointer<LLFontFreetype> head = loadFt(dejavu);
         LLPointer<LLFontFreetype> cjk  = loadFt(han);
         LLPointer<LLFontFreetype> emo  = loadFt(emoji);
-        {
-            INFO("all loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(cjk.notNull());
-            REQUIRE(emo.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(cjk.notNull());
+        REQUIRE(emo.notNull());
         head->addFallbackFont(cjk);
         head->addFallbackFont(emo);
 
@@ -427,16 +389,12 @@ namespace
         const Text s = text('a', 0x4F60, 0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
-        UNSCOPED_INFO("3 glyphs (one per codepoint)");
         REQUIRE(out.size() == 3u);
 
         // Each glyph carries the face it came from — verify the routing.
-        UNSCOPED_INFO("'a' routed to head (DejaVu)");
-        REQUIRE(out[0].face == head.get());
-        UNSCOPED_INFO("CJK routed to SourceHanSans");
-        REQUIRE(out[1].face == cjk.get());
-        UNSCOPED_INFO("emoji routed to Noto-COLRv1");
-        REQUIRE(out[2].face == emo.get());
+        CHECK(out[0].face == head.get());
+        CHECK(out[1].face == cjk.get());
+        CHECK(out[2].face == emo.get());
         // All three glyphs should have non-zero ids (no notdef anywhere).
         UNSCOPED_INFO("'a' resolved to non-zero glyph");
         CHECK(out[0].glyph_id != 0u);
@@ -458,7 +416,6 @@ namespace
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded");
         REQUIRE(ft.notNull());
 
         // Heart + VS-16 + ZWJ + fire. The second codepoint (FE0F) gets
@@ -468,7 +425,6 @@ namespace
         const Text s = text(0x2764, 0xFE0F, 0x200D, 0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("output non-empty");
         REQUIRE_FALSE(out.empty());
         // Whatever the final shape (ZWJ ligature collapses to 1 glyph,
         // or 2 with VS-16 stripped), every cluster must point into the
@@ -478,11 +434,8 @@ namespace
         // the strip MUST rebase past it.
         for (const auto& g : out)
         {
-            {
-                INFO("cluster points into original string range");
-                REQUIRE(g.cluster >= 0);
-                REQUIRE(g.cluster < (S32)s.size());
-            }
+            REQUIRE(g.cluster >= 0);
+            REQUIRE(g.cluster < (S32)s.size());
             UNSCOPED_INFO("cluster does NOT point at stripped VS-16 position");
             REQUIRE(g.cluster != (S32)s.at(1));
         }
@@ -502,11 +455,8 @@ namespace
 
         LLPointer<LLFontFreetype> a = loadFt(a_path);
         LLPointer<LLFontFreetype> b = loadFt(b_path);
-        {
-            INFO("both loaded");
-            REQUIRE(a.notNull());
-            REQUIRE(b.notNull());
-        }
+        REQUIRE(a.notNull());
+        REQUIRE(b.notNull());
         a->addFallbackFont(b);
 
         // Shape via A — its entry's glyph stream contains a B glyph
@@ -514,9 +464,7 @@ namespace
         const Text s = text('a', 0x4F60);
         const auto& a_first = ALFontShaping::shapeLine(a, s, 0, s.size());
         const auto& b_first = ALFontShaping::shapeLine(b, s, 0, s.size());
-        UNSCOPED_INFO("a non-empty");
         REQUIRE_FALSE(a_first.empty());
-        UNSCOPED_INFO("b non-empty");
         REQUIRE_FALSE(b_first.empty());
         const void* a_addr = a_first.data();
         const void* b_addr = b_first.data();
@@ -529,15 +477,16 @@ namespace
         // not load-bearing for the contract; B's survival is.)
         const auto& a_after = ALFontShaping::shapeLine(a, s, 0, s.size());
         const auto& b_after = ALFontShaping::shapeLine(b, s, 0, s.size());
-        UNSCOPED_INFO("A re-shape produces output");
-        REQUIRE_FALSE(a_after.empty());
+        CHECK_FALSE(a_after.empty());
+        // b_first is a reference into the cache: it dangles unless B's
+        // entry survived, so this REQUIRE guards the read below.
         UNSCOPED_INFO("B's entry survived clearCacheForFace(A)");
         REQUIRE(b_after.data() == b_addr);
         // Sanity: the data we read out of the survived B entry is the
         // same B stream we observed before — a hidden cross-purge would
         // have reset it.
         UNSCOPED_INFO("B output unchanged across A's cache flush");
-        REQUIRE(b_after.size() == b_first.size());
+        CHECK(b_after.size() == b_first.size());
     }
 
     // notdef contract: shaping a codepoint through a head with NO
@@ -551,7 +500,6 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         // U+1F525 (fire emoji) is not in DejaVuSans's cmap, and we
@@ -559,9 +507,7 @@ namespace
         const Text s = text(0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("uncovered codepoint produces 1 glyph");
         REQUIRE(out.size() == 1u);
-        UNSCOPED_INFO("uncovered codepoint glyph_id == 0 (notdef)");
         CHECK(out[0].glyph_id == 0u);
     }
 
@@ -581,17 +527,13 @@ namespace
 
         LLPointer<LLFontFreetype> head  = loadFt(head_path);
         LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
-        {
-            INFO("both loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(emoji.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(emoji.notNull());
         head->addFallbackFont(emoji);
 
         const Text s = text('9', 0xFE0F, 0x20E3);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
-        UNSCOPED_INFO("keycap shaped to non-empty output");
         REQUIRE_FALSE(out.empty());
         // The emoji face has the GSUB rule digit + U+20E3 -> keycap glyph
         // (VS-16 stripped pre-shape). All output glyphs must come from
@@ -600,7 +542,6 @@ namespace
         // '9' glyph on `head` and only the keycap mark on `emoji`.
         for (const auto& g : out)
         {
-            UNSCOPED_INFO("every keycap-cluster glyph routes to emoji face");
             REQUIRE(g.face == emoji.get());
         }
         // Strong pin: the GSUB rule actually fires across the face
@@ -608,8 +549,7 @@ namespace
         // but GSUB doesn't collapse — would leave 2+ glyphs on the
         // emoji face (the '9' outline plus an unbound keycap mark),
         // matching exactly what the user sees in the buggy report.
-        UNSCOPED_INFO("keycap '9️⃣' GSUB-collapsed to a single glyph");
-        REQUIRE(out.size() == 1u);
+        CHECK(out.size() == 1u);
     }
 
     // ZWJ heart-on-fire across face boundary: U+2764 (BMP heart, present
@@ -626,11 +566,8 @@ namespace
 
         LLPointer<LLFontFreetype> head  = loadFt(head_path);
         LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
-        {
-            INFO("both loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(emoji.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(emoji.notNull());
         head->addFallbackFont(emoji);
 
         // Sanity: head DOES carry U+2764 — selectShapingFace would
@@ -642,21 +579,17 @@ namespace
         const Text s = text(0x2764, 0xFE0F, 0x200D, 0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
-        UNSCOPED_INFO("heart-on-fire shaped to non-empty output");
         REQUIRE_FALSE(out.empty());
         for (const auto& g : out)
         {
-            UNSCOPED_INFO("every heart-on-fire glyph routes to emoji face");
             REQUIRE(g.face == emoji.get());
         }
         // Pin the ligature too — Noto-COLRv1's GSUB collapses the
-        // sequence to a single glyph. Test 6 covers the same rule when
-        // shaping directly through Noto; this asserts it still fires when
-        // the head is a non-emoji font and the cluster is routed across
-        // the fallback boundary.
-        UNSCOPED_INFO("heart-on-fire ZWJ ligated to a single glyph "
-                      "even across the fallback boundary");
-        REQUIRE(out.size() == 1u);
+        // sequence to a single glyph. The first heart-on-fire case covers
+        // the same rule when shaping directly through Noto; this asserts
+        // it still fires when the head is a non-emoji font and the
+        // cluster is routed across the fallback boundary.
+        CHECK(out.size() == 1u);
     }
 
     // Bare digit control: '9' alone (no FE0F + 20E3 follower) is NOT a
@@ -671,28 +604,22 @@ namespace
 
         LLPointer<LLFontFreetype> head  = loadFt(head_path);
         LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
-        {
-            INFO("both loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(emoji.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(emoji.notNull());
         head->addFallbackFont(emoji);
 
         const Text s = text('9');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
-        UNSCOPED_INFO("bare '9' produces one glyph");
         REQUIRE(out.size() == 1u);
-        UNSCOPED_INFO("bare '9' routes to head (not emoji fallback)");
-        REQUIRE(out[0].face == head.get());
-        UNSCOPED_INFO("bare '9' glyph_id matches head's cmap");
+        CHECK(out[0].face == head.get());
         CHECK(out[0].glyph_id == head->getCharGlyphIndex(L'9'));
     }
 
     // Hash-keycap directly through the emoji face: pin that Noto-COLRv1
     // actually has the GSUB rule for '#' + VS-16 + U+20E3 -> composed
-    // keycap (one glyph). The '9' rule is exercised by test 13 across
-    // a face boundary; this version uses Noto-COLRv1 directly so a font-
+    // keycap (one glyph). The '9' rule is exercised by the keycap 9 case
+    // across a face boundary; this version uses Noto-COLRv1 directly so a font-
     // level missing rule is observable as glyph_count > 1 (not a routing
     // bug). User report: '#️⃣' renders as '#' + a standalone keycap mark
     // — diagnosed by this test as either a font-rule miss or a routing
@@ -703,27 +630,22 @@ namespace
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded");
         REQUIRE(ft.notNull());
 
         // Sanity: the font carries '#' and U+20E3 in cmap. If either
         // were missing, hb_shape would emit notdef before any GSUB
         // could match.
-        UNSCOPED_INFO("Noto-COLRv1 has '#' in cmap");
         CHECK(ft->getCharGlyphIndex(L'#') != 0u);
-        UNSCOPED_INFO("Noto-COLRv1 has U+20E3 in cmap");
         CHECK(ft->getCharGlyphIndex(0x20E3) != 0u);
 
         const Text s = text('#', 0xFE0F, 0x20E3);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("hash-keycap shaped to non-empty output");
         REQUIRE_FALSE(out.empty());
         // If the GSUB keycap rule fires, the run collapses to a single
-        // composed glyph (the same shape test 6 / test 13 expect for
-        // their respective ligatures).
-        UNSCOPED_INFO("hash-keycap '#️⃣' GSUB-collapsed to a single glyph");
-        REQUIRE(out.size() == 1u);
+        // composed glyph (the same shape the heart-on-fire and keycap 9
+        // cases expect for their respective ligatures).
+        CHECK(out.size() == 1u);
     }
 
     // Adjacent clusters: '3️⃣' (keycap) + '🏳️‍🌈' (pride flag, ZWJ
@@ -743,11 +665,8 @@ namespace
 
         LLPointer<LLFontFreetype> head  = loadFt(head_path);
         LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
-        {
-            INFO("both loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(emoji.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(emoji.notNull());
         head->addFallbackFont(emoji);
 
         // '3' VS-16 U+20E3 (keycap), then U+1F3F3 (waving white flag)
@@ -756,11 +675,9 @@ namespace
                            0x1F3F3, 0xFE0F, 0x200D, 0x1F308);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
-        UNSCOPED_INFO("adjacent clusters shaped to non-empty output");
         REQUIRE_FALSE(out.empty());
         for (const auto& g : out)
         {
-            UNSCOPED_INFO("every glyph routes to emoji face");
             REQUIRE(g.face == emoji.get());
         }
         // Both clusters compose: keycap '3️⃣' -> 1 glyph, pride flag
@@ -769,7 +686,7 @@ namespace
         // (e.g. the pride flag's GSUB matching against the keycap mark
         // and falling back to bare white-flag + standalone rainbow).
         UNSCOPED_INFO("each adjacent cluster collapses independently");
-        REQUIRE(out.size() == 2u);
+        CHECK(out.size() == 2u);
     }
 
     // Cluster with no emoji-face coverage: route to root rather than to
@@ -789,27 +706,20 @@ namespace
 
         LLPointer<LLFontFreetype> head     = loadFt(head_path);
         LLPointer<LLFontFreetype> fallback = loadFt(fallback_path);
-        {
-            INFO("both loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(fallback.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(fallback.notNull());
         head->addFallbackFont(fallback);
 
         // Sanity: neither face has U+20E3 (keycap mark) — that's the
         // scenario this test exercises. Neither has the keycap GSUB
         // rule. Best-case outcome: the base '#' renders through root.
-        UNSCOPED_INFO("Inter lacks U+20E3");
         CHECK(head->getCharGlyphIndex(0x20E3) == 0u);
-        UNSCOPED_INFO("DejaVu lacks U+20E3");
         CHECK(fallback->getCharGlyphIndex(0x20E3) == 0u);
-        UNSCOPED_INFO("Inter has '#' in cmap");
         CHECK(head->getCharGlyphIndex(L'#') != 0u);
 
         const Text s = text('#', 0xFE0F, 0x20E3);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
-        UNSCOPED_INFO("shape produced output");
         REQUIRE_FALSE(out.empty());
         // The base '#' must end up on a face that has it (root). A
         // regression that routed to a non-covering face would tofu
@@ -840,11 +750,8 @@ namespace
 
         LLPointer<LLFontFreetype> head  = loadFt(head_path);
         LLPointer<LLFontFreetype> emoji = loadFt(emoji_path);
-        {
-            INFO("both loaded");
-            REQUIRE(head.notNull());
-            REQUIRE(emoji.notNull());
-        }
+        REQUIRE(head.notNull());
+        REQUIRE(emoji.notNull());
         head->addFallbackFont(emoji);
 
         // 🏴 (U+1F3F4) + 'g' 'b' 'e' 'n' 'g' tag chars + U+E007F.
@@ -853,7 +760,6 @@ namespace
                            0xE007F);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
-        UNSCOPED_INFO("subdivision flag shaped to non-empty output");
         REQUIRE_FALSE(out.empty());
         // Routing assertion is the load-bearing one: every cluster
         // member must land on the emoji face. A predicate regression
@@ -861,7 +767,6 @@ namespace
         // the tag bytes onto root.
         for (const auto& g : out)
         {
-            UNSCOPED_INFO("every tag-flag glyph routes to emoji face");
             REQUIRE(g.face == emoji.get());
         }
         // Stretch goal: if Noto-COLRv1 carries the GB-ENG subdivision
@@ -870,7 +775,7 @@ namespace
         // up to N glyphs, but never MORE than the input length (which
         // would mean glyph duplication).
         UNSCOPED_INFO("output glyph count never exceeds input codepoint count");
-        REQUIRE(out.size() <= s.size());
+        CHECK(out.size() <= s.size());
     }
 
     // Cell-alignment probe. For each monospace face shipped in
@@ -890,8 +795,8 @@ namespace
             "SourceCodeVF-Upright.woff2",
         };
 
-        // Mixed ASCII pool to exercise more lookups than test 2's
-        // simple AV pair: alphanumerics, punctuation, brackets,
+        // Mixed ASCII pool to exercise more lookups than the simple AV
+        // pair in alfontshaping_gl_test.cpp: alphanumerics, punctuation, brackets,
         // symbols. Repeated to 200 chars so per-glyph drift
         // accumulates measurably.
         const std::string ascii_pool =
@@ -912,16 +817,14 @@ namespace
             const std::string path = std::string(kFontDir) + fname;
             if (!fileExists(path))
                 continue;
+            CAPTURE(fname);
             LLPointer<LLFontFreetype> ft = loadFt(path);
-            UNSCOPED_INFO("monospace font loaded");
             REQUIRE(ft.notNull());
-            UNSCOPED_INFO("font is fixed-width");
             REQUIRE(ft->isFixedWidth());
             ft->setAllowMonospaceLigatures(true);  // route through HB
 
             std::vector<ALShapedGlyph> out;
             ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-            UNSCOPED_INFO("N codepoints produce N glyphs through HB");
             REQUIRE(out.size() == N);
 
             // Reference: first glyph's advance. In a fixed-width face
@@ -929,10 +832,8 @@ namespace
             // sets the canonical cell. Deliberately don't use
             // ft->getXAdvance — that path asserts !mIsFallback and
             // the probe loads as fallback to skip GL pre-warm.
-            UNSCOPED_INFO("at least one glyph");
             REQUIRE_FALSE(out.empty());
             const F32 ref_advance = out[0].x_advance;
-            UNSCOPED_INFO("reference advance positive");
             REQUIRE(ref_advance > 0.f);
 
             F32 max_dev    = 0.f;
@@ -967,16 +868,12 @@ namespace
 
             // Tolerance: 0.5px is generous — meaningful column drift
             // shows as ~1px by char ~50 in production reports.
-            UNSCOPED_INFO("per-glyph advance drift < 0.5px");
             REQUIRE(max_dev < 0.5f);
-            UNSCOPED_INFO("cumulative advance drift < 0.5px");
             REQUIRE(cumulative_dev < 0.5f);
             // Bypass writes 0 offsets; HB output should match for
             // ASCII (no GPOS positioning adjustments fire on monospace
             // ASCII with kern off).
-            UNSCOPED_INFO("HB ASCII x_offset is zero");
             REQUIRE(max_xoff < 0.5f);
-            UNSCOPED_INFO("HB ASCII y_offset is zero");
             REQUIRE(max_yoff < 0.5f);
             ++fonts_tested;
         }
@@ -1019,13 +916,11 @@ namespace
             const std::string path = std::string(kFontDir) + fname;
             if (!fileExists(path))
                 continue;
+            CAPTURE(fname);
             LLPointer<LLFontFreetype> ft = loadFt(path);
-            UNSCOPED_INFO("monospace font loaded");
             REQUIRE(ft.notNull());
-            UNSCOPED_INFO("font is fixed-width");
             REQUIRE(ft->isFixedWidth());
             // Default: ligatures off. Routes through HB with kFixedWidthStrict.
-            UNSCOPED_INFO("ligatures default off");
             REQUIRE_FALSE(ft->getAllowMonospaceLigatures());
 
             // All ASCII, so a byte is a codepoint here too.
@@ -1033,7 +928,6 @@ namespace
 
             std::vector<ALShapedGlyph> out;
             ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-            UNSCOPED_INFO("strict-mono glyph_count == codepoint_count");
             REQUIRE(out.size() == s.size());
             ++fonts_tested;
         }
@@ -1058,9 +952,7 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSansMono.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSansMono loaded");
         REQUIRE(ft.notNull());
-        UNSCOPED_INFO("DejaVuSansMono is fixed-width");
         CHECK(ft->isFixedWidth());
 
         const Text s = text(L'a', 0x0301);  // a + COMBINING ACUTE ACCENT
@@ -1075,7 +967,6 @@ namespace
                         k, out[k].glyph_id, out[k].cluster,
                         out[k].x_advance, out[k].x_offset, out[k].y_offset);
         }
-        UNSCOPED_INFO("combining cluster produces at least 1 glyph");
         REQUIRE_FALSE(out.empty());
         // Expected outcomes:
         //  (a) ccmp composed to precomposed 'á' → 1 glyph, full cell advance.
@@ -1085,7 +976,6 @@ namespace
         // Either is correct GPOS-driven behavior; the bypass produced
         // neither (it emitted 2 glyphs, both with full advance).
         const F32 ref_advance = out[0].x_advance;
-        UNSCOPED_INFO("base glyph has positive advance");
         CHECK(ref_advance > 0.f);
         if (out.size() == 1)
         {
@@ -1111,7 +1001,7 @@ namespace
     }
 
     // -----------------------------------------------------------------
-    // FT/HB consistency block (tests 23-31). Locks the integration
+    // FT/HB consistency block (the next eight cases). Locks the integration
     // invariants between FreeType and HarfBuzz so a refactor that breaks
     // size, scale, glyph identity, hinting, variation axes, cmap
     // selection, or stem-darkening surfaces immediately. Every test
@@ -1144,14 +1034,11 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         const ALFontFace* face = ft->getFontFace();
-        UNSCOPED_INFO("face accessible");
         REQUIRE(face != nullptr);
         hb_font_t* hbf = face->getHbFont();
-        UNSCOPED_INFO("hb_font accessible");
         REQUIRE(hbf != nullptr);
 
         int hb_x_scale = 0, hb_y_scale = 0;
@@ -1163,22 +1050,17 @@ namespace
         // avoid 32-bit overflow at large UPEM × scale products.
         const int expected_x = (int)((((std::uint64_t)m.x_scale * (std::uint64_t)ftf->units_per_EM) + (1u << 15)) >> 16);
         const int expected_y = (int)((((std::uint64_t)m.y_scale * (std::uint64_t)ftf->units_per_EM) + (1u << 15)) >> 16);
-        UNSCOPED_INFO("HB x_scale matches hb-ft derivation from FT state");
         CHECK(hb_x_scale == expected_x);
-        UNSCOPED_INFO("HB y_scale matches hb-ft derivation from FT state");
         CHECK(hb_y_scale == expected_y);
         // Sanity: scale must be positive (zero would mean uninitialized).
-        UNSCOPED_INFO("HB x_scale is positive");
         CHECK(hb_x_scale > 0);
-        UNSCOPED_INFO("HB y_scale is positive");
         CHECK(hb_y_scale > 0);
     }
 
-    // (test<24> intentionally absent — formerly checked hb_font_get_ppem
+    // (Audit test 24 intentionally absent — it checked hb_font_get_ppem
     // against FT ppem, but hb_ft_font_create_referenced doesn't set
-    // ppem on the HB font; only scale carries the size invariant.
-    // Keeping the gap so the audit's test numbering (23 + 25..31)
-    // matches the plan file unchanged.)
+    // ppem on the HB font; only scale carries the size invariant. This
+    // block is the audit's tests 23 and 25..31, in that order.)
 
     // For an unligatured / unkerned ASCII run, HB's per-glyph
     // x_advance must equal FT's slot->advance.x for the same glyph
@@ -1192,7 +1074,6 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         const ALFontFace* face = ft->getFontFace();
@@ -1202,19 +1083,17 @@ namespace
         const Text s = text('a','b','c','d','e','f');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("6 glyphs for 'abcdef'");
         REQUIRE(out.size() == 6u);
 
         for (size_t i = 0; i < out.size(); ++i)
         {
-            UNSCOPED_INFO("FT_Load_Glyph succeeded");
+            CAPTURE(i);
             REQUIRE(FT_Load_Glyph(ftf, out[i].glyph_id, load_flags) == 0);
             const F32 ft_advance = ftf->glyph->advance.x * (1.f / 64.f);
             // 26.6 -> float; equality in float at this precision
             // would be exact when no GPOS adjustment fired. Tolerate
             // 1/64 px to cover HB's internal rounding paths.
             const F32 delta = std::fabs(out[i].x_advance - ft_advance);
-            UNSCOPED_INFO("HB x_advance matches FT advance for unkerned glyph");
             REQUIRE(delta < (1.f / 64.f) + 1e-5f);
         }
     }
@@ -1230,21 +1109,17 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         const ALFontFace* face = ft->getFontFace();
         hb_font_t* hbf = face->getHbFont();
-        UNSCOPED_INFO("hb_font accessible");
         REQUIRE(hbf != nullptr);
 
         const int hb_flags = hb_ft_font_get_load_flags(hbf);
         const int expected = static_cast<int>(face->hinting());
-        UNSCOPED_INFO("HB load flags == (int)mHinting");
         CHECK(hb_flags == expected);
         // And confirm the cast equivalence between the two surfaces
         // (HB takes int, FT takes FT_Int32) hasn't drifted.
-        UNSCOPED_INFO("(int)mHinting == (FT_Int32)mHinting");
         CHECK(static_cast<int>(face->hinting()) ==
                       (int)static_cast<FT_Int32>(face->hinting()));
     }
@@ -1266,8 +1141,8 @@ namespace
         ALFontVarAxes va;
         va.wght = 600.f; va.wght_set = true;
         LLPointer<LLFontFreetype> ft = new LLFontFreetype;
-        UNSCOPED_INFO("InterVariable loaded at weight=600");
-        CHECK(ft->loadFace(path, /*point_size=*/14.f,
+        // A failed load leaves no face for the reads below.
+        REQUIRE(ft->loadFace(path, /*point_size=*/14.f,
                             /*vert_dpi=*/96.f, /*horz_dpi=*/96.f,
                             /*is_fallback=*/true,
                             /*face_n=*/0, EFontHinting::DEFAULT,
@@ -1276,36 +1151,30 @@ namespace
         const ALFontFace* face = ft->getFontFace();
         FT_Face ftf = face->face();
         hb_font_t* hbf = face->getHbFont();
-        UNSCOPED_INFO("hb_font accessible");
         REQUIRE(hbf != nullptr);
 
         FT_MM_Var* mm = nullptr;
-        UNSCOPED_INFO("FT_Get_MM_Var on a variable font");
         CHECK(FT_Get_MM_Var(ftf, &mm) == 0);
-        UNSCOPED_INFO("FT_MM_Var allocated");
         REQUIRE(mm != nullptr);
         const FT_UInt num_axis = mm->num_axis;
-        UNSCOPED_INFO("variable font reports >= 1 axis");
         CHECK(num_axis >= 1u);
 
         std::vector<FT_Fixed> ft_coords(num_axis);
-        UNSCOPED_INFO("FT_Get_Var_Design_Coordinates");
         CHECK(FT_Get_Var_Design_Coordinates(ftf, num_axis, ft_coords.data()) == 0);
 
         unsigned int hb_len = 0;
         const float* hb_coords = hb_font_get_var_coords_design(hbf, &hb_len);
-        UNSCOPED_INFO("HB has design coords set");
         REQUIRE(hb_coords != nullptr);
-        UNSCOPED_INFO("HB axis count matches FT");
-        CHECK(hb_len == (unsigned int)num_axis);
+        // The loop below reads hb_coords[i] for every FT axis.
+        REQUIRE(hb_len == (unsigned int)num_axis);
 
         for (FT_UInt i = 0; i < num_axis; ++i)
         {
+            CAPTURE(i);
             const float ft_design = ft_coords[i] / 65536.0f;  // 16.16 -> design
             const float delta = std::fabs(hb_coords[i] - ft_design);
             // 16.16 round-trip: equality should be exact, but allow
             // 1/65536 to cover any internal float-conversion rounding.
-            UNSCOPED_INFO("HB design coord matches FT design coord");
             REQUIRE(delta < (1.f / 65536.f) + 1e-6f);
         }
 
@@ -1320,7 +1189,6 @@ namespace
     // stem darkening.
     TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: stem darkening is off on every FreeType module that has the property", "[ALFontShaping]")
     {
-        UNSCOPED_INFO("gFTLibrary initialized");
         REQUIRE(gFTLibrary != nullptr);
 
         const char* modules[] = { "autofitter", "cff", "type1", "t1cid" };
@@ -1335,7 +1203,7 @@ namespace
             // a no-op.
             if (err != 0)
                 continue;
-            UNSCOPED_INFO(std::string("no-stem-darkening enabled on ") + mod);
+            CAPTURE(mod);
             REQUIRE(no_darken != 0);
         }
     }
@@ -1350,30 +1218,25 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         const ALFontFace* face = ft->getFontFace();
         FT_Face ftf = face->face();
-        UNSCOPED_INFO("active charmap is set");
         REQUIRE(ftf->charmap != nullptr);
-        UNSCOPED_INFO("active charmap encoding is FT_ENCODING_UNICODE");
-        CHECK((int)ftf->charmap->encoding ==
-                      (int)FT_ENCODING_UNICODE);
+        CHECK((int)ftf->charmap->encoding == (int)FT_ENCODING_UNICODE);
     }
 
     // VS-15 strip parity with VS-16: a face that lacks U+FE0E in cmap
     // must still produce identical shape output for `<base, VS-15>`
     // vs just `<base>` — the do_shape strip pass should drop VS-15
     // before HB so the notdef glyph for VS-15 doesn't sit between
-    // base and follow-up codepoints. Mirrors test<7>'s VS-16 proof.
+    // base and follow-up codepoints. Mirrors the VS-16 strip case's proof.
     TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: a VS-15 the cmap lacks is stripped as VS-16 is", "[ALFontShaping]")
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             SKIP("Noto-COLRv1.ttf not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("Noto-COLRv1 loaded");
         REQUIRE(ft.notNull());
 
         // Sanity: the test only verifies anything if Noto-COLRv1 also
@@ -1389,20 +1252,18 @@ namespace
         ALFontShaping::shapeRun(ft, with_vs,    0, with_vs.size(),    with_out);
         ALFontShaping::shapeRun(ft, without_vs, 0, without_vs.size(), without_out);
 
-        UNSCOPED_INFO("with-VS15 and without-VS15 produce same glyph count");
         REQUIRE(with_out.size() == without_out.size());
-        UNSCOPED_INFO("with-VS15 produced at least one glyph");
         REQUIRE_FALSE(with_out.empty());
         for (size_t i = 0; i < with_out.size(); ++i)
         {
-            UNSCOPED_INFO("with-VS15 glyph_id matches without-VS15");
+            CAPTURE(i);
             REQUIRE(with_out[i].glyph_id == without_out[i].glyph_id);
         }
     }
 
     // Identity check between codepoint→glyph (cmap) and shape result
-    // for a non-Latin codepoint that DejaVuSans covers. test<2> covers
-    // ASCII; this extends the contract to the upper BMP so a regression
+    // for a non-Latin codepoint that DejaVuSans covers. The ASCII case
+    // covers ASCII; this extends the contract to the upper BMP so a regression
     // limited to Unicode-cmap binding (Defect B in the audit plan) is
     // caught even when ASCII still works.
     TEST_CASE_METHOD(alfontshaping_data, "ALFontShaping: a non-ASCII codepoint shapes to the glyph the cmap gives it", "[ALFontShaping]")
@@ -1411,7 +1272,6 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         // Pick the first non-ASCII codepoint the face has. DejaVuSans
@@ -1432,11 +1292,8 @@ namespace
         const Text s = text(wch);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("1 glyph for non-ASCII codepoint");
         REQUIRE(out.size() == 1u);
-        UNSCOPED_INFO("shape glyph_id matches cmap lookup");
         CHECK(out[0].glyph_id == ft->getCharGlyphIndex(wch));
-        UNSCOPED_INFO("non-ASCII glyph has positive advance");
         CHECK(out[0].x_advance > 0.f);
     }
 
@@ -1452,7 +1309,6 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         // begin/end are written as codepoint indices and converted per case.
@@ -1469,6 +1325,7 @@ namespace
 
         for (size_t ci = 0; ci < cases.size(); ++ci)
         {
+            CAPTURE(ci);
             const auto& c = cases[ci];
             const size_t begin_bytes = c.s.at(c.begin);
             const size_t end_bytes   = c.s.at(c.end);
@@ -1476,9 +1333,7 @@ namespace
             ALFontShaping::shapeRun(ft, c.s, begin_bytes, end_bytes, out);
             for (const auto& g : out)
             {
-                UNSCOPED_INFO(("cluster >= begin (case " + std::to_string(ci) + ")").c_str());
                 REQUIRE(g.cluster >= (S32)begin_bytes);
-                UNSCOPED_INFO(("cluster < end (case " + std::to_string(ci) + ")").c_str());
                 REQUIRE(g.cluster < (S32)end_bytes);
             }
         }
@@ -1502,7 +1357,6 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFt(path);
-        UNSCOPED_INFO("DejaVuSans loaded");
         REQUIRE(ft.notNull());
 
         // "X" + trans flag (5 cps, [1, 6)) + "Y". The cluster walker
@@ -1514,7 +1368,6 @@ namespace
                            0xFE0F, L'Y');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        UNSCOPED_INFO("shape produced output");
         REQUIRE_FALSE(out.empty());
 
         // Every glyph whose cluster falls inside the flag must report the
@@ -1526,7 +1379,7 @@ namespace
         {
             if (g.cluster >= flag_begin && g.cluster < flag_end)
                 saw_cluster_glyph = true;
-            UNSCOPED_INFO("trans-flag cluster glyphs collapse to cluster start");
+            CAPTURE(g.cluster, flag_begin, flag_end);
             REQUIRE_FALSE((g.cluster > flag_begin && g.cluster < flag_end));
         }
         UNSCOPED_INFO("at least one glyph routed through the cluster sub-run "
@@ -1553,22 +1406,16 @@ namespace
 
         LLPointer<LLFontFreetype> a = loadFt(a_path);
         LLPointer<LLFontFreetype> b = loadFt(b_path);
-        {
-            INFO("both loaded");
-            REQUIRE(a.notNull());
-            REQUIRE(b.notNull());
-        }
+        REQUIRE(a.notNull());
+        REQUIRE(b.notNull());
 
         // Pre-fallback shape: U+4F60 (你) is not in DejaVuSans's cmap, so
         // HB returns one notdef glyph (glyph_id=0) on face A.
         const Text s = text(0x4F60);
         std::vector<ALShapedGlyph> pre;
         ALFontShaping::shapeRun(a, s, 0, s.size(), pre);
-        UNSCOPED_INFO("pre-fallback shape produces 1 glyph");
         REQUIRE(pre.size() == 1u);
-        UNSCOPED_INFO("pre-fallback glyph routes to head A");
-        REQUIRE(pre[0].face == a.get());
-        UNSCOPED_INFO("pre-fallback glyph is notdef (glyph_id=0)");
+        CHECK(pre[0].face == a.get());
         CHECK(pre[0].glyph_id == 0u);
         UNSCOPED_INFO("pre-fallback shape leaves one cache entry");
         CHECK(ALFontShaping::cacheSize() == 1u);
@@ -1584,11 +1431,8 @@ namespace
         // non-zero glyph_id (B has the CJK glyph in its cmap).
         std::vector<ALShapedGlyph> post;
         ALFontShaping::shapeRun(a, s, 0, s.size(), post);
-        UNSCOPED_INFO("post-fallback shape produces 1 glyph");
         REQUIRE(post.size() == 1u);
-        UNSCOPED_INFO("post-fallback glyph routes to fallback B");
-        REQUIRE(post[0].face == b.get());
-        UNSCOPED_INFO("post-fallback glyph is real (not notdef)");
+        CHECK(post[0].face == b.get());
         CHECK(post[0].glyph_id != 0u);
     }
 

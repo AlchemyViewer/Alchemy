@@ -82,7 +82,6 @@ namespace
 
         void setUp()
         {
-            UNSCOPED_INFO("target allocates");
             REQUIRE(mTarget.allocate(SIZE, SIZE, GL_RGBA8));
         }
 
@@ -97,17 +96,13 @@ namespace
         setUp();
         mTarget.bindTarget();
         gGL.setClearColor(LLColor4::red);
-        UNSCOPED_INFO("GL holds the cached colour");
         CHECK(glClearValue() == gGL.getClearColor());
         mTarget.clear();
-        UNSCOPED_INFO("cleared red");
         CHECK(pixel(1, 1) == RED);
         gGL.setClearColor(LLColor4::green);
         mTarget.clear();
-        UNSCOPED_INFO("cleared green");
         CHECK(pixel(1, 1) == GREEN);
         mTarget.flush();
-        UNSCOPED_INFO("no GL error");
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -126,18 +121,13 @@ namespace
         CHECK(glClearValue() == LLColor4::red);
 
         gGL.refreshState();
-        UNSCOPED_INFO("refreshState restores the clear colour");
         CHECK(glClearValue() == LLColor4::green);
         S32 box[4];
         glScissorBox(box);
-        {
-            INFO("refreshState restores the scissor box");
-            CHECK(box[0] == 1);
-            CHECK(box[1] == 1);
-            CHECK(box[2] == 2);
-            CHECK(box[3] == 2);
-        }
-        UNSCOPED_INFO("no GL error");
+        CHECK(box[0] == 1);
+        CHECK(box[1] == 1);
+        CHECK(box[2] == 2);
+        CHECK(box[3] == 2);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -198,11 +188,10 @@ namespace
             CHECK(box[3] == (S32)SIZE);
         }
         mTarget.flush();
-        UNSCOPED_INFO("no GL error");
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
-    // And the patch size, on a context with tessellation to have one.
+    // refreshState puts back the patch size too, on a context with tessellation to have one.
     TEST_CASE_METHOD(alrenderstate_data, "alrenderstate_gl: refreshState puts back the patch size gGL holds", "[alrenderstate_gl]")
     {
         if (!glPatchParameteri)
@@ -232,9 +221,7 @@ namespace
 
         gGL.refreshState();
         glGetIntegerv(GL_PATCH_VERTICES, &patch);
-        UNSCOPED_INFO("refreshState restores the patch size");
         CHECK((S32)patch == 4);
-        UNSCOPED_INFO("no GL error");
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }

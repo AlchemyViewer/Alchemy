@@ -45,11 +45,8 @@ namespace
     {
         LLFontBitmapCache a;
         LLFontBitmapCache b;
-        UNSCOPED_INFO("two instances get distinct generations");
         CHECK(a.getCacheGeneration() != b.getCacheGeneration());
-        UNSCOPED_INFO("first generation > 0");
         CHECK(a.getCacheGeneration() > 0);
-        UNSCOPED_INFO("second generation > first");
         CHECK(b.getCacheGeneration() > a.getCacheGeneration());
     }
 
@@ -61,9 +58,7 @@ namespace
         const S32 before = LLFontBitmapCache::getGlobalGeneration();
         LLFontBitmapCache c;
         const S32 after  = LLFontBitmapCache::getGlobalGeneration();
-        UNSCOPED_INFO("global generation strictly increased on construction");
         CHECK(after > before);
-        UNSCOPED_INFO("global generation matches new instance's gen");
         CHECK(after == c.getCacheGeneration());
     }
 
@@ -76,17 +71,12 @@ namespace
 
         c.init(/*max_char_width=*/2, /*max_char_height=*/2);
         // 2*40=80 → next pow2 ≥ 80 → 128, capped at 1024.
-        UNSCOPED_INFO("bitmap width set by init");
         CHECK(c.getBitmapWidth() == 128);
-        UNSCOPED_INFO("bitmap height set by init");
         CHECK(c.getBitmapHeight() == 128);
 
         c.reset();
-        UNSCOPED_INFO("bitmap width cleared by reset");
         CHECK(c.getBitmapWidth() == 0);
-        UNSCOPED_INFO("bitmap height cleared by reset");
         CHECK(c.getBitmapHeight() == 0);
-        UNSCOPED_INFO("reset bumped generation");
         CHECK(c.getCacheGeneration() > gen_init0);
     }
 
@@ -96,17 +86,13 @@ namespace
     TEST_CASE("LLFontBitmapCache: queries out of range or on an empty cache return safe defaults", "[LLFontBitmapCache]")
     {
         LLFontBitmapCache c;
-        UNSCOPED_INFO("getNumBitmaps(Count) returns 0");
         CHECK(c.getNumBitmaps(EFontGlyphType::Count) == 0u);
-        UNSCOPED_INFO("getImageRaw(Count, 0) returns null");
-        REQUIRE(c.getImageRaw(EFontGlyphType::Count, 0) == nullptr);
-        UNSCOPED_INFO("getImageGL(Count, 0) returns null");
-        REQUIRE(c.getImageGL(EFontGlyphType::Count, 0) == nullptr);
-        UNSCOPED_INFO("getImageRaw on empty Grayscale returns null");
-        REQUIRE(c.getImageRaw(EFontGlyphType::Grayscale, 0) == nullptr);
-        UNSCOPED_INFO("getSheetLastUsedTime out-of-range == 0");
+        CHECK(c.getImageRaw(EFontGlyphType::Count, 0) == nullptr);
+        CHECK(c.getImageGL(EFontGlyphType::Count, 0) == nullptr);
+        UNSCOPED_INFO("an empty Grayscale vector");
+        CHECK(c.getImageRaw(EFontGlyphType::Grayscale, 0) == nullptr);
         CHECK(c.getSheetLastUsedTime(EFontGlyphType::Grayscale, 0) == 0.0);
-        UNSCOPED_INFO("isSheetReleased on empty cache reports false (slot doesn't exist)");
+        UNSCOPED_INFO("a slot that does not exist is not released");
         CHECK_FALSE(c.isSheetReleased(EFontGlyphType::Grayscale, 0));
     }
 }

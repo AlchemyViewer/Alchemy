@@ -126,7 +126,6 @@ namespace
     TEST_CASE_METHOD(llfonttextcache_data, "LLFontTextCache: a default-constructed cache destroys cleanly", "[LLFontTextCache]")
     {
         LLFontTextCache vb;
-        UNSCOPED_INFO("default-constructed buffer reaches end-of-scope");
         CHECK(true);
         // Implicit destruct at scope exit; assertion above catches any
         // crash during dtor by being unreached.
@@ -138,7 +137,6 @@ namespace
         LLFontTextCache vb;
         vb.reset();
         vb.reset();  // idempotent
-        UNSCOPED_INFO("reset on fresh buffer returns cleanly");
         CHECK(true);
     }
 
@@ -151,7 +149,6 @@ namespace
         LLFontTextCache::enableBufferCollection(true);
         LLFontTextCache::enableColorOnlyRegen(false);
         LLFontTextCache::enableColorOnlyRegen(true);
-        UNSCOPED_INFO("static toggles set/reset without crash");
         CHECK(true);
     }
 
@@ -161,7 +158,6 @@ namespace
         LLFontTextCache wb;
         wb.reset();
         wb.reset();
-        UNSCOPED_INFO("LLFontTextCache construct + reset return cleanly");
         CHECK(true);
         LLFontTextCache::enableBufferCollection(false);
         LLFontTextCache::enableBufferCollection(true);
@@ -180,7 +176,6 @@ namespace
         b.reset();
         w1.reset();
         w2.reset();
-        UNSCOPED_INFO("multiple coexisting buffers reset cleanly");
         CHECK(true);
     }
 
@@ -197,7 +192,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
@@ -205,11 +199,10 @@ namespace
         const F32 first  = wb.getWidthBytes(font, s, 0, 5, false);
         const F32 second = wb.getWidthBytes(font, s, 0, 5, false);
         const F32 ref    = font->getWidthF32Bytes(s, 0, 5, false);
-        UNSCOPED_INFO("first width matches getWidthF32");
+        UNSCOPED_INFO("first width matches getWidthF32Bytes");
         CHECK(first == ref);
         UNSCOPED_INFO("second call same as first (cache hit)");
         CHECK(second == first);
-        UNSCOPED_INFO("width is positive");
         CHECK(first > 0.f);
     }
 
@@ -221,14 +214,12 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
         LLFontTextCache wb;
         const F32 w_5 = wb.getWidthBytes(font, s, 0, 5, false);
         const F32 w_3 = wb.getWidthBytes(font, s, 0, 3, false);
-        UNSCOPED_INFO("width(5) > width(3)");
         CHECK(w_5 > w_3);
         const F32 w_3_again = wb.getWidthBytes(font, s, 0, 3, false);
         UNSCOPED_INFO("identical max_chars hits cache");
@@ -242,7 +233,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
@@ -268,7 +258,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
@@ -296,7 +285,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
@@ -320,7 +308,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
@@ -342,7 +329,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
 
         // "A", a three-byte character, "B": five bytes, three characters.
@@ -357,6 +343,7 @@ namespace
         LLFontTextCache wb;
         for (S32 bound : { 0, 1, 4, 5 })
         {
+            CAPTURE(bound);
             const F32 cached = wb.getWidthBytes(font, s, 0, bound, false);
             UNSCOPED_INFO("cached width agrees with the font");
             REQUIRE(cached == font->getWidthF32Bytes(s, 0, bound, false));
@@ -398,14 +385,12 @@ namespace
         // Same length, differing at the front and at the back -- the second is
         // what a sample taken only from the front would miss.
         ALFontCacheKey front;
-        UNSCOPED_INFO("records");
         REQUIRE(front.sameTextAsRecorded("Received Items"));
         UNSCOPED_INFO("a different string of the same length is caught");
         CHECK_FALSE(front.sameTextAsRecorded("Xeceived Items"));
 
         ALFontCacheKey back;
         const std::string common(64, 'a');
-        UNSCOPED_INFO("records");
         REQUIRE(back.sameTextAsRecorded(common + "tail"));
         UNSCOPED_INFO("a difference past the sampled front is caught");
         CHECK_FALSE(back.sameTextAsRecorded(common + "tai1"));
@@ -450,7 +435,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
@@ -462,7 +446,6 @@ namespace
                                 LLFontGL::LEFT, LLFontGL::BASELINE,
                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
                                 /*max_chars=*/5);
-        UNSCOPED_INFO("render returned 5 chars");
         CHECK(n == 5);
     }
 
@@ -476,7 +459,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
@@ -510,7 +492,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
@@ -540,7 +521,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "AB";
 
@@ -555,7 +535,6 @@ namespace
                                  LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
         UNSCOPED_INFO("char count stable after geometry change");
         CHECK(n1 == n2);
-        UNSCOPED_INFO("both calls returned positive count");
         CHECK(n1 > 0);
     }
 
@@ -568,7 +547,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
@@ -597,7 +575,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
         const std::string s = "Hi";
 
@@ -611,7 +588,6 @@ namespace
                                      LLFontGL::BOLD, LLFontGL::NO_SHADOW, 2);
         UNSCOPED_INFO("char count stable across style flip");
         CHECK(n_norm == n_bold);
-        UNSCOPED_INFO("both renders returned positive");
         CHECK(n_norm > 0);
     }
 
@@ -626,7 +602,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;
@@ -679,7 +654,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;
@@ -718,7 +692,7 @@ namespace
                                       /*use_ellipses=*/true,
                                       true);
         UNSCOPED_INFO("full-fit render returns the entire string length");
-        REQUIRE(n_full == (S32)s.length());
+        CHECK(n_full == (S32)s.length());
     }
 
     // Moving text does not rebuild it. Glyph geometry is built relative to the
@@ -731,7 +705,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;
@@ -807,7 +780,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;
@@ -877,7 +849,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font available");
         REQUIRE(font != nullptr);
 
         ll_test::FontStateScope scope;

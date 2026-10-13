@@ -111,10 +111,8 @@ namespace
                             /*font_overrides=*/LLSD(),
                             /*create_gl_textures=*/true);
 
-        UNSCOPED_INFO("default fonts loaded");
         CHECK(LLFontGL::loadDefaultFonts());
-        UNSCOPED_INFO("SansSerif resolves");
-        REQUIRE(LLFontGL::getFontSansSerif() != nullptr);
+        CHECK(LLFontGL::getFontSansSerif() != nullptr);
     }
 
     // After ASCII rasterization, the SansSerif font's bitmap cache
@@ -137,7 +135,6 @@ namespace
                             LLSD(), /*create_gl_textures=*/true);
 
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("SansSerif resolves");
         REQUIRE(font != nullptr);
 
         // Force the ASCII range to rasterize so the atlas isn't empty.
@@ -146,19 +143,14 @@ namespace
         font->generateASCIIglyphs();
 
         const LLFontFreetype* ft = font->getFontFreetype();
-        UNSCOPED_INFO("LLFontFreetype present");
         REQUIRE(ft != nullptr);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        UNSCOPED_INFO("bitmap cache present");
         REQUIRE(cache != nullptr);
-        UNSCOPED_INFO("at least one grayscale atlas page");
         CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
 
         LLImageGL* page = cache->getImageGL(EFontGlyphType::Grayscale, 0);
-        UNSCOPED_INFO("page 0 LLImageGL present");
         REQUIRE(page != nullptr);
-        UNSCOPED_INFO("page 0 has a live GL texture name");
         CHECK(page->getTexName() != 0);
     }
 
@@ -173,12 +165,10 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* mono = LLFontGL::getFontMonospace();
-        UNSCOPED_INFO("Monospace resolves");
         REQUIRE(mono != nullptr);
         const LLFontFreetype* ft = mono->getFontFreetype();
-        UNSCOPED_INFO("Monospace has a freetype");
         REQUIRE(ft != nullptr);
-        UNSCOPED_INFO("Monospace freetype is fixed-width: " + ft->getName());
+        INFO("Monospace resolved to " << ft->getName());
         CHECK(ft->isFixedWidth());
     }
 
@@ -193,17 +183,12 @@ namespace
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* small = LLFontGL::getFontSansSerifSmall();
         LLFontGL* big   = LLFontGL::getFontSansSerifBig();
-        UNSCOPED_INFO("Small SansSerif resolves");
         REQUIRE(small != nullptr);
-        UNSCOPED_INFO("Big   SansSerif resolves");
         REQUIRE(big   != nullptr);
         const LLFontFreetype* fs = small->getFontFreetype();
         const LLFontFreetype* fb = big->getFontFreetype();
-        UNSCOPED_INFO("Small line-height > 0");
         CHECK(fs->getLineHeight() > 0.f);
-        UNSCOPED_INFO("Big   line-height > 0");
         CHECK(fb->getLineHeight() > 0.f);
-        UNSCOPED_INFO("Big line-height > Small line-height");
         CHECK(fb->getLineHeight() > fs->getLineHeight());
     }
 
@@ -219,10 +204,8 @@ namespace
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* a = LLFontGL::getFontSansSerif();
         LLFontGL* b = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("first resolve non-null");
         REQUIRE(a != nullptr);
-        UNSCOPED_INFO("second resolve returns the same instance");
-        REQUIRE(a == b);
+        CHECK(a == b);
     }
 
     // generateASCIIglyphs is idempotent — repeat calls don't allocate
@@ -235,19 +218,16 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         font->generateASCIIglyphs();
         const LLFontFreetype* ft    = font->getFontFreetype();
         const LLFontBitmapCache* bc = ft->getFontBitmapCache();
         const U32 sheets_after_first = bc->getNumBitmaps(EFontGlyphType::Grayscale);
-        UNSCOPED_INFO("at least one sheet after first generate");
         CHECK(sheets_after_first >= 1u);
 
         font->generateASCIIglyphs();
         const U32 sheets_after_second = bc->getNumBitmaps(EFontGlyphType::Grayscale);
-        UNSCOPED_INFO("second generate is idempotent (no extra sheets)");
         CHECK(sheets_after_second == sheets_after_first);
     }
 
@@ -261,10 +241,8 @@ namespace
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* a = LLFontGL::getFontByName("SANSSERIF");
         LLFontGL* b = LLFontGL::getFontByName("SANSSERIF");
-        UNSCOPED_INFO("legacy name resolves to non-null");
         REQUIRE(a != nullptr);
-        UNSCOPED_INFO("repeat lookup returns same instance");
-        REQUIRE(a == b);
+        CHECK(a == b);
     }
 
     // collectGarbage on the font face does not crash and (since
@@ -279,10 +257,8 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
         const LLFontFreetype* ft = font->getFontFreetype();
-        UNSCOPED_INFO("freetype present");
         REQUIRE(ft != nullptr);
 
         // What a sweep must not do is disturb glyphs still in use. Measure
@@ -298,7 +274,6 @@ namespace
         CHECK(before > 0.f);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        UNSCOPED_INFO("bitmap cache present");
         REQUIRE(cache != nullptr);
         const U32 pages_before = cache->getNumBitmaps(EFontGlyphType::Grayscale);
 
@@ -327,7 +302,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* before = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("first resolve non-null");
         REQUIRE(before != nullptr);
 
         // Re-call initClass with different DPI. The single-shot
@@ -336,8 +310,7 @@ namespace
         LLFontGL::initClass(72.f, 0.5f, 0.5f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* after = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("second resolve returns same instance after re-init");
-        REQUIRE(after == before);
+        CHECK(after == before);
     }
 
     // Static getter family — every named getter must resolve to a
@@ -349,28 +322,17 @@ namespace
             SKIP("fonts.xml not found");
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
-        UNSCOPED_INFO("SansSerif");
-        REQUIRE(LLFontGL::getFontSansSerif()           != nullptr);
-        UNSCOPED_INFO("SansSerifSmall");
-        REQUIRE(LLFontGL::getFontSansSerifSmall()      != nullptr);
-        UNSCOPED_INFO("SansSerifSmallBold");
-        REQUIRE(LLFontGL::getFontSansSerifSmallBold()  != nullptr);
-        UNSCOPED_INFO("SansSerifBig");
-        REQUIRE(LLFontGL::getFontSansSerifBig()        != nullptr);
-        UNSCOPED_INFO("SansSerifHuge");
-        REQUIRE(LLFontGL::getFontSansSerifHuge()       != nullptr);
-        UNSCOPED_INFO("SansSerifBold");
-        REQUIRE(LLFontGL::getFontSansSerifBold()       != nullptr);
-        UNSCOPED_INFO("Monospace");
-        REQUIRE(LLFontGL::getFontMonospace()           != nullptr);
-        UNSCOPED_INFO("EmojiSmall");
-        REQUIRE(LLFontGL::getFontEmojiSmall()          != nullptr);
-        UNSCOPED_INFO("EmojiMedium");
-        REQUIRE(LLFontGL::getFontEmojiMedium()         != nullptr);
-        UNSCOPED_INFO("EmojiLarge");
-        REQUIRE(LLFontGL::getFontEmojiLarge()          != nullptr);
-        UNSCOPED_INFO("FontDefault");
-        REQUIRE(LLFontGL::getFontDefault()             != nullptr);
+        CHECK(LLFontGL::getFontSansSerif()           != nullptr);
+        CHECK(LLFontGL::getFontSansSerifSmall()      != nullptr);
+        CHECK(LLFontGL::getFontSansSerifSmallBold()  != nullptr);
+        CHECK(LLFontGL::getFontSansSerifBig()        != nullptr);
+        CHECK(LLFontGL::getFontSansSerifHuge()       != nullptr);
+        CHECK(LLFontGL::getFontSansSerifBold()       != nullptr);
+        CHECK(LLFontGL::getFontMonospace()           != nullptr);
+        CHECK(LLFontGL::getFontEmojiSmall()          != nullptr);
+        CHECK(LLFontGL::getFontEmojiMedium()         != nullptr);
+        CHECK(LLFontGL::getFontEmojiLarge()          != nullptr);
+        CHECK(LLFontGL::getFontDefault()             != nullptr);
     }
 
     // getWidthF32: the whole-string overload defaults to the text's length;
@@ -382,7 +344,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
         const std::string s = "Hello";
         const F32 wfull = font->getWidthF32(s);
@@ -390,7 +351,6 @@ namespace
                                                  (S32)s.size(), false);
         UNSCOPED_INFO("getWidthF32 with default max == explicit max");
         CHECK(wfull == wexp);
-        UNSCOPED_INFO("width is positive");
         CHECK(wfull > 0.f);
     }
 
@@ -405,16 +365,12 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
         const F32 w1 = font->getWidthF32(std::string("A"));
         const F32 w2 = font->getWidthF32(std::string("AA"));
         const F32 w3 = font->getWidthF32(std::string("AAA"));
-        UNSCOPED_INFO("width(A) > 0");
         CHECK(w1 > 0.f);
-        UNSCOPED_INFO("width(AA) > width(A)");
         CHECK(w2 > w1);
-        UNSCOPED_INFO("width(AAA) > width(AA)");
         CHECK(w3 > w2);
     }
 
@@ -429,10 +385,8 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
         const F32 w = font->getWidthF32(std::string("...."));
-        UNSCOPED_INFO("ellipsis width is positive");
         CHECK(w > 0.f);
     }
 
@@ -445,15 +399,12 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
         const std::string s = "Hello";
 
-        UNSCOPED_INFO("budget 0 fits nothing");
-        REQUIRE(font->maxDrawableBytes(s, 0.f, (S32)s.size()) ==
+        CHECK(font->maxDrawableBytes(s, 0.f, (S32)s.size()) ==
                       (S32)0);
-        UNSCOPED_INFO("budget F32_MAX fits the whole string");
-        REQUIRE(font->maxDrawableBytes(s, F32_MAX,
+        CHECK(font->maxDrawableBytes(s, F32_MAX,
                                              (S32)s.size()) ==
                       (S32)s.size());
         // Find a budget that should fit "Hel" but not "Hell".
@@ -463,7 +414,7 @@ namespace
         const F32 mid_budget = (w_hel + w_hell) * 0.5f;
         const S32 fit = font->maxDrawableBytes(s, mid_budget,
                                                (S32)s.size());
-        UNSCOPED_INFO("partial-budget fit is in [3, 3] (Hel exactly)");
+        UNSCOPED_INFO("a budget halfway between Hel and Hell fits Hel");
         CHECK(fit == 3);
     }
 
@@ -477,7 +428,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
         const std::string s = "Hello";
         // ASCII, so one byte per character: prefix lengths 0..5.
@@ -523,7 +473,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         const std::string a_s  = "a";
@@ -537,7 +486,6 @@ namespace
             SKIP("font's fallback chain doesn't cover U+4F60");
         // Tolerance: ~0.5 px accounts for sub-pixel positioning across
         // shape-range boundaries.
-        UNSCOPED_INFO("width(a你) ≈ width(a) + width(你) within 0.5px");
         CHECK(std::abs(wac - (wa + wc)) <= 0.5f);
     }
 
@@ -562,13 +510,10 @@ namespace
         for (U8 style : cases)
         {
             const std::string s = LLFontGL::getStringFromStyle(style);
-            UNSCOPED_INFO("string output is non-empty");
+            CAPTURE(s);
             REQUIRE_FALSE(s.empty());
-            UNSCOPED_INFO("no leading pipe");
             REQUIRE(s.front() != '|');
-            UNSCOPED_INFO("no trailing pipe");
             REQUIRE(s.back() != '|');
-            UNSCOPED_INFO("round-trip preserves style bits");
             REQUIRE(LLFontGL::getStyleFromString(s) == style);
         }
 
@@ -578,10 +523,8 @@ namespace
         CHECK(LLFontGL::getStyleFromString("FAUX-BOLD") == 0);
         UNSCOPED_INFO("NOTBOLD does not set BOLD");
         CHECK(LLFontGL::getStyleFromString("NOTBOLD") == 0);
-        UNSCOPED_INFO("empty string is NORMAL");
         CHECK(LLFontGL::getStyleFromString("") ==
                       LLFontGL::NORMAL);
-        UNSCOPED_INFO("BOLD|ITALIC tokenizes correctly");
         CHECK(LLFontGL::getStyleFromString("BOLD|ITALIC") ==
                       (LLFontGL::BOLD | LLFontGL::ITALIC));
     }
@@ -602,7 +545,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         // "X" + trans flag (5 codepoints) + "Y". The cluster's byte bounds
@@ -644,6 +586,7 @@ namespace
             const S32 pos = font->byteFromPixelOffset(s, 0,
                                                       x, F32_MAX,
                                                       total, /*round=*/true);
+            CAPTURE(x, pos);
             const bool inside_cluster = (pos > cluster_start && pos < cluster_end);
             UNSCOPED_INFO("byteFromPixelOffset round=true returns mid-cluster offset");
             REQUIRE_FALSE(inside_cluster);
@@ -664,7 +607,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         // Byte bounds recorded as the string is built: the five codepoints of
@@ -692,6 +634,7 @@ namespace
         for (F32 px = 0.f; px <= wfull + 2.f; px += 0.5f)
         {
             const S32 first = font->firstDrawableByte(s, px);
+            CAPTURE(px, first);
             {
                 INFO("firstDrawableByte names a position inside the text");
                 REQUIRE(first >= 0);
@@ -716,7 +659,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         // "a", e-acute (two bytes), "b", "c" -- so byte 2 is the only offset
@@ -735,7 +677,8 @@ namespace
         for (F32 px = 0.f; px <= wfull + 2.f; px += 0.25f)
         {
             const S32 first = font->firstDrawableByte(s, px);
-            UNSCOPED_INFO("a larger budget starts drawing later");
+            CAPTURE(px);
+            UNSCOPED_INFO("a larger budget starts drawing no later");
             REQUIRE(first <= previous);
             previous = first;
             seen.insert(first);
@@ -757,7 +700,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         const std::string s = "Hello";
@@ -779,6 +721,7 @@ namespace
         // with room to spare the answer is the beginning whichever it is.
         for (S32 start = 0; start < total; ++start)
         {
+            CAPTURE(start);
             UNSCOPED_INFO("room for everything draws from the beginning");
             REQUIRE(font->firstDrawableByte(s, F32_MAX, start) == (S32)0);
             UNSCOPED_INFO("no room draws the character asked for");
@@ -796,7 +739,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         // Three characters, three bytes each.
@@ -841,7 +783,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         // "A", a three-byte character, "B" -- and the tail on its own.
@@ -854,10 +795,10 @@ namespace
         CHECK(font->getWidthF32Bytes(s, 1, S32_MAX, false) ==
                       font->getWidthF32Bytes(tail, 0, S32_MAX, false));
         UNSCOPED_INFO("S32_MAX from a non-zero offset does not overflow");
-        REQUIRE(font->getWidthF32Bytes(s, 1, S32_MAX, false) ==
+        CHECK(font->getWidthF32Bytes(s, 1, S32_MAX, false) ==
                       font->getWidthF32Bytes(s, 1, (S32)s.size() - 1, false));
         UNSCOPED_INFO("an offset at the end measures nothing");
-        REQUIRE(font->getWidthF32Bytes(s, (S32)s.size(), S32_MAX, false) == 0.f);
+        CHECK(font->getWidthF32Bytes(s, (S32)s.size(), S32_MAX, false) == 0.f);
 
         // Hit-testing from an offset answers in the same frame of reference.
         const F32 w_tail_first = font->getWidthF32Bytes(tail, 0, 3, false);
@@ -885,7 +826,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         const std::string s = "alpha beta";
@@ -942,7 +882,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         // Long enough that a small pixel budget windows well inside it, in a
@@ -970,6 +909,7 @@ namespace
         for (F32 px = 8.f; px < 900.f; px += 13.f)
         {
             const S32 got = font->maxDrawableBytes(s, px, total, LLFontGL::ANYWHERE);
+            CAPTURE(px, got);
             {
                 INFO("the answer stays inside the text");
                 REQUIRE(got >= 0);
@@ -998,6 +938,7 @@ namespace
             for (F32 px = 24.f; px < 900.f; px += 37.f)
             {
                 const S32 got = font->maxDrawableBytes(s, px, total, style);
+                CAPTURE(style, px, got);
                 {
                     INFO("a word-boundary answer stays inside the text");
                     REQUIRE(got >= 0);
@@ -1062,7 +1003,6 @@ namespace
         LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         // A chat line long enough to wrap several times at a readable width.
@@ -1139,7 +1079,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         gl.clearFramebuffer();
@@ -1162,7 +1101,6 @@ namespace
         // Force any pending verts to draw.
         gGL.flush();
         gGL.endList();
-        UNSCOPED_INFO("render returned 1 char");
         CHECK(n == 1);
 
         U32 verts = 0;
@@ -1202,11 +1140,8 @@ namespace
                                          LLFontGL::RIGHT, LLFontGL::BASELINE,
                                          LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 3);
         gGL.flush();
-        UNSCOPED_INFO("LEFT render returns 3 bytes");
         CHECK(n_left == 3);
-        UNSCOPED_INFO("HCENTER render returns 3 bytes");
         CHECK(n_cen == 3);
-        UNSCOPED_INFO("RIGHT render returns 3 bytes");
         CHECK(n_right == 3);
     }
 
@@ -1231,11 +1166,8 @@ namespace
                                        LLFontGL::LEFT, LLFontGL::BOTTOM,
                                        LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
         gGL.flush();
-        UNSCOPED_INFO("TOP render returns 2 bytes");
         CHECK(n_top == 2);
-        UNSCOPED_INFO("BASELINE render returns 2 bytes");
         CHECK(n_bs == 2);
-        UNSCOPED_INFO("BOTTOM render returns 2 bytes");
         CHECK(n_btm == 2);
     }
 
@@ -1259,11 +1191,8 @@ namespace
                                         LLFontGL::LEFT, LLFontGL::BASELINE,
                                         LLFontGL::UNDERLINE, LLFontGL::NO_SHADOW, 5);
         gGL.flush();
-        UNSCOPED_INFO("NORMAL render returns 5 bytes");
         CHECK(n_norm == 5);
-        UNSCOPED_INFO("BOLD render returns 5 bytes");
         CHECK(n_bold == 5);
-        UNSCOPED_INFO("UNDERLINE render returns 5 bytes");
         CHECK(n_und == 5);
     }
 
@@ -1291,11 +1220,8 @@ namespace
                                         LLFontGL::LEFT, LLFontGL::BASELINE,
                                         LLFontGL::NORMAL, LLFontGL::DROP_SHADOW_SOFT, 2);
         gGL.flush();
-        UNSCOPED_INFO("NO_SHADOW returns 2");
         CHECK(n_no == 2);
-        UNSCOPED_INFO("DROP_SHADOW returns 2");
         CHECK(n_drop == 2);
-        UNSCOPED_INFO("DROP_SHADOW_SOFT returns 2");
         CHECK(n_soft == 2);
     }
 
@@ -1319,10 +1245,8 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
         const LLFontFreetype* head = font->getFontFreetype();
-        UNSCOPED_INFO("head freetype resolves");
         REQUIRE(head != nullptr);
 
         // U+1F995 SAUROPOD — obscure enough that no other test in this
@@ -1333,7 +1257,6 @@ namespace
         const LLFontFreetype* emoji_face = head->selectShapingFace(emoji_cp, emoji_idx);
         if (!emoji_face || emoji_face == head || emoji_idx == 0)
             SKIP("no emoji fallback covers U+1F995 in this harness");
-        UNSCOPED_INFO("emoji fallback has a face wrapper");
         REQUIRE(emoji_face->getFontFace() != nullptr);
         if (emoji_face->getFontFace()->findGlyphInfo(emoji_idx, EFontGlyphType::Color))
             SKIP("U+1F995 already rasterized; mid-render upload won't fire");
@@ -1382,7 +1305,6 @@ namespace
 
         UNSCOPED_INFO("string spans two distinct atlas textures");
         CHECK(latin_tex != emoji_tex);
-        UNSCOPED_INFO("capture produced batches");
         REQUIRE_FALSE(capture.empty());
 
         // The first captured batch is the Latin prefix, flushed when the
@@ -1408,7 +1330,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         const std::string s = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E";
@@ -1456,10 +1377,8 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
         const LLFontFreetype* ft = font->getFontFreetype();
-        UNSCOPED_INFO("freetype present");
         REQUIRE(ft != nullptr);
 
         // Devanagari, which shapes two glyphs to a cluster with an advance on
@@ -1497,6 +1416,7 @@ namespace
                                             S32_MAX, (S32)px);
             gGL.flush();
             gGL.endList();
+            CAPTURE(px, n);
 
             U32 verts = 0;
             for (const LLVertexBufferData& entry : capture)
@@ -1548,7 +1468,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         const std::string samples[] = {
@@ -1562,6 +1481,7 @@ namespace
 
         for (const std::string& s : samples)
         {
+            CAPTURE(s);
             const S32 total = (S32)s.size();
             // no_padding: right_x is where the pen ended, so it carries the
             // advances and not the extent overhang of the last glyph, which is
@@ -1596,7 +1516,6 @@ namespace
         if (!fileExists(kFontsXml))
             SKIP("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        UNSCOPED_INFO("font resolves");
         REQUIRE(font != nullptr);
 
         const std::string s = "a string rather wider than the budget it is given";
@@ -1659,13 +1578,12 @@ namespace
         const LLFontGL::HAlign aligns[] = { LLFontGL::LEFT, LLFontGL::RIGHT, LLFontGL::HCENTER };
         for (LLFontGL* font : { LLFontGL::getFontMonospace(), LLFontGL::getFontSansSerif() })
         {
-            UNSCOPED_INFO("font resolves");
             REQUIRE(font != nullptr);
             for (const std::string s : { "7", "42", "12345", "Hello, world" })
             {
                 for (LLFontGL::HAlign halign : aligns)
                 {
-                    const std::string what = s + " aligned " + std::to_string((int)halign);
+                    CAPTURE(s, halign);
                     const std::vector<U8> said = frame([&] {
                         font->renderUTF8(s, 0, 128.f, 100.f, LLColor4::white, halign, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
                     });
@@ -1673,9 +1591,9 @@ namespace
                     const F32                     shift = font->placeGlyphs(s, halign, placed);
                     const std::vector<LLColor4U>  colors(placed.size(), LLColor4U(255, 255, 255, 255));
                     const std::vector<U8>         drawn = frame([&] { font->renderGlyphs(placed.data(), colors.data(), placed.size(), 128.f + shift, 100.f); });
-                    UNSCOPED_INFO(what + ": drawn at all");
+                    UNSCOPED_INFO("drawn at all");
                     REQUIRE(lit(said));
-                    UNSCOPED_INFO(what + ": the same pixels");
+                    UNSCOPED_INFO("the same pixels");
                     REQUIRE(said == drawn);
                 }
             }

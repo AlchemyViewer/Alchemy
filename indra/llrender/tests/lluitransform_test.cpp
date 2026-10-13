@@ -60,12 +60,10 @@ namespace
     };
 
 
-    // With nothing pushed, a local rect is where it says it is.
     TEST_CASE_METHOD(lluitransform_data, "lluitransform: with nothing pushed a local rect is where it says it is", "[lluitransform]")
     {
         const LLRect local(10, 40, 110, 20);
         const LLRect screen = LLRender2D::toScreen(local);
-        UNSCOPED_INFO("untransformed, it is itself " + where(screen));
         CHECK(where(screen) == where(local));
     }
 
@@ -74,13 +72,9 @@ namespace
     {
         LLFontGL::sCurOrigin.set(7, 13);
         const LLRect screen = LLRender2D::toScreen(LLRect(10, 40, 110, 20));
-        UNSCOPED_INFO("moved by the offset");
         CHECK(screen.mLeft == 17);
-        UNSCOPED_INFO("in both directions");
         CHECK(screen.mBottom == 33);
-        UNSCOPED_INFO("keeping its width");
         CHECK(screen.getWidth() == 100);
-        UNSCOPED_INFO("and its height");
         CHECK(screen.getHeight() == 20);
     }
 
@@ -96,16 +90,18 @@ namespace
         LLFontGL::sCurScaleY = 2.f;
 
         const LLRect screen = LLRender2D::toScreen(LLRect(0, 50, 100, 0));
-        UNSCOPED_INFO("the near edge is the scaled offset");
-        CHECK(screen.mLeft == 20);
-        UNSCOPED_INFO("and so is the bottom");
-        CHECK(screen.mBottom == 40);
+        {
+            INFO("the near edges are the scaled offset");
+            CHECK(screen.mLeft == 20);
+            CHECK(screen.mBottom == 40);
+        }
         UNSCOPED_INFO("the far edge is scaled too");
         CHECK(screen.mRight == 220);
-        UNSCOPED_INFO("the rect is twice the size");
-        CHECK(screen.getWidth() == 200);
-        UNSCOPED_INFO("in both directions");
-        CHECK(screen.getHeight() == 100);
+        {
+            INFO("the rect is twice the size");
+            CHECK(screen.getWidth() == 200);
+            CHECK(screen.getHeight() == 100);
+        }
     }
 
     // The two axes are independent, because the renderer's are.
@@ -115,7 +111,6 @@ namespace
         LLFontGL::sCurScaleY = 1.f;
 
         const LLRect screen = LLRender2D::toScreen(LLRect(0, 10, 10, 0));
-        UNSCOPED_INFO("across");
         CHECK(screen.getWidth() == 30);
         UNSCOPED_INFO("down is left alone");
         CHECK(screen.getHeight() == 10);
@@ -131,16 +126,15 @@ namespace
         F32 x = 0.f;
         F32 y = 0.f;
         LLRender2D::toScreen(20.f, 30.f, x, y);
-        UNSCOPED_INFO("across");
         CHECK((S32)ll_round(x) == 36);
-        UNSCOPED_INFO("down");
         CHECK((S32)ll_round(y) == 90);
 
         const LLRect screen = LLRender2D::toScreen(LLRect(20, 30, 20, 30));
-        UNSCOPED_INFO("the rect's corner is the same point");
-        CHECK(screen.mLeft == 36);
-        UNSCOPED_INFO("and the same on the other axis");
-        CHECK(screen.mBottom == 90);
+        {
+            INFO("the rect's corner is the same point");
+            CHECK(screen.mLeft == 36);
+            CHECK(screen.mBottom == 90);
+        }
     }
 
     // A scale keeps the origin it was pushed at: what is under it is drawn
@@ -155,16 +149,18 @@ namespace
         F32 x = 0.f;
         F32 y = 0.f;
         LLRender2D::toScreen(0.f, 0.f, x, y);
-        UNSCOPED_INFO("the corner it was pushed at is where it was");
-        CHECK(ll_round(x) == 300);
-        UNSCOPED_INFO("on both axes");
-        CHECK(ll_round(y) == 200);
+        {
+            INFO("the corner it was pushed at is where it was");
+            CHECK(ll_round(x) == 300);
+            CHECK(ll_round(y) == 200);
+        }
 
         LLRender2D::toScreen(50.f, 40.f, x, y);
-        UNSCOPED_INFO("and what is on it is twice as far along");
-        CHECK(ll_round(x) == 400);
-        UNSCOPED_INFO("in both directions");
-        CHECK(ll_round(y) == 280);
+        {
+            INFO("what is on it is twice as far along");
+            CHECK(ll_round(x) == 400);
+            CHECK(ll_round(y) == 280);
+        }
 
         LLRender2D::popMatrix();
     }
@@ -182,11 +178,12 @@ namespace
         F32 x = 0.f;
         F32 y = 0.f;
         LLRender2D::toScreen(10.f, 10.f, x, y);
-        UNSCOPED_INFO("the offset is the one the frame was pushed on");
-        CHECK(ll_round(x) == 40);
-        UNSCOPED_INFO("on both axes");
-        CHECK(ll_round(y) == 50);
-        UNSCOPED_INFO("and the scale is off with it");
+        {
+            INFO("the offset is the one the frame was pushed on");
+            CHECK(ll_round(x) == 40);
+            CHECK(ll_round(y) == 50);
+        }
+        UNSCOPED_INFO("the scale is off with it");
         CHECK(LLFontGL::sCurScaleX == 1.f);
 
         LLRender2D::popMatrix();

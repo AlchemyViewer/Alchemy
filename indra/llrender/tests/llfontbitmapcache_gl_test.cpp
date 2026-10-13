@@ -57,13 +57,10 @@ namespace
         c.init(2, 2);
 
         S32 px = 0, py = 0; U32 sheet = 0;
-        UNSCOPED_INFO("nextOpenPos succeeded");
         CHECK(c.nextOpenPos(/*width=*/8, /*height=*/8, px, py, EFontGlyphType::Grayscale, sheet));
 
         LLImageRaw* raw = c.getImageRaw(EFontGlyphType::Grayscale, sheet);
-        UNSCOPED_INFO("raw image present");
         REQUIRE(raw != nullptr);
-        UNSCOPED_INFO("Grayscale atlas has 2 components");
         CHECK((S32)raw->getComponents() == 2);
     }
 
@@ -75,13 +72,10 @@ namespace
         c.init(2, 2);
 
         S32 px = 0, py = 0; U32 sheet = 0;
-        UNSCOPED_INFO("nextOpenPos succeeded");
         CHECK(c.nextOpenPos(8, 8, px, py, EFontGlyphType::Color, sheet));
 
         LLImageRaw* raw = c.getImageRaw(EFontGlyphType::Color, sheet);
-        UNSCOPED_INFO("raw image present");
         REQUIRE(raw != nullptr);
-        UNSCOPED_INFO("Color atlas has 4 components");
         CHECK((S32)raw->getComponents() == 4);
     }
 
@@ -95,13 +89,9 @@ namespace
         c.init(2, 2);
 
         S32 px = -1, py = -1; U32 sheet = 99;
-        UNSCOPED_INFO("first Grayscale alloc succeeded");
         CHECK(c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, sheet));
-        UNSCOPED_INFO("first Grayscale posX == 4");
         CHECK(px == 4);
-        UNSCOPED_INFO("first Grayscale posY == 4");
         CHECK(py == 4);
-        UNSCOPED_INFO("first Grayscale sheet index == 0");
         CHECK((S32)sheet == 0);
 
         // Repeat for Color — a fresh cache, fresh allocation. The bug
@@ -109,11 +99,8 @@ namespace
         LLFontBitmapCache c2;
         c2.init(2, 2);
         S32 px2 = -1, py2 = -1; U32 sheet2 = 99;
-        UNSCOPED_INFO("first Color alloc succeeded");
         CHECK(c2.nextOpenPos(8, 8, px2, py2, EFontGlyphType::Color, sheet2));
-        UNSCOPED_INFO("first Color posX == 4");
         CHECK(px2 == 4);
-        UNSCOPED_INFO("first Color posY == 4");
         CHECK(py2 == 4);
     }
 
@@ -127,16 +114,14 @@ namespace
 
         S32 px = 0, py = 0; U32 sheet = 0;
         c.nextOpenPos(10, 8, px, py, EFontGlyphType::Grayscale, sheet);
-        UNSCOPED_INFO("first posX");
         CHECK(px == 4);
-        UNSCOPED_INFO("first posY");
         CHECK(py == 4);
 
         c.nextOpenPos(10, 8, px, py, EFontGlyphType::Grayscale, sheet);
         // Expected: 4 (initial border) + 10 (first width) + 4 (border)
-        UNSCOPED_INFO("second posX advances by width+4");
+        UNSCOPED_INFO("the second allocation advances by width + 4");
         CHECK(px == 18);
-        UNSCOPED_INFO("second posY stays in same row");
+        UNSCOPED_INFO("in the same row");
         CHECK(py == 4);
     }
 
@@ -149,22 +134,21 @@ namespace
         // (4 + 50 + 4 + 50 + 4 = 112 ≤ 128); third forces wrap.
         LLFontBitmapCache c;
         c.init(2, 2);
-        UNSCOPED_INFO("sheet width is 128");
         CHECK(c.getBitmapWidth() == 128);
 
         S32 px = 0, py = 0; U32 sheet = 0;
         c.nextOpenPos(50, 30, px, py, EFontGlyphType::Grayscale, sheet); // row 0, col 0
         c.nextOpenPos(50, 20, px, py, EFontGlyphType::Grayscale, sheet); // row 0, col 1
-        UNSCOPED_INFO("second alloc still in row 0");
+        UNSCOPED_INFO("the second allocation is still in row 0");
         CHECK(py == 4);
 
         c.nextOpenPos(50, 8, px, py, EFontGlyphType::Grayscale, sheet);  // wraps to row 1
-        UNSCOPED_INFO("third alloc wraps posX to 4");
+        UNSCOPED_INFO("the third allocation wraps");
         CHECK(px == 4);
         // Tallest in row 0 was 30, so row 1 starts at 4 + 30 + 4 = 38.
-        UNSCOPED_INFO("third alloc posY uses tallest glyph in prior row");
+        UNSCOPED_INFO("below the tallest glyph of row 0");
         CHECK(py == 38);
-        UNSCOPED_INFO("still on sheet 0 (row wrap, not sheet rollover)");
+        UNSCOPED_INFO("a row wrap and not a new sheet");
         CHECK((S32)sheet == 0);
     }
 
@@ -175,9 +159,7 @@ namespace
     {
         LLFontBitmapCache c;
         c.init(2, 2);
-        UNSCOPED_INFO("sheet width is 128");
         CHECK(c.getBitmapWidth() == 128);
-        UNSCOPED_INFO("sheet height is 128");
         CHECK(c.getBitmapHeight() == 128);
 
         // Glyphs 50 wide, 30 tall. 2 per row (positions 4 and 58),
@@ -188,23 +170,22 @@ namespace
         {
             c.nextOpenPos(50, 30, px, py, EFontGlyphType::Grayscale, sheet);
         }
-        UNSCOPED_INFO("six allocs of 50x30 still on sheet 0");
+        UNSCOPED_INFO("six allocations fill three rows of sheet 0");
         CHECK((S32)sheet == 0);
-        UNSCOPED_INFO("one sheet so far");
         CHECK(c.getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
 
         // 7th glyph: Y advance to 4+30+4+30+4+30+4=106, bottom would
         // be 106+30+4=140 > 128 → new sheet. Either the row-wrap path
         // (line 125) or the vertical-fit recheck (line 144) fires.
         c.nextOpenPos(50, 30, px, py, EFontGlyphType::Grayscale, sheet);
-        UNSCOPED_INFO("7th alloc moved to new sheet");
+        UNSCOPED_INFO("the seventh allocation goes to a new sheet");
         CHECK((S32)sheet == 1);
-        UNSCOPED_INFO("two sheets allocated");
         CHECK(c.getNumBitmaps(EFontGlyphType::Grayscale) == 2u);
-        UNSCOPED_INFO("new sheet starts at posX=4");
-        CHECK(px == 4);
-        UNSCOPED_INFO("new sheet starts at posY=4");
-        CHECK(py == 4);
+        {
+            INFO("the new sheet's first position");
+            CHECK(px == 4);
+            CHECK(py == 4);
+        }
     }
 
     // Per-type isolation: a Grayscale allocation must not move the
@@ -222,15 +203,13 @@ namespace
         // Color must still be at the (4, 4) start.
         S32 cpx = 0, cpy = 0; U32 csheet = 99;
         c.nextOpenPos(8, 8, cpx, cpy, EFontGlyphType::Color, csheet);
-        UNSCOPED_INFO("Color pen unaffected by Grayscale activity (x)");
-        CHECK(cpx == 4);
-        UNSCOPED_INFO("Color pen unaffected by Grayscale activity (y)");
-        CHECK(cpy == 4);
-        UNSCOPED_INFO("Color sheet index starts at 0");
+        {
+            INFO("the Color pen after two Grayscale allocations");
+            CHECK(cpx == 4);
+            CHECK(cpy == 4);
+        }
         CHECK((S32)csheet == 0);
-        UNSCOPED_INFO("Grayscale + Color each have one sheet");
         CHECK(c.getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
-        UNSCOPED_INFO("Color has its own sheet vector");
         CHECK(c.getNumBitmaps(EFontGlyphType::Color) == 1u);
     }
 
@@ -247,17 +226,14 @@ namespace
         S32 px = 0, py = 0; U32 sheet = 0;
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, sheet);
         const S32 g1 = c.getCacheGeneration();
-        UNSCOPED_INFO("generation bumped by nextOpenPos");
         CHECK(g1 > g0);
 
         c.releaseSheet(EFontGlyphType::Grayscale, sheet);
         const S32 g2 = c.getCacheGeneration();
-        UNSCOPED_INFO("generation bumped by releaseSheet");
         CHECK(g2 > g1);
 
         c.reset();
         const S32 g3 = c.getCacheGeneration();
-        UNSCOPED_INFO("generation bumped by reset");
         CHECK(g3 > g2);
     }
 
@@ -271,7 +247,6 @@ namespace
         S32 px = 0, py = 0; U32 sheet = 0;
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, sheet);
 
-        UNSCOPED_INFO("sheet not yet released");
         CHECK_FALSE(c.isSheetReleased(EFontGlyphType::Grayscale, sheet));
         // Don't assert getSheetLastUsedTime is > 0 here — it samples
         // LLFrameTimer::getTotalSeconds() and the test environment may
@@ -282,14 +257,11 @@ namespace
 
         c.releaseSheet(EFontGlyphType::Grayscale, sheet);
 
-        UNSCOPED_INFO("isSheetReleased flips true after release");
         CHECK(c.isSheetReleased(EFontGlyphType::Grayscale, sheet));
-        UNSCOPED_INFO("released sheet getImageRaw returns null");
-        REQUIRE(c.getImageRaw(EFontGlyphType::Grayscale, sheet) ==
-                      (LLImageRaw*)nullptr);
-        UNSCOPED_INFO("released sheet last-used time cleared to 0");
+        CHECK(c.getImageRaw(EFontGlyphType::Grayscale, sheet) == nullptr);
+        UNSCOPED_INFO("a released sheet's last-used time is cleared");
         CHECK(c.getSheetLastUsedTime(EFontGlyphType::Grayscale, sheet) == 0.0);
-        UNSCOPED_INFO("getNumBitmaps preserves slot count after release");
+        UNSCOPED_INFO("the slot is kept");
         CHECK(c.getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
     }
 
@@ -309,17 +281,15 @@ namespace
         c.releaseSheet(EFontGlyphType::Grayscale, sheet);
 
         S32 px2 = 0, py2 = 0; U32 sheet2 = 99;
-        UNSCOPED_INFO("nextOpenPos succeeds after active sheet release");
         CHECK(c.nextOpenPos(8, 8, px2, py2, EFontGlyphType::Grayscale, sheet2));
-        UNSCOPED_INFO("released slot 0 is recycled for the new sheet");
+        UNSCOPED_INFO("the released slot is recycled");
         CHECK((S32)sheet2 == 0);
-        UNSCOPED_INFO("new sheet starts at posX=4");
-        CHECK(px2 == 4);
-        UNSCOPED_INFO("new sheet starts at posY=4");
-        CHECK(py2 == 4);
-        UNSCOPED_INFO("recycled slot 0 is live again");
+        {
+            INFO("the new sheet's first position");
+            CHECK(px2 == 4);
+            CHECK(py2 == 4);
+        }
         CHECK_FALSE(c.isSheetReleased(EFontGlyphType::Grayscale, 0));
-        UNSCOPED_INFO("slot vector did not grow");
         CHECK(c.getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
     }
 
@@ -333,22 +303,18 @@ namespace
         S32 px = 0, py = 0; U32 sheet = 0;
         c.nextOpenPos(40, 20, px, py, EFontGlyphType::Grayscale, sheet);
         c.nextOpenPos(40, 20, px, py, EFontGlyphType::Grayscale, sheet);
-        UNSCOPED_INFO("two sheets pending before reset");
+        UNSCOPED_INFO("two glyphs on one sheet before reset");
         CHECK(c.getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
 
         c.reset();
-        UNSCOPED_INFO("no Grayscale sheets after reset");
         CHECK(c.getNumBitmaps(EFontGlyphType::Grayscale) == 0u);
-        UNSCOPED_INFO("no Color sheets after reset");
         CHECK(c.getNumBitmaps(EFontGlyphType::Color) == 0u);
 
         // Re-init and verify pens really did reset back to (4,4).
         c.init(2, 2);
         S32 px2 = -1, py2 = -1; U32 sheet2 = 99;
         c.nextOpenPos(8, 8, px2, py2, EFontGlyphType::Grayscale, sheet2);
-        UNSCOPED_INFO("post-reset first posX");
         CHECK(px2 == 4);
-        UNSCOPED_INFO("post-reset first posY");
         CHECK(py2 == 4);
     }
 
@@ -364,28 +330,21 @@ namespace
         S32 px = 0, py = 0;
         U32 s0 = 0, s1 = 99, s2 = 99;
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s0);
-        UNSCOPED_INFO("first alloc lands on sheet 0");
         CHECK((S32)s0 == 0);
         const S32 gen0 = c.getCacheGeneration();
         c.releaseSheet(EFontGlyphType::Grayscale, s0);
 
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s1);
-        UNSCOPED_INFO("second alloc recycles slot 0");
         CHECK((S32)s1 == 0);
         const S32 gen1 = c.getCacheGeneration();
-        UNSCOPED_INFO("generation advanced across release+recycle");
         CHECK(gen1 > gen0);
         c.releaseSheet(EFontGlyphType::Grayscale, s1);
 
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s2);
-        UNSCOPED_INFO("third alloc recycles slot 0 again");
         CHECK((S32)s2 == 0);
-        UNSCOPED_INFO("generation advanced again");
         CHECK(c.getCacheGeneration() > gen1);
 
-        UNSCOPED_INFO("getNumBitmaps == 1 (slots recycled, not reserved)");
         CHECK(c.getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
-        UNSCOPED_INFO("slot 0 live after the final alloc");
         CHECK_FALSE(c.isSheetReleased(EFontGlyphType::Grayscale, 0));
     }
 
@@ -404,7 +363,6 @@ namespace
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s0);
         c.releaseSheet(EFontGlyphType::Grayscale, s0);
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s1);
-        UNSCOPED_INFO("after release+alloc, recycled onto slot 0");
         CHECK((S32)s1 == 0);
 
         // Further allocs must keep landing on the recycled sheet (it has
@@ -413,12 +371,10 @@ namespace
         {
             U32 si = 99;
             c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, si);
-            UNSCOPED_INFO("subsequent alloc stays on the recycled sheet");
+            UNSCOPED_INFO("a later allocation on the recycled sheet");
             REQUIRE((S32)si == 0);
         }
-        UNSCOPED_INFO("still 1 sheet slot (no extra allocation)");
         CHECK(c.getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
-        UNSCOPED_INFO("recycled sheet stays live");
         CHECK_FALSE(c.isSheetReleased(EFontGlyphType::Grayscale, 0));
     }
 
@@ -436,22 +392,22 @@ namespace
         const S32 g0 = LLFontBitmapCache::getGlobalGeneration();
         c1.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, sheet);
         const S32 g1 = LLFontBitmapCache::getGlobalGeneration();
-        UNSCOPED_INFO("c1 alloc bumped global gen");
+        UNSCOPED_INFO("after c1 allocated");
         CHECK(g1 > g0);
 
         c2.nextOpenPos(8, 8, px, py, EFontGlyphType::Color, sheet);
         const S32 g2 = LLFontBitmapCache::getGlobalGeneration();
-        UNSCOPED_INFO("c2 alloc bumped global gen");
+        UNSCOPED_INFO("after c2 allocated");
         CHECK(g2 > g1);
 
         c1.releaseSheet(EFontGlyphType::Grayscale, 0);
         const S32 g3 = LLFontBitmapCache::getGlobalGeneration();
-        UNSCOPED_INFO("c1 release bumped global gen");
+        UNSCOPED_INFO("after c1 released");
         CHECK(g3 > g2);
 
         c2.releaseSheet(EFontGlyphType::Color, 0);
         const S32 g4 = LLFontBitmapCache::getGlobalGeneration();
-        UNSCOPED_INFO("c2 release bumped global gen");
+        UNSCOPED_INFO("after c2 released");
         CHECK(g4 > g3);
     }
 
@@ -469,22 +425,17 @@ namespace
 
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, gs_sheet);
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Color,     col_sheet);
-        UNSCOPED_INFO("Grayscale on its own sheet 0");
         CHECK((S32)gs_sheet == 0);
-        UNSCOPED_INFO("Color on its own sheet 0");
         CHECK((S32)col_sheet == 0);
 
         c.releaseSheet(EFontGlyphType::Color, col_sheet);
-        UNSCOPED_INFO("Color sheet 0 released");
         CHECK(c.isSheetReleased(EFontGlyphType::Color, 0));
-        UNSCOPED_INFO("Grayscale sheet 0 unaffected by Color release");
         CHECK_FALSE(c.isSheetReleased(EFontGlyphType::Grayscale, 0));
 
         // Allocate again on Grayscale: still lands on sheet 0 (its
         // trailing slot is live, unaffected by Color side).
         S32 px2 = 0, py2 = 0; U32 gs_sheet2 = 99;
         c.nextOpenPos(8, 8, px2, py2, EFontGlyphType::Grayscale, gs_sheet2);
-        UNSCOPED_INFO("Grayscale alloc stays on sheet 0 (Color release didn't touch it)");
         CHECK((S32)gs_sheet2 == 0);
     }
 }

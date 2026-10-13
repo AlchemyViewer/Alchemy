@@ -161,29 +161,22 @@ namespace tut
             SKIP("InterVariable.woff2 not present in test data dir");
             return;
         }
-        UNSCOPED_INFO("parse ok");
         CHECK(loadXml(kInterXml));
 
         LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
-        UNSCOPED_INFO("getFont resolves Inter/Small");
         REQUIRE(font != nullptr);
 
         font->generateASCIIglyphs();
 
         const LLFontFreetype* ft = font->getFontFreetype();
-        UNSCOPED_INFO("LLFontFreetype present");
         REQUIRE(ft != nullptr);
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
-        UNSCOPED_INFO("bitmap cache present");
         REQUIRE(cache != nullptr);
-        UNSCOPED_INFO("at least one grayscale atlas page");
         CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
 
         LLImageGL* page = cache->getImageGL(EFontGlyphType::Grayscale, 0);
-        UNSCOPED_INFO("page 0 LLImageGL present");
         REQUIRE(page != nullptr);
-        UNSCOPED_INFO("page 0 has a live GL texture name");
         CHECK(page->getTexName() != 0);
     }
 
@@ -197,17 +190,13 @@ namespace tut
             SKIP("InterVariable.woff2 not present in test data dir");
             return;
         }
-        UNSCOPED_INFO("parse ok");
         CHECK(loadXml(kInterXml));
 
         LLFontGL* first = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
-        UNSCOPED_INFO("first getFont resolves");
         REQUIRE(first != nullptr);
 
         LLFontGL* second = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
-        UNSCOPED_INFO("second getFont resolves");
         REQUIRE(second != nullptr);
-        UNSCOPED_INFO("repeat getFont returns the same LLFontGL pointer");
         CHECK(first == second);
     }
 
@@ -225,26 +214,20 @@ namespace tut
             SKIP("InterVariable.woff2 not present in test data dir");
             return;
         }
-        UNSCOPED_INFO("parse ok");
         CHECK(loadXml(kInterXml));
 
         LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
-        UNSCOPED_INFO("getFont resolves");
         REQUIRE(font != nullptr);
 
         font->generateASCIIglyphs();
 
         const LLFontBitmapCache* cache = font->getFontFreetype()->getFontBitmapCache();
-        UNSCOPED_INFO("at least one atlas page before destroyGL");
-        CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
-        UNSCOPED_INFO("texname live before destroyGL");
+        REQUIRE(cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
         CHECK(cache->getImageGL(EFontGlyphType::Grayscale, 0)->getTexName() != 0);
 
         reg.destroyGL();
 
-        UNSCOPED_INFO("page vector cleared after destroyGL");
         CHECK((S32)cache->getNumBitmaps(EFontGlyphType::Grayscale) == 0);
-        UNSCOPED_INFO("registry entry survived destroyGL — same LLFontGL pointer");
         CHECK(reg.getFont(LLFontDescriptor("Inter", "Small", 0)) == font);
     }
 
@@ -270,13 +253,10 @@ namespace tut
             "    <style name='NORMAL'><file>InterVariable.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        UNSCOPED_INFO("v1 parse ok");
         CHECK(loadXml(kV1));
         LLFontGL* font_v1 = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
-        UNSCOPED_INFO("v1 getFont resolves");
         REQUIRE(font_v1 != nullptr);
         F32 ascender_v1 = font_v1->getAscenderHeight();
-        UNSCOPED_INFO("v1 ascender > 0");
         CHECK(ascender_v1 > 0.f);
 
         // Wipe + re-parse with 2x size.
@@ -288,18 +268,14 @@ namespace tut
             "    <style name='NORMAL'><file>InterVariable.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        UNSCOPED_INFO("v2 parse ok");
         CHECK(loadXml(kV2));
         LLFontGL* font_v2 = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
-        UNSCOPED_INFO("v2 getFont resolves");
         REQUIRE(font_v2 != nullptr);
         F32 ascender_v2 = font_v2->getAscenderHeight();
-        UNSCOPED_INFO("v2 ascender > 0");
         CHECK(ascender_v2 > 0.f);
 
         // Doubling pt should ~double ascender (allow generous tolerance for
         // FreeType rounding: 1.7x lower bound is comfortably above 1.0x).
-        UNSCOPED_INFO("ascender scales with reloaded point size");
         CHECK(ascender_v2 > ascender_v1 * 1.7f);
     }
 
@@ -337,30 +313,24 @@ namespace tut
             "</fonts>";
 
         // First load: override SansSerifBase -> OpenDyslexic.
-        UNSCOPED_INFO("parse v1 ok");
         CHECK(loadXml(kXml));
         LLSD overrides;
         overrides["SansSerifBase"] = "OpenDyslexic";
         resolve(overrides);
 
         LLFontGL* font_with = reg.getFont(LLFontDescriptor("SansSerif", "Large", 0));
-        UNSCOPED_INFO("getFont with override resolves");
         REQUIRE(font_with != nullptr);
         F32 ascender_with = font_with->getAscenderHeight();
-        UNSCOPED_INFO("ascender with override > 0");
         CHECK(ascender_with > 0.f);
 
         // Wipe + re-parse with no override.
         simulateReload();
-        UNSCOPED_INFO("parse v2 ok");
         CHECK(loadXml(kXml));
         resolve(LLSD());
 
         LLFontGL* font_no = reg.getFont(LLFontDescriptor("SansSerif", "Large", 0));
-        UNSCOPED_INFO("getFont without override resolves");
         REQUIRE(font_no != nullptr);
         F32 ascender_no = font_no->getAscenderHeight();
-        UNSCOPED_INFO("ascender without override > 0");
         CHECK(ascender_no > 0.f);
 
         // The two states must produce visibly different ascender heights:
@@ -372,7 +342,6 @@ namespace tut
         const F32 diff = (ascender_with > ascender_no)
                              ? (ascender_with - ascender_no)
                              : (ascender_no - ascender_with);
-        UNSCOPED_INFO("override and no-override produce distinguishable ascenders");
         CHECK(diff > ascender_no * 0.1f);
     }
 
@@ -406,16 +375,13 @@ namespace tut
             "  </font>"
             "</fonts>";
 
-        UNSCOPED_INFO("parse ok");
         CHECK(loadXml(kXml));
         resolve();
         LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Large", 0));
-        UNSCOPED_INFO("getFont resolves");
         REQUIRE(font != nullptr);
 
         // Head is Inter at chain's 16pt.
         F32 head_ascender = font->getAscenderHeight();
-        UNSCOPED_INFO("head ascender > 0");
         CHECK(head_ascender > 0.f);
 
         // Find the DejaVu fallback in the chain. Its mPointSize should be
@@ -430,17 +396,14 @@ namespace tut
                 break;
             }
         }
-        UNSCOPED_INFO("DejaVu fallback present in chain");
         REQUIRE(dejavu_fallback != nullptr);
 
         F32 fb_ascender = dejavu_fallback->getAscenderHeight();
-        UNSCOPED_INFO("DejaVu fallback ascender > 0");
         CHECK(fb_ascender > 0.f);
 
         // The pinned fallback at 8pt must be substantially smaller than
         // the head's 16pt rendering. Demand >40% smaller — comfortably
         // separates "pin applied" from "fell through to chain pt".
-        UNSCOPED_INFO("pinned fallback ascender is substantially smaller than head");
         CHECK(fb_ascender < head_ascender * 0.6f);
     }
 
@@ -479,31 +442,25 @@ namespace tut
             "</fonts>";
 
         // Override A: Target -> OpenDyslexic. Per-file pin lands head at 14pt.
-        UNSCOPED_INFO("v1 parse ok");
         CHECK(loadXml(kXml));
         LLSD ovr_a;
         ovr_a["Target"] = "OpenDyslexic";
         resolve(ovr_a);
         LLFontGL* font_a = reg.getFont(LLFontDescriptor("Target", "Large", 0));
-        UNSCOPED_INFO("getFont under OpenDyslexic override");
         REQUIRE(font_a != nullptr);
         F32 asc_a = font_a->getAscenderHeight();
-        UNSCOPED_INFO("OpenDyslexic ascender > 0");
         CHECK(asc_a > 0.f);
 
         // Swap: Target -> Inter (pin Large=8). Head must reload at 8pt
         // with Inter's intrinsics — substantially smaller than 14pt OD.
         simulateReload();
-        UNSCOPED_INFO("v2 parse ok");
         CHECK(loadXml(kXml));
         LLSD ovr_b;
         ovr_b["Target"] = "Inter";
         resolve(ovr_b);
         LLFontGL* font_b = reg.getFont(LLFontDescriptor("Target", "Large", 0));
-        UNSCOPED_INFO("getFont under Inter override");
         REQUIRE(font_b != nullptr);
         F32 asc_b = font_b->getAscenderHeight();
-        UNSCOPED_INFO("Inter ascender > 0");
         CHECK(asc_b > 0.f);
 
         // Inter at 8pt is comfortably smaller than OpenDyslexic at 14pt.
@@ -530,16 +487,13 @@ namespace tut
             "    <style name='NORMAL'><file>does-not-exist.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        UNSCOPED_INFO("parse ok");
         CHECK(loadXml(kXml));
         resolve();
 
         LLFontDescriptor desc("Phantom", "Small", 0);
         LLFontGL* first = reg.getFont(desc);
-        UNSCOPED_INFO("getFont with missing file returns NULL");
-        REQUIRE(first == nullptr);
+        CHECK(first == nullptr);
 
-        UNSCOPED_INFO("failed createFont must NOT poison mFontMap with a NULL slot");
         CHECK_FALSE(fontMapContains(desc));
     }
 
@@ -556,14 +510,11 @@ namespace tut
             SKIP("InterVariable.woff2 not present in test data dir");
             return;
         }
-        UNSCOPED_INFO("parse ok");
         CHECK(loadXml(kInterXml));
 
         LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
-        UNSCOPED_INFO("getFont resolves");
         REQUIRE(font != nullptr);
         F32 ascender_96 = font->getAscenderHeight();
-        UNSCOPED_INFO("ascender at 96 DPI > 0");
         CHECK(ascender_96 > 0.f);
 
         LLFontGL::sVertDPI  = 192.f;
@@ -571,11 +522,9 @@ namespace tut
         reg.reloadForDpiChange();
 
         F32 ascender_192 = font->getAscenderHeight();
-        UNSCOPED_INFO("ascender at 192 DPI > 0");
         CHECK(ascender_192 > 0.f);
 
         // 192/96 = 2.0x; allow 1.7x lower bound for FreeType rounding.
-        UNSCOPED_INFO("ascender scales with DPI after reloadForDpiChange");
         CHECK(ascender_192 > ascender_96 * 1.7f);
 
         // Restore so neighbour tests see the fixture default.
@@ -596,23 +545,19 @@ namespace tut
             SKIP("InterVariable.woff2 not present in test data dir");
             return;
         }
-        UNSCOPED_INFO("parse ok");
         CHECK(loadXml(kInterXml));
 
         LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
-        UNSCOPED_INFO("getFont resolves");
         REQUIRE(font != nullptr);
         font->generateASCIIglyphs();
 
         const LLFontBitmapCache* cache = font->getFontFreetype()->getFontBitmapCache();
         const U32 pages_before = cache->getNumBitmaps(EFontGlyphType::Grayscale);
-        UNSCOPED_INFO("at least one atlas page before sweep");
         CHECK(pages_before >= 1u);
 
         reg.sweepGlyphCaches();
 
         const U32 pages_after = cache->getNumBitmaps(EFontGlyphType::Grayscale);
-        UNSCOPED_INFO("sweep does not drop in-use atlas pages");
         CHECK(pages_after == pages_before);
     }
 
@@ -666,15 +611,12 @@ namespace tut
             "    <style name='NORMAL'><file>InterVariable.woff2</file></style>"
             "  </font>"
             "</fonts>";
-        UNSCOPED_INFO("parse ok");
         CHECK(loadXml(kXml));
         resolve();
 
         LLFontGL* head_a = reg.getFont(LLFontDescriptor("HeadA", "Small", 0));
         LLFontGL* head_b = reg.getFont(LLFontDescriptor("HeadB", "Small", 0));
-        UNSCOPED_INFO("HeadA resolves");
         REQUIRE(head_a != nullptr);
-        UNSCOPED_INFO("HeadB resolves");
         REQUIRE(head_b != nullptr);
 
         // Locate the Noto-COLRv1 fallback inside each head's chain.
@@ -689,9 +631,7 @@ namespace tut
         };
         const LLFontFreetype* emoji_a = find_emoji_fallback(head_a);
         const LLFontFreetype* emoji_b = find_emoji_fallback(head_b);
-        UNSCOPED_INFO("HeadA chain includes Noto-COLRv1");
         REQUIRE(emoji_a != nullptr);
-        UNSCOPED_INFO("HeadB chain includes Noto-COLRv1");
         REQUIRE(emoji_b != nullptr);
         UNSCOPED_INFO("siblings share the fallback freetype instance "
                       "(mFallbackInstanceCache dedup)");
@@ -706,9 +646,7 @@ namespace tut
             kFire, EFontGlyphType::Color);
         const LLFontGlyphInfo* gi_b = head_b->getFontFreetype()->getGlyphInfo(
             kFire, EFontGlyphType::Color);
-        UNSCOPED_INFO("HeadA produced an emoji glyph entry");
         REQUIRE(gi_a != nullptr);
-        UNSCOPED_INFO("HeadB produced an emoji glyph entry");
         REQUIRE(gi_b != nullptr);
         // Face-level dedup → both heads see the same face-owned entry.
         UNSCOPED_INFO("face dedup returns the same entry to both heads");
@@ -728,9 +666,7 @@ namespace tut
         // to the deleted entry; post-fix, neither head has such a cache.
         const ALFontFace* emoji_face = emoji_a->getFontFace();
         LLFontBitmapCache* cache = emoji_a->getBitmapCache();
-        UNSCOPED_INFO("fallback freetype exposes its face");
         REQUIRE(emoji_face != nullptr);
-        UNSCOPED_INFO("fallback freetype exposes its atlas");
         REQUIRE(cache != nullptr);
 
         emoji_face->erase_glyph_entries(
@@ -745,9 +681,7 @@ namespace tut
                 return false;
             });
         cache->releaseSheet(target.first, static_cast<U32>(target.second));
-        UNSCOPED_INFO("target sheet reports released");
-        CHECK(cache->isSheetReleased(target.first,
-                                      static_cast<U32>(target.second)));
+        CHECK(cache->isSheetReleased(target.first, static_cast<U32>(target.second)));
 
         // Re-request the emoji through both heads. Each lookup must:
         //  1. not crash on a freed face entry,
@@ -757,17 +691,11 @@ namespace tut
             kFire, EFontGlyphType::Color);
         const LLFontGlyphInfo* gi_b2 = head_b->getFontFreetype()->getGlyphInfo(
             kFire, EFontGlyphType::Color);
-        UNSCOPED_INFO("HeadA re-rasterized after sibling-driven eviction");
         REQUIRE(gi_a2 != nullptr);
-        UNSCOPED_INFO("HeadB re-rasterized after sibling-driven eviction");
         REQUIRE(gi_b2 != nullptr);
         const auto post_a = gi_a2->mPhaseSlots[0].mBitmapEntry;
         const auto post_b = gi_b2->mPhaseSlots[0].mBitmapEntry;
-        UNSCOPED_INFO("HeadA's post-eviction entry points at a live sheet");
-        CHECK_FALSE(cache->isSheetReleased(post_a.first,
-                                       static_cast<U32>(post_a.second)));
-        UNSCOPED_INFO("HeadB's post-eviction entry points at a live sheet");
-        CHECK_FALSE(cache->isSheetReleased(post_b.first,
-                                       static_cast<U32>(post_b.second)));
+        CHECK_FALSE(cache->isSheetReleased(post_a.first, static_cast<U32>(post_a.second)));
+        CHECK_FALSE(cache->isSheetReleased(post_b.first, static_cast<U32>(post_b.second)));
     }
 }
