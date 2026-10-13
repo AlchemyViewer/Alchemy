@@ -247,7 +247,8 @@ namespace tut
     }
 
     // ALDrawnOnly reaches what the depth test on the far plane reached before it, under reverse-Z: every pixel the
-    // world drew, out to the farthest depth the infinite projection stores, and none the sky holds.
+    // world drew, out as far as reconstruction reaches, and none the sky holds. Nothing the viewer draws lies past
+    // that; a surface 100,000 km out stores 1e-9, which Mesa's llvmpipe has the bounds turn away.
     template<> template<>
     void aldepthbounds_object_t::test<1>()
     {
@@ -257,7 +258,7 @@ namespace tut
             0.0,                                                    // sky
             stored_depth(true, MAX_RECONSTRUCT_DISTANCE),           // as far as reconstruction reaches
             stored_depth(true, 256000.0),                           // the water's rim
-            stored_depth(true, 1.0e8),                              // past every reach
+            stored_depth(true, 8192.0),                             // terrain's reach
             0.5,
             1.0,                                                    // on the near plane
             0.0,                                                    // sky
