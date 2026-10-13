@@ -198,16 +198,16 @@ namespace
         // The grid's builtins, which the optimizer and const folding read. A
         // test that needs them asks for them itself: Tailslide keeps them for
         // the process once loaded, so whichever asks first loads them.
-        static void ensureGridBuiltins()
+        static void requireGridBuiltins()
         {
             ALLSLService service;
             std::string  error;
-            UNSCOPED_INFO("builtins: " + error);
+            INFO("builtins: " << error);
             REQUIRE(service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
         }
 
         // The same but the notes of a require nothing reads, which a script
-        // made to try something else may leave about (test 50 tries them).
+        // made to try something else may leave about (the last case here tries them).
         static std::string faults(const ALPreprocessor::Result& r)
         {
             ALPreprocessor::Result kept;
@@ -242,12 +242,9 @@ namespace
                                    "#define TWICE(x) x + x\n"
                                    "default { state_entry() { llSay(0, GREETING); integer y = TWICE(2); string s = \"GREETING\"; /* GREETING */ } }";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("text");
         CHECK(r.text ==
                       std::string("\n\ndefault { state_entry() { llSay(0, \"hello\"); integer y = 2 + 2; string s = \"GREETING\"; /* GREETING */ } }"));
-        UNSCOPED_INFO("not disabled");
         CHECK_FALSE(r.disabled);
 
         // A function-like macro's name on its own is only a name, and its
@@ -255,13 +252,11 @@ namespace
         r = ALPreprocessor::run("#define M(a, b) a+b\nM + 1\nM(1,\n 2)\n", options());
         UNSCOPED_INFO("name alone");
         CHECK(r.text == std::string("\nM + 1\n1+2\n"));
-        UNSCOPED_INFO("no problems");
         CHECK(messages(r) == std::string());
 
         // `#define` needs a name; an unknown directive is an error; a
         // redefinition is a warning; `#undef` takes it away.
         r = ALPreprocessor::run("#define\n#foo\n#define A 1\n#define A 2\nA\n#undef A\nA\n", options());
-        UNSCOPED_INFO("errors");
         CHECK(messages(r) == std::string("E 0: macro name missing in #define\nE 1: ill formed preprocessor directive '#foo'\nW 3: macro 'A' redefined\n"));
         UNSCOPED_INFO("undef");
         CHECK(squeeze(r.text) == std::string("2\nA\n"));
@@ -281,9 +276,7 @@ namespace
                                    "STR(__LINE__)\n"
                                    "TAIL(1) TAIL(1, 2, 3)\n";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("text");
         CHECK(squeeze(r.text) ==
                       std::string("\"hello world\"\n"
                                   "\"\\\"q\\\\n\\\"\"\n"
@@ -323,9 +316,7 @@ namespace
                                    "AB\n"
                                    "I(I)(3)\n";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("text");
         CHECK(squeeze(r.text) == std::string("2*9*g\nfoo\na b AB\nI(3)\n"));
     }
 
@@ -369,9 +360,7 @@ namespace
                                    "#endif\n"
                                    "end\n";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("text");
         CHECK(squeeze(r.text) == std::string("yes\nyes2\nyes3\nyes4\nyes5\nyes6\nend\n"));
         std::istringstream in(r.text);
         std::string        line;
@@ -389,7 +378,6 @@ namespace
         CHECK(loc.line == 19);
 
         r = ALPreprocessor::run("#if 1\n#else\n#else\n#endif\n#endif\n#elif 1\n#if 1/0\n#endif\n#if 1 +\n#endif\n#if (1\n#endif\n#if 1\n", options());
-        UNSCOPED_INFO("errors");
         CHECK(messages(r) ==
                       std::string("E 2: #else after #else\n"
                                   "E 4: #endif without #if\n"
@@ -418,31 +406,22 @@ namespace
                                    "#include NAME\n"
                                    "FROM_INC\n";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string("E 5: could not find include file 'missing.lsl'\n"));
-        UNSCOPED_INFO("text");
         CHECK(r.text ==
                       std::string("\ninteger a = 1; string f = \"a.lsl\"; string id = \"aaaa\";\n"
                                   "string top = \"main.lsl\"; string tid = \"NOT_IN_WORLD\";\n"
                                   "\n\nonce\n"
                                   "\n\n\n\n\n\n7\n"));
-        UNSCOPED_INFO("includes");
         REQUIRE(r.includes.size() == 3u);
-        UNSCOPED_INFO("first include");
         CHECK(r.includes[0] == std::string("a.lsl"));
-        UNSCOPED_INFO("pending");
         REQUIRE(r.pending.size() == 1u);
-        UNSCOPED_INFO("pending name");
         CHECK(r.pending[0] == std::string("pending.lsl"));
-        UNSCOPED_INFO("files");
         REQUIRE(r.map.files().size() == 4u);
-        UNSCOPED_INFO("main file");
         CHECK(r.map.files()[0].name == std::string("main.lsl"));
         UNSCOPED_INFO("an include by its identity");
         CHECK(r.map.fileOf("once.lsl") == 2);
 
         r = ALPreprocessor::run("#include \"deep.lsl\"\n", options());
-        UNSCOPED_INFO("too deep");
         REQUIRE(messages(r).find("nested too deeply") != std::string::npos);
         UNSCOPED_INFO("in the include");
         CHECK(r.problems.front().file == "deep.lsl");
@@ -468,7 +447,6 @@ namespace
 
         const std::string off = "//fspreprocessor off\n#define X 1\nX\n";
         r                     = ALPreprocessor::run(off, options());
-        UNSCOPED_INFO("disabled");
         CHECK(r.disabled);
         UNSCOPED_INFO("as it was");
         CHECK(r.text == off);
@@ -486,7 +464,6 @@ namespace
         r = ALPreprocessor::run("__LINE__ __FILE__ __SHORTFILE__ __ASSETID__\n__AGENTKEY__ __AGENTID__ __AGENTIDRAW__ __AGENTNAME__ __UNIXTIME__\n"
                                 "integer(1.5) list(1, 2) key(x)\n__DATE__ __TIME__\n",
                                 o);
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
         UNSCOPED_INFO("line one");
         CHECK(r.text.substr(0, r.text.find('\n')) == std::string("1 \"main.lsl\" \"main.lsl\" \"asset-1\""));
@@ -529,11 +506,8 @@ namespace
                                    "default: llSay(0, \"other\");\n"
                                    "}\n";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("used");
         CHECK(r.usedSwitches);
-        UNSCOPED_INFO("text");
         CHECK(r.text ==
                       std::string("\n{if((x) == (1))jump _sw1_1;\n"
                                   "if((x) == (2))jump _sw1_2;\n"
@@ -580,12 +554,9 @@ namespace
                                    "list l; integer i = (integer)l[2]; l[0] = 5; string s = (string)(l[(integer)l[1]]); rotation r = (rotation)l[0];\n"
                                    "x = (integer)(l[0]; f((float)l[0], l[1] = 2);\n";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("used");
         CHECK(r.usedLazyLists);
         const std::string helper = "list lazy_list_set(list L, integer i, list v)\n{\n    while (llGetListLength(L) < i)\n        L = L + 0;\n    return llListReplaceList(L, v, i, i);\n}\n\n";
-        UNSCOPED_INFO("text");
         CHECK(r.text ==
                       helper + "\nlist l; integer i = llList2Integer(l, 2); l = lazy_list_set(l,0,[5]); string s = llList2String(l, llList2Integer(l, 1)); rotation r = llList2Rot(l, 0);\n"
                                "x = (integer)(l[0]; f(llList2Float(l, 0), l = lazy_list_set(l,1,[2]));\n");
@@ -604,9 +575,7 @@ namespace
         o.compress                = true;
         ALPreprocessor::Result r =
             ALPreprocessor::run("// comment\ndefault   {  state_entry ( ) { integer a = - -1 ; /* x */ llSay( 0 , \"a  b\" ) ; a ++ ; float f = 1 . 5; } }\n", o);
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("text");
         CHECK(r.text == std::string("default{state_entry(){integer a=- -1;llSay(0,\"a  b\");a++;float f=1 . 5;}}\n"));
         r = ALPreprocessor::run("a\n\n\nb / /* c */ d\n", o);
         UNSCOPED_INFO("lines kept, not multiplied");
@@ -622,9 +591,7 @@ namespace
                                    "print(N)\n"
                                    "--#line 3\n";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options(true));
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("text");
         CHECK(r.text ==
                       std::string("\nlocal s = [[N]] -- N\nlocal t = \"N\" .. #N_list .. 'N' .. `N{N}`\n--[==[ N\nN ]==]\nprint(3)\n--#line 3\n"));
 
@@ -632,14 +599,11 @@ namespace
         add("b", "return 42\n");
         add("c", "return require(\"c\")\n");
         r = ALPreprocessor::run("local a = require(\"a\")\nlocal b = require('b')\nlocal x = require(name)\n", options(true));
-        UNSCOPED_INFO("problems");
         CHECK(faults(r) == std::string());
         // Numbered as met: a, then what a requires.
         const std::string bundled = bundleOf({ "local b = require(2)\nreturn { b = b }\n", "return 42\n" },
                                              "local a = require(1)\nlocal b = require(2)\nlocal x = require(name)\n");
-        UNSCOPED_INFO("modules");
         CHECK(r.text == bundled);
-        UNSCOPED_INFO("included");
         REQUIRE(r.includes.size() == 2u);
         UNSCOPED_INFO("b mapped to its file");
         CHECK(r.map.files()[r.map.toSource(7, 0).file].name == std::string("b"));
@@ -663,11 +627,8 @@ namespace
             ALPreprocessor::run("local a = require(\"a\")\nlocal b = require('b')\nlocal x = require(name)\n", apart);
         UNSCOPED_INFO("the bundle as ever");
         CHECK(split.text == bundled);
-        {
-            INFO("apart");
-            CHECK(split.apart.valid);
-            REQUIRE(split.apart.modules.size() == 2);
-        }
+        CHECK(split.apart.valid);
+        REQUIRE(split.apart.modules.size() == 2);
         UNSCOPED_INFO("the script, its requires calls");
         CHECK(split.apart.script.text ==
                       std::string("local a = require(\"a\")\nlocal b = require('b')\nlocal x = require(name)\n"));
@@ -677,7 +638,6 @@ namespace
         CHECK(split.apart.modules[0].text == std::string("local b = require(\"b\")\nreturn { b = b }\n"));
         UNSCOPED_INFO("then what it reached");
         CHECK(split.apart.modules[1].key == std::string("b"));
-        UNSCOPED_INFO("b");
         CHECK(split.apart.modules[1].text == std::string("return 42\n"));
         const ALSourceMap::Loc in_a = split.apart.modules[0].map.toSource(1, 0);
         {
@@ -706,12 +666,9 @@ namespace
     {
         add("inc", "x;\n");
         ALPreprocessor::Result r = ALPreprocessor::run("#define X 10\ninteger a = X + 1;\n#include \"inc\"\ny;\n", options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("text");
         CHECK(r.text == std::string("\ninteger a = 10 + 1;\n\nx;\ny;\n"));
         ALSourceMap::Loc loc = r.map.toSource(1, 0);
-        UNSCOPED_INFO("found");
         REQUIRE(loc.found());
         UNSCOPED_INFO("integer");
         CHECK(loc.line * 1000 + loc.column == 1000);
@@ -781,7 +738,7 @@ namespace
             const std::string stem     = entry.path().stem().string();
             const fs::path    expected = dir / (stem + "_expected" + entry.path().extension().string());
             ALPreprocessor::Result r   = runGolden(entry.path(), "\n");
-            UNSCOPED_INFO("problems in " + name);
+            CAPTURE(name);
             REQUIRE(messages(r) == std::string());
             // With AL_PREPROCESSOR_WRITE_EXPECTED set, the run writes the
             // expected files instead of checking them: for a new golden
@@ -793,9 +750,7 @@ namespace
                 out << r.text;
                 continue;
             }
-            UNSCOPED_INFO("expected file for " + name);
             REQUIRE(fs::exists(expected));
-            UNSCOPED_INFO("output of " + name);
             REQUIRE(r.text == readFile(expected));
             ++checked;
         }
@@ -805,16 +760,14 @@ namespace
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: the optimizer runs on expanded text and its notes map to the source", "[alpreprocessor]")
     {
-        ensureGridBuiltins();
+        requireGridBuiltins();
         add("consts.lsl", "#define CHANNEL 7\ninteger unused = 1;\n");
         ALPreprocessor::Options o = options();
         o.optimize                = true;
         o.compress                = true;
         const std::string source  = "#include \"consts.lsl\"\n#define TWICE(x) ((x) * 2)\ndefault\n{\n    state_entry()\n    {\n        llSay(CHANNEL, (string)TWICE(21));\n    }\n}\n";
         ALPreprocessor::Result r  = ALPreprocessor::run(source, o);
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
-        UNSCOPED_INFO("text");
         CHECK(r.text == std::string("default\n{\nstate_entry()\n{\nllSay(7,\"42\");\n}\n}\n"));
         // The unused global was in the include, and the note says so.
         bool noted = false;
@@ -829,15 +782,12 @@ namespace
                 REQUIRE(p.line == 1);
             }
         }
-        UNSCOPED_INFO("noted");
         CHECK(noted);
         // The llSay is on output line 4, which came from source line 6.
         const ALSourceMap::Loc loc = r.map.toSource(4, 0);
-        UNSCOPED_INFO("found");
         REQUIRE(loc.found());
         UNSCOPED_INFO("main file");
         CHECK(loc.file == 0);
-        UNSCOPED_INFO("line");
         CHECK(loc.line == 6);
     }
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: break and continue become jumps; &= |= ^= <<= >>= become assignments", "[alpreprocessor]")
@@ -845,9 +795,7 @@ namespace
         ALPreprocessor::Options o = options();
         o.extensions              = true;
         ALPreprocessor::Result r  = ALPreprocessor::run("while (a) { if (b) break; if (c) continue; d++; }\n", o);
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("used");
         CHECK(r.usedExtensions);
         UNSCOPED_INFO("a while");
         CHECK(r.text == std::string("while (a) { if (b) jump _brk1; if (c) jump _cnt1; d++; @_cnt1;}@_brk1;\n"));
@@ -880,12 +828,9 @@ namespace
         r = ALPreprocessor::run("inline f() { }\ninline integer g(integer x) { return x; }\ninline = 3;\n", o);
         UNSCOPED_INFO("inline before a function is taken off and the name kept");
         CHECK(r.text == std::string("f() { }\ninteger g(integer x) { return x; }\ninline = 3;\n"));
-        {
-            INFO("the names");
-            REQUIRE(r.inlined.size() == 2);
-            CHECK(r.inlined[0] == "f");
-            CHECK(r.inlined[1] == "g");
-        }
+        REQUIRE(r.inlined.size() == 2);
+        CHECK(r.inlined[0] == "f");
+        CHECK(r.inlined[1] == "g");
         r = ALPreprocessor::run("integer break; while (a) { break = 1; x = continue; }\n", o);
         UNSCOPED_INFO("the words as names are errors, not rewrites");
         CHECK(messages(r) ==
@@ -900,7 +845,6 @@ namespace
         ALPreprocessor::Options o = options();
         o.extensions              = true;
         ALPreprocessor::Result r  = ALPreprocessor::run("while (a) { if (b) break; c++; }\n@out;\n", o);
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
         UNSCOPED_INFO("a label after the loop is the break's");
         CHECK(r.text == std::string("while (a) { if (b) jump out; c++; }\n@out;\n"));
@@ -925,11 +869,8 @@ namespace
         ALPreprocessor::Result r  = ALPreprocessor::run("continue;\n#define f(a, a) a\n", o);
         // The directives go first, the extensions after: the macro's
         // problem is said before the loop's.
-        UNSCOPED_INFO("two problems");
         REQUIRE(r.problems.size() == size_t(2));
-        UNSCOPED_INFO("the words");
         CHECK(r.problems[1].message == std::string("continue outside a loop"));
-        UNSCOPED_INFO("the key");
         CHECK(r.problems[1].key == std::string("PreprocOutsideLoop"));
         {
             INFO("the word it was built with");
@@ -971,7 +912,6 @@ namespace
             REQUIRE_FALSE(r.problems.empty());
             CHECK(r.problems.back().key == std::string("PreprocTooMuch"));
         }
-        UNSCOPED_INFO("an error");
         CHECK(r.problems.back().severity == ALScriptProblem::Severity::Error);
         // A run within the budget is untouched by it.
         ALPreprocessor::Result fine = ALPreprocessor::run("#define A 1\ninteger n = A;\n", o);
@@ -995,13 +935,10 @@ namespace
         ALPreprocessor::Options d = options();
         d.expressionDepth         = 16;
         ALPreprocessor::Result nested = ALPreprocessor::run(deep, d);
-        UNSCOPED_INFO("said");
         REQUIRE_FALSE(nested.problems.empty());
-        UNSCOPED_INFO("with its key");
         CHECK(nested.problems.front().key == std::string("PreprocExpressionTooDeep"));
         // And one within the depth is answered.
         ALPreprocessor::Result shallow = ALPreprocessor::run("#if ((((1))))\ninteger n;\n#endif\n", d);
-        UNSCOPED_INFO("nothing said");
         REQUIRE(shallow.problems.empty());
         UNSCOPED_INFO("the group taken");
         REQUIRE(shallow.text.find("integer n;") != std::string::npos);
@@ -1019,7 +956,6 @@ namespace
         {
             deep = deep || p.key == "PreprocIncludeTooDeep";
         }
-        UNSCOPED_INFO("said so");
         CHECK(deep);
         UNSCOPED_INFO("each listed once");
         REQUIRE(r.includes.size() == size_t(2));
@@ -1027,9 +963,7 @@ namespace
         files.clear();
         add("c.lsl", "#pragma once\ninteger c;\n");
         ALPreprocessor::Result twice = ALPreprocessor::run("#include \"c.lsl\"\n#include \"c.lsl\"\n", o);
-        UNSCOPED_INFO("nothing said");
         REQUIRE(twice.problems.empty());
-        UNSCOPED_INFO("listed once");
         REQUIRE(twice.includes.size() == size_t(1));
         UNSCOPED_INFO("and put in once");
         CHECK(twice.text.find("integer c;") == twice.text.rfind("integer c;"));
@@ -1052,7 +986,6 @@ namespace
         UNSCOPED_INFO("the expansion alone leaves it as it was");
         REQUIRE(in_two.text.find("// comment") != std::string::npos);
         ALPreprocessor::finish(in_two, whole);
-        UNSCOPED_INFO("the same text");
         CHECK(in_two.text == at_once.text);
         UNSCOPED_INFO("and the same way back");
         CHECK(in_two.map.toSource(0, 0).line == at_once.map.toSource(0, 0).line);
@@ -1063,13 +996,12 @@ namespace
         ALPreprocessor::Options opts = options();
         opts.defines = { "DEBUG", "LEVEL=3", " SPACED = 7 ", "2BAD", "" };
         ALPreprocessor::Result r = ALPreprocessor::run("#if DEBUG\nx = LEVEL;\n#endif\ny = SPACED;\n#undef LEVEL\nz = LEVEL;\n", opts);
-        UNSCOPED_INFO("no problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("DEBUG is 1, so the block is in: " + r.text);
+        UNSCOPED_INFO("DEBUG is 1, so the block is in: " << r.text);
         REQUIRE(r.text.find("x = 3;") != std::string::npos);
-        UNSCOPED_INFO("a value around blanks: " + r.text);
+        UNSCOPED_INFO("a value around blanks: " << r.text);
         REQUIRE(r.text.find("y = 7;") != std::string::npos);
-        UNSCOPED_INFO("undefined by the script: " + r.text);
+        UNSCOPED_INFO("undefined by the script: " << r.text);
         REQUIRE(r.text.find("z = LEVEL;") != std::string::npos);
     }
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a run is bounded through chained ?: and nested calls and self includes", "[alpreprocessor]")
@@ -1088,7 +1020,7 @@ namespace
         }
         chain += "\nyes\n#endif\n";
         ALPreprocessor::Result r = ALPreprocessor::run(chain, options());
-        UNSCOPED_INFO("the chain is too deep: " + messages(r).substr(0, 200));
+        UNSCOPED_INFO("the chain is too deep: " << messages(r).substr(0, 200));
         REQUIRE(messages(r).find("nests too deeply") != std::string::npos);
 
         // A macro invoked in its own argument, deeper than the bound.
@@ -1104,9 +1036,8 @@ namespace
         }
         nested += ";\n";
         r = ALPreprocessor::run(nested, options());
-        UNSCOPED_INFO("overran");
         CHECK(r.overran);
-        UNSCOPED_INFO("and said why: " + messages(r).substr(0, 200));
+        UNSCOPED_INFO("and said why: " << messages(r).substr(0, 200));
         REQUIRE(messages(r).find("more deeply than this preprocessor follows") != std::string::npos);
         UNSCOPED_INFO("the text is the source as it was");
         CHECK(r.text == nested);
@@ -1114,7 +1045,7 @@ namespace
         // Within the bound, as deep as a person writes, it expands.
         r = ALPreprocessor::run("#define F(x) x\nF(F(F(F(F(1)))));\n", options());
         {
-            INFO("five deep is nothing: " + messages(r));
+            INFO("five deep is nothing: " << messages(r));
             CHECK_FALSE(r.overran);
             REQUIRE(r.text.find("1;") != std::string::npos);
         }
@@ -1134,7 +1065,7 @@ namespace
         ALPreprocessor::Options opts = options();
         opts.fileName                = "Say \"hi\" \\ there";
         ALPreprocessor::Result r     = ALPreprocessor::run("llSay(0, __FILE__);\nllSay(0, __SHORTFILE__);\n", opts);
-        UNSCOPED_INFO("the quote and the backslash escaped: " + r.text);
+        UNSCOPED_INFO("the quote and the backslash escaped: " << r.text);
         REQUIRE(r.text.find("\"Say \\\"hi\\\" \\\\ there\"") != std::string::npos);
 
         // A module found on a Windows disk: required by its number, and
@@ -1145,12 +1076,11 @@ namespace
         module.path = "disk:C:\\Users\\me\\lib\\util.luau";
         files["./util"] = module;
         r = ALPreprocessor::run("local util = require(\"./util\")\n", options(true));
-        UNSCOPED_INFO("nothing wrong");
         CHECK(faults(r) == std::string());
-        UNSCOPED_INFO("required by its number: " + r.text);
+        UNSCOPED_INFO("required by its number: " << r.text);
         REQUIRE(r.text.find("local util = require(1)") != std::string::npos);
         {
-            INFO("no path: " + r.text);
+            INFO("no path: " << r.text);
             REQUIRE(r.text.find("disk:") == std::string::npos);
             REQUIRE(r.text.find("Users") == std::string::npos);
         }
@@ -1168,7 +1098,7 @@ namespace
             }
         }
         {
-            INFO("the string whole, then what follows it: " + std::to_string(kinds.size()));
+            INFO("the string whole, then what follows it");
             REQUIRE(kinds.size() >= 6);
             CHECK(kinds[3] == "`a{ \"{\" .. `{'}'}` }b`");
             CHECK(kinds[4] == "..");
@@ -1177,7 +1107,7 @@ namespace
 
         // And the macro after it is expanded.
         ALPreprocessor::Result r = ALPreprocessor::run("--#define X 42\nlocal s = `{\"{\"}` .. X\n", options(true));
-        UNSCOPED_INFO("the macro after the string expanded: " + r.text);
+        UNSCOPED_INFO("the macro after the string expanded: " << r.text);
         REQUIRE(r.text.find(".. 42") != std::string::npos);
     }
 
@@ -1200,9 +1130,8 @@ namespace
         }
         blocks += "\n} }\n";
         ALPreprocessor::Result r = ALPreprocessor::run(blocks, opts);
-        UNSCOPED_INFO("overran");
         CHECK(r.overran);
-        UNSCOPED_INFO("and said why: " + messages(r).substr(0, 200));
+        UNSCOPED_INFO("and said why: " << messages(r).substr(0, 200));
         REQUIRE(messages(r).find("blocks nest more deeply") != std::string::npos);
         UNSCOPED_INFO("the text is the source as it was");
         CHECK(r.text == blocks);
@@ -1221,7 +1150,7 @@ namespace
         r = ALPreprocessor::run(switches, opts);
         UNSCOPED_INFO("switches overran");
         CHECK(r.overran);
-        UNSCOPED_INFO("and said why: " + messages(r).substr(0, 200));
+        UNSCOPED_INFO("and said why: " << messages(r).substr(0, 200));
         REQUIRE(messages(r).find("blocks nest more deeply") != std::string::npos);
 
         // As deep as anybody writes, done.
@@ -1238,11 +1167,11 @@ namespace
         loops += "\n} }\n";
         r = ALPreprocessor::run(loops, opts);
         {
-            INFO("thirty deep is nothing: " + messages(r).substr(0, 200));
+            INFO("thirty deep is nothing: " << messages(r).substr(0, 200));
             CHECK_FALSE(r.overran);
             CHECK_FALSE(r.hasErrors());
         }
-        UNSCOPED_INFO("and the loops were lowered: " + r.text.substr(0, 200));
+        UNSCOPED_INFO("and the loops were lowered: " << r.text.substr(0, 200));
         REQUIRE(r.text.find("jump _brk") != std::string::npos);
 
         // A loop governing a long chain of else-ifs, on a thread with what
@@ -1257,7 +1186,7 @@ namespace
         std::thread worker([&]() { r = ALPreprocessor::run(chain, opts); });
         worker.join();
         {
-            INFO("the chain is no deeper for its length: " + messages(r).substr(0, 200));
+            INFO("the chain is no deeper for its length: " << messages(r).substr(0, 200));
             CHECK_FALSE(r.overran);
             CHECK_FALSE(r.hasErrors());
         }
@@ -1269,9 +1198,8 @@ namespace
     {
         const std::string source = "#define X 1\n/* one\n   two\n   three */ integer x = X;\n";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options());
-        UNSCOPED_INFO("nothing wrong");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("the comment on the lines it was on: " + r.text);
+        UNSCOPED_INFO("the comment on the lines it was on: " << r.text);
         REQUIRE(r.text.find("\n/* one\n   two\n   three */ integer x = 1;") != std::string::npos);
         ALSourceMap::Loc loc = r.map.toSource(2, 4);
         UNSCOPED_INFO("the comment's middle line maps");
@@ -1298,7 +1226,6 @@ namespace
 
         const std::string lua = "--#define X 2\nlocal s = [[one\ntwo\nthree]] .. X\n";
         r = ALPreprocessor::run(lua, options(true));
-        UNSCOPED_INFO("nothing wrong in SLua");
         CHECK(messages(r) == std::string());
         loc = r.map.toSource(2, 1);
         {
@@ -1328,15 +1255,11 @@ namespace
             return t;
         };
         std::string word;
-        UNSCOPED_INFO("switch");
         CHECK(of({ "    switch (x)" }, 0, &word) == T::Switch);
-        UNSCOPED_INFO("its word");
         CHECK(word == std::string("switch"));
         UNSCOPED_INFO("switch not called");
         CHECK(of({ "switch = 2;" }, 0) == T::None);
-        UNSCOPED_INFO("a case");
         CHECK(of({ "  case 1:" }, 0, &word) == T::Switch);
-        UNSCOPED_INFO("the case's word");
         CHECK(word == std::string("case"));
         UNSCOPED_INFO("case assigned");
         CHECK(of({ "case = 1;" }, 0) == T::None);
@@ -1344,23 +1267,19 @@ namespace
         CHECK(of({ "case(1);" }, 0) == T::None);
         UNSCOPED_INFO("case with no colon");
         CHECK(of({ "case 1" }, 0) == T::None);
-        UNSCOPED_INFO("break");
         CHECK(of({ "break;" }, 0) == T::Extensions);
         UNSCOPED_INFO("break out of two");
         CHECK(of({ "break 2;" }, 0) == T::Extensions);
-        UNSCOPED_INFO("continue");
         CHECK(of({ "\tcontinue;" }, 0) == T::Extensions);
         UNSCOPED_INFO("break assigned");
         CHECK(of({ "break = 3;" }, 0) == T::None);
         UNSCOPED_INFO("an inline function");
         CHECK(of({ "inline f(integer a)" }, 0, &word) == T::Extensions);
-        UNSCOPED_INFO("inline's word");
         CHECK(word == std::string("inline"));
         UNSCOPED_INFO("an inline function with its type");
         CHECK(of({ "inline integer f(integer a)" }, 0) == T::Extensions);
         UNSCOPED_INFO("inline after the parameters");
         CHECK(of({ "integer f(integer a) inline {" }, 0, &word) == T::Extensions);
-        UNSCOPED_INFO("its word");
         CHECK(word == std::string("inline"));
         UNSCOPED_INFO("inline after them, the brace on the next line");
         CHECK(of({ "f() inline" }, 0) == T::Extensions);
@@ -1370,7 +1289,6 @@ namespace
         CHECK(of({ "inline = 2;" }, 0) == T::None);
         UNSCOPED_INFO("const before a type");
         CHECK(of({ "const integer X = 1;" }, 0, &word) == T::Extensions);
-        UNSCOPED_INFO("const's word");
         CHECK(word == std::string("const"));
         UNSCOPED_INFO("a const parameter");
         CHECK(of({ "f(integer a, const vector v)" }, 0) == T::Extensions);
@@ -1401,7 +1319,7 @@ namespace
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: verbatimSpan maps copied source back whole but not a macro's output", "[alpreprocessor]")
     {
         const ALPreprocessor::Result r = ALPreprocessor::run("#define GREET llOwnerSay(\"hi\")\nGREET;\n    llSay(0, \"x\");\n", options());
-        UNSCOPED_INFO("no problems: " + messages(r));
+        UNSCOPED_INFO("no problems: " << messages(r));
         REQUIRE(r.problems.empty());
         // Where each call landed in the output.
         S32 greet_line = -1, greet_column = -1, say_line = -1, say_column = -1;
@@ -1421,7 +1339,7 @@ namespace
             }
         }
         {
-            INFO("both in the output: " + r.text);
+            INFO("both in the output: " << r.text);
             CHECK(greet_line >= 0);
             CHECK(say_line >= 0);
         }
@@ -1451,7 +1369,7 @@ namespace
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a weighed optimizer run says what it saved in all and per note", "[alpreprocessor]")
     {
-        ensureGridBuiltins();
+        requireGridBuiltins();
         const std::string source = "integer unused(integer n)\n"
                                    "{\n"
                                    "    return n * 3;\n"
@@ -1468,10 +1386,9 @@ namespace
         o.optimizer.target        = ALLSLOptimizer::Target::LSO;
         o.weigh                   = true;
         const ALPreprocessor::Result r = ALPreprocessor::run(source, o);
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
         {
-            INFO("weighed, and lighter: " + std::to_string(r.codeBefore) + " to " + std::to_string(r.codeAfter));
+            INFO("weighed, and lighter");
             CHECK(r.codeAfter > 0);
             CHECK(r.codeAfter < r.codeBefore);
         }
@@ -1489,7 +1406,7 @@ namespace
             REQUIRE(removed);
             REQUIRE(removed->savedBytes.has_value());
         }
-        UNSCOPED_INFO("its lines' code all saved: " + std::to_string(removed->savedBytes.value_or(0)));
+        UNSCOPED_INFO("its lines' code all saved");
         CHECK(*removed->savedBytes > 0);
         {
             INFO("the fold noted, with what its line saved");
@@ -1529,7 +1446,7 @@ namespace
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a script that does not compile: the optimizer stands aside with a note", "[alpreprocessor]")
     {
-        ensureGridBuiltins();
+        requireGridBuiltins();
         // Nexii's library, whose ObjectLinksetSittingAvatars has a parameter
         // without its type, included as a save would include it.
         llifstream        in(std::string(AL_ALSCRIPT_TEST_DIR) + "/preprocessor/include/linkset.lsl", std::ios::binary);
@@ -1541,18 +1458,14 @@ namespace
         o.optimize                = true;
         o.weigh                   = true;
         ALPreprocessor::Result r  = ALPreprocessor::run(source, o);
-        UNSCOPED_INFO("no error of the preprocessor's: " + messages(r));
+        UNSCOPED_INFO("no error of the preprocessor's: " << messages(r));
         CHECK_FALSE(r.hasErrors());
         UNSCOPED_INFO("one note, on the library's line");
         CHECK(messages(r) ==
                       std::string("N linkset.lsl:110: not optimized: the script does not compile as it stands, and compiling it says why\n"));
-        {
-            INFO("keyed");
-            REQUIRE(r.problems.size() == 1);
-            CHECK(r.problems[0].key == "OptimizerUncompiled");
-            CHECK(r.problems[0].column == 33);
-        }
-        UNSCOPED_INFO("not optimized");
+        REQUIRE(r.problems.size() == 1);
+        CHECK(r.problems[0].key == "OptimizerUncompiled");
+        CHECK(r.problems[0].column == 33);
         CHECK_FALSE(r.optimized);
         ALPreprocessor::Options plain = options();
         UNSCOPED_INFO("the text as expanded, for the compiler to read");
@@ -1566,7 +1479,6 @@ namespace
                                                              "local b = t : require(\"x\")\n"
                                                              "local c = t .. require(\"x\")\n",
                                                              options(true));
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
         UNSCOPED_INFO("only the concatenated call is a module's");
         CHECK(r.text ==
@@ -1589,9 +1501,7 @@ namespace
                                    "local h = require([[h]])\n"
                                    "local i = x .. require(\"i\")\n"; // 10
         const std::vector<ALPreprocessor::Required> found = ALPreprocessor::requiresIn(source);
-        UNSCOPED_INFO("three");
         REQUIRE(found.size() == size_t(3));
-        UNSCOPED_INFO("a");
         CHECK(found[0].name == std::string("a"));
         {
             INFO("a's stretch");
@@ -1600,7 +1510,6 @@ namespace
             CHECK(found[0].endLine == 0);
             CHECK(found[0].endColumn == 22);
         }
-        UNSCOPED_INFO("c");
         CHECK(found[1].name == std::string("c"));
         {
             INFO("c's stretch, across lines");
@@ -1609,7 +1518,6 @@ namespace
             CHECK(found[1].endLine == 4);
             CHECK(found[1].endColumn == 1);
         }
-        UNSCOPED_INFO("i");
         CHECK(found[2].name == std::string("i"));
         {
             INFO("i's line");
@@ -1623,7 +1531,6 @@ namespace
         add("c", "return 3\n");
         add("i", "return 9\n");
         const ALPreprocessor::Result r = ALPreprocessor::run(source, options(true));
-        UNSCOPED_INFO("problems");
         CHECK(faults(r) == std::string());
         // Each module's function is put at the top once, and asked for by
         // its number where it was called for.
@@ -1646,7 +1553,6 @@ namespace
         const ALPreprocessor::Result r = ALPreprocessor::run("#include \"lib/util.lsl\"\n#include \"lib/util.lsl\"\ndefault {}\n", options());
         // Included twice, with no #pragma once: its own include asked for
         // twice as well.
-        UNSCOPED_INFO("four found");
         REQUIRE(r.resolved.size() == size_t(4));
         {
             INFO("the script's, by its name, as the identity found");
@@ -1689,7 +1595,7 @@ namespace
         const std::string many = "#define D(x) x x x x x x x x x x x x x x x x\nD(D(D(D(D(D(D(1)))))))\n";
         ALPreprocessor::Result r = ALPreprocessor::run(many, options());
         {
-            INFO("ran away: " + messages(r));
+            INFO("ran away: " << messages(r));
             CHECK(r.overran);
             CHECK(r.problems.back().key == std::string("PreprocTooMuch"));
         }
@@ -1705,7 +1611,7 @@ namespace
         }
         r = ALPreprocessor::run("#define CAT(a) a##a\n#define D(a) CAT(a)\n" + call + ";\n", options());
         {
-            INFO("pasting stopped: " + messages(r));
+            INFO("pasting stopped: " << messages(r));
             CHECK(r.overran);
             CHECK(r.problems.back().key == std::string("PreprocTokenTooLong"));
         }
@@ -1718,7 +1624,7 @@ namespace
         }
         r = ALPreprocessor::run("#define S(x) #x\n#define X(x) S(x)\n" + call + ";\n", options());
         {
-            INFO("stringizing stopped: " + messages(r));
+            INFO("stringizing stopped: " << messages(r));
             CHECK(r.overran);
             CHECK(r.problems.back().key == std::string("PreprocTokenTooLong"));
         }
@@ -1729,13 +1635,13 @@ namespace
         small.byteBudget              = 1000;
         r = ALPreprocessor::run("#define L \"" + std::string(600, 'a') + "\"\nL L\n", small);
         {
-            INFO("the bytes: " + messages(r));
+            INFO("the bytes: " << messages(r));
             CHECK(r.overran);
             CHECK(r.problems.back().key == std::string("PreprocTooMuch"));
         }
         r = ALPreprocessor::run("#define L \"" + std::string(100, 'a') + "\"\nL L\n", small);
         {
-            INFO("within them: " + messages(r));
+            INFO("within them: " << messages(r));
             CHECK_FALSE(r.overran);
             REQUIRE(r.text.find(std::string(100, 'a')) != std::string::npos);
         }
@@ -1776,7 +1682,7 @@ namespace
         o.lazyLists               = true;
         ALPreprocessor::Result r  = ALPreprocessor::run(deep, o);
         {
-            INFO("stopped at the depth: " + messages(r));
+            INFO("stopped at the depth: " << messages(r));
             CHECK(r.overran);
             CHECK(r.problems.back().key == std::string("PreprocNestsTooDeep"));
         }
@@ -1784,7 +1690,7 @@ namespace
         // Within it, each read is a call, the inner in the outer's place.
         r = ALPreprocessor::run("#define N0 0\n#define N1 (integer)l[N0]\n#define N2 (integer)l[N1]\n#define N3 (integer)l[N2]\nlist l;\ninteger x = N3;\n", o);
         {
-            INFO("nested reads each a call: " + r.text);
+            INFO("nested reads each a call: " << r.text);
             CHECK_FALSE(r.overran);
             REQUIRE(r.text.find("integer x = llList2Integer(l, llList2Integer(l, llList2Integer(l, 0)));") != std::string::npos);
         }
@@ -1795,7 +1701,6 @@ namespace
         add("m", "return 1\n");
         const ALPreprocessor::Result r =
             ALPreprocessor::run("-- @file vehicle/hovertext.luau\n--!strict\n--!nolint LocalUnused\nlocal m = require(\"m\")\n", options(true));
-        UNSCOPED_INFO("problems");
         CHECK(faults(r) == std::string());
         UNSCOPED_INFO("the header first, whole");
         CHECK(r.text.substr(0, r.text.find("do\n    local modules")) ==
@@ -1858,14 +1763,12 @@ namespace
         add("guarded.lsl", "// the helpers\n#ifndef GUARDED\n#define GUARDED\ninteger helper() { return 1; }\n#endif\n");
         const ALPreprocessor::Result r = ALPreprocessor::run(
             "#include \"guarded.lsl\"\n#include \"guarded.lsl\"\n#include \"guarded.lsl\"\ndefault { state_entry() { helper(); } }\n", options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
         size_t count = 0;
         for (size_t at = r.text.find("integer helper()"); at != std::string::npos; at = r.text.find("integer helper()", at + 1))
         {
             ++count;
         }
-        UNSCOPED_INFO("once");
         CHECK(count == size_t(1));
         UNSCOPED_INFO("listed once");
         REQUIRE(r.map.files().size() == size_t(2));
@@ -1894,14 +1797,12 @@ namespace
                                    "TWO(1,\n2) TWO( (1, 2) ,\t3 )\n"
                                    "I\n(3)\n";
         const ALPreprocessor::Result r = ALPreprocessor::run(source, options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("text");
         CHECK(squeeze(r.text) == std::string("zero zero Z\n[1] I  x I\n1+2 (1, 2)+3\n[3]\n"));
     }
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a function marked inline in any form is listed and the mark taken off", "[alpreprocessor]")
     {
-        ensureGridBuiltins();
+        requireGridBuiltins();
         ALPreprocessor::Options o = options();
         o.extensions              = true;
         ALPreprocessor::Result r  = ALPreprocessor::run("integer f(integer a) inline { return a; }\n"
@@ -1909,14 +1810,13 @@ namespace
                                                         "h() //pragma inline\n{\n}\n"
                                                         "k() /* pragma inline */ { }\n",
                                                         o);
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
         UNSCOPED_INFO("the four marked, in order");
         CHECK(r.inlined == std::vector<std::string>{ "f", "g", "h", "k" });
-        UNSCOPED_INFO("the word after the parameters taken off: " + r.text);
+        UNSCOPED_INFO("the word after the parameters taken off: " << r.text);
         REQUIRE(r.text.find("integer f(integer a) { return a; }") != std::string::npos);
         {
-            INFO("a comment left as it is: " + r.text);
+            INFO("a comment left as it is: " << r.text);
             REQUIRE(r.text.find("g(string s) /*pragma inline*/ { llOwnerSay(s); }") != std::string::npos);
             REQUIRE(r.text.find("h() //pragma inline\n{") != std::string::npos);
         }
@@ -1947,7 +1847,7 @@ namespace
                                                                  "default\n{\n    state_entry()\n    {\n        say(\"a\");\n        say(\"b\");\n    }\n}\n",
                                                                  optimizing);
         {
-            INFO("both calls put in place: " + put.text);
+            INFO("both calls put in place: " << put.text);
             REQUIRE(put.text.find("say(") == std::string::npos);
             REQUIRE(put.text.find("llOwnerSay(\"a\")") != std::string::npos);
             REQUIRE(put.text.find("llOwnerSay(\"b\" + \"!\")") != std::string::npos);
@@ -1956,7 +1856,7 @@ namespace
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: const before a type is taken off and each name said where it is", "[alpreprocessor]")
     {
-        ensureGridBuiltins();
+        requireGridBuiltins();
         const auto at = [](const ALPreprocessor::Result& r, size_t i, const std::string& name, S32 line, S32 column, bool function) {
             return i < r.consts.size() && r.consts[i].name == name && r.consts[i].line == line && r.consts[i].column == column &&
                    r.consts[i].function == function;
@@ -1966,7 +1866,6 @@ namespace
                                                        "const integer sq(const integer x) { return x * x; }\n"
                                                        "default { state_entry() { const vector v = <1, 2, 3>; llOwnerSay((string)v); } }\n",
                                                        options());
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
         UNSCOPED_INFO("taken off");
         CHECK(r.text ==
@@ -1974,7 +1873,6 @@ namespace
                                   "float Y = 10.0;\n"
                                   "integer sq(integer x) { return x * x; }\n"
                                   "default { state_entry() { vector v = <1, 2, 3>; llOwnerSay((string)v); } }\n"));
-        UNSCOPED_INFO("five");
         REQUIRE(r.consts.size() == size_t(5));
         UNSCOPED_INFO("a global");
         CHECK(at(r, 0, "X", 0, 8, false));
@@ -2001,7 +1899,6 @@ namespace
         ALPreprocessor::Options o = options();
         o.extensions              = true;
         r                         = ALPreprocessor::run("#define FIXED const integer\nFIXED Z = 3;\n", o);
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
         UNSCOPED_INFO("a macro's");
         CHECK(squeeze(r.text) == std::string("integer Z = 3;\n"));
@@ -2021,7 +1918,6 @@ namespace
         // A line that starts with # goes on an expression: never a
         // directive, and nothing said of it.
         ALPreprocessor::Result r = ALPreprocessor::run("local n =\n    #items\n#define N 3\nprint(N)\n", options(true));
-        UNSCOPED_INFO("nothing wrong");
         CHECK(messages(r) == std::string());
         UNSCOPED_INFO("# lines are Luau's");
         CHECK(r.text == std::string("local n =\n    #items\n#define N 3\nprint(N)\n"));
@@ -2042,7 +1938,6 @@ namespace
                                 "--#endif\n"
                                 "--#line 40\n",
                                 options(true));
-        UNSCOPED_INFO("nothing wrong");
         CHECK(messages(r) == std::string());
         UNSCOPED_INFO("directives read, # as length");
         CHECK(r.text ==
@@ -2059,7 +1954,6 @@ namespace
                                      "local z = 1 --#define Z 3\n"
                                      "print(X, Y, Z)\n";
         r = ALPreprocessor::run(comments, options(true));
-        UNSCOPED_INFO("nothing wrong");
         CHECK(messages(r) == std::string());
         UNSCOPED_INFO("all as written");
         CHECK(r.text == comments);
@@ -2067,7 +1961,6 @@ namespace
         // An include, as LSL has one.
         add("lib.luau", "--#define GREETING \"hi\"\nlocal lib = {}\n");
         r = ALPreprocessor::run("--#include \"lib.luau\"\nprint(GREETING)\n", options(true));
-        UNSCOPED_INFO("nothing wrong");
         CHECK(messages(r) == std::string());
         {
             INFO("the include's text in, and its macro");
@@ -2078,7 +1971,7 @@ namespace
         // Its errors are the directive's.
         r = ALPreprocessor::run("--#endif\n--#if\n--#endif\n", options(true));
         {
-            INFO("an #endif without #if, and an #if without an expression: " + messages(r));
+            INFO("an #endif without #if, and an #if without an expression: " << messages(r));
             REQUIRE(messages(r).find("E 0:") != std::string::npos);
             REQUIRE(messages(r).find("E 1:") != std::string::npos);
         }
@@ -2112,12 +2005,11 @@ namespace
                                "    print(x)\n"
                                "SAY(\"hi\")\n";
         ALPreprocessor::Result r = ALPreprocessor::run(lf, options(true));
-        UNSCOPED_INFO("nothing wrong");
         CHECK(messages(r) == std::string());
         const std::string joined = r.text;
         const size_t      used   = joined.find("ll.OwnerSay(\"hi\")");
         {
-            INFO("the body on the line that uses it: " + joined);
+            INFO("the body on the line that uses it: " << joined);
             REQUIRE(used != std::string::npos);
             CHECK(joined.find("print(\"hi\")") > used);
             CHECK(joined.find('\n', used) > joined.find("print(\"hi\")"));
@@ -2155,7 +2047,7 @@ namespace
         r = ALPreprocessor::run("--#include \"say.luau\"\nSAY(1)\n", options(true));
         UNSCOPED_INFO("an include with CRLF said nothing");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("and its macro goes on over its lines: " + r.text);
+        UNSCOPED_INFO("and its macro goes on over its lines: " << r.text);
         REQUIRE(r.text.find("print(1)") != std::string::npos);
     }
 
@@ -2177,9 +2069,8 @@ namespace
             {
                 const std::string      said = ending[1] ? " with CRLF" : " with a lone CR";
                 ALPreprocessor::Result r    = runGolden(entry.path(), ending);
-                UNSCOPED_INFO("problems in " + name + said);
+                INFO(name << said);
                 REQUIRE(messages(r) == std::string());
-                UNSCOPED_INFO("output of " + name + said);
                 REQUIRE(r.text == want);
             }
             ++checked;
@@ -2191,7 +2082,6 @@ namespace
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: usesDirectives and wanted: why a script is preprocessed", "[alpreprocessor]")
     {
         typedef ALPreprocessor P;
-        UNSCOPED_INFO("#define");
         CHECK(P::usesDirectives("#define X 1\ndefault { state_entry() { } }\n", false));
         UNSCOPED_INFO("one further down, indented");
         CHECK(P::usesDirectives("integer x;\n  #include \"lib.lsl\"\n", false));
@@ -2251,7 +2141,6 @@ namespace
             return ALPreprocessor::Found::No;
         };
         const ALPreprocessor::Result r = ALPreprocessor::run("local util = require('util')\nlocal other = require(\"other\")\n", o);
-        UNSCOPED_INFO("both said");
         REQUIRE(r.problems.size() == size_t(2));
         const ALScriptProblem& moved = r.problems[0];
         UNSCOPED_INFO("where the search found it");
@@ -2272,11 +2161,8 @@ namespace
             CHECK(plain.edits[0].column == 21);
             CHECK(plain.edits[0].endColumn == 27);
         }
-        {
-            INFO("preferred");
-            CHECK(plain.preferred);
-            CHECK(plain.key == "ScriptFixRequireAs");
-        }
+        CHECK(plain.preferred);
+        CHECK(plain.key == "ScriptFixRequireAs");
         const ALScriptFix& alias = moved.fixes[1];
         {
             INFO("the alias's named in it, and not preferred");
@@ -2303,14 +2189,10 @@ namespace
             return ALPreprocessor::Found::Yes;
         };
         const ALPreprocessor::Result r = ALPreprocessor::run("local both = require('./both')\nprint(both)\n", o);
-        UNSCOPED_INFO("one said");
         REQUIRE(r.problems.size() == size_t(1));
         const ALScriptProblem& said = r.problems[0];
-        {
-            INFO("a warning");
-            CHECK(said.severity == ALScriptProblem::Severity::Warning);
-            CHECK(said.key == "PreprocModuleBesideInit");
-        }
+        CHECK(said.severity == ALScriptProblem::Severity::Warning);
+        CHECK(said.key == "PreprocModuleBesideInit");
         UNSCOPED_INFO("naming both, each from the folder both are in");
         CHECK(said.args == std::vector<std::string>({ "./both", "both.luau", "both/init.luau" }));
         UNSCOPED_INFO("the module taken");
@@ -2325,7 +2207,6 @@ namespace
             return ALPreprocessor::Found::No;
         };
         const ALPreprocessor::Result r = ALPreprocessor::run("require('./a')\nrequire('./b')\nrequire('./c')\n", o);
-        UNSCOPED_INFO("each said");
         REQUIRE(r.problems.size() == size_t(3));
         {
             INFO("keyed");
@@ -2371,7 +2252,6 @@ namespace
                                                              "shared = own.inner == a\n"
                                                              "ownSees = own.sees\n",
                                                              options(true));
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
 
         // Run in SLua's VM, its globals read back.
@@ -2392,10 +2272,10 @@ namespace
         // module of the scripter's making.
         lua_setmemcat(L, LUA_FIRST_USER_MEMCAT);
         const std::string bytecode = Luau::compile(r.text);
-        UNSCOPED_INFO("loads: " + r.text);
+        UNSCOPED_INFO("loads: " << r.text);
         REQUIRE(luau_load(L, "=bundle", bytecode.data(), bytecode.size(), 0) == 0);
         const int status = lua_pcall(L, 0, 0, 0);
-        UNSCOPED_INFO(std::string("runs: ") + (status != 0 && lua_isstring(L, -1) ? lua_tostring(L, -1) : "") + "\n" + r.text);
+        UNSCOPED_INFO("runs: " << (status != 0 && lua_isstring(L, -1) ? lua_tostring(L, -1) : "") << "\n" << r.text);
         CHECK(status == 0);
         const auto truth = [L](const char* name) {
             lua_getglobal(L, name);
@@ -2477,17 +2357,16 @@ namespace
         lua.lineComments            = true;
         const std::string script    = "--!strict\nlocal util = require(\"util\")\n\nlocal deep = require(\"deep\")\nprint(util.f(), deep.k)\n";
         ALPreprocessor::Result r    = ALPreprocessor::run(script, lua);
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("the reader finds every line: " + why);
+        UNSCOPED_INFO("the reader finds every line: " << why);
         CHECK(readsTrue(r, "main.luau", why));
-        UNSCOPED_INFO("the header still first: " + r.text);
+        UNSCOPED_INFO("the header still first: " << r.text);
         CHECK(r.text.rfind("--!strict\ndo\n", 0) == 0);
-        UNSCOPED_INFO("a module's first: " + r.text);
+        UNSCOPED_INFO("a module's first: " << r.text);
         REQUIRE(r.text.find("        [1] = function()\n-- @line 1 \"util\"\nlocal M = {}\n") != std::string::npos);
-        UNSCOPED_INFO("one past a directive: " + r.text);
+        UNSCOPED_INFO("one past a directive: " << r.text);
         REQUIRE(r.text.find("-- @line 2 \"deep\"\nreturn { k = 2 }\n") != std::string::npos);
-        UNSCOPED_INFO("the script's after the modules: " + r.text);
+        UNSCOPED_INFO("the script's after the modules: " << r.text);
         REQUIRE(r.text.find("end\n-- @line 2 \"main.luau\"\nlocal util = require(1)\n") != std::string::npos);
         UNSCOPED_INFO("three, no more");
         CHECK(std::count(r.text.begin(), r.text.end(), '@') == 3);
@@ -2503,16 +2382,15 @@ namespace
         ALPreprocessor::Options lsl = options();
         lsl.lineComments            = true;
         r = ALPreprocessor::run("integer a;\n#include \"inc.lsl\"\n#if 0\ninteger gone;\n\n#endif\n#define TWICE(v) \\\n    ((v) * 2)\ninteger b = TWICE(3);\ndefault { state_entry() { } }\n", lsl);
-        UNSCOPED_INFO("problems");
         CHECK(messages(r) == std::string());
-        UNSCOPED_INFO("the reader finds every line: " + why);
+        UNSCOPED_INFO("the reader finds every line: " << why);
         CHECK(readsTrue(r, "main.lsl", why));
-        UNSCOPED_INFO("in LSL's comment: " + r.text);
+        UNSCOPED_INFO("in LSL's comment: " << r.text);
         REQUIRE(r.text.find("// @line 1 \"inc.lsl\"\ninteger x;\n") != std::string::npos);
 
         // Nothing moved: none at all.
         r = ALPreprocessor::run("integer a;\n\ndefault { state_entry() { } }\n", lsl);
-        UNSCOPED_INFO("nothing to say: " + r.text);
+        UNSCOPED_INFO("nothing to say: " << r.text);
         REQUIRE(r.text.find("@line") == std::string::npos);
     }
 
@@ -2534,7 +2412,7 @@ namespace
 
         ALPreprocessor::Result r = ALPreprocessor::run("local util = require(\"util\")\nlocal used = require(\"used\")\nprint(used)\n", options(true));
         std::vector<const ALScriptProblem*> said = notes(r);
-        UNSCOPED_INFO("one note: " + messages(r));
+        UNSCOPED_INFO("one note: " << messages(r));
         REQUIRE(said.size() == size_t(1));
         {
             INFO("a note, at the require");
@@ -2548,7 +2426,7 @@ namespace
             REQUIRE(said[0]->args[0] == "util");
             CHECK(said[0]->args[1] == "util");
         }
-        UNSCOPED_INFO("with its weight: " + said[0]->args[2]);
+        UNSCOPED_INFO("with its weight: " << said[0]->args[2]);
         CHECK(std::atoi(said[0]->args[2].c_str()) > 0);
         UNSCOPED_INFO("still in the bundle");
         REQUIRE(r.text.find("M.twice") != std::string::npos);
@@ -2572,7 +2450,7 @@ namespace
         files["wrap"]  = wrap;
         r              = ALPreprocessor::run("local w = require(\"wrap\")\nprint(w)\n", options(true));
         said           = notes(r);
-        UNSCOPED_INFO("one, in the module: " + messages(r));
+        UNSCOPED_INFO("one, in the module: " << messages(r));
         REQUIRE(said.size() == size_t(1));
         {
             INFO("in its file, at its require");

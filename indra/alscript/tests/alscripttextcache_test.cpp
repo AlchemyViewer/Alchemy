@@ -41,11 +41,10 @@ namespace
         std::string  text;
         {
             INFO("nothing held");
-            REQUIRE_FALSE(cache.take("inventory:a", one, text));
+            CHECK_FALSE(cache.take("inventory:a", one, text));
             CHECK_FALSE(cache.holds("inventory:a"));
         }
         cache.failed("inventory:a");
-        UNSCOPED_INFO("failed");
         CHECK(cache.hasFailed("inventory:a"));
         cache.put("inventory:a", one, "integer a;\n");
         UNSCOPED_INFO("put: no longer failed");
@@ -67,7 +66,6 @@ namespace
         CHECK(cache.bytes() == size_t(11));
         cache.failed("inventory:b");
         cache.forgetFailure("inventory:b");
-        UNSCOPED_INFO("forgotten");
         CHECK_FALSE(cache.hasFailed("inventory:b"));
     }
 

@@ -228,11 +228,8 @@ namespace
         UNSCOPED_INFO("not before the quiet");
         REQUIRE(released.empty());
         pass(0.2);
-        UNSCOPED_INFO("released once");
         REQUIRE(released.size() == size_t(1));
-        UNSCOPED_INFO("the master");
         CHECK(almasterwatch_data::joined(released[0].masters) == std::string("door.lsl"));
-        UNSCOPED_INFO("no include");
         REQUIRE(released[0].includes.empty());
         looked();
         pass(5.0);
@@ -266,9 +263,7 @@ namespace
         UNSCOPED_INFO("the burst goes on: nothing yet");
         REQUIRE(released.empty());
         pass(0.2);
-        UNSCOPED_INFO("released once");
         REQUIRE(released.size() == size_t(1));
-        UNSCOPED_INFO("all ten together");
         REQUIRE(released[0].masters.size() == size_t(10));
     }
 
@@ -284,11 +279,8 @@ namespace
         put(util, "b2", 200);
         looked();
         pass(1.1);
-        UNSCOPED_INFO("released once");
         REQUIRE(released.size() == size_t(1));
-        UNSCOPED_INFO("the master");
         CHECK(almasterwatch_data::joined(released[0].masters) == std::string("door.lsl"));
-        UNSCOPED_INFO("the include");
         CHECK(almasterwatch_data::joined(released[0].includes) == std::string("util.lsl"));
     }
 
@@ -325,7 +317,6 @@ namespace
         pass(0.2);
         UNSCOPED_INFO("then, before the emptied hold would have ended");
         REQUIRE(released.size() == size_t(3));
-        UNSCOPED_INFO("the file, once");
         REQUIRE(released[2].masters.size() == size_t(1));
     }
 
@@ -369,7 +360,6 @@ namespace
             CHECK(watched.waiting(door));
             CHECK_FALSE(watched.watching(door));
         }
-        UNSCOPED_INFO("asked once");
         REQUIRE(asked.size() == size_t(1));
 
         // The studio writes it, then somebody else saves it, all before the
@@ -399,11 +389,8 @@ namespace
         put(door, "studio", 200);
         watched.seen(door);
         answer(0, before);
-        {
-            INFO("both watched");
-            CHECK(watched.watching(door));
-            CHECK(watched.watching(lamp));
-        }
+        CHECK(watched.watching(door));
+        CHECK(watched.watching(lamp));
         looked();
         pass(5.0);
         UNSCOPED_INFO("the studio's write is no change");
@@ -420,14 +407,11 @@ namespace
         UNSCOPED_INFO("not waiting now");
         CHECK_FALSE(watched.waiting(door));
         answer(0);
-        UNSCOPED_INFO("not watched");
         CHECK_FALSE(watched.watching(door));
-        UNSCOPED_INFO("nothing at all");
         REQUIRE(watched.size() == size_t(0));
         put(door, "changed", 200);
         looked();
         pass(5.0);
-        UNSCOPED_INFO("nothing heard");
         REQUIRE(released.empty());
     }
 
@@ -466,12 +450,10 @@ namespace
         UNSCOPED_INFO("lamp waits on its look still: other alone asked");
         REQUIRE(asked[3].paths.size() == size_t(1));
         answer(3);
-        UNSCOPED_INFO("other watched");
         CHECK(watched.watching(other));
         UNSCOPED_INFO("lamp waits on its own");
         CHECK(watched.waiting(lamp));
         answer(2);
-        UNSCOPED_INFO("lamp watched");
         CHECK(watched.watching(lamp));
     }
 
@@ -488,9 +470,7 @@ namespace
                                                     return true;
                                                 });
         watch->watch({ almasterwatch_data::master(door), almasterwatch_data::include(util) });
-        UNSCOPED_INFO("a master");
         CHECK(*watch->periodOf(door) == ALMasterWatch::MASTER_PERIOD);
-        UNSCOPED_INFO("an include");
         CHECK(*watch->periodOf(util) == ALMasterWatch::INCLUDE_PERIOD);
         UNSCOPED_INFO("both looked at first");
         CHECK(looks == size_t(2));
@@ -501,11 +481,9 @@ namespace
             many.push_back(almasterwatch_data::master(in("m" + std::to_string(i) + ".lsl")));
         }
         watch->watch(many);
-        UNSCOPED_INFO("257 watched");
         REQUIRE(watch->size() == size_t(257));
         UNSCOPED_INFO("past 256: a master every two seconds");
         CHECK(*watch->periodOf(door) == ALMasterWatch::MANY_PERIOD);
-        UNSCOPED_INFO("and an include");
         CHECK(*watch->periodOf(util) == ALMasterWatch::MANY_PERIOD);
         UNSCOPED_INFO("only the new ones looked at");
         CHECK(looks == size_t(257));
@@ -513,7 +491,6 @@ namespace
         watch->watch({ almasterwatch_data::master(door), almasterwatch_data::include(util) });
         UNSCOPED_INFO("fewer again: a master's own");
         CHECK(*watch->periodOf(door) == ALMasterWatch::MASTER_PERIOD);
-        UNSCOPED_INFO("an include's own");
         CHECK(*watch->periodOf(util) == ALMasterWatch::INCLUDE_PERIOD);
         UNSCOPED_INFO("nothing looked at again");
         CHECK(looks == size_t(257));

@@ -652,19 +652,17 @@ namespace tut
             {
                 under = under_tree(file);
             }
-            UNSCOPED_INFO(std::string(one.what) + ": as LAD9 has it");
+            INFO(one.what);
             REQUIRE(under == std::string(one.chosen));
             if (*one.name != '@')
             {
                 // A name the search before took: asked of it.
                 const std::string before = searched(one.name, own, disk);
-                UNSCOPED_INFO(std::string(one.what) + ": as before");
                 REQUIRE((before.empty() ? before : under_tree(before)) == std::string(one.before));
             }
             else if (!*one.rule)
             {
                 // An alias's, where all agree: found so before.
-                UNSCOPED_INFO(std::string(one.what) + ": as before");
                 REQUIRE(under == std::string(one.before));
             }
         }
@@ -874,7 +872,7 @@ namespace tut
         const auto missed = [&](const std::string& name, const ALIncludeSearch::Asking& who) {
             ALPreprocessor::Include  include;
             std::vector<std::string> aliases;
-            UNSCOPED_INFO(name + ": found nothing now");
+            CAPTURE(name);
             REQUIRE(search.resolve(alincludesearch_data::ask(name, true, who.self), include, who, disk, nullptr, false, &aliases) ==
                                                      ALPreprocessor::Found::No);
             return include;
@@ -907,7 +905,7 @@ namespace tut
         UNSCOPED_INFO("from an object, where none reaches it");
         CHECK(include.searched == solo);
         UNSCOPED_INFO("through a studio alias of the folder that holds it, named after it");
-        CHECK(said(include) == std::string("@other/solo +@other"));
+        REQUIRE(said(include) == std::string("@other/solo +@other"));
         UNSCOPED_INFO("the folder named");
         CHECK(include.moves[0].folder == s.at("other"));
         include = missed("deep/net", in_object);
@@ -939,9 +937,7 @@ namespace tut
         const ALIncludeSearch::Asking own{ ALIncludeIdentity::ofFile(script), true };
         ALPreprocessor::Include       found;
         std::vector<std::string>      aliases;
-        UNSCOPED_INFO("found");
         CHECK(search.resolve(ask("./both", true, own.self), found, own, disk, nullptr, false, &aliases) == ALPreprocessor::Found::Yes);
-        UNSCOPED_INFO("the file");
         CHECK(found.path == ALIncludeIdentity::ofFile(file));
         UNSCOPED_INFO("the init passed over, by its path from the folder both are in");
         CHECK(found.passedOver == std::string("both/init.luau"));
@@ -983,9 +979,7 @@ namespace tut
         CHECK(why("@c1") == std::string("detected alias cycle (@c1 -> @c2 -> @c1)"));
         UNSCOPED_INFO("an alias whose folder is not there");
         CHECK(why("@gone/x") == std::string("the alias stands for './gone', which is not there"));
-        UNSCOPED_INFO("reserved");
         REQUIRE(why("@sl-std/x").find("reserved") != std::string::npos);
-        UNSCOPED_INFO("climbing");
         REQUIRE(why("@lib/../x").find("may not climb") != std::string::npos);
 
         // Said as a module not found, for what explains it.
@@ -1060,7 +1054,7 @@ namespace tut
                 }
                 ALPreprocessor::Include  found;
                 std::vector<std::string> aliases;
-                UNSCOPED_INFO("resolves: " + one.path);
+                CAPTURE(one.path);
                 REQUIRE(search.resolve(ask(one.path, true, own.self), found, own, disk, nullptr, false, &aliases) ==
                                                     ALPreprocessor::Found::Yes);
             }
@@ -1186,7 +1180,7 @@ namespace tut
         UNSCOPED_INFO("broken: its alias gone");
         REQUIRE(resolved("@lib/net", &why).empty());
         {
-            INFO("said why, naming it: " + why);
+            INFO("said why, naming it: " << why);
             CHECK(why.find("the configuration '") == 0);
             REQUIRE(why.find(".config.luau' could not be read: ") != std::string::npos);
         }
@@ -1259,9 +1253,9 @@ namespace tut
             }
             return out;
         };
-        UNSCOPED_INFO("offered while the world is let in: " + offered(on));
+        UNSCOPED_INFO("offered while the world is let in: " << offered(on));
         REQUIRE(offered(on).find("@inv") != std::string::npos);
-        UNSCOPED_INFO("not otherwise: " + offered(off));
+        UNSCOPED_INFO("not otherwise: " << offered(off));
         REQUIRE(offered(off).find("@inv") == std::string::npos);
 
         // Beside a folder on disk, which is read only while the disk is.
@@ -1428,7 +1422,7 @@ namespace tut
         const std::string            inner = ALIncludeIdentity::ofFile(s.write("proj/src/main.luau", "return 1\n"));
         const ALIncludeSearch::Where both  = where(false, true, { s.at("inc"), s.at("proj") });
         const std::string            said  = why("@lib/x", inner, both);
-        UNSCOPED_INFO("not reached through it: " + said);
+        UNSCOPED_INFO("not reached through it: " << said);
         CHECK(said.find("the configuration '" + s.at("proj/src/.luaurc") + "' could not be read: ") == 0);
         UNSCOPED_INFO("a path walks as ever");
         CHECK(why("./near", inner, both) == std::string("found"));

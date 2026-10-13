@@ -82,34 +82,26 @@ namespace
             "        }\n"
             "    }\n"
             "}\n";
-        UNSCOPED_INFO("lsl structure");
         CHECK(lsl(in) == want);
     }
 
     // LSL spacing: operators, unary signs, vectors, casts, comments.
     TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: LSL spacing: operators; unary signs; vectors; casts; comments", "[alscriptformatter]")
     {
-        UNSCOPED_INFO("binary");
         CHECK(lsl("x=a+b*c;\n") == std::string("x = a + b * c;\n"));
-        UNSCOPED_INFO("unary");
         CHECK(lsl("x = -a * -b;\n") == std::string("x = -a * -b;\n"));
-        UNSCOPED_INFO("not");
         CHECK(lsl("if(!x)y=~z;\n") == std::string("if (!x) y = ~z;\n"));
-        UNSCOPED_INFO("vector");
         CHECK(lsl("v=<1,-2,3>*<0,0,1>;\n") == std::string("v = <1, -2, 3> * <0, 0, 1>;\n"));
-        UNSCOPED_INFO("comparison");
         CHECK(lsl("if(a<b&&c>d)x++;\n") == std::string("if (a < b && c > d) x++;\n"));
         UNSCOPED_INFO("cast kept");
         CHECK(lsl("x=(integer)y;\n") == std::string("x = (integer)y;\n"));
         UNSCOPED_INFO("cast spaced kept");
         CHECK(lsl("x=(integer) y;\n") == std::string("x = (integer) y;\n"));
-        UNSCOPED_INFO("for");
         CHECK(lsl("for(i=0;i<n;i++){}\n") == std::string("for (i = 0; i < n; i++) {}\n"));
         UNSCOPED_INFO("trailing comment kept");
         CHECK(lsl("x = 1;   // one\n") == std::string("x = 1;   // one\n"));
         UNSCOPED_INFO("string kept");
         CHECK(lsl("s=\"a  +  b\";\n") == std::string("s = \"a  +  b\";\n"));
-        UNSCOPED_INFO("label");
         CHECK(lsl("@loop;jump loop;\n") == std::string("@loop; jump loop;\n"));
         UNSCOPED_INFO("braces on a line");
         CHECK(lsl("if (x){llSay(0,\"a\");}\n") == std::string("if (x) { llSay(0, \"a\"); }\n"));
@@ -157,13 +149,11 @@ namespace
             "    a = 1,\n"
             "    b = { 1, 2 },\n"
             "}\n";
-        UNSCOPED_INFO("luau structure");
         CHECK(lua(in) == want);
         UNSCOPED_INFO("generics kept");
         CHECK(lua("local x: Array<number> = {}\n") == std::string("local x: Array<number> = {}\n"));
         UNSCOPED_INFO("method kept");
         CHECK(lua("obj:method(1)\n") == std::string("obj:method(1)\n"));
-        UNSCOPED_INFO("not");
         CHECK(lua("if not(x)then end\n") == std::string("if not (x) then end\n"));
         UNSCOPED_INFO("long string kept");
         CHECK(lua("s = [[\n  a\n]]\nx=1\n") == std::string("s = [[\n  a\n]]\nx = 1\n"));
@@ -284,11 +274,9 @@ namespace
     }
     TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: a comment-only line is indented as a statement there would be", "[alscriptformatter]")
     {
-        UNSCOPED_INFO("LSL");
         CHECK(lsl("// first\ndefault\n{\n// a note\nstate_entry()\n{\n/* over\n   lines */\nif (x)\n// why\nllSay(0, \"a\");\n}\n}\n") ==
                       std::string("// first\ndefault\n{\n    // a note\n    state_entry()\n    {\n        /* over\n   lines */\n        if (x)\n"
                                   "            // why\n            llSay(0, \"a\");\n    }\n}\n"));
-        UNSCOPED_INFO("Luau");
         CHECK(lua("-- first\nlocal function f()\n-- a note\nreturn 1\nend\n--[[ over\n   lines ]]\n") ==
                       std::string("-- first\nlocal function f()\n    -- a note\n    return 1\nend\n--[[ over\n   lines ]]\n"));
         // Some lines asked for, as the studio asks for all of a script's:
@@ -403,7 +391,6 @@ namespace
         ALScriptFormatter::Options tabs = options;
         tabs.tabs                       = true;
         const std::string call = "llSay(0, \"" + std::string(92 - 13, 'x') + "\");";
-        UNSCOPED_INFO("a call of 92");
         REQUIRE(call.size() == size_t(92));
         const std::string tabbed = "default\n{\n    state_entry()\n    {\n        " + call + "\n    }\n}\n";
         UNSCOPED_INFO("fits");
@@ -449,12 +436,10 @@ namespace
 
     TEST_CASE_METHOD(alscriptformatter_data, "alscriptformatter: a sign hugs the bracket after it and is spaced from a < or minus before it", "[alscriptformatter]")
     {
-        UNSCOPED_INFO("Luau");
         CHECK(lua("local x = - (a)\nlocal y = # (t)\nlocal z = # {1}\nif i <#t and i <-1 and i > - (2) then end\n"
                                   "local w = not (a)\nlocal q = a - (b)\nreturn -(x)\nlocal d = #{1} -#{2} - -#t + -#t\n") ==
                       std::string("local x = -(a)\nlocal y = #(t)\nlocal z = #{ 1 }\nif i < #t and i < -1 and i > -(2) then end\n"
                                   "local w = not (a)\nlocal q = a - (b)\nreturn -(x)\nlocal d = #{ 1 } - #{ 2 } - -#t + -#t\n"));
-        UNSCOPED_INFO("LSL");
         CHECK(lsl("default { state_entry() { integer x = - (a); vector v = < -1, 0, 0 >; if (i <-1) x = ! (b); } }\n") ==
                       std::string("default { state_entry() { integer x = -(a); vector v = <-1, 0, 0>; if (i < -1) x = !(b); } }\n"));
         UNSCOPED_INFO("a list of vectors");
@@ -513,7 +498,6 @@ namespace
         CHECK(lua(repeat) == repeat);
         UNSCOPED_INFO("flat");
         CHECK(lua("if a then\nx()\n-- note\nend\n") == std::string("if a then\n    x()\n    -- note\nend\n"));
-        UNSCOPED_INFO("LSL");
         CHECK(lsl("default\n{\n    touch_start(integer n)\n    {\n        x();\n    // about the end\n    }\n}\n") ==
                       std::string("default\n{\n    touch_start(integer n)\n    {\n        x();\n    // about the end\n    }\n}\n"));
     }

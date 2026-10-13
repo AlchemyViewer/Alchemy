@@ -84,13 +84,13 @@ namespace
                    body + "llOwnerSay((string)[i, j, f, s, k, v] + (string)l);\n} }\n";
         }
 
-        S32 size(Target t, const Snippet& s, int copies)
+        S32 require_compiled_size(Target t, const Snippet& s, int copies)
         {
             const std::string    text   = script(s, copies);
             const ALScriptWeight weight = t == Target::LSO    ? ALScriptWeigh::lso(text)
                                           : t == Target::Mono ? ALScriptWeigh::mono(text)
                                                               : ALScriptWeigh::lslLuau(text);
-            UNSCOPED_INFO("compiles for " + std::string(nameOf(t)) + ": " + weight.error + "\n" + text);
+            INFO("compiles for " << nameOf(t) << ": " << weight.error << "\n" << text);
             REQUIRE(weight.compiled);
             return S32(weight.total);
         }
@@ -105,11 +105,11 @@ namespace
         };
         Delta delta(Target t, const Snippet& a, const Snippet& b)
         {
-            const S32 a1 = size(t, a, 1);
-            const S32 b1 = size(t, b, 1);
+            const S32 a1 = require_compiled_size(t, a, 1);
+            const S32 b1 = require_compiled_size(t, b, 1);
             Delta     d;
             d.first = b1 - a1;
-            d.each  = !a.body.empty() && !b.body.empty() ? (size(t, b, 2) - b1) - (size(t, a, 2) - a1) : d.first;
+            d.each  = !a.body.empty() && !b.body.empty() ? (require_compiled_size(t, b, 2) - b1) - (require_compiled_size(t, a, 2) - a1) : d.first;
             return d;
         }
 
@@ -385,21 +385,20 @@ namespace
                 const Delta  d = delta(t, fact.a, fact.b);
                 said(fact.what, t, d, 0);
                 const char v = fact.once ? verdict({ d.first, d.first }) : verdict(d);
-                UNSCOPED_INFO(std::string(fact.what) + " on " + nameOf(t));
+                INFO(fact.what << " on " << nameOf(t));
                 REQUIRE(v == fact.verdicts[n]);
                 // A flag on is a form smaller there; one off may be for what
                 // a first use costs a script that the pair does not show
                 // (allslcosts.cpp says where).
                 if (fact.flag && ALLSLCosts::of(t).*fact.flag)
                 {
-                    UNSCOPED_INFO(std::string(fact.what) + ": the flag on " + nameOf(t) + ", and the form not smaller");
+                    UNSCOPED_INFO("the flag is on and the form not smaller");
                     REQUIRE(v == '<');
                 }
             }
         }
     }
 
-    // What a function costs, and a call of it, a local and a jump.
     TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: what a function costs and a call of it and a local and a jump", "[ALLSLCosts]")
     {
         UNSCOPED_INFO("builtins: " + error);
@@ -410,40 +409,33 @@ namespace
         const Snippet param{ "f1(integer a) { }", "" };
         for (const Target t : TARGETS)
         {
-            const ALLSLCosts& c     = ALLSLCosts::of(t);
-            const std::string where = std::string(" on ") + nameOf(t);
+            const ALLSLCosts& c = ALLSLCosts::of(t);
+            INFO("on " << nameOf(t));
 
             const Delta local = delta(t, { "", "integer z = i; j = z;" }, { "", "j = i;" });
             said("a local", t, local, -c.local);
-            UNSCOPED_INFO("a local" + where);
             REQUIRE(-local.each == c.local);
 
             const Delta jump = delta(t, { "", "jump L; @L;" }, { "", "" });
             said("a jump", t, jump, -c.jump);
-            UNSCOPED_INFO("a jump" + where + ": " + std::to_string(-jump.first));
             REQUIRE(-jump.first == c.jump);
 
             const Delta f2  = delta(t, none, two);
             const Delta f18 = delta(t, none, eighteen);
             said("a function", t, f2, c.function + 2 * c.functionChar);
-            UNSCOPED_INFO("a function's name, by the character" + where);
             REQUIRE((f18.first - f2.first) / 16 == c.functionChar);
-            UNSCOPED_INFO("a function" + where);
             REQUIRE(f2.first - 2 * c.functionChar == c.function);
 
             const Delta p = delta(t, two, param);
             said("a parameter", t, p, c.parameter);
-            UNSCOPED_INFO("a parameter" + where);
             REQUIRE(p.first == c.parameter);
 
             const Delta call = delta(t, { "f1() { }", "f1();" }, { "f1() { }", "f1(); f1();" });
             said("a call", t, call, c.call);
-            UNSCOPED_INFO("a call" + where);
             REQUIRE(call.each == c.call);
 
             const Delta argued = delta(t, { "f1(integer a) { }", "f1(i);" }, { "f1(integer a) { }", "f1(i); f1(i);" });
             said("a call with an argument", t, argued, c.call + c.argument);
-            UNSCOPED_INFO("an argument" + where);
             REQUIRE(argued.each - c.call == c.argument);
 
             for (const char* text : { "hello", "hello world, hello" })
@@ -451,7 +443,7 @@ namespace
                 const S32   length = S32(strlen(text));
                 const Delta string = delta(t, { "", "s = s;" }, { "", "s = \"" + std::string(text) + "\";" });
                 said("a string of " + std::to_string(length) + ", held once", t, string, c.stringHeld + length * c.stringHeldChar);
-                UNSCOPED_INFO("a string of " + std::to_string(length) + ", held once" + where);
+                CAPTURE(length);
                 REQUIRE(string.first - string.each ==
                               c.stringHeld + length * c.stringHeldChar);
             }
@@ -459,9 +451,7 @@ namespace
             const Delta first2  = delta(t, two, { "f1() { }", "f1();" });
             const Delta first18 = delta(t, eighteen, { "a_much_longer_name() { }", "a_much_longer_name();" });
             said("a first call", t, first2, c.call + c.reference + 2 * c.referenceChar);
-            UNSCOPED_INFO("a first call's reference, by the character" + where);
             REQUIRE((first18.first - first2.first) / 16 == c.referenceChar);
-            UNSCOPED_INFO("a first call's reference" + where);
             REQUIRE(first2.first - c.call - 2 * c.referenceChar == c.reference);
 
             // The most elements of a literal added to a list bare: at it
@@ -478,20 +468,19 @@ namespace
             };
             if (c.elementsForListMost > 0)
             {
-                UNSCOPED_INFO("the most added bare, smaller" + where);
+                UNSCOPED_INFO("the most added bare, smaller");
                 REQUIRE(verdict(bare(c.elementsForListMost)) == '<');
-                UNSCOPED_INFO("one more, larger" + where);
+                UNSCOPED_INFO("one more, larger");
                 REQUIRE(verdict(bare(c.elementsForListMost + 1)) == '>');
             }
             else
             {
-                UNSCOPED_INFO("eight added bare, smaller" + where);
+                UNSCOPED_INFO("eight added bare, smaller");
                 REQUIRE(verdict(bare(8)) == '<');
             }
         }
     }
 
-    // A global never assigned, against its value written where it is read.
     TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: a global never assigned against its value written where it is read", "[ALLSLCosts]")
     {
         UNSCOPED_INFO("builtins: " + error);
@@ -516,8 +505,8 @@ namespace
         const auto put = [](std::string text, const std::string& what) { return text.replace(text.find('@'), 1, what); };
         for (const Target t : TARGETS)
         {
-            const ALLSLCosts& c     = ALLSLCosts::of(t);
-            const std::string where = std::string(" on ") + nameOf(t);
+            const ALLSLCosts& c = ALLSLCosts::of(t);
+            INFO("on " << nameOf(t));
             for (const Kind& kind : kinds)
             {
                 std::string value;
@@ -532,11 +521,9 @@ namespace
                 const ALLSLCosts::Held& held   = c.*kind.held;
                 said(std::string(kind.what) + " global", t, own, held.global);
                 said(std::string(kind.what) + " written out", t, out, held.first);
-                UNSCOPED_INFO(std::string(kind.what) + " global" + where);
+                CAPTURE(kind.what);
                 REQUIRE(own.first == held.global);
-                UNSCOPED_INFO(std::string(kind.what) + " written out, first" + where);
                 REQUIRE(out.first == held.first);
-                UNSCOPED_INFO(std::string(kind.what) + " written out, each" + where);
                 REQUIRE(out.each == held.each);
             }
             // A string at two lengths, what a character adds the same.
@@ -551,11 +538,9 @@ namespace
                 const std::string      what   = "a string of " + std::to_string(length);
                 said(what + " global", t, own, held.global);
                 said(what + " written out", t, out, held.first);
-                UNSCOPED_INFO(what + " global" + where);
+                CAPTURE(length);
                 REQUIRE(own.first == held.global);
-                UNSCOPED_INFO(what + " written out, first" + where);
                 REQUIRE(out.first == held.first);
-                UNSCOPED_INFO(what + " written out, each" + where);
                 REQUIRE(out.each == held.each);
             }
         }
@@ -602,18 +587,17 @@ namespace
                 {
                     bytes = part.name == one.name ? S32(part.bytes) : bytes;
                 }
-                UNSCOPED_INFO(std::string(one.what) + ": the function weighed on " + nameOf(t) + ": " + whole.error);
+                INFO(one.what << " on " << nameOf(t));
+                UNSCOPED_INFO("the function weighed: " << whole.error);
                 REQUIRE(bytes > 0);
-                const S32 measured = size(t, one.inlined, 1) - size(t, one.called, 1);
+                const S32 measured = require_compiled_size(t, one.inlined, 1) - require_compiled_size(t, one.called, 1);
                 ALLSLCosts::Inlining f = one.f;
                 f.bytes                = bytes;
                 const S32 estimate     = ALLSLCosts::of(t).inlined(f);
                 said(std::string(one.what) + " (estimated)", t, { measured, measured }, estimate);
-                {
-                    INFO(std::string(one.what) + " on " + nameOf(t) + ": estimated " + std::to_string(estimate) + ", measured " + std::to_string(measured));
-                    REQUIRE((estimate < 0) == (measured < 0));
-                    REQUIRE(std::abs(estimate - measured) <= std::max(12, std::abs(measured) / 4));
-                }
+                CAPTURE(estimate, measured);
+                REQUIRE((estimate < 0) == (measured < 0));
+                REQUIRE(std::abs(estimate - measured) <= std::max(12, std::abs(measured) / 4));
             }
         }
     }
@@ -627,8 +611,8 @@ namespace
         CHECK(lslLoaded);
         for (const Target t : TARGETS)
         {
-            const ALLSLCosts& c     = ALLSLCosts::of(t);
-            const std::string where = std::string(" on ") + nameOf(t);
+            const ALLSLCosts& c = ALLSLCosts::of(t);
+            INFO("on " << nameOf(t));
             if (c.listShapeLeast == 0)
             {
                 continue;
@@ -648,7 +632,6 @@ namespace
                 least = std::min(least, -delta(t, a, b).each);
             }
             said("the least a list's shape saves", t, { least, least }, c.listShapeLeast);
-            UNSCOPED_INFO("the least a list's shape saves at a place" + where);
             REQUIRE(least == c.listShapeLeast);
             // A helper each: a cast to a list, something added after one,
             // something added before one.
@@ -660,7 +643,6 @@ namespace
                 most          = std::max(most, d.first - d.each);
             }
             said("the most a helper costs", t, { most, most }, c.listHelperMost);
-            UNSCOPED_INFO("the most a list's helper new to the script costs" + where);
             REQUIRE(most == c.listHelperMost);
         }
     }

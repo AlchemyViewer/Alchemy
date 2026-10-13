@@ -69,7 +69,6 @@ namespace
 
     TEST_CASE_METHOD(alscripttempfiles_data, "alscripttempfiles: a copy's name is the cleaned script name and id and language's extension", "[alscripttempfiles]")
     {
-        UNSCOPED_INFO("LSL");
         CHECK(ALScriptTempFiles::nameFor("/tmp", "My Script", "abc", false) == std::string("/tmp/sl_script_My Script_abc.lsl"));
         UNSCOPED_INFO("SLua, the name cleaned");
         CHECK(ALScriptTempFiles::nameFor("/tmp/", "a/b:c?", "abc", true) ==
@@ -103,7 +102,6 @@ namespace
         // Held again after it went: written again, and listed once.
         std::shared_ptr<ALScriptTempFiles::Claim> again = files.claim(copy);
         put(copy);
-        UNSCOPED_INFO("there");
         CHECK(there(copy));
     }
 
@@ -130,7 +128,6 @@ namespace
         std::shared_ptr<ALScriptTempFiles::Claim> held = running.claim(shared);
 
         ALScriptTempFiles sweeper(lists, "now");
-        UNSCOPED_INFO("three went");
         CHECK(sweeper.sweep() == size_t(3));
         UNSCOPED_INFO("the crashed one's copy");
         CHECK_FALSE(there(left));
@@ -174,13 +171,9 @@ namespace
                 CHECK(there(lists + "clean.lock"));
             }
         }
-        UNSCOPED_INFO("no copy");
         CHECK_FALSE(there(copy));
-        {
-            INFO("no list, no lock");
-            CHECK_FALSE(there(lists + "clean.list"));
-            CHECK_FALSE(there(lists + "clean.lock"));
-        }
+        CHECK_FALSE(there(lists + "clean.list"));
+        CHECK_FALSE(there(lists + "clean.lock"));
 
         // One that let go of the store first, a hold outliving it: the
         // lock is kept until the hold goes.

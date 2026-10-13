@@ -63,7 +63,6 @@ namespace
         const std::thread::id asking = std::this_thread::get_id();
         std::thread::id       ran;
         alScriptOnLargeStack([&]() { ran = std::this_thread::get_id(); });
-        UNSCOPED_INFO("on the same thread");
         CHECK(ran == asking);
 
         bool caught = false;
@@ -111,7 +110,7 @@ namespace
         {
             INFO("expanded, within the bound");
             CHECK_FALSE(result.overran);
-            REQUIRE(result.text.find("1;") != std::string::npos);
+            CHECK(result.text.find("1;") != std::string::npos);
         }
     }
 

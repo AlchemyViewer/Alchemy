@@ -36,47 +36,32 @@ namespace
         using namespace ALScriptLexicon;
         for (const char* word : { "default", "state", "jump", "return", "if", "else", "for", "do", "while" })
         {
-            {
-                INFO(std::string("control: ") + word);
-                REQUIRE(lslWord(word) == LSL_CONTROL);
-                REQUIRE(isLslKeyword(word));
-            }
+            CAPTURE(word);
+            REQUIRE(lslWord(word) == LSL_CONTROL);
+            REQUIRE(isLslKeyword(word));
         }
         for (const char* word : { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" })
         {
-            {
-                INFO(std::string("type: ") + word);
-                REQUIRE(lslWord(word) == LSL_TYPE);
-                REQUIRE(isLslType(word));
-                REQUIRE(isLslKeyword(word));
-            }
+            CAPTURE(word);
+            REQUIRE(lslWord(word) == LSL_TYPE);
+            REQUIRE(isLslType(word));
+            REQUIRE(isLslKeyword(word));
         }
-        {
-            INFO("event and print are reserved");
-            CHECK(lslWord("event") == LSL_RESERVED);
-            CHECK(lslWord("print") == LSL_RESERVED);
-            CHECK(isLslKeyword("print"));
-        }
-        {
-            INFO("TRUE and FALSE are constants, not keywords");
-            CHECK(lslWord("TRUE") == LSL_CONSTANT);
-            CHECK(lslWord("FALSE") == LSL_CONSTANT);
-            CHECK_FALSE(isLslKeyword("TRUE"));
-        }
+        CHECK(lslWord("event") == LSL_RESERVED);
+        CHECK(lslWord("print") == LSL_RESERVED);
+        CHECK(isLslKeyword("print"));
+        CHECK(lslWord("TRUE") == LSL_CONSTANT);
+        CHECK(lslWord("FALSE") == LSL_CONSTANT);
+        CHECK_FALSE(isLslKeyword("TRUE"));
         for (const char* word : { "inline", "const", "break", "continue", "switch", "case" })
         {
-            {
-                INFO(std::string("extension, not a keyword: ") + word);
-                REQUIRE(lslWord(word) == LSL_EXTENSION);
-                REQUIRE_FALSE(isLslKeyword(word));
-            }
+            CAPTURE(word);
+            REQUIRE(lslWord(word) == LSL_EXTENSION);
+            REQUIRE_FALSE(isLslKeyword(word));
         }
-        {
-            INFO("a name is none of them");
-            CHECK(lslWord("count") == LSL_NAME);
-            CHECK(lslWord("llSay") == LSL_NAME);
-            CHECK(lslWord("") == LSL_NAME);
-        }
+        CHECK(lslWord("count") == LSL_NAME);
+        CHECK(lslWord("llSay") == LSL_NAME);
+        CHECK(lslWord("") == LSL_NAME);
         {
             INFO("case matters");
             CHECK(lslWord("Integer") == LSL_NAME);
@@ -90,22 +75,17 @@ namespace
         for (const char* word : { "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "nil", "not",
                                   "or", "repeat", "return", "then", "true", "until", "while", "continue", "export", "const" })
         {
-            {
-                INFO(std::string("keyword: ") + word);
-                REQUIRE(isLuauKeyword(word));
-                REQUIRE(isKeyword(true, word));
-            }
+            CAPTURE(word);
+            REQUIRE(isLuauKeyword(word));
+            REQUIRE(isKeyword(true, word));
         }
         {
             INFO("type and typeof are called");
             CHECK_FALSE(isLuauKeyword("type"));
             CHECK_FALSE(isLuauKeyword("typeof"));
         }
-        {
-            INFO("a name is not");
-            CHECK_FALSE(isLuauKeyword("print"));
-            CHECK_FALSE(isLuauKeyword("ll"));
-        }
+        CHECK_FALSE(isLuauKeyword("print"));
+        CHECK_FALSE(isLuauKeyword("ll"));
         {
             INFO("the language decides");
             CHECK(isKeyword(false, "state"));
@@ -118,36 +98,24 @@ namespace
     TEST_CASE("alscriptlexicon: a name is ASCII letters and digits and underscores; no digit first", "[alscriptlexicon]")
     {
         using namespace ALScriptLexicon;
-        {
-            INFO("letters and an underscore");
-            CHECK(isName("_count2"));
-            CHECK(isName("x"));
-            CHECK(isName("llSay"));
-        }
-        UNSCOPED_INFO("not a digit first");
+        CHECK(isName("_count2"));
+        CHECK(isName("x"));
+        CHECK(isName("llSay"));
         CHECK_FALSE(isName("2x"));
-        {
-            INFO("not empty, nor with other bytes");
-            CHECK_FALSE(isName(""));
-            CHECK_FALSE(isName("a-b"));
-            CHECK_FALSE(isName("a.b"));
-            CHECK_FALSE(isName("caf\xc3\xa9"));
-        }
-        {
-            INFO("the bytes");
-            CHECK(isNameStart('_'));
-            CHECK_FALSE(isNameStart('7'));
-            CHECK(isNameByte('7'));
-            CHECK_FALSE(isNameByte('$'));
-        }
+        CHECK_FALSE(isName(""));
+        CHECK_FALSE(isName("a-b"));
+        CHECK_FALSE(isName("a.b"));
+        CHECK_FALSE(isName("caf\xc3\xa9"));
+        CHECK(isNameStart('_'));
+        CHECK_FALSE(isNameStart('7'));
+        CHECK(isNameByte('7'));
+        CHECK_FALSE(isNameByte('$'));
     }
 
     TEST_CASE("alscriptlexicon: a long bracket's level and where its closer of that level ends", "[alscriptlexicon]")
     {
         using namespace ALScriptLexicon;
-        UNSCOPED_INFO("[[");
         CHECK(longBracketLevel("x = [[a]]", 4) == 0);
-        UNSCOPED_INFO("[==[");
         CHECK(longBracketLevel("[==[a]==]", 0) == 2);
         UNSCOPED_INFO("not one");
         CHECK(longBracketLevel("[=a", 0) == -1);
@@ -157,10 +125,8 @@ namespace
         CHECK(longBracketLevel("[[", 5) == -1);
         UNSCOPED_INFO("the closer of its level, not another's");
         CHECK(longBracketClose("a]=]b]]c", 0, 0) == size_t(7));
-        UNSCOPED_INFO("level two");
         CHECK(longBracketClose("a]]]=]]==]x", 0, 2) == size_t(10));
-        UNSCOPED_INFO("none");
-        REQUIRE(longBracketClose("a]=]", 0, 0) == std::string_view::npos);
+        CHECK(longBracketClose("a]=]", 0, 0) == std::string_view::npos);
     }
 
     TEST_CASE("alscriptlexicon: LSL: strings run past escapes and breaks; comments to the break or closer", "[alscriptlexicon]")
@@ -168,11 +134,8 @@ namespace
         using namespace ALScriptLexicon;
         const std::string_view text = "a \"b\\\"c\nd\" // e\n/* f */ g /* h";
         Stretch s = stretchAt(text, 0, false);
-        {
-            INFO("code, one byte");
-            CHECK(s.kind == Kind::Code);
-            CHECK(s.end == 1);
-        }
+        CHECK(s.kind == Kind::Code);
+        CHECK(s.end == 1);
         s = stretchAt(text, 2, false);
         {
             INFO("the string, across the break");
@@ -194,26 +157,22 @@ namespace
         }
         const size_t block = text.find("/*");
         s                  = stretchAt(text, block, false);
-        {
-            INFO("the block comment");
-            CHECK(s.kind == Kind::Comment);
-            CHECK(s.closed);
-            CHECK(s.close == 2);
-            CHECK(text.substr(block, s.end - block) == "/* f */");
-        }
+        CHECK(s.kind == Kind::Comment);
+        CHECK(s.closed);
+        CHECK(s.close == 2);
+        CHECK(text.substr(block, s.end - block) == "/* f */");
         s = stretchAt(text, text.rfind("/*"), false);
         {
             INFO("a block comment the text runs out in");
             CHECK(s.kind == Kind::Comment);
             CHECK_FALSE(s.closed);
-            REQUIRE(s.end == text.size());
+            CHECK(s.end == text.size());
             CHECK(s.close == 0);
         }
         UNSCOPED_INFO("no char constants");
         CHECK(stretchAt("'x'", 0, false).kind == Kind::Code);
         UNSCOPED_INFO("no -- comment");
         CHECK(stretchAt("--x", 0, false).kind == Kind::Code);
-        UNSCOPED_INFO("a string not closed");
         CHECK_FALSE(stretchAt("\"abc", 0, false).closed);
     }
 
@@ -223,12 +182,10 @@ namespace
         for (const char* quoted : { "\"a\\\"b\"", "'a\\'b'", "`a{b}c`" })
         {
             const Stretch s = stretchAt(quoted, 0, true);
-            {
-                INFO(std::string("closed: ") + quoted);
-                REQUIRE(s.kind == Kind::String);
-                REQUIRE(s.closed);
-                REQUIRE(s.end == std::string_view(quoted).size());
-            }
+            CAPTURE(quoted);
+            REQUIRE(s.kind == Kind::String);
+            REQUIRE(s.closed);
+            REQUIRE(s.end == std::string_view(quoted).size());
         }
         Stretch s = stretchAt("'abc\nd'", 0, true);
         {
@@ -244,31 +201,22 @@ namespace
             CHECK(s.end == 6);
         }
         s = stretchAt("[==[a]]b]==]c", 0, true);
-        {
-            INFO("a long string");
-            CHECK(s.kind == Kind::String);
-            CHECK(s.closed);
-            CHECK(s.open == 4);
-            CHECK(s.close == 4);
-            CHECK(s.end == 12);
-        }
+        CHECK(s.kind == Kind::String);
+        CHECK(s.closed);
+        CHECK(s.open == 4);
+        CHECK(s.close == 4);
+        CHECK(s.end == 12);
         s = stretchAt("--[[a\nb]] c", 0, true);
-        {
-            INFO("a long comment");
-            CHECK(s.kind == Kind::Comment);
-            CHECK(s.closed);
-            CHECK(s.open == 4);
-            CHECK(s.close == 2);
-            CHECK(s.end == 9);
-        }
+        CHECK(s.kind == Kind::Comment);
+        CHECK(s.closed);
+        CHECK(s.open == 4);
+        CHECK(s.close == 2);
+        CHECK(s.end == 9);
         s = stretchAt("-- a\nb", 0, true);
-        {
-            INFO("a line comment");
-            CHECK(s.kind == Kind::Comment);
-            CHECK(s.closed);
-            CHECK(s.close == 0);
-            CHECK(s.end == 4);
-        }
+        CHECK(s.kind == Kind::Comment);
+        CHECK(s.closed);
+        CHECK(s.close == 0);
+        CHECK(s.end == 4);
         s = stretchAt("--[[ a", 0, true);
         {
             INFO("a long comment the text runs out in");

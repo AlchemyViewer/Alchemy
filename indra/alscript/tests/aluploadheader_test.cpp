@@ -97,18 +97,18 @@ namespace
         {
             ALUploadHeader absolute = bare;
             absolute.file           = where;
-            UNSCOPED_INFO(std::string("never absolute: ") + where);
+            INFO("never absolute: " << where);
             REQUIRE(absolute.write(false) == bare.write(false));
         }
         ALUploadHeader aliased = bare;
         aliased.file           = "@lib/util.luau";
         UNSCOPED_INFO("an alias is no root");
-        REQUIRE(aliased.write(true).find("-- @file @lib/util.luau\n") != std::string::npos);
+        CHECK(aliased.write(true).find("-- @file @lib/util.luau\n") != std::string::npos);
 
         ALUploadHeader broken = bare;
         broken.creator        = "two\nlines\r";
         UNSCOPED_INFO("a line break in a field stays in its comment");
-        REQUIRE(broken.write(false).find("// @creator two lines \n") != std::string::npos);
+        CHECK(broken.write(false).find("// @creator two lines \n") != std::string::npos);
     }
 
     TEST_CASE_METHOD(aluploadheader_data, "aluploadheader: ours reads back and take() steps past it to the code", "[aluploadheader]")
@@ -120,24 +120,17 @@ namespace
             const std::string    text    = written.write(lua) + code;
             std::string_view     rest    = text;
             const std::optional<ALUploadHeader> back = ALUploadHeader::take(rest, lua);
-            const std::string    name    = lua ? "SLua: " : "LSL: ";
-            UNSCOPED_INFO(name + "read");
+            CAPTURE(lua);
             REQUIRE(back.has_value());
-            UNSCOPED_INFO(name + "ours");
             REQUIRE(back->ours);
-            UNSCOPED_INFO(name + "file");
             REQUIRE(back->file == written.file);
-            UNSCOPED_INFO(name + "hash");
             REQUIRE(back->hash == written.hash);
-            UNSCOPED_INFO(name + "date");
             REQUIRE(back->date == written.date);
-            UNSCOPED_INFO(name + "creator");
             REQUIRE(back->creator == written.creator);
-            UNSCOPED_INFO(name + "no key");
             REQUIRE(back->creatorId == std::string());
-            UNSCOPED_INFO(name + "the code is what is left");
+            UNSCOPED_INFO("the code is what is left");
             REQUIRE(std::string(rest) == code);
-            UNSCOPED_INFO(name + "not in the other language's comments");
+            UNSCOPED_INFO("not in the other language's comments");
             REQUIRE_FALSE(ALUploadHeader::parse(text, !lua).has_value());
         }
 
@@ -148,7 +141,6 @@ namespace
         REQUIRE(windows.has_value());
         UNSCOPED_INFO("and none in a field");
         CHECK(windows->hash == std::string("h"));
-        UNSCOPED_INFO("past it");
         CHECK(std::string(crlf) == std::string("code"));
     }
 
@@ -166,19 +158,13 @@ namespace
                                  "default { }\n";
         std::string_view                    rest = text;
         const std::optional<ALUploadHeader> back = ALUploadHeader::take(rest, false);
-        UNSCOPED_INFO("read");
         REQUIRE(back.has_value());
-        UNSCOPED_INFO("not ours");
         CHECK_FALSE(back->ours);
-        UNSCOPED_INFO("file");
         CHECK(back->file == std::string("scripts/door.lsl"));
         UNSCOPED_INFO("its sha256, as it is");
         CHECK(back->hash == std::string("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"));
-        UNSCOPED_INFO("date");
         CHECK(back->date == std::string("2026-10-07 14:03:11"));
-        UNSCOPED_INFO("creator");
         CHECK(back->creator == std::string("Rye Resident"));
-        UNSCOPED_INFO("key");
         CHECK(back->creatorId == std::string("0b8f2ef9-1d4a-4f4c-9b62-7d3a1c4e5f60"));
         UNSCOPED_INFO("the code is what is left");
         CHECK(std::string(rest) == std::string("default { }\n"));
@@ -190,7 +176,7 @@ namespace
         {
             INFO("SLua's, a field to come passed over");
             REQUIRE(slua.has_value());
-            REQUIRE(slua->file == "a.luau");
+            CHECK(slua->file == "a.luau");
             CHECK_FALSE(slua->ours);
         }
     }
@@ -216,9 +202,8 @@ namespace
         for (const char* text : texts)
         {
             std::string_view rest = text;
-            UNSCOPED_INFO(std::string("not a header: ") + text);
+            CAPTURE(text);
             REQUIRE_FALSE(ALUploadHeader::take(rest, false).has_value());
-            UNSCOPED_INFO(std::string("and nothing taken: ") + text);
             REQUIRE(std::string(rest) == std::string(text));
         }
         std::string runs_on = "// ================ alchemy meta ================\n";
@@ -228,7 +213,7 @@ namespace
         }
         runs_on += "// ====\n";
         UNSCOPED_INFO("a block far longer than any header");
-        REQUIRE_FALSE(ALUploadHeader::parse(runs_on, false).has_value());
+        CHECK_FALSE(ALUploadHeader::parse(runs_on, false).has_value());
     }
 
     TEST_CASE_METHOD(aluploadheader_data, "aluploadheader: the hash is XXH128 of v1 and the target and source and code split by noughts", "[aluploadheader]")
@@ -238,7 +223,7 @@ namespace
         UNSCOPED_INFO("xxHash's own");
         CHECK(hash == aluploadheader_data::xxhsum("v1\0mono\0#define X 1\nX\0001"s));
         UNSCOPED_INFO("its scheme and 32 digits");
-        REQUIRE(hash.size() == std::string("xxh128:").size() + 32);
+        CHECK(hash.size() == std::string("xxh128:").size() + 32);
         UNSCOPED_INFO("plain: the text alone");
         CHECK(ALUploadHeader::hashOfPlain("luau", "print(1)") ==
                       aluploadheader_data::xxhsum("v1\0luau\0print(1)"s));
@@ -270,12 +255,12 @@ namespace
 
         for (const char* path : { "/a", "\\a", "\\\\host\\a", "C:\\a", "c:/a", "z:a", "~/a", "~rye/a" })
         {
-            UNSCOPED_INFO(std::string("absolute: ") + path);
+            CAPTURE(path);
             REQUIRE(ALUploadHeader::absolute(path));
         }
         for (const char* path : { "", "a", "net/door.lsl", "../shared/util.luau", "@lib/util.luau", "1:x", ":a" })
         {
-            UNSCOPED_INFO(std::string("not: ") + path);
+            CAPTURE(path);
             REQUIRE_FALSE(ALUploadHeader::absolute(path));
         }
     }

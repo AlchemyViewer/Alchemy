@@ -113,7 +113,7 @@ namespace
         {
             INFO("by its path from the folder, then its own name");
             REQUIRE(file->names.size() >= 2);
-            REQUIRE(file->names[0] == "lib/util.lsl");
+            CHECK(file->names[0] == "lib/util.lsl");
             CHECK(file->names[1] == "util.lsl");
         }
         UNSCOPED_INFO("what it declares");
@@ -138,7 +138,7 @@ namespace
         {
             INFO("by its stem, under the prefix");
             REQUIRE(util);
-            REQUIRE(util->names[0] == "@lib/util");
+            CHECK(util->names[0] == "@lib/util");
             CHECK(util->exports == std::vector<std::string>{ "clamp" });
         }
         const ALModuleLook::Candidate* folder = named(found, "init");
@@ -206,7 +206,7 @@ namespace
         {
             INFO("listed, by its stem");
             REQUIRE(one);
-            REQUIRE(one->names[0] == "@lib/Upper");
+            CHECK(one->names[0] == "@lib/Upper");
             CHECK(one->exports == std::vector<std::string>{ "one" });
         }
 

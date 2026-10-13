@@ -176,7 +176,7 @@ namespace
                                  "}\n";
         const ALLSLReference::Result lso = ALLSLReference::compile(text, Target::LSO);
         UNSCOPED_INFO("LSO: " + lso.messages);
-        CHECK(lso.ok);
+        REQUIRE(lso.ok);
         // Events 35 to 43, bits 34 to 42.
         UNSCOPED_INFO("their bits");
         CHECK(reg64(lso.image, NER) == (U64)0x1ff << 34);
@@ -188,7 +188,7 @@ namespace
                                      "edefaultexperience_permissions_denied(", "edefaultlinkset_data(", "edefaultgame_control(",
                                      "edefaulton_death(", "edefaulton_damage(", "edefaultfinal_damage(" })
         {
-            UNSCOPED_INFO(std::string(handler) + ": " + cil.cil);
+            INFO(handler << ": " << cil.cil);
             REQUIRE(has(cil.cil, handler));
         }
     }
@@ -251,7 +251,7 @@ namespace
                                  "default { state_entry() { llSay(0, (string)(twice(g) * 3 + 6)); } }\n";
         const ALLSLReference::Result lso = ALLSLReference::compile(text, Target::LSO);
         UNSCOPED_INFO("LSO: " + lso.messages);
-        CHECK(lso.ok);
+        REQUIRE(lso.ok);
 
         // llSay is function 23: heard here for the run, as it was after.
         gSaid.clear();
@@ -266,13 +266,9 @@ namespace
                 vm.runQuanta(FALSE, LLUUID::null, &error, 1.f, events, timer);
             }
         }
-        UNSCOPED_INFO("no fault: " + std::string(error ? error : ""));
-        REQUIRE_FALSE(error);
-        UNSCOPED_INFO("one handler run");
+        CHECK_FALSE(error);
         CHECK(events == (U32)1);
-        UNSCOPED_INFO("said once");
         REQUIRE(gSaid.size() == (size_t)1);
-        UNSCOPED_INFO("what it worked out");
         CHECK(gSaid[0] == std::string("42"));
     }
 }

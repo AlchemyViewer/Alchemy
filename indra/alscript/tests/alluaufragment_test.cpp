@@ -495,16 +495,17 @@ namespace
             }
         }
 
-        void report(const char* corpus, const Tally& tally, bool answers = true)
+        void require_answers_as_whole(const char* corpus, const Tally& tally, bool answers = true)
         {
             std::printf("alluaufragment, %s solver, %s: %zu places, %zu answered over a fragment; told apart by a type beside a name %zu, "
                         "by which fit %zu, by a few names %zu, by a signature's parameters %zu\n",
                         newSolver ? "new" : "old", corpus, tally.asked, tally.answered, tally.types, tally.fits, tally.few, tally.generics);
-            UNSCOPED_INFO(std::string(corpus) + ": the fragment answers as the whole script does:\n" + tally.faults);
+            CAPTURE(corpus);
+            UNSCOPED_INFO("the fragment answers as the whole script does:\n" + tally.faults);
             REQUIRE(tally.faults.empty());
             if (answers)
             {
-                UNSCOPED_INFO(std::string(corpus) + ": most places answered over a fragment");
+                UNSCOPED_INFO("most places answered over a fragment");
                 REQUIRE(tally.answered * 2 > tally.asked);
             }
         }
@@ -527,7 +528,7 @@ namespace
         {
             ask((*it)["name"].asString(), probesOf((*it)["body"].asString(), 12), tally);
         }
-        report("the templates", tally);
+        require_answers_as_whole("the templates", tally);
     }
 
     TEST_CASE_METHOD(alluaufragment_data, "alluaufragment: over Tailslide's scripts as SLua the fragment answers as the whole does", "[alluaufragment]")
@@ -560,7 +561,7 @@ namespace
                 ask(name, probesOf(converted.text, 6), tally);
             }
         }
-        report("Tailslide's scripts", tally);
+        require_answers_as_whole("Tailslide's scripts", tally);
     }
 
     TEST_CASE_METHOD(alluaufragment_data, "alluaufragment: over an expanded script with modules the fragment answers as the whole does", "[alluaufragment]")
@@ -600,13 +601,12 @@ namespace
         {
             modules.reaches.push_back({ resolved.from, resolved.name, resolved.path });
         }
-        UNSCOPED_INFO("its modules");
         REQUIRE(modules.modules.size() == 2);
         fragment.setModules(modules);
         whole.setModules(modules);
         Tally tally;
         ask("test_require", probesOf(made.apart.script.text, 12), tally);
-        report("an expanded script", tally);
+        require_answers_as_whole("an expanded script", tally);
         // A module changed since the last check: util, which had a function
         // since taken out.
         ALLuauService::Modules before = modules;
@@ -627,7 +627,7 @@ namespace
             fragment.setModules(modules);
             ask("test_require, util changed", { probe }, changed, /*settled*/ true);
         }
-        report("an expanded script, a module changed since", changed, false);
+        require_answers_as_whole("an expanded script, a module changed since", changed, false);
         UNSCOPED_INFO("a module changed since: every place asked of the whole script");
         CHECK(changed.answered == size_t(0));
         fragment.setModules({});
@@ -685,9 +685,10 @@ namespace
             const std::string text = base + place.line + "\n";
             fragment.check(base);
             fragment.warm(base);
-            UNSCOPED_INFO(std::string(place.line) + ": over a fragment");
+            CAPTURE(place.line);
+            UNSCOPED_INFO("over a fragment");
             REQUIRE(stubbed(fragment.complete(text, 1, place.column)) == place.offered);
-            UNSCOPED_INFO(std::string(place.line) + ": over the whole script");
+            UNSCOPED_INFO("over the whole script");
             REQUIRE(stubbed(whole.complete(text, 1, place.column)) == place.offered);
         }
     }
@@ -745,11 +746,9 @@ namespace
                 ask(above + place.checked, place.typed, [&](ALLuauService& service, const std::string& text, S32 line, const char* over) {
                     const std::vector<ALScriptCompletion> found = service.complete(text, line, place.column);
                     const auto test = std::find_if(found.begin(), found.end(), [](const ALScriptCompletion& c) { return c.text == "test"; });
-                    {
-                        INFO(llformat("round %d, %s, over %s: the number", round, place.typed, over));
-                        REQUIRE(test != found.end());
-                        REQUIRE(test->kind == ALScriptSymbolKind::Variable);
-                    }
+                    CAPTURE(round, place.typed, over);
+                    REQUIRE(test != found.end());
+                    REQUIRE(test->kind == ALScriptSymbolKind::Variable);
                 });
             }
             // A function of two strings declared over one of a number: a
@@ -757,11 +756,9 @@ namespace
             ask(above + "local function call(n: number)\nend\nlocal call = function(s: string, t: string)\nend\n", "call(\"x\", \"y\")",
                 [&](ALLuauService& service, const std::string& text, S32 line, const char* over) {
                     const ALScriptSignature found = service.signature(text, line, 5);
-                    {
-                        INFO(llformat("round %d, a call, over %s: the two strings, not %s", round, over, found.label.c_str()));
-                        REQUIRE(found.found);
-                        REQUIRE(found.parameters.size() == 2);
-                    }
+                    CAPTURE(round, over, found.label);
+                    REQUIRE(found.found);
+                    REQUIRE(found.parameters.size() == 2);
                 });
         }
         UNSCOPED_INFO("answered over a fragment");

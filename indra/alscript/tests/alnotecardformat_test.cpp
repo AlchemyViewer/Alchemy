@@ -62,7 +62,6 @@ namespace
         UNSCOPED_INFO("prose with a colon or two");
         CHECK(ALNotecardFormat::guess("Note: read this.\nWelcome to the store\nAsk for help\nHave fun\n") ==
                       std::string("text"));
-        UNSCOPED_INFO("nothing");
         CHECK(ALNotecardFormat::guess("") == std::string("text"));
     }
 
@@ -93,8 +92,7 @@ namespace
                                  "  \"on\": true\n"
                                  "}\n";
         const std::vector<ALScriptOutlineEntry> entries = ALNotecardFormat::outline(text);
-        UNSCOPED_INFO("the keys");
-        CHECK(said(entries) ==
+        REQUIRE(said(entries) ==
                       std::string("name=\"Door\" speed=2.5 sounds={...} .open=\"creak\" .shut=\"bang\" stops=[...] .[2]={...} ..at=3 on=true"));
         const ALScriptOutlineEntry& sounds = entries[2];
         {
@@ -136,8 +134,8 @@ namespace
         {
             INFO("inside the string");
             REQUIRE(named);
-            REQUIRE(named->name == "config");
-            REQUIRE(named->begin == 30);
+            CHECK(named->name == "config");
+            CHECK(named->begin == 30);
             CHECK(named->end == 38);
         }
         UNSCOPED_INFO("on its quote");
@@ -158,19 +156,12 @@ namespace
                                    "  touch_start(integer n) { llGetNumberOfNotecardLines(\"config\"); llGetNotecardLine(\"other\", 0); }\n"
                                    "}\n";
         const std::vector<ALScriptSpan> read = ALNotecardFormat::readersOf(script, "config");
-        UNSCOPED_INFO("two readers of it");
         REQUIRE(read.size() == size_t(2));
-        {
-            INFO("the first");
-            CHECK(read[0].line == 1);
-            CHECK(read[0].column == 36);
-            CHECK(read[0].endColumn == 44);
-        }
-        {
-            INFO("the second");
-            CHECK(read[1].line == 2);
-            CHECK(read[1].column == 54);
-        }
+        CHECK(read[0].line == 1);
+        CHECK(read[0].column == 36);
+        CHECK(read[0].endColumn == 44);
+        CHECK(read[1].line == 2);
+        CHECK(read[1].column == 54);
         UNSCOPED_INFO("none of another");
         REQUIRE(ALNotecardFormat::readersOf(script, "missing").empty());
     }
@@ -182,7 +173,6 @@ namespace
                                    "  touch_start(integer n) { llGetNumberOfNotecardLines(\"config\"); }\n"
                                    "}\r";
         const std::vector<ALScriptSpan> read = ALNotecardFormat::readersOf(script, "config");
-        UNSCOPED_INFO("both");
         REQUIRE(read.size() == size_t(2));
         {
             INFO("the first on the second line");

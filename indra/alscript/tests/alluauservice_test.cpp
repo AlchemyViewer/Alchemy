@@ -108,7 +108,6 @@ namespace
         REQUIRE_FALSE(definitions.empty());
         UNSCOPED_INFO("definitions load: " + error);
         CHECK(loaded);
-        UNSCOPED_INFO("service says so");
         CHECK(service.hasDefinitions());
     }
 
@@ -131,10 +130,8 @@ namespace
         CHECK(loaded);
         ALScriptProblems problems = service.check("ll.Say(\"zero\", 0)\n");
         UNSCOPED_INFO("an error: " + said(problems));
-        CHECK(errors(problems) > 0);
-        UNSCOPED_INFO("from the type checker");
+        REQUIRE(errors(problems) > 0);
         CHECK(problems.front().source == ALScriptProblem::Source::Types);
-        UNSCOPED_INFO("on the first line");
         CHECK(problems.front().line == 0);
     }
 
@@ -189,15 +186,13 @@ namespace
         CHECK(loaded);
         ALScriptProblems problems = service.check("local x = \n");
         UNSCOPED_INFO("an error: " + said(problems));
-        CHECK(errors(problems) > 0);
-        UNSCOPED_INFO("from the parser");
+        REQUIRE(errors(problems) > 0);
         CHECK(problems.front().source == ALScriptProblem::Source::Parser);
     }
 
     TEST_CASE_METHOD(alluauservice_data, "alluauservice: without the definitions ll is unknown", "[alluauservice]")
     {
         ALLuauService bare;
-        UNSCOPED_INFO("nothing loaded");
         CHECK_FALSE(bare.hasDefinitions());
         ALScriptProblems problems = bare.check("ll.Say(0, \"x\")\n");
         UNSCOPED_INFO("an error: " + said(problems));
@@ -210,11 +205,8 @@ namespace
     {
         ALLuauService bare;
         std::string   why;
-        UNSCOPED_INFO("refused");
         REQUIRE_FALSE(bare.loadDefinitions("declare ll: {\n", why));
-        UNSCOPED_INFO("with a reason");
         REQUIRE_FALSE(why.empty());
-        UNSCOPED_INFO("and nothing loaded");
         CHECK_FALSE(bare.hasDefinitions());
     }
 
@@ -231,7 +223,6 @@ namespace
             if (c.text == "Say")
             {
                 say = true;
-                UNSCOPED_INFO("a function");
                 REQUIRE(c.kind == ALScriptSymbolKind::Function);
                 UNSCOPED_INFO("with a signature: " + c.detail);
                 REQUIRE(c.detail.find("(") != std::string::npos);
@@ -251,7 +242,6 @@ namespace
         }
         UNSCOPED_INFO("the local, typed");
         CHECK(local);
-        UNSCOPED_INFO("a keyword");
         CHECK(keyword);
     }
 
@@ -263,18 +253,15 @@ namespace
         std::stringstream json;
         json << in.rdbuf();
         std::string docs_error;
-        UNSCOPED_INFO("docs loaded: " + docs_error);
         CHECK(service.loadDocs(json.str(), docs_error));
         const std::string script = "local count = 1\nll.Say(0, tostring(count))\n";
         ALScriptHover hover = service.hover(script, 1, 4);  // on `Say`
-        UNSCOPED_INFO("found");
         REQUIRE(hover.found);
         {
             INFO("the name and its type: " + hover.label);
             REQUIRE(hover.label.find("Say") != std::string::npos);
             REQUIRE(hover.label.find("(") != std::string::npos);
         }
-        UNSCOPED_INFO("documented: " + hover.documentation);
         REQUIRE_FALSE(hover.documentation.empty());
         UNSCOPED_INFO("not the script's own");
         CHECK_FALSE(hover.hasDefinition);
@@ -293,7 +280,7 @@ namespace
         hover = service.hover(script, 1, 0);  // on `ll` itself
         UNSCOPED_INFO("the table is found");
         REQUIRE(hover.found);
-        UNSCOPED_INFO(llformat("and said in a glance, not %d characters", (int)hover.label.size()));
+        UNSCOPED_INFO("and said in a glance");
         REQUIRE(hover.label.size() < 1200);
         UNSCOPED_INFO("with how many more there are: " + hover.label);
         REQUIRE(hover.label.find("more") != std::string::npos);
@@ -310,16 +297,12 @@ namespace
         CHECK(loaded);
         const std::string script = "ll.Say(0, \"hi\")\n";
         ALScriptSignature sig = service.signature(script, 0, 7);  // in the first argument
-        UNSCOPED_INFO("found");
         REQUIRE(sig.found);
         UNSCOPED_INFO("the call: " + sig.label);
         REQUIRE(sig.label.find("Say") != std::string::npos);
-        UNSCOPED_INFO("two parameters");
         REQUIRE(sig.parameters.size() == size_t(2));
-        UNSCOPED_INFO("at the first");
         CHECK(sig.active == 0);
         sig = service.signature(script, 0, 11);  // in the second
-        UNSCOPED_INFO("at the second");
         CHECK(sig.active == 1);
         UNSCOPED_INFO("none outside a call");
         REQUIRE_FALSE(service.signature(script, 0, 0).found);
@@ -339,18 +322,15 @@ namespace
         ALScriptReferences refs = service.references(script, 1, 20);  // on `count` in the call
         UNSCOPED_INFO("the local is found");
         REQUIRE(refs.found);
-        UNSCOPED_INFO("by name");
         CHECK(refs.name == std::string("count"));
-        UNSCOPED_INFO(llformat("a variable, not kind %d", (int)refs.kind));
         CHECK(refs.kind == ALScriptSymbolKind::Variable);
         {
-            INFO(llformat("bound on the first line, not %d:%d-%d", refs.definition.line, refs.definition.column, refs.definition.endColumn));
+            INFO("bound on the first line");
             CHECK(refs.hasDefinition);
             CHECK(refs.definition.line == 0);
             CHECK(refs.definition.column == 6);
             CHECK(refs.definition.endColumn == 11);
         }
-        UNSCOPED_INFO("five places");
         REQUIRE(refs.references.size() == size_t(5));
         UNSCOPED_INFO("the first is the binding");
         CHECK(refs.references[0] == refs.definition);
@@ -368,14 +348,12 @@ namespace
             REQUIRE(refs.found);
             CHECK(refs.name == "Say");
         }
-        UNSCOPED_INFO("a function");
         CHECK(refs.kind == ALScriptSymbolKind::Function);
         {
             INFO("not bound in the script");
             CHECK_FALSE(refs.hasDefinition);
             CHECK_FALSE(refs.renamable);
         }
-        UNSCOPED_INFO("used once");
         REQUIRE(refs.references.size() == size_t(1));
 
         refs = service.references(script, 5, 2);  // on `f` in `M.f(count)`
@@ -392,7 +370,6 @@ namespace
         }
         UNSCOPED_INFO("declared and called");
         REQUIRE(refs.references.size() == size_t(2));
-        UNSCOPED_INFO("and renamable");
         CHECK(refs.renamable);
 
         refs = service.references(script, 0, 6);  // on the binding itself
@@ -464,7 +441,6 @@ namespace
         UNSCOPED_INFO("definitions loaded: " + error);
         CHECK(loaded);
         ALScriptProblems problems = service.check("ll.ay(0, \"hi\")\n");
-        UNSCOPED_INFO("one problem");
         REQUIRE_FALSE(problems.empty());
         const std::string& message = problems.front().message;
         {
@@ -474,7 +450,7 @@ namespace
         }
         UNSCOPED_INFO("and suggests Say: " + message);
         REQUIRE(message.find("'Say'") != std::string::npos);
-        UNSCOPED_INFO(llformat("in a glance, not %d characters", (int)message.size()));
+        UNSCOPED_INFO("in a glance");
         REQUIRE(message.size() < 100);
     }
 
@@ -677,6 +653,7 @@ namespace
         UNSCOPED_INFO("a builtin by its signature: " + hover.label);
         CHECK(hover.label.rfind(newSolver ? "function print<" : "function print(", 0) == 0);
     }
+
     TEST_CASE_METHOD(alluauservice_data, "alluauservice: the configuration adds globals and turns lints off until it is replaced", "[alluauservice]")
     {
         UNSCOPED_INFO("definitions loaded: " + error);
@@ -689,7 +666,6 @@ namespace
         CHECK(mentions(plain, "unused"));
         ALLuauConfig config;
         std::string  bad;
-        UNSCOPED_INFO("parses: " + bad);
         REQUIRE(ALLuauConfig::parse("{ \"globals\": [\"Alchemy\"], \"lint\": { \"LocalUnused\": false } }", config, bad));
         service.setConfig(config);
         ALScriptProblems configured = service.check(script);
@@ -738,6 +714,7 @@ namespace
             REQUIRE(keyed);
         }
     }
+
     TEST_CASE_METHOD(alluauservice_data, "alluauservice: questions reuse a text's check and hints are the same whatever came first", "[alluauservice]")
     {
         UNSCOPED_INFO("definitions loaded: " + error);
@@ -764,15 +741,12 @@ namespace
         CHECK(service.typeChecks() == checked);
         // A text asked about before a check has what a hover does.
         const std::vector<ALScriptInlayHint> after_hover = service.inlayHints(script, true, true);
-        UNSCOPED_INFO("as many hints");
         REQUIRE(after_hover.size() == after_check.size());
         for (size_t i = 0; i < after_hover.size(); ++i)
         {
-            {
-                INFO("the same hint: " + after_hover[i].text + " / " + after_check[i].text);
-                REQUIRE(after_hover[i].text == after_check[i].text);
-                REQUIRE(after_hover[i].line == after_check[i].line);
-            }
+            CAPTURE(i);
+            REQUIRE(after_hover[i].text == after_check[i].text);
+            REQUIRE(after_hover[i].line == after_check[i].line);
         }
         // Another configuration, or another text, is checked again: one
         // unlike either solver's default.
@@ -795,11 +769,9 @@ namespace
         CHECK(loaded);
         const std::string script = "local T = {}\nfunction T:m(a: number, b: string) end\nT.m(T, 1, \"x\")\nT:m(1, \"x\")\n";
         ALScriptSignature dotted = service.signature(script, 2, 12);  // in "x"
-        UNSCOPED_INFO("found");
         REQUIRE(dotted.found);
         UNSCOPED_INFO("self, a and b: " + dotted.label);
         REQUIRE(dotted.parameters.size() == size_t(3));
-        UNSCOPED_INFO("at the third");
         CHECK(dotted.active == 2);
         UNSCOPED_INFO("which is b: " + dotted.parameters[2]);
         CHECK(dotted.parameters[2].find("b") == 0);
@@ -820,9 +792,7 @@ namespace
         for (const bool use : { true, false, true })
         {
             std::string why;
-            UNSCOPED_INFO("switched: " + why);
             REQUIRE(service.setNewSolver(use, why));
-            UNSCOPED_INFO("the one asked for");
             REQUIRE(service.newSolver() == use);
             UNSCOPED_INFO("the definitions with it");
             REQUIRE(service.hasDefinitions());
@@ -972,18 +942,12 @@ namespace
         CHECK(loaded);
         const std::string       script = "local f: ((n: number) -> ()) & ((a: string, b: string) -> ()) = nil :: any\nf(\"x\", \"y\")\n";
         const ALScriptSignature sig    = service.signature(script, 1, 7);
-        UNSCOPED_INFO("found");
         REQUIRE(sig.found);
-        UNSCOPED_INFO("both forms");
         REQUIRE(sig.overloads.size() == size_t(2));
         UNSCOPED_INFO("the second fits two arguments");
         CHECK(sig.overload == 1);
-        {
-            INFO("shown");
-            CHECK(sig.label == sig.overloads[1].label);
-            REQUIRE(sig.parameters.size() == 2);
-        }
-        UNSCOPED_INFO("at the second argument");
+        CHECK(sig.label == sig.overloads[1].label);
+        REQUIRE(sig.parameters.size() == 2);
         CHECK(sig.active == 1);
         UNSCOPED_INFO("one form: none listed");
         REQUIRE(service.signature("local function g(a: number) end\ng(1)\n", 1, 2).overloads.empty());
@@ -1042,11 +1006,8 @@ namespace
         REQUIRE(loose_hints.size() == size_t(2));
         UNSCOPED_INFO("and strict");
         REQUIRE(strict_hints.size() == size_t(2));
-        {
-            INFO("the same");
-            CHECK(loose_hints[0].text == strict_hints[0].text);
-            CHECK(loose_hints[1].text == strict_hints[1].text);
-        }
+        CHECK(loose_hints[0].text == strict_hints[0].text);
+        CHECK(loose_hints[1].text == strict_hints[1].text);
         {
             INFO("the problems of each told apart");
             CHECK(said(service.check(loose)) == first);
@@ -1071,11 +1032,8 @@ namespace
         UNSCOPED_INFO("what was checked stands");
         CHECK(service.typeChecks() == checked);
         const std::string docs = "{\"@sl-slua/global/ll.Say\": {\"documentation\": \"Says it.\", \"learn_more_link\": \"x\"}}";
-        {
-            INFO("docs loaded");
-            CHECK(service.loadDocs(docs, why));
-            CHECK(service.hasDocs());
-        }
+        CHECK(service.loadDocs(docs, why));
+        CHECK(service.hasDocs());
         {
             INFO("and the same again");
             CHECK(service.loadDocs(docs, why));
@@ -1118,7 +1076,7 @@ namespace
             {
                 offered |= fix.title == std::string("Declare it as '") + type + "'";
             }
-            UNSCOPED_INFO("line " + std::to_string(line) + ": declared as " + type);
+            CAPTURE(line, type);
             REQUIRE(offered);
         }
     }
@@ -1326,7 +1284,6 @@ namespace
             CHECK(LLSDSerialize::fromXML(templates, in) != LLSDParser::PARSE_FAILURE);
             REQUIRE(templates.isArray());
         }
-        UNSCOPED_INFO("some");
         REQUIRE(templates.size() > 0);
         for (LLSD::array_const_iterator it = templates.beginArray(); it != templates.endArray(); ++it)
         {
@@ -1340,7 +1297,7 @@ namespace
                     wrong += llformat(" [%d:%d] %s", problem.line, problem.column, problem.message.c_str());
                 }
             }
-            UNSCOPED_INFO(name + ":" + wrong);
+            CAPTURE(name, wrong);
             REQUIRE(wrong.empty());
         }
     }
@@ -1459,15 +1416,11 @@ namespace
                                                     "local m: number? = nil\n"
                                                     "if m then print(m) end\n"
                                                     "if n ~= 0 or not (n > 1) then print(b, t) end\n");
-        UNSCOPED_INFO("four: " + llformat("%zu", said.size()));
         REQUIRE(said.size() == size_t(4));
-        {
-            INFO("each: " + said[0] + "|" + said[1] + "|" + said[2] + "|" + said[3]);
-            CHECK(said[0] == "LuauLintSlNumberTruth n 1");
-            CHECK(said[1] == "LuauLintSlNumberTruth n 2");
-            CHECK(said[2] == "LuauLintSlNumberTruthNot n 3");
-            CHECK(said[3] == "LuauLintSlNumberTruth n 4");
-        }
+        CHECK(said[0] == "LuauLintSlNumberTruth n 1");
+        CHECK(said[1] == "LuauLintSlNumberTruth n 2");
+        CHECK(said[2] == "LuauLintSlNumberTruthNot n 3");
+        CHECK(said[3] == "LuauLintSlNumberTruth n 4");
         // A local by what it is given, where the old solver's nonstrict
         // mode says any: a copy of a number is one; one given a string, or
         // joined to one, or a parameter, is not.
@@ -1608,17 +1561,14 @@ namespace
             "function LLEvents.touch_start(n: number) end\n";
         const std::vector<ALScriptOutlineEntry> outline = service.outline(script);
         const std::vector<ALScriptOutlineEntry> shape   = ALLuauService::shape(script);
-        UNSCOPED_INFO("as many");
         REQUIRE(shape.size() == outline.size());
         for (size_t i = 0; i < shape.size(); ++i)
         {
-            {
-                INFO("the same symbol, where it was");
-                REQUIRE(shape[i].name == outline[i].name);
-                REQUIRE(shape[i].kind == outline[i].kind);
-                REQUIRE(shape[i].span == outline[i].span);
-                REQUIRE(shape[i].depth == outline[i].depth);
-            }
+            CAPTURE(i);
+            REQUIRE(shape[i].name == outline[i].name);
+            REQUIRE(shape[i].kind == outline[i].kind);
+            REQUIRE(shape[i].span == outline[i].span);
+            REQUIRE(shape[i].depth == outline[i].depth);
             UNSCOPED_INFO("no type");
             REQUIRE(shape[i].detail.empty());
         }
@@ -1771,11 +1721,9 @@ namespace
         for (const ALScriptCompletion& c : found)
         {
             said += " " + c.text;
-            UNSCOPED_INFO("a word of the language: " + c.text);
+            CAPTURE(c.text);
             REQUIRE(c.kind == ALScriptSymbolKind::Keyword);
-            UNSCOPED_INFO("in a hot comment: " + c.text);
             REQUIRE(c.context == ALScriptCompletion::Context::HotComment);
-            UNSCOPED_INFO("one the studio offers: " + c.text);
             REQUIRE(ALScriptLexicon::isLuauHotComment(c.text));
         }
         UNSCOPED_INFO("each of them:" + said);
@@ -1797,12 +1745,11 @@ namespace
             return nullptr;
         };
         std::string why;
-        UNSCOPED_INFO("docs loaded");
         CHECK(service.loadDocs("{\"@sl-slua/global/ll.Say\": {\"documentation\": \"Says it.\", \"learn_more_link\": \"x\"},"
-                                               " \"@sl-slua/global/ll\": {\"documentation\": \"The library.\", \"learn_more_link\": \"x\"},"
-                                               " \"@sl-slua/global/vector\": {\"documentation\": \"Makes one.\", \"learn_more_link\": \"x\"},"
-                                               " \"@sl-slua/global/vector.magnitude\": {\"documentation\": \"Its length.\", \"learn_more_link\": \"x\"}}",
-                                               why));
+                               " \"@sl-slua/global/ll\": {\"documentation\": \"The library.\", \"learn_more_link\": \"x\"},"
+                               " \"@sl-slua/global/vector\": {\"documentation\": \"Makes one.\", \"learn_more_link\": \"x\"},"
+                               " \"@sl-slua/global/vector.magnitude\": {\"documentation\": \"Its length.\", \"learn_more_link\": \"x\"}}",
+                               why));
         const std::string base = "local count: number = 1\n"
                                  "local function twice(n: number): number return n * 2 end\n"
                                  "local t = { a = 1, b = \"x\" }\n";
@@ -1814,16 +1761,13 @@ namespace
         UNSCOPED_INFO("off: checked whole");
         CHECK(service.typeChecks() > checks);
         UNSCOPED_INFO("a call of a field documented as the field, not what holds it");
-        CHECK(service.signature(base + "ll.Say(0, )\n", 3, 10).documentation ==
-                      std::string("Says it."));
+        CHECK(service.signature(base + "ll.Say(0, )\n", 3, 10).documentation == std::string("Says it."));
         // `vector` is a table that is also called, whose fields Luau gives
         // no symbol of their own.
         UNSCOPED_INFO("and of a callable table's field");
-        CHECK(service.signature(base + "local m = vector.magnitude()\n", 3, 27).documentation ==
-                      std::string("Its length."));
+        CHECK(service.signature(base + "local m = vector.magnitude()\n", 3, 27).documentation == std::string("Its length."));
 
         service.setFragments(true);
-        UNSCOPED_INFO("on");
         CHECK(service.fragments());
         service.check(base);
         service.complete(base, 0, 0);
@@ -1849,9 +1793,7 @@ namespace
         ALScriptSignature said = service.signature(base + "ll.Say(0, )\n", 3, 10);
         UNSCOPED_INFO("a call's signature");
         REQUIRE(said.found);
-        UNSCOPED_INFO("its label");
         CHECK(said.label == std::string("ll.Say(channel: number, msg: string): ()"));
-        UNSCOPED_INFO("at its second argument");
         CHECK(said.active == 1);
         UNSCOPED_INFO("documented as the field it calls");
         CHECK(said.documentation == std::string("Says it."));
@@ -1867,8 +1809,7 @@ namespace
         UNSCOPED_INFO("no signature outside a call");
         REQUIRE_FALSE(service.signature(base + "local q = 1\n", 3, 8).found);
         UNSCOPED_INFO("a callable table's field over the fragment too");
-        CHECK(service.signature(base + "local m = vector.magnitude()\n", 3, 27).documentation ==
-                      std::string("Its length."));
+        CHECK(service.signature(base + "local m = vector.magnitude()\n", 3, 27).documentation == std::string("Its length."));
         UNSCOPED_INFO("none of it checked whole");
         CHECK(service.typeChecks() == checks);
         UNSCOPED_INFO("each answered over its statement");
@@ -1886,7 +1827,6 @@ namespace
         size_t checks = service.typeChecks();
         size_t parts  = service.fragmentsChecked();
         const std::string base = "local count: number = 1\n";
-        UNSCOPED_INFO("answered");
         REQUIRE_FALSE(service.complete(base + "local x = co\n", 1, 10).empty());
         {
             INFO("checked whole");
@@ -1899,9 +1839,7 @@ namespace
         ALLuauService::Stop stop = ALLuauService::newStop();
         ALLuauService::cancel(stop);
         service.setStop(stop);
-        UNSCOPED_INFO("nothing");
         REQUIRE(service.complete(base + "local y = co\n", 1, 10).empty());
-        UNSCOPED_INFO("stopped");
         CHECK(service.stopped());
         service.setStop(nullptr);
         checks = service.typeChecks();
@@ -1926,7 +1864,6 @@ namespace
         parts  = service.fragmentsChecked();
         const std::string changed = "local function twice(n: string): string return n end\nlocal function main()\n    local count = 1\n    local x = tw\nend\n";
         const std::vector<ALScriptCompletion> found = service.complete(changed, 3, 14);
-        UNSCOPED_INFO("answered");
         CHECK(offers(found, "twice"));
         {
             INFO("whole");
@@ -1986,14 +1923,12 @@ namespace
         checks = service.typeChecks();
         service.warm(base);
         UNSCOPED_INFO("the old solver's autocomplete module checked; the new solver's check is it");
-        CHECK(service.typeChecks() - checks ==
-                      size_t(newSolver ? 0 : 1));
+        CHECK(service.typeChecks() - checks == size_t(newSolver ? 0 : 1));
         service.warm(base);
         UNSCOPED_INFO("and not again for the same text");
         CHECK(service.typeChecks() - checks == size_t(newSolver ? 0 : 1));
         checks             = service.typeChecks();
         const size_t parts = service.fragmentsChecked();
-        UNSCOPED_INFO("answered");
         CHECK(offers(service.complete(typed, 1, 18), "count"));
         UNSCOPED_INFO("over its statement");
         CHECK(service.fragmentsChecked() - parts == size_t(1));
@@ -2415,11 +2350,8 @@ namespace
             return sig.found && sig.overloads.size() == 2 ? sig.overload : -1;
         };
         const ALScriptSignature listen = service.signature(script, 0, 24);
-        {
-            INFO("found, both forms");
-            REQUIRE(listen.found);
-            REQUIRE(listen.overloads.size() == 2);
-        }
+        REQUIRE(listen.found);
+        REQUIRE(listen.overloads.size() == 2);
         {
             INFO("listen, not a detected event: " + listen.label);
             CHECK(listen.overload == 1);
@@ -2515,7 +2447,7 @@ namespace
         UNSCOPED_INFO("definitions loaded: " + error);
         CHECK(loaded);
         std::string why;
-        UNSCOPED_INFO("the other solver: " + why);
+        UNSCOPED_INFO("the other solver");
         REQUIRE(service.setNewSolver(!newSolver, why));
         ALScriptProblems problems = service.check("print(REZ_TORQUE)\n");
         UNSCOPED_INFO("known there: " + said(problems));
@@ -2526,7 +2458,6 @@ namespace
         UNSCOPED_INFO("known again: " + said(problems));
         CHECK_FALSE(unknownGlobal(problems, "REZ_TORQUE"));
         const ALScriptHover hover = service.hover("print(REZ_TORQUE)\n", 0, 8);
-        UNSCOPED_INFO("hover finds it");
         REQUIRE(hover.found);
         UNSCOPED_INFO("a number: " + hover.label);
         REQUIRE(hover.label.find("number") != std::string::npos);

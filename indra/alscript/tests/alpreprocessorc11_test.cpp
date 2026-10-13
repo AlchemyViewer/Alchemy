@@ -170,11 +170,9 @@ namespace
                       std::string("string s = \"ab\\ncd\" ;"));
         {
             const ALPreprocessor::Result r = run("// a note \\\nint hidden;\nint shown;\n");
-            {
-                INFO("a // comment goes on over the join: " + r.text);
-                REQUIRE(r.text.find("\nint hidden") == std::string::npos);
-                REQUIRE(r.text.find("int shown;") != std::string::npos);
-            }
+            INFO("a // comment goes on over the join: " + r.text);
+            CHECK(r.text.find("\nint hidden") == std::string::npos);
+            CHECK(r.text.find("int shown;") != std::string::npos);
         }
         UNSCOPED_INFO("the lines after keep their numbers");
         CHECK(pp(std::string("#define A 1 \\\n"
@@ -1000,9 +998,7 @@ namespace
                                                                "--#if B or A ~= 2\ntwo\n--#endif\n"
                                                                "--#if (A && !B) == 1\nthree\n--#endif\n"
                                                                "--#if not A or B\nno\n--#else\nfour\n--#endif\n", lua);
-            UNSCOPED_INFO("said");
             CHECK(messages(r) == std::string());
-            UNSCOPED_INFO("taken");
             CHECK(flat(r.text) == std::string("one two three four"));
         }
     }
@@ -1024,9 +1020,9 @@ namespace
         const std::string joined = pp(lf);
         {
             INFO("the macro's lines are its body: " + joined);
-            REQUIRE(joined.find("PROBLEMS") == std::string::npos);
-            REQUIRE(joined.find("llSay") != std::string::npos);
-            REQUIRE(joined.find('\\') == std::string::npos);
+            CHECK(joined.find("PROBLEMS") == std::string::npos);
+            CHECK(joined.find("llSay") != std::string::npos);
+            CHECK(joined.find('\\') == std::string::npos);
             CHECK(joined.find("default") == 0);
         }
         UNSCOPED_INFO("CRLF");
@@ -1050,8 +1046,7 @@ namespace
         {
             const ALPreprocessor::Result r = run("// a note \\ \nint shown;\n");
             UNSCOPED_INFO("a note's backslash and a blank take no line: " + r.text);
-            REQUIRE(r.text.find("int shown;") != std::string::npos);
-            UNSCOPED_INFO("nothing said");
+            CHECK(r.text.find("int shown;") != std::string::npos);
             CHECK(messages(r) == std::string());
         }
     }

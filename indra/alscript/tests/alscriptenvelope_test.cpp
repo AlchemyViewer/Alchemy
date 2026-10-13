@@ -122,23 +122,15 @@ namespace
             "//last_compiled 09/20/2026 10:11:12\n"
             "//mono\n"
             "default { state_entry() { llSay(0, (string)1); } }\n";
-        UNSCOPED_INFO("looks wrapped");
         CHECK(ALScriptEnvelope::looksWrapped(asset));
         std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(asset);
-        UNSCOPED_INFO("parsed");
         REQUIRE(envelope.has_value());
-        UNSCOPED_INFO("lsl");
         CHECK_FALSE(envelope->lua);
-        UNSCOPED_INFO("the source");
         CHECK(envelope->source ==
                       std::string("#define X 1\n/* a comment */\ndefault { state_entry() { llSay(0, (string)X); } }"));
-        UNSCOPED_INFO("the target");
         CHECK(envelope->compileTarget == std::string("mono"));
-        UNSCOPED_INFO("the program");
         CHECK(envelope->programVersion == std::string("Firestorm-Releasex64 7.1.11 (76496)"));
-        UNSCOPED_INFO("the date");
         CHECK(envelope->lastCompiled == std::string("09/20/2026 10:11:12"));
-        UNSCOPED_INFO("the expanded code");
         CHECK(envelope->expanded == std::string("default { state_entry() { llSay(0, (string)1); } }\n"));
 
         UNSCOPED_INFO("plain source is not an envelope");
@@ -161,13 +153,9 @@ namespace
                       std::string("//start_unprocessed_text\n/*/|/ src\ndefault { }*/\n//end_unprocessed_text\n"
                                   "//nfo_preprocessor_version 0\n//program_version Alchemy 9.0.0\n//last_compiled now\n//lsl2\ndefault { }\n"));
         std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(asset);
-        UNSCOPED_INFO("reads back");
         REQUIRE(back.has_value());
-        UNSCOPED_INFO("the source");
         CHECK(back->source == envelope.source);
-        UNSCOPED_INFO("the expanded code");
         CHECK(back->expanded == envelope.expanded);
-        UNSCOPED_INFO("the target");
         CHECK(back->compileTarget == envelope.compileTarget);
     }
 
@@ -186,35 +174,25 @@ namespace
             REQUIRE(asset.find("--[==[local t") != std::string::npos);
             REQUIRE(asset.find("]==]\n--end_unprocessed_text\n") != std::string::npos);
         }
-        UNSCOPED_INFO("looks wrapped");
         CHECK(ALScriptEnvelope::looksWrapped(asset));
         std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(asset);
-        UNSCOPED_INFO("reads back");
         REQUIRE(back.has_value());
-        UNSCOPED_INFO("lua");
         CHECK(back->lua);
-        UNSCOPED_INFO("the source");
         CHECK(back->source == envelope.source);
-        UNSCOPED_INFO("the expanded code");
         CHECK(back->expanded == envelope.expanded);
-        UNSCOPED_INFO("the target");
         CHECK(back->compileTarget == std::string("luau"));
     }
 
     TEST_CASE_METHOD(alscriptenvelope_data, "alscriptenvelope: a directive is a line of its own", "[alscriptenvelope]")
     {
-        UNSCOPED_INFO("mono");
         CHECK(ALScriptEnvelope::directiveOf("// x\n//mono\ndefault{}", false) == std::string("mono"));
         // As Firestorm has it: mono anywhere wins over lsl2 anywhere.
         UNSCOPED_INFO("mono over lsl2");
         CHECK(ALScriptEnvelope::directiveOf("//lsl2\n//mono\n", false) == std::string("mono"));
-        UNSCOPED_INFO("lsl2");
         CHECK(ALScriptEnvelope::directiveOf("//lsl2\n", false) == std::string("lsl2"));
-        UNSCOPED_INFO("none");
         CHECK(ALScriptEnvelope::directiveOf("//monolith\n", false) == std::string());
         UNSCOPED_INFO("not mid-line");
         CHECK(ALScriptEnvelope::directiveOf("x //mono\n", false) == std::string());
-        UNSCOPED_INFO("lua");
         CHECK(ALScriptEnvelope::directiveOf("--luau\n", true) == std::string("luau"));
         UNSCOPED_INFO("not lua's in lsl");
         CHECK(ALScriptEnvelope::directiveOf("--luau\n", false) == std::string());
@@ -252,20 +230,17 @@ namespace
             size_t       level = 0;
             size_t       body  = 0;
             const size_t end   = luaCommentEnd(asset, level, body);
-            UNSCOPED_INFO(c.name + ": the level");
+            CAPTURE(c.name);
             REQUIRE(level == c.level);
-            UNSCOPED_INFO(c.name + ": the comment closes where the source ends");
+            UNSCOPED_INFO("the comment closes where the source ends");
             REQUIRE(end == body + c.source.size());
-            UNSCOPED_INFO(c.name + ": and the end line follows the closer");
+            UNSCOPED_INFO("and the end line follows the closer");
             REQUIRE(asset.substr(end + level + 2, 24) ==
                           std::string("\n--end_unprocessed_text\n"));
 
             std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(asset);
-            UNSCOPED_INFO(c.name + ": reads back");
             REQUIRE(back.has_value());
-            UNSCOPED_INFO(c.name + ": the source");
             REQUIRE(back->source == c.source);
-            UNSCOPED_INFO(c.name + ": the expanded code");
             REQUIRE(back->expanded == envelope.expanded);
         }
     }
@@ -338,9 +313,9 @@ namespace
                 from = nl + 1;
             }
             const int at = envelope.codeLine();
-            UNSCOPED_INFO(std::string(lua ? "SLua" : "LSL") + ": the code's first line there");
+            CAPTURE(lua);
             REQUIRE(lines[static_cast<size_t>(at)] == std::string("first"));
-            UNSCOPED_INFO(std::string(lua ? "SLua" : "LSL") + ": after the source's lines and the envelope's own");
+            UNSCOPED_INFO("after the source's lines and the envelope's own");
             REQUIRE(at == 9);
         }
     }
@@ -361,7 +336,7 @@ namespace
                     envelope.compileTarget  = target;
                     envelope.programVersion = "Alchemy Test 1.2.3";
                     envelope.lastCompiled   = "2026-09-27T12:00:00Z";
-                    UNSCOPED_INFO(std::string(lua ? "SLua " : "LSL ") + "'" + source + "' for '" + target + "'");
+                    CAPTURE(lua, source, target);
                     REQUIRE(envelope.wrappedSize() ==
                                   envelope.wrap().size());
                 }
@@ -380,24 +355,20 @@ namespace
                           lsl.header + lsl.expanded);
         for (const bool lua : { false, true })
         {
-            const std::string               name    = lua ? "SLua: " : "LSL: ";
+            CAPTURE(lua);
             const ALScriptEnvelope          written = alscriptenvelope_data::made(lua, true);
             std::optional<ALScriptEnvelope> back    = ALScriptEnvelope::parse(written.wrap());
-            UNSCOPED_INFO(name + "reads back");
             REQUIRE(back.has_value());
-            UNSCOPED_INFO(name + "the header");
             REQUIRE(back->header == written.header);
-            UNSCOPED_INFO(name + "the code alone");
+            UNSCOPED_INFO("the code alone");
             REQUIRE(back->expanded == written.expanded);
-            UNSCOPED_INFO(name + "the source");
             REQUIRE(back->source == written.source);
-            UNSCOPED_INFO(name + "the target");
             REQUIRE(back->compileTarget == written.compileTarget);
-            UNSCOPED_INFO(name + "written again, the same");
+            UNSCOPED_INFO("written again, the same");
             REQUIRE(back->wrap() == written.wrap());
-            UNSCOPED_INFO(name + "its size worked out");
+            UNSCOPED_INFO("its size worked out");
             REQUIRE(written.wrappedSize() == written.wrap().size());
-            UNSCOPED_INFO(name + "and from the fields");
+            UNSCOPED_INFO("and from the fields");
             REQUIRE(ALScriptEnvelope::wrappedSize(lua, written.source, written.expanded, written.compileTarget, written.programVersion,
                                                         written.lastCompiled, written.header) ==
                           written.wrap().size());
@@ -406,13 +377,10 @@ namespace
             // with nothing added.
             const ALScriptEnvelope plain = alscriptenvelope_data::made(lua, false);
             back                         = ALScriptEnvelope::parse(plain.wrap());
-            UNSCOPED_INFO(name + "none: reads back");
             REQUIRE(back.has_value());
-            UNSCOPED_INFO(name + "none: no header");
             REQUIRE(back->header == std::string());
-            UNSCOPED_INFO(name + "none: the code");
             REQUIRE(back->expanded == plain.expanded);
-            UNSCOPED_INFO(name + "none: the header's bytes and no more");
+            UNSCOPED_INFO("without one: the header's bytes and no more");
             REQUIRE(plain.wrap().size() + written.header.size() == written.wrap().size());
         }
 
@@ -431,7 +399,7 @@ namespace
         {
             INFO("untargeted: the header taken");
             REQUIRE(back);
-            REQUIRE(back->header == untargeted.header);
+            CHECK(back->header == untargeted.header);
             CHECK(back->expanded == untargeted.expanded);
         }
 
@@ -443,7 +411,7 @@ namespace
         {
             INFO("the plugin's taken");
             REQUIRE(back);
-            REQUIRE(back->header == theirs.header);
+            CHECK(back->header == theirs.header);
             CHECK(back->expanded == theirs.expanded);
         }
 
@@ -455,7 +423,7 @@ namespace
         {
             INFO("one header taken");
             REQUIRE(back);
-            REQUIRE(back->header == twice.header);
+            CHECK(back->header == twice.header);
             CHECK(back->expanded == twice.expanded);
         }
     }
@@ -464,13 +432,12 @@ namespace
     {
         for (const bool lua : { false, true })
         {
-            const std::string      name    = lua ? "SLua: " : "LSL: ";
+            CAPTURE(lua);
             const ALScriptEnvelope without = alscriptenvelope_data::made(lua, false);
             const ALScriptEnvelope with    = alscriptenvelope_data::made(lua, true);
             const int              lines   = static_cast<int>(std::count(with.header.begin(), with.header.end(), '\n'));
-            UNSCOPED_INFO(name + "the header's lines");
             REQUIRE(lines == 5);
-            UNSCOPED_INFO(name + "the code begins that much later");
+            UNSCOPED_INFO("the code begins that much later");
             REQUIRE(with.codeLine() == without.codeLine() + lines);
 
             // The asset's line codeLine() + n is the code's line n either
@@ -480,16 +447,16 @@ namespace
             const std::vector<std::string> code   = alscriptenvelope_data::linesOf(with.expanded);
             for (size_t i = 0; i < code.size(); ++i)
             {
-                UNSCOPED_INFO(name + "code line " + std::to_string(i) + " without");
+                CAPTURE(i);
+                UNSCOPED_INFO("without a header");
                 REQUIRE(plain[static_cast<size_t>(without.codeLine()) + i] == code[i]);
-                UNSCOPED_INFO(name + "code line " + std::to_string(i) + " with");
+                UNSCOPED_INFO("with a header");
                 REQUIRE(headed[static_cast<size_t>(with.codeLine()) + i] == code[i]);
             }
             // And read back from the asset, as a save hears of it.
             const std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(with.wrap());
-            UNSCOPED_INFO(name + "reads back");
             REQUIRE(back.has_value());
-            UNSCOPED_INFO(name + "read back, the same line");
+            UNSCOPED_INFO("read back, the same line");
             REQUIRE(back->codeLine() == with.codeLine());
         }
     }
@@ -498,7 +465,7 @@ namespace
     {
         for (const bool lua : { false, true })
         {
-            const std::string      name  = lua ? "SLua: " : "LSL: ";
+            CAPTURE(lua);
             const ALScriptEnvelope sent  = alscriptenvelope_data::made(lua, true);
             ALScriptEnvelope       later = alscriptenvelope_data::made(lua, true);
             ALUploadHeader         again = *ALUploadHeader::parse(later.header, lua);
@@ -507,27 +474,24 @@ namespace
 
             const std::optional<ALScriptEnvelope> held = ALScriptEnvelope::parse(sent.wrap());
             const std::optional<ALScriptEnvelope> came = ALScriptEnvelope::parse(later.wrap());
-            {
-                INFO(name + "both read");
-                REQUIRE(held);
-                REQUIRE(came);
-            }
-            UNSCOPED_INFO(name + "the headers apart");
+            REQUIRE(held);
+            REQUIRE(came);
+            UNSCOPED_INFO("the headers apart");
             REQUIRE(held->header != came->header);
             // What the bridge holds up to tell an edit of the compiled half:
             // the code the same, whenever it went up.
-            UNSCOPED_INFO(name + "the code the same");
+            UNSCOPED_INFO("the code the same");
             REQUIRE(held->expanded == came->expanded);
-            UNSCOPED_INFO(name + "compiled from the expansion");
+            UNSCOPED_INFO("compiled from the expansion");
             REQUIRE(ALScriptEnvelope::compiledFrom(sent.expanded, came->expanded, lua));
             // Even left in, a header is comments, which it passes over.
-            UNSCOPED_INFO(name + "a header in the code passed over");
+            UNSCOPED_INFO("a header in the code passed over");
             REQUIRE(ALScriptEnvelope::compiledFrom(sent.expanded, sent.header + sent.expanded, lua));
-            UNSCOPED_INFO(name + "the source told as it was");
+            UNSCOPED_INFO("the source told as it was");
             REQUIRE(ALScriptEnvelope::comparable(came->source, lua, true, false));
             // The hash is of what was sent, the header aside: worked out
             // again from the halves read back, it is what the header says.
-            UNSCOPED_INFO(name + "the hash again");
+            UNSCOPED_INFO("the hash again");
             REQUIRE(ALUploadHeader::hashOf(came->compileTarget, came->source, came->expanded) ==
                           ALUploadHeader::parse(came->header, lua)->hash);
         }

@@ -109,7 +109,6 @@ namespace
         index.changed(id(3), std::nullopt);
         std::map<LLUUID, std::string> seen;
         index.forEach([&seen](const LLUUID& item, const std::string& name) { UNSCOPED_INFO("once each"); REQUIRE(seen.emplace(item, name).second); });
-        UNSCOPED_INFO("what is listed");
         REQUIRE(seen.size() == size_t(2));
         {
             INFO("by its name now");

@@ -60,45 +60,30 @@ namespace
         CHECK(queue.limit() == size_t(4));
         for (const char* key : { "a", "b", "c", "d" })
         {
-            UNSCOPED_INFO(std::string("starts: ") + key);
+            CAPTURE(key);
             REQUIRE(queue.ask(key, Send::Derived));
-            {
-                INFO(std::string("is underway: ") + key);
-                REQUIRE(queue.underway(key));
-                REQUIRE_FALSE(queue.waiting(key));
-            }
+            REQUIRE(queue.underway(key));
+            REQUIRE_FALSE(queue.waiting(key));
         }
-        UNSCOPED_INFO("four busy");
         CHECK(queue.busy() == size_t(4));
         UNSCOPED_INFO("a fifth waits");
         CHECK_FALSE(queue.ask("e", Send::Derived));
         UNSCOPED_INFO("a sixth too");
         CHECK_FALSE(queue.ask("f", Send::Direct));
-        {
-            INFO("waiting, not underway");
-            CHECK(queue.waiting("e"));
-            CHECK_FALSE(queue.underway("e"));
-        }
-        UNSCOPED_INFO("still four busy");
+        CHECK(queue.waiting("e"));
+        CHECK_FALSE(queue.underway("e"));
         CHECK(queue.busy() == size_t(4));
 
         UNSCOPED_INFO("one ends, the first waiting starts");
         CHECK(almasterqueue_data::started(queue.finished("c")) == std::string("e*"));
-        {
-            INFO("the one ended is not underway");
-            CHECK_FALSE(queue.underway("c"));
-            CHECK_FALSE(queue.waiting("c"));
-        }
-        {
-            INFO("the one started is");
-            CHECK(queue.underway("e"));
-            CHECK_FALSE(queue.waiting("e"));
-        }
+        CHECK_FALSE(queue.underway("c"));
+        CHECK_FALSE(queue.waiting("c"));
+        CHECK(queue.underway("e"));
+        CHECK_FALSE(queue.waiting("e"));
         UNSCOPED_INFO("then the next");
         CHECK(almasterqueue_data::started(queue.finished("a")) == std::string("f"));
         UNSCOPED_INFO("then nothing waits");
         CHECK(almasterqueue_data::started(queue.finished("b")) == std::string());
-        UNSCOPED_INFO("three busy");
         CHECK(queue.busy() == size_t(3));
         UNSCOPED_INFO("one asked now starts at once");
         CHECK(queue.ask("g", Send::Derived));
@@ -112,7 +97,6 @@ namespace
     {
         using Send = almasterqueue_data::Send;
         ALMasterQueue queue;
-        UNSCOPED_INFO("starts");
         REQUIRE(queue.ask("a", Send::Direct));
         UNSCOPED_INFO("asked again, waits");
         CHECK_FALSE(queue.ask("a", Send::Direct));
@@ -134,11 +118,8 @@ namespace
         }
         UNSCOPED_INFO("ended: nothing more");
         CHECK(almasterqueue_data::started(queue.finished("a")) == std::string());
-        {
-            INFO("and gone");
-            CHECK_FALSE(queue.underway("a"));
-            CHECK(queue.busy() == 0);
-        }
+        CHECK_FALSE(queue.underway("a"));
+        CHECK(queue.busy() == 0);
     }
 
     TEST_CASE_METHOD(almasterqueue_data, "almasterqueue: a send asked while it waits stays in its place", "[almasterqueue]")
@@ -207,11 +188,8 @@ namespace
         queue.ask("a", Send::Direct);
         UNSCOPED_INFO("a ends, the first waiting goes, not a");
         CHECK(almasterqueue_data::started(queue.finished("a")) == std::string("e*"));
-        {
-            INFO("a waits");
-            CHECK(queue.waiting("a"));
-            CHECK_FALSE(queue.underway("a"));
-        }
+        CHECK(queue.waiting("a"));
+        CHECK_FALSE(queue.underway("a"));
         UNSCOPED_INFO("then f");
         CHECK(almasterqueue_data::started(queue.finished("b")) == std::string("f*"));
         UNSCOPED_INFO("then a, as it was asked again");
@@ -271,7 +249,6 @@ namespace
             UNSCOPED_INFO("never more than four");
             REQUIRE(queue.busy() <= 4);
         }
-        UNSCOPED_INFO("four started");
         REQUIRE(underway.size() == size_t(4));
         while (!underway.empty())
         {
@@ -300,12 +277,9 @@ namespace
         CHECK_FALSE(none.ask("b", Send::Derived));
 
         none.clear();
-        {
-            INFO("cleared");
-            CHECK_FALSE(none.underway("a"));
-            CHECK_FALSE(none.waiting("b"));
-            CHECK(none.busy() == 0);
-        }
+        CHECK_FALSE(none.underway("a"));
+        CHECK_FALSE(none.waiting("b"));
+        CHECK(none.busy() == 0);
         UNSCOPED_INFO("and starts afresh");
         CHECK(none.ask("b", Send::Derived));
         UNSCOPED_INFO("with nothing behind it");

@@ -139,12 +139,8 @@ namespace
         CHECK(loaded);
         open("a", true);
         ALScriptReferences refs = service.references(SCRIPT_A, 5, 12); // `twice` in `util.twice(2)`
-        {
-            INFO("found");
-            REQUIRE(refs.found);
-            CHECK(refs.name == "twice");
-        }
-        UNSCOPED_INFO(llformat("a function, not kind %d", (int)refs.kind));
+        REQUIRE(refs.found);
+        CHECK(refs.name == "twice");
         CHECK(refs.kind == ALScriptSymbolKind::Function);
         UNSCOPED_INFO("declared in the module");
         CHECK(refs.definitionFile == std::string(UTIL));
@@ -168,8 +164,7 @@ namespace
 
         refs = service.references(SCRIPT_A, 6, 12); // `limit`, assigned
         UNSCOPED_INFO("a field assigned: declared where it is assigned");
-        CHECK(refs.definitionFile + "@" + where(refs.definition) ==
-                      std::string(UTIL) + "@6:2");
+        CHECK(refs.definitionFile + "@" + where(refs.definition) == std::string(UTIL) + "@6:2");
         refs = service.references(SCRIPT_A, 5, 29); // `double`, a module that requires the other
         UNSCOPED_INFO("each module its own key");
         CHECK(refs.definitionFile + "@" + where(refs.definition) == std::string(SHAPES) + "@2:11");
@@ -196,18 +191,13 @@ namespace
         CHECK(loaded);
         open("a", true);
         const ALScriptReferences refs = service.references(SCRIPT_A, 4, 15); // `Point` in `util.Point`
-        {
-            INFO("found");
-            REQUIRE(refs.found);
-            CHECK(refs.name == "Point");
-        }
-        UNSCOPED_INFO("a type");
+        REQUIRE(refs.found);
+        CHECK(refs.name == "Point");
         CHECK(refs.kind == ALScriptSymbolKind::Type);
         UNSCOPED_INFO("declared in the module");
         CHECK(refs.definitionFile + "@" + where(refs.definition) == std::string(UTIL) + "@2:12");
         UNSCOPED_INFO("each place: the script's, the module's");
         CHECK(placesOf(refs) == std::string("4:14 ") + UTIL + "@2:12 " + UTIL + "@7:21");
-        UNSCOPED_INFO("renamable");
         CHECK(refs.renamable);
 
         // The local the module was required as is named in a type's prefix
@@ -225,20 +215,16 @@ namespace
         open("a", true);
         ALScriptReferences refs = service.references(SCRIPT_A, 5, 12);
         UNSCOPED_INFO("the script's, the module's own, and the other module's");
-        CHECK(placesOf(refs) ==
-                      std::string("5:11 ") + UTIL + "@3:11 " + SHAPES + "@3:16");
+        CHECK(placesOf(refs) == std::string("5:11 ") + UTIL + "@3:11 " + SHAPES + "@3:16");
         refs = service.references(SCRIPT_A, 6, 12);
         UNSCOPED_INFO("an assigned one the same");
         CHECK(placesOf(refs) == std::string("6:11 ") + UTIL + "@6:2 " + SHAPES + "@3:32");
 
         // The script's own table's field of the same name: the script's alone.
         refs = service.references(SCRIPT_A, 5, 46);
-        {
-            INFO("found");
-            REQUIRE(refs.found);
-            CHECK(refs.name == "twice");
-            REQUIRE(refs.definitionFile.empty());
-        }
+        REQUIRE(refs.found);
+        CHECK(refs.name == "twice");
+        REQUIRE(refs.definitionFile.empty());
         UNSCOPED_INFO("declared in the script's constructor");
         CHECK(where(refs.definition) == std::string("3:16"));
         UNSCOPED_INFO("and used once; none of the module's");
@@ -275,18 +261,13 @@ namespace
             CHECK(from_module.definitionFile == UTIL);
         }
         UNSCOPED_INFO("the script's use, through the require, and the module's declaration");
-        CHECK(placesOf(from_module) ==
-                      std::string("1:11 ") + UTIL + "@3:11");
+        CHECK(placesOf(from_module) == std::string("1:11 ") + UTIL + "@3:11");
         // A module's local is its own alone.
         const ALScriptReferences local = service.references(SCRIPT_B, 1, 6, UTIL); // `M` in `local M = {}`
-        {
-            INFO("found");
-            REQUIRE(local.found);
-            CHECK(local.name == "M");
-        }
+        REQUIRE(local.found);
+        CHECK(local.name == "M");
         UNSCOPED_INFO("the module's places alone");
-        CHECK(placesOf(local) ==
-                      std::string(UTIL) + "@1:6 " + UTIL + "@3:9 " + UTIL + "@6:0 " + UTIL + "@7:9 " + UTIL + "@10:7");
+        CHECK(placesOf(local) == std::string(UTIL) + "@1:6 " + UTIL + "@3:9 " + UTIL + "@6:0 " + UTIL + "@7:9 " + UTIL + "@10:7");
         service.setDocument("");
     }
 
@@ -296,7 +277,6 @@ namespace
         CHECK(loaded);
         open("a", true);
         ALScriptHover hover = service.hover(SCRIPT_A, 4, 15); // `Point` in `util.Point`
-        UNSCOPED_INFO("found");
         REQUIRE(hover.found);
         {
             INFO("the module's, by its name and fields: " + hover.label);
@@ -304,8 +284,7 @@ namespace
             REQUIRE(hover.label.find("x: number") != std::string::npos);
         }
         UNSCOPED_INFO("declared in the module");
-        CHECK(hover.definitionFile + "@" + llformat("%d:%d", hover.definitionLine, hover.definitionColumn) ==
-                      std::string(UTIL) + "@2:12");
+        CHECK(hover.definitionFile + "@" + llformat("%d:%d", hover.definitionLine, hover.definitionColumn) == std::string(UTIL) + "@2:12");
 
         const std::string own = "--!strict\n"                                   // 0
                                 "type Pair<T> = { first: T, second: T }\n"      // 1
@@ -344,27 +323,20 @@ namespace
                                  "print(t.name, t[\"name\"], t['size'])\n";     // 3
         open("keys", false);
         ALScriptReferences refs = service.references(text, 2, 4); // `size` in `t["size"]`
-        {
-            INFO("found");
-            REQUIRE(refs.found);
-            CHECK(refs.name == "size");
-        }
+        REQUIRE(refs.found);
+        CHECK(refs.name == "size");
         UNSCOPED_INFO("each place: the record's key, the strings' insides, the name");
         CHECK(placesOf(refs) == std::string("1:12 2:3 2:14 3:28"));
         UNSCOPED_INFO("declared by the record");
         CHECK(where(refs.definition) == std::string("1:12"));
-        {
-            INFO("renamable");
-            CHECK(refs.hasDefinition);
-            CHECK(refs.renamable);
-        }
+        CHECK(refs.hasDefinition);
+        CHECK(refs.renamable);
 
         refs = service.references(text, 3, 9); // `name` in `t.name`
         UNSCOPED_INFO("a key in brackets declares it");
         CHECK(placesOf(refs) == std::string("1:24 3:8 3:17"));
         UNSCOPED_INFO("there, inside its quotes");
         CHECK(where(refs.definition) == std::string("1:24"));
-        UNSCOPED_INFO("renamable");
         CHECK(refs.renamable);
         UNSCOPED_INFO("asked at that key: the same");
         CHECK(placesOf(service.references(text, 1, 25)) == std::string("1:24 3:8 3:17"));
@@ -388,18 +360,12 @@ namespace
                                     "print(a:deposit(5))\n";                         // 10
         open("account", false);
         ALScriptReferences refs = service.references(account, 6, 18); // `deposit` in `function Account:deposit`
-        {
-            INFO("found");
-            REQUIRE(refs.found);
-            CHECK(refs.name == "deposit");
-        }
+        REQUIRE(refs.found);
+        CHECK(refs.name == "deposit");
         UNSCOPED_INFO("the declaration and the object's call");
         CHECK(placesOf(refs) == std::string("6:17 10:8"));
-        {
-            INFO("renamable");
-            CHECK(refs.hasDefinition);
-            CHECK(refs.renamable);
-        }
+        CHECK(refs.hasDefinition);
+        CHECK(refs.renamable);
         refs = service.references(account, 10, 9); // `deposit` in `a:deposit(5)`
         UNSCOPED_INFO("from the call: the same");
         CHECK(placesOf(refs) == std::string("6:17 10:8"));
@@ -415,11 +381,8 @@ namespace
                                   "print(Base.greet(), o.greet)\n";                                         // 6
         open("proxy", false);
         refs = service.references(proxy, 2, 15); // `greet` in `function Base.greet`
-        {
-            INFO("found, and declared");
-            REQUIRE(refs.found);
-            CHECK(refs.hasDefinition);
-        }
+        REQUIRE(refs.found);
+        CHECK(refs.hasDefinition);
         UNSCOPED_INFO("an object's field of the name, its __index a function: not to rename");
         CHECK_FALSE(refs.renamable);
         service.setDocument("");

@@ -35,16 +35,11 @@ namespace
         const ALScriptMessages::Place place = ALScriptMessages::readDiagnostic("(12, 4) : ERROR : Syntax error", false);
         UNSCOPED_INFO("the line as it came");
         CHECK(place.line == 12);
-        UNSCOPED_INFO("the column too");
         CHECK(place.column == 4);
-        UNSCOPED_INFO("a column was given");
         CHECK(place.hasColumn);
-        UNSCOPED_INFO("the level");
         CHECK(place.level == std::string("ERROR"));
-        UNSCOPED_INFO("the words");
         CHECK(place.message == std::string("Syntax error"));
         const ALScriptMessages::Place warned = ALScriptMessages::readDiagnostic("(3, 0) : WARNING : Unused variable x", false);
-        UNSCOPED_INFO("a warning says so");
         CHECK(warned.level == std::string("WARNING"));
         // Anything else is an error with no place: "Math Error" comes so.
         const ALScriptMessages::Place bare = ALScriptMessages::readDiagnostic("Math Error", false);
@@ -67,14 +62,11 @@ namespace
         const ALScriptMessages::Place place = ALScriptMessages::readDiagnostic("script:14: unexpected symbol near 'end'", true);
         UNSCOPED_INFO("one off the line");
         CHECK(place.line == 13);
-        UNSCOPED_INFO("no column");
         CHECK_FALSE(place.hasColumn);
-        UNSCOPED_INFO("an error");
         CHECK(place.level == std::string("ERROR"));
         UNSCOPED_INFO("the words past the colon");
         CHECK(place.message == std::string("unexpected symbol near 'end'"));
         // Line one stays line zero rather than going negative.
-        UNSCOPED_INFO("the first line");
         CHECK(ALScriptMessages::readDiagnostic("x:1: bad", true).line == 0);
         // A line of neither form is no place: the whole is the words.
         const ALScriptMessages::Place other = ALScriptMessages::readDiagnostic("Math Error", true);
@@ -93,7 +85,6 @@ namespace
         errors.append("(1, 2) : ERROR : first");
         errors.append("(3, 4) : WARNING : second");
         const std::vector<ALScriptMessages::Place> places = ALScriptMessages::readDiagnostics(errors, false);
-        UNSCOPED_INFO("both");
         REQUIRE(places.size() == size_t(2));
         UNSCOPED_INFO("in order");
         CHECK(places[1].message == std::string("second"));
@@ -116,9 +107,7 @@ namespace
     TEST_CASE("alscriptmessages: a run-time error's header names the object and script and marks what follows", "[alscriptmessages]")
     {
         ALScriptMessages::Header named;
-        UNSCOPED_INFO("a header");
         REQUIRE(ALScriptMessages::readRuntimeHeader("Object [script:My Script] Script run-time error", named));
-        UNSCOPED_INFO("the object");
         CHECK(named.object == std::string("Object"));
         UNSCOPED_INFO("the script, spaces and all");
         CHECK(named.script == std::string("My Script"));
@@ -143,14 +132,12 @@ namespace
         CHECK(where.line == 6);
         UNSCOPED_INFO("no column");
         CHECK(where.column == -1);
-        UNSCOPED_INFO("the words");
         CHECK(where.message == std::string("attempt to index nil"));
         const std::vector<std::string> lsl = { "Object [script:s] Script run-time error", "(5, 2) : ERROR : Stack-Heap Collision" };
         UNSCOPED_INFO("LSL's");
         CHECK(ALScriptMessages::readRuntimeLocation(lsl, false, where));
         UNSCOPED_INFO("the line as it came");
         CHECK(where.line == 5);
-        UNSCOPED_INFO("and the column");
         CHECK(where.column == 2);
         UNSCOPED_INFO("the words past the level");
         CHECK(where.message == std::string("Stack-Heap Collision"));
@@ -169,7 +156,6 @@ namespace
         ALScriptMessages::Frame frame;
         UNSCOPED_INFO("a bare frame");
         REQUIRE(ALScriptMessages::readStackFrame("s:7", frame));
-        UNSCOPED_INFO("its chunk");
         CHECK(frame.chunk == std::string("s"));
         UNSCOPED_INFO("its line, one off");
         CHECK(frame.line == 6);
@@ -177,13 +163,11 @@ namespace
         CHECK(ALScriptMessages::readStackFrame("  My Script:12 function counter", frame));
         UNSCOPED_INFO("a script's name, spaces and all");
         CHECK(frame.chunk == std::string("My Script"));
-        UNSCOPED_INFO("that line");
         CHECK(frame.line == 11);
         UNSCOPED_INFO("as Lua quotes a chunk");
         CHECK(ALScriptMessages::readStackFrame("[string \"My Script\"]:30: in function 'tick'", frame));
         UNSCOPED_INFO("the quoted name, spaces and all");
         CHECK(frame.chunk == std::string("My Script"));
-        UNSCOPED_INFO("and its line");
         CHECK(frame.line == 29);
         UNSCOPED_INFO("the heading is no frame");
         CHECK_FALSE(ALScriptMessages::readStackFrame("stack traceback:", frame));
@@ -211,16 +195,11 @@ namespace
                                                 "... (+4 frames)",
                                                 "lua_script:30" };
         ALScriptMessages::Header named;
-        UNSCOPED_INFO("the header");
         REQUIRE(ALScriptMessages::readRuntimeHeader(said[0], named));
-        UNSCOPED_INFO("names the script");
         CHECK(named.script == std::string("Counter"));
         ALScriptMessages::Location where;
-        UNSCOPED_INFO("where");
         REQUIRE(ALScriptMessages::readRuntimeLocation(said, true, where));
-        UNSCOPED_INFO("its line");
         CHECK(where.line == 11);
-        UNSCOPED_INFO("its words");
         CHECK(where.message == std::string("attempt to index nil with 'field'"));
         std::vector<S32> frames;
         for (size_t i = 1; i < said.size(); ++i)
@@ -246,12 +225,12 @@ namespace
         for (const char* goes_on : { "lua_script:12: attempt to index nil with 'field'", "stack traceback:", "[C] function error",
                                      "lua_script:12 function tick", "  lua_script:30", "... (+4 frames)", "(12, 3) : ERROR : Stack-Heap Collision" })
         {
-            UNSCOPED_INFO(std::string("goes on: ") + goes_on);
+            CAPTURE(goes_on);
             REQUIRE(ALScriptMessages::continuesRuntimeError(goes_on));
         }
         for (const char* besides : { "hello", "Counter: 12 visitors", "", "   ", "Object [script:Counter] Script run-time error" })
         {
-            UNSCOPED_INFO(std::string("its own: ") + besides);
+            CAPTURE(besides);
             REQUIRE_FALSE(ALScriptMessages::continuesRuntimeError(besides));
         }
     }
@@ -282,6 +261,7 @@ namespace
         const std::string said = "Line 320: WARN: Declaration of `activeRequest' in this scope shadows previous declaration at (345, 1)";
         for (const bool lua : { false, true })
         {
+            CAPTURE(lua);
             const ALScriptMessages::Place place = ALScriptMessages::readDiagnostic(said, lua);
             {
                 INFO("a line named");
@@ -290,7 +270,6 @@ namespace
             }
             UNSCOPED_INFO("one off the line");
             REQUIRE(place.line == 319);
-            UNSCOPED_INFO("its level");
             REQUIRE(place.level == std::string("WARN"));
             UNSCOPED_INFO("the words past the level");
             REQUIRE(place.message == std::string("Declaration of `activeRequest' in this scope shadows previous declaration at (345, 1)"));

@@ -96,11 +96,8 @@ namespace
 
         ALDiskIncludes blessed;
         blessed.bless(s.at("lib"));
-        {
-            INFO("blessed");
-            CHECK(blessed.blessed());
-            REQUIRE(blessed.folders().size() == 1);
-        }
+        CHECK(blessed.blessed());
+        REQUIRE(blessed.folders().size() == 1);
         UNSCOPED_INFO("a file under it is read, as it stands");
         CHECK(blessed.admits(lib).value_or("") == lib);
         UNSCOPED_INFO("a path from a root elsewhere is not");
@@ -204,7 +201,6 @@ namespace
         s.write("project/.lslrc", "{\"include\": [\"../lib\", \"shared/\"]}");
         s.write("project/src/deep/main.lsl", "x\n");
         const std::vector<std::string> listed = ALDiskIncludes::lslrcFolders(s.at("project"));
-        UNSCOPED_INFO("both");
         REQUIRE(listed.size() == size_t(2));
         UNSCOPED_INFO("the one above, from beside the file");
         CHECK(listed[0] == s.at("lib"));
@@ -316,7 +312,7 @@ namespace
         // A link inside that leads outside is where it leads.
         std::error_code ec;
         fs::create_directory_symlink(s.under("secret"), s.under("project/escape"), ec);
-        UNSCOPED_INFO("linked: " + ec.message());
+        UNSCOPED_INFO("linked: " << ec.message());
         REQUIRE_FALSE(ec);
         UNSCOPED_INFO("not through a link out");
         CHECK_FALSE(none.mayFromConfig(s.at("project/escape"), s.at("project")));
@@ -397,7 +393,7 @@ namespace
         std::error_code ec;
         fs::remove(s.under("first/.luaurc"), ec);
         fs::create_symlink(s.under("elsewhere/.luaurc"), s.under("first/.luaurc"), ec);
-        UNSCOPED_INFO("linked: " + ec.message());
+        UNSCOPED_INFO("linked: " << ec.message());
         REQUIRE_FALSE(ec);
         UNSCOPED_INFO("not through a link out");
         CHECK(blessed.atTop(".luaurc") == files{ third, second });
@@ -459,7 +455,6 @@ namespace
         CHECK(ALDiskIncludes::extensionOf("defs.LSLH", ALDiskIncludes::scriptExtensions(false)) == size_t(5));
         UNSCOPED_INFO("past a name of its own");
         CHECK(ALDiskIncludes::extensionOf(".luau", lua) == size_t(0));
-        UNSCOPED_INFO("none");
         CHECK(ALDiskIncludes::extensionOf("notes.txt", lua) == size_t(0));
         UNSCOPED_INFO("a require of one in any case is that file");
         CHECK(ALDiskIncludes::namesFor("Util.LUAU", true, true) ==

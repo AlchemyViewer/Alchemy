@@ -64,11 +64,8 @@ namespace
         REQUIRE(burst.release(100.0).empty());
 
         burst.changed("/s/door.lsl", 100.0);
-        {
-            INFO("it waits");
-            CHECK(burst.waiting("/s/door.lsl"));
-            REQUIRE(burst.size() == 1);
-        }
+        CHECK(burst.waiting("/s/door.lsl"));
+        REQUIRE(burst.size() == 1);
         UNSCOPED_INFO("due a second on");
         CHECK(*burst.dueAt() == 101.0);
         {
@@ -76,13 +73,9 @@ namespace
             REQUIRE(burst.release(100.5).empty());
             REQUIRE(burst.release(almasterburst_data::before(101.0)).empty());
         }
-        UNSCOPED_INFO("then");
         CHECK(almasterburst_data::joined(burst.release(101.0)) == std::string("/s/door.lsl"));
-        {
-            INFO("and is gone");
-            REQUIRE(burst.empty());
-            REQUIRE_FALSE(burst.dueAt());
-        }
+        REQUIRE(burst.empty());
+        REQUIRE_FALSE(burst.dueAt());
         UNSCOPED_INFO("not given twice");
         REQUIRE(burst.release(200.0).empty());
 
@@ -113,7 +106,6 @@ namespace
             UNSCOPED_INFO("none while it goes on");
             REQUIRE(burst.release(last).empty());
         }
-        UNSCOPED_INFO("all thirty wait");
         REQUIRE(burst.size() == size_t(30));
         UNSCOPED_INFO("due a second after the last");
         CHECK(*burst.dueAt() == last + 1.0);
@@ -121,11 +113,8 @@ namespace
         REQUIRE(burst.release(almasterburst_data::before(last + 1.0)).empty());
         UNSCOPED_INFO("all of them, in the order heard");
         CHECK(almasterburst_data::joined(burst.release(last + 1.0)) == expected);
-        {
-            INFO("nothing left");
-            REQUIRE(burst.empty());
-            REQUIRE(burst.release(last + 60.0).empty());
-        }
+        REQUIRE(burst.empty());
+        REQUIRE(burst.release(last + 60.0).empty());
     }
 
     TEST_CASE_METHOD(almasterburst_data, "almasterburst: a file rewritten every half-second still goes at the burst's longest", "[almasterburst]")
@@ -218,11 +207,8 @@ namespace
         burst.changed("/s/b.lsl", 0.25);
         burst.forget("/s/a.lsl");
         burst.forget("/s/never.lsl");
-        {
-            INFO("forgotten");
-            CHECK_FALSE(burst.waiting("/s/a.lsl"));
-            REQUIRE(burst.size() == 1);
-        }
+        CHECK_FALSE(burst.waiting("/s/a.lsl"));
+        REQUIRE(burst.size() == 1);
         UNSCOPED_INFO("the rest goes");
         CHECK(almasterburst_data::joined(burst.release(1.25)) == std::string("/s/b.lsl"));
 
@@ -248,12 +234,9 @@ namespace
         burst.changed("/s/a.lsl", 200.0);
         burst.changed("/s/b.lsl", 200.0, 1.5);
         burst.clear();
-        {
-            INFO("cleared");
-            REQUIRE(burst.empty());
-            REQUIRE_FALSE(burst.dueAt());
-            REQUIRE(burst.release(300.0).empty());
-        }
+        REQUIRE(burst.empty());
+        REQUIRE_FALSE(burst.dueAt());
+        REQUIRE(burst.release(300.0).empty());
     }
 
     TEST_CASE_METHOD(almasterburst_data, "almasterburst: Windows paths match in any case and separator and go as last spelled", "[almasterburst]")

@@ -95,8 +95,8 @@ namespace
         lane.put(queued("check a2", "a", true), take);
         {
             INFO("the waiting one taken");
-            REQUIRE(jobs[0]->taken);
-            REQUIRE_FALSE(jobs[0]->stopped);
+            CHECK(jobs[0]->taken);
+            CHECK_FALSE(jobs[0]->stopped);
             CHECK_FALSE(jobs[1]->taken);
         }
         UNSCOPED_INFO("and let go of");
@@ -112,8 +112,8 @@ namespace
         {
             INFO("the running one told to stop");
             REQUIRE(jobs.back()->name == "check x2");
-            REQUIRE(jobs[jobs.size() - 2]->taken);
-            REQUIRE(jobs[jobs.size() - 2]->stopped);
+            CHECK(jobs[jobs.size() - 2]->taken);
+            CHECK(jobs[jobs.size() - 2]->stopped);
         }
         UNSCOPED_INFO("and the later one ran after");
         CHECK(ran.back() == "check x2");

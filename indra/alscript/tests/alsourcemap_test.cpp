@@ -108,8 +108,8 @@ namespace
         CHECK(map.toSource(0, 20000).column == 2999);
         {
             INFO("a line with none: nowhere");
-            REQUIRE_FALSE(map.toSource(1, 0).found());
-            REQUIRE(map.toSource(2, 1).found());
+            CHECK_FALSE(map.toSource(1, 0).found());
+            CHECK(map.toSource(2, 1).found());
         }
     }
 
@@ -149,7 +149,7 @@ namespace
             CHECK(through.toSource(0, 11).column == 1);
         }
         UNSCOPED_INFO("a line the inner has nothing for: dropped");
-        REQUIRE_FALSE(through.toSource(1, 0).found());
+        CHECK_FALSE(through.toSource(1, 0).found());
         ALSourceMap::Loc begin, end;
         {
             INFO("the copied stretches stay verbatim");
@@ -161,17 +161,11 @@ namespace
     TEST_CASE("alsourcemap: a text mapped to itself: every line its own even the last without a newline", "[alsourcemap]")
     {
         const ALSourceMap map = ALSourceMap::identity("one\ntwo three\nlast", "same");
-        {
-            INFO("named");
-            REQUIRE(map.files().size() == 1);
-            CHECK(map.files()[0].name == "same");
-        }
-        {
-            INFO("each line");
-            CHECK(map.toSource(1, 5).line == 1);
-            CHECK(map.toSource(1, 5).column == 5);
-            CHECK(map.toSource(2, 2).line == 2);
-        }
+        REQUIRE(map.files().size() == 1);
+        CHECK(map.files()[0].name == "same");
+        CHECK(map.toSource(1, 5).line == 1);
+        CHECK(map.toSource(1, 5).column == 5);
+        CHECK(map.toSource(2, 2).line == 2);
     }
     TEST_CASE("alsourcemap: a verbatim stretch on a long line: the first segment to reach the column", "[alsourcemap]")
     {

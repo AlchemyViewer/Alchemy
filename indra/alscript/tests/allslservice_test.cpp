@@ -85,7 +85,6 @@ namespace
     {
         UNSCOPED_INFO("builtins load: " + error);
         CHECK(loaded);
-        UNSCOPED_INFO("service says so");
         CHECK(service.hasBuiltins());
     }
 
@@ -121,17 +120,13 @@ namespace
         const ALScriptProblem* problem = coded(problems, "10011");
         UNSCOPED_INFO("the wrong-type error: " + said(problems));
         REQUIRE(problem != nullptr);
-        UNSCOPED_INFO("an error");
         CHECK(problem->severity == ALScriptProblem::Severity::Error);
-        UNSCOPED_INFO("from the checks");
         CHECK(problem->source == ALScriptProblem::Source::Types);
         UNSCOPED_INFO("on the call's line, zero-based");
         CHECK(problem->line == 4);
         // Taken apart by its code, for another language to say: the
         // words in the order the marks have them.
-        UNSCOPED_INFO("the key");
         CHECK(problem->key == std::string("LSLArgumentWrongType"));
-        UNSCOPED_INFO("five words");
         REQUIRE(problem->args.size() == size_t(5));
         UNSCOPED_INFO("the type passed");
         CHECK(problem->args[0] == std::string("string"));
@@ -159,13 +154,10 @@ namespace
         const ALScriptProblem* problem = coded(problems, "20009");
         UNSCOPED_INFO("the unused warning: " + said(problems));
         REQUIRE(problem != nullptr);
-        UNSCOPED_INFO("a warning");
         CHECK(problem->severity == ALScriptProblem::Severity::Warning);
-        UNSCOPED_INFO("from the lint");
         CHECK(problem->source == ALScriptProblem::Source::Lint);
         UNSCOPED_INFO("on the declaration's line");
         CHECK(problem->line == 0);
-        UNSCOPED_INFO("no errors");
         CHECK(errors(problems) == 0);
     }
 
@@ -181,10 +173,8 @@ namespace
             "    }\n"
             "}\n");
         UNSCOPED_INFO("an error: " + said(problems));
-        CHECK(errors(problems) > 0);
-        UNSCOPED_INFO("from the parser");
+        REQUIRE(errors(problems) > 0);
         CHECK(problems.front().source == ALScriptProblem::Source::Parser);
-        UNSCOPED_INFO("on a line past the first");
         CHECK(problems.front().line > 0);
     }
 
@@ -192,11 +182,8 @@ namespace
     {
         ALLSLService bare;
         std::string  why;
-        UNSCOPED_INFO("refused");
         REQUIRE_FALSE(bare.loadBuiltins("/nonexistent/builtins.txt", why));
-        UNSCOPED_INFO("with a reason");
         REQUIRE_FALSE(why.empty());
-        UNSCOPED_INFO("nothing loaded");
         CHECK_FALSE(bare.hasBuiltins());
     }
 
@@ -229,15 +216,10 @@ namespace
             }
             return false;
         };
-        UNSCOPED_INFO("the global");
         CHECK(has("count", ALScriptSymbolKind::Variable, "integer count"));
-        UNSCOPED_INFO("the function");
         CHECK(has("half", ALScriptSymbolKind::Function, "float half(integer n)"));
-        UNSCOPED_INFO("the state");
         CHECK(has("other", ALScriptSymbolKind::State, "state other"));
-        UNSCOPED_INFO("the event's parameter");
         CHECK(has("total", ALScriptSymbolKind::Parameter, "integer total"));
-        UNSCOPED_INFO("the local before");
         CHECK(has("before", ALScriptSymbolKind::Variable, "string before"));
         bool after = false, builtin = false;
         for (const ALScriptCompletion& c : found)
@@ -245,9 +227,7 @@ namespace
             after   = after || c.text == "after";
             builtin = builtin || c.text == "llSay";
         }
-        UNSCOPED_INFO("not the local after");
         CHECK_FALSE(after);
-        UNSCOPED_INFO("not the builtins");
         CHECK_FALSE(builtin);
     }
 
@@ -265,17 +245,11 @@ namespace
             "    }\n"
             "}\n";
         ALScriptHover hover = service.hover(script, 5, 26);  // on `half`
-        UNSCOPED_INFO("found");
         REQUIRE(hover.found);
-        UNSCOPED_INFO("as declared");
         CHECK(hover.label == std::string("float half(integer n)"));
-        {
-            INFO("declared on the first line");
-            CHECK(hover.hasDefinition);
-            CHECK(hover.definitionLine == 0);
-        }
+        CHECK(hover.hasDefinition);
+        CHECK(hover.definitionLine == 0);
         hover = service.hover(script, 5, 10);  // on `llSay`
-        UNSCOPED_INFO("a builtin is found");
         REQUIRE(hover.found);
         UNSCOPED_INFO("as declared: " + hover.label);
         REQUIRE(hover.label.find("llSay(") != std::string::npos);
@@ -283,21 +257,14 @@ namespace
         CHECK_FALSE(hover.hasDefinition);
 
         ALScriptSignature sig = service.signature(script, 5, 15);  // in llSay's first argument
-        UNSCOPED_INFO("in the call");
         REQUIRE(sig.found);
         UNSCOPED_INFO("the builtin's signature: " + sig.label);
         REQUIRE((sig.label.find("llSay(") == 0 || sig.label.find(" llSay(") != std::string::npos));
-        UNSCOPED_INFO("two parameters");
         REQUIRE(sig.parameters.size() == size_t(2));
-        UNSCOPED_INFO("the first");
         CHECK(sig.active == 0);
         sig = service.signature(script, 5, 30);  // just inside half(
-        {
-            INFO("the inner call");
-            REQUIRE(sig.found);
-            CHECK(sig.label == "float half(integer n)");
-        }
-        UNSCOPED_INFO("its only parameter");
+        REQUIRE(sig.found);
+        CHECK(sig.label == "float half(integer n)");
         CHECK(sig.active == 0);
         UNSCOPED_INFO("none at the top");
         REQUIRE_FALSE(service.signature(script, 0, 0).found);
@@ -323,38 +290,25 @@ namespace
             "    state_entry() { state default; }\n"
             "}\n";
         ALScriptReferences refs = service.references(script, 5, 16);  // on the second `count`
-        {
-            INFO("found");
-            REQUIRE(refs.found);
-            CHECK(refs.name == "count");
-        }
-        UNSCOPED_INFO("a variable");
+        REQUIRE(refs.found);
+        CHECK(refs.name == "count");
         CHECK(refs.kind == ALScriptSymbolKind::Variable);
-        {
-            INFO(llformat("declared on the first line, not %d:%d-%d (%d)", refs.definition.line, refs.definition.column, refs.definition.endColumn, (int)refs.hasDefinition));
-            CHECK(refs.hasDefinition);
-            CHECK(refs.definition.line == 0);
-            CHECK(refs.definition.column == 8);
-            CHECK(refs.definition.endColumn == 13);
-        }
-        UNSCOPED_INFO("four places");
+        CHECK(refs.hasDefinition);
+        CHECK(refs.definition.line == 0);
+        CHECK(refs.definition.column == 8);
+        CHECK(refs.definition.endColumn == 13);
         REQUIRE(refs.references.size() == size_t(4));
-        UNSCOPED_INFO("the declaration first");
         CHECK(refs.references[0] == refs.definition);
         {
             INFO("the cast's operand last");
             CHECK(refs.references[3].line == 6);
             CHECK(refs.references[3].column == 25);
         }
-        UNSCOPED_INFO("renamable");
         CHECK(refs.renamable);
 
         refs = service.references(script, 6, 10);  // on llSay
-        {
-            INFO("a builtin is found");
-            REQUIRE(refs.found);
-            CHECK(refs.name == "llSay");
-        }
+        REQUIRE(refs.found);
+        CHECK(refs.name == "llSay");
         {
             INFO("used once, declared nowhere here");
             REQUIRE(refs.references.size() == 1);
@@ -363,40 +317,26 @@ namespace
         }
 
         refs = service.references(script, 7, 15);  // on `other` in `state other;`
-        {
-            INFO("a state is found");
-            REQUIRE(refs.found);
-            CHECK(refs.kind == ALScriptSymbolKind::State);
-        }
-        {
-            INFO("declared where it is");
-            CHECK(refs.hasDefinition);
-            CHECK(refs.definition.line == 10);
-            CHECK(refs.definition.column == 6);
-        }
+        REQUIRE(refs.found);
+        CHECK(refs.kind == ALScriptSymbolKind::State);
+        CHECK(refs.hasDefinition);
+        CHECK(refs.definition.line == 10);
+        CHECK(refs.definition.column == 6);
         UNSCOPED_INFO("the declaration and the change");
         REQUIRE(refs.references.size() == size_t(2));
-        UNSCOPED_INFO("renamable");
         CHECK(refs.renamable);
 
         refs = service.references(script, 12, 26);  // on `default` in `state default;`
-        {
-            INFO("default is found");
-            REQUIRE(refs.found);
-            CHECK(refs.name == "default");
-        }
+        REQUIRE(refs.found);
+        CHECK(refs.name == "default");
         UNSCOPED_INFO("but is not the script's to rename");
         CHECK_FALSE(refs.renamable);
 
         refs = service.references(script, 3, 6);  // on state_entry
-        {
-            INFO("an event is found");
-            REQUIRE(refs.found);
-            CHECK(refs.kind == ALScriptSymbolKind::Event);
-        }
-        UNSCOPED_INFO(llformat("in both states, not %d places", (int)refs.references.size()));
+        REQUIRE(refs.found);
+        CHECK(refs.kind == ALScriptSymbolKind::Event);
+        UNSCOPED_INFO("in both states");
         REQUIRE(refs.references.size() == 2);
-        UNSCOPED_INFO("not renamable");
         CHECK_FALSE(refs.renamable);
     }
 
@@ -420,54 +360,30 @@ namespace
         for (const ALScriptOutlineEntry& e : outline) names += " " + e.name + llformat("@%d", e.depth);
         UNSCOPED_INFO("six entries:" + names);
         REQUIRE(outline.size() == size_t(6));
-        {
-            INFO("the global");
-            CHECK(outline[0].name == "count");
-            CHECK(outline[0].kind == ALScriptSymbolKind::Variable);
-            CHECK(outline[0].detail == "integer count");
-            CHECK(outline[0].depth == 0);
-        }
-        {
-            INFO("the function, as declared");
-            CHECK(outline[1].name == "half");
-            CHECK(outline[1].kind == ALScriptSymbolKind::Function);
-            CHECK(outline[1].detail == "float half(integer n)");
-        }
-        {
-            INFO("its name where it is");
-            CHECK(outline[1].nameSpan.line == 1);
-            CHECK(outline[1].nameSpan.column == 6);
-            CHECK(outline[1].nameSpan.endColumn == 10);
-        }
-        {
-            INFO("default, a state");
-            CHECK(outline[2].name == "default");
-            CHECK(outline[2].kind == ALScriptSymbolKind::State);
-            CHECK(outline[2].depth == 0);
-        }
-        {
-            INFO("spanning its lines");
-            CHECK(outline[2].span.line == 2);
-            CHECK(outline[2].span.endLine == 8);
-        }
-        {
-            INFO("state_entry, one deeper");
-            CHECK(outline[3].name == "state_entry");
-            CHECK(outline[3].kind == ALScriptSymbolKind::Event);
-            CHECK(outline[3].depth == 1);
-        }
-        {
-            INFO("touch_start with its parameter");
-            CHECK(outline[4].name == "touch_start");
-            CHECK(outline[4].detail == "touch_start(integer total)");
-            CHECK(outline[4].span.line == 5);
-            CHECK(outline[4].span.endLine == 7);
-        }
-        {
-            INFO("the other state");
-            CHECK(outline[5].name == "other");
-            CHECK(outline[5].kind == ALScriptSymbolKind::State);
-        }
+        CHECK(outline[0].name == "count");
+        CHECK(outline[0].kind == ALScriptSymbolKind::Variable);
+        CHECK(outline[0].detail == "integer count");
+        CHECK(outline[0].depth == 0);
+        CHECK(outline[1].name == "half");
+        CHECK(outline[1].kind == ALScriptSymbolKind::Function);
+        CHECK(outline[1].detail == "float half(integer n)");
+        CHECK(outline[1].nameSpan.line == 1);
+        CHECK(outline[1].nameSpan.column == 6);
+        CHECK(outline[1].nameSpan.endColumn == 10);
+        CHECK(outline[2].name == "default");
+        CHECK(outline[2].kind == ALScriptSymbolKind::State);
+        CHECK(outline[2].depth == 0);
+        CHECK(outline[2].span.line == 2);
+        CHECK(outline[2].span.endLine == 8);
+        CHECK(outline[3].name == "state_entry");
+        CHECK(outline[3].kind == ALScriptSymbolKind::Event);
+        CHECK(outline[3].depth == 1);
+        CHECK(outline[4].name == "touch_start");
+        CHECK(outline[4].detail == "touch_start(integer total)");
+        CHECK(outline[4].span.line == 5);
+        CHECK(outline[4].span.endLine == 7);
+        CHECK(outline[5].name == "other");
+        CHECK(outline[5].kind == ALScriptSymbolKind::State);
     }
 
     TEST_CASE_METHOD(allslservice_data, "allslservice: semantic tokens tell every name by what it is", "[allslservice]")
@@ -645,16 +561,10 @@ namespace
         // A call not yet closed, the caret after an argument half typed.
         std::string script = head + "        llSay(0, be" + tail;
         ALScriptSignature sig = service.signature(script, 7, 19);
-        {
-            INFO("the call is found");
-            REQUIRE(sig.found);
-            REQUIRE(sig.label.find("llSay(") != std::string::npos);
-        }
-        UNSCOPED_INFO("at its second parameter");
+        REQUIRE(sig.found);
+        REQUIRE(sig.label.find("llSay(") != std::string::npos);
         CHECK(sig.active == 1);
-        UNSCOPED_INFO("the text does not parse");
         CHECK_FALSE(service.parsed());
-        UNSCOPED_INFO("but was understood");
         CHECK(service.understood());
         const std::string in_scope = names(script, 7, 17);
         UNSCOPED_INFO("the local before, in scope:" + in_scope);
@@ -666,14 +576,10 @@ namespace
 
         // The bracket just typed, and a comma just typed.
         sig = service.signature(head + "        llSay(" + tail, 7, 14);
-        UNSCOPED_INFO("just opened");
         REQUIRE(sig.found);
-        UNSCOPED_INFO("at the first parameter");
         CHECK(sig.active == 0);
         sig = service.signature(head + "        llSay(0," + tail, 7, 16);
-        UNSCOPED_INFO("after the comma");
         REQUIRE(sig.found);
-        UNSCOPED_INFO("at the second parameter");
         CHECK(sig.active == 1);
         sig = service.signature(head + "        llSay(0, \"hel" + tail, 7, 20);
         {
@@ -682,22 +588,16 @@ namespace
             CHECK(sig.active == 1);
         }
         sig = service.signature(head + "        half(" + tail, 7, 13);
-        {
-            INFO("the script's own function");
-            REQUIRE(sig.found);
-            CHECK(sig.label == "float half(integer n)");
-        }
+        REQUIRE(sig.found);
+        CHECK(sig.label == "float half(integer n)");
 
         // A name alone, and a statement without its semicolon.
-        UNSCOPED_INFO("a word alone");
         REQUIRE(names(head + "        bef" + tail, 7, 8).find(" before ") != std::string::npos);
-        UNSCOPED_INFO("no semicolon");
         REQUIRE(names(head + "        llSay(0, before)" + tail, 7, 17).find(" before ") != std::string::npos);
 
         // What the check's other questions answer of a text that does not
         // parse: the rest of it, rather than nothing.
         script = head + "        llSay(0, be" + tail;
-        UNSCOPED_INFO("the outline");
         REQUIRE(service.outline(script).size() == 4);
         const std::vector<ALScriptSemanticToken> tokens = service.semanticTokens(script);
         bool before_named = false;
@@ -707,7 +607,6 @@ namespace
         }
         UNSCOPED_INFO("the names before the break");
         CHECK(before_named);
-        UNSCOPED_INFO("the hints");
         REQUIRE_FALSE(service.inlayHints(head + "        llSay(0, \"x\");\n        llOwnerSay(" + tail, true).empty());
 
         // A function being declared at the top, before the states.
@@ -718,7 +617,6 @@ namespace
             REQUIRE(hover.found);
             CHECK(hover.label == "integer count");
         }
-        UNSCOPED_INFO("its references");
         REQUIRE(service.references(script, 6, 26).references.size() == 2);
 
         // A block left open at the end.
@@ -751,14 +649,10 @@ namespace
         };
         // A call not closed, the block closed on the next line.
         ALScriptProblem p = first_error(head + "        llSay(0, \"hi\"\n    }\n}\n");
-        UNSCOPED_INFO("missing the bracket: " + p.message);
         CHECK(p.message == std::string("Missing ')'."));
-        {
-            INFO("keyed");
-            CHECK(p.key == "LSLSyntaxMissing");
-            REQUIRE(p.args.size() == 1);
-            CHECK(p.args[0] == "')'");
-        }
+        CHECK(p.key == "LSLSyntaxMissing");
+        REQUIRE(p.args.size() == 1);
+        CHECK(p.args[0] == "')'");
         {
             INFO("on the string's closing quote, not the next line's brace");
             CHECK(p.line == 4);
@@ -767,7 +661,6 @@ namespace
         }
         // A statement not ended.
         p = first_error(head + "        llSay(0, \"hi\")\n        llOwnerSay(\"x\");\n    }\n}\n");
-        UNSCOPED_INFO("missing the semicolon: " + p.message);
         CHECK(p.message == std::string("Missing ';'."));
         {
             INFO("after the call");
@@ -775,7 +668,7 @@ namespace
             CHECK(p.column == 21);
         }
         p = first_error(head + "        integer x = 5 // five\n    }\n}\n");
-        UNSCOPED_INFO("past a comment: " + p.message);
+        UNSCOPED_INFO("past a comment");
         CHECK(p.message == std::string("Missing ';'."));
         {
             INFO("on the number");
@@ -800,7 +693,6 @@ namespace
         CHECK(loaded);
         const std::string script = "integer unused;\nlist g = [1, 2];\ninteger h = g;\ndefault\n{\n    state_entry()\n    {\n        integer never;\n    }\n}\n";
         const ALScriptProblems first = service.check(script, true);
-        UNSCOPED_INFO("something to say: " + said(first));
         REQUIRE_FALSE(first.empty());
         service.outline(script);
         service.hover(script, 0, 9);
@@ -831,15 +723,11 @@ namespace
         const std::string tail = "default\n{\n    state_entry() { }\n}\n";
         // As Nexii's linkset library has it.
         ALScriptProblem p = first_error("list ObjectLinksetSittingAvatars(object) {\n    return [];\n}\n" + tail);
-        UNSCOPED_INFO("the first: " + p.message);
         CHECK(p.message ==
                       std::string("The parameter 'object' needs its type before it: integer, float, string, key, vector, rotation or list."));
-        {
-            INFO("keyed");
-            CHECK(p.key == "LSLParameterUntyped");
-            REQUIRE(p.args.size() == 1);
-            CHECK(p.args[0] == "object");
-        }
+        CHECK(p.key == "LSLParameterUntyped");
+        REQUIRE(p.args.size() == 1);
+        CHECK(p.args[0] == "object");
         {
             INFO("on the name, whole");
             CHECK(p.line == 0);
@@ -850,14 +738,14 @@ namespace
         p = first_error("f(integer a, b) { }\n" + tail);
         {
             INFO("after a comma: " + p.message);
-            CHECK(p.key == "LSLParameterUntyped");
+            REQUIRE(p.key == "LSLParameterUntyped");
             CHECK(p.args[0] == "b");
             CHECK(p.column == 13);
         }
         p = first_error("default\n{\n    touch_start(total)\n    {\n    }\n}\n");
         {
             INFO("an event's: " + p.message);
-            CHECK(p.key == "LSLParameterUntyped");
+            REQUIRE(p.key == "LSLParameterUntyped");
             CHECK(p.args[0] == "total");
             CHECK(p.line == 2);
         }
@@ -1054,21 +942,17 @@ namespace
         CHECK(loaded);
         llifstream in(std::string(AL_SCRIPT_TEMPLATES_DIR) + "/lsl.xml", std::ios::in | std::ios::binary);
         LLSD       templates;
-        {
-            INFO("read");
-            CHECK(in.is_open());
-            CHECK(LLSDSerialize::fromXML(templates, in) != LLSDParser::PARSE_FAILURE);
-            REQUIRE(templates.isArray());
-        }
-        UNSCOPED_INFO("some");
+        CHECK(in.is_open());
+        CHECK(LLSDSerialize::fromXML(templates, in) != LLSDParser::PARSE_FAILURE);
+        REQUIRE(templates.isArray());
         REQUIRE(templates.size() > 0);
         for (LLSD::array_const_iterator it = templates.beginArray(); it != templates.endArray(); ++it)
         {
             const std::string      name     = (*it)["name"].asString();
             const ALScriptProblems problems = service.check((*it)["body"].asString());
-            UNSCOPED_INFO(name + " parses");
+            CAPTURE(name);
             REQUIRE(service.parsed());
-            UNSCOPED_INFO(name + ": " + said(problems));
+            INFO(said(problems));
             REQUIRE(errors(problems) == size_t(0));
         }
     }
@@ -1090,14 +974,10 @@ namespace
         const std::string open = "default\n{\n    state_entry()\n    {\n        llSay(0, \"Hello, Avatar!\");\n\n";
         // A handler with parameters, read as a call.
         ALScriptProblem p = first_error(open + "    touch_start(integer total_number)\n    {\n        llSay(0, \"Touched.\");\n    }\n}\n");
-        UNSCOPED_INFO("the brace: " + p.message);
         CHECK(p.message == std::string("Missing '}'."));
-        {
-            INFO("keyed");
-            CHECK(p.key == "LSLSyntaxMissing");
-            REQUIRE(p.args.size() == 1);
-            CHECK(p.args[0] == "'}'");
-        }
+        CHECK(p.key == "LSLSyntaxMissing");
+        REQUIRE(p.args.size() == 1);
+        CHECK(p.args[0] == "'}'");
         {
             INFO("on the semicolon before it");
             CHECK(p.line == 4);
@@ -1106,7 +986,7 @@ namespace
         }
         // One without, its brace on the next line.
         p = first_error(open + "    touch_start()\n    {\n    }\n}\n");
-        UNSCOPED_INFO("the brace, a head without parameters: " + p.message);
+        UNSCOPED_INFO("a head without parameters");
         CHECK(p.message == std::string("Missing '}'."));
         {
             INFO("on the same semicolon");
@@ -1115,7 +995,7 @@ namespace
         }
         // A state after one not closed.
         p = first_error("default\n{\n    state_entry()\n    {\n    }\n\nstate other\n{\n    state_entry()\n    {\n    }\n}\n");
-        UNSCOPED_INFO("the state's brace: " + p.message);
+        UNSCOPED_INFO("a state after one not closed");
         CHECK(p.message == std::string("Missing '}'."));
         {
             INFO("after the handler's");
@@ -1198,18 +1078,15 @@ namespace
             "}\n";
         const std::vector<ALScriptOutlineEntry> whole = service.outline(script);
         const std::vector<ALScriptOutlineEntry> shape = service.outline(script, false);
-        UNSCOPED_INFO("as many");
         REQUIRE(shape.size() == whole.size());
         for (size_t i = 0; i < shape.size(); ++i)
         {
-            {
-                INFO("the same " + whole[i].name);
-                REQUIRE(shape[i].name == whole[i].name);
-                REQUIRE(shape[i].kind == whole[i].kind);
-                REQUIRE(shape[i].depth == whole[i].depth);
-                REQUIRE(shape[i].span == whole[i].span);
-                REQUIRE(shape[i].nameSpan == whole[i].nameSpan);
-            }
+            CAPTURE(whole[i].name);
+            REQUIRE(shape[i].name == whole[i].name);
+            REQUIRE(shape[i].kind == whole[i].kind);
+            REQUIRE(shape[i].depth == whole[i].depth);
+            REQUIRE(shape[i].span == whole[i].span);
+            REQUIRE(shape[i].nameSpan == whole[i].nameSpan);
             UNSCOPED_INFO("no words of its declaration: " + shape[i].detail);
             REQUIRE(shape[i].detail.empty());
         }

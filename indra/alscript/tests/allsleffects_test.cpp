@@ -126,7 +126,6 @@ namespace
                        "r() { k += 2; s(); }\n"
                        "s() { r(); }\n"
                        "default { state_entry() { f(); } }\n");
-        UNSCOPED_INFO("parsed");
         REQUIRE(p.script != nullptr);
         const ALLSLEffects effects(p.script);
         const auto         is = [&](const char* name, std::initializer_list<const char*> globals, bool impure) {
@@ -138,7 +137,6 @@ namespace
             }
             return same;
         };
-        UNSCOPED_INFO("a writes g");
         CHECK(is("a", { "g" }, false));
         UNSCOPED_INFO("b writes h, and g through a");
         CHECK(is("b", { "g", "h" }, false));
@@ -181,12 +179,10 @@ namespace
                        "    x = y + same(y++);\n"                 // 11: and here after
                        "    g = bump();\n"                        // 12: the store is after
                        "} }\n");
-        UNSCOPED_INFO("parsed");
         REQUIRE(p.script != nullptr);
         const ALLSLEffects                        effects(p.script);
         const std::vector<LSLFunctionExpression*> bumps = p.calls("bump");
         const std::vector<LSLFunctionExpression*> sames = p.calls("same");
-        UNSCOPED_INFO("the calls");
         REQUIRE(bumps.size() == size_t(11));
         const auto first = [&](LSLFunctionExpression* call) { return effects.mayRunFirst(statementOf(call), call); };
         UNSCOPED_INFO("0: the right operand runs first");
@@ -231,7 +227,6 @@ namespace
                        "    l = [look(), bump()];\n"   // bump writes what look reads
                        "    l = [bump(), same(2)];\n"  // same changes nothing, and bump does
                        "} }\n");
-        UNSCOPED_INFO("parsed");
         REQUIRE(q.script != nullptr);
         const ALLSLEffects quiet(q.script);
         const auto         firstQ = [&](LSLFunctionExpression* call) { return quiet.mayRunFirst(statementOf(call), call); };
@@ -253,7 +248,6 @@ namespace
                        "integer near() { return look(); }\n"
                        "integer bump() { return ++h; }\n"
                        "default { state_entry() { me(); loud(); near(); bump(); } }\n");
-        UNSCOPED_INFO("parsed");
         REQUIRE(p.script != nullptr);
         const ALLSLEffects effects(p.script);
         UNSCOPED_INFO("reading the world is past the script");

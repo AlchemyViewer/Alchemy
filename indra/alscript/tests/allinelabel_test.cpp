@@ -113,7 +113,6 @@ namespace
             REQUIRE(ALLineLabel::relative("proj", "proj/util.luau").empty());
             REQUIRE(ALLineLabel::relative("/home/me", "util.luau").empty());
         }
-        UNSCOPED_INFO("nothing");
         REQUIRE(ALLineLabel::relative("", "").empty());
     }
 
@@ -158,7 +157,6 @@ namespace
 
     TEST_CASE_METHOD(allinelabel_data, "allinelabel: quotable makes a label safe for a reader with no escapes", "[allinelabel]")
     {
-        UNSCOPED_INFO("each");
         CHECK(ALLineLabel::quotable("a\"b\\c\nd\re\tf\x7fg") == std::string("a'b/c_d_e_f_g"));
         UNSCOPED_INFO("the rest as it was");
         CHECK(ALLineLabel::quotable("lib/my util (2).luau \xc3\xa9") == std::string("lib/my util (2).luau \xc3\xa9"));
@@ -190,7 +188,7 @@ namespace
         CHECK(label(fileOf("util.luau", "disk:/home/me/proj/lib/util.luau"), false) == std::string("lib/util.luau"));
         for (const char* path : { "disk:/home/me/proj/lib/util.luau", "disk:/home/me/shared/util.luau", "disk:/opt/x.luau" })
         {
-            UNSCOPED_INFO("never from a root: " + std::string(path));
+            CAPTURE(path);
             REQUIRE_FALSE(fromRoot(label.of(fileOf("x", path), false)));
         }
     }
@@ -249,7 +247,6 @@ namespace
         REQUIRE(r.text.find("-- @line 1 \"../shared/util.luau\"\nreturn { b = 2 }\n") != std::string::npos);
         UNSCOPED_INFO("the script's: " + r.text);
         REQUIRE(r.text.find("-- @line 1 \"main.luau\"\nlocal a = require(1)\n") != std::string::npos);
-        UNSCOPED_INFO("three files");
         REQUIRE(r.map.files().size() == size_t(3));
         {
             INFO("each still called its __SHORTFILE__");

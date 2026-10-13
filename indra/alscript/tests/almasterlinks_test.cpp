@@ -100,7 +100,6 @@ namespace
         links.put(almasterlinks_data::link(1, 2, "/s/door.lsl"));
         links.put(almasterlinks_data::link(0, 2, "/s/inventory.lsl"));
         links.put(almasterlinks_data::link(3, 4, "/s/lamp.lsl"));
-        UNSCOPED_INFO("three");
         REQUIRE(links.size() == size_t(3));
         UNSCOPED_INFO("by its object and item");
         CHECK(links.of(almasterlinks_data::key(1), almasterlinks_data::key(2))->master == std::string("/s/door.lsl"));
@@ -131,7 +130,6 @@ namespace
         UNSCOPED_INFO("nothing to change of an item not linked");
         REQUIRE_FALSE(links.find(almasterlinks_data::key(9), almasterlinks_data::key(9)));
 
-        UNSCOPED_INFO("removed");
         CHECK(links.remove(almasterlinks_data::key(1), almasterlinks_data::key(2)));
         UNSCOPED_INFO("and gone");
         REQUIRE_FALSE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(2)));
@@ -247,7 +245,6 @@ namespace
             links.put(one);
         }
 
-        UNSCOPED_INFO("one pruned");
         CHECK(links.prune(now) == size_t(1));
         UNSCOPED_INFO("the old orphan");
         REQUIRE_FALSE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(10)));
@@ -310,7 +307,6 @@ namespace
         }
 
         const LLSD llsd = links.toLLSD();
-        UNSCOPED_INFO("version 1");
         CHECK(llsd["version"].asInteger() == 1);
         UNSCOPED_INFO("every link");
         REQUIRE(llsd["links"].size() == 5);
@@ -319,7 +315,6 @@ namespace
         LLSDSerialize::toNotation(llsd, out);
         std::istringstream in(out.str());
         LLSD               back;
-        UNSCOPED_INFO("as notation");
         REQUIRE(LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
 
         const ALMasterLinks read = ALMasterLinks::fromLLSD(back);
@@ -328,39 +323,26 @@ namespace
         const ALMasterLink* got = read.of(full.object, full.item);
         UNSCOPED_INFO("the full one");
         REQUIRE(got != nullptr);
-        UNSCOPED_INFO("master");
         CHECK(got->master == full.master);
-        UNSCOPED_INFO("made");
         CHECK(got->made == full.made);
-        UNSCOPED_INFO("lua");
         CHECK(got->lua);
-        UNSCOPED_INFO("target");
         CHECK(got->target == full.target);
-        UNSCOPED_INFO("base");
         CHECK(got->base == full.base);
-        UNSCOPED_INFO("hash");
         CHECK(got->hash == full.hash);
         UNSCOPED_INFO("stamp, to the nanosecond");
         CHECK(got->stamp == full.stamp);
-        UNSCOPED_INFO("uses");
         CHECK(almasterlinks_data::joined(got->uses) == almasterlinks_data::joined(full.uses));
-        UNSCOPED_INFO("object name");
         CHECK(got->objectName == full.objectName);
-        UNSCOPED_INFO("item name");
         CHECK(got->itemName == full.itemName);
-        UNSCOPED_INFO("region name");
         CHECK(got->regionName == full.regionName);
-        UNSCOPED_INFO("linked");
         CHECK(got->linked == full.linked);
-        UNSCOPED_INFO("state");
         CHECK(got->state == full.state);
-        UNSCOPED_INFO("orphaned since");
         CHECK(got->orphanedSince == full.orphanedSince);
         const ALMasterLink* plain = read.of(LLUUID::null, inventory.item);
         {
             INFO("the inventory's, with no object");
             REQUIRE(plain);
-            REQUIRE(plain->object.isNull());
+            CHECK(plain->object.isNull());
             CHECK(plain->state == ALMasterLink::State::Differing);
         }
         {
@@ -371,12 +353,10 @@ namespace
         for (const ALMasterLink::State state : { ALMasterLink::State::Active, ALMasterLink::State::Pending, ALMasterLink::State::Suspended })
         {
             const ALMasterLink* one = read.of(almasterlinks_data::key(5), almasterlinks_data::key(10 + static_cast<int>(state)));
-            {
-                INFO("each state");
-                REQUIRE(one);
-                REQUIRE(one->state == state);
-                REQUIRE(one->made == ALMasterLink::Made::Hint);
-            }
+            CAPTURE(state);
+            REQUIRE(one);
+            REQUIRE(one->state == state);
+            REQUIRE(one->made == ALMasterLink::Made::Hint);
         }
         UNSCOPED_INFO("found by their masters");
         REQUIRE(read.mastering("/s/x.lsl").size() == size_t(3));
@@ -448,7 +428,7 @@ namespace
         REQUIRE(plain != nullptr);
         {
             INFO("what it does not say is as a new link has it");
-            REQUIRE(plain->made == ALMasterLink::Made::Picked);
+            CHECK(plain->made == ALMasterLink::Made::Picked);
             CHECK(plain->state == ALMasterLink::State::Active);
         }
         UNSCOPED_INFO("a stamp written as an integer");
@@ -459,7 +439,6 @@ namespace
         once["links"].append(good);
         const ALMasterLinks careful = ALMasterLinks::fromLLSD(once);
         const ALMasterLink* odd     = careful.of(almasterlinks_data::key(1), almasterlinks_data::key(5));
-        UNSCOPED_INFO("read");
         REQUIRE(odd != nullptr);
         UNSCOPED_INFO("a way of making not known is a hint's");
         CHECK(odd->made == ALMasterLink::Made::Hint);
@@ -491,9 +470,8 @@ namespace
         for (int m = 0; m < MASTERS; ++m)
         {
             const std::vector<const ALMasterLink*> found = links.mastering("/s/master" + std::to_string(m) + ".lsl");
-            UNSCOPED_INFO("each master's");
+            CAPTURE(m);
             REQUIRE(found.size() == size_t(LINKS / MASTERS));
-            UNSCOPED_INFO("each the master's");
             REQUIRE(found.front()->master == "/s/master" + std::to_string(m) + ".lsl");
         }
         UNSCOPED_INFO("every user of the include they share");
@@ -534,7 +512,6 @@ namespace
         LLSDSerialize::toNotation(llsd, out);
         std::istringstream in(out.str());
         LLSD               back;
-        UNSCOPED_INFO("as notation");
         REQUIRE(LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
         const ALMasterLinks read = ALMasterLinks::fromLLSD(back);
         UNSCOPED_INFO("read back set");

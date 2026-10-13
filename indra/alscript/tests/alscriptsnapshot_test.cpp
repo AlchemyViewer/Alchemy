@@ -54,7 +54,7 @@ namespace
         const ALPreprocessor::Result made = snapshot.run(
             "#include \"lib.lsl\"\n#include \"gone.lsl\"\n#include \"new.lsl\"\n#include \"new.lsl\"\ndefault { state_entry() { helper(); } }\n");
         UNSCOPED_INFO("the answered one in");
-        REQUIRE(made.text.find("integer helper()") != std::string::npos);
+        CHECK(made.text.find("integer helper()") != std::string::npos);
         UNSCOPED_INFO("the missing one said");
         CHECK(std::any_of(made.problems.begin(), made.problems.end(), [](const ALScriptProblem& p) { return p.key == "PreprocIncludeNotFound"; }));
         const std::vector<ALPreprocessor::Ask> missed = snapshot.missed();
@@ -64,7 +64,7 @@ namespace
             CHECK(missed[0].name == "new.lsl");
         }
         UNSCOPED_INFO("taken away by the asking");
-        REQUIRE(snapshot.missed().empty());
+        CHECK(snapshot.missed().empty());
     }
 
     TEST_CASE_METHOD(alscriptsnapshot_data, "alscriptsnapshot: keyOf is the name and who asks and whether it is a require", "[alscriptsnapshot]")

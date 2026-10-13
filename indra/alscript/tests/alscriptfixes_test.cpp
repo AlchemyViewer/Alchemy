@@ -105,36 +105,33 @@ namespace
         // The problem keyed so, its preferred fix, the text with it made,
         // and that text checked again: the problem gone, and no error in
         // its place.
-        std::string fixed(const std::string& script, bool lua, const std::string& key, const std::string& title)
+        std::string require_fixed(const std::string& script, bool lua, const std::string& key, const std::string& title)
         {
             const ALScriptProblems problems = check(script, lua);
             const ALScriptProblem* problem  = keyed(problems, key);
-            UNSCOPED_INFO("said: " + key + "\n" + said(problems));
+            CAPTURE(key);
+            INFO("said:\n" + said(problems));
             REQUIRE(problem != nullptr);
-            UNSCOPED_INFO("a fix: " + said(problems));
             REQUIRE_FALSE(problem->fixes.empty());
             const ALScriptFix& fix = problem->fixes.front();
-            UNSCOPED_INFO("preferred");
             REQUIRE(fix.preferred);
-            UNSCOPED_INFO("its words");
             REQUIRE(fix.title == title);
             const std::optional<std::string> made = ALScriptFixes::apply(script, fix);
-            UNSCOPED_INFO("applies");
             REQUIRE(made.has_value());
             const ALScriptProblems after = check(*made, lua);
-            UNSCOPED_INFO("gone from:\n" + *made + "\n" + said(after));
+            INFO("made:\n" + *made + "\nsaid then:\n" + said(after));
             REQUIRE(keyed(after, key) == nullptr);
-            UNSCOPED_INFO("no error in its place:\n" + *made + "\n" + said(after));
+            UNSCOPED_INFO("no error in its place");
             REQUIRE(errors(after) <= errors(problems) - (problem->severity == ALScriptProblem::Severity::Error ? 1 : 0));
             return *made;
         }
 
         // Where a piece of the script is, zero-based: its first line and
         // column, and where it ends on that line.
-        static void place(const std::string& script, const std::string& piece, S32& line, S32& column, S32& end)
+        static void require_place(const std::string& script, const std::string& piece, S32& line, S32& column, S32& end)
         {
             const size_t at = script.find(piece);
-            UNSCOPED_INFO("in the script: " + piece);
+            CAPTURE(piece);
             REQUIRE(at != std::string::npos);
             const size_t start = script.rfind('\n', at);
             line               = static_cast<S32>(std::count(script.begin(), script.begin() + at, '\n'));
@@ -160,7 +157,7 @@ namespace
         // The text with the refactor titled so made, among those offered at
         // a place, and that text checked again: no error in it. Where none
         // is titled so, what was offered.
-        std::string acted(const std::string& script, bool lua, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& title)
+        std::string require_acted(const std::string& script, bool lua, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& title)
         {
             const std::vector<ALScriptFix> offered = actions(script, lua, line, column, endLine, endColumn);
             for (const ALScriptFix& action : offered)
@@ -169,13 +166,12 @@ namespace
                 {
                     continue;
                 }
-                UNSCOPED_INFO("a refactor");
+                CAPTURE(title);
                 REQUIRE(action.kind == ALScriptFix::Kind::Refactor);
                 const std::optional<std::string> made = ALScriptFixes::apply(script, action);
-                UNSCOPED_INFO("applies");
                 REQUIRE(made.has_value());
                 const ALScriptProblems after = check(*made, lua);
-                UNSCOPED_INFO("no error in:\n" + *made + "\n" + said(after));
+                INFO("made:\n" + *made + "\nsaid then:\n" + said(after));
                 REQUIRE(errors(after) == 0);
                 return *made;
             }
@@ -184,11 +180,11 @@ namespace
 
         // The same with the caret, or the stretch chosen, on a piece of the
         // script.
-        std::string actedOn(const std::string& script, bool lua, const std::string& piece, bool chosen, const std::string& title)
+        std::string require_acted_on(const std::string& script, bool lua, const std::string& piece, bool chosen, const std::string& title)
         {
             S32 line = 0, column = 0, end = 0;
-            place(script, piece, line, column, end);
-            return acted(script, lua, line, column, line, chosen ? end : column, title);
+            require_place(script, piece, line, column, end);
+            return require_acted(script, lua, line, column, line, chosen ? end : column, title);
         }
     };
 
@@ -196,7 +192,7 @@ namespace
     {
         UNSCOPED_INFO("builtins: " + error);
         CHECK(lslLoaded);
-        const std::string made = fixed("default\n{\n    state_entry()\n    {\n        integer a = 1\n        llOwnerSay((string)a);\n    }\n}\n", false,
+        const std::string made = require_fixed("default\n{\n    state_entry()\n    {\n        integer a = 1\n        llOwnerSay((string)a);\n    }\n}\n", false,
                                        "LSLSyntaxMissing", "Insert ';'");
         UNSCOPED_INFO("after the 1: " + made);
         REQUIRE(made.find("integer a = 1;\n") != std::string::npos);
@@ -206,11 +202,11 @@ namespace
     {
         UNSCOPED_INFO("builtins: " + error);
         CHECK(lslLoaded);
-        std::string made = fixed("default\n{\n    state_entry()\n    {\n        llownersay(\"hi\");\n    }\n}\n", false, "LSLUndeclared",
+        std::string made = require_fixed("default\n{\n    state_entry()\n    {\n        llownersay(\"hi\");\n    }\n}\n", false, "LSLUndeclared",
                                  "Change 'llownersay' to 'llOwnerSay'");
         UNSCOPED_INFO("the call: " + made);
         REQUIRE(made.find("llOwnerSay(\"hi\")") != std::string::npos);
-        made = fixed("default\n{\n    state_entry()\n    {\n        integer count = 1;\n        llOwnerSay((string)coutn);\n    }\n}\n", false,
+        made = require_fixed("default\n{\n    state_entry()\n    {\n        integer count = 1;\n        llOwnerSay((string)coutn);\n    }\n}\n", false,
                      "LSLUndeclared", "Change 'coutn' to 'count'");
         UNSCOPED_INFO("the local: " + made);
         REQUIRE(made.find("(string)count)") != std::string::npos);
@@ -229,7 +225,7 @@ namespace
     {
         UNSCOPED_INFO("builtins: " + error);
         CHECK(lslLoaded);
-        const std::string made = fixed("default\n{\n    state_entry()\n    {\n        llSoundPreload(\"boom\");\n    }\n}\n", false,
+        const std::string made = require_fixed("default\n{\n    state_entry()\n    {\n        llSoundPreload(\"boom\");\n    }\n}\n", false,
                                        "LSLDeprecatedWithReplacement", "Use 'llPreloadSound' instead of 'llSoundPreload'");
         UNSCOPED_INFO("the call: " + made);
         REQUIRE(made.find("llPreloadSound(\"boom\");") != std::string::npos);
@@ -246,8 +242,7 @@ namespace
     {
         UNSCOPED_INFO("definitions: " + error);
         CHECK(luauLoaded);
-        const std::string      made     = fixed("local unused = 1\n", true, "LuauLintLocalUnused", "Rename to '_unused'");
-        UNSCOPED_INFO("marked");
+        const std::string      made     = require_fixed("local unused = 1\n", true, "LuauLintLocalUnused", "Rename to '_unused'");
         CHECK(made == std::string("local _unused = 1\n"));
         const ALScriptProblems problems = check("local function helper() end\n", true);
         const ALScriptProblem* problem  = keyed(problems, "LuauLintFunctionUnused");
@@ -256,7 +251,6 @@ namespace
             REQUIRE(problem != nullptr);
             REQUIRE_FALSE(problem->fixes.empty());
         }
-        UNSCOPED_INFO("safe");
         CHECK(problem->fixes.front().safe);
     }
 
@@ -271,8 +265,7 @@ namespace
             config.mode = "strict";
             luau.setConfig(config);
         }
-        const std::string made = fixed("ll.OwnerSya(\"hi\")\n", true, "LuauKeyNotFoundDidYouMean", "Change 'OwnerSya' to 'OwnerSay'");
-        UNSCOPED_INFO("the call");
+        const std::string made = require_fixed("ll.OwnerSya(\"hi\")\n", true, "LuauKeyNotFoundDidYouMean", "Change 'OwnerSya' to 'OwnerSay'");
         CHECK(made == std::string("ll.OwnerSay(\"hi\")\n"));
     }
 
@@ -293,18 +286,15 @@ namespace
         REQUIRE(problem != nullptr);
         UNSCOPED_INFO("a fix: " + said(problems));
         REQUIRE_FALSE(problem->fixes.empty());
-        UNSCOPED_INFO("not safe");
         CHECK_FALSE(problem->fixes.front().safe);
         const std::optional<std::string> made = ALScriptFixes::apply("local n = ll.Abs(-1)\nprint(n)\n", problem->fixes.front());
-        UNSCOPED_INFO("applies");
         REQUIRE(made.has_value());
         const ALScriptProblems after = check(*made, true);
+        INFO("made:\n" + *made + "\nsaid then:\n" + said(after));
         for (const ALScriptProblem& each : after)
         {
-            UNSCOPED_INFO("no longer deprecated:\n" + *made + "\n" + said(after));
             REQUIRE(each.code != "DeprecatedApi");
         }
-        UNSCOPED_INFO("no errors:\n" + *made + "\n" + said(after));
         CHECK(errors(after) == static_cast<size_t>(0));
     }
 
@@ -313,7 +303,6 @@ namespace
         ALScriptFix fix;
         fix.edits.push_back({ 1, 0, 1, 3, "BAR" });
         fix.edits.push_back({ 0, 0, 0, 0, ">" });
-        UNSCOPED_INFO("both");
         CHECK(ALScriptFixes::apply("foo\nbar\n", fix).value_or("refused") == std::string(">foo\nBAR\n"));
 
         fix.edits.push_back({ 1, 2, 1, 3, "x" });
@@ -385,36 +374,33 @@ namespace
         lint.severity = ALScriptProblem::Severity::Warning;
         lint.source   = ALScriptProblem::Source::Lint;
         lint.code     = "LocalUnused";
-        auto made = [&lint](const std::string& line, bool lua) {
+        auto require_suppression = [&lint](const std::string& line, bool lua) {
             const std::optional<ALScriptFix> fix = ALScriptFixes::suppression(lint, line, lua);
-            UNSCOPED_INFO("a fix for: " + line);
+            CAPTURE(line);
             REQUIRE(fix.has_value());
-            {
-                INFO("a suppression");
-                REQUIRE(fix->kind == ALScriptFix::Kind::Suppress);
-                REQUIRE_FALSE(fix->preferred);
-                REQUIRE(fix->safe);
-            }
+            REQUIRE(fix->kind == ALScriptFix::Kind::Suppress);
+            REQUIRE_FALSE(fix->preferred);
+            REQUIRE(fix->safe);
             const std::string after = ALScriptFixes::apply(line, *fix).value_or("refused");
             UNSCOPED_INFO("suppresses: " + after);
             REQUIRE(ALScriptFixes::suppressed(lint, after, "", lua));
             return after;
         };
         UNSCOPED_INFO("its own");
-        CHECK(made("local x = 1", true) == std::string("local x = 1  -- NOLINT(LocalUnused)"));
+        CHECK(require_suppression("local x = 1", true) == std::string("local x = 1  -- NOLINT(LocalUnused)"));
         UNSCOPED_INFO("the line's comment");
-        CHECK(made("local x = 1 -- why", true) == std::string("local x = 1 -- why NOLINT(LocalUnused)"));
+        CHECK(require_suppression("local x = 1 -- why", true) == std::string("local x = 1 -- why NOLINT(LocalUnused)"));
         UNSCOPED_INFO("a NOLINT's list");
-        CHECK(made("local x = 1 -- NOLINT(ShadowLocal)", true) == std::string("local x = 1 -- NOLINT(ShadowLocal, LocalUnused)"));
+        CHECK(require_suppression("local x = 1 -- NOLINT(ShadowLocal)", true) == std::string("local x = 1 -- NOLINT(ShadowLocal, LocalUnused)"));
         UNSCOPED_INFO("after a block comment");
-        CHECK(made("local x = 1 --[[ why ]]", true) == std::string("local x = 1 --[[ why ]]  -- NOLINT(LocalUnused)"));
+        CHECK(require_suppression("local x = 1 --[[ why ]]", true) == std::string("local x = 1 --[[ why ]]  -- NOLINT(LocalUnused)"));
         UNSCOPED_INFO("nothing where a bare NOLINT says it");
         REQUIRE_FALSE(ALScriptFixes::suppression(lint, "local x = 1 -- NOLINT", true).has_value());
 
         lint.code = "20009";
         lint.key  = "LSLDeclaredButNotUsed";
         UNSCOPED_INFO("LSL");
-        CHECK(made("    integer x;", false) == std::string("    integer x;  // NOLINT(DeclaredButNotUsed)"));
+        CHECK(require_suppression("    integer x;", false) == std::string("    integer x;  // NOLINT(DeclaredButNotUsed)"));
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: an SLua global spelt wrong is changed to the nearest name in scope", "[ALScriptFixes]")
@@ -432,11 +418,9 @@ namespace
         }
         UNSCOPED_INFO("said: " + said(problems));
         REQUIRE(problem != nullptr);
-        const std::string made = fixed("pirnt(\"hi\")\n", true, problem->key, "Change 'pirnt' to 'print'");
-        UNSCOPED_INFO("the call");
+        const std::string made = require_fixed("pirnt(\"hi\")\n", true, problem->key, "Change 'pirnt' to 'print'");
         CHECK(made == std::string("print(\"hi\")\n"));
-        const std::string local = fixed("local count = 1\nprint(coutn)\n", true, problem->key, "Change 'coutn' to 'count'");
-        UNSCOPED_INFO("a local");
+        const std::string local = require_fixed("local count = 1\nprint(coutn)\n", true, problem->key, "Change 'coutn' to 'count'");
         CHECK(local == std::string("local count = 1\nprint(count)\n"));
     }
 
@@ -444,23 +428,23 @@ namespace
     {
         UNSCOPED_INFO("builtins: " + error);
         CHECK(lslLoaded);
-        std::string made = fixed("default\n{\n    state_entry()\n    {\n        llOwnerSay(5 + 1);\n    }\n}\n", false, "LSLArgumentWrongType",
+        std::string made = require_fixed("default\n{\n    state_entry()\n    {\n        llOwnerSay(5 + 1);\n    }\n}\n", false, "LSLArgumentWrongType",
                                  "Cast to string");
         UNSCOPED_INFO("the argument: " + made);
         REQUIRE(made.find("llOwnerSay((string)(5 + 1));") != std::string::npos);
-        made = fixed("default\n{\n    state_entry()\n    {\n        llSetText(\"a\", <1, 1, 1>, \"1\");\n    }\n}\n", false, "LSLArgumentWrongType",
+        made = require_fixed("default\n{\n    state_entry()\n    {\n        llSetText(\"a\", <1, 1, 1>, \"1\");\n    }\n}\n", false, "LSLArgumentWrongType",
                      "Cast to float");
         UNSCOPED_INFO("the third, past a vector's commas: " + made);
         REQUIRE(made.find("<1, 1, 1>, (float)\"1\")") != std::string::npos);
-        made = fixed("default\n{\n    state_entry()\n    {\n        string s = 5;\n        llOwnerSay(s);\n    }\n}\n", false,
+        made = require_fixed("default\n{\n    state_entry()\n    {\n        string s = 5;\n        llOwnerSay(s);\n    }\n}\n", false,
                      "LSLWrongTypeInAssignment", "Cast to string");
         UNSCOPED_INFO("the declaration: " + made);
         REQUIRE(made.find("string s = (string)5;") != std::string::npos);
-        made = fixed("default\n{\n    state_entry()\n    {\n        string s;\n        s = 6;\n        llOwnerSay(s);\n    }\n}\n", false,
+        made = require_fixed("default\n{\n    state_entry()\n    {\n        string s;\n        s = 6;\n        llOwnerSay(s);\n    }\n}\n", false,
                      "LSLInvalidOperator", "Cast to string");
         UNSCOPED_INFO("the assignment: " + made);
         REQUIRE(made.find("s = (string)6;") != std::string::npos);
-        made = fixed("string f()\n{\n    return 5;\n}\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay(f());\n    }\n}\n", false,
+        made = require_fixed("string f()\n{\n    return 5;\n}\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay(f());\n    }\n}\n", false,
                      "LSLBadReturnType", "Cast to string");
         UNSCOPED_INFO("the return: " + made);
         REQUIRE(made.find("return (string)5;") != std::string::npos);
@@ -480,13 +464,13 @@ namespace
         CHECK(lslLoaded);
         const std::string head = "default\n{\n    state_entry()\n    {\n        integer a = 2;\n";
         const std::string tail = "        llOwnerSay((string)a);\n    }\n}\n";
-        std::string made = fixed(head + "        a == 3;\n" + tail, false, "LSLEqAsStatement", "Assign with '='");
+        std::string made = require_fixed(head + "        a == 3;\n" + tail, false, "LSLEqAsStatement", "Assign with '='");
         UNSCOPED_INFO("assigned: " + made);
         REQUIRE(made.find("        a = 3;\n") != std::string::npos);
-        made = fixed(head + "        a *= 1.5;\n" + tail, false, "LSLIntFloatMulAssign", "Multiply as a float, then cast to integer");
+        made = require_fixed(head + "        a *= 1.5;\n" + tail, false, "LSLIntFloatMulAssign", "Multiply as a float, then cast to integer");
         UNSCOPED_INFO("rewritten: " + made);
         REQUIRE(made.find("a = (integer)(a * 1.5);") != std::string::npos);
-        made = fixed(head + "        state default;\n" + tail, false, "LSLChangeToCurrentState", "Write 'return' instead");
+        made = require_fixed(head + "        state default;\n" + tail, false, "LSLChangeToCurrentState", "Write 'return' instead");
         UNSCOPED_INFO("returned: " + made);
         REQUIRE(made.find("        return;\n") != std::string::npos);
 
@@ -500,18 +484,11 @@ namespace
             REQUIRE(problem != nullptr);
             REQUIRE(problem->fixes.size() >= 2);
         }
-        {
-            INFO("neither preferred");
-            REQUIRE_FALSE(problem->fixes[0].preferred);
-            CHECK_FALSE(problem->fixes[1].preferred);
-        }
-        UNSCOPED_INFO("compared");
-        REQUIRE((ALScriptFixes::apply(script, problem->fixes[0]).value_or("").find("if (a == 1)") != std::string::npos) == true);
-        {
-            INFO("bracketed, safely");
-            REQUIRE(problem->fixes[1].safe);
-            REQUIRE(ALScriptFixes::apply(script, problem->fixes[1]).value_or("").find("if ((a = 1))") != std::string::npos);
-        }
+        REQUIRE_FALSE(problem->fixes[0].preferred);
+        CHECK_FALSE(problem->fixes[1].preferred);
+        REQUIRE(ALScriptFixes::apply(script, problem->fixes[0]).value_or("").find("if (a == 1)") != std::string::npos);
+        REQUIRE(problem->fixes[1].safe);
+        REQUIRE(ALScriptFixes::apply(script, problem->fixes[1]).value_or("").find("if ((a = 1))") != std::string::npos);
         const std::optional<std::string> quiet = ALScriptFixes::apply(script, problem->fixes[1]);
         {
             INFO("and quiet after");
@@ -524,20 +501,20 @@ namespace
     {
         UNSCOPED_INFO("definitions: " + error);
         CHECK(luauLoaded);
-        std::string made = fixed("--!strict\nlocal n = 5\nlocal s: string = n\nprint(s)\n", true, "LuauTypeMismatch", "Wrap in tostring()");
+        std::string made = require_fixed("--!strict\nlocal n = 5\nlocal s: string = n\nprint(s)\n", true, "LuauTypeMismatch", "Wrap in tostring()");
         UNSCOPED_INFO("the value a declaration is given: " + made);
         REQUIRE(made.find("local s: string = tostring(n)") != std::string::npos);
-        made = fixed("--!strict\nlocal t = {}\nfunction t:m() return self end\nprint(t.m())\n", true, "LuauRequiresSelf", "Call with ':'");
+        made = require_fixed("--!strict\nlocal t = {}\nfunction t:m() return self end\nprint(t.m())\n", true, "LuauRequiresSelf", "Call with ':'");
         UNSCOPED_INFO("with a colon: " + made);
         REQUIRE(made.find("print(t:m())") != std::string::npos);
-        made = fixed("local function f()\n    counter = 1\n    return counter\nend\nprint(f())\n", true, "LuauLintGlobalUsedAsLocalFunction",
+        made = require_fixed("local function f()\n    counter = 1\n    return counter\nend\nprint(f())\n", true, "LuauLintGlobalUsedAsLocalFunction",
                      "Make 'counter' local");
         UNSCOPED_INFO("local: " + made);
         REQUIRE(made.find("    local counter = 1\n") != std::string::npos);
-        made = fixed("--!strict\nlocal x\nprint(x)\n", true, "LuauLintUninitializedLocal", "Initialize 'x' with nil");
+        made = require_fixed("--!strict\nlocal x\nprint(x)\n", true, "LuauLintUninitializedLocal", "Initialize 'x' with nil");
         UNSCOPED_INFO("given nil: " + made);
         REQUIRE(made.find("local x = nil\n") != std::string::npos);
-        made = fixed("--!nonstrickt\nprint(1)\n", true, "LuauLintDirectiveUnknownDidYouMean", "Change 'nonstrickt' to 'nonstrict'");
+        made = require_fixed("--!nonstrickt\nprint(1)\n", true, "LuauLintDirectiveUnknownDidYouMean", "Change 'nonstrickt' to 'nonstrict'");
         UNSCOPED_INFO("spelt: " + made);
         CHECK(made.compare(0, 12, "--!nonstrict") == 0);
     }
@@ -547,13 +524,13 @@ namespace
         UNSCOPED_INFO("builtins: " + error);
         CHECK(lslLoaded);
         const std::string state = "default\n{\n    state_entry()\n    {\n        llOwnerSay(\"x\");\n    }\n}\n";
-        std::string made = fixed("integer unused = 5;\n" + state, false, "LSLDeclaredButNotUsed", "Remove 'unused'");
+        std::string made = require_fixed("integer unused = 5;\n" + state, false, "LSLDeclaredButNotUsed", "Remove 'unused'");
         UNSCOPED_INFO("the global's line gone");
         CHECK(made == state);
-        made = fixed("integer helper(integer x)\n{\n    return x;\n}\n" + state, false, "LSLDeclaredButNotUsed", "Remove 'helper'");
+        made = require_fixed("integer helper(integer x)\n{\n    return x;\n}\n" + state, false, "LSLDeclaredButNotUsed", "Remove 'helper'");
         UNSCOPED_INFO("the function's lines gone");
         CHECK(made == state);
-        made = fixed("default\n{\n    state_entry()\n    {\n        integer a = 1 + 2;\n        llOwnerSay(\"x\");\n    }\n}\n", false,
+        made = require_fixed("default\n{\n    state_entry()\n    {\n        integer a = 1 + 2;\n        llOwnerSay(\"x\");\n    }\n}\n", false,
                      "LSLDeclaredButNotUsed", "Remove 'a'");
         UNSCOPED_INFO("the local's line gone");
         CHECK(made == state);
@@ -630,37 +607,37 @@ namespace
         CHECK(lslLoaded);
         const std::string head = "default\n{\n    state_entry()\n    {\n";
         const std::string tail = "    }\n}\n";
-        std::string       made = actedOn(head + "        llOwnerSay((string)(llGetUnixTime() + 5));\n" + tail, false, "llGetUnixTime() + 5", true,
+        std::string       made = require_acted_on(head + "        llOwnerSay((string)(llGetUnixTime() + 5));\n" + tail, false, "llGetUnixTime() + 5", true,
                                          "Put it in a local, 'value'");
         UNSCOPED_INFO("on its own line");
         CHECK(made ==
                       head + "        integer value = llGetUnixTime() + 5;\n        llOwnerSay((string)(value));\n" + tail);
         // After another statement on the line, just before its own; and
         // named as nothing in the script is.
-        made = actedOn(head + "        integer value = 1; llOwnerSay((string)(value * 2.5));\n" + tail, false, "value * 2.5", true,
+        made = require_acted_on(head + "        integer value = 1; llOwnerSay((string)(value * 2.5));\n" + tail, false, "value * 2.5", true,
                        "Put it in a local, 'value2'");
         UNSCOPED_INFO("beside");
         CHECK(made == head + "        integer value = 1; float value2 = value * 2.5; llOwnerSay((string)(value2));\n" + tail);
-        made = actedOn(head + "        llSetRot(llEuler2Rot(<0, 0, 1>));\n" + tail, false, "llEuler2Rot(<0, 0, 1>)", true, "Put it in a local, 'value'");
+        made = require_acted_on(head + "        llSetRot(llEuler2Rot(<0, 0, 1>));\n" + tail, false, "llEuler2Rot(<0, 0, 1>)", true, "Put it in a local, 'value'");
         UNSCOPED_INFO("a rotation as LSL says it: " + made);
         REQUIRE(made.find("rotation value = llEuler2Rot(<0, 0, 1>);") != std::string::npos);
         // Not out of a loop's condition, nor from under an if with no
         // braces, nor what is assigned to.
         std::string none = head + "        integer i;\n        while (i < 10) ++i;\n" + tail;
-        UNSCOPED_INFO("a condition: " + actedOn(none, false, "i < 10", true, "Put it in a local, 'value'"));
-        CHECK(actedOn(none, false, "i < 10", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        UNSCOPED_INFO("a condition: " + require_acted_on(none, false, "i < 10", true, "Put it in a local, 'value'"));
+        CHECK(require_acted_on(none, false, "i < 10", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         none = head + "        integer i;\n        if (i) llOwnerSay((string)(i + 1));\n" + tail;
         UNSCOPED_INFO("under an if");
-        CHECK(actedOn(none, false, "i + 1", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(none, false, "i + 1", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         none = head + "        integer i;\n        i = 4;\n        llOwnerSay((string)i);\n" + tail;
         S32 line = 0, column = 0, end = 0;
-        place(none, "i = 4", line, column, end);
+        require_place(none, "i = 4", line, column, end);
         UNSCOPED_INFO("assigned to");
-        CHECK(acted(none, false, line, column, line, column + 1, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted(none, false, line, column, line, column + 1, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         // Nor the whole of a statement, which would leave `value;`.
         none = head + "        llOwnerSay((string)llGetUnixTime());\n" + tail;
         UNSCOPED_INFO("the whole statement");
-        CHECK(actedOn(none, false, "llOwnerSay((string)llGetUnixTime())", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(none, false, "llOwnerSay((string)llGetUnixTime())", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: an LSL if-else is inverted: the condition turned and the branches swapped", "[ALScriptFixes]")
@@ -669,28 +646,28 @@ namespace
         CHECK(lslLoaded);
         const std::string head = "default\n{\n    touch_start(integer n)\n    {\n";
         const std::string tail = "    }\n}\n";
-        std::string       made = actedOn(head + "        if (n == 1)\n        {\n            llOwnerSay(\"one\");\n        }\n        else\n        {\n"
+        std::string       made = require_acted_on(head + "        if (n == 1)\n        {\n            llOwnerSay(\"one\");\n        }\n        else\n        {\n"
                                                 "            llOwnerSay(\"many\");\n        }\n" + tail,
                                          false, "if", false, "Invert the if");
         UNSCOPED_INFO("braces");
         CHECK(made ==
                       head + "        if (n != 1)\n        {\n            llOwnerSay(\"many\");\n        }\n        else\n        {\n"
                              "            llOwnerSay(\"one\");\n        }\n" + tail);
-        made = actedOn(head + "        if (!n) llOwnerSay(\"none\"); else llOwnerSay(\"some\");\n" + tail, false, "if", false, "Invert the if");
+        made = require_acted_on(head + "        if (!n) llOwnerSay(\"none\"); else llOwnerSay(\"some\");\n" + tail, false, "if", false, "Invert the if");
         UNSCOPED_INFO("a not taken off");
         CHECK(made == head + "        if (n) llOwnerSay(\"some\"); else llOwnerSay(\"none\");\n" + tail);
-        made = actedOn(head + "        if (n > 2) llOwnerSay(\"many\"); else llOwnerSay(\"few\");\n" + tail, false, "if", false, "Invert the if");
+        made = require_acted_on(head + "        if (n > 2) llOwnerSay(\"many\"); else llOwnerSay(\"few\");\n" + tail, false, "if", false, "Invert the if");
         UNSCOPED_INFO("an order under a not");
         CHECK(made == head + "        if (!(n > 2)) llOwnerSay(\"few\"); else llOwnerSay(\"many\");\n" + tail);
         const std::string chain = head + "        if (n == 1) llOwnerSay(\"one\"); else if (n == 2) llOwnerSay(\"two\");\n" + tail;
         UNSCOPED_INFO("not with an else if");
-        CHECK(actedOn(chain, false, "if", false, "Invert the if").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(chain, false, "if", false, "Invert the if").rfind("offered", 0) == 0);
         const std::string lone = head + "        if (n == 1) llOwnerSay(\"one\");\n" + tail;
         UNSCOPED_INFO("not without an else");
-        CHECK(actedOn(lone, false, "if", false, "Invert the if").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(lone, false, "if", false, "Invert the if").rfind("offered", 0) == 0);
         // An else branch ending in an if of its own goes first in braces,
         // or the else would come to be that if's.
-        made = actedOn(head + "        if (n) llOwnerSay(\"a\"); else while (n--) if (n == 3) llOwnerSay(\"c\");\n" + tail, false, "if", false,
+        made = require_acted_on(head + "        if (n) llOwnerSay(\"a\"); else while (n--) if (n == 3) llOwnerSay(\"c\");\n" + tail, false, "if", false,
                        "Invert the if");
         UNSCOPED_INFO("braced");
         CHECK(made == head + "        if (!n) { while (n--) if (n == 3) llOwnerSay(\"c\"); } else llOwnerSay(\"a\");\n" + tail);
@@ -702,7 +679,7 @@ namespace
         CHECK(lslLoaded);
         const std::string script = "default\n{\n    state_entry()\n    {\n        llListen(0, \"\", NULL_KEY, \"\");\n        llSetTimerEvent(1.0);\n"
                                    "    }\n}\n";
-        std::string made = actedOn(script, false, "llListen", false, "Add a handler for 'listen'");
+        std::string made = require_acted_on(script, false, "llListen", false, "Add a handler for 'listen'");
         UNSCOPED_INFO("before the brace, after a blank line");
         CHECK(made ==
                       "default\n{\n    state_entry()\n    {\n        llListen(0, \"\", NULL_KEY, \"\");\n        llSetTimerEvent(1.0);\n    }\n\n"
@@ -715,14 +692,14 @@ namespace
         REQUIRE(actions(heard, false, 3, 8, 3, 8).empty());
         // The brace where the state's first handler has it.
         const std::string same = "default\n{\n    state_entry() {\n        llSensorRepeat(\"\", NULL_KEY, AGENT, 10.0, PI, 5.0);\n    }\n}\n";
-        made = actedOn(same, false, "llSensorRepeat", false, "Add a handler for 'sensor'");
+        made = require_acted_on(same, false, "llSensorRepeat", false, "Add a handler for 'sensor'");
         UNSCOPED_INFO("on its line: " + made);
         REQUIRE(made.find("\n\n    sensor(integer num_detected) {\n    }\n}\n") != std::string::npos);
         // Asked for from a function a handler calls, and from one that one
         // calls: offered all the same.
         const std::string helper = "arm()\n{\n    llSetTimerEvent(1.0);\n}\nstart()\n{\n    arm();\n}\n"
                                    "default\n{\n    state_entry()\n    {\n        start();\n    }\n}\n";
-        made = actedOn(helper, false, "start();\n    }", false, "Add a handler for 'timer'");
+        made = require_acted_on(helper, false, "start();\n    }", false, "Add a handler for 'timer'");
         UNSCOPED_INFO("through two calls: " + made);
         REQUIRE(made.find("    timer()\n    {\n    }\n") != std::string::npos);
     }
@@ -731,61 +708,60 @@ namespace
     {
         UNSCOPED_INFO("definitions: " + error);
         CHECK(luauLoaded);
-        std::string made = actedOn("local function f(n: number)\n    print(n * 2 + 1)\nend\nf(1)\n", true, "n * 2", true, "Put it in a local, 'value'");
+        std::string made = require_acted_on("local function f(n: number)\n    print(n * 2 + 1)\nend\nf(1)\n", true, "n * 2", true, "Put it in a local, 'value'");
         UNSCOPED_INFO("before the statement");
         CHECK(made == "local function f(n: number)\n    local value = n * 2\n    print(value + 1)\nend\nf(1)\n");
-        made = actedOn("local x = 1; print(x + 1)\n", true, "x + 1", true, "Put it in a local, 'value'");
+        made = require_acted_on("local x = 1; print(x + 1)\n", true, "x + 1", true, "Put it in a local, 'value'");
         UNSCOPED_INFO("beside");
         CHECK(made == "local x = 1; local value = x + 1; print(value)\n");
         const std::string skipped = "local x = 1\nprint(x > 0 and tostring(x))\n";
         UNSCOPED_INFO("not what and may skip");
-        CHECK(actedOn(skipped, true, "tostring(x)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(skipped, true, "tostring(x)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         const std::string looped = "local x = 1\nwhile x < 10 do\n    x += 1\nend\n";
         UNSCOPED_INFO("not a loop's condition");
-        CHECK(actedOn(looped, true, "x < 10", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(looped, true, "x < 10", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         const std::string elseif = "local x = 1\nif x == 0 then\n    print(0)\nelseif x + 1 == 2 then\n    print(1)\nend\n";
         UNSCOPED_INFO("not an elseif's condition");
-        CHECK(actedOn(elseif, true, "x + 1", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(elseif, true, "x + 1", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         // Not a call that is the whole statement: `value` alone is no
         // statement.
         const std::string whole = "print(math.abs(-1))\n";
         UNSCOPED_INFO("not the whole statement");
-        CHECK(actedOn(whole, true, "print(math.abs(-1))", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
-        UNSCOPED_INFO("its argument yes: " + actedOn(whole, true, "math.abs(-1)", true, "Put it in a local, 'value'"));
-        CHECK(actedOn(whole, true, "math.abs(-1)", true, "Put it in a local, 'value'") == "local value = math.abs(-1)\nprint(value)\n");
+        CHECK(require_acted_on(whole, true, "print(math.abs(-1))", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        UNSCOPED_INFO("its argument yes: " + require_acted_on(whole, true, "math.abs(-1)", true, "Put it in a local, 'value'"));
+        CHECK(require_acted_on(whole, true, "math.abs(-1)", true, "Put it in a local, 'value'") == "local value = math.abs(-1)\nprint(value)\n");
         // Not a call where all it gives is kept, since a local keeps one.
         const std::string two = "local function g(n: number) return n, 2 end\n";
         UNSCOPED_INFO("not a last argument");
-        CHECK(actedOn(two + "print(g(1))\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(two + "print(g(1))\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         UNSCOPED_INFO("not a last return");
-        CHECK(actedOn(two + "local function h() return 0, g(1) end\nh()\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(two + "local function h() return 0, g(1) end\nh()\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         UNSCOPED_INFO("not a table's last item");
-        CHECK(actedOn(two + "local t = { g(1) }\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(two + "local t = { g(1) }\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         UNSCOPED_INFO("not to two names");
-        CHECK(actedOn(two + "local a, b = g(1)\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(two + "local a, b = g(1)\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         UNSCOPED_INFO("not a for-in's values");
-        CHECK(actedOn("for k, v in pairs({}) do end\n", true, "pairs({})", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on("for k, v in pairs({}) do end\n", true, "pairs({})", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         // Where only the first is kept anyway, yes.
-        UNSCOPED_INFO("an argument before the last: " + actedOn(two + "print(g(1), 3)\n", true, "g(1)", true, "Put it in a local, 'value'"));
-        CHECK(actedOn(two + "print(g(1), 3)\n", true, "g(1)", true, "Put it in a local, 'value'") == two + "local value = g(1)\nprint(value, 3)\n");
-        UNSCOPED_INFO("to one name: " + actedOn(two + "local a = g(1)\n", true, "g(1)", true, "Put it in a local, 'value'"));
-        CHECK(actedOn(two + "local a = g(1)\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) != 0);
+        UNSCOPED_INFO("an argument before the last: " + require_acted_on(two + "print(g(1), 3)\n", true, "g(1)", true, "Put it in a local, 'value'"));
+        CHECK(require_acted_on(two + "print(g(1), 3)\n", true, "g(1)", true, "Put it in a local, 'value'") == two + "local value = g(1)\nprint(value, 3)\n");
+        UNSCOPED_INFO("to one name: " + require_acted_on(two + "local a = g(1)\n", true, "g(1)", true, "Put it in a local, 'value'"));
+        CHECK(require_acted_on(two + "local a = g(1)\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) != 0);
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: a SLua if is inverted; a join interpolated; a local given its type", "[ALScriptFixes]")
     {
         UNSCOPED_INFO("definitions: " + error);
         CHECK(luauLoaded);
-        std::string made = actedOn("local x = 1\nif x == 1 then\n    print(\"one\")\nelse\n    print(\"other\")\nend\n", true, "if", false, "Invert the if");
-        UNSCOPED_INFO("inverted");
+        std::string made = require_acted_on("local x = 1\nif x == 1 then\n    print(\"one\")\nelse\n    print(\"other\")\nend\n", true, "if", false, "Invert the if");
         CHECK(made == "local x = 1\nif x ~= 1 then\n    print(\"other\")\nelse\n    print(\"one\")\nend\n");
-        made = actedOn("local x = 1\nif not (x > 1) then\n    print(\"few\")\nelse\n    print(\"many\")\nend\n", true, "if", false, "Invert the if");
+        made = require_acted_on("local x = 1\nif not (x > 1) then\n    print(\"few\")\nelse\n    print(\"many\")\nend\n", true, "if", false, "Invert the if");
         UNSCOPED_INFO("a not taken off");
         CHECK(made == "local x = 1\nif x > 1 then\n    print(\"many\")\nelse\n    print(\"few\")\nend\n");
-        made = actedOn("local x = 1\nprint(\"n = \" .. x .. \"!\")\n", true, "..", false, "Write it as an interpolated string");
+        made = require_acted_on("local x = 1\nprint(\"n = \" .. x .. \"!\")\n", true, "..", false, "Write it as an interpolated string");
         UNSCOPED_INFO("interpolated");
         CHECK(made == "local x = 1\nprint(`n = {x}!`)\n");
-        made = actedOn("local count = 5\nprint(count)\n", true, "count", false, "Declare it as 'number'");
+        made = require_acted_on("local count = 5\nprint(count)\n", true, "count", false, "Declare it as 'number'");
         UNSCOPED_INFO("annotated");
         CHECK(made == "local count: number = 5\nprint(count)\n");
     }
@@ -802,17 +778,17 @@ namespace
         grid.mode = "nonstrict";
         luau.setConfig(grid);
         const std::string script = "ll.Listen(0, \"\", ll.GetOwner(), \"\")\n";
-        std::string       made   = actedOn(script, true, "Listen", false, "Add a handler for 'listen'");
+        std::string       made   = require_acted_on(script, true, "Listen", false, "Add a handler for 'listen'");
         UNSCOPED_INFO("at the end");
         CHECK(made ==
                       script + "\nLLEvents:on(\"listen\", function(channel: number, name: string, id: uuid, msg: string)\nend)\n");
         const std::string heard = script + "LLEvents:on(\"listen\", function(channel, name, id, text) end)\n";
         UNSCOPED_INFO("heard: " + titles(actions(heard, true, 0, 3, 0, 3)));
-        CHECK(actedOn(heard, true, "Listen", false, "Add a handler for 'listen'").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(heard, true, "Listen", false, "Add a handler for 'listen'").rfind("offered", 0) == 0);
         // A handler taken off is no handler put on.
         const std::string off = script + "local function said(channel, name, id, text) end\nLLEvents:off(\"listen\", said)\n";
         UNSCOPED_INFO("offered where only taken off: " + titles(actions(off, true, 0, 3, 0, 3)));
-        CHECK(actedOn(off, true, "Listen", false, "Add a handler for 'listen'").rfind("offered", 0) != 0);
+        CHECK(require_acted_on(off, true, "Listen", false, "Add a handler for 'listen'").rfind("offered", 0) != 0);
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: a refactor's name is fresh and a line put in maps to its source line", "[ALScriptFixes]")
@@ -832,7 +808,6 @@ namespace
         const ALPreprocessor::Result       result = ALPreprocessor::run(script, options);
         ALScriptProblem                    held;
         const ALSourceMap::Loc             carried = result.map.toExpanded(0, 5, 8);
-        UNSCOPED_INFO("carried");
         REQUIRE(carried.found());
         held.fixes.push_back(ALScriptFixes::titled("ScriptActionExtract", "Put it in a local, '[1]'", { "value" }));
         held.fixes.back().edits.push_back({ carried.line, 0, carried.line, 0, "        integer value = 1;\n" });
@@ -841,7 +816,6 @@ namespace
         REQUIRE(held.fixes.size() == static_cast<size_t>(1));
         UNSCOPED_INFO("the source's line");
         CHECK(held.fixes.front().edits.front().line == 5);
-        UNSCOPED_INFO("its start");
         CHECK(held.fixes.front().edits.front().column == 0);
     }
 
@@ -889,7 +863,6 @@ namespace
         UNSCOPED_INFO("after the last require");
         CHECK(made("--!strict\nlocal a = require(\"a\")\nlocal b = require(\"b\").b\n\nprint(util.x)\n", "util", false) ==
                       std::string("--!strict\nlocal a = require(\"a\")\nlocal b = require(\"b\").b\nlocal util = require(\"util\")\n\nprint(util.x)\n"));
-        UNSCOPED_INFO("its words");
         CHECK(problem.fixes.front().title == std::string("Require 'util'"));
         UNSCOPED_INFO("after the comments, the blank line kept");
         CHECK(made("--!strict\n--[[ A header\n  over lines ]]\n\nprint(util.x)\n", "@lib/util", false) ==
@@ -897,7 +870,6 @@ namespace
         UNSCOPED_INFO("apart from code that follows at once");
         CHECK(made("print(util)\n", "helpers", true) ==
                       std::string("local util = require(\"helpers\").util\n\nprint(util)\n"));
-        UNSCOPED_INFO("a field's words");
         CHECK(problem.fixes.front().title == std::string("Take 'util' from 'helpers'"));
         UNSCOPED_INFO("past a last line with no break");
         CHECK(made("-- only a comment", "util", false) ==
@@ -909,11 +881,8 @@ namespace
         ALScriptFixes::offerRequire(problem, "print(util)\n", "util", false);
         UNSCOPED_INFO("offered once");
         REQUIRE(problem.fixes.size() == static_cast<size_t>(1));
-        {
-            INFO("neither preferred nor safe");
-            CHECK_FALSE(problem.fixes.front().preferred);
-            CHECK_FALSE(problem.fixes.front().safe);
-        }
+        CHECK_FALSE(problem.fixes.front().preferred);
+        CHECK_FALSE(problem.fixes.front().safe);
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: an LSL include exports its macros and top-level functions and globals", "[ALScriptFixes]")
@@ -954,7 +923,6 @@ namespace
         UNSCOPED_INFO("after the last directive");
         CHECK(made("// Hello\n#include \"a.lsl\"\n#define LONG \\\n    1\n\ndefault {}\n", "helpers.lsl") ==
                       std::string("// Hello\n#include \"a.lsl\"\n#define LONG \\\n    1\n#include \"helpers.lsl\"\n\ndefault {}\n"));
-        UNSCOPED_INFO("its words");
         CHECK(problem.fixes.front().title == std::string("Include 'helpers.lsl'"));
         UNSCOPED_INFO("after the comments, the blank line kept");
         CHECK(made("/* A header\n   over lines */\n\ndefault {}\n", "helpers") ==
@@ -976,7 +944,8 @@ namespace
             {
                 said_so = said_so || (each.key == "LSLUndeclared" && each.args.size() == 1 && each.args[0] == name);
             }
-            UNSCOPED_INFO(std::string("undeclared: ") + name + "\n" + said(problems));
+            CAPTURE(name);
+            INFO("said:\n" + said(problems));
             REQUIRE(said_so);
         }
     }
@@ -1046,7 +1015,7 @@ namespace
                                    "default\n{\n    state_entry()\n    {\n        llOwnerSay(\"hello there\");\n"
                                    "        llSetText(\"hello there\", <1.0, 1.0, 1.0>, 1.0);\n    }\n"
                                    "    touch_start(integer n)\n    {\n        llOwnerSay(\"hello there\");\n        llOwnerSay(\"other\");\n    }\n}\n";
-        const std::string made = actedOn(script, false, "\"hello there\");", false, "Put the string in a global, 'gHelloThere', for its 3 uses");
+        const std::string made = require_acted_on(script, false, "\"hello there\");", false, "Put the string in a global, 'gHelloThere', for its 3 uses");
         UNSCOPED_INFO("declared after the globals, each use named, the global's own value kept");
         CHECK(made ==
                       "string gGreeting = \"hello there\";\nstring gHelloThere = \"hello there\";\n"
@@ -1055,7 +1024,7 @@ namespace
                       "    touch_start(integer n)\n    {\n        llOwnerSay(gHelloThere);\n        llOwnerSay(\"other\");\n    }\n}\n");
         // A short one costs more as a global than it saves: the list says
         // so, weighing it. A long one, used as often, is lighter.
-        UNSCOPED_INFO("heavier on LSO: " + std::to_string(ALScriptWeigh::lso(made).total) + " from " + std::to_string(ALScriptWeigh::lso(script).total));
+        UNSCOPED_INFO("heavier on LSO");
         CHECK(ALScriptWeigh::lso(made).total >= ALScriptWeigh::lso(script).total);
         std::string long_script = script;
         std::string long_made   = made;
@@ -1066,15 +1035,14 @@ namespace
                 text->replace(at, 11, "hello there, and a sentence of some length said to the owner");
             }
         }
-        UNSCOPED_INFO("a long one lighter on LSO: " + std::to_string(ALScriptWeigh::lso(long_made).total) + " from " +
-                   std::to_string(ALScriptWeigh::lso(long_script).total));
+        UNSCOPED_INFO("a long one lighter on LSO");
         CHECK(ALScriptWeigh::lso(long_made).total < ALScriptWeigh::lso(long_script).total);
         UNSCOPED_INFO("not for a string used once");
-        CHECK(actedOn(script, false, "\"other\"", false, "Put the string in a global, 'gOther', for its 1 uses").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(script, false, "\"other\"", false, "Put the string in a global, 'gOther', for its 1 uses").rfind("offered", 0) == 0);
 
         // No globals to follow: ahead of what the script opens with.
         const std::string bare = "default\n{\n    state_entry()\n    {\n        llOwnerSay(\"hi\\n\");\n        llOwnerSay(\"hi\\n\");\n    }\n}\n";
-        const std::string placed = actedOn(bare, false, "\"hi", false, "Put the string in a global, 'gHi', for its 2 uses");
+        const std::string placed = require_acted_on(bare, false, "\"hi", false, "Put the string in a global, 'gHi', for its 2 uses");
         UNSCOPED_INFO("ahead of the state, a blank line after: " + placed);
         CHECK(placed.rfind("string gHi = \"hi\\n\";\n\ndefault\n", 0) == 0);
     }
@@ -1087,18 +1055,18 @@ namespace
                                    "default\n{\n    state_entry()\n    {\n        integer n = 5;\n"
                                    "        list l = [n, \"two\", <3.0, 3.0, 3.0>, -4, n + 3, llGetListLength(gFixed)];\n"
                                    "        llOwnerSay((string)[1, 2]);\n    }\n}\n";
-        std::string made = actedOn(script, false, "[n,", false, "Write the list as a sum");
+        std::string made = require_acted_on(script, false, "[n,", false, "Write the list as a sum");
         UNSCOPED_INFO("each where it would mean what it meant");
         CHECK(made ==
                       "list gFixed = [1, 2];\n"
                       "default\n{\n    state_entry()\n    {\n        integer n = 5;\n"
                       "        list l = (list)n + \"two\" + <3.0, 3.0, 3.0> + (-4) + (n + 3) + llGetListLength(gFixed);\n"
                       "        llOwnerSay((string)[1, 2]);\n    }\n}\n");
-        made = actedOn(script, false, "[1, 2]);", false, "Write the list as a sum");
+        made = require_acted_on(script, false, "[1, 2]);", false, "Write the list as a sum");
         UNSCOPED_INFO("bracketed under a cast: " + made);
         REQUIRE(made.find("llOwnerSay((string)((list)1 + 2));") != std::string::npos);
         UNSCOPED_INFO("not a global's value, which must be written out");
-        CHECK(actedOn(script, false, "[1, 2];", false, "Write the list as a sum").rfind("offered", 0) == 0);
+        CHECK(require_acted_on(script, false, "[1, 2];", false, "Write the list as a sum").rfind("offered", 0) == 0);
     }
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: a fix that takes code out says so and one that only renames does not", "[ALScriptFixes]")
     {
@@ -1109,16 +1077,10 @@ namespace
         const std::string state = "default\n{\n    state_entry()\n    {\n        llOwnerSay(\"x\");\n    }\n}\n";
         const ALScriptProblems lsl = check("integer helper(integer x)\n{\n    return x;\n}\n" + state, false);
         const ALScriptProblem* unused = keyed(lsl, "LSLDeclaredButNotUsed");
-        {
-            INFO("said");
-            REQUIRE(unused != nullptr);
-            REQUIRE_FALSE(unused->fixes.empty());
-        }
-        {
-            INFO("a removal is safe, and removes");
-            REQUIRE(unused->fixes.front().safe);
-            CHECK(unused->fixes.front().removes);
-        }
+        REQUIRE(unused != nullptr);
+        REQUIRE_FALSE(unused->fixes.empty());
+        REQUIRE(unused->fixes.front().safe);
+        CHECK(unused->fixes.front().removes);
         const ALScriptProblems lua = check("local function f()\n    local unused = 1\nend\nf()\n", true);
         const ALScriptProblem* local = keyed(lua, "LuauLintLocalUnused");
         {
@@ -1126,11 +1088,8 @@ namespace
             REQUIRE(local != nullptr);
             REQUIRE_FALSE(local->fixes.empty());
         }
-        {
-            INFO("a rename is safe, and removes nothing");
-            REQUIRE(local->fixes.front().safe);
-            CHECK_FALSE(local->fixes.front().removes);
-        }
+        REQUIRE(local->fixes.front().safe);
+        CHECK_FALSE(local->fixes.front().removes);
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: short names guess one edit away; a swap is one edit; ties not preferred", "[ALScriptFixes]")
@@ -1172,11 +1131,8 @@ namespace
         REQUIRE(problem != nullptr);
         UNSCOPED_INFO("both: " + titles(problem->fixes));
         REQUIRE(problem->fixes.size() == size_t(2));
-        {
-            INFO("neither preferred");
-            REQUIRE_FALSE(problem->fixes[0].preferred);
-            CHECK_FALSE(problem->fixes[1].preferred);
-        }
+        REQUIRE_FALSE(problem->fixes[0].preferred);
+        CHECK_FALSE(problem->fixes[1].preferred);
         problems = check("local cat, car = 1, 2\nprint(cat, car, cax)\n", true);
         problem  = unknown(problems);
         UNSCOPED_INFO("said: " + said(problems));
@@ -1226,7 +1182,7 @@ namespace
             const ALScriptEdit put{ 0, 0, 0, 0, "local v = print(x)\n" };
             const ALScriptEdit swap{ 0, 0, 0, 8, "v" };
             fix.edits = insertion_first ? std::vector<ALScriptEdit>{ put, swap } : std::vector<ALScriptEdit>{ swap, put };
-            UNSCOPED_INFO((insertion_first ? "put in first" : "replaced first"));
+            CAPTURE(insertion_first);
             REQUIRE(ALScriptFixes::apply("print(x)\n", fix).value_or("refused") ==
                           std::string("local v = print(x)\nv\n"));
         }
@@ -1251,36 +1207,31 @@ namespace
         problem.column                 = 0;
         problem.endColumn              = 1;
         ALScriptFixes::attachOptimizer(problem, "integer x;\n");
-        UNSCOPED_INFO("nothing added");
         REQUIRE(problem.fixes.size() == size_t(1));
-        UNSCOPED_INFO("still preferred");
         CHECK(problem.fixes.front().preferred);
         // Where it can, its own is added unpreferred.
         problem.line = problem.endLine = 0;
         problem.column                 = 8;
         problem.endColumn              = 9;
         ALScriptFixes::attachOptimizer(problem, "integer x;\n");
-        {
-            INFO("added: " + std::to_string(problem.fixes.size()));
-            REQUIRE(problem.fixes.size() == 2);
-            CHECK_FALSE(problem.fixes.back().preferred);
-            CHECK(problem.fixes.front().preferred);
-        }
+        REQUIRE(problem.fixes.size() == 2);
+        CHECK_FALSE(problem.fixes.back().preferred);
+        CHECK(problem.fixes.front().preferred);
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: LSL's operators and zero indexes in SLua fixed; only ~= is safe", "[ALScriptFixes]")
     {
         UNSCOPED_INFO("~=");
-        CHECK(fixed("local a, b = 1, 2\nif a != b then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '!=' to '~='") ==
+        CHECK(require_fixed("local a, b = 1, 2\nif a != b then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '!=' to '~='") ==
                       std::string("local a, b = 1, 2\nif a ~= b then print(1) end\n"));
         UNSCOPED_INFO("and, apart from what it joins");
-        CHECK(fixed("local a, b = true, false\nif a&&b then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '&&' to 'and'") ==
+        CHECK(require_fixed("local a, b = true, false\nif a&&b then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '&&' to 'and'") ==
                       std::string("local a, b = true, false\nif a and b then print(1) end\n"));
         UNSCOPED_INFO("or");
-        CHECK(fixed("local a, b = true, false\nif a || b then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '||' to 'or'") ==
+        CHECK(require_fixed("local a, b = true, false\nif a || b then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '||' to 'or'") ==
                       std::string("local a, b = true, false\nif a or b then print(1) end\n"));
         UNSCOPED_INFO("not, apart from its operand");
-        CHECK(fixed("local a = true\nif(!a) then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '!' to 'not'") ==
+        CHECK(require_fixed("local a = true\nif(!a) then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '!' to 'not'") ==
                       std::string("local a = true\nif(not a) then print(1) end\n"));
         const ALScriptProblems compared = check("local a, b = 1, 2\nif a != b then print(1) end\n", true);
         const ALScriptProblems denied   = check("local a = true\nif !a then print(1) end\n", true);
@@ -1298,34 +1249,34 @@ namespace
         }
 
         UNSCOPED_INFO("an index from 0");
-        CHECK(fixed("local t = {}\ntable.insert(t, 0, 5)\n", true, "LuauLintTableInsertZero", "Change '0' to '1'") ==
+        CHECK(require_fixed("local t = {}\ntable.insert(t, 0, 5)\n", true, "LuauLintTableInsertZero", "Change '0' to '1'") ==
                       std::string("local t = {}\ntable.insert(t, 1, 5)\n"));
         UNSCOPED_INFO("a loop from 0");
-        CHECK(fixed("local t = {1, 2}\nfor i = 0, #t do print(t[i]) end\n", true, "LuauLintForRangeZero", "Change '0' to '1'") ==
+        CHECK(require_fixed("local t = {1, 2}\nfor i = 0, #t do print(t[i]) end\n", true, "LuauLintForRangeZero", "Change '0' to '1'") ==
                       std::string("local t = {1, 2}\nfor i = 1, #t do print(t[i]) end\n"));
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: LSL fixes: an if's ';' and event parameters and untyped ones and braces", "[ALScriptFixes]")
     {
         UNSCOPED_INFO("the if's ';' out");
-        CHECK(fixed("default { state_entry() { integer x = llGetUnixTime(); if (x); llOwnerSay(\"a\"); } }", false, "LSLEmptyIf",
+        CHECK(require_fixed("default { state_entry() { integer x = llGetUnixTime(); if (x); llOwnerSay(\"a\"); } }", false, "LSLEmptyIf",
                                                 "Take out the ';' that ends the if") ==
                       std::string("default { state_entry() { integer x = llGetUnixTime(); if (x) llOwnerSay(\"a\"); } }"));
         UNSCOPED_INFO("a wrong type, the name kept");
-        CHECK(fixed("default { touch_start(string n) { llOwnerSay((string)n); } }", false, "LSLArgumentWrongTypeEvent",
+        CHECK(require_fixed("default { touch_start(string n) { llOwnerSay((string)n); } }", false, "LSLArgumentWrongTypeEvent",
                                                           "Write the parameters 'touch_start' takes") ==
                       std::string("default { touch_start(integer n) { llOwnerSay((string)n); } }"));
         UNSCOPED_INFO("too few, the builtins' names");
-        CHECK(fixed("default { touch_start() { } }", false, "LSLTooFewArgumentsEvent", "Write the parameters 'touch_start' takes") ==
+        CHECK(require_fixed("default { touch_start() { } }", false, "LSLTooFewArgumentsEvent", "Write the parameters 'touch_start' takes") ==
                       std::string("default { touch_start(integer num_detected) { } }"));
         UNSCOPED_INFO("too many");
-        CHECK(fixed("default { touch_start(integer n, integer m) { } }", false, "LSLTooManyArgumentsEvent", "Write the parameters 'touch_start' takes") ==
+        CHECK(require_fixed("default { touch_start(integer n, integer m) { } }", false, "LSLTooManyArgumentsEvent", "Write the parameters 'touch_start' takes") ==
                       std::string("default { touch_start(integer n) { } }"));
         UNSCOPED_INFO("an event's with no type");
-        CHECK(fixed("default { touch_start(n) { } }", false, "LSLParameterUntyped", "Write the parameters 'touch_start' takes") ==
+        CHECK(require_fixed("default { touch_start(n) { } }", false, "LSLParameterUntyped", "Write the parameters 'touch_start' takes") ==
                       std::string("default { touch_start(integer n) { } }"));
         UNSCOPED_INFO("a declaration as an if's body, braced");
-        CHECK(fixed("default { state_entry() { if (llGetUnixTime()) integer i = 1; } }", false, "LSLDeclarationInvalidHere",
+        CHECK(require_fixed("default { state_entry() { if (llGetUnixTime()) integer i = 1; } }", false, "LSLDeclarationInvalidHere",
                                                                     "Put it in braces of its own") ==
                       std::string("default { state_entry() { if (llGetUnixTime()) { integer i = 1; } } }"));
 
@@ -1362,10 +1313,9 @@ namespace
         CHECK(lslLoaded);
         const std::string script = "default\n{\n    state_entry()\n    {\n        llSay(0, \"Hello, Avatar!\");\n\n"
                                    "    touch_start(integer total_number)\n    {\n        llSay(0, \"Touched.\");\n    }\n}\n";
-        const std::string made = fixed(script, false, "LSLSyntaxMissing", "Insert '}'");
+        const std::string made = require_fixed(script, false, "LSLSyntaxMissing", "Insert '}'");
         UNSCOPED_INFO("closed after the call, its own line: " + made);
         REQUIRE(made.find("\"Hello, Avatar!\");\n    }\n\n    touch_start(") != std::string::npos);
-        UNSCOPED_INFO("no error left");
         CHECK(errors(check(made, false)) == 0);
     }
 
@@ -1373,18 +1323,14 @@ namespace
     {
         UNSCOPED_INFO("definitions: " + error);
         CHECK(luauLoaded);
-        const std::string made = fixed("local x = 1\nx = x + 2 * x\nprint(x)\n", true, "LuauLintSlCompoundAssign", "Write it x += ...");
-        UNSCOPED_INFO("the text");
+        const std::string made = require_fixed("local x = 1\nx = x + 2 * x\nprint(x)\n", true, "LuauLintSlCompoundAssign", "Write it x += ...");
         CHECK(made == std::string("local x = 1\nx += 2 * x\nprint(x)\n"));
         const ALScriptProblems problems = check("local x = 1\nx = x + 2 * x\nprint(x)\n", true);
         const ALScriptProblem* problem  = keyed(problems, "LuauLintSlCompoundAssign");
-        {
-            INFO("safe");
-            REQUIRE(problem);
-            CHECK(problem->fixes.front().safe);
-        }
+        REQUIRE(problem);
+        CHECK(problem->fixes.front().safe);
         UNSCOPED_INFO("a field, joined");
-        CHECK(fixed("local t = { n = \"a\" }\nt.n = t.n ..\"b\" .. \"c\"\nprint(t.n)\n", true, "LuauLintSlCompoundAssign",
+        CHECK(require_fixed("local t = { n = \"a\" }\nt.n = t.n ..\"b\" .. \"c\"\nprint(t.n)\n", true, "LuauLintSlCompoundAssign",
                                                "Write it t.n ..= ...") ==
                       std::string("local t = { n = \"a\" }\nt.n ..= \"b\" .. \"c\"\nprint(t.n)\n"));
     }
@@ -1397,8 +1343,7 @@ namespace
                                    "    list l = [1, 2]; integer length = 3; integer i;\n"
                                    "    for (i = 0; i < llGetListLength(l); ++i) llOwnerSay((string)(i + length));\n"
                                    "} }\n";
-        const std::string made = fixed(script, false, "LSLSlLoopInvariantCall", "Work out llGetListLength once, before the loop");
-        UNSCOPED_INFO("the text");
+        const std::string made = require_fixed(script, false, "LSLSlLoopInvariantCall", "Work out llGetListLength once, before the loop");
         CHECK(made ==
                       std::string("default { state_entry() {\n"
                                   "    list l = [1, 2]; integer length = 3; integer i;\n"
@@ -1407,11 +1352,8 @@ namespace
                                   "} }\n"));
         const ALScriptProblems problems = check(script, false);
         const ALScriptProblem* problem  = keyed(problems, "LSLSlLoopInvariantCall");
-        {
-            INFO("not safe");
-            REQUIRE(problem);
-            CHECK_FALSE(problem->fixes.front().safe);
-        }
+        REQUIRE(problem);
+        CHECK_FALSE(problem->fixes.front().safe);
         // Not where the loop is all its if has: a declaration may not be.
         const ALScriptProblems in_if = check("default { state_entry() {\n"
                                              "    list l; integer i;\n"
@@ -1419,11 +1361,8 @@ namespace
                                              "} }\n",
                                              false);
         const ALScriptProblem* alone = keyed(in_if, "LSLSlLoopInvariantCall");
-        {
-            INFO("said, with no fix");
-            REQUIRE(alone);
-            REQUIRE(alone->fixes.empty());
-        }
+        REQUIRE(alone);
+        REQUIRE(alone->fixes.empty());
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: SlNumberTruth's fixes: n ~= 0 bracketed where needed and not n as n == 0", "[ALScriptFixes]")
@@ -1431,22 +1370,19 @@ namespace
         UNSCOPED_INFO("definitions: " + error);
         CHECK(luauLoaded);
         UNSCOPED_INFO("compared");
-        CHECK(fixed("local n = 0\nif n then print(n) end\n", true, "LuauLintSlNumberTruth", "Compare it: n ~= 0") ==
+        CHECK(require_fixed("local n = 0\nif n then print(n) end\n", true, "LuauLintSlNumberTruth", "Compare it: n ~= 0") ==
                       std::string("local n = 0\nif n ~= 0 then print(n) end\n"));
         UNSCOPED_INFO("bracketed");
-        CHECK(fixed("local c = true\nif (if c then 1 else 2) then print(c) end\n", true, "LuauLintSlNumberTruth",
+        CHECK(require_fixed("local c = true\nif (if c then 1 else 2) then print(c) end\n", true, "LuauLintSlNumberTruth",
                                          "Compare it: if c then 1 else 2 ~= 0") ==
                       std::string("local c = true\nif ((if c then 1 else 2) ~= 0) then print(c) end\n"));
         UNSCOPED_INFO("not");
-        CHECK(fixed("local n = 0\nprint(not n)\n", true, "LuauLintSlNumberTruthNot", "Ask whether it is 0: n == 0") ==
+        CHECK(require_fixed("local n = 0\nprint(not n)\n", true, "LuauLintSlNumberTruthNot", "Ask whether it is 0: n == 0") ==
                       std::string("local n = 0\nprint(n == 0)\n"));
         const ALScriptProblems problems = check("local n = 0\nif n then print(n) end\n", true);
         const ALScriptProblem* problem  = keyed(problems, "LuauLintSlNumberTruth");
-        {
-            INFO("not safe");
-            REQUIRE(problem);
-            CHECK_FALSE(problem->fixes.front().safe);
-        }
+        REQUIRE(problem);
+        CHECK_FALSE(problem->fixes.front().safe);
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: SlNilSentinel's fixes: nil for SLua's finds and -1 for llcompat's; safe", "[ALScriptFixes]")
@@ -1454,32 +1390,29 @@ namespace
         UNSCOPED_INFO("definitions: " + error);
         CHECK(luauLoaded);
         UNSCOPED_INFO("never");
-        CHECK(fixed("local l = {1}\nif ll.ListFindList(l, {2}) == -1 then print(l) end\n", true, "LuauLintSlNilSentinel",
+        CHECK(require_fixed("local l = {1}\nif ll.ListFindList(l, {2}) == -1 then print(l) end\n", true, "LuauLintSlNilSentinel",
                                      "Write it ll.ListFindList(...) == nil") ==
                       std::string("local l = {1}\nif ll.ListFindList(l, {2}) == nil then print(l) end\n"));
         UNSCOPED_INFO("on the right");
-        CHECK(fixed("local i = table.find({1}, 1)\nprint(-1 ~= i)\n", true, "LuauLintSlNilSentinelAlways", "Write it i ~= nil") ==
+        CHECK(require_fixed("local i = table.find({1}, 1)\nprint(-1 ~= i)\n", true, "LuauLintSlNilSentinelAlways", "Write it i ~= nil") ==
                       std::string("local i = table.find({1}, 1)\nprint(i ~= nil)\n"));
         UNSCOPED_INFO("ordered, bracketed");
-        CHECK(fixed("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint((i) < 0)\n", true, "LuauLintSlNilSentinelOrder",
+        CHECK(require_fixed("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint((i) < 0)\n", true, "LuauLintSlNilSentinelOrder",
                                                   "Write it i == nil") ==
                       std::string("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint((i) == nil)\n"));
         UNSCOPED_INFO("ordered, on the right");
-        CHECK(fixed("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint(0 <= i)\n", true,
+        CHECK(require_fixed("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint(0 <= i)\n", true,
                                                      "LuauLintSlNilSentinelOrder", "Write it i ~= nil") ==
                       std::string("local i = ll.SubStringIndex(\"ab\", \"b\")\nprint(i ~= nil)\n"));
         UNSCOPED_INFO("llcompat's");
-        CHECK(fixed("print(llcompat.ListFindList({1}, {1}) ~= nil)\n", true, "LuauLintSlNilSentinelAlways",
+        CHECK(require_fixed("print(llcompat.ListFindList({1}, {1}) ~= nil)\n", true, "LuauLintSlNilSentinelAlways",
                                           "Write it llcompat.ListFindList(...) ~= -1") ==
                       std::string("print(llcompat.ListFindList({1}, {1}) ~= -1)\n"));
         const ALScriptProblems problems = check("print(table.find({1}, 1) == -1)\n", true);
         const ALScriptProblem* problem  = keyed(problems, "LuauLintSlNilSentinel");
-        {
-            INFO("safe");
-            REQUIRE(problem);
-            REQUIRE_FALSE(problem->fixes.empty());
-            CHECK(problem->fixes.front().safe);
-        }
+        REQUIRE(problem);
+        REQUIRE_FALSE(problem->fixes.empty());
+        CHECK(problem->fixes.front().safe);
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: a deprecated ll function is renamed only where the arguments match", "[ALScriptFixes]")
@@ -1487,7 +1420,7 @@ namespace
         UNSCOPED_INFO("definitions: " + error);
         CHECK(luauLoaded);
         UNSCOPED_INFO("the same arguments");
-        CHECK(fixed("ll.SetLinkPrimitiveParams(LINK_THIS, {})\n", true, "LuauLintDeprecatedMemberUse",
+        CHECK(require_fixed("ll.SetLinkPrimitiveParams(LINK_THIS, {})\n", true, "LuauLintDeprecatedMemberUse",
                                                   "Use 'll.SetLinkPrimitiveParamsFast' instead of 'll.SetLinkPrimitiveParams'") ==
                       std::string("ll.SetLinkPrimitiveParamsFast(LINK_THIS, {})\n"));
         for (const char* call : { "ll.SetPrimitiveParams({})\n", "ll.MakeFire(1, 1, 1, 1, 1, \"\", vector(0, 0, 0))\n" })
@@ -1499,7 +1432,7 @@ namespace
                 {
                     for (const ALScriptFix& fix : problem.fixes)
                     {
-                        UNSCOPED_INFO("no replacement by name: " + std::string(call) + fix.title);
+                        CAPTURE(call, fix.title);
                         REQUIRE(fix.key != "ScriptFixUseInstead");
                     }
                 }
@@ -1531,7 +1464,7 @@ namespace
         CHECK(luauLoaded);
         // The fixture's statics named by its class: MSVC finds none of them
         // from a lambda, even one holding `this`.
-        const auto removal = [this](const std::string& script) -> const ALScriptFix* {
+        const auto require_removal = [this](const std::string& script) -> const ALScriptFix* {
             static ALScriptProblems problems;
             problems                       = check(script, true);
             const ALScriptProblem* problem = alscriptfixes_data::keyed(problems, "LuauLintImportUnused");
@@ -1552,28 +1485,23 @@ namespace
             return nullptr;
         };
         const std::string script = "local util = require(\"util\")\nprint(1)\n";
-        const ALScriptFix* fix   = removal(script);
-        UNSCOPED_INFO("offered");
+        const ALScriptFix* fix   = require_removal(script);
         REQUIRE(fix != nullptr);
-        UNSCOPED_INFO("its words");
         CHECK(fix->title == std::string("Remove the require of \"util\""));
-        {
-            INFO("neither preferred nor safe");
-            REQUIRE_FALSE(fix->preferred);
-            CHECK_FALSE(fix->safe);
-        }
+        REQUIRE_FALSE(fix->preferred);
+        CHECK_FALSE(fix->safe);
         UNSCOPED_INFO("its line gone");
         CHECK(ALScriptFixes::apply(script, *fix).value_or("(not made)") == std::string("print(1)\n"));
 
         const std::string bare = "local util = require 'util'; print(1)\n";
-        fix                    = removal(bare);
+        fix                    = require_removal(bare);
         UNSCOPED_INFO("without brackets, and its ;");
         REQUIRE(fix != nullptr);
         UNSCOPED_INFO("the statement alone gone");
         CHECK(ALScriptFixes::apply(bare, *fix).value_or("(not made)") == std::string("print(1)\n"));
 
         UNSCOPED_INFO("a module named by an expression: nothing to name");
-        REQUIRE(removal("local name = 'util'\nlocal util = require(name)\n") == nullptr);
+        REQUIRE(require_removal("local name = 'util'\nlocal util = require(name)\n") == nullptr);
     }
 
     TEST_CASE_METHOD(alscriptfixes_data, "ALScriptFixes: a deprecated call with other arguments is rewritten as a call that works", "[ALScriptFixes]")
@@ -1582,7 +1510,7 @@ namespace
         CHECK(luauLoaded);
         // The fixture's statics named by its class: MSVC finds none of them
         // from a lambda, even one holding `this`.
-        const auto deprecated = [this](const std::string& script) -> const ALScriptProblem* {
+        const auto require_deprecated = [this](const std::string& script) -> const ALScriptProblem* {
             static ALScriptProblems problems;
             problems = check(script, true);
             for (const ALScriptProblem& problem : problems)
@@ -1592,54 +1520,50 @@ namespace
                     return &problem;
                 }
             }
-            UNSCOPED_INFO("said: " + alscriptfixes_data::said(problems));
-            REQUIRE(false);
+            FAIL("no deprecation said:\n" + alscriptfixes_data::said(problems));
             return nullptr;
         };
-        const auto written = [&](const std::string& script) {
-            const ALScriptProblem* problem = deprecated(script);
-            UNSCOPED_INFO("a fix: " + script);
+        const auto require_written = [&](const std::string& script) {
+            CAPTURE(script);
+            const ALScriptProblem* problem = require_deprecated(script);
             REQUIRE_FALSE(problem->fixes.empty());
             const ALScriptFix& fix = problem->fixes.front();
-            {
-                INFO("preferred, not safe: " + fix.title);
-                REQUIRE(fix.preferred);
-                REQUIRE_FALSE(fix.safe);
-            }
+            CAPTURE(fix.title);
+            REQUIRE(fix.preferred);
+            REQUIRE_FALSE(fix.safe);
             const std::string made = ALScriptFixes::apply(script, fix).value_or("(not made)");
             const ALScriptProblems after = check(made, true);
+            INFO("made:\n" + made + "\nsaid then:\n" + alscriptfixes_data::said(after));
             for (const ALScriptProblem& each : after)
             {
-                UNSCOPED_INFO("no longer deprecated:\n" + made);
                 REQUIRE(each.key.rfind("LuauLintDeprecated", 0) != 0);
             }
-            UNSCOPED_INFO("no errors:\n" + made + "\n" + alscriptfixes_data::said(after));
             REQUIRE(alscriptfixes_data::errors(after) == static_cast<size_t>(0));
             return fix.title + "\n" + made;
         };
         const std::string vectors = "local a, b = vector(1, 0, 0), vector(0, 1, 0)\n";
         UNSCOPED_INFO("a distance");
-        CHECK(written(vectors + "print(ll.VecDist(a, ll.GetPos()))\n") ==
+        CHECK(require_written(vectors + "print(ll.VecDist(a, ll.GetPos()))\n") ==
                       "Write it vector.magnitude(a - ll.GetPos())\n" + vectors + "print(vector.magnitude(a - ll.GetPos()))\n");
         UNSCOPED_INFO("bracketed");
-        CHECK(written(vectors + "print(ll.VecDist(a + b, b))\n") ==
+        CHECK(require_written(vectors + "print(ll.VecDist(a + b, b))\n") ==
                       "Write it vector.magnitude((a + b) - b)\n" + vectors + "print(vector.magnitude((a + b) - b))\n");
         UNSCOPED_INFO("half up");
-        CHECK(written("local n = 2\nprint(ll.Round(n * 0.25))\n") ==
+        CHECK(require_written("local n = 2\nprint(ll.Round(n * 0.25))\n") ==
                       std::string("Write it math.floor((n * 0.25) + 0.5)\nlocal n = 2\nprint(math.floor((n * 0.25) + 0.5))\n"));
         UNSCOPED_INFO("a link first");
-        CHECK(written("ll.SetPrimitiveParams({PRIM_SIZE, vector(1, 1, 1)})\n") ==
+        CHECK(require_written("ll.SetPrimitiveParams({PRIM_SIZE, vector(1, 1, 1)})\n") ==
                       std::string("Write it ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_SIZE, vector(1, 1, 1)})\n"
                                   "ll.SetLinkPrimitiveParamsFast(LINK_THIS, {PRIM_SIZE, vector(1, 1, 1)})\n"));
         UNSCOPED_INFO("a length");
-        CHECK(written("local t = {1, 2}\nprint(table.getn(t))\n") ==
+        CHECK(require_written("local t = {1, 2}\nprint(table.getn(t))\n") ==
                       std::string("Write it #t\nlocal t = {1, 2}\nprint(#t)\n"));
         UNSCOPED_INFO("a name");
-        CHECK(written("print(ll.Abs(-1))\n") == std::string("Use 'math.abs' instead of 'll.Abs'\nprint(math.abs(-1))\n"));
+        CHECK(require_written("print(ll.Abs(-1))\n") == std::string("Use 'math.abs' instead of 'll.Abs'\nprint(math.abs(-1))\n"));
 
-        const ALScriptProblem* norm = deprecated("print(ll.VecNorm(vector(0, 0, 0)))\n");
+        const ALScriptProblem* norm = require_deprecated("print(ll.VecNorm(vector(0, 0, 0)))\n");
         {
-            INFO(("normalize offered: " + alscriptfixes_data::said({ *norm })));
+            INFO("normalize offered: " + alscriptfixes_data::said({ *norm }));
             REQUIRE_FALSE(norm->fixes.empty());
             CHECK(norm->fixes.front().title == "Use 'vector.normalize' instead of 'll.VecNorm'");
         }
@@ -1649,8 +1573,9 @@ namespace
                                     "local a = vector(1, 0, 0)\nprint(ll.VecDist(a,\n    a))\n", "local f = ll.VecDist\nprint(f)\n",
                                     "print(ll.GetListEntryType({1}, 0))\n" })
         {
-            const ALScriptProblem* problem = deprecated(script);
-            UNSCOPED_INFO(("no fix: " + std::string(script) + alscriptfixes_data::said({ *problem })));
+            CAPTURE(script);
+            const ALScriptProblem* problem = require_deprecated(script);
+            INFO(alscriptfixes_data::said({ *problem }));
             REQUIRE(problem->fixes.empty());
         }
 

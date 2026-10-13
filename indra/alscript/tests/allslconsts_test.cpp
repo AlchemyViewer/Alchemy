@@ -63,11 +63,9 @@ namespace
     {
         UNSCOPED_INFO("builtins: " + error);
         CHECK(lslLoaded);
-        UNSCOPED_INFO("nothing wrong");
         CHECK(said("const integer A = 1;\n"
                                             "default { state_entry() { const float f = A * 2; llOwnerSay((string)(f + A)); } }\n") ==
                       std::string());
-        UNSCOPED_INFO("each write, where it is");
         CHECK(said("const integer A = 1;\n"
                            "f(const integer n) { n = 2; }\n"
                            "default\n{\n    state_entry()\n    {\n        const vector v = <1, 2, 3>;\n        A += 1;\n        v.x = 2;\n        ++A;\n"
@@ -76,7 +74,6 @@ namespace
                                   "ConstAssigned 7:8 A\n"
                                   "ConstAssigned 8:8 v\n"
                                   "ConstAssigned 9:8 A\n"));
-        UNSCOPED_INFO("no value");
         CHECK(said("const integer A;\ndefault { state_entry() { const string s; llOwnerSay(s + (string)A); } }\n") ==
                       std::string("ConstWithoutValue 0:14 A\n"
                                   "ConstWithoutValue 1:39 s\n"));
@@ -95,7 +92,6 @@ namespace
                            "integer twice(integer x) { return x * 2; }\n"
                            "const integer f(integer x) { integer y = twice(x) + fixed; return llAbs(y); }\n" + handler) ==
                       std::string());
-        UNSCOPED_INFO("each thing it may not do, where it does it");
         CHECK(said(globals +
                            "const integer f(integer x)\n{\n    counter = x;\n    llOwnerSay(\"hi\");\n    if (x) state other;\n    return x + counter;\n}\n"
                            "default { state_entry() { counter = 1; } }\nstate other { state_entry() { } }\n") ==
@@ -124,9 +120,7 @@ namespace
                                    "const integer C = changing + 1;\n"
                                    "default { state_entry() { changing = 2; llOwnerSay((string)[FLAGS, STEP, TWICE, UP, NAME, SAME, PLAIN, C] + (string)L); } }\n";
         const ALPreprocessor::Result r = ALPreprocessor::run(source, ALPreprocessor::Options());
-        UNSCOPED_INFO("nothing wrong");
         CHECK(said(source) == std::string());
-        UNSCOPED_INFO("each written");
         CHECK(r.text ==
                       std::string("integer FLAGS = 20;\n"
                                   "float STEP = 0.5235988;\n"
@@ -148,7 +142,6 @@ namespace
             CHECK(twenty.column == 22);
         }
         // The names are where they are now: the list's two lines are one.
-        UNSCOPED_INFO("nine");
         REQUIRE(r.consts.size() == 9);
         {
             INFO("a name after the folded list, a line up");
@@ -189,7 +182,6 @@ namespace
                                   "ConstNotKnown 2:18 KEYS\n"));
         // A plain global is left to the compiler: only a const is worked out.
         const std::string plain = "integer A = 2 * 3;\ndefault { state_entry() { llOwnerSay((string)A); } }\n";
-        UNSCOPED_INFO("not a const");
         CHECK(ALPreprocessor::run(plain, ALPreprocessor::Options()).text == plain);
     }
 
@@ -226,7 +218,6 @@ namespace
         const ALPreprocessor::Result r = ALPreprocessor::run(source, o);
         UNSCOPED_INFO("optimized: " + r.text);
         CHECK(r.optimized);
-        UNSCOPED_INFO("nothing wrong");
         CHECK(said(source) == std::string());
         // The list stays a literal: as a sum it would need a helper the
         // script has no other use for, which costs Mono more than it saves.
@@ -254,7 +245,6 @@ namespace
                                                              "const integer twice(const integer n) { return n * 2; }\n"
                                                              "default { state_entry() { llOwnerSay((string)twice(LIMIT)); } }\n",
                                                              ALPreprocessor::Options());
-        UNSCOPED_INFO("three");
         REQUIRE(r.consts.size() == size_t(3));
         const auto declaredAt = [&](const std::string& word, size_t from) {
             const size_t at     = r.text.find(word, from);
@@ -266,16 +256,14 @@ namespace
         const size_t handler = r.text.find("default");
         for (const auto& [word, from] : std::vector<std::pair<std::string, size_t>>{ { "LIMIT", handler }, { "twice", handler }, { "n * 2", 0 } })
         {
+            CAPTURE(word);
             const ALScriptHover hover = declaredAt(word, from);
-            {
-                INFO(word + ": found");
-                REQUIRE(hover.found);
-                REQUIRE(hover.hasDefinition);
-            }
+            REQUIRE(hover.found);
+            REQUIRE(hover.hasDefinition);
             const bool matches = std::any_of(r.consts.begin(), r.consts.end(), [&](const ALPreprocessor::Result::Const& c) {
                 return c.line == hover.definitionLine && c.column == hover.definitionColumn;
             });
-            UNSCOPED_INFO(word + ": at a const's place, " + std::to_string(hover.definitionLine) + ":" + std::to_string(hover.definitionColumn));
+            CAPTURE(hover.definitionLine, hover.definitionColumn);
             REQUIRE(matches);
         }
     }

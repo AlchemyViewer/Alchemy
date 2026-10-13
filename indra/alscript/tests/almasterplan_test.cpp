@@ -112,10 +112,7 @@ namespace
         CHECK(sizeof(table) / sizeof(table[0]) == size_t(32));
         for (const Row& row : table)
         {
-            const std::string name = std::string(row.kind == Send::Direct ? "direct" : "derived") + (row.moved ? ", moved" : ", not moved") +
-                                     (row.same ? ", the same" : ", not the same") + (row.unchanged ? ", unchanged" : ", changed") +
-                                     (row.skip ? ", skipping" : ", not skipping");
-            UNSCOPED_INFO(name);
+            CAPTURE(row.kind == Send::Direct, row.moved, row.same, row.unchanged, row.skip);
             REQUIRE(almasterplan_data::nameOf(ALMasterPlan::decide(row.kind, row.moved, row.same, row.unchanged, row.skip)) ==
                           almasterplan_data::nameOf(row.expected));
         }
@@ -147,9 +144,7 @@ namespace
     {
         const LLUUID door("00000001-0000-4000-8000-000000000000");
         const LLUUID lamp("00000002-0000-4000-8000-000000000000");
-        UNSCOPED_INFO("none");
         CHECK(ALMasterPlan::objectsOf({}) == size_t(0));
-        UNSCOPED_INFO("one script");
         CHECK(ALMasterPlan::objectsOf({ door }) == size_t(1));
         UNSCOPED_INFO("many scripts in one object");
         CHECK(ALMasterPlan::objectsOf({ door, door, door, door, door }) == size_t(1));
@@ -162,7 +157,7 @@ namespace
         // two in two objects do at once.
         std::vector<LLUUID> one(20, door);
         UNSCOPED_INFO("twenty in one object, over eight");
-        REQUIRE(ALMasterPlan::askFirst(one.size(), ALMasterPlan::objectsOf(one), 8));
+        CHECK(ALMasterPlan::askFirst(one.size(), ALMasterPlan::objectsOf(one), 8));
         UNSCOPED_INFO("eight in one object, not");
         CHECK_FALSE(ALMasterPlan::askFirst(8, ALMasterPlan::objectsOf(std::vector<LLUUID>(8, door)), 8));
         UNSCOPED_INFO("two in the inventory and an object");

@@ -233,7 +233,7 @@ namespace
         for (const char* elsewhere : { "\\\\host\\share\\door.lsl", "//host/share/door.lsl", "\\\\?\\UNC\\host\\share\\door.lsl", "C:\\door.lsl",
                                        "c:door.lsl" })
         {
-            UNSCOPED_INFO(std::string("never asked of: ") + elsewhere);
+            CAPTURE(elsewhere);
             REQUIRE(almastermatch_data::resolved(elsewhere, blessed, false) ==
                           "- '" + std::string(elsewhere) + "' is outside the include folders");
         }
@@ -412,15 +412,10 @@ namespace
     TEST_CASE_METHOD(almastermatch_data, "almastermatch: a notecard's master is text or notecard or JSON in any case; never a script", "[almastermatch]")
     {
         const std::vector<std::string>& notecards = ALMasterMatch::notecardExtensions();
-        UNSCOPED_INFO("text");
         CHECK(ALDiskIncludes::extensionOf("readme.txt", notecards) != 0);
-        UNSCOPED_INFO("a notecard");
         CHECK(ALDiskIncludes::extensionOf("Config.NOTECARD", notecards) != 0);
-        UNSCOPED_INFO("JSON");
         CHECK(ALDiskIncludes::extensionOf("data/settings.json", notecards) != 0);
-        UNSCOPED_INFO("not a script");
         CHECK(ALDiskIncludes::extensionOf("door.lsl", notecards) == 0);
-        UNSCOPED_INFO("nor SLua");
         CHECK(ALDiskIncludes::extensionOf("door.luau", notecards) == 0);
     }
 }

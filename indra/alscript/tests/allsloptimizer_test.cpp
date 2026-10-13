@@ -173,7 +173,7 @@ namespace
 
         // A script optimized for a target with the defaults, what it became
         // checked to compile there.
-        static std::string optimized(const std::string& source, ALLSLOptimizer::Target target)
+        static std::string require_optimized(const std::string& source, ALLSLOptimizer::Target target)
         {
             ALLSLOptimizer::Options o = options();
             o.target                  = target;
@@ -211,17 +211,12 @@ namespace
         const std::string source = "integer unused = 5;\ninteger used = 2;\n" +
                                    wrap("", "        integer x = used * 3 + 1;\n        llSay(0, (string)x);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
-        UNSCOPED_INFO("text");
         CHECK(r.text == wrap("", "        llSay(0, \"7\");\n"));
-        UNSCOPED_INFO("noted the global");
         CHECK(has(r, "removed the unused global unused"));
         UNSCOPED_INFO("noted the fold: " + notes(r));
         CHECK(has(r, "folded used * 3 + 1 to 7"));
-        UNSCOPED_INFO("noted the local");
         CHECK(has(r, "removed the unused local x"));
-        UNSCOPED_INFO("smaller");
         CHECK(r.sizeAfter < r.sizeBefore);
     }
 
@@ -231,15 +226,12 @@ namespace
         // it stays a variable and the fold shows in its declaration.
         const std::string source = wrap("", "        float a = 0.1 + 0.2;\n        float b = PI * 2;\n        float c = 1.0 / 3;\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = 0;\n        }\n        llSay(0, (string)a + (string)b + (string)c);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
         // 0.1f + 0.2f is 0.3 exactly as a single, PI * 2 is 6.2831855f,
         // and each reads back as the same single.
-        UNSCOPED_INFO("a: " + r.text);
+        UNSCOPED_INFO("as written: " + r.text);
         REQUIRE(r.text.find("float a = 0.3;") != std::string::npos);
-        UNSCOPED_INFO("b");
         REQUIRE(r.text.find("float b = 6.2831855;") != std::string::npos);
-        UNSCOPED_INFO("c");
         REQUIRE(r.text.find("float c = 0.33333334;") != std::string::npos);
 
         // A float that is a whole number prints as an integer where LSL
@@ -260,7 +252,6 @@ namespace
     {
         const std::string source = wrap("", "        llSay(0, (string)(2147483647 + 1));\n        llSay(0, (string)(1 / 0));\n        llSay(0, (string)(-2147483648 / -1));\n        llSay(0, (string)(7 / 2 * 2));\n        llSay(0, (string)(1 << 40));\n        llSay(0, (string)(-7 % 3));\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
         UNSCOPED_INFO("wrapped: " + r.text);
         REQUIRE(r.text.find("llSay(0, \"-2147483648\");") != std::string::npos);
@@ -281,7 +272,6 @@ namespace
     {
         const std::string source = wrap("", "        integer a = llAbs(-3);\n        float b = llSqrt(16);\n        string c = llToUpper(\"abc\");\n        string d = llGetSubString(\"abcdef\", 4, 1);\n        string e = llDeleteSubString(\"abcdef\", 1, 3);\n        integer f = llStringLength(\"hello\");\n        string g = llEscapeURL(\"a b\");\n        string h = llBase64ToString(llStringToBase64(\"hi\"));\n        integer i = llList2Integer([1, 2, 3], -1);\n        string j = llList2String([1, 2.5, <1,2,3>], 1);\n        list k = llList2List([1, 2, 3, 4], 1, 2);\n        integer l = llFloor(2.7) + llCeil(2.2);\n        string m = llGetSubString(\"h\xc3\xa9llo\", 0, 1);\n        integer n = llGetUnixTime();\n        string o = llList2CSV([1, \"a\", 2.0]);\n        if (llFrand(1) < 0.5)\n        {\n            a = f = i = l = n = 0; b = 0; c = d = e = g = h = j = m = o = \"\"; k = [];\n        }\n        llSay(0, (string)a + (string)b + c + d + e + (string)f + g + h + (string)i + j + llList2CSV(k) + (string)l + m + (string)n + o);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
         UNSCOPED_INFO("abs: " + r.text);
         REQUIRE(r.text.find("integer a = 3;") != std::string::npos);
@@ -320,7 +310,6 @@ namespace
         const std::string source = wrap("integer g;\ninteger h;\n",
                                         "        integer a = g + 0;\n        integer b = g * 1;\n        integer c = g - -1;\n        integer d = g + -2;\n        integer e = (integer)g;\n        integer f = g * 0;\n        integer i = (g == 0);\n        if (g != 0) h = 1;\n        if (!!g) h = 2;\n        if (!(g == h)) h = 3;\n        if (!g) h = 4; else h = 5;\n        h = a + b + c + d + e + f + i;\n        a = b = c = d = e = f = i = 0;\n        g = h;\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
         UNSCOPED_INFO("plus zero: " + r.text);
         REQUIRE(r.text.find("integer a = g;") != std::string::npos);
@@ -357,15 +346,11 @@ namespace
         const std::string source = "f()\n{\n    return;\n    llSay(0, \"never\");\n}\ng()\n{\n}\n"
                                    "default\n{\n    state_entry()\n    {\n        if (0) llSay(0, \"no\");\n        if (1) llSay(0, \"yes\"); else llSay(0, \"no\");\n        while (0) llSay(0, \"no\");\n        @unused;\n        f();\n        ;\n        {}\n        3;\n    }\n}\nstate other\n{\n    state_entry()\n    {\n    }\n}\n";
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
-        UNSCOPED_INFO("text");
         CHECK(r.text == "f()\n{\n    return;\n}\n\ndefault\n{\n    state_entry()\n    {\n        llSay(0, \"yes\");\n        f();\n    }\n}\n");
         UNSCOPED_INFO("noted the return");
         CHECK(has(r, "can never run"));
-        UNSCOPED_INFO("noted g");
         CHECK(has(r, "removed the unused function g"));
-        UNSCOPED_INFO("noted the state");
         CHECK(has(r, "removed the state other"));
         UNSCOPED_INFO("noted the label");
         CHECK(has(r, "nothing jumps to"));
@@ -419,13 +404,9 @@ namespace
         ALLSLOptimizer::Options o = options();
         o.shrinknames             = true;
         ALLSLOptimizer::Result r  = ALLSLOptimizer::run(source, o);
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
-        UNSCOPED_INFO("renamed counter");
         REQUIRE(r.renamed.count("counter") == 1);
-        UNSCOPED_INFO("renamed bump");
         REQUIRE(r.renamed.count("bump") == 1);
-        UNSCOPED_INFO("renamed total");
         REQUIRE(r.renamed.count("total") == 1);
         UNSCOPED_INFO("the event stays");
         REQUIRE(r.text.find("touch_start(integer ") != std::string::npos);
@@ -441,36 +422,26 @@ namespace
             REQUIRE(r.text.find("counter") == std::string::npos);
             REQUIRE(r.text.find("bump") == std::string::npos);
         }
-        UNSCOPED_INFO("noted");
         CHECK(has(r, "renamed the function bump to"));
     }
 
     TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a script with errors is left alone and the map leads back", "[allsloptimizer]")
     {
         ALLSLOptimizer::Result r = ALLSLOptimizer::run("default { state_entry() { integer x = ; } }", options());
-        UNSCOPED_INFO("not optimized");
         CHECK_FALSE(r.optimized);
-        {
-            INFO("an error");
-            REQUIRE(r.problems.size() == 1);
-            CHECK(r.problems[0].severity == ALScriptProblem::Severity::Error);
-        }
+        REQUIRE(r.problems.size() == 1);
+        CHECK(r.problems[0].severity == ALScriptProblem::Severity::Error);
         UNSCOPED_INFO("the source as it was");
         CHECK(r.text == "default { state_entry() { integer x = ; } }");
 
         const std::string source = "integer g = 3;\n\n\ndefault\n{\n    state_entry()\n    {\n        llSay(0, (string)g);\n    }\n}\n";
         r                        = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
-        UNSCOPED_INFO("text");
         CHECK(r.text == "default\n{\n    state_entry()\n    {\n        llSay(0, \"3\");\n    }\n}\n");
         // The llSay is on output line 4 and came from source line 7.
         const ALSourceMap::Loc loc = r.map.toSource(4, 8);
-        UNSCOPED_INFO("found");
         REQUIRE(loc.found());
-        UNSCOPED_INFO("line");
         CHECK(loc.line == 7);
-        UNSCOPED_INFO("column");
         CHECK(loc.column == 8);
     }
 
@@ -486,6 +457,7 @@ namespace
             {
                 continue;
             }
+            CAPTURE(name);
             const std::string stem     = entry.path().stem().string();
             const fs::path    expected = dir / (stem + "_expected.lsl");
             const auto        read     = [](const fs::path& path) {
@@ -501,7 +473,7 @@ namespace
             o.addstrings                  = first.find("addstrings") != std::string::npos;
             o.target = first.find("lso") != std::string::npos ? ALLSLOptimizer::Target::LSO : first.find("luau") != std::string::npos ? ALLSLOptimizer::Target::Luau : ALLSLOptimizer::Target::Mono;
             ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
-            UNSCOPED_INFO("optimized " + name + ": " + notes(r));
+            UNSCOPED_INFO("optimized: " + notes(r));
             REQUIRE(r.optimized);
             if (const char* write = std::getenv("AL_OPTIMIZER_WRITE_EXPECTED"); write && *write)
             {
@@ -509,9 +481,7 @@ namespace
                 out << r.text;
                 continue;
             }
-            UNSCOPED_INFO("expected file for " + name);
             REQUIRE(fs::exists(expected));
-            UNSCOPED_INFO("output of " + name);
             REQUIRE(r.text == read(expected));
             ++checked;
         }
@@ -522,7 +492,6 @@ namespace
     {
         const std::string source = wrap("", "        rotation a = llEuler2Rot(<0, 0, PI_BY_TWO>);\n        vector b = llRot2Euler(<0, 0, 0.7071068, 0.7071068>);\n        rotation c = llAxisAngle2Rot(<0, 0, 2>, PI);\n        vector d = llRot2Axis(<0, 0, 0.7071068, 0.7071068>);\n        float e = llRot2Angle(<0, 0, 0.7071068, 0.7071068>);\n        vector f = llRot2Fwd(<0, 0, 0.7071068, 0.7071068>);\n        vector h = llRot2Up(<0.7071068, 0, 0, 0.7071068>);\n        vector i = llRot2Axis(<0, 0, 0, 1>);\n        vector j = llRot2Fwd(<0, 0, 2, 2>);\n        if (llFrand(1) < 0.5)\n        {\n            a = c = ZERO_ROTATION; b = d = f = h = i = j = ZERO_VECTOR; e = 0;\n        }\n        llSay(0, (string)a + (string)b + (string)c + (string)d + (string)e + (string)f + (string)h + (string)i + (string)j);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
         auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
         // A quarter turn about z: x and y zero, z and s a half root two.
@@ -558,7 +527,6 @@ namespace
     {
         const std::string source = wrap("", "        string a = llJsonGetValue(\"{\\\"name\\\": \\\"Ann\\\", \\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"name\"]);\n        string b = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", -7]}\", [\"tags\", 1]);\n        string c = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"tags\", 2, \"k\"]);\n        string d = llJsonGetValue(\"[1.5]\", [0]);\n        string e = llJsonGetValue(\"[true]\", [0]);\n        string f = llJsonGetValue(\"[1]\", [3]);\n        string g = llJsonGetValue(\"{\\\"a\\\": 1, \\\"a\\\": 2}\", [\"a\"]);\n        string h = llJsonGetValue(\"[1,]\", [0]);\n        string i = llJsonGetValue(\"[\\\"a\\\\\\\"b\\\"]\", [0]);\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = d = e = f = g = h = i = \"\";\n        }\n        llSay(0, a + b + c + d + e + f + g + h + i);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
         auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
         UNSCOPED_INFO("a key: " + r.text);
@@ -582,7 +550,6 @@ namespace
         // The answers that are constants are the constants' names.
         const std::string more = wrap("", "        string a = llJsonGetValue(\"[true, null]\", [0]);\n        string b = llJsonGetValue(\"[1]\", [3]);\n        string c = llJsonValueType(\"{\\\"a\\\": [1, {}]}\", [\"a\", 1]);\n        string d = llJsonValueType(\"{\\\"a\\\": 1}\", [\"b\"]);\n        string e = llJsonValueType(\"[1,]\", []);\n        string f = llList2Json(JSON_OBJECT, [\"name\", \"Ann Lee\", \"count\", 3]);\n        string g = llList2Json(JSON_ARRAY, [1, \"true\"]);\n        string h = llList2Json(JSON_ARRAY, [1.5]);\n        list i = llJson2List(\"[1, \\\"two\\\", -3]\");\n        list j = llJson2List(\"{\\\"k\\\": \\\"v\\\"}\");\n        list k = llJson2List(\"[true]\");\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = d = e = f = g = h = \"\"; i = j = k = [];\n        }\n        llSay(0, a + b + c + d + e + f + g + h + llList2CSV(i) + llList2CSV(j) + llList2CSV(k));\n");
         ALLSLOptimizer::Result m = ALLSLOptimizer::run(more, options());
-        UNSCOPED_INFO("optimized");
         CHECK(m.optimized);
         auto hasm = [&m](const char* text) { return m.text.find(text) != std::string::npos; };
         UNSCOPED_INFO("true is JSON_TRUE: " + m.text);
@@ -611,7 +578,6 @@ namespace
         // value in, at a key or an index, where the document is plain.
         const std::string sets = wrap("", "        string a = llJsonGetValue(\"{\\\"a\\\": [1, {\\\"b\\\": true}, \\\"c\\\"]}\", [\"a\"]);\n        string b = llJsonSetValue(\"{\\\"a\\\": 1}\", [\"b\"], \"two\");\n        string c = llJsonSetValue(\"[1, 2]\", [1], \"9\");\n        string d = llJsonSetValue(\"[1, 2]\", [JSON_APPEND], JSON_TRUE);\n        string e = llJsonSetValue(\"[1, 2]\", [5], \"9\");\n        string f = llJsonSetValue(\"{}\", [\"a\", \"b\"], \"x\");\n        string g = llJsonSetValue(\"[1]\", [0], \"1.5\");\n        string h = llJsonGetValue(\"[1.5]\", []);\n        if (llFrand(1) < 0.5)\n        {\n            a = b = c = d = e = f = g = h = \"\";\n        }\n        llSay(0, a + b + c + d + e + f + g + h);\n");
         ALLSLOptimizer::Result n = ALLSLOptimizer::run(sets, options());
-        UNSCOPED_INFO("optimized");
         CHECK(n.optimized);
         auto hasn = [&n](const char* text) { return n.text.find(text) != std::string::npos; };
         UNSCOPED_INFO("a nested value, compact: " + n.text);
@@ -681,7 +647,6 @@ namespace
         CHECK(r.optimized);
         // The inliner's own text is what the optimizer read.
         const ALLSLInliner::Result put = ALLSLInliner::run(source);
-        UNSCOPED_INFO("five put in place");
         CHECK(put.inlined == 5);
         UNSCOPED_INFO("the block where the call was: " + put.text);
         REQUIRE(put.text.find("        {\nstring what = \"hi\";\ninteger n = i;\n\n    integer i_1 = n * 2;\n    llSay(0, what + (string)i_1);\n\n}\n") != std::string::npos);
@@ -726,7 +691,6 @@ namespace
         CHECK(said == 5);
         // The map leads from the block back to the function's own lines.
         const size_t at = r.text.find("llSay(0, what + (string)i_1);");
-        UNSCOPED_INFO("found");
         REQUIRE(at != std::string::npos);
         S32 line = 0;
         for (size_t i = 0; i < at; ++i)
@@ -860,7 +824,6 @@ namespace
             CHECK_FALSE(has("inner(integer k)"));
             CHECK_FALSE(has("outer()\n"));
         }
-        UNSCOPED_INFO("three calls went");
         CHECK(put.inlined == 3);
         ALLSLOptimizer::Options o = options();
         o.inlining                = true;
@@ -923,7 +886,6 @@ namespace
         }
         UNSCOPED_INFO("no stray ; where the declaration stood: " + put.text);
         CHECK_FALSE(has("};"));
-        UNSCOPED_INFO("six went");
         CHECK(put.inlined == 6);
         // A temporary above an if whose condition has the call, and above
         // a for whose first part has it; not above a while, whose
@@ -958,7 +920,6 @@ namespace
         CHECK(got("while (both(llAbs(g)) < 9) g++;"));
         UNSCOPED_INFO("so does the else-if: " + above.text);
         CHECK(got("else if (both(llAbs(g))) g = 2;"));
-        UNSCOPED_INFO("two went");
         CHECK(above.inlined == 2);
     }
     TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: recursive functions stay and a label after the call is the return's target", "[allsloptimizer]")
@@ -1014,7 +975,6 @@ namespace
             CHECK_FALSE(has("_ret"));
             CHECK(has("            @next;"));
         }
-        UNSCOPED_INFO("one went");
         CHECK(put.inlined == 1);
     }
     TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a run without notes says nothing and one out of budget stops where it is", "[allsloptimizer]")
@@ -1035,7 +995,6 @@ namespace
         o.notes       = true;
         o.visitBudget = 1;
         ALLSLOptimizer::Result stopped = ALLSLOptimizer::run(source, o);
-        UNSCOPED_INFO("it stopped early");
         CHECK(stopped.stoppedEarly);
         {
             INFO("and said so: " + notes(stopped));
@@ -1059,7 +1018,6 @@ namespace
                      "        llSetPrimitiveParams([PRIM_TEXTURE, 0, s, <1, 1, 0>, ZERO_VECTOR, 0.0]);\n"
                      "        llSay(n, llList2CSV(l) + s);\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        UNSCOPED_INFO("optimized");
         CHECK(r.optimized);
         UNSCOPED_INFO("a zero appended stays: " + r.text);
         REQUIRE(r.text.find("l = l + 0;") != std::string::npos);
@@ -1083,7 +1041,6 @@ namespace
         // The literal's elements, however it is written now, all there:
         // the texture's face and the glow.
         const size_t call = r.text.find("llSetPrimitiveParams(");
-        UNSCOPED_INFO("the call");
         REQUIRE(call != std::string::npos);
         const std::string args = r.text.substr(call, r.text.find(';', call) - call);
         UNSCOPED_INFO("the face, a zero: " + args);
@@ -1355,10 +1312,10 @@ namespace
     TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: list literal sums bracket elements and stay literals where order shows", "[allsloptimizer]")
     {
         // On LSO, where a list's shapes are made wherever they are smaller:
-        // Mono weighs them against the helpers they need (test 41).
+        // Mono weighs them against the helpers they need (see the case on Mono's list shapes).
         ALLSLOptimizer::Options lso = options();
         lso.target                  = ALLSLOptimizer::Target::LSO;
-        const auto compiles = [](const ALLSLOptimizer::Result& r) {
+        const auto require_compiles = [](const ALLSLOptimizer::Result& r) {
             ALLSLService           service;
             const ALScriptProblems said = service.check(r.text);
             for (const ALScriptProblem& p : said)
@@ -1382,7 +1339,7 @@ namespace
         // Each element added to the list bare (ALLSLCosts::elementForList).
         UNSCOPED_INFO("the comparison bracketed: " + r.text);
         REQUIRE(r.text.find("loc_params + 41 + (-1 < --loc_sitTargetsRemaining) + <0.0, 0.0, 0.0> + <0.0, 0.0, 0.0, 1.0>") != std::string::npos);
-        compiles(r);
+        require_compiles(r);
 
         // The first element under the cast, bracketed where the cast would
         // take less of it; the rest where the sum would.
@@ -1397,7 +1354,7 @@ namespace
         REQUIRE(r.text.find("l = (list)-1 + 3;") != std::string::npos);
         UNSCOPED_INFO("a product under the cast, a difference after it: " + r.text);
         REQUIRE(r.text.find("l = (list)(a * b) + (a - b);") != std::string::npos);
-        compiles(r);
+        require_compiles(r);
 
         // A sum takes its right side first, so the elements would be taken
         // last to first: where more than one of them could see another's
@@ -1415,7 +1372,7 @@ namespace
         REQUIRE(r.text.find("l = [llGetUnixTime(), bump()];") != std::string::npos);
         UNSCOPED_INFO("reads alone, a sum: " + r.text);
         REQUIRE(r.text.find("l = (list)i + g;") != std::string::npos);
-        compiles(r);
+        require_compiles(r);
     }
 
     TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: removed unreachable code is quoted by its first line cut to a few words", "[allsloptimizer]")
@@ -1425,11 +1382,8 @@ namespace
         body += "\");\n";
         const ALLSLOptimizer::Result r = ALLSLOptimizer::run(wrap("", body), options());
         const auto note = std::find_if(r.problems.begin(), r.problems.end(), [](const ALScriptProblem& p) { return p.key == "OptimizerRemovedUnreachable"; });
-        {
-            INFO("said");
-            REQUIRE(note != r.problems.end());
-            REQUIRE(note->args.size() == 1);
-        }
+        REQUIRE(note != r.problems.end());
+        REQUIRE(note->args.size() == 1);
         {
             INFO("not all of it");
             REQUIRE(note->args[0].size() < 80);
@@ -1451,13 +1405,11 @@ namespace
         // Room for the inliner's first round and not much more: it stops,
         // and leaves the optimizer nothing.
         const ALLSLInliner::Result once = ALLSLInliner::run(source, ALLSLInliner::Asked(), size_t(-1));
-        UNSCOPED_INFO("the inliner visits");
         CHECK(once.visited > 0);
         o.visitBudget = once.visited / 4;
         const ALLSLOptimizer::Result short_of = ALLSLOptimizer::run(source, o);
         UNSCOPED_INFO("the optimizer stopped for what the inliner spent");
         CHECK(short_of.stoppedEarly);
-        UNSCOPED_INFO("said");
         CHECK(std::any_of(short_of.problems.begin(), short_of.problems.end(), [](const ALScriptProblem& p) { return p.key == "OptimizerStoppedEarly"; }));
         const ALLSLInliner::Result cut = ALLSLInliner::run(source, ALLSLInliner::Asked(), 1);
         {
@@ -1546,7 +1498,7 @@ namespace
         REQUIRE(r.text.find("[llGetTime(), llGetTime()]") != std::string::npos);
         for (const char* pure : { "llRound", "llListFindList", "llListSort", "llDumpList2String", "llMD5String", "llAcos", "llAsin" })
         {
-            UNSCOPED_INFO(std::string(pure) + " is pure");
+            CAPTURE(pure);
             REQUIRE(ALLSLTraits::pure(pure));
         }
         {
@@ -1646,7 +1598,8 @@ namespace
         for (const char* label : { "@_ret_1;", "@_ret_2;", "@_ret_3;", "@_ret_4;", "@_ret_5;", "@_ret_6;" })
         {
             const size_t first = put.text.find(label);
-            UNSCOPED_INFO(std::string("one ") + label + ": " + put.text);
+            CAPTURE(label);
+            UNSCOPED_INFO("at most once: " + put.text);
             REQUIRE((first == std::string::npos || put.text.find(label, first + 1) == std::string::npos));
         }
         UNSCOPED_INFO("g runs before f(4) and f writes g: the call stays: " + put.text);
@@ -1882,8 +1835,8 @@ namespace
         REQUIRE(refused.has_value());
         {
             INFO("as a warning with the parser's words");
-            REQUIRE(refused->key == "OptimizerWroteUncompilable");
-            REQUIRE(refused->severity == ALScriptProblem::Severity::Warning);
+            CHECK(refused->key == "OptimizerWroteUncompilable");
+            CHECK(refused->severity == ALScriptProblem::Severity::Warning);
             REQUIRE_FALSE(refused->args[0].empty());
         }
     }
@@ -1969,11 +1922,8 @@ namespace
             REQUIRE(r.text.find("say(") == std::string::npos);
             UNSCOPED_INFO("the large one stays: " + r.text);
             REQUIRE(r.text.find("tell(") != std::string::npos);
-            {
-                INFO("weighed");
-                REQUIRE(r.weight.compiled);
-                REQUIRE(r.weight.total > 0);
-            }
+            REQUIRE(r.weight.compiled);
+            REQUIRE(r.weight.total > 0);
             const ALScriptProblem* chose = nullptr;
             for (const ALScriptProblem& p : r.problems)
             {
@@ -2502,21 +2452,29 @@ namespace
         const std::string hashOfX = "\"70c6ab518c36e18d9925c3c27c048b26\"";
         for (const Target target : { Target::LSO, Target::Mono, Target::Luau })
         {
-            UNSCOPED_INFO("a hash of one character is smaller as the call");
+            INFO("a hash of one character is smaller as the call");
             REQUIRE_FALSE(folded(target, "        llOwnerSay(llMD5String(\"x\", 0));\n"));
         }
         // LSO writes the argument where it is used, as it would the answer.
-        UNSCOPED_INFO("a hash of a longer string is smaller as its answer on LSO");
-        CHECK(folded(Target::LSO, "        llOwnerSay(llMD5String(\"Hello, Avatar!\", 0));\n"));
+        {
+            INFO("a hash of a longer string is smaller as its answer on LSO");
+            CHECK(folded(Target::LSO, "        llOwnerSay(llMD5String(\"Hello, Avatar!\", 0));\n"));
+        }
         // Mono and Luau hold a string once: where a function holds the
         // answer already, it costs a load.
         const std::string held = "        llOwnerSay(llMD5String(\"x\", 0));\n        llOwnerSay(" + hashOfX + ");\n";
-        UNSCOPED_INFO("held already on Mono");
-        CHECK(folded(Target::Mono, held));
-        UNSCOPED_INFO("held already on Luau");
-        CHECK(folded(Target::Luau, held));
-        UNSCOPED_INFO("LSO writes it again");
-        CHECK_FALSE(folded(Target::LSO, held));
+        {
+            INFO("held already on Mono");
+            CHECK(folded(Target::Mono, held));
+        }
+        {
+            INFO("held already on Luau");
+            CHECK(folded(Target::Luau, held));
+        }
+        {
+            INFO("LSO writes it again");
+            CHECK_FALSE(folded(Target::LSO, held));
+        }
     }
     TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: same-named labels in a handler keep one short name when names shrink", "[allsloptimizer]")
     {
@@ -3105,7 +3063,7 @@ namespace
                                         "        g = c & 7;\n"
                                         "        g = a >> 2;\n"
                                         "        llOwnerSay((string)[a, b, c, f, e, g, h]);\n"), { "g", "h" });
-        const std::string mono = optimized(source, ALLSLOptimizer::Target::Mono);
+        const std::string mono = require_optimized(source, ALLSLOptimizer::Target::Mono);
         UNSCOPED_INFO("Mono: a - b as a + -b: " + mono);
         CHECK(in(mono, "g = a + -b;"));
         UNSCOPED_INFO("Mono: -= as += -");
@@ -3131,7 +3089,7 @@ namespace
             CHECK(in(mono, "g = c & 7;"));
         }
 
-        const std::string lso = optimized(source, ALLSLOptimizer::Target::LSO);
+        const std::string lso = require_optimized(source, ALLSLOptimizer::Target::LSO);
         {
             INFO("LSO: a - b stays: " + lso);
             CHECK(in(lso, "g = a - b;"));
@@ -3150,7 +3108,7 @@ namespace
             CHECK(in(lso, "if (a < b && b > 2)"));
         }
 
-        const std::string luau = optimized(source, ALLSLOptimizer::Target::Luau);
+        const std::string luau = require_optimized(source, ALLSLOptimizer::Target::Luau);
         UNSCOPED_INFO("Luau: a shift as a product: " + luau);
         CHECK(in(luau, "g = a * 8;"));
         UNSCOPED_INFO("Luau: a doubling as a sum");
@@ -3199,7 +3157,7 @@ namespace
                                    "    touch_start(integer n)\n    {\n        llOwnerSay((string)g + t);\n    }\n}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
-            const std::string text = optimized(source, target);
+            const std::string text = require_optimized(source, target);
             const bool        lso  = target == ALLSLOptimizer::Target::LSO;
             const bool        mono = target == ALLSLOptimizer::Target::Mono;
             UNSCOPED_INFO("a truth returned: " + text);
@@ -3265,7 +3223,7 @@ namespace
                                    "    }\n}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
-            const std::string text = optimized(source, target);
+            const std::string text = require_optimized(source, target);
             const bool        luau = target == ALLSLOptimizer::Target::Luau;
             UNSCOPED_INFO("a for known to run as a do, its step in the check: " + text);
             REQUIRE((luau ? in(text, "for (i = 0; i < 10; ++i)") : in(text, "while(++i < 10);")));
@@ -3310,7 +3268,7 @@ namespace
                                    "}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
-            const std::string text = optimized(source, target);
+            const std::string text = require_optimized(source, target);
             UNSCOPED_INFO("a local set to the owner: " + text);
             REQUIRE(in(text, "if (owner)"));
             UNSCOPED_INFO("a detected key, its ways turned round");
@@ -3347,7 +3305,7 @@ namespace
                                    "    touch_start(integer t)\n    {\n        llOwnerSay((string)got);\n    }\n}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
-            const std::string text = optimized(source, target);
+            const std::string text = require_optimized(source, target);
             {
                 INFO("a parameter never read gone, and its arguments: " + text);
                 REQUIRE(in(text, "say(string message)"));
@@ -3398,7 +3356,7 @@ namespace
                                    "        kept = t;\n    }\n}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
-            const std::string text = optimized(source, target);
+            const std::string text = require_optimized(source, target);
             // A read of the clock changes nothing, and goes with it.
             UNSCOPED_INFO("a value set again before it is read not set: " + text);
             REQUIRE(in(text, "integer i = (integer)llFrand(9);"));
@@ -3440,7 +3398,7 @@ namespace
                                    "        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n"
                                    "        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n        llSetPos(llGetPos() + <1.5, 2.5, 3.5>);\n"
                                    "    }\n}\n";
-        const std::string lso = optimized(source, ALLSLOptimizer::Target::LSO);
+        const std::string lso = require_optimized(source, ALLSLOptimizer::Target::LSO);
         {
             INFO("LSO: a long string at three places kept in a global: " + lso);
             CHECK(in(lso, "string s = \"a sentence long enough to be worth holding\";"));
@@ -3451,7 +3409,7 @@ namespace
         UNSCOPED_INFO("LSO: a global's reads stay, as large as a local's there");
         CHECK(in(lso, "llSay(channel, \"one\");"));
 
-        const std::string luau = optimized(source, ALLSLOptimizer::Target::Luau);
+        const std::string luau = require_optimized(source, ALLSLOptimizer::Target::Luau);
         {
             INFO("Luau: a global read three times read once: " + luau);
             CHECK(in(luau, "integer localChannel = channel;"));
@@ -3464,7 +3422,7 @@ namespace
         UNSCOPED_INFO("Luau: constants held once in a function already");
         CHECK_FALSE(in(luau, "string s = "));
 
-        const std::string mono = optimized(source, ALLSLOptimizer::Target::Mono);
+        const std::string mono = require_optimized(source, ALLSLOptimizer::Target::Mono);
         UNSCOPED_INFO("Mono: a vector at four places kept in a local, its frame paid for: " + mono);
         CHECK(in(mono, "vector v = <1.5, 2.5, 3.5>;"));
         UNSCOPED_INFO("Mono: three reads of a global not worth a local's frame");
@@ -3482,7 +3440,7 @@ namespace
                                    "        @out;\n        llOwnerSay(\"done\");\n    }\n}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
-            const std::string text = optimized(source, target);
+            const std::string text = require_optimized(source, target);
             const bool        lso  = target == ALLSLOptimizer::Target::LSO;
             const bool        luau = target == ALLSLOptimizer::Target::Luau;
             UNSCOPED_INFO("two literals joined on LSO alone, by default: " + text);
@@ -3517,7 +3475,7 @@ namespace
                                    "    }\n}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
-            const std::string text = optimized(source, target);
+            const std::string text = require_optimized(source, target);
             size_t minus_ones = 0;
             for (size_t at = text.find("llOwnerSay(\"-1\");"); at != std::string::npos; at = text.find("llOwnerSay(\"-1\");", at + 1))
             {
@@ -3557,7 +3515,7 @@ namespace
                                    "    }\n}\n";
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
         {
-            const std::string text = optimized(source, target);
+            const std::string text = require_optimized(source, target);
             {
                 INFO("each folded as the VM's single: " + text);
                 REQUIRE(in(text, "llOwnerSay(\"1024.000000\");"));
@@ -3571,7 +3529,7 @@ namespace
             UNSCOPED_INFO("-0 made 0, not -0: " + text);
             REQUIRE_FALSE(in(text, "-0.000000"));
         }
-        const std::string luau = optimized(source, ALLSLOptimizer::Target::Luau);
+        const std::string luau = require_optimized(source, ALLSLOptimizer::Target::Luau);
         {
             INFO("a single, not the double: " + luau);
             CHECK(in(luau, "(string)0.8414709568023682"));

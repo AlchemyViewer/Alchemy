@@ -58,7 +58,6 @@ namespace
         const std::vector<ALScriptOutlineEntry> right = { symbol("count", K::Variable, 0, 0), symbol("b", K::Function, 1, 5), symbol("made", K::Function, 6, 7),
                                                           symbol("a", K::Function, 8, 12) };
         const std::vector<Pair> pairs = ALScriptOutlinePairs::pair(left, right);
-        UNSCOPED_INFO("two");
         REQUIRE(pairs.size() == size_t(2));
         UNSCOPED_INFO("a with a, in the left's order");
         CHECK(pairs[0] == Pair{ 1, 4, 8, 12 });
@@ -80,7 +79,6 @@ namespace
             symbol("inner", K::Function, 16, 18, 1), symbol("touch_start", K::Event, 20, 21),
         };
         const std::vector<Pair> pairs = ALScriptOutlinePairs::pair(left, right);
-        UNSCOPED_INFO("six");
         REQUIRE(pairs.size() == size_t(6));
         UNSCOPED_INFO("default with default");
         CHECK(pairs[0] == Pair{ 0, 9, 5, 12 });

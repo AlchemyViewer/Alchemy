@@ -169,7 +169,6 @@ namespace
     TEST_CASE_METHOD(almasterindex_data, "almasterindex: links go through the file and come back as they went", "[almasterindex]")
     {
         ALMasterIndex& made = open();
-        UNSCOPED_INFO("none at first");
         REQUIRE(made.empty());
         ALMasterLink door = almasterindex_data::link(1, 2, "/s/door.lsl");
         door.uses         = { "disk:/s/util.lsl" };
@@ -185,30 +184,18 @@ namespace
         CHECK_FALSE(made.dirty());
 
         ALMasterIndex& back = open();
-        UNSCOPED_INFO("both back");
         REQUIRE(back.size() == size_t(2));
         const std::optional<ALMasterLink> read = back.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
-        UNSCOPED_INFO("the door's");
         REQUIRE(read.has_value());
-        UNSCOPED_INFO("its master");
         CHECK(read->master == std::string("/s/door.lsl"));
-        UNSCOPED_INFO("its hash");
         CHECK(read->hash == std::string("abc"));
-        UNSCOPED_INFO("its stamp");
         CHECK(read->stamp == S64(1234));
-        UNSCOPED_INFO("its base");
         CHECK(read->base == almasterindex_data::key(9));
-        UNSCOPED_INFO("its uses");
         REQUIRE(read->uses.size() == size_t(1));
-        UNSCOPED_INFO("its name");
         CHECK(read->itemName == std::string("Door"));
-        UNSCOPED_INFO("the card's, a notecard's");
         CHECK(back.linkOf(LLUUID::null, almasterindex_data::key(3))->notecard);
-        UNSCOPED_INFO("found by its master");
         REQUIRE(back.mastering("/s/door.lsl").size() == size_t(1));
-        UNSCOPED_INFO("and by what it read");
         REQUIRE(back.affectedBy("disk:/s/util.lsl").size() == size_t(1));
-        UNSCOPED_INFO("in its object");
         REQUIRE(back.linksIn(almasterindex_data::key(1)).size() == size_t(1));
         UNSCOPED_INFO("in the inventory");
         REQUIRE(back.linksIn(LLUUID::null).size() == size_t(1));
@@ -222,7 +209,6 @@ namespace
         almasterindex_data::put(file, garbage);
         {
             ALMasterIndex& looked = open();
-            UNSCOPED_INFO("no links");
             REQUIRE(looked.empty());
             UNSCOPED_INFO("nothing to write");
             CHECK_FALSE(looked.dirty());
@@ -273,12 +259,9 @@ namespace
     {
         ALMasterIndex& made = open();
         made.link({ almasterindex_data::link(1, 1, "/s/a.lsl"), almasterindex_data::link(1, 2, "/s/b.lsl"), almasterindex_data::link(2, 3, "/s/c.lsl") });
-        UNSCOPED_INFO("three");
         REQUIRE(made.size() == size_t(3));
-        UNSCOPED_INFO("told once");
         CHECK(told == 1);
         made.link(almasterindex_data::link(2, 4, "/s/d.lsl"));
-        UNSCOPED_INFO("and once more");
         CHECK(told == 2);
         made.link(std::vector<ALMasterLink>());
         UNSCOPED_INFO("none, not told");
@@ -286,7 +269,6 @@ namespace
         made.link(almasterindex_data::link(1, 1, "/s/a2.lsl"));
         UNSCOPED_INFO("put over, not beside");
         REQUIRE(made.size() == size_t(4));
-        UNSCOPED_INFO("the new master");
         CHECK(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(1))->master == std::string("/s/a2.lsl"));
     }
 
@@ -295,11 +277,8 @@ namespace
         ALMasterIndex& made = open();
         made.link({ almasterindex_data::link(1, 1, "/s/a.lsl"), almasterindex_data::link(1, 2, "/s/b.lsl") });
         told = 0;
-        UNSCOPED_INFO("let go of");
         CHECK(made.unlink(almasterindex_data::key(1), almasterindex_data::key(1)));
-        UNSCOPED_INFO("told");
         CHECK(told == 1);
-        UNSCOPED_INFO("gone");
         REQUIRE_FALSE(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(1)));
         UNSCOPED_INFO("one not linked is not");
         CHECK_FALSE(made.unlink(almasterindex_data::key(1), almasterindex_data::key(1)));
@@ -309,9 +288,7 @@ namespace
         const size_t marked = made.markPending({ { almasterindex_data::key(1), almasterindex_data::key(1) }, { almasterindex_data::key(1), almasterindex_data::key(2) } });
         UNSCOPED_INFO("the one linked");
         CHECK(marked == size_t(1));
-        UNSCOPED_INFO("pending");
         CHECK(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2))->state == ALMasterLink::State::Pending);
-        UNSCOPED_INFO("told");
         CHECK(told == 2);
         UNSCOPED_INFO("none linked, none marked");
         CHECK(made.markPending({ { almasterindex_data::key(5), almasterindex_data::key(5) } }) == size_t(0));
@@ -319,9 +296,7 @@ namespace
         CHECK(told == 2);
         index.reset();
         const ALMasterLinks disk = onDisk();
-        UNSCOPED_INFO("one on disk");
         REQUIRE(disk.size() == size_t(1));
-        UNSCOPED_INFO("pending there");
         CHECK(disk.of(almasterindex_data::key(1), almasterindex_data::key(2))->state == ALMasterLink::State::Pending);
     }
 
@@ -350,28 +325,21 @@ namespace
         CHECK_FALSE(made.dirty());
 
         // A recompile: the same text, a new asset.
-        UNSCOPED_INFO("the same");
         CHECK(made.heardSaved(almasterindex_data::key(1), almasterindex_data::key(2), almasterindex_data::key(101), ours) == ALMasterIndex::Heard::Same);
         const std::optional<ALMasterLink> same = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
-        UNSCOPED_INFO("the base moved");
         CHECK(same->base == almasterindex_data::key(101));
-        UNSCOPED_INFO("still active");
         CHECK(same->state == ALMasterLink::State::Active);
-        UNSCOPED_INFO("nobody told");
         CHECK(told == 0);
         UNSCOPED_INFO("to be written");
         CHECK(made.dirty());
         UNSCOPED_INFO("a notecard's by its text");
         CHECK(made.heardSaved(almasterindex_data::key(1), almasterindex_data::key(3), almasterindex_data::key(201), "hello") == ALMasterIndex::Heard::Same);
 
-        UNSCOPED_INFO("something else");
         CHECK(made.heardSaved(almasterindex_data::key(1), almasterindex_data::key(2), almasterindex_data::key(102), "default {}") == ALMasterIndex::Heard::Differing);
         const std::optional<ALMasterLink> other = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
-        UNSCOPED_INFO("differing");
         CHECK(other->state == ALMasterLink::State::Differing);
         UNSCOPED_INFO("its base as it was");
         CHECK(other->base == almasterindex_data::key(101));
-        UNSCOPED_INFO("told");
         CHECK(told == 1);
 
         // Nothing sent through it yet: no hash to be the same as.
@@ -388,33 +356,25 @@ namespace
         ALMasterLink sent = *made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
         sent.hash         = "h1";
         sent.base         = almasterindex_data::key(50);
-        UNSCOPED_INFO("put back");
         CHECK(made.finished(almasterindex_data::key(1), almasterindex_data::key(2), sent));
         UNSCOPED_INFO("with what the send left");
         CHECK(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2))->hash == std::string("h1"));
-        UNSCOPED_INFO("told");
         CHECK(told == 1);
 
         // Saved as another item: the link is that one's.
         ALMasterLink rekeyed = sent;
         rekeyed.item         = almasterindex_data::key(3);
         rekeyed.hash         = "h2";
-        UNSCOPED_INFO("put");
         CHECK(made.finished(almasterindex_data::key(1), almasterindex_data::key(2), rekeyed));
         UNSCOPED_INFO("not the old item's");
         REQUIRE_FALSE(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2)));
-        UNSCOPED_INFO("the new one's");
         CHECK(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(3))->hash == std::string("h2"));
-        UNSCOPED_INFO("one link");
         REQUIRE(made.size() == size_t(1));
-        UNSCOPED_INFO("found by its master");
         REQUIRE(made.mastering("/s/door.lsl").size() == size_t(1));
 
         // Let go of while it was on its way: stays let go of.
         made.unlink(almasterindex_data::key(1), almasterindex_data::key(3));
-        UNSCOPED_INFO("not put");
         CHECK_FALSE(made.finished(almasterindex_data::key(1), almasterindex_data::key(3), rekeyed));
-        UNSCOPED_INFO("none");
         REQUIRE(made.empty());
     }
 
@@ -426,23 +386,16 @@ namespace
         CHECK(ALMasterIndex::knowsNothing(*made.linkOf(almasterindex_data::key(1), almasterindex_data::key(1))));
         told = 0;
 
-        UNSCOPED_INFO("kept");
         CHECK(made.adopted(almasterindex_data::key(1), almasterindex_data::key(1), "/s/a.lsl", { "disk:/s/util.lsl" }, false, "ha", 77));
         const std::optional<ALMasterLink> a = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(1));
-        UNSCOPED_INFO("what it read");
         REQUIRE(a->uses.size() == size_t(1));
         UNSCOPED_INFO("what went up, as the world holds it");
         CHECK(a->hash == std::string("ha"));
-        UNSCOPED_INFO("the stamp with it");
         CHECK(a->stamp == S64(77));
-        UNSCOPED_INFO("found by what it read");
         REQUIRE_FALSE(made.affectedBy("disk:/s/util.lsl").empty());
         // The world holding something else: what it read, and no hash.
-        UNSCOPED_INFO("kept too");
         CHECK(made.adopted(almasterindex_data::key(1), almasterindex_data::key(2), "/s/b.lsl", {}, true, std::string(), 0));
-        UNSCOPED_INFO("missed");
         CHECK(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2))->missed);
-        UNSCOPED_INFO("no hash");
         REQUIRE(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2))->hash.empty());
         UNSCOPED_INFO("not told yet");
         CHECK(told == 0);
@@ -558,7 +511,6 @@ namespace
         made.link({ almasterindex_data::link(1, 1, "/s/a.lsl"), almasterindex_data::link(1, 2, "/s/b.lsl") });
         UNSCOPED_INFO("a link: handed over at once");
         CHECK_FALSE(made.dirty());
-        UNSCOPED_INFO("on disk");
         REQUIRE(on_disk(1).has_value());
 
         // A send's bookkeeping waits, and a crash now loses it.
@@ -576,7 +528,6 @@ namespace
         made.markPending({ { almasterindex_data::key(1), almasterindex_data::key(2) } });
         UNSCOPED_INFO("pending: at once");
         CHECK_FALSE(made.dirty());
-        UNSCOPED_INFO("pending on disk");
         CHECK(on_disk(2)->state == ALMasterLink::State::Pending);
         UNSCOPED_INFO("and what waited with it");
         CHECK(on_disk(1)->hash == std::string("h1"));
@@ -587,7 +538,6 @@ namespace
         made.finished(almasterindex_data::key(1), almasterindex_data::key(1), sent);
         UNSCOPED_INFO("suspended: at once");
         CHECK_FALSE(made.dirty());
-        UNSCOPED_INFO("suspended on disk");
         CHECK(on_disk(1)->state == ALMasterLink::State::Suspended);
         sent.state = ALMasterLink::State::Active;
         made.finished(almasterindex_data::key(1), almasterindex_data::key(1), sent);

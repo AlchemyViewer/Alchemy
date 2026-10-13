@@ -122,7 +122,7 @@ namespace
 
         // A shared start's edits made from the end back, as an editor's
         // replaceAll does.
-        static std::string applied(const std::string& script, const ALLuauSharedStart::Rewrite& rewrite)
+        static std::string require_applied(const std::string& script, const ALLuauSharedStart::Rewrite& rewrite)
         {
             std::vector<std::string> lines;
             for (size_t from = 0; from <= script.size();)
@@ -182,13 +182,9 @@ namespace
         CHECK(weight.compiled);
         UNSCOPED_INFO("against SLua's limit");
         CHECK(weight.limit == size_t(131072));
-        UNSCOPED_INFO("not an estimate");
         CHECK_FALSE(weight.estimate);
-        {
-            INFO("something, and not much");
-            CHECK(weight.total > 50);
-            CHECK(weight.total < 2000);
-        }
+        CHECK(weight.total > 50);
+        CHECK(weight.total < 2000);
         const ALScriptWeight::Part* greet = named(weight, "greet");
         const ALScriptWeight::Part* count = named(weight, "count");
         {
@@ -206,18 +202,15 @@ namespace
         {
             INFO("a function that does nothing weighs least:" + listed(weight));
             REQUIRE(nothing);
-            REQUIRE(nothing->bytes < greet->bytes);
+            CHECK(nothing->bytes < greet->bytes);
             CHECK(nothing->bytes < count->bytes);
         }
-        {
-            INFO("the script itself, and its strings");
-            REQUIRE(named(weight, "script"));
-            REQUIRE(named(weight, "strings"));
-        }
+        CHECK(named(weight, "script"));
+        CHECK(named(weight, "strings"));
         const size_t parts = std::accumulate(weight.parts.begin(), weight.parts.end(), size_t(0),
                                              [](size_t sum, const ALScriptWeight::Part& p) { return sum + p.bytes; });
         {
-            INFO("the parts are nearly the whole: " + std::to_string(parts) + " of " + std::to_string(weight.total));
+            INFO("the parts are nearly the whole: " << parts << " of " << weight.total);
             CHECK(parts <= weight.total);
             CHECK(weight.total - parts < 16);
         }
@@ -237,12 +230,8 @@ namespace
         const std::string    words(2000, 'x');
         const ALScriptWeight heavy = ALScriptWeigh::slua("local s = \"" + words + "\"\nprint(s)\n");
         const ALScriptWeight light = ALScriptWeigh::slua("local s = \"x\"\nprint(s)\n");
-        {
-            INFO("both compiled");
-            CHECK(heavy.compiled);
-            CHECK(light.compiled);
-        }
-        UNSCOPED_INFO("the string weighs");
+        CHECK(heavy.compiled);
+        CHECK(light.compiled);
         CHECK(heavy.total >= light.total + 2000);
         // Heavy, it is a part of its own, and no longer the table of
         // strings'.
@@ -256,7 +245,7 @@ namespace
         {
             INFO("a part of its own:" + listed(heavy));
             REQUIRE(constant);
-            REQUIRE(constant->bytes >= 2000);
+            CHECK(constant->bytes >= 2000);
             CHECK(constant->line == 1);
         }
         {
@@ -354,11 +343,8 @@ namespace
         }
 
         const ALScriptWeight broken = ALScriptWeigh::slua("local function (\n");
-        {
-            INFO("a script that does not compile");
-            CHECK_FALSE(broken.compiled);
-            REQUIRE_FALSE(broken.error.empty());
-        }
+        CHECK_FALSE(broken.compiled);
+        CHECK_FALSE(broken.error.empty());
     }
 
     // LSO weighs its image to the top of its heap: the registers, the
@@ -390,11 +376,8 @@ namespace
         CHECK(weight.compiled);
         UNSCOPED_INFO("against LSO's limit");
         CHECK(weight.limit == size_t(16384));
-        {
-            INFO("well under it");
-            CHECK(weight.total > 0);
-            CHECK(weight.total < 4096);
-        }
+        CHECK(weight.total > 0);
+        CHECK(weight.total < 4096);
         const ALScriptWeight::Part* twice = named(weight, "twice");
         const ALScriptWeight::Part* state = named(weight, "default");
         const ALScriptWeight::Part* touch = named(weight, "touch_start");
@@ -403,8 +386,8 @@ namespace
             REQUIRE(twice);
             REQUIRE(state);
             REQUIRE(touch);
-            REQUIRE(named(weight, "state_entry"));
-            REQUIRE(named(weight, "registers"));
+            CHECK(named(weight, "state_entry"));
+            CHECK(named(weight, "registers"));
         }
         UNSCOPED_INFO("a function where it is");
         CHECK(twice->line == 2);
@@ -416,16 +399,12 @@ namespace
         CHECK(state->bytes == size_t(5 + 8 * 2));
         const ALScriptWeight::Part* count = named(weight, "gCount");
         const ALScriptWeight::Part* name  = named(weight, "gName");
-        {
-            INFO("the globals too");
-            REQUIRE(count);
-            REQUIRE(name);
-        }
+        REQUIRE(count);
+        REQUIRE(name);
         UNSCOPED_INFO("a string global weighs its string");
         CHECK(name->bytes > count->bytes);
     }
 
-    // What does not fit in 16 KB says so.
     TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: what does not fit in 16 KB says so", "[ALScriptWeight]")
     {
         UNSCOPED_INFO("builtins: " + error);
@@ -438,18 +417,15 @@ namespace
         script += "];\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay(llList2String(gWords, 0));\n    }\n}\n";
         const ALScriptWeight weight = ALScriptWeigh::lso(script);
         {
-            INFO("does not fit: " + weight.error + " " + std::to_string(weight.total));
+            INFO("does not fit: " << weight.error << " " << weight.total);
             CHECK_FALSE(weight.compiled);
-            REQUIRE_FALSE(weight.error.empty());
+            CHECK_FALSE(weight.error.empty());
         }
         UNSCOPED_INFO("and weighs more than there is");
         CHECK(weight.total > weight.limit);
         const ALScriptWeight broken = ALScriptWeigh::lso("default { state_entry() { integer x = ; } }\n");
-        {
-            INFO("a script that does not parse");
-            CHECK_FALSE(broken.compiled);
-            REQUIRE_FALSE(broken.error.empty());
-        }
+        CHECK_FALSE(broken.compiled);
+        CHECK_FALSE(broken.error.empty());
     }
 
     // Mono is an estimate: the IL sized by the opcode table with what it
@@ -478,15 +454,11 @@ namespace
         const ALScriptWeight weight = ALScriptWeigh::mono(script);
         UNSCOPED_INFO("compiled: " + weight.error);
         CHECK(weight.compiled);
-        UNSCOPED_INFO("an estimate");
         CHECK(weight.estimate);
         UNSCOPED_INFO("against Mono's limit");
         CHECK(weight.limit == size_t(65536));
-        {
-            INFO("over what an assembly costs, and under the limit");
-            CHECK(weight.total > ALScriptWeigh::MONO_BASE_BYTES);
-            CHECK(weight.total < 8192);
-        }
+        CHECK(weight.total > ALScriptWeigh::MONO_BASE_BYTES);
+        CHECK(weight.total < 8192);
         const ALScriptWeight::Part* twice = named(weight, "twice");
         const ALScriptWeight::Part* touch = named(weight, "touch_start");
         const ALScriptWeight::Part* entry = named(weight, "state_entry");
@@ -495,20 +467,18 @@ namespace
             REQUIRE(twice);
             REQUIRE(touch);
             REQUIRE(entry);
-            REQUIRE(named(weight, "globals"));
-            REQUIRE(named(weight, "assembly"));
+            CHECK(named(weight, "globals"));
+            CHECK(named(weight, "assembly"));
         }
         UNSCOPED_INFO("a function where it is");
         CHECK(twice->line == 1);
         UNSCOPED_INFO("a handler in its state");
         CHECK(touch->within == std::string("default"));
-        UNSCOPED_INFO("where it is");
         CHECK(touch->line == 11);
         UNSCOPED_INFO("a long string weighs:" + listed(weight));
         CHECK(touch->bytes > entry->bytes);
         const size_t parts = std::accumulate(weight.parts.begin(), weight.parts.end(), size_t(0),
                                              [](size_t sum, const ALScriptWeight::Part& p) { return sum + p.bytes; });
-        UNSCOPED_INFO("the parts are the whole");
         CHECK(parts == weight.total);
     }
 
@@ -540,26 +510,23 @@ namespace
         CHECK(weight.compiled);
         UNSCOPED_INFO("against Luau's limit");
         CHECK(weight.limit == size_t(131072));
-        UNSCOPED_INFO("not an estimate");
         CHECK_FALSE(weight.estimate);
         {
-            INFO("something, and not much: " + std::to_string(weight.total) + listed(weight));
+            INFO("parts:" + listed(weight));
             CHECK(weight.total > 50);
             CHECK(weight.total < 4096);
         }
         const ALScriptWeight::Part* twice = named(weight, "twice");
         UNSCOPED_INFO("a function a part:" + listed(weight));
         REQUIRE(twice != nullptr);
-        UNSCOPED_INFO("where it is: " + std::to_string(twice->line));
         CHECK(twice->line == 1);
         const ALScriptWeight::Part* touch = named(weight, "touch_start");
         {
             INFO("a handler in its state:" + listed(weight));
             REQUIRE(touch);
-            REQUIRE(touch->within == "default");
+            CHECK(touch->within == "default");
             CHECK(touch->kind == ALScriptWeight::Part::Kind::Handler);
         }
-        UNSCOPED_INFO("where it is");
         CHECK(touch->line == 11);
         // Its lines, read off the compiler's lined bytecode, which the
         // server's is not: the total stays what the server charges.
@@ -574,11 +541,8 @@ namespace
         UNSCOPED_INFO("nothing past the script's lines:" + lined(weight));
         CHECK(within(weight, 16, 1000) == 0);
         const ALScriptWeight broken = ALScriptWeigh::lslLuau("default { state_entry() { integer x = ; } }\n");
-        {
-            INFO("a script that does not compile");
-            CHECK_FALSE(broken.compiled);
-            REQUIRE_FALSE(broken.error.empty());
-        }
+        CHECK_FALSE(broken.compiled);
+        CHECK_FALSE(broken.error.empty());
     }
 
     // LSO by line: what the compiler wrote while it stood at each
@@ -592,8 +556,7 @@ namespace
         const ALScriptWeight weight = ALScriptWeigh::lso(byLine());
         UNSCOPED_INFO("compiled: " + weight.error);
         CHECK(weight.compiled);
-        UNSCOPED_INFO("by line:" + lined(weight));
-        REQUIRE_FALSE(weight.lines.empty());
+        CHECK_FALSE(weight.lines.empty());
         UNSCOPED_INFO("the loop's body" + lined(weight));
         CHECK(at(weight, 13) > 0);
         UNSCOPED_INFO("the loop itself: its test, its step and its jump back" + lined(weight));
@@ -634,8 +597,7 @@ namespace
         const ALScriptWeight weight = ALScriptWeigh::mono(byLine());
         UNSCOPED_INFO("compiled: " + weight.error);
         CHECK(weight.compiled);
-        UNSCOPED_INFO("by line:" + lined(weight));
-        REQUIRE_FALSE(weight.lines.empty());
+        CHECK_FALSE(weight.lines.empty());
         UNSCOPED_INFO("the loop's body" + lined(weight));
         CHECK(at(weight, 13) > 0);
         UNSCOPED_INFO("the loop itself" + lined(weight));
@@ -664,11 +626,8 @@ namespace
         {
             all += line.bytes;
         }
-        {
-            INFO("the lines are less than the whole");
-            CHECK(all > 0);
-            CHECK(all < weight.total);
-        }
+        CHECK(all > 0);
+        CHECK(all < weight.total);
     }
 
     // In the source's places: a part in an include is in the include, at
@@ -716,7 +675,6 @@ namespace
         UNSCOPED_INFO("compiled: " + weight.error);
         CHECK(weight.compiled);
         const ALScriptWeight placed = weight.inSource(mapped(true));
-        UNSCOPED_INFO("the same weight");
         CHECK(placed.total == weight.total);
         const ALScriptWeight::Part* twice = named(placed, "twice");
         const ALScriptWeight::Part* entry = named(placed, "state_entry");
@@ -732,7 +690,7 @@ namespace
         UNSCOPED_INFO("to its end there");
         CHECK(twice->endLine == 3);
         UNSCOPED_INFO("a handler in the script");
-        REQUIRE(entry->file.empty());
+        CHECK(entry->file.empty());
         UNSCOPED_INFO("at the script's line");
         CHECK(entry->line == 3);
         size_t in_include = 0, in_script = 0;
@@ -778,7 +736,6 @@ namespace
         }
         script += "];\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay((string)llGetListLength(gNumbers));\n    }\n}\n";
         lsl.check(script);
-        UNSCOPED_INFO("it parses");
         CHECK(lsl.parsed());
         const ALScriptWeight weight = ALScriptWeigh::lso(script);
         UNSCOPED_INFO("and is weighed: " + weight.error);
@@ -855,8 +812,8 @@ namespace
         {
             INFO("a local function, from its function to its end:" + listed(weight));
             REQUIRE(twice);
-            REQUIRE(twice->line == 1);
-            REQUIRE(twice->endLine == 3);
+            CHECK(twice->line == 1);
+            CHECK(twice->endLine == 3);
             CHECK(twice->endColumn == 3);
         }
         UNSCOPED_INFO("not a handler");
@@ -869,17 +826,17 @@ namespace
         }
         {
             INFO("from its function to its end");
-            REQUIRE(entry->line == 6);
-            REQUIRE(entry->column == 18);
+            CHECK(entry->line == 6);
+            CHECK(entry->column == 18);
             CHECK(entry->endLine == 8);
         }
         UNSCOPED_INFO("a state named by a string:" + listed(weight));
-        REQUIRE(find("touch_start", "other place") != nullptr);
+        CHECK(find("touch_start", "other place") != nullptr);
         const ALScriptWeight::Part* touched = find("touch_start", "");
         {
             INFO("LLEvents' handler by its event:" + listed(weight));
             REQUIRE(touched);
-            REQUIRE(touched->kind == ALScriptWeight::Part::Kind::Handler);
+            CHECK(touched->kind == ALScriptWeight::Part::Kind::Handler);
             CHECK(touched->line == 11);
         }
         const ALScriptWeight::Part* tick = find("LLTimers:every", "");
@@ -895,9 +852,9 @@ namespace
         UNSCOPED_INFO("the long string on the line that says it:" + lined(weight));
         CHECK(at(weight, 7) > 80);
         UNSCOPED_INFO("a short one on its own line:" + lined(weight));
-        REQUIRE(at(weight, 12) > 4 + std::string("touched").size());
+        CHECK(at(weight, 12) > 4 + std::string("touched").size());
         const size_t lines = within(weight, 0, 100);
-        UNSCOPED_INFO("most of the whole on some line: " + std::to_string(lines) + " of " + std::to_string(weight.total));
+        UNSCOPED_INFO("most of the whole on some line: " << lines << " of " << weight.total);
         CHECK(lines * 3 > weight.total * 2);
     }
 
@@ -932,40 +889,40 @@ namespace
         {
             INFO("a value loaded twice");
             REQUIRE(again);
-            REQUIRE(again->uses == 2);
-            REQUIRE(again->loads == 2);
-            REQUIRE(again->line == 6);
+            CHECK(again->uses == 2);
+            CHECK(again->loads == 2);
+            CHECK(again->line == 6);
             CHECK(again->bytes == 12);
         }
         const ALScriptWeight::String* colour = of("colour");
         {
             INFO("a field's name: named, never loaded");
             REQUIRE(colour);
-            REQUIRE(colour->uses >= 2);
-            REQUIRE(colour->loads == 0);
+            CHECK(colour->uses >= 2);
+            CHECK(colour->loads == 0);
             CHECK(colour->line == 4);
         }
         const ALScriptWeight::String* blue = of("blue");
         {
             INFO("a comparison's: named, never loaded");
             REQUIRE(blue);
-            REQUIRE(blue->uses == 1);
+            CHECK(blue->uses == 1);
             CHECK(blue->loads == 0);
         }
         const ALScriptWeight::String* say = of("OwnerSay");
         {
             INFO("an import's path");
             REQUIRE(say);
-            REQUIRE(say->uses >= 1);
-            REQUIRE(say->loads == 0);
+            CHECK(say->uses >= 1);
+            CHECK(say->loads == 0);
             CHECK(say->line == 1);
         }
         const ALScriptWeight::String* greet = of("greet");
         {
             INFO("a function's name, at the line it starts on");
             REQUIRE(greet);
-            REQUIRE(greet->name);
-            REQUIRE(greet->uses == 0);
+            CHECK(greet->name);
+            CHECK(greet->uses == 0);
             CHECK(greet->line == 0);
         }
         size_t bytes = 0;
@@ -1023,7 +980,7 @@ namespace
         UNSCOPED_INFO("the start the four share");
         CHECK(shared.start == start);
         UNSCOPED_INFO("the four, not the field's");
-        REQUIRE(shared.strings.size() == rests.size());
+        CHECK(shared.strings.size() == rests.size());
         size_t before = 0;
         size_t after  = 1 + start.size();
         for (const std::string& rest : rests)
@@ -1036,11 +993,8 @@ namespace
         CHECK(shared.saved == before - cost);
         for (const size_t i : shared.strings)
         {
-            {
-                INFO("each one of them");
-                REQUIRE(w.strings[i].text.rfind(start, 0) == 0);
-                REQUIRE(w.strings[i].text != start + "zulu");
-            }
+            REQUIRE(w.strings[i].text.rfind(start, 0) == 0);
+            REQUIRE(w.strings[i].text != start + "zulu");
         }
 
         // The costs against the compiler's own: the four written whole, and
@@ -1055,24 +1009,21 @@ namespace
         }
         const ALScriptWeight as_whole = ALScriptWeigh::slua(whole);
         const ALScriptWeight as_apart = ALScriptWeigh::slua(apart);
-        {
-            INFO("both compiled");
-            CHECK(as_whole.compiled);
-            CHECK(as_apart.compiled);
-            REQUIRE(as_whole.sharedStarts.size() == 1);
-        }
+        CHECK(as_whole.compiled);
+        CHECK(as_apart.compiled);
+        REQUIRE(as_whole.sharedStarts.size() == 1);
         const S64 really = S64(as_whole.total) - S64(as_apart.total);
-        UNSCOPED_INFO(llformat("saves about what was said: %lld against %zu", (long long)really, as_whole.sharedStarts[0].saved));
+        UNSCOPED_INFO("saves about what was said: " << really << " against " << as_whole.sharedStarts[0].saved);
         CHECK(std::abs(really - S64(as_whole.sharedStarts[0].saved)) <= 8);
 
         // Nothing where only two share a start: two loads cost more than
         // one start saves, until the start is long.
         UNSCOPED_INFO("two with a middling start: nothing");
-        REQUIRE(ALScriptWeigh::slua("ll.OwnerSay(\"twenty bytes of start, then one\")\nll.OwnerSay(\"twenty bytes of start, then two\")\n").sharedStarts.empty());
+        CHECK(ALScriptWeigh::slua("ll.OwnerSay(\"twenty bytes of start, then one\")\nll.OwnerSay(\"twenty bytes of start, then two\")\n").sharedStarts.empty());
         UNSCOPED_INFO("two with a long one: worth it");
-        REQUIRE(ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once, then one\")\n"
-                                   "ll.OwnerSay(\"a start long enough to be worth keeping once, then two\")\n")
-                       .sharedStarts.size() == 1);
+        CHECK(ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once, then one\")\n"
+                                 "ll.OwnerSay(\"a start long enough to be worth keeping once, then two\")\n")
+                     .sharedStarts.size() == 1);
         // Never inside a character.
         const ALScriptWeight cut = ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once \xC3\xA9t\xC3\xA9\")\n"
                                                        "ll.OwnerSay(\"a start long enough to be worth keeping once \xC3\xA8re\")\n");
@@ -1110,15 +1061,14 @@ namespace
         REQUIRE(before.sharedStarts.size() == size_t(1));
         const std::vector<std::string> strings = textsOf(before, before.sharedStarts[0]);
         UNSCOPED_INFO("not the require's path, which is no string to keep once");
-        REQUIRE(std::find(strings.begin(), strings.end(), start + "x") == strings.end());
+        CHECK(std::find(strings.begin(), strings.end(), start + "x") == strings.end());
         ALLuauSharedStart::Rewrite rewrite;
         std::string                error;
         const bool                 done = ALLuauSharedStart::rewrite(script, before.sharedStarts[0].start, strings, rewrite, error);
         UNSCOPED_INFO("rewritten: " + error);
         CHECK(done);
-        UNSCOPED_INFO("its name");
         CHECK(rewrite.name == std::string("sharedStart"));
-        const std::string after = applied(script, rewrite);
+        const std::string after = require_applied(script, rewrite);
         const auto has = [&after](const std::string& text) { return after.find(text) != std::string::npos; };
         UNSCOPED_INFO("the local past the --! comment: " + after);
         CHECK(after.rfind("--!strict\nlocal sharedStart\nsharedStart = \"" + start + "\"\n\n", 0) == 0);
@@ -1144,8 +1094,7 @@ namespace
         // Nothing left to keep once: the start is the local's one value,
         // kept once already, and the require's path no literal to keep.
         UNSCOPED_INFO("nothing offered again");
-        REQUIRE(weighed.sharedStarts.size() == size_t(0));
-        UNSCOPED_INFO(llformat("lighter: %zu then %zu", before.total, weighed.total));
+        CHECK(weighed.sharedStarts.size() == size_t(0));
         CHECK(weighed.total < before.total);
         ALLuauService     service;
         llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
@@ -1159,12 +1108,12 @@ namespace
             said += p.severity == ALScriptProblem::Severity::Error && p.message.find("require") == std::string::npos ? p.message + "\n" : std::string();
         }
         UNSCOPED_INFO("checks, strict:\n" + said + "---\n" + after);
-        REQUIRE(said.empty());
+        CHECK(said.empty());
 
         {
             INFO("nothing to make of a script without them");
             CHECK_FALSE(ALLuauSharedStart::rewrite("print(\"x\")\n", start, strings, rewrite, error));
-            REQUIRE_FALSE(error.empty());
+            CHECK_FALSE(error.empty());
         }
         const bool taken = ALLuauSharedStart::rewrite("local sharedStart = 1\nprint(\"" + start + "alpha\")\n", start, { start + "alpha" }, rewrite, error);
         UNSCOPED_INFO("rewritten with a name taken: " + error);
@@ -1221,8 +1170,8 @@ namespace
         UNSCOPED_INFO("what it saves, a capture for each closure");
         CHECK(shared.saved == before - cost);
         const S64 really = S64(as_whole.total) - S64(as_apart.total);
-        UNSCOPED_INFO(llformat("saves about what was said: %lld against %zu", (long long)really, shared.saved));
-        REQUIRE(std::abs(really - S64(shared.saved)) <= S64(8 + 2 * rests.size()));
+        UNSCOPED_INFO("saves about what was said: " << really << " against " << shared.saved);
+        CHECK(std::abs(really - S64(shared.saved)) <= S64(8 + 2 * rests.size()));
     }
 
     // Where the start's local goes: before the first of the script that is
@@ -1244,14 +1193,14 @@ namespace
             const bool                 done = ALLuauSharedStart::rewrite(script, start, strings, rewrite, why);
             UNSCOPED_INFO("rewritten: " + why + "\n" + script);
             REQUIRE(done);
-            return alscriptweight_data::applied(script, rewrite);
+            return alscriptweight_data::require_applied(script, rewrite);
         };
         const auto heads = [&](const std::string& head, const std::string& text) { return text.rfind(head + local, 0) == 0; };
         std::string after = kept("-- Door script\n--!strict\n" + said);
         UNSCOPED_INFO("past an ordinary comment and the --! one: " + after);
         CHECK(heads("-- Door script\n--!strict\n", after));
         UNSCOPED_INFO("and the strings kept: " + after);
-        REQUIRE(after.find("ll.OwnerSay(sharedStart .. \"alpha\")") != std::string::npos);
+        CHECK(after.find("ll.OwnerSay(sharedStart .. \"alpha\")") != std::string::npos);
         after = kept("\n--!strict\n" + said);
         UNSCOPED_INFO("past a blank first line: " + after);
         CHECK(heads("\n--!strict\n", after));
@@ -1262,7 +1211,7 @@ namespace
         {
             INFO("at the start of an indented line: " + after);
             CHECK(heads("--!strict\n", after));
-            REQUIRE(after.find(local + "    ll.OwnerSay") != std::string::npos);
+            CHECK(after.find(local + "    ll.OwnerSay") != std::string::npos);
         }
         after = kept("--[[ The door ]] " + said);
         UNSCOPED_INFO("after a comment on the same line: " + after);
@@ -1272,21 +1221,21 @@ namespace
         std::string                error;
         {
             INFO("a call's string on a line of its own would be ambiguous bracketed");
-            REQUIRE_FALSE(ALLuauSharedStart::rewrite("ll.OwnerSay\n\"" + start + "alpha\"\nll.OwnerSay(\"" + start + "bravo\")\n", start, strings, rewrite, error));
-            REQUIRE(error.find("does not parse") != std::string::npos);
+            CHECK_FALSE(ALLuauSharedStart::rewrite("ll.OwnerSay\n\"" + start + "alpha\"\nll.OwnerSay(\"" + start + "bravo\")\n", start, strings, rewrite, error));
+            CHECK(error.find("does not parse") != std::string::npos);
         }
         UNSCOPED_INFO("nothing made of it");
-        REQUIRE(rewrite.edits.empty());
+        CHECK(rewrite.edits.empty());
         {
             INFO("a string not written out: " + error);
             CHECK_FALSE(ALLuauSharedStart::rewrite("ll.OwnerSay(\"" + start + "alpha\")\n", start, strings, rewrite, error));
-            REQUIRE(error.find("not every one") != std::string::npos);
+            CHECK(error.find("not every one") != std::string::npos);
         }
         {
             INFO("none written out, a local joined on: " + error);
             CHECK_FALSE(ALLuauSharedStart::rewrite("local greeting = \"" + start + "\"\nll.OwnerSay(greeting .. \"alpha\")\nll.OwnerSay(greeting .. \"bravo\")\n",
                                            start, strings, rewrite, error));
-            REQUIRE(error.find("none of these strings") != std::string::npos);
+            CHECK(error.find("none of these strings") != std::string::npos);
         }
 
         UNSCOPED_INFO("a byte of no character in hex, a whole one as it is");
@@ -1308,27 +1257,27 @@ namespace
     {
         const std::string start = "You have touched the object of the day: ";
         UNSCOPED_INFO("an interpolated string's pattern");
-        REQUIRE(ALScriptWeigh::slua("local function said(name: string)\n"
-                                   "    ll.OwnerSay(`" + start + "{name}, first`)\n"
-                                   "    ll.OwnerSay(`" + start + "{name}, second`)\n"
-                                   "    ll.OwnerSay(`" + start + "{name}, third`)\n"
-                                   "end\n"
-                                   "said(\"x\")\n")
-                   .sharedStarts.empty());
+        CHECK(ALScriptWeigh::slua("local function said(name: string)\n"
+                                 "    ll.OwnerSay(`" + start + "{name}, first`)\n"
+                                 "    ll.OwnerSay(`" + start + "{name}, second`)\n"
+                                 "    ll.OwnerSay(`" + start + "{name}, third`)\n"
+                                 "end\n"
+                                 "said(\"x\")\n")
+                 .sharedStarts.empty());
         UNSCOPED_INFO("strings joined on a local's constant value");
-        REQUIRE(ALScriptWeigh::slua("local greeting = \"" + start + "\"\n"
-                                   "ll.OwnerSay(greeting .. \"alpha\")\n"
-                                   "ll.OwnerSay(greeting .. \"bravo\")\n"
-                                   "ll.OwnerSay(greeting .. \"charlie\")\n")
-                   .sharedStarts.empty());
+        CHECK(ALScriptWeigh::slua("local greeting = \"" + start + "\"\n"
+                                 "ll.OwnerSay(greeting .. \"alpha\")\n"
+                                 "ll.OwnerSay(greeting .. \"bravo\")\n"
+                                 "ll.OwnerSay(greeting .. \"charlie\")\n")
+                 .sharedStarts.empty());
         const auto feelings = [&start](const std::string& type) {
             return "type Mood = " + type + "\nlocal function feel(mood: Mood) end\n"
                    "feel(\"" + start + "happy\")\nfeel(\"" + start + "sad\")\nfeel(\"" + start + "bored\")\n";
         };
         UNSCOPED_INFO("given for a string");
-        REQUIRE(ALScriptWeigh::slua(feelings("string")).sharedStarts.size() == size_t(1));
+        CHECK(ALScriptWeigh::slua(feelings("string")).sharedStarts.size() == size_t(1));
         UNSCOPED_INFO("given for a singleton");
-        REQUIRE(ALScriptWeigh::slua(feelings("\"" + start + "happy\" | \"" + start + "sad\" | \"" + start + "bored\"")).sharedStarts.empty());
+        CHECK(ALScriptWeigh::slua(feelings("\"" + start + "happy\" | \"" + start + "sad\" | \"" + start + "bored\"")).sharedStarts.empty());
 
         // Kept once, with an interpolated string sharing the start beside
         // them: neither it nor the start's local is offered again.
@@ -1346,17 +1295,17 @@ namespace
             REQUIRE(kept.sharedStarts.size() == 1);
         }
         UNSCOPED_INFO("the three written out, not the pattern");
-        REQUIRE(kept.sharedStarts[0].strings.size() == size_t(3));
+        CHECK(kept.sharedStarts[0].strings.size() == size_t(3));
         ALLuauSharedStart::Rewrite rewrite;
         std::string                error;
         bool                       done = ALLuauSharedStart::rewrite(kept_script, start, textsOf(kept, kept.sharedStarts[0]), rewrite, error);
         UNSCOPED_INFO("rewritten: " + error);
         CHECK(done);
-        const ALScriptWeight again = ALScriptWeigh::slua(applied(kept_script, rewrite));
+        const ALScriptWeight again = ALScriptWeigh::slua(require_applied(kept_script, rewrite));
         UNSCOPED_INFO("weighed again: " + again.error);
         CHECK(again.compiled);
         UNSCOPED_INFO("nothing offered again");
-        REQUIRE(again.sharedStarts.size() == size_t(0));
+        CHECK(again.sharedStarts.size() == size_t(0));
 
         // Joined on to a name, each piece is loaded on its own.
         const std::string joined = "local function touched(name: string)\n"
@@ -1375,15 +1324,12 @@ namespace
         done = ALLuauSharedStart::rewrite(joined, start, textsOf(pieces, pieces.sharedStarts[0]), rewrite, error);
         UNSCOPED_INFO("rewritten: " + error);
         CHECK(done);
-        const std::string pieces_after = applied(joined, rewrite);
+        const std::string pieces_after = require_applied(joined, rewrite);
         UNSCOPED_INFO("each piece kept in place: " + pieces_after);
-        REQUIRE(pieces_after.find("ll.OwnerSay(name .. sharedStart .. \"alpha\" .. \"!\")") != std::string::npos);
+        CHECK(pieces_after.find("ll.OwnerSay(name .. sharedStart .. \"alpha\" .. \"!\")") != std::string::npos);
         const ALScriptWeight lighter = ALScriptWeigh::slua(pieces_after);
-        {
-            INFO(llformat("lighter: %zu then %zu", pieces.total, lighter.total));
-            CHECK(lighter.compiled);
-            CHECK(lighter.total < pieces.total);
-        }
+        CHECK(lighter.compiled);
+        CHECK(lighter.total < pieces.total);
 
         // A module's strings, in the source's places, are not the script's
         // to keep once: the first three lines are a module's.
@@ -1417,12 +1363,12 @@ namespace
         {
             INFO("weighed: " + bundled.error);
             CHECK(bundled.compiled);
-            REQUIRE(bundled.sharedStarts.size() == 1);
+            CHECK(bundled.sharedStarts.size() == 1);
         }
         UNSCOPED_INFO("all the script's: kept");
-        REQUIRE(bundled.inSource(mapped(0)).sharedStarts.size() == size_t(1));
+        CHECK(bundled.inSource(mapped(0)).sharedStarts.size() == size_t(1));
         UNSCOPED_INFO("two a module's: nothing");
-        REQUIRE(bundled.inSource(mapped(3)).sharedStarts.size() == size_t(0));
+        CHECK(bundled.inSource(mapped(3)).sharedStarts.size() == size_t(0));
     }
 
     // LSL's constants are folded as the grid's compiler folds them: a
@@ -1432,11 +1378,8 @@ namespace
     {
         const ALScriptWeight named   = ALScriptWeigh::slua("local x = PRIM_SIZE\nprint(x)\n");
         const ALScriptWeight written = ALScriptWeigh::slua("local x = 7\nprint(x)\n");
-        {
-            INFO("both compiled");
-            CHECK(named.compiled);
-            CHECK(written.compiled);
-        }
+        CHECK(named.compiled);
+        CHECK(written.compiled);
         UNSCOPED_INFO("the same as its value written out");
         CHECK(named.total == written.total);
         bool looked_up = false;
@@ -1464,8 +1407,8 @@ namespace
         REQUIRE(found != nullptr);
         {
             INFO("named on one line: " + found->name);
-            REQUIRE(found->name.rfind("\"a\\rb\\tc", 0) == 0);
-            REQUIRE(found->name.find('\r') == std::string::npos);
+            CHECK(found->name.rfind("\"a\\rb\\tc", 0) == 0);
+            CHECK(found->name.find('\r') == std::string::npos);
         }
     }
 }

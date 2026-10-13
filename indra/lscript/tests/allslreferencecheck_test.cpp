@@ -278,7 +278,6 @@ namespace
             }
             where += name + " from byte " + std::to_string(at) + ", in its " + regionOf(ll.image, at) + "\n";
         }
-        UNSCOPED_INFO("most of them: " + std::to_string(same));
         CHECK(same >= 75);
         UNSCOPED_INFO("the images that part: " + listed(parted) + "\n" + where);
         CHECK(parted == PARTED);
@@ -330,10 +329,9 @@ namespace
                 where += name + ": [" + (at < written.size() ? written[at] : "") + "] against LL's [" + (at < theirs.size() ? theirs[at] : "") + "]\n";
             }
         }
-        UNSCOPED_INFO("most of them: " + std::to_string(both));
         CHECK(both >= 75);
         UNSCOPED_INFO("the same as LL's:\n" + where);
-        REQUIRE(parted.empty());
+        CHECK(parted.empty());
         UNSCOPED_INFO("LL's compiles alone: " + listed(only_ll));
         CHECK(only_ll == ONLY_LL);
         UNSCOPED_INFO("Tailslide compiles alone: " + listed(only_tailslide));
@@ -370,10 +368,9 @@ namespace
                 wrong += name + ": LL's weighs " + std::to_string(theirs.total) + ", Tailslide's " + std::to_string(tailslide.total) + "\n";
             }
         }
-        UNSCOPED_INFO("most of them: " + std::to_string(both));
         CHECK(both >= 75);
         UNSCOPED_INFO(wrong);
-        REQUIRE(wrong.empty());
+        CHECK(wrong.empty());
     }
 
     TEST_CASE_METHOD(allslreferencecheck_data, "allslreferencecheck: integer literals past 32 bits read -1 as on 32-bit hosts; both make one image", "[allslreferencecheck]")
@@ -388,11 +385,9 @@ namespace
         std::vector<U8> ours;
         std::string     why;
         UNSCOPED_INFO("Tailslide compiles it: " + why);
-        REQUIRE(ALScriptWeigh::tailslideLSO(text, ours, why));
+        CHECK(ALScriptWeigh::tailslideLSO(text, ours, why));
         const ALLSLReference::Result ll = ALLSLReference::compile(text, Target::LSO);
-        UNSCOPED_INFO("LL's compiles it");
         CHECK(ll.ok);
-        UNSCOPED_INFO("the same image");
         CHECK(ours == ll.image);
     }
 }

@@ -127,11 +127,8 @@ namespace
         const std::string file = s.write("lib/util.lsl", "integer one;\n");
         ALDiskCache       cache;
         std::string       text;
-        {
-            INFO("read");
-            REQUIRE(cache.read(file, text));
-            CHECK(text == "integer one;\n");
-        }
+        REQUIRE(cache.read(file, text));
+        CHECK(text == "integer one;\n");
         s.write("lib/util.lsl", "integer three;\n");
         {
             INFO("read again once it changed");
