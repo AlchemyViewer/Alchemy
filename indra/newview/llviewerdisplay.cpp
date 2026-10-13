@@ -1025,7 +1025,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
                 gOcclusionProgram.bind();
                 for (U32 i = 0; i < num_types; i++)
                 {
-                    gPipeline.renderObjects(types[i], LLVertexBuffer::MAP_VERTEX, false);
+                    gPipeline.renderObjects(types[i], false, false);
                 }
 
                 gOcclusionProgram.unbind();
