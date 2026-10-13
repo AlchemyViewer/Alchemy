@@ -38,14 +38,14 @@
 #include "../lsl/allslservice.h"
 #include "../core/alscriptweight.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
 
-namespace tut
+namespace
 {
     struct allslcosts_data
     {
@@ -90,7 +90,8 @@ namespace tut
             const ALScriptWeight weight = t == Target::LSO    ? ALScriptWeigh::lso(text)
                                           : t == Target::Mono ? ALScriptWeigh::mono(text)
                                                               : ALScriptWeigh::lslLuau(text);
-            ensure("compiles for " + std::string(nameOf(t)) + ": " + weight.error + "\n" + text, weight.compiled);
+            UNSCOPED_INFO("compiles for " + std::string(nameOf(t)) + ": " + weight.error + "\n" + text);
+            REQUIRE(weight.compiled);
             return S32(weight.total);
         }
 
@@ -154,18 +155,15 @@ namespace tut
             }
         }
     };
-    typedef test_group<allslcosts_data> allslcosts_group;
-    typedef allslcosts_group::object    allslcosts_object;
-    allslcosts_group                    allslcosts_instance("ALLSLCosts");
 
     // The rewrites: each pair's verdict on LSO, Mono and Luau in turn --
     // '<' where the second form is smaller -- and the flag that stands for
     // it where the optimizer has one. The rest are what rewrites still to
     // come will read: here so that what was measured stays measured.
-    template<> template<>
-    void allslcosts_object::test<1>()
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: the rewrites: each pair's verdict on each target and the flag for it", "[ALLSLCosts]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         using Flag = bool ALLSLCosts::*;
         struct Fact
         {
@@ -387,23 +385,25 @@ namespace tut
                 const Delta  d = delta(t, fact.a, fact.b);
                 said(fact.what, t, d, 0);
                 const char v = fact.once ? verdict({ d.first, d.first }) : verdict(d);
-                ensure_equals(std::string(fact.what) + " on " + nameOf(t), v, fact.verdicts[n]);
+                UNSCOPED_INFO(std::string(fact.what) + " on " + nameOf(t));
+                REQUIRE(v == fact.verdicts[n]);
                 // A flag on is a form smaller there; one off may be for what
                 // a first use costs a script that the pair does not show
                 // (allslcosts.cpp says where).
                 if (fact.flag && ALLSLCosts::of(t).*fact.flag)
                 {
-                    ensure(std::string(fact.what) + ": the flag on " + nameOf(t) + ", and the form not smaller", v == '<');
+                    UNSCOPED_INFO(std::string(fact.what) + ": the flag on " + nameOf(t) + ", and the form not smaller");
+                    REQUIRE(v == '<');
                 }
             }
         }
     }
 
     // What a function costs, and a call of it, a local and a jump.
-    template<> template<>
-    void allslcosts_object::test<2>()
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: what a function costs and a call of it and a local and a jump", "[ALLSLCosts]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         const Snippet none{ "", "" };
         const Snippet two{ "f1() { }", "" };
         const Snippet eighteen{ "a_much_longer_name() { }", "" };
@@ -415,44 +415,54 @@ namespace tut
 
             const Delta local = delta(t, { "", "integer z = i; j = z;" }, { "", "j = i;" });
             said("a local", t, local, -c.local);
-            ensure_equals("a local" + where, -local.each, c.local);
+            UNSCOPED_INFO("a local" + where);
+            REQUIRE(-local.each == c.local);
 
             const Delta jump = delta(t, { "", "jump L; @L;" }, { "", "" });
             said("a jump", t, jump, -c.jump);
-            ensure("a jump" + where + ": " + std::to_string(-jump.first), -jump.first == c.jump);
+            UNSCOPED_INFO("a jump" + where + ": " + std::to_string(-jump.first));
+            REQUIRE(-jump.first == c.jump);
 
             const Delta f2  = delta(t, none, two);
             const Delta f18 = delta(t, none, eighteen);
             said("a function", t, f2, c.function + 2 * c.functionChar);
-            ensure_equals("a function's name, by the character" + where, (f18.first - f2.first) / 16, c.functionChar);
-            ensure_equals("a function" + where, f2.first - 2 * c.functionChar, c.function);
+            UNSCOPED_INFO("a function's name, by the character" + where);
+            REQUIRE((f18.first - f2.first) / 16 == c.functionChar);
+            UNSCOPED_INFO("a function" + where);
+            REQUIRE(f2.first - 2 * c.functionChar == c.function);
 
             const Delta p = delta(t, two, param);
             said("a parameter", t, p, c.parameter);
-            ensure_equals("a parameter" + where, p.first, c.parameter);
+            UNSCOPED_INFO("a parameter" + where);
+            REQUIRE(p.first == c.parameter);
 
             const Delta call = delta(t, { "f1() { }", "f1();" }, { "f1() { }", "f1(); f1();" });
             said("a call", t, call, c.call);
-            ensure_equals("a call" + where, call.each, c.call);
+            UNSCOPED_INFO("a call" + where);
+            REQUIRE(call.each == c.call);
 
             const Delta argued = delta(t, { "f1(integer a) { }", "f1(i);" }, { "f1(integer a) { }", "f1(i); f1(i);" });
             said("a call with an argument", t, argued, c.call + c.argument);
-            ensure_equals("an argument" + where, argued.each - c.call, c.argument);
+            UNSCOPED_INFO("an argument" + where);
+            REQUIRE(argued.each - c.call == c.argument);
 
             for (const char* text : { "hello", "hello world, hello" })
             {
                 const S32   length = S32(strlen(text));
                 const Delta string = delta(t, { "", "s = s;" }, { "", "s = \"" + std::string(text) + "\";" });
                 said("a string of " + std::to_string(length) + ", held once", t, string, c.stringHeld + length * c.stringHeldChar);
-                ensure_equals("a string of " + std::to_string(length) + ", held once" + where, string.first - string.each,
+                UNSCOPED_INFO("a string of " + std::to_string(length) + ", held once" + where);
+                REQUIRE(string.first - string.each ==
                               c.stringHeld + length * c.stringHeldChar);
             }
 
             const Delta first2  = delta(t, two, { "f1() { }", "f1();" });
             const Delta first18 = delta(t, eighteen, { "a_much_longer_name() { }", "a_much_longer_name();" });
             said("a first call", t, first2, c.call + c.reference + 2 * c.referenceChar);
-            ensure_equals("a first call's reference, by the character" + where, (first18.first - first2.first) / 16, c.referenceChar);
-            ensure_equals("a first call's reference" + where, first2.first - c.call - 2 * c.referenceChar, c.reference);
+            UNSCOPED_INFO("a first call's reference, by the character" + where);
+            REQUIRE((first18.first - first2.first) / 16 == c.referenceChar);
+            UNSCOPED_INFO("a first call's reference" + where);
+            REQUIRE(first2.first - c.call - 2 * c.referenceChar == c.reference);
 
             // The most elements of a literal added to a list bare: at it
             // smaller, one past it larger; with none, eight smaller.
@@ -468,21 +478,24 @@ namespace tut
             };
             if (c.elementsForListMost > 0)
             {
-                ensure("the most added bare, smaller" + where, verdict(bare(c.elementsForListMost)) == '<');
-                ensure("one more, larger" + where, verdict(bare(c.elementsForListMost + 1)) == '>');
+                UNSCOPED_INFO("the most added bare, smaller" + where);
+                REQUIRE(verdict(bare(c.elementsForListMost)) == '<');
+                UNSCOPED_INFO("one more, larger" + where);
+                REQUIRE(verdict(bare(c.elementsForListMost + 1)) == '>');
             }
             else
             {
-                ensure("eight added bare, smaller" + where, verdict(bare(8)) == '<');
+                UNSCOPED_INFO("eight added bare, smaller" + where);
+                REQUIRE(verdict(bare(8)) == '<');
             }
         }
     }
 
     // A global never assigned, against its value written where it is read.
-    template<> template<>
-    void allslcosts_object::test<3>()
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: a global never assigned against its value written where it is read", "[ALLSLCosts]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         struct Kind
         {
             const char*                  what;
@@ -519,9 +532,12 @@ namespace tut
                 const ALLSLCosts::Held& held   = c.*kind.held;
                 said(std::string(kind.what) + " global", t, own, held.global);
                 said(std::string(kind.what) + " written out", t, out, held.first);
-                ensure_equals(std::string(kind.what) + " global" + where, own.first, held.global);
-                ensure_equals(std::string(kind.what) + " written out, first" + where, out.first, held.first);
-                ensure_equals(std::string(kind.what) + " written out, each" + where, out.each, held.each);
+                UNSCOPED_INFO(std::string(kind.what) + " global" + where);
+                REQUIRE(own.first == held.global);
+                UNSCOPED_INFO(std::string(kind.what) + " written out, first" + where);
+                REQUIRE(out.first == held.first);
+                UNSCOPED_INFO(std::string(kind.what) + " written out, each" + where);
+                REQUIRE(out.each == held.each);
             }
             // A string at two lengths, what a character adds the same.
             for (const char* text : { "hello", "hello world, hello" })
@@ -535,9 +551,12 @@ namespace tut
                 const std::string      what   = "a string of " + std::to_string(length);
                 said(what + " global", t, own, held.global);
                 said(what + " written out", t, out, held.first);
-                ensure_equals(what + " global" + where, own.first, held.global);
-                ensure_equals(what + " written out, first" + where, out.first, held.first);
-                ensure_equals(what + " written out, each" + where, out.each, held.each);
+                UNSCOPED_INFO(what + " global" + where);
+                REQUIRE(own.first == held.global);
+                UNSCOPED_INFO(what + " written out, first" + where);
+                REQUIRE(out.first == held.first);
+                UNSCOPED_INFO(what + " written out, each" + where);
+                REQUIRE(out.each == held.each);
             }
         }
     }
@@ -545,10 +564,10 @@ namespace tut
     // What putting a function in place is estimated to come to, against the
     // script written both ways and weighed: the same side of nothing, and
     // near it.
-    template<> template<>
-    void allslcosts_object::test<4>()
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: what putting a function in place is estimated to come to", "[ALLSLCosts]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         struct Case
         {
             const char* what;
@@ -583,14 +602,18 @@ namespace tut
                 {
                     bytes = part.name == one.name ? S32(part.bytes) : bytes;
                 }
-                ensure(std::string(one.what) + ": the function weighed on " + nameOf(t) + ": " + whole.error, bytes > 0);
+                UNSCOPED_INFO(std::string(one.what) + ": the function weighed on " + nameOf(t) + ": " + whole.error);
+                REQUIRE(bytes > 0);
                 const S32 measured = size(t, one.inlined, 1) - size(t, one.called, 1);
                 ALLSLCosts::Inlining f = one.f;
                 f.bytes                = bytes;
                 const S32 estimate     = ALLSLCosts::of(t).inlined(f);
                 said(std::string(one.what) + " (estimated)", t, { measured, measured }, estimate);
-                ensure(std::string(one.what) + " on " + nameOf(t) + ": estimated " + std::to_string(estimate) + ", measured " + std::to_string(measured),
-                       (estimate < 0) == (measured < 0) && std::abs(estimate - measured) <= std::max(12, std::abs(measured) / 4));
+                {
+                    INFO(std::string(one.what) + " on " + nameOf(t) + ": estimated " + std::to_string(estimate) + ", measured " + std::to_string(measured));
+                    REQUIRE((estimate < 0) == (measured < 0));
+                    REQUIRE(std::abs(estimate - measured) <= std::max(12, std::abs(measured) / 4));
+                }
             }
         }
     }
@@ -598,10 +621,10 @@ namespace tut
     // Where a list's helpers are held once for the script: the least a
     // list's shape saves at a place, and the most a helper new to the
     // script costs.
-    template<> template<>
-    void allslcosts_object::test<5>()
+    TEST_CASE_METHOD(allslcosts_data, "ALLSLCosts: where a list's helpers are held once for the script", "[ALLSLCosts]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         for (const Target t : TARGETS)
         {
             const ALLSLCosts& c     = ALLSLCosts::of(t);
@@ -625,7 +648,8 @@ namespace tut
                 least = std::min(least, -delta(t, a, b).each);
             }
             said("the least a list's shape saves", t, { least, least }, c.listShapeLeast);
-            ensure_equals("the least a list's shape saves at a place" + where, least, c.listShapeLeast);
+            UNSCOPED_INFO("the least a list's shape saves at a place" + where);
+            REQUIRE(least == c.listShapeLeast);
             // A helper each: a cast to a list, something added after one,
             // something added before one.
             const Snippet had{ "", "l = l + [i];" };
@@ -636,7 +660,8 @@ namespace tut
                 most          = std::max(most, d.first - d.each);
             }
             said("the most a helper costs", t, { most, most }, c.listHelperMost);
-            ensure_equals("the most a list's helper new to the script costs" + where, most, c.listHelperMost);
+            UNSCOPED_INFO("the most a list's helper new to the script costs" + where);
+            REQUIRE(most == c.listHelperMost);
         }
     }
 }
