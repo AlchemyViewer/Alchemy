@@ -323,9 +323,10 @@ void main()
     float lobe = pow(clamp(dot(reflect(-v, sun_norm), l), 0.0, 1.0), glint_exp);
     float glint = lobe * (glint_exp + 2.0) / 6.2831853;
     // The half vector's cosine with the view, sqrt((1 + v.l) / 2), which needs no half vector: v and l are opposite at
-    // the horizon under a setting sun, and theirs would not normalize.
+    // the horizon under a setting sun, and theirs would not normalize. Rounding can carry it a hair past 1 with the sun
+    // straight behind the camera, where pow would take a negative base.
     float vh = sqrt(max(0.5 + 0.5 * dot(v, l), 0.0));
-    float fresnel = 0.02 + 0.98 * pow(1.0 - vh, 5.0);
+    float fresnel = 0.02 + 0.98 * pow(max(1.0 - vh, 0.0), 5.0);
     vec3 punctual = min(glint * fresnel, 10.0) * sunlit_linear * shadow * atten;
 
     // The glint's glow, as WindLight's water wrote it: the lobe at its peak of 1, by 0.1 rising to 0.3 as the light
