@@ -264,7 +264,7 @@ void LLFloaterMessageLog::updateGlobalNetList(bool starting)
     if(!starting)
     {
         refreshNetList();
-        refreshNetInfo(FALSE);
+        refreshNetInfo(false);
     }
 }
 
@@ -440,7 +440,7 @@ void LLFloaterMessageLog::setInfoPaneMode(EInfoPaneMode mode)
 {
     mInfoPaneMode = mode;
     if(mode == IPANE_NET)
-        refreshNetInfo(TRUE);
+        refreshNetInfo(true);
 
     //we hide the regular net_info editor and show two panes for http log mode
     getChild<LLView>("net_info")->setVisible(mode != IPANE_HTTP_LOG);
@@ -626,7 +626,7 @@ void LLFloaterMessageLog::pairHTTPResponse(LogPayload entry)
 void LLFloaterMessageLog::onCommitNetList(LLUICtrl* ctrl)
 {
     setInfoPaneMode(IPANE_NET);
-    refreshNetInfo(TRUE);
+    refreshNetInfo(true);
 }
 
 void LLFloaterMessageLog::onCommitMessageLog(LLUICtrl* ctrl)

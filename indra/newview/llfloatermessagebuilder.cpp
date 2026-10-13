@@ -37,7 +37,7 @@
 ////////////////////////////////
 LLNetListItem::LLNetListItem(LLUUID id)
 :   mID(id),
-    mAutoName(TRUE),
+    mAutoName(true),
     mName("No name"),
     mPreviousRegionName(""),
     mHandle(0),
@@ -223,7 +223,7 @@ bool LLFloaterMessageBuilder::postBuild()
     getChild<LLTextBase>("message_edit")->setText(mInitialText);
     getChild<LLUICtrl>("send_btn")->setCommitCallback(boost::bind(&LLFloaterMessageBuilder::onClickSend, this));
 
-    return TRUE;
+    return true;
 }
 
 void LLFloaterMessageBuilder::onCommitPacketCombo(LLUICtrl* ctrl)
