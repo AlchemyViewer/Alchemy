@@ -911,9 +911,10 @@ namespace
     TEST_CASE_METHOD(allslservice_data, "allslservice: another region's builtins: new ones known after and none declared twice", "[allslservice]")
     {
         const std::string base = std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt";
-        std::string       error;
-        UNSCOPED_INFO("the first region's: " + error);
-        REQUIRE(service.loadBuiltins(base, error));
+        std::string       why;
+        const bool        first = service.loadBuiltins(base, why);
+        UNSCOPED_INFO("the first region's: " + why);
+        REQUIRE(first);
         const std::string script = "default\n{\n    state_entry()\n    {\n        integer n = llBrandNewThing(1);\n        llOwnerSay((string)n);\n    }\n}\n";
         bool unknown = false;
         for (const ALScriptProblem& problem : service.check(script))
@@ -937,13 +938,13 @@ namespace
             llofstream out(path, std::ios::out | std::ios::binary | std::ios::trunc);
             out << text << "integer llBrandNewThing( integer Value )\n";
         }
-        const bool loaded = service.loadBuiltins(path, error);
+        const bool newer = service.loadBuiltins(path, why);
         // Tailslide's table is the process's and only ever added to: what
         // the file declares stays for every case after this one.
         ll_test::StateGuard::accept("Tailslide's builtins");
         LLFile::remove(path);
-        UNSCOPED_INFO("loaded: " + error);
-        CHECK(loaded);
+        UNSCOPED_INFO("loaded: " + why);
+        CHECK(newer);
         unknown = false;
         for (const ALScriptProblem& problem : service.check(script))
         {
@@ -1070,6 +1071,7 @@ namespace
         {
             INFO("the outer call of two: " + said[2].message);
             CHECK(said[2].line == 5);
+            REQUIRE_FALSE(said[2].args.empty());
             CHECK(said[2].args[0] == "llGetListLength");
         }
         UNSCOPED_INFO("a NOLINT answers to the rule's name");

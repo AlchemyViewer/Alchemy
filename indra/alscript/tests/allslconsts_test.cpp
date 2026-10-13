@@ -248,6 +248,7 @@ namespace
         REQUIRE(r.consts.size() == size_t(3));
         const auto declaredAt = [&](const std::string& word, size_t from) {
             const size_t at     = r.text.find(word, from);
+            REQUIRE(at != std::string::npos);
             const S32    line   = static_cast<S32>(std::count(r.text.begin(), r.text.begin() + at, '\n'));
             const size_t start  = r.text.rfind('\n', at);
             const S32    column = static_cast<S32>(start == std::string::npos ? at : at - start - 1);

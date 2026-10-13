@@ -253,7 +253,9 @@ namespace
         std::stringstream json;
         json << in.rdbuf();
         std::string docs_error;
-        CHECK(service.loadDocs(json.str(), docs_error));
+        const bool  docs_loaded = service.loadDocs(json.str(), docs_error);
+        UNSCOPED_INFO("docs loaded: " + docs_error);
+        CHECK(docs_loaded);
         const std::string script = "local count = 1\nll.Say(0, tostring(count))\n";
         ALScriptHover hover = service.hover(script, 1, 4);  // on `Say`
         REQUIRE(hover.found);
@@ -666,7 +668,9 @@ namespace
         CHECK(mentions(plain, "unused"));
         ALLuauConfig config;
         std::string  bad;
-        REQUIRE(ALLuauConfig::parse("{ \"globals\": [\"Alchemy\"], \"lint\": { \"LocalUnused\": false } }", config, bad));
+        const bool   parsed = ALLuauConfig::parse("{ \"globals\": [\"Alchemy\"], \"lint\": { \"LocalUnused\": false } }", config, bad);
+        UNSCOPED_INFO("parses: " + bad);
+        REQUIRE(parsed);
         service.setConfig(config);
         ALScriptProblems configured = service.check(script);
         UNSCOPED_INFO("Alchemy known: " + said(configured));
@@ -779,7 +783,7 @@ namespace
         UNSCOPED_INFO("with a colon, a and b");
         REQUIRE(colon.parameters.size() == size_t(2));
         {
-            INFO("at b: " + colon.parameters[static_cast<size_t>(std::max(0, colon.active))]);
+            INFO("at b: " + colon.label);
             CHECK(colon.active == 1);
             CHECK(colon.parameters[1].find("b") == 0);
         }
@@ -792,7 +796,9 @@ namespace
         for (const bool use : { true, false, true })
         {
             std::string why;
-            REQUIRE(service.setNewSolver(use, why));
+            const bool  switched = service.setNewSolver(use, why);
+            UNSCOPED_INFO("switched: " + why);
+            REQUIRE(switched);
             REQUIRE(service.newSolver() == use);
             UNSCOPED_INFO("the definitions with it");
             REQUIRE(service.hasDefinitions());
@@ -996,7 +1002,6 @@ namespace
         service.hover(strict, 2, 6);
         UNSCOPED_INFO("and nothing checked again");
         CHECK(service.typeChecks() - before == size_t(one_slot ? 1 : 2));
-        // The hints the questions read are the strict ones either way.
         // The types a question reads are the strict ones, whatever the
         // script's mode: a nonstrict check's module knows none of them.
         const std::string typed       = "local s = string.rep(\"a\", 2)\nlocal n = #s\nprint(n)\n";
@@ -1403,6 +1408,7 @@ namespace
             {
                 if (p.code == "SlNumberTruth")
                 {
+                    REQUIRE_FALSE(p.args.empty());
                     out.push_back(p.key + " " + p.args[0] + " " + std::to_string(p.line));
                 }
             }
@@ -1494,6 +1500,7 @@ namespace
             {
                 if (p.code == "SlNilSentinel")
                 {
+                    REQUIRE(p.args.size() > 4);
                     out.push_back(p.key + " " + p.args[0] + " " + p.args[4] + " " + std::to_string(p.line) +
                                   (p.severity == ALScriptProblem::Severity::Error ? "" : " not an error"));
                 }
@@ -1572,8 +1579,10 @@ namespace
             UNSCOPED_INFO("no type");
             REQUIRE(shape[i].detail.empty());
         }
+        const std::vector<ALScriptOutlineEntry> again = service.outline(script);
+        REQUIRE_FALSE(again.empty());
         UNSCOPED_INFO("the outline still typed");
-        CHECK(service.outline(script)[0].detail == "number");
+        CHECK(again[0].detail == "number");
         const std::vector<ALScriptOutlineEntry> broken = ALLuauService::shape("local function a()\n  x = \nend\nlocal function b()\nend\n");
         {
             INFO("broken in a: both still there");
@@ -2435,8 +2444,9 @@ namespace
         ALLuauService own;
         std::string   why;
         own.setNewSolver(newSolver, why);
+        const bool    read = own.loadDefinitions(definitions + "\ndeclare REZ_TORQUE: string\n", why);
         UNSCOPED_INFO("loads: " + why);
-        CHECK(own.loadDefinitions(definitions + "\ndeclare REZ_TORQUE: string\n", why));
+        CHECK(read);
         const ALScriptProblems problems = own.check("--!strict\nlocal s: string = REZ_TORQUE\nlocal n: number = SKY_MIE_CONFIG\nprint(s, n)\n");
         UNSCOPED_INFO("theirs, a string; ours, a number: " + said(problems));
         CHECK(alluauservice_data::errors(problems) == size_t(0));
@@ -2447,13 +2457,15 @@ namespace
         UNSCOPED_INFO("definitions loaded: " + error);
         CHECK(loaded);
         std::string why;
-        UNSCOPED_INFO("the other solver");
-        REQUIRE(service.setNewSolver(!newSolver, why));
+        const bool  other = service.setNewSolver(!newSolver, why);
+        UNSCOPED_INFO("the other solver: " + why);
+        REQUIRE(other);
         ALScriptProblems problems = service.check("print(REZ_TORQUE)\n");
         UNSCOPED_INFO("known there: " + said(problems));
         CHECK_FALSE(unknownGlobal(problems, "REZ_TORQUE"));
+        const bool back = service.setNewSolver(newSolver, why);
         UNSCOPED_INFO("and back: " + why);
-        CHECK(service.setNewSolver(newSolver, why));
+        CHECK(back);
         problems = service.check("print(REZ_TORQUE)\n");
         UNSCOPED_INFO("known again: " + said(problems));
         CHECK_FALSE(unknownGlobal(problems, "REZ_TORQUE"));

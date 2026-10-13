@@ -23,8 +23,6 @@
 
 #include "linden_common.h"
 
-#include "linden_common.h"
-
 #include "../lsl/allsleffects.h"
 #include "../lsl/allslservice.h"
 
@@ -184,6 +182,7 @@ namespace
         const std::vector<LSLFunctionExpression*> bumps = p.calls("bump");
         const std::vector<LSLFunctionExpression*> sames = p.calls("same");
         REQUIRE(bumps.size() == size_t(11));
+        REQUIRE(sames.size() == size_t(2));
         const auto first = [&](LSLFunctionExpression* call) { return effects.mayRunFirst(statementOf(call), call); };
         UNSCOPED_INFO("0: the right operand runs first");
         CHECK(first(bumps[0]));
@@ -228,14 +227,18 @@ namespace
                        "    l = [bump(), same(2)];\n"  // same changes nothing, and bump does
                        "} }\n");
         REQUIRE(q.script != nullptr);
-        const ALLSLEffects quiet(q.script);
-        const auto         firstQ = [&](LSLFunctionExpression* call) { return quiet.mayRunFirst(statementOf(call), call); };
+        const ALLSLEffects                        quiet(q.script);
+        const std::vector<LSLFunctionExpression*> quiet_bumps = q.calls("bump");
+        const std::vector<LSLFunctionExpression*> quiet_sames = q.calls("same");
+        REQUIRE(quiet_bumps.size() == size_t(2));
+        REQUIRE(quiet_sames.size() == size_t(2));
+        const auto firstQ = [&](LSLFunctionExpression* call) { return quiet.mayRunFirst(statementOf(call), call); };
         UNSCOPED_INFO("a quiet call before a quiet one");
-        CHECK(firstQ(q.calls("same")[0]));
+        CHECK(firstQ(quiet_sames[0]));
         UNSCOPED_INFO("a call that reads before one that writes");
-        CHECK_FALSE(firstQ(q.calls("bump")[0]));
+        CHECK_FALSE(firstQ(quiet_bumps[0]));
         UNSCOPED_INFO("a call that writes before a quiet one");
-        CHECK_FALSE(firstQ(q.calls("same")[1]));
+        CHECK_FALSE(firstQ(quiet_sames[1]));
     }
     TEST_CASE_METHOD(allsleffects_data, "allsleffects: a function's changes past the script and globals it reads through calls", "[allsleffects]")
     {

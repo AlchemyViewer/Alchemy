@@ -40,7 +40,9 @@ namespace
     {
         ALLuauConfig config;
         std::string  error;
-        REQUIRE(ALLuauConfig::parse("{\n  \"languageMode\": \"strict\",\n  \"aliases\": { \"Lib\": \"./lib\", \"shared\": \"../shared\", \"abs\": \"/opt/lua\" }\n}\n", config, error));
+        const bool   parsed = ALLuauConfig::parse("{\n  \"languageMode\": \"strict\",\n  \"aliases\": { \"Lib\": \"./lib\", \"shared\": \"../shared\", \"abs\": \"/opt/lua\" }\n}\n", config, error);
+        UNSCOPED_INFO("parses: " + error);
+        REQUIRE(parsed);
         REQUIRE(config.aliases.size() == size_t(3));
         UNSCOPED_INFO("by lower-case name");
         CHECK(config.aliases["lib"] == std::string("./lib"));
@@ -129,7 +131,9 @@ namespace
         ALLuauConfig config;
         std::string  error;
         const ALLuauConfig defaults;
-        REQUIRE(ALLuauConfig::parse("{\n  \"lint\": { \"LocalUnused\": false, \"LocalShadow\": true },\n  \"globals\": [\"Alchemy\", \"grid\"]\n}\n", config, error));
+        const bool         parsed = ALLuauConfig::parse("{\n  \"lint\": { \"LocalUnused\": false, \"LocalShadow\": true },\n  \"globals\": [\"Alchemy\", \"grid\"]\n}\n", config, error);
+        UNSCOPED_INFO("parses: " + error);
+        REQUIRE(parsed);
         REQUIRE(config.globals.size() == size_t(2));
         UNSCOPED_INFO("in order");
         CHECK(config.globals[0] == std::string("Alchemy"));
@@ -285,8 +289,9 @@ namespace
         }
         ALLuauConfig out;
         std::string  error;
-        UNSCOPED_INFO("beside Luau's");
-        REQUIRE(ALLuauConfig::parse("{ \"languageMode\": \"strict\", \"lint\": { \"LocalUnused\": false, \"SlCompoundAssign\": false } }", out, error));
+        const bool   beside = ALLuauConfig::parse("{ \"languageMode\": \"strict\", \"lint\": { \"LocalUnused\": false, \"SlCompoundAssign\": false } }", out, error);
+        UNSCOPED_INFO("beside Luau's: " + error);
+        REQUIRE(beside);
         {
             INFO("the rest read");
             CHECK(out.mode == "strict");
@@ -295,31 +300,36 @@ namespace
         UNSCOPED_INFO("ours off");
         CHECK((out.slLints & compound) == 0);
         {
-            INFO("alone");
-            CHECK(ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false } }", out, error));
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false } }", out, error);
+            INFO("alone: " + error);
+            CHECK(parsed);
             CHECK((out.slLints & compound) == 0);
         }
         {
-            INFO("first");
-            CHECK(ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false, \"LocalUnused\": false }, \"globals\": [\"g\"] }", out, error));
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false, \"LocalUnused\": false }, \"globals\": [\"g\"] }", out, error);
+            INFO("first: " + error);
+            CHECK(parsed);
             CHECK((out.slLints & compound) == 0);
             CHECK(out.globals == std::vector<std::string>{ "g" });
             CHECK((out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
         }
         {
-            INFO("with // comments, over lines");
-            CHECK(ALLuauConfig::parse("{\n  // c style\n  \"lint\": {\n    \"LocalUnused\": true,\n    \"SlCompoundAssign\": false\n  }\n}", out, error));
+            const bool parsed = ALLuauConfig::parse("{\n  // c style\n  \"lint\": {\n    \"LocalUnused\": true,\n    \"SlCompoundAssign\": false\n  }\n}", out, error);
+            INFO("with // comments, over lines: " + error);
+            CHECK(parsed);
             CHECK((out.slLints & compound) == 0);
         }
         {
-            INFO("* for ours too");
-            CHECK(ALLuauConfig::parse("{ \"lint\": { \"*\": false } }", out, error));
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"*\": false } }", out, error);
+            INFO("* for ours too: " + error);
+            CHECK(parsed);
             CHECK(out.slLints == 0);
             CHECK((out.lints & ALLuauConfig::lintBit("LocalUnused")) == 0);
         }
         {
-            INFO("then one on");
-            CHECK(ALLuauConfig::parse("{ \"lint\": { \"*\": false, \"SlCompoundAssign\": true } }", out, error));
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"*\": false, \"SlCompoundAssign\": true } }", out, error);
+            INFO("then one on: " + error);
+            CHECK(parsed);
             CHECK(out.slLints == compound);
         }
         {
@@ -333,8 +343,9 @@ namespace
             CHECK(error == "Bad setting 'fatal'.  Valid options are true and false");
         }
         {
-            INFO("Luau's words on the rest keep their lines");
-            CHECK_FALSE(ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false },\n  \"globals\": 3 }", out, error));
+            const bool parsed = ALLuauConfig::parse("{ \"lint\": { \"SlCompoundAssign\": false },\n  \"globals\": 3 }", out, error);
+            INFO("Luau's words on the rest keep their lines: " + error);
+            CHECK_FALSE(parsed);
             REQUIRE(error.find("line 2") != std::string::npos);
         }
 
@@ -342,8 +353,9 @@ namespace
         base.slLints      = 0;
         base.slFatalLints = compound;
         {
-            INFO("the base's where the file does not say");
-            CHECK(ALLuauConfig::parse("{ \"languageMode\": \"strict\" }", out, error, &base));
+            const bool parsed = ALLuauConfig::parse("{ \"languageMode\": \"strict\" }", out, error, &base);
+            INFO("the base's where the file does not say: " + error);
+            CHECK(parsed);
             CHECK(out.slLints == 0);
             CHECK(out.slFatalLints == compound);
         }
@@ -366,10 +378,13 @@ namespace
             "    other = { tool = true },\n"
             "}\n";
         std::string json, error;
-        REQUIRE(ALLuauConfigScript::asLuaurc(source, json, error));
+        const bool  ran = ALLuauConfigScript::asLuaurc(source, json, error);
+        UNSCOPED_INFO("ran: " + error);
+        REQUIRE(ran);
         ALLuauConfig config;
+        const bool   parsed = ALLuauConfig::parse(json, config, error);
         UNSCOPED_INFO("and parses as a .luaurc: " + error + " in " + json);
-        REQUIRE(ALLuauConfig::parse(json, config, error));
+        REQUIRE(parsed);
         CHECK(config.mode == std::string("strict"));
         {
             INFO("its aliases, by name in lower case");
@@ -407,8 +422,12 @@ namespace
         // as it is, and what one cannot hold is refused.
         {
             INFO("a backslash kept");
-            CHECK(ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'C:\\\\lua\\\\lib' } } }", json, error));
-            CHECK(ALLuauConfig::parse(json, config, error));
+            const bool written = ALLuauConfigScript::asLuaurc("return { luau = { aliases = { q = 'C:\\\\lua\\\\lib' } } }", json, error);
+            UNSCOPED_INFO("ran: " + error);
+            CHECK(written);
+            const bool read = ALLuauConfig::parse(json, config, error);
+            UNSCOPED_INFO("parses: " + error);
+            CHECK(read);
             CHECK(config.aliases["q"] == "C:\\lua\\lib");
         }
         {
@@ -511,14 +530,16 @@ namespace
         // many elements, at once.
         const auto moving = std::chrono::steady_clock::now();
         {
-            INFO("two billion nils moved, refused at once");
-            CHECK_FALSE(ALLuauConfigScript::asLuaurc("table.move({}, 1, 2147483646, 2) return {}", json, error));
+            const bool ran = ALLuauConfigScript::asLuaurc("table.move({}, 1, 2147483646, 2) return {}", json, error);
+            INFO("two billion nils moved, refused at once: " + error);
+            CHECK_FALSE(ran);
             REQUIRE(error.find("table.move") != std::string::npos);
             CHECK(std::chrono::duration<F64>(std::chrono::steady_clock::now() - moving).count() < ALLuauConfigScript::MOST_SECONDS);
         }
         {
-            INFO("a move within it, as Luau's");
-            CHECK(ALLuauConfigScript::asLuaurc("return { luau = { globals = table.move({ 'a', 'b' }, 1, 2, 2, { 'z' }) } }", json, error));
+            const bool ran = ALLuauConfigScript::asLuaurc("return { luau = { globals = table.move({ 'a', 'b' }, 1, 2, 2, { 'z' }) } }", json, error);
+            INFO("a move within it, as Luau's: " + error);
+            CHECK(ran);
             CHECK(json == "{\"globals\": [\"z\", \"a\", \"b\"]}");
         }
         {
@@ -535,14 +556,16 @@ namespace
         // Second Life's VM opens Eris as `ares`; a configuration is run
         // without it. The rest of Luau's libraries are there.
         {
-            INFO("no ares");
-            CHECK(ALLuauConfigScript::asLuaurc("return { luau = { languagemode = ares and 'strict' or 'nonstrict' } }", json, error));
+            const bool ran = ALLuauConfigScript::asLuaurc("return { luau = { languagemode = ares and 'strict' or 'nonstrict' } }", json, error);
+            INFO("no ares: " + error);
+            CHECK(ran);
             REQUIRE(json.find("nonstrict") != std::string::npos);
         }
         {
-            INFO("Luau's libraries");
-            CHECK(ALLuauConfigScript::asLuaurc("return { luau = { globals = { string.upper('a'), tostring(math.max(1, 2)), table.concat({ 'x', 'y' }), buffer and 'b' or 'none' } } }",
-                                               json, error));
+            const bool ran = ALLuauConfigScript::asLuaurc(
+                "return { luau = { globals = { string.upper('a'), tostring(math.max(1, 2)), table.concat({ 'x', 'y' }), buffer and 'b' or 'none' } } }", json, error);
+            INFO("Luau's libraries: " + error);
+            CHECK(ran);
             CHECK(json == "{\"globals\": [\"A\", \"2\", \"xy\", \"b\"]}");
         }
     }
