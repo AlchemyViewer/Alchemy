@@ -343,8 +343,10 @@ namespace
         REQUIRE(each.size() == size_t(6));
         UNSCOPED_INFO("the broken line's, breaks and all");
         CHECK(each[1] + "\n" == want.substr(want.find("    local r"), want.find("    print(string") - want.find("    local r")));
-        UNSCOPED_INFO("a line asked for");
-        CHECK(ALScriptFormatter::formatEach(in, options, 2, 2)[1] == in.substr(in.find("    local r"), in.find(" -- sent") + 8 - in.find("    local r")));
+        const std::vector<std::string> asked = ALScriptFormatter::formatEach(in, options, 2, 2);
+        REQUIRE(asked.size() > size_t(1));
+        UNSCOPED_INFO("a line not asked for: as written");
+        CHECK(asked[1] == in.substr(in.find("    local r"), in.find(" -- sent") + 8 - in.find("    local r")));
         // From below the first line: every line still one of its own, the
         // blank ones that the whole text's runs would take out too.
         const std::vector<std::string> blanks = ALScriptFormatter::formatEach("\n\n\n\n\nprint(1)\n", options, -1, 5);

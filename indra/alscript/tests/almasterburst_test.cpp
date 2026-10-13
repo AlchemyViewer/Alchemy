@@ -66,8 +66,10 @@ namespace
         burst.changed("/s/door.lsl", 100.0);
         CHECK(burst.waiting("/s/door.lsl"));
         REQUIRE(burst.size() == 1);
+        std::optional<F64> due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("due a second on");
-        CHECK(*burst.dueAt() == 101.0);
+        CHECK(*due == 101.0);
         {
             INFO("not before");
             REQUIRE(burst.release(100.5).empty());
@@ -82,11 +84,15 @@ namespace
         // A quiet time set shorter, and one less than nothing.
         burst.setQuiet(0.25);
         burst.changed("/s/door.lsl", 300.0);
+        due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("the quiet time set");
-        CHECK(*burst.dueAt() == 300.25);
+        CHECK(*due == 300.25);
         burst.setQuiet(-1.0);
+        due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("none at all is no wait");
-        CHECK(*burst.dueAt() == 300.0);
+        CHECK(*due == 300.0);
         UNSCOPED_INFO("and goes at once");
         CHECK(almasterburst_data::joined(burst.release(300.0)) == std::string("/s/door.lsl"));
     }
@@ -107,8 +113,10 @@ namespace
             REQUIRE(burst.release(last).empty());
         }
         REQUIRE(burst.size() == size_t(30));
+        const std::optional<F64> due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("due a second after the last");
-        CHECK(*burst.dueAt() == last + 1.0);
+        CHECK(*due == last + 1.0);
         UNSCOPED_INFO("not a moment before");
         REQUIRE(burst.release(almasterburst_data::before(last + 1.0)).empty());
         UNSCOPED_INFO("all of them, in the order heard");
@@ -127,8 +135,10 @@ namespace
             burst.changed("/s/build/out.lsl", now);
             if (n == 6)
             {
+                const std::optional<F64> due = burst.dueAt();
+                REQUIRE(due.has_value());
                 UNSCOPED_INFO("due when quiet, while that is sooner");
-                REQUIRE(*burst.dueAt() == 4.0);
+                REQUIRE(*due == 4.0);
             }
             if (!burst.release(now).empty())
             {
@@ -142,8 +152,10 @@ namespace
         // The next change began a burst of its own.
         UNSCOPED_INFO("then ten seconds after the change that followed");
         CHECK(gone[1] == 20.5);
+        const std::optional<F64> due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("and once more due when that one is over");
-        CHECK(*burst.dueAt() == 25.0 + 1.0);
+        CHECK(*due == 25.0 + 1.0);
     }
 
     TEST_CASE_METHOD(almasterburst_data, "almasterburst: a file held past the quiet time stays and the others go first", "[almasterburst]")
@@ -153,8 +165,10 @@ namespace
         // Found emptied: held a second and a half.
         burst.changed("/s/emptied.lsl", 0.25, 1.5);
         burst.changed("/s/b.lsl", 0.5);
+        std::optional<F64> due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("due when quiet");
-        CHECK(*burst.dueAt() == 1.5);
+        CHECK(*due == 1.5);
         UNSCOPED_INFO("the others go");
         CHECK(almasterburst_data::joined(burst.release(1.5)) == std::string("/s/a.lsl /s/b.lsl"));
         {
@@ -162,8 +176,10 @@ namespace
             CHECK(burst.waiting("/s/emptied.lsl"));
             REQUIRE(burst.size() == 1);
         }
+        due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("due when its hold is over");
-        CHECK(*burst.dueAt() == 1.75);
+        CHECK(*due == 1.75);
         UNSCOPED_INFO("not before");
         REQUIRE(burst.release(almasterburst_data::before(1.75)).empty());
         UNSCOPED_INFO("then it goes");
@@ -172,8 +188,10 @@ namespace
         // Held, but the burst it is in goes on: it waits for both.
         burst.changed("/s/emptied.lsl", 10.0, 1.5);
         burst.changed("/s/c.lsl", 11.0);
+        due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("past its hold, the burst not over");
-        CHECK(*burst.dueAt() == 12.0);
+        CHECK(*due == 12.0);
         UNSCOPED_INFO("together then");
         CHECK(almasterburst_data::joined(burst.release(12.0)) == std::string("/s/emptied.lsl /s/c.lsl"));
     }
@@ -184,16 +202,20 @@ namespace
         burst.changed("/s/a.lsl", 0.0, 1.5);
         burst.changed("/s/b.lsl", 0.125);
         burst.changed("/s/a.lsl", 0.25);
+        std::optional<F64> due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("due when quiet, the hold gone");
-        CHECK(*burst.dueAt() == 1.25);
+        CHECK(*due == 1.25);
         UNSCOPED_INFO("both, the refilled one in its first place");
         CHECK(almasterburst_data::joined(burst.release(1.25)) ==
                       std::string("/s/a.lsl /s/b.lsl"));
 
         burst.changed("/s/a.lsl", 5.0);
         burst.changed("/s/a.lsl", 5.25, 1.5);
+        due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("emptied later, held from then");
-        CHECK(*burst.dueAt() == 6.75);
+        CHECK(*due == 6.75);
         UNSCOPED_INFO("not when quiet");
         REQUIRE(burst.release(6.25).empty());
         UNSCOPED_INFO("when the later hold is over");
@@ -226,8 +248,10 @@ namespace
             REQUIRE(burst.release(now).empty());
         }
         burst.changed("/s/busy.lsl", 115.0);
+        const std::optional<F64> due = burst.dueAt();
+        REQUIRE(due.has_value());
         UNSCOPED_INFO("due at the rest's longest");
-        CHECK(*burst.dueAt() == 115.0);
+        CHECK(*due == 115.0);
         UNSCOPED_INFO("which it goes at");
         CHECK(almasterburst_data::joined(burst.release(115.0)) == std::string("/s/busy.lsl"));
 

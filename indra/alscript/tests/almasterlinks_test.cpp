@@ -101,11 +101,14 @@ namespace
         links.put(almasterlinks_data::link(0, 2, "/s/inventory.lsl"));
         links.put(almasterlinks_data::link(3, 4, "/s/lamp.lsl"));
         REQUIRE(links.size() == size_t(3));
+        const ALMasterLink* const door = links.of(almasterlinks_data::key(1), almasterlinks_data::key(2));
+        REQUIRE(door);
         UNSCOPED_INFO("by its object and item");
-        CHECK(links.of(almasterlinks_data::key(1), almasterlinks_data::key(2))->master == std::string("/s/door.lsl"));
+        CHECK(door->master == std::string("/s/door.lsl"));
+        const ALMasterLink* const inventory = links.of(LLUUID::null, almasterlinks_data::key(2));
+        REQUIRE(inventory);
         UNSCOPED_INFO("the same item in the inventory is another");
-        CHECK(links.of(LLUUID::null, almasterlinks_data::key(2))->master ==
-                      std::string("/s/inventory.lsl"));
+        CHECK(inventory->master == std::string("/s/inventory.lsl"));
         UNSCOPED_INFO("not by the item in another object");
         REQUIRE_FALSE(links.of(almasterlinks_data::key(3), almasterlinks_data::key(2)));
 
@@ -116,8 +119,10 @@ namespace
         REQUIRE(links.size() == size_t(3));
         UNSCOPED_INFO("what put answers is the one kept");
         CHECK(put.master == std::string("/s/door2.lsl"));
+        const ALMasterLink* const replaced = links.of(almasterlinks_data::key(1), almasterlinks_data::key(2));
+        REQUIRE(replaced);
         UNSCOPED_INFO("and found so");
-        CHECK(links.of(almasterlinks_data::key(1), almasterlinks_data::key(2))->made == ALMasterLink::Made::Hint);
+        CHECK(replaced->made == ALMasterLink::Made::Hint);
         UNSCOPED_INFO("in its place");
         CHECK(links.all()[0].master == std::string("/s/door2.lsl"));
 
@@ -125,8 +130,10 @@ namespace
         UNSCOPED_INFO("found to change");
         REQUIRE(found != nullptr);
         found->hash = "xxh128:00";
+        const ALMasterLink* const lamp = links.of(almasterlinks_data::key(3), almasterlinks_data::key(4));
+        REQUIRE(lamp);
         UNSCOPED_INFO("changed where it is kept");
-        CHECK(links.of(almasterlinks_data::key(3), almasterlinks_data::key(4))->hash == std::string("xxh128:00"));
+        CHECK(lamp->hash == std::string("xxh128:00"));
         UNSCOPED_INFO("nothing to change of an item not linked");
         REQUIRE_FALSE(links.find(almasterlinks_data::key(9), almasterlinks_data::key(9)));
 
@@ -135,11 +142,15 @@ namespace
         REQUIRE_FALSE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(2)));
         UNSCOPED_INFO("not twice");
         CHECK_FALSE(links.remove(almasterlinks_data::key(1), almasterlinks_data::key(2)));
-        UNSCOPED_INFO("the rest kept, in order");
-        CHECK(links.all()[0].master == std::string("/s/inventory.lsl"));
+        {
+            INFO("the rest kept, in order");
+            REQUIRE(links.size() == size_t(2));
+            CHECK(links.all()[0].master == std::string("/s/inventory.lsl"));
+        }
+        const ALMasterLink* const moved = links.of(almasterlinks_data::key(3), almasterlinks_data::key(4));
+        REQUIRE(moved);
         UNSCOPED_INFO("and found where they now are");
-        CHECK(links.of(almasterlinks_data::key(3), almasterlinks_data::key(4))->master ==
-                      std::string("/s/lamp.lsl"));
+        CHECK(moved->master == std::string("/s/lamp.lsl"));
     }
 
     TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: mastering lists a file's items comparing paths as their platform does", "[almasterlinks]")
@@ -169,7 +180,9 @@ namespace
         CHECK(ALMasterLinks::keyOf("/S/Door.lsl") == std::string("/S/Door.lsl"));
 
         // Changed through find(): the index follows.
-        links.find(almasterlinks_data::key(2), almasterlinks_data::key(11))->master = "/s/net/lamp.lsl";
+        ALMasterLink* const remastered = links.find(almasterlinks_data::key(2), almasterlinks_data::key(11));
+        REQUIRE(remastered);
+        remastered->master = "/s/net/lamp.lsl";
         UNSCOPED_INFO("a master changed through find");
         CHECK(almasterlinks_data::items(links.mastering("/s/net/door.lsl")) ==
                       std::string("10"));
@@ -210,7 +223,9 @@ namespace
                       std::string("12"));
 
         // The uses of the next expansion, written through find().
-        links.find(almasterlinks_data::key(1), almasterlinks_data::key(10))->uses = { "disk:/s/lib/net.lsl" };
+        ALMasterLink* const expanded = links.find(almasterlinks_data::key(1), almasterlinks_data::key(10));
+        REQUIRE(expanded);
+        expanded->uses = { "disk:/s/lib/net.lsl" };
         UNSCOPED_INFO("uses changed through find");
         CHECK(almasterlinks_data::items(links.usersOf("disk:/s/lib/util.lsl")) ==
                       std::string("11"));
@@ -513,11 +528,15 @@ namespace
         std::istringstream in(out.str());
         LLSD               back;
         REQUIRE(LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
-        const ALMasterLinks read = ALMasterLinks::fromLLSD(back);
+        const ALMasterLinks       read  = ALMasterLinks::fromLLSD(back);
+        const ALMasterLink* const set   = read.of(almasterlinks_data::key(1), almasterlinks_data::key(10));
+        const ALMasterLink* const unset = read.of(almasterlinks_data::key(1), almasterlinks_data::key(11));
+        REQUIRE(set);
+        REQUIRE(unset);
         UNSCOPED_INFO("read back set");
-        CHECK(read.of(almasterlinks_data::key(1), almasterlinks_data::key(10))->missed);
+        CHECK(set->missed);
         UNSCOPED_INFO("and not");
-        CHECK_FALSE(read.of(almasterlinks_data::key(1), almasterlinks_data::key(11))->missed);
+        CHECK_FALSE(unset->missed);
 
         // As an older version wrote it, with no such field, and as it might
         // be written otherwise.
@@ -535,12 +554,18 @@ namespace
         const ALMasterLinks old = ALMasterLinks::fromLLSD(older);
         UNSCOPED_INFO("all read");
         REQUIRE(old.size() == size_t(3));
+        const ALMasterLink* const unsaid   = old.of(LLUUID::null, almasterlinks_data::key(12));
+        const ALMasterLink* const number   = old.of(LLUUID::null, almasterlinks_data::key(13));
+        const ALMasterLink* const no_value = old.of(LLUUID::null, almasterlinks_data::key(14));
+        REQUIRE(unsaid);
+        REQUIRE(number);
+        REQUIRE(no_value);
         UNSCOPED_INFO("none said is none missed");
-        CHECK_FALSE(old.of(LLUUID::null, almasterlinks_data::key(12))->missed);
+        CHECK_FALSE(unsaid->missed);
         UNSCOPED_INFO("a number is read as one");
-        CHECK(old.of(LLUUID::null, almasterlinks_data::key(13))->missed);
+        CHECK(number->missed);
         UNSCOPED_INFO("what is no value is none");
-        CHECK_FALSE(old.of(LLUUID::null, almasterlinks_data::key(14))->missed);
+        CHECK_FALSE(no_value->missed);
     }
 
     TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: affectedBy lists users and links that missed but none suspended or orphaned", "[almasterlinks]")
@@ -576,7 +601,9 @@ namespace
                       std::string("11 14 15"));
 
         // Expanded again, and nothing missed now.
-        links.find(almasterlinks_data::key(1), almasterlinks_data::key(14))->missed = false;
+        ALMasterLink* const expanded = links.find(almasterlinks_data::key(1), almasterlinks_data::key(14));
+        REQUIRE(expanded);
+        expanded->missed = false;
         UNSCOPED_INFO("no longer");
         CHECK(almasterlinks_data::items(links.affectedBy("/s/lib/new.lsl")) == std::string("11"));
         UNSCOPED_INFO("nothing at all with nothing linked");
@@ -614,8 +641,12 @@ namespace
         REQUIRE(ALMasterLinks().watched().empty());
 
         // Orphaned, the file it masters is watched no longer.
-        links.find(almasterlinks_data::key(1), almasterlinks_data::key(14))->state = State::Orphaned;
-        links.find(almasterlinks_data::key(1), almasterlinks_data::key(13))->state = State::Orphaned;
+        ALMasterLink* const gone = links.find(almasterlinks_data::key(1), almasterlinks_data::key(14));
+        REQUIRE(gone);
+        gone->state = State::Orphaned;
+        ALMasterLink* const include = links.find(almasterlinks_data::key(1), almasterlinks_data::key(13));
+        REQUIRE(include);
+        include->state = State::Orphaned;
         UNSCOPED_INFO("an include again where it no longer masters");
         CHECK(almasterlinks_data::watched(links.watched()) ==
                       std::string("/s/a.lsl* /s/lib/u.lsl /s/lib/v.lsl /s/b.lsl* /s/c.lsl* /s/c2.lsl C:\\S\\G.lsl*"));
@@ -669,10 +700,14 @@ namespace
         CHECK(llsd["links"][0]["notecard"].asBoolean());
         UNSCOPED_INFO("and not where not");
         REQUIRE_FALSE(llsd["links"][1].has("notecard"));
-        const ALMasterLinks read = ALMasterLinks::fromLLSD(llsd);
+        const ALMasterLinks       read   = ALMasterLinks::fromLLSD(llsd);
+        const ALMasterLink* const card   = read.of(almasterlinks_data::key(1), almasterlinks_data::key(10));
+        const ALMasterLink* const script = read.of(almasterlinks_data::key(1), almasterlinks_data::key(11));
+        REQUIRE(card);
+        REQUIRE(script);
         UNSCOPED_INFO("read back a notecard's");
-        CHECK(read.of(almasterlinks_data::key(1), almasterlinks_data::key(10))->notecard);
+        CHECK(card->notecard);
         UNSCOPED_INFO("and a script's");
-        CHECK_FALSE(read.of(almasterlinks_data::key(1), almasterlinks_data::key(11))->notecard);
+        CHECK_FALSE(script->notecard);
     }
 }

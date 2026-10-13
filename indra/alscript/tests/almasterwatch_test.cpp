@@ -447,8 +447,11 @@ namespace
         }
         const std::string other = in("other.lsl");
         watched.watch({ almasterwatch_data::master(door), almasterwatch_data::master(lamp), almasterwatch_data::master(other) });
-        UNSCOPED_INFO("lamp waits on its look still: other alone asked");
-        REQUIRE(asked[3].paths.size() == size_t(1));
+        {
+            INFO("lamp waits on its look still: other alone asked");
+            REQUIRE(asked.size() == size_t(4));
+            REQUIRE(asked[3].paths.size() == size_t(1));
+        }
         answer(3);
         CHECK(watched.watching(other));
         UNSCOPED_INFO("lamp waits on its own");
@@ -470,8 +473,12 @@ namespace
                                                     return true;
                                                 });
         watch->watch({ almasterwatch_data::master(door), almasterwatch_data::include(util) });
-        CHECK(*watch->periodOf(door) == ALMasterWatch::MASTER_PERIOD);
-        CHECK(*watch->periodOf(util) == ALMasterWatch::INCLUDE_PERIOD);
+        std::optional<F32> door_period = watch->periodOf(door);
+        std::optional<F32> util_period = watch->periodOf(util);
+        REQUIRE(door_period.has_value());
+        REQUIRE(util_period.has_value());
+        CHECK(*door_period == ALMasterWatch::MASTER_PERIOD);
+        CHECK(*util_period == ALMasterWatch::INCLUDE_PERIOD);
         UNSCOPED_INFO("both looked at first");
         CHECK(looks == size_t(2));
 
@@ -482,16 +489,24 @@ namespace
         }
         watch->watch(many);
         REQUIRE(watch->size() == size_t(257));
+        door_period = watch->periodOf(door);
+        util_period = watch->periodOf(util);
+        REQUIRE(door_period.has_value());
+        REQUIRE(util_period.has_value());
         UNSCOPED_INFO("past 256: a master every two seconds");
-        CHECK(*watch->periodOf(door) == ALMasterWatch::MANY_PERIOD);
-        CHECK(*watch->periodOf(util) == ALMasterWatch::MANY_PERIOD);
+        CHECK(*door_period == ALMasterWatch::MANY_PERIOD);
+        CHECK(*util_period == ALMasterWatch::MANY_PERIOD);
         UNSCOPED_INFO("only the new ones looked at");
         CHECK(looks == size_t(257));
 
         watch->watch({ almasterwatch_data::master(door), almasterwatch_data::include(util) });
+        door_period = watch->periodOf(door);
+        util_period = watch->periodOf(util);
+        REQUIRE(door_period.has_value());
+        REQUIRE(util_period.has_value());
         UNSCOPED_INFO("fewer again: a master's own");
-        CHECK(*watch->periodOf(door) == ALMasterWatch::MASTER_PERIOD);
-        CHECK(*watch->periodOf(util) == ALMasterWatch::INCLUDE_PERIOD);
+        CHECK(*door_period == ALMasterWatch::MASTER_PERIOD);
+        CHECK(*util_period == ALMasterWatch::INCLUDE_PERIOD);
         UNSCOPED_INFO("nothing looked at again");
         CHECK(looks == size_t(257));
         UNSCOPED_INFO("one not watched has no period");

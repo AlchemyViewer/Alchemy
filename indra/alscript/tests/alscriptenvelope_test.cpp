@@ -314,6 +314,7 @@ namespace
             }
             const int at = envelope.codeLine();
             CAPTURE(lua);
+            REQUIRE(static_cast<size_t>(at) < lines.size());
             REQUIRE(lines[static_cast<size_t>(at)] == std::string("first"));
             UNSCOPED_INFO("after the source's lines and the envelope's own");
             REQUIRE(at == 9);
@@ -445,6 +446,8 @@ namespace
             const std::vector<std::string> plain  = alscriptenvelope_data::linesOf(without.wrap());
             const std::vector<std::string> headed = alscriptenvelope_data::linesOf(with.wrap());
             const std::vector<std::string> code   = alscriptenvelope_data::linesOf(with.expanded);
+            REQUIRE(static_cast<size_t>(without.codeLine()) + code.size() <= plain.size());
+            REQUIRE(static_cast<size_t>(with.codeLine()) + code.size() <= headed.size());
             for (size_t i = 0; i < code.size(); ++i)
             {
                 CAPTURE(i);
@@ -466,11 +469,13 @@ namespace
         for (const bool lua : { false, true })
         {
             CAPTURE(lua);
-            const ALScriptEnvelope sent  = alscriptenvelope_data::made(lua, true);
-            ALScriptEnvelope       later = alscriptenvelope_data::made(lua, true);
-            ALUploadHeader         again = *ALUploadHeader::parse(later.header, lua);
-            again.date                   = "2026-10-08 09:00:00";
-            later.header                 = again.write(lua);
+            const ALScriptEnvelope              sent   = alscriptenvelope_data::made(lua, true);
+            ALScriptEnvelope                    later  = alscriptenvelope_data::made(lua, true);
+            const std::optional<ALUploadHeader> parsed = ALUploadHeader::parse(later.header, lua);
+            REQUIRE(parsed.has_value());
+            ALUploadHeader again = *parsed;
+            again.date           = "2026-10-08 09:00:00";
+            later.header         = again.write(lua);
 
             const std::optional<ALScriptEnvelope> held = ALScriptEnvelope::parse(sent.wrap());
             const std::optional<ALScriptEnvelope> came = ALScriptEnvelope::parse(later.wrap());
@@ -491,9 +496,10 @@ namespace
             REQUIRE(ALScriptEnvelope::comparable(came->source, lua, true, false));
             // The hash is of what was sent, the header aside: worked out
             // again from the halves read back, it is what the header says.
+            const std::optional<ALUploadHeader> says = ALUploadHeader::parse(came->header, lua);
+            REQUIRE(says.has_value());
             UNSCOPED_INFO("the hash again");
-            REQUIRE(ALUploadHeader::hashOf(came->compileTarget, came->source, came->expanded) ==
-                          ALUploadHeader::parse(came->header, lua)->hash);
+            REQUIRE(ALUploadHeader::hashOf(came->compileTarget, came->source, came->expanded) == says->hash);
         }
     }
 }

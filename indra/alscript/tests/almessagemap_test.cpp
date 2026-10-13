@@ -214,66 +214,76 @@ namespace
 
     TEST_CASE_METHOD(almessagemap_data, "almessagemap: why a SLua require found nothing is keyed with the module name left blank", "[almessagemap]")
     {
-        ALMessageMap::Match m;
         {
             INFO("a child");
+            ALMessageMap::Match m;
             REQUIRE(ALMessageMap::luauRequire("could not resolve child component \"util\"", m));
             CHECK(m.key == "PreprocRequireNoChild");
             CHECK(m.args == std::vector<std::string>({ "", "util" }));
         }
         {
             INFO("ambiguous, the fuller shape");
+            ALMessageMap::Match m;
             CHECK(ALMessageMap::luauRequire("could not resolve child component \"util\" (ambiguous)", m));
             CHECK(m.key == "PreprocRequireNoChildAmbiguous");
         }
         {
             INFO("an alias");
+            ALMessageMap::Match m;
             CHECK(ALMessageMap::luauRequire("@lib is not a valid alias", m));
             CHECK(m.key == "PreprocRequireNotAlias");
-            CHECK(m.args[1] == "lib");
+            CHECK(m.args == std::vector<std::string>({ "", "lib" }));
         }
         {
             INFO("a cycle");
+            ALMessageMap::Match m;
             CHECK(ALMessageMap::luauRequire("detected alias cycle (@a -> @b -> @a)", m));
             CHECK(m.key == "PreprocRequireAliasCycle");
-            CHECK(m.args[1] == "@a -> @b -> @a");
+            CHECK(m.args == std::vector<std::string>({ "", "@a -> @b -> @a" }));
         }
         {
             INFO("the studio's own");
+            ALMessageMap::Match m;
             CHECK(ALMessageMap::luauRequire("the alias '@sl-std' is reserved: aliases starting @sl- are Second Life's", m));
             CHECK(m.key == "PreprocRequireReserved");
-            CHECK(m.args[1] == "sl-std");
+            CHECK(m.args == std::vector<std::string>({ "", "sl-std" }));
         }
         {
             INFO("a folder with both configurations");
+            ALMessageMap::Match m;
             CHECK(ALMessageMap::luauRequire("could not resolve alias \"lib\" (ambiguous configuration file)", m));
             CHECK(m.key == "PreprocRequireConfigAmbiguous");
-            CHECK(m.args[1] == "lib");
+            CHECK(m.args == std::vector<std::string>({ "", "lib" }));
         }
         {
             INFO("a file nothing lets in");
+            ALMessageMap::Match m;
             CHECK(ALMessageMap::luauRequire("'C:/lib/x.luau' is there, but no include folder or alias lets a require read it", m));
             CHECK(m.key == "PreprocRequireNotAdmitted");
-            CHECK(m.args[1] == "C:/lib/x.luau");
+            CHECK(m.args == std::vector<std::string>({ "", "C:/lib/x.luau" }));
         }
         {
             INFO("an alias past its configuration's folder");
+            ALMessageMap::Match m;
             CHECK(ALMessageMap::luauRequire("the configuration in 'C:/lib' names 'D:/out', which is outside it and outside the include folders", m));
             CHECK(m.key == "PreprocRequireAliasRefused");
             CHECK(m.args == std::vector<std::string>({ "", "C:/lib", "D:/out" }));
         }
         {
             INFO("a configuration that could not be read");
+            ALMessageMap::Match m;
             CHECK(ALMessageMap::luauRequire("the configuration 'C:/lib/.luaurc' could not be read: expected value", m));
             CHECK(m.key == "PreprocRequireConfigBroken");
             CHECK(m.args == std::vector<std::string>({ "", "C:/lib/.luaurc", "expected value" }));
         }
         {
             INFO("a world alias naming the disk");
+            ALMessageMap::Match m;
             CHECK(ALMessageMap::luauRequire("the alias stands for '/x', a path on disk, which a configuration in the world may not name", m));
             CHECK(m.key == "PreprocRequireAliasNamesDisk");
-            CHECK(m.args[1] == "/x");
+            CHECK(m.args == std::vector<std::string>({ "", "/x" }));
         }
+        ALMessageMap::Match m;
         UNSCOPED_INFO("a reason of no known shape");
         CHECK_FALSE(ALMessageMap::luauRequire("something else went wrong", m));
         {

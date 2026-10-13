@@ -142,10 +142,18 @@ namespace
         REQUIRE(ALNotecardFormat::namedAt(lsl, 30).has_value());
         UNSCOPED_INFO("not on the call's name");
         REQUIRE_FALSE(ALNotecardFormat::namedAt(lsl, 16));
-        UNSCOPED_INFO("SLua's, single quotes, blanks about the bracket");
-        CHECK(ALNotecardFormat::namedAt("ll.GetNumberOfNotecardLines ( 'dialog' )", 32)->name == "dialog");
-        UNSCOPED_INFO("an escape taken out");
-        CHECK(ALNotecardFormat::namedAt("llGetNotecardLineSync(\"say \\\"hi\\\"\", 0)", 25)->name == "say \"hi\"");
+        named = ALNotecardFormat::namedAt("ll.GetNumberOfNotecardLines ( 'dialog' )", 32);
+        {
+            INFO("SLua's, single quotes, blanks about the bracket");
+            REQUIRE(named);
+            CHECK(named->name == "dialog");
+        }
+        named = ALNotecardFormat::namedAt("llGetNotecardLineSync(\"say \\\"hi\\\"\", 0)", 25);
+        {
+            INFO("an escape taken out");
+            REQUIRE(named);
+            CHECK(named->name == "say \"hi\"");
+        }
         UNSCOPED_INFO("a string another call is given, not");
         REQUIRE_FALSE(ALNotecardFormat::namedAt("llSay(0, \"config\");", 12));
         UNSCOPED_INFO("the second argument, not");

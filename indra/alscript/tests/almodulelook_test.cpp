@@ -138,6 +138,7 @@ namespace
         {
             INFO("by its stem, under the prefix");
             REQUIRE(util);
+            REQUIRE_FALSE(util->names.empty());
             CHECK(util->names[0] == "@lib/util");
             CHECK(util->exports == std::vector<std::string>{ "clamp" });
         }
@@ -145,6 +146,7 @@ namespace
         {
             INFO("a folder's init by the folder's name first");
             REQUIRE(folder);
+            REQUIRE_FALSE(folder->names.empty());
             CHECK(folder->names[0] == "@lib/net");
         }
         const ALModuleLook::Candidate* open = named(found, "open");
@@ -158,11 +160,17 @@ namespace
 
         // The same version, another text: kept as it was read.
         input.texts[0].text = std::make_shared<const std::string>("local M = {}\nfunction M.two() end\nreturn M\n");
+        found = look.look(input);
+        open  = named(found, "open");
+        REQUIRE(open);
         UNSCOPED_INFO("the same version: as read");
-        CHECK(named(look.look(input), "open")->exports == std::vector<std::string>{ "one" });
+        CHECK(open->exports == std::vector<std::string>{ "one" });
         input.texts[0].version = 2;
+        found = look.look(input);
+        open  = named(found, "open");
+        REQUIRE(open);
         UNSCOPED_INFO("a new one: read again");
-        CHECK(named(look.look(input), "open")->exports == std::vector<std::string>{ "two" });
+        CHECK(open->exports == std::vector<std::string>{ "two" });
     }
 
     TEST_CASE_METHOD(almodulelook_data, "almodulelook: SLua: checked exports of the same text win for files and open texts alike", "[almodulelook]")
@@ -174,21 +182,33 @@ namespace
         input.lua     = true;
         input.self    = "object:self";
         input.folders = { { std::string(), s.at("mods") } };
+        std::vector<ALModuleLook::Candidate> found = look.look(input);
+        const ALModuleLook::Candidate*       one   = named(found, "made");
+        REQUIRE(one);
         UNSCOPED_INFO("the text alone says nothing of a table made by a call");
-        REQUIRE(named(look.look(input), "made")->exports.empty());
+        REQUIRE(one->exports.empty());
         ALLuauExports::checked(ALIncludeIdentity::ofFile(made), made_text, { "alpha", "beta" });
+        found = look.look(input);
+        one   = named(found, "made");
+        REQUIRE(one);
         UNSCOPED_INFO("checked: what its type says");
-        CHECK(named(look.look(input), "made")->exports == std::vector<std::string>({ "alpha", "beta" }));
+        CHECK(one->exports == std::vector<std::string>({ "alpha", "beta" }));
 
         auto text = std::make_shared<const std::string>(made_text);
         input.texts.push_back({ "inventory:open", "open.luau", 1, text });
         ALLuauExports::checked("inventory:open", made_text, { "gamma" });
+        found = look.look(input);
+        one   = named(found, "open");
+        REQUIRE(one);
         UNSCOPED_INFO("an open text checked");
-        CHECK(named(look.look(input), "open")->exports == std::vector<std::string>{ "gamma" });
+        CHECK(one->exports == std::vector<std::string>{ "gamma" });
         input.texts[0].text    = std::make_shared<const std::string>("local M = {}\nfunction M.delta() end\nreturn M\n");
         input.texts[0].version = 2;
+        found = look.look(input);
+        one   = named(found, "open");
+        REQUIRE(one);
         UNSCOPED_INFO("its text moved on since: read as it says");
-        CHECK(named(look.look(input), "open")->exports == std::vector<std::string>{ "delta" });
+        CHECK(one->exports == std::vector<std::string>{ "delta" });
     }
 
     TEST_CASE_METHOD(almodulelook_data, "almodulelook: extensions match in any case and a later check of the same text is taken", "[almodulelook]")
@@ -206,16 +226,23 @@ namespace
         {
             INFO("listed, by its stem");
             REQUIRE(one);
+            REQUIRE_FALSE(one->names.empty());
             CHECK(one->names[0] == "@lib/Upper");
             CHECK(one->exports == std::vector<std::string>{ "one" });
         }
 
         ALLuauExports::checked(ALIncludeIdentity::ofFile(upper), text, { "first" });
+        found = look.look(input);
+        one   = named(found, "Upper");
+        REQUIRE(one);
         UNSCOPED_INFO("checked");
-        CHECK(named(look.look(input), "Upper")->exports == std::vector<std::string>{ "first" });
+        CHECK(one->exports == std::vector<std::string>{ "first" });
         ALLuauExports::checked(ALIncludeIdentity::ofFile(upper), text, { "second" });
+        found = look.look(input);
+        one   = named(found, "Upper");
+        REQUIRE(one);
         UNSCOPED_INFO("checked again, the text the same: taken");
-        CHECK(named(look.look(input), "Upper")->exports == std::vector<std::string>{ "second" });
+        CHECK(one->exports == std::vector<std::string>{ "second" });
 
         input.lua = false;
         found     = look.look(input);
