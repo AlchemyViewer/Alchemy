@@ -84,4 +84,12 @@ namespace
         mApp->setOptionData(LLApp::PRIORITY_RUNTIME_OVERRIDE, options);
         CHECK_FALSE(mApp->getOption("boolean-test").asBoolean());
     }
+
+    TEST_CASE_METHOD(application, "application: instance() finds no app once it is gone", "[application]")
+    {
+        CHECK(LLApp::instance() == mApp);
+        delete mApp;
+        mApp = nullptr;
+        CHECK(LLApp::instance() == nullptr);
+    }
 }
