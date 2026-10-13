@@ -34,6 +34,8 @@
 #include "llfonttest_helpers.h"
 #include "llheadlessgl_fixture.h"
 
+#include "llframetimer.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -52,6 +54,20 @@ namespace
     {
         std::unique_ptr<ll_test::HeadlessGL> gl = std::make_unique<ll_test::HeadlessGL>();
         ll_test::FontStateScope font_scope;
+    };
+
+    // The frame clock, which the atlas stamps a sheet's use with and the
+    // glyph sweep reads, set by a case that needs time to have passed.
+    struct FrameClock : LLFrameTimer
+    {
+        static void set(F64 seconds) { sTotalSeconds = seconds; }
+    };
+
+    // The clock is the process's: put back however the case ends.
+    struct FrameClockRestore
+    {
+        const F64 mSaved = LLFrameTimer::getTotalSeconds();
+        ~FrameClockRestore() { FrameClock::set(mSaved); }
     };
 
 
@@ -76,14 +92,17 @@ namespace
         CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
     }
 
-    // collectGarbage is throttled — calling it twice in immediate
-    // succession does not re-sweep. We observe the throttle by
-    // confirming the call returns without crashing and the cache
-    // generation does NOT advance on the second call (only the first
-    // would invalidate sheets if there were anything to evict).
-    // Pins 169390b593 — the cache-sweep gating moved out of the
-    // render hot path.
-    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: two collectGarbage calls in a row return cleanly", "[LLFontFreetypeRender]")
+    // collectGarbage is throttled — a call within the interval of the
+    // last sweep (GC_INTERVAL_SEC, 5 s, in ALFontFace::collectGarbage)
+    // does not re-sweep, not even for a sheet idle past the threshold
+    // (IDLE_THRESHOLD_SEC, 15 min) that a sweep would release. The case
+    // moves the frame clock the sweep reads: the first call comes 899 s
+    // after the sheet was last used, inside the threshold, and starts
+    // the interval; the second comes 3 s later, past the threshold and
+    // inside the interval, so the sheet survives and the cache
+    // generation does NOT advance. Pins 169390b593 — the cache-sweep
+    // gating moved out of the render hot path.
+    TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: collectGarbage again within its interval leaves an idle sheet alone", "[LLFontFreetypeRender]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -93,13 +112,23 @@ namespace
         // Force at least one glyph onto the atlas so collectGarbage
         // has something to consider.
         (void)ft->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
+        const LLFontBitmapCache* cache = ft->getFontBitmapCache();
+        REQUIRE(cache != nullptr);
+        CHECK(cache->getNumBitmaps(EFontGlyphType::Grayscale) == 1u);
+        const F64 used = cache->getSheetLastUsedTime(EFontGlyphType::Grayscale, 0);
 
-        // Two back-to-back calls: throttle gate keeps the second from
-        // doing real work. Both must complete without crashing.
+        FrameClockRestore restore_clock;
+        FrameClock::set(used + 899.0);
         ft->collectGarbage();
+        const S32 gen = cache->getCacheGeneration();
+
+        FrameClock::set(used + 902.0);
         ft->collectGarbage();
-        UNSCOPED_INFO("both calls returned");
-        CHECK(true);
+        {
+            INFO("the throttled call released nothing");
+            CHECK_FALSE(cache->isSheetReleased(EFontGlyphType::Grayscale, 0));
+            CHECK(cache->getCacheGeneration() == gen);
+        }
     }
 
     // LLFontManager::collectGarbage drops face cache entries with
@@ -122,7 +151,6 @@ namespace
         (void)ft->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
         LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         REQUIRE(face.notNull());
-        CHECK(face->isValid());
         const U32 glyph_a = face->getCharGlyphIndex(L'A');
         UNSCOPED_INFO("the head rasterized into this face");
         REQUIRE(face->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) != nullptr);
@@ -140,7 +168,6 @@ namespace
         gFontManagerp->collectGarbage();
         LLPointer<ALFontFace> reloaded = gFontManagerp->getOrCreateFace(makeKey(path));
         REQUIRE(reloaded.notNull());
-        CHECK(reloaded->isValid());
         UNSCOPED_INFO("the reloaded face has no glyphs: the cached one was evicted");
         CHECK(reloaded->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) == nullptr);
     }
@@ -266,9 +293,10 @@ namespace
     // Cross-instance global generation contention: rasterizing on
     // face A bumps the global counter, then rasterizing on a
     // different face B bumps it again. Pins that the global counter
-    // ticks across faces (llfontbitmapcache.h:81-90) so that vertex
-    // buffers using face B's atlas can detect changes that fired on
-    // any face.
+    // ticks across faces (llfontbitmapcache.h:84-92): every atlas draws
+    // its generation from it, and LLFontGL::getCacheGeneration keys its
+    // memo on it, so a glyph rasterized on any face of a font's chain
+    // has to move it.
     TEST_CASE_METHOD(llfontfreetype_render_data, "LLFontFreetypeRender: rasterizing on each of two faces bumps the global generation", "[LLFontFreetypeRender]")
     {
         const std::string a_path = std::string(kFontDir) + "DejaVuSans.woff2";
@@ -360,6 +388,7 @@ namespace
         LLFontGlyphInfo* b_gi2 = head_b->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
         REQUIRE(b_gi2 != nullptr);
         const auto post_entry = b_gi2->mPhaseSlots[0].mBitmapEntry;
+        CHECK(static_cast<U32>(post_entry.second) < cache->getNumBitmaps(post_entry.first));
         CHECK_FALSE(cache->isSheetReleased(post_entry.first,
                                        static_cast<U32>(post_entry.second)));
     }
@@ -409,6 +438,7 @@ namespace
         LLFontGlyphInfo* g2 = ft->getGlyphInfo(L'Z', EFontGlyphType::Grayscale);
         REQUIRE(g2 != nullptr);
         const auto post = g2->mPhaseSlots[0].mBitmapEntry;
+        CHECK(static_cast<U32>(post.second) < ft->getBitmapCache()->getNumBitmaps(post.first));
         CHECK_FALSE(ft->getBitmapCache()->isSheetReleased(
                    post.first, static_cast<U32>(post.second)));
     }

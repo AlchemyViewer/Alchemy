@@ -183,8 +183,11 @@ namespace
             CHECK(ll_round(x) == 40);
             CHECK(ll_round(y) == 50);
         }
-        UNSCOPED_INFO("the scale is off with it");
-        CHECK(LLFontGL::sCurScaleX == 1.f);
+        {
+            INFO("the scale is off with it");
+            CHECK(LLFontGL::sCurScaleX == 1.f);
+            CHECK(LLFontGL::sCurScaleY == 1.f);
+        }
 
         LLRender2D::popMatrix();
     }

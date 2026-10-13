@@ -40,6 +40,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_COLOR_H
+
 #include <string>
 
 namespace
@@ -103,8 +107,8 @@ namespace
 
         LLPointer<ALFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
         LLPointer<ALFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
-        CHECK(nf->isValid());
-        CHECK(df->isValid());
+        REQUIRE(nf.notNull());
+        REQUIRE(df.notNull());
         CHECK(nf->hasColrV1());
         CHECK_FALSE(df->hasColrV1());
     }
@@ -120,22 +124,29 @@ namespace
 
         LLPointer<ALFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
         LLPointer<ALFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
+        REQUIRE(nf.notNull());
+        REQUIRE(df.notNull());
         CHECK(nf->hasColor());
         CHECK_FALSE(df->hasColor());
     }
 
-    // hasSvg: Noto-COLRv1 doesn't ship OT-SVG; DejaVuSans doesn't
-    // either. Both should report false. (TwemojiSVG would be the
-    // positive case but isn't checked into the fixture set.)
-    TEST_CASE_METHOD(alfontface_data, "ALFontFace: hasSvg is false for both Noto-COLRv1 and DejaVuSans", "[ALFontFace]")
+    // hasSvg: TwemojiSVG carries an OT-SVG table; Noto-COLRv1 (COLR
+    // and CPAL) and DejaVuSans (outlines only) do not.
+    TEST_CASE_METHOD(alfontface_data, "ALFontFace: hasSvg is true for TwemojiSVG and false for Noto-COLRv1 and DejaVuSans", "[ALFontFace]")
     {
-        const std::string noto = std::string(kFontDir) + "Noto-COLRv1.ttf";
-        const std::string dv   = std::string(kFontDir) + "DejaVuSans.woff2";
-        if (!fileExists(noto) || !fileExists(dv))
-            SKIP("Noto-COLRv1 + DejaVuSans required");
+        const std::string twemoji = std::string(kFontDir) + "TwemojiSVG.woff2";
+        const std::string noto    = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        const std::string dv      = std::string(kFontDir) + "DejaVuSans.woff2";
+        if (!fileExists(twemoji) || !fileExists(noto) || !fileExists(dv))
+            SKIP("TwemojiSVG + Noto-COLRv1 + DejaVuSans required");
 
+        LLPointer<ALFontFace> tf = gFontManagerp->getOrCreateFace(makeKey(twemoji));
         LLPointer<ALFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
         LLPointer<ALFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
+        REQUIRE(tf.notNull());
+        REQUIRE(nf.notNull());
+        REQUIRE(df.notNull());
+        CHECK(tf->hasSvg());
         CHECK_FALSE(nf->hasSvg());
         CHECK_FALSE(df->hasSvg());
     }
@@ -156,8 +167,8 @@ namespace
 
         LLPointer<ALFontFace> def = gFontManagerp->getOrCreateFace(k_default);
         LLPointer<ALFontFace> bld = gFontManagerp->getOrCreateFace(k_bold);
-        CHECK(def->isValid());
-        CHECK(bld->isValid());
+        REQUIRE(def.notNull());
+        REQUIRE(bld.notNull());
         CHECK_FALSE(def->wghtAxisSet());
         CHECK(bld->wghtAxisSet());
     }
@@ -173,6 +184,8 @@ namespace
             SKIP("DejaVuSans + DejaVuSansMono required");
         LLPointer<ALFontFace> m = gFontManagerp->getOrCreateFace(makeKey(mono));
         LLPointer<ALFontFace> p = gFontManagerp->getOrCreateFace(makeKey(prop));
+        REQUIRE(m.notNull());
+        REQUIRE(p.notNull());
         CHECK(m->isFixedWidth());
         CHECK_FALSE(p->isFixedWidth());
     }
@@ -186,10 +199,12 @@ namespace
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(f.notNull());
 
         const U32 g_a       = f->getCharGlyphIndex(L'A');
         const U32 g_a_again = f->getCharGlyphIndex(L'A');
         CHECK(g_a != 0u);
+        CHECK(g_a == FT_Get_Char_Index(f->face(), L'A'));
         UNSCOPED_INFO("a repeat lookup hits the cache");
         CHECK(g_a == g_a_again);
         UNSCOPED_INFO("an absent codepoint");
@@ -199,10 +214,10 @@ namespace
         CHECK(f->getCharGlyphIndex(0xE000) == 0u);
     }
 
-    // Refcount sharing: two LLFontFreetype instances that point at
-    // the same ALFontFace via getOrCreateFace must keep the face
-    // alive while either lives. The face cache also holds a ref,
-    // so getNumRefs >= 3 (cache + a + b) when both shares exist.
+    // Refcount sharing: two getOrCreateFace lookups of one key share
+    // one ALFontFace, which stays alive while either holds it. The
+    // face cache also holds a ref, so getNumRefs >= 3 (cache + a + b)
+    // when both shares exist.
     TEST_CASE_METHOD(alfontface_data, "ALFontFace: two lookups share a face and the cache keeps it after both let go", "[ALFontFace]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
@@ -211,10 +226,16 @@ namespace
 
         LLPointer<ALFontFace> a = gFontManagerp->getOrCreateFace(makeKey(path));
         LLPointer<ALFontFace> b = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(a.notNull());
         REQUIRE(a.get() == b.get());
         UNSCOPED_INFO("refs held by the cache and a and b");
         CHECK(a->getNumRefs() >= 3);
 
+        // The atlas generation identifies this face: every face builds an
+        // atlas of its own, which draws a generation no atlas had before.
+        // Its address is no evidence -- the allocator may hand the same
+        // block straight back to a reload.
+        const S32 atlas_gen = a->getBitmapCache()->getCacheGeneration();
         ALFontFace* raw = a.get();
         b = nullptr; // drop b's ref
         UNSCOPED_INFO("face still alive after b dropped");
@@ -222,84 +243,94 @@ namespace
         a = nullptr; // drop a's ref
         // Cache still holds a ref, so the face is alive but has
         // refcount 1. Verify by re-fetching: should return the same
-        // pointer (cache hit), not a freshly-loaded face.
+        // face (cache hit), not a freshly-loaded one.
         LLPointer<ALFontFace> c = gFontManagerp->getOrCreateFace(makeKey(path));
+        REQUIRE(c.notNull());
         UNSCOPED_INFO("cache kept face alive after both refs dropped");
-        CHECK(c.get() == raw);
+        CHECK(c->getBitmapCache()->getCacheGeneration() == atlas_gen);
     }
 
-    // resetBitmapCache clears atlas state without destroying the face.
-    // A subsequent getCharGlyphIndex still works (cmap survives).
-    TEST_CASE_METHOD(alfontface_data, "ALFontFace: resetBitmapCache keeps the face valid with its cmap and its atlas", "[ALFontFace]")
+    // resetBitmapCache drops the face's glyphs and resets its atlas
+    // without destroying the face. A subsequent getCharGlyphIndex still
+    // works (cmap survives). There is no GL here to rasterize a glyph
+    // with, so one goes into the face's glyph cache by hand, where the
+    // rasterizer would put it.
+    TEST_CASE_METHOD(alfontface_data, "ALFontFace: resetBitmapCache drops glyphs and the atlas and keeps face and cmap", "[ALFontFace]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             SKIP("DejaVuSans.woff2 not present");
         LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(makeKey(path));
-        CHECK(f->isValid());
+        REQUIRE(f.notNull());
+        const U32 glyph_a = f->getCharGlyphIndex(L'A');
+        f->insertGlyphInfo(glyph_a, new LLFontGlyphInfo(glyph_a, EFontGlyphType::Grayscale));
+        const S32 atlas_gen = f->getBitmapCache()->getCacheGeneration();
+
         f->resetBitmapCache();
         CHECK(f->isValid());
         UNSCOPED_INFO("cmap survives reset");
         CHECK(f->getCharGlyphIndex(L'A') != 0u);
-        CHECK(f->getBitmapCache() != nullptr);
+        UNSCOPED_INFO("the glyph is dropped");
+        CHECK(f->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) == nullptr);
+        REQUIRE(f->getBitmapCache() != nullptr);
+        UNSCOPED_INFO("the atlas is reset: what was drawn from it rebuilds");
+        CHECK(f->getBitmapCache()->getCacheGeneration() > atlas_gen);
     }
 
     // paletteIndex() is computed at load time from LLFontGL::sUseDarkEmojiPalette
     // — flipping the flag mid-process can't change an already-loaded face's
-    // index. Test by force-evicting between loads. If Noto-COLRv1 ships no
-    // FT_PALETTE_FOR_DARK_BACKGROUND palette the second load still returns 0
-    // and we skip the equality check rather than fail. Pins b6ba746728's
-    // load-time read at alfontface.cpp:122-137.
+    // index. Test by force-evicting between loads. With the flag on, a load
+    // takes the first palette the font flags FT_PALETTE_FOR_DARK_BACKGROUND,
+    // and palette 0 where it flags none. Noto-COLRv1 flags none -- its
+    // CPAL table is version 0, which has no flags -- so with the package's
+    // font the case pins that fallback. Pins b6ba746728's load-time read
+    // at alfontface.cpp:122-137.
     TEST_CASE_METHOD(alfontface_data, "ALFontFace: paletteIndex follows sUseDarkEmojiPalette as it was at load", "[ALFontFace]")
     {
         const std::string noto = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(noto))
             SKIP("Noto-COLRv1.ttf not present");
 
-        const bool saved_flag = LLFontGL::sUseDarkEmojiPalette;
+        // The flag is the process's: put back however the case ends.
+        struct DarkPaletteRestore
+        {
+            const bool mSaved = LLFontGL::sUseDarkEmojiPalette;
+            ~DarkPaletteRestore() { LLFontGL::sUseDarkEmojiPalette = mSaved; }
+        } restore;
 
         // Use an unusual point size so the cache key is fresh.
         auto k = makeKey(noto, 11.5f);
 
         LLFontGL::sUseDarkEmojiPalette = false;
-        U32 pi_default;
         {
             LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
-            {
-                INFO("face valid (dark=false)");
-                REQUIRE(f.notNull());
-                CHECK(f->isValid());
-            }
-            pi_default = f->paletteIndex();
+            REQUIRE(f.notNull());
             UNSCOPED_INFO("loaded with dark=false");
-            CHECK(pi_default == 0u);
+            CHECK(f->paletteIndex() == 0u);
         }
         // Drop our ref; collectGarbage evicts since cache holds the only ref.
         gFontManagerp->collectGarbage();
 
         LLFontGL::sUseDarkEmojiPalette = true;
-        U32 pi_dark;
+        LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
+        REQUIRE(f.notNull());
+
+        // The palette a dark background gets, as FreeType reads the font.
+        U32 dark_palette = 0;
+        FT_Palette_Data palettes = {};
+        if (FT_Palette_Data_Get(f->face(), &palettes) == 0 && palettes.palette_flags)
         {
-            LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
+            for (FT_UShort i = 0; i < palettes.num_palettes; ++i)
             {
-                INFO("face valid (dark=true)");
-                REQUIRE(f.notNull());
-                CHECK(f->isValid());
+                if (palettes.palette_flags[i] & FT_PALETTE_FOR_DARK_BACKGROUND)
+                {
+                    dark_palette = i;
+                    break;
+                }
             }
-            pi_dark = f->paletteIndex();
         }
-
-        // Restore early so a failure below doesn't pollute later tests.
-        LLFontGL::sUseDarkEmojiPalette = saved_flag;
-        gFontManagerp->collectGarbage();
-
-        // Noto-COLRv1 may or may not ship a dark-flagged palette. If it
-        // does, pi_dark is non-zero (the index of that palette); if it
-        // doesn't, pi_dark stays 0 and we skip the assertion.
-        if (pi_dark == 0)
-            SKIP("font has no FT_PALETTE_FOR_DARK_BACKGROUND palette");
-
-        CHECK(pi_dark != 0u);
+        UNSCOPED_INFO("loaded with dark=true");
+        CHECK(f->paletteIndex() == dark_palette);
     }
 
     // Variable axis on a non-variable font: requesting weight=600 on
@@ -317,7 +348,6 @@ namespace
         k.var_axes.wght_set = true;
         LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
         REQUIRE(f.notNull());
-        CHECK(f->isValid());
         CHECK_FALSE(f->wghtAxisSet());
     }
 
@@ -343,8 +373,8 @@ namespace
 
         LLPointer<ALFontFace> f400 = gFontManagerp->getOrCreateFace(k_400);
         LLPointer<ALFontFace> f600 = gFontManagerp->getOrCreateFace(k_600);
-        CHECK(f400->isValid());
-        CHECK(f600->isValid());
+        REQUIRE(f400.notNull());
+        REQUIRE(f600.notNull());
         CHECK(f400.get() != f600.get());
     }
 
@@ -390,8 +420,8 @@ namespace
         // Cache identity round-trips through the face manager.
         LLPointer<ALFontFace> fd = gFontManagerp->getOrCreateFace(k_default);
         LLPointer<ALFontFace> fi = gFontManagerp->getOrCreateFace(k_ital);
-        CHECK(fd->isValid());
-        CHECK(fi->isValid());
+        REQUIRE(fd.notNull());
+        REQUIRE(fi.notNull());
         UNSCOPED_INFO("distinct ital settings are distinct cached faces");
         CHECK(fd.get() != fi.get());
     }
@@ -417,7 +447,6 @@ namespace
 
         LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
         REQUIRE(f.notNull());
-        CHECK(f->isValid());
         CHECK_FALSE(f->italAxisSet());
         CHECK_FALSE(f->wdthAxisSet());
         CHECK_FALSE(f->slntAxisSet());
@@ -471,11 +500,8 @@ namespace
         LLPointer<ALFontFace> b = gFontManagerp->getOrCreateFace(makeKey(path, 14.f));
         LLPointer<ALFontFace> c = gFontManagerp->getOrCreateFace(makeKey(path, 18.f));
         REQUIRE(a.notNull());
-        CHECK(a->isValid());
         REQUIRE(b.notNull());
-        CHECK(b->isValid());
         REQUIRE(c.notNull());
-        CHECK(c->isValid());
         CHECK(a.get() == b.get());
         CHECK(a.get() != c.get());
     }
@@ -499,10 +525,9 @@ namespace
                                      14.f, 96.f, 96.f, true, 0,
                                      EFontHinting::DEFAULT, 0);
         CHECK_FALSE(ok);
-        // Don't deref ft beyond this — destructor must run cleanly.
+        // Don't deref ft beyond this — destructor must run cleanly, and
+        // the case passes by getting past it.
         ft = nullptr;
-        UNSCOPED_INFO("destruct after failed load did not crash");
-        CHECK(true);
     }
 
     // getCharGlyphIndex returns non-zero for ASCII present in the cmap
@@ -593,6 +618,8 @@ namespace
 
         LLPointer<LLFontFreetype> m = loadFt(mono);
         LLPointer<LLFontFreetype> p = loadFt(prop);
+        REQUIRE(m.notNull());
+        REQUIRE(p.notNull());
         CHECK(m->isFixedWidth());
         CHECK_FALSE(p->isFixedWidth());
         UNSCOPED_INFO("ligatures default off");
@@ -614,6 +641,8 @@ namespace
 
         LLPointer<LLFontFreetype> n = loadFt(normal);
         LLPointer<LLFontFreetype> b = loadFt(bold);
+        REQUIRE(n.notNull());
+        REQUIRE(b.notNull());
         CHECK((n->getStyle() & LLFontGL::BOLD) == 0);
         CHECK((b->getStyle() & LLFontGL::BOLD) != 0);
     }
@@ -621,11 +650,13 @@ namespace
     // selectShapingFace walks the fallback chain by codepoint coverage:
     // ASCII routes to the head, CJK routes to a CJK fallback, emoji
     // routes to the emoji fallback. Pins multi-hop priority resolution
-    // at llfontfreetype.cpp:266-284.
+    // at llfontfreetype.cpp:266-284. The CJK face is the first of the
+    // package's Source Han Sans collection, which the CJK font in
+    // fonts.xml loads with the rest.
     TEST_CASE_METHOD(llfontfreetype_data, "LLFontFreetype: selectShapingFace sends ASCII to the head and CJK and emoji to fallbacks", "[LLFontFreetype]")
     {
         const std::string dejavu = std::string(kFontDir) + "DejaVuSans.woff2";
-        const std::string han    = std::string(kFontDir) + "SourceHanSans-Regular.woff2";
+        const std::string han    = std::string(kFontDir) + "SourceHanSans-VF.otf.ttc";
         const std::string emoji  = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(dejavu) || !fileExists(han) || !fileExists(emoji))
             SKIP("DejaVuSans + SourceHanSans + Noto-COLRv1 required");
@@ -645,7 +676,7 @@ namespace
         UNSCOPED_INFO("the head's glyph for 'a'");
         CHECK(idx != 0u);
 
-        // U+4F60 你 lives in SourceHanSans, not in DejaVuSans → CJK fallback.
+        // U+4F60 你 lives in Source Han Sans, not in DejaVuSans → CJK fallback.
         idx = 0;
         CHECK(head->selectShapingFace(0x4F60, idx) == cjk.get());
 
@@ -711,15 +742,17 @@ namespace
         REQUIRE(head.notNull());
         REQUIRE(emo.notNull());
 
-        // Functor accepts only emoji-range codepoints; rejects ASCII.
-        // If TwemojiSVG happens to carry ASCII outlines, the functor
-        // forces the head to win 'a' regardless.
+        // Functor accepts only emoji-range codepoints. U+2600 (sun) is
+        // below that range and in both faces' cmaps, and a functor
+        // fallback is asked before the head, so only the functor keeps
+        // Twemoji from it. (TwemojiSVG has no ASCII: 'a' would go to the
+        // head whatever the functor said.)
         auto pictograph_only = [](llwchar c) -> bool { return c >= 0x1F000; };
         head->addFallbackFont(emo, pictograph_only);
 
         U32 idx = 0;
-        UNSCOPED_INFO("the functor rejects 'a' for Twemoji");
-        CHECK(head->selectShapingFace(L'a', idx) == head.get());
+        UNSCOPED_INFO("the functor rejects U+2600 for Twemoji");
+        CHECK(head->selectShapingFace(0x2600, idx) == head.get());
         // Functor allows emoji range, so emoji codepoints route to Twemoji.
         idx = 0;
         UNSCOPED_INFO("the functor passes the emoji to Twemoji");

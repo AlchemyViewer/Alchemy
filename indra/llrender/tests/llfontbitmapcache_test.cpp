@@ -67,17 +67,17 @@ namespace
     TEST_CASE("LLFontBitmapCache: init sizes the sheets; reset clears them and bumps the generation", "[LLFontBitmapCache]")
     {
         LLFontBitmapCache c;
-        const S32 gen_init0 = c.getCacheGeneration();
-
         c.init(/*max_char_width=*/2, /*max_char_height=*/2);
         // 2*40=80 → next pow2 ≥ 80 → 128, capped at 1024.
         CHECK(c.getBitmapWidth() == 128);
         CHECK(c.getBitmapHeight() == 128);
+        // Read after init, which resets and so bumps it too.
+        const S32 gen_before_reset = c.getCacheGeneration();
 
         c.reset();
         CHECK(c.getBitmapWidth() == 0);
         CHECK(c.getBitmapHeight() == 0);
-        CHECK(c.getCacheGeneration() > gen_init0);
+        CHECK(c.getCacheGeneration() > gen_before_reset);
     }
 
     // Out-of-range queries on a freshly-constructed (or reset) cache

@@ -379,10 +379,11 @@ namespace
     }
 
     // Cross-instance global generation: two LLFontBitmapCache instances
-    // mutating in interleaved order each bump the global counter. Pins
-    // that vertex buffers checking `mLastFontCacheGen` against
-    // getGlobalGeneration() can detect changes that fired on any cache,
-    // not just the one they captured against.
+    // mutating in interleaved order each bump the global counter. Every
+    // cache draws its generation from it, and LLFontGL::getCacheGeneration
+    // keys its memo on it, so a change to any cache of a font's chain has
+    // to move it. (Vertex buffers no longer compare against it directly:
+    // llfontbitmapcache.h:84-92.)
     TEST_CASE_METHOD(llfontbitmapcache_gl_data, "LLFontBitmapCacheGL: two caches' allocations and releases each bump the global generation", "[LLFontBitmapCacheGL]")
     {
         LLFontBitmapCache c1; c1.init(2, 2);
