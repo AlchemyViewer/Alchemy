@@ -132,8 +132,8 @@ public:
     /// The waves' settings, held to their ranges: the wave height dial and the tessellation density.
     struct WaveSettings
     {
-        F32 mHeight = 1.f;
-        F32 mDensity = 64.f;
+        F32 mHeight = 0.5f;
+        F32 mDensity = 32.f;
     };
     static WaveSettings waveSettings();
 

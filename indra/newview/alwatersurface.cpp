@@ -53,8 +53,8 @@
 
 ALWaterSurface::WaveSettings ALWaterSurface::waveSettings()
 {
-    static LLCachedControl<F32> wave_height(gSavedSettings, "AlchemyRenderWaterWaveHeight", 1.f);
-    static LLCachedControl<F32> tess_density(gSavedSettings, "AlchemyRenderWaterTessDensity", 64.f);
+    static LLCachedControl<F32> wave_height(gSavedSettings, "AlchemyRenderWaterWaveHeight", 0.5f);
+    static LLCachedControl<F32> tess_density(gSavedSettings, "AlchemyRenderWaterTessDensity", 32.f);
     WaveSettings out;
     out.mHeight = llclamp((F32)wave_height, 0.f, 4.f);
     out.mDensity = llclamp((F32)tess_density, 8.f, 256.f);
@@ -63,7 +63,7 @@ ALWaterSurface::WaveSettings ALWaterSurface::waveSettings()
 
 bool ALWaterSurface::wavesWanted()
 {
-    static LLCachedControl<bool> waves(gSavedSettings, "AlchemyRenderWaterWaves", false);
+    static LLCachedControl<bool> waves(gSavedSettings, "AlchemyRenderWaterWaves", true);
     return waves && water_waves_supported();
 }
 
