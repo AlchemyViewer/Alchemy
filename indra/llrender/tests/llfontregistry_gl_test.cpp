@@ -165,11 +165,11 @@ namespace tut
 
         LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
         REQUIRE(font != nullptr);
-
-        font->generateASCIIglyphs();
-
+        // generateASCIIglyphs rasterizes through the freetype.
         const LLFontFreetype* ft = font->getFontFreetype();
         REQUIRE(ft != nullptr);
+
+        font->generateASCIIglyphs();
 
         const LLFontBitmapCache* cache = ft->getFontBitmapCache();
         REQUIRE(cache != nullptr);
@@ -218,12 +218,17 @@ namespace tut
 
         LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
         REQUIRE(font != nullptr);
+        const LLFontFreetype* destroy_ft = font->getFontFreetype();
+        REQUIRE(destroy_ft != nullptr);
 
         font->generateASCIIglyphs();
 
-        const LLFontBitmapCache* cache = font->getFontFreetype()->getFontBitmapCache();
+        const LLFontBitmapCache* cache = destroy_ft->getFontBitmapCache();
+        REQUIRE(cache != nullptr);
         REQUIRE(cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 1u);
-        CHECK(cache->getImageGL(EFontGlyphType::Grayscale, 0)->getTexName() != 0);
+        LLImageGL* page = cache->getImageGL(EFontGlyphType::Grayscale, 0);
+        REQUIRE(page != nullptr);
+        CHECK(page->getTexName() != 0);
 
         reg.destroyGL();
 
@@ -379,6 +384,9 @@ namespace tut
         resolve();
         LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Large", 0));
         REQUIRE(font != nullptr);
+        // getAscenderHeight reads through the freetype too.
+        const LLFontFreetype* head_ft = font->getFontFreetype();
+        REQUIRE(head_ft != nullptr);
 
         // Head is Inter at chain's 16pt.
         F32 head_ascender = font->getAscenderHeight();
@@ -386,7 +394,7 @@ namespace tut
 
         // Find the DejaVu fallback in the chain. Its mPointSize should be
         // the per-family pin 8.0, NOT the chain's 16.0.
-        const auto& fallbacks = font->getFontFreetype()->getFallbackFonts();
+        const auto& fallbacks = head_ft->getFallbackFonts();
         const LLFontFreetype* dejavu_fallback = nullptr;
         for (const auto& fb : fallbacks)
         {
@@ -549,9 +557,12 @@ namespace tut
 
         LLFontGL* font = reg.getFont(LLFontDescriptor("Inter", "Small", 0));
         REQUIRE(font != nullptr);
+        const LLFontFreetype* sweep_ft = font->getFontFreetype();
+        REQUIRE(sweep_ft != nullptr);
         font->generateASCIIglyphs();
 
-        const LLFontBitmapCache* cache = font->getFontFreetype()->getFontBitmapCache();
+        const LLFontBitmapCache* cache = sweep_ft->getFontBitmapCache();
+        REQUIRE(cache != nullptr);
         const U32 pages_before = cache->getNumBitmaps(EFontGlyphType::Grayscale);
         CHECK(pages_before >= 1u);
 
@@ -618,19 +629,23 @@ namespace tut
         LLFontGL* head_b = reg.getFont(LLFontDescriptor("HeadB", "Small", 0));
         REQUIRE(head_a != nullptr);
         REQUIRE(head_b != nullptr);
+        const LLFontFreetype* ft_a = head_a->getFontFreetype();
+        const LLFontFreetype* ft_b = head_b->getFontFreetype();
+        REQUIRE(ft_a != nullptr);
+        REQUIRE(ft_b != nullptr);
 
         // Locate the Noto-COLRv1 fallback inside each head's chain.
-        auto find_emoji_fallback = [](LLFontGL* head) -> const LLFontFreetype*
+        auto find_emoji_fallback = [](const LLFontFreetype* head_ft) -> const LLFontFreetype*
         {
-            for (const auto& fb : head->getFontFreetype()->getFallbackFonts())
+            for (const auto& fb : head_ft->getFallbackFonts())
             {
                 if (fb.first && fb.first->getName().find("Noto-COLRv1") != std::string::npos)
                     return fb.first.get();
             }
             return nullptr;
         };
-        const LLFontFreetype* emoji_a = find_emoji_fallback(head_a);
-        const LLFontFreetype* emoji_b = find_emoji_fallback(head_b);
+        const LLFontFreetype* emoji_a = find_emoji_fallback(ft_a);
+        const LLFontFreetype* emoji_b = find_emoji_fallback(ft_b);
         REQUIRE(emoji_a != nullptr);
         REQUIRE(emoji_b != nullptr);
         UNSCOPED_INFO("siblings share the fallback freetype instance "
@@ -642,16 +657,16 @@ namespace tut
         // walk picks Noto-COLRv1 → face's findGlyphInfo allocates and
         // caches on the FIRST call; the SECOND head hits the face cache.
         constexpr llwchar kFire = 0x1F525;
-        const LLFontGlyphInfo* gi_a = head_a->getFontFreetype()->getGlyphInfo(
-            kFire, EFontGlyphType::Color);
-        const LLFontGlyphInfo* gi_b = head_b->getFontFreetype()->getGlyphInfo(
-            kFire, EFontGlyphType::Color);
+        const LLFontGlyphInfo* gi_a = ft_a->getGlyphInfo(kFire, EFontGlyphType::Color);
+        const LLFontGlyphInfo* gi_b = ft_b->getGlyphInfo(kFire, EFontGlyphType::Color);
         REQUIRE(gi_a != nullptr);
         REQUIRE(gi_b != nullptr);
         // Face-level dedup → both heads see the same face-owned entry.
         UNSCOPED_INFO("face dedup returns the same entry to both heads");
         REQUIRE(gi_a == gi_b);
 
+        // Slot 0 is always there: mPhaseSlots is a fixed array, and every
+        // rasterized glyph fills its first mPhaseCount (1 or kNumPhases).
         const auto target = gi_a->mPhaseSlots[0].mBitmapEntry;
         {
             INFO("emoji glyph references a real Color sheet");
@@ -687,14 +702,21 @@ namespace tut
         //  1. not crash on a freed face entry,
         //  2. produce a non-null glyph entry,
         //  3. land that entry on a LIVE sheet (not the released one).
-        const LLFontGlyphInfo* gi_a2 = head_a->getFontFreetype()->getGlyphInfo(
-            kFire, EFontGlyphType::Color);
-        const LLFontGlyphInfo* gi_b2 = head_b->getFontFreetype()->getGlyphInfo(
-            kFire, EFontGlyphType::Color);
+        const LLFontGlyphInfo* gi_a2 = ft_a->getGlyphInfo(kFire, EFontGlyphType::Color);
+        const LLFontGlyphInfo* gi_b2 = ft_b->getGlyphInfo(kFire, EFontGlyphType::Color);
         REQUIRE(gi_a2 != nullptr);
         REQUIRE(gi_b2 != nullptr);
         const auto post_a = gi_a2->mPhaseSlots[0].mBitmapEntry;
         const auto post_b = gi_b2->mPhaseSlots[0].mBitmapEntry;
+        // isSheetReleased is false for a sheet that does not exist, so an
+        // entry naming none, (Unspecified, -1), would pass the checks below.
+        {
+            INFO("re-rasterized glyphs reference real Color sheets");
+            CHECK(post_a.first == EFontGlyphType::Color);
+            CHECK(post_a.second >= 0);
+            CHECK(post_b.first == EFontGlyphType::Color);
+            CHECK(post_b.second >= 0);
+        }
         CHECK_FALSE(cache->isSheetReleased(post_a.first, static_cast<U32>(post_a.second)));
         CHECK_FALSE(cache->isSheetReleased(post_b.first, static_cast<U32>(post_b.second)));
     }

@@ -249,11 +249,13 @@ namespace tut
     }
 
     // operator< orders lexicographically by (name, style, size). Style
-    // comparisons happen ahead of size — verify by holding name fixed.
-    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: operator< orders descriptors that differ only in style", "[LLFontRegistry]")
+    // comparisons happen ahead of size — verify by holding name fixed and
+    // giving the lower style the later size: "Small" sorts after "Huge",
+    // so comparing size first would put b ahead of a.
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: operator< compares style before size", "[LLFontRegistry]")
     {
-        LLFontDescriptor a("SansSerif", "Medium", 0);
-        LLFontDescriptor b("SansSerif", "Medium", LLFontGL::BOLD);
+        LLFontDescriptor a("SansSerif", "Small", 0);
+        LLFontDescriptor b("SansSerif", "Huge", LLFontGL::BOLD);
         CHECK(a < b);
         UNSCOPED_INFO("strict weak ordering");
         CHECK_FALSE(b < a);
@@ -312,6 +314,8 @@ namespace tut
         const LLFontDescriptor* bold   = templateFor("Inter", LLFontGL::BOLD);
         REQUIRE(normal != nullptr);
         REQUIRE(bold != nullptr);
+        REQUIRE_FALSE(normal->getFontFiles().empty());
+        REQUIRE_FALSE(bold->getFontFiles().empty());
         CHECK(normal->getFontFiles()[0].mVarAxes.wght_set);
         CHECK(normal->getFontFiles()[0].mVarAxes.wght == 400.f);
         CHECK((S32)normal->getFontFiles()[0].mHinting == (S32)EFontHinting::LIGHT);
@@ -356,6 +360,7 @@ namespace tut
         CHECK(loadXml(xml));
         const LLFontDescriptor* d = templateFor("Mono", LLFontGL::NORMAL);
         REQUIRE(d != nullptr);
+        REQUIRE_FALSE(d->getFontFiles().empty());
         CHECK(d->getFontFiles()[0].mMonospaceLigatures);
     }
 
@@ -373,10 +378,16 @@ namespace tut
             "  </font>"
             "</fonts>";
         CHECK(loadXml(xml));
+        const LLFontDescriptor* cjk = templateFor("CJK");
+        const LLFontDescriptor* mono = templateFor("Mono");
+        REQUIRE(cjk != nullptr);
+        REQUIRE(mono != nullptr);
+        REQUIRE_FALSE(cjk->getFontFiles().empty());
+        REQUIRE_FALSE(mono->getFontFiles().empty());
         UNSCOPED_INFO("family-level load_collection inherited");
-        CHECK(templateFor("CJK")->getFontFiles()[0].mLoadCollection);
+        CHECK(cjk->getFontFiles()[0].mLoadCollection);
         UNSCOPED_INFO("file-level load_collection works alone");
-        CHECK(templateFor("Mono")->getFontFiles()[0].mLoadCollection);
+        CHECK(mono->getFontFiles()[0].mLoadCollection);
     }
 
     // flags="bold" forces LLFontGL::BOLD into the file's flags so that
@@ -395,6 +406,7 @@ namespace tut
         CHECK(loadXml(xml));
         const LLFontDescriptor* d = templateFor("Inter", LLFontGL::BOLD);
         REQUIRE(d != nullptr);
+        REQUIRE_FALSE(d->getFontFiles().empty());
         CHECK((d->getFontFiles()[0].mFlags & LLFontGL::BOLD) == (S32)LLFontGL::BOLD);
     }
 
@@ -411,7 +423,10 @@ namespace tut
             "  </font>"
             "</fonts>";
         CHECK(loadXml(xml));
-        const auto& cf = templateFor("Emoji")->getFontFiles()[0].CharFunctor;
+        const LLFontDescriptor* d = templateFor("Emoji");
+        REQUIRE(d != nullptr);
+        REQUIRE_FALSE(d->getFontFiles().empty());
+        const auto& cf = d->getFontFiles()[0].CharFunctor;
         REQUIRE(static_cast<bool>(cf));
         UNSCOPED_INFO("U+2600 inside range");
         CHECK(cf(0x2600));
@@ -440,7 +455,10 @@ namespace tut
             "  </font>"
             "</fonts>";
         CHECK(loadXml(xml));
-        const auto& cf = templateFor("Frag")->getFontFiles()[0].CharFunctor;
+        const LLFontDescriptor* d = templateFor("Frag");
+        REQUIRE(d != nullptr);
+        REQUIRE_FALSE(d->getFontFiles().empty());
+        const auto& cf = d->getFontFiles()[0].CharFunctor;
         REQUIRE(static_cast<bool>(cf));
         CHECK(cf(0x2700));
     }
@@ -458,7 +476,10 @@ namespace tut
             "  </font>"
             "</fonts>";
         CHECK(loadXml(xml));
-        CHECK(templateFor("X")->getFontFiles()[0].mSizeDelta == -1.5f);
+        const LLFontDescriptor* d = templateFor("X");
+        REQUIRE(d != nullptr);
+        REQUIRE_FALSE(d->getFontFiles().empty());
+        CHECK(d->getFontFiles()[0].mSizeDelta == -1.5f);
     }
 
     // Family metadata: label / user_selectable / monospace flow into
@@ -619,7 +640,8 @@ namespace tut
         CHECK(countFile("A", "C.woff2") == 1);
     }
 
-    // Self-reference <use family="self"/> logs and is skipped.
+    // A <use> naming the family itself (<use family='A'/> inside A) logs
+    // and is skipped: the chain holds only A's own file, once.
     TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use> of the family itself is skipped", "[LLFontRegistry]")
     {
         const char* xml =
@@ -728,11 +750,12 @@ namespace tut
     // mInheritFlags are consumed at the end of the first call. Per-
     // family sizes (mFamilySizes) and per-file source-family tags
     // survive — those are runtime data, not parse state.
-    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a second resolveFontReferences call adds nothing", "[LLFontRegistry]")
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a second resolveFontReferences adds nothing and keeps size and source", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
             "  <font name='A'>"
+            "    <size name='Large' size='9.0'/>"
             "    <use family='B'/>"
             "    <style name='NORMAL'><file>A.woff2</file></style>"
             "  </font>"
@@ -746,6 +769,16 @@ namespace tut
         resolve(); // second call must not re-append
         auto second = fileNames("A");
         CHECK((S32)first.size() == (S32)second.size());
+
+        F32 pin = 0.f;
+        CHECK(familySizePt("A", "Large", pin));
+        CHECK(pin == 9.0f);
+        const LLFontDescriptor* a = templateFor("A");
+        REQUIRE(a != nullptr);
+        const auto& files = a->getFontFiles();
+        REQUIRE((S32)files.size() == 2);
+        CHECK(files[0].mSourceFamily == std::string("A"));
+        CHECK(files[1].mSourceFamily == std::string("B"));
     }
 
     // ===================================================================
@@ -794,7 +827,10 @@ namespace tut
         LLSD overrides;
         overrides["UI"] = "user-supplied.ttf";
         applyOverrides(overrides);
-        const auto& files = templateFor("UI")->getFontFiles();
+        const LLFontDescriptor* ui = templateFor("UI");
+        REQUIRE(ui != nullptr);
+        const auto& files = ui->getFontFiles();
+        REQUIRE_FALSE(files.empty());
         CHECK(files[0].FileName == std::string("user-supplied.ttf"));
         CHECK((S32)files[0].mHinting == (S32)EFontHinting::LIGHT);
         CHECK(files[0].mVarAxes.wght == 400.f);
@@ -893,7 +929,9 @@ namespace tut
         // The override DID prepend Alt's file onto UI's chain, with
         // mSourceFamily=Alt — so per-file pin lookup at render time
         // would use Alt's <size> for that prepended file.
-        const auto& files = templateFor("UI")->getFontFiles();
+        const LLFontDescriptor* ui = templateFor("UI");
+        REQUIRE(ui != nullptr);
+        const auto& files = ui->getFontFiles();
         REQUIRE_FALSE(files.empty());
         CHECK(files[0].FileName == std::string("A.woff2"));
         CHECK(files[0].mSourceFamily == std::string("Alt"));
@@ -916,19 +954,26 @@ namespace tut
     // ===================================================================
 
     // getMatchingFontDesc applies normalize() to its argument, so passing
-    // an unnormalized "SansSerifHuge" finds the {SansSerif, Huge} template.
-    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: getMatchingFontDesc finds a declared template and misses an absent one", "[LLFontRegistry]")
+    // an unnormalized "SansSerifBold" finds the {SansSerif, BOLD} template.
+    // (A size suffix such as "Huge" would not: normalize moves it into the
+    // size, over "TEMPLATE", so the query names a head, not a template.)
+    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: getMatchingFontDesc normalizes its query and misses an absent family", "[LLFontRegistry]")
     {
         const char* xml =
             "<fonts>"
             "  <font name='SansSerif'>"
             "    <style name='NORMAL'><file>S.woff2</file></style>"
+            "    <style name='BOLD'><file>S-Bold.woff2</file></style>"
             "  </font>"
             "</fonts>";
         CHECK(loadXml(xml));
         resolve();
         LLFontDescriptor query("SansSerif", "TEMPLATE", 0);
         CHECK(reg.getMatchingFontDesc(query) != nullptr);
+        const LLFontDescriptor* bold = reg.getMatchingFontDesc(LLFontDescriptor("SansSerifBold", "TEMPLATE", 0));
+        REQUIRE(bold != nullptr);
+        CHECK(bold->getName() == std::string("SansSerif"));
+        CHECK((S32)bold->getStyle() == (S32)LLFontGL::BOLD);
         LLFontDescriptor miss("Nope", "TEMPLATE", 0);
         CHECK(reg.getMatchingFontDesc(miss) == nullptr);
     }
@@ -1075,26 +1120,6 @@ namespace tut
         CHECK(fams[0].label == std::string("Plain"));
     }
 
-    // <use family='A'/> inside <font name='A'> — literal self-reference
-    // by name, distinct from the 'self' alias path (Group 3). The cycle
-    // detector must skip both. The post-resolve chain should contain
-    // only A's own files, with no duplicate insertion.
-    TEST_CASE_METHOD(llfontregistry_data, "LLFontRegistry: a <use> naming the family itself leaves only the family's own file", "[LLFontRegistry]")
-    {
-        const char* xml =
-            "<fonts>"
-            "  <font name='Mono'>"
-            "    <use family='Mono'/>"
-            "    <style name='NORMAL'><file>M.woff2</file></style>"
-            "  </font>"
-            "</fonts>";
-        CHECK(loadXml(xml));
-        resolve();
-        auto names = fileNames("Mono");
-        REQUIRE((S32)names.size() == 1);
-        CHECK(names[0] == std::string("M.woff2"));
-    }
-
     // Empty <fonts/> root with no children is a degenerate but valid
     // input — init_from_xml + resolve must complete without crashing
     // and leave the registry's font map empty. Pins safe handling of
@@ -1140,7 +1165,9 @@ namespace tut
         LLSD ovr1;
         ovr1["UI"] = "AltA";
         applyOverrides(ovr1);
-        const auto& files_a = templateFor("UI")->getFontFiles();
+        const LLFontDescriptor* ui_a = templateFor("UI");
+        REQUIRE(ui_a != nullptr);
+        const auto& files_a = ui_a->getFontFiles();
         REQUIRE_FALSE(files_a.empty());
         CHECK(files_a[0].FileName == std::string("A.woff2"));
         CHECK(files_a[0].mSourceFamily == std::string("AltA"));
@@ -1150,7 +1177,9 @@ namespace tut
         LLSD ovr2;
         ovr2["UI"] = "AltB";
         applyOverrides(ovr2);
-        const auto& files_b = templateFor("UI")->getFontFiles();
+        const LLFontDescriptor* ui_b = templateFor("UI");
+        REQUIRE(ui_b != nullptr);
+        const auto& files_b = ui_b->getFontFiles();
         REQUIRE_FALSE(files_b.empty());
         CHECK(files_b[0].FileName == std::string("B.woff2"));
         CHECK(files_b[0].mSourceFamily == std::string("AltB"));
@@ -1657,7 +1686,9 @@ namespace tut
             "</fonts>";
         CHECK(loadXml(xml));
         resolve();
-        const auto& a_files = templateFor("A")->getFontFiles();
+        const LLFontDescriptor* a = templateFor("A");
+        REQUIRE(a != nullptr);
+        const auto& a_files = a->getFontFiles();
         REQUIRE((S32)a_files.size() == 2);
         CHECK(a_files[0].mSourceFamily == std::string("A"));
         CHECK(a_files[1].mSourceFamily == std::string("B"));
@@ -2053,7 +2084,9 @@ namespace tut
             "</fonts>";
         CHECK(loadXml(xml));
         resolve();
-        const auto& files = templateFor("A")->getFontFiles();
+        const LLFontDescriptor* a = templateFor("A");
+        REQUIRE(a != nullptr);
+        const auto& files = a->getFontFiles();
         REQUIRE((S32)files.size() == 2);
         CHECK(files[0].mSourceFamily == std::string("A"));
         CHECK(files[1].mSourceFamily == std::string("B"));
@@ -2095,7 +2128,9 @@ namespace tut
         LLSD ovr_a;
         ovr_a["Target"] = "SourceA";
         resolve(ovr_a);
-        const auto& a_files = templateFor("Target")->getFontFiles();
+        const LLFontDescriptor* target_a = templateFor("Target");
+        REQUIRE(target_a != nullptr);
+        const auto& a_files = target_a->getFontFiles();
         REQUIRE_FALSE(a_files.empty());
         CHECK(a_files[0].FileName == std::string("SourceA.woff2"));
         CHECK(a_files[0].mSourceFamily == std::string("SourceA"));
@@ -2109,7 +2144,9 @@ namespace tut
         LLSD ovr_b;
         ovr_b["Target"] = "SourceB";
         resolve(ovr_b);
-        const auto& b_files = templateFor("Target")->getFontFiles();
+        const LLFontDescriptor* target_b = templateFor("Target");
+        REQUIRE(target_b != nullptr);
+        const auto& b_files = target_b->getFontFiles();
         REQUIRE_FALSE(b_files.empty());
         CHECK(b_files[0].FileName == std::string("SourceB.woff2"));
         CHECK(b_files[0].mSourceFamily == std::string("SourceB"));
@@ -2224,9 +2261,12 @@ namespace tut
             "</fonts>";
         CHECK(loadXml(xml));
         resolve();
-        // No heads instantiated, no fallback-cache entries.
+        // No heads instantiated, no fallback-cache entries: the map holds
+        // the UI template alone, with no font behind it.
+        CHECK(templateFor("UI") != nullptr);
+        // The case passes by returning: the sweep walks that entry without
+        // dereferencing its NULL font.
         reg.sweepGlyphCaches();
-        CHECK(true);
     }
 
     // OpenType variation axes plumbed through XML parse. Family-level
@@ -2284,6 +2324,7 @@ namespace tut
         CHECK(loadXml(xml));
         const LLFontDescriptor* d = templateFor("Plain", LLFontGL::NORMAL);
         REQUIRE(d != nullptr);
+        REQUIRE_FALSE(d->getFontFiles().empty());
         const auto& f = d->getFontFiles()[0];
         CHECK_FALSE(f.mVarAxes.wght_set);
         CHECK_FALSE(f.mVarAxes.opsz_set);
@@ -2556,8 +2597,12 @@ namespace tut
         CHECK(loadXml(xml));
         resolve();
 
-        const auto& bf = templateFor("Broad")->getFontFiles();
-        const auto& nf = templateFor("Narrow")->getFontFiles();
+        const LLFontDescriptor* broad = templateFor("Broad");
+        const LLFontDescriptor* narrow = templateFor("Narrow");
+        REQUIRE(broad != nullptr);
+        REQUIRE(narrow != nullptr);
+        const auto& bf = broad->getFontFiles();
+        const auto& nf = narrow->getFontFiles();
         REQUIRE((S32)bf.size() == 1);
         REQUIRE((S32)nf.size() == 1);
         // Broad accepts U+1F100; Narrow doesn't.
@@ -2597,8 +2642,12 @@ namespace tut
         overrides["EmojiBase"] = "Twemoji.ttf";
         resolve(overrides);
 
-        const auto& bf = templateFor("Broad")->getFontFiles();
-        const auto& nf = templateFor("Narrow")->getFontFiles();
+        const LLFontDescriptor* broad = templateFor("Broad");
+        const LLFontDescriptor* narrow = templateFor("Narrow");
+        REQUIRE(broad != nullptr);
+        REQUIRE(narrow != nullptr);
+        const auto& bf = broad->getFontFiles();
+        const auto& nf = narrow->getFontFiles();
         // Each consumer sees BOTH files (Twemoji prepended onto the
         // EmojiBase chain by the override; Noto preserved behind it),
         // each with the consumer's filter applied.
@@ -2638,8 +2687,12 @@ namespace tut
         overrides["EmojiBase"] = entry;
         resolve(overrides);
 
-        const auto& bf = templateFor("Broad")->getFontFiles();
-        const auto& nf = templateFor("Narrow")->getFontFiles();
+        const LLFontDescriptor* broad = templateFor("Broad");
+        const LLFontDescriptor* narrow = templateFor("Narrow");
+        REQUIRE(broad != nullptr);
+        REQUIRE(narrow != nullptr);
+        const auto& bf = broad->getFontFiles();
+        const auto& nf = narrow->getFontFiles();
         // replace_first dropped Noto from EmojiBase's chain; consumers
         // pull just Twemoji through their respective use-level filters.
         REQUIRE((S32)bf.size() == 1);
@@ -2811,7 +2864,9 @@ namespace tut
             "</fonts>";
         CHECK(loadXml(xml));
         resolve();
-        const auto& files = templateFor("Emoji")->getFontFiles();
+        const LLFontDescriptor* emoji = templateFor("Emoji");
+        REQUIRE(emoji != nullptr);
+        const auto& files = emoji->getFontFiles();
         REQUIRE((S32)files.size() == 1);
         CHECK(files[0].FileName == std::string("Noto.ttf"));
         CHECK_FALSE(static_cast<bool>(files[0].CharFunctor));
@@ -2858,7 +2913,8 @@ namespace tut
         overrides["EmojiBase"] = entry;
         resolve(overrides);
 
-        const auto& files = templateFor("Emoji")->getFontFiles();
-        CHECK((S32)files.size() == 1);
+        const LLFontDescriptor* emoji = templateFor("Emoji");
+        REQUIRE(emoji != nullptr);
+        CHECK((S32)emoji->getFontFiles().size() == 1);
     }
 }
