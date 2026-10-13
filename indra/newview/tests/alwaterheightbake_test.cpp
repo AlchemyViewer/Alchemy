@@ -30,6 +30,7 @@
 #include "../alwaterheightbake.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -477,7 +478,9 @@ namespace tut
     {
         set_test_name("a float as a half");
         ensure_equals("0", ALWaterHeightBake::halfOf(0.f), (U16)0x0000);
-        ensure_equals("-0", ALWaterHeightBake::halfOf(-0.f), (U16)0x8000);
+        // -0 from its bits, read at run time: a build that ignores the sign of zero may make a constant -0 into +0.
+        volatile U32 negative_zero = 0x80000000u;
+        ensure_equals("-0", ALWaterHeightBake::halfOf(std::bit_cast<F32>((U32)negative_zero)), (U16)0x8000);
         ensure_equals("1", ALWaterHeightBake::halfOf(1.f), (U16)0x3c00);
         ensure_equals("-2", ALWaterHeightBake::halfOf(-2.f), (U16)0xc000);
         ensure_equals("the largest", ALWaterHeightBake::halfOf(65504.f), (U16)0x7bff);
