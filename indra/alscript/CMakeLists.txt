@@ -237,6 +237,17 @@ if(AL_BUILD_TESTS)
     templates_define
     "AL_SCRIPT_TEMPLATES_DIR=\"${INDRA_SOURCE_DIR}/newview/app_settings/script_templates\""
   )
+  # What every binary of alscript's tests sets up once, as the viewer has it
+  # before it checks a script, and the state guard's checks on what the
+  # script engines keep for the process.
+  add_library(alscript_test_checks OBJECT tests/alscript_test_checks.cpp)
+  target_link_libraries(
+    alscript_test_checks
+    PRIVATE al::flags al_test_support alscript llcommon ll::tailslide
+  )
+  target_compile_definitions(alscript_test_checks PRIVATE ${definitions_defines})
+  set_target_properties(alscript_test_checks PROPERTIES FOLDER "Tests/alscript")
+
   # One Catch2 binary for alscript's tests, each test file run in a process
   # of its own. The SLua checks, and LSL written again as SLua, run again
   # with Luau's new type solver, which a scripter may choose
@@ -288,6 +299,7 @@ if(AL_BUILD_TESTS)
       tests/alscriptweight_test.cpp
       tests/alsourcemap_test.cpp
       tests/aluploadheader_test.cpp
+    SUPPORT alscript_test_checks llcommon_test_checks
     LIBRARIES alscript llcommon ll::slua ll::tailslide
     DEFINES
       ${definitions_defines}

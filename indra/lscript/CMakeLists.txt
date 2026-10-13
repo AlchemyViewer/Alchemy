@@ -180,6 +180,7 @@ al_add_test_binary(
   lscript_tests
   PROJECT lscript
   SOURCES tests/allslreference_test.cpp tests/allslreferencecheck_test.cpp
+  SUPPORT alscript_test_checks llcommon_test_checks
   LIBRARIES lscript alscript llcommon
   DEFINES
     "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\""

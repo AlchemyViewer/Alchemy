@@ -27,6 +27,8 @@
 #include "../lsl/allslservice.h"
 #include "../lint/alscriptfixes.h"
 
+#include "alteststateguard.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "llsdserialize.h"
@@ -792,6 +794,9 @@ namespace
         }
         std::string   why;
         const bool    read = service.loadBuiltins(path, why);
+        // Tailslide's table is the process's and only ever added to: what
+        // the file declares stays for every case after this one.
+        ll_test::StateGuard::accept("Tailslide's builtins");
         std::error_code gone;
         std::filesystem::remove(fsyspath(path), gone);
         UNSCOPED_INFO("loaded: " + why);
@@ -823,6 +828,9 @@ namespace
         }
         std::string why;
         const bool  read = service.loadBuiltins(path, why);
+        // Tailslide's table is the process's and only ever added to: what
+        // the file declares stays for every case after this one.
+        ll_test::StateGuard::accept("Tailslide's builtins");
         std::error_code gone;
         std::filesystem::remove_all(dir, gone);
         UNSCOPED_INFO("loaded: " + why);
@@ -930,6 +938,9 @@ namespace
             out << text << "integer llBrandNewThing( integer Value )\n";
         }
         const bool loaded = service.loadBuiltins(path, error);
+        // Tailslide's table is the process's and only ever added to: what
+        // the file declares stays for every case after this one.
+        ll_test::StateGuard::accept("Tailslide's builtins");
         LLFile::remove(path);
         UNSCOPED_INFO("loaded: " + error);
         CHECK(loaded);
