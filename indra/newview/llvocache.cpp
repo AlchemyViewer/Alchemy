@@ -884,6 +884,7 @@ public:
           mPixelThreshold(pixel_threshold)
     {
         mLocalShift = shift;
+        mEye.load3((camera->getOrigin() - shift).mV); // the cache's octree is in the region's space
         mUseObjectCacheOcclusion = use_object_cache_occlusion;
         mNearRadius = LLVOCacheEntry::sNearRadius;
     }
@@ -1001,6 +1002,7 @@ public:
         : LLViewerOctreeCull(camera), mRegionp(regionp), mPixelThreshold(pixel_threshold), mUseObjectCacheOcclusion(use_occlusion)
     {
         mLocalShift = shift;
+        mEye.load3((camera->getOrigin() - shift).mV); // the cache's octree is in the region's space
         mSphereRadius = LLVOCacheEntry::sRearFarRadius;
     }
 

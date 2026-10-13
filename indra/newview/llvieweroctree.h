@@ -363,7 +363,10 @@ class LLViewerOctreeCull : public OctreeTraveler
 {
 public:
     LLViewerOctreeCull(LLCamera* camera)
-        : mCamera(camera), mRes(0) { }
+        : mCamera(camera), mRes(0)
+    {
+        mEye.load3(camera->getOrigin().mV);
+    }
 
     virtual void traverse(const OctreeNode* n);
 
@@ -401,6 +404,9 @@ protected:
 
 protected:
     LLCamera *mCamera;
+    // The camera in the octree's own space, which traverse() visits children nearest to first: the groups it hands
+    // on then come roughly front to back, and the depth test rejects what nearer ones hide.
+    LLVector4a mEye;
     S32 mRes;
 };
 
