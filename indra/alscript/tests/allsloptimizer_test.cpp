@@ -1504,47 +1504,69 @@ namespace
         {
             INFO("llGetPos is not");
             CHECK_FALSE(ALLSLTraits::pure("llGetPos"));
-            CHECK(ALLSLTraits::of("llGetPos")->mustUse);
+            const ALLSLTraits::Trait* get_pos = ALLSLTraits::of("llGetPos");
+            REQUIRE(get_pos);
+            CHECK(get_pos->mustUse);
         }
         // What SLua makes of each, from the same definitions.
         {
             INFO("llGetSubString takes its second and third from one in SLua's ll");
-            CHECK(ALLSLTraits::of("llGetSubString")->slua == ALLSLTraits::SluaIndexArgs);
-            CHECK(ALLSLTraits::of("llGetSubString")->sluaIndexArgs == 0x6);
+            const ALLSLTraits::Trait* sub_string = ALLSLTraits::of("llGetSubString");
+            REQUIRE(sub_string);
+            CHECK(sub_string->slua == ALLSLTraits::SluaIndexArgs);
+            CHECK(sub_string->sluaIndexArgs == 0x6);
         }
+        const ALLSLTraits::Trait* find_list = ALLSLTraits::of("llListFindList");
+        REQUIRE(find_list);
         UNSCOPED_INFO("llListFindList answers an index, and SLua deprecates it");
-        CHECK(ALLSLTraits::of("llListFindList")->slua == (ALLSLTraits::SluaIndexResult | ALLSLTraits::SluaDeprecated));
+        CHECK(find_list->slua == (ALLSLTraits::SluaIndexResult | ALLSLTraits::SluaDeprecated));
+        const ALLSLTraits::Trait* same_group = ALLSLTraits::of("llSameGroup");
+        REQUIRE(same_group);
         UNSCOPED_INFO("llSameGroup answers a boolean");
-        CHECK(ALLSLTraits::of("llSameGroup")->slua == ALLSLTraits::SluaBool);
+        CHECK(same_group->slua == ALLSLTraits::SluaBool);
+        const ALLSLTraits::Trait* timer_event = ALLSLTraits::of("llSetTimerEvent");
+        REQUIRE(timer_event);
         UNSCOPED_INFO("llSetTimerEvent is llcompat's alone");
-        CHECK(ALLSLTraits::of("llSetTimerEvent")->slua == ALLSLTraits::SluaRemoved);
+        CHECK(timer_event->slua == ALLSLTraits::SluaRemoved);
         {
             INFO("llSay is as it was");
-            CHECK(ALLSLTraits::of("llSay")->slua == 0);
-            REQUIRE_FALSE(ALLSLTraits::of("llSay")->sluaUse);
+            const ALLSLTraits::Trait* say = ALLSLTraits::of("llSay");
+            REQUIRE(say);
+            CHECK(say->slua == 0);
+            CHECK_FALSE(say->sluaUse);
         }
         {
             INFO("llAbs has math.abs in its stead");
-            REQUIRE(ALLSLTraits::of("llAbs")->sluaUse);
-            CHECK(std::string(ALLSLTraits::of("llAbs")->sluaUse) == "math.abs");
+            const ALLSLTraits::Trait* ll_abs = ALLSLTraits::of("llAbs");
+            REQUIRE(ll_abs);
+            REQUIRE(ll_abs->sluaUse);
+            CHECK(std::string(ll_abs->sluaUse) == "math.abs");
         }
         // How long each sleeps, under LSO and under Mono.
         {
             INFO("llSetPos sleeps 0.2 s");
-            CHECK(ALLSLTraits::of("llSetPos")->sleep == 0.2f);
-            CHECK(ALLSLTraits::of("llSetPos")->monoSleep == 0.2f);
+            const ALLSLTraits::Trait* set_pos = ALLSLTraits::of("llSetPos");
+            REQUIRE(set_pos);
+            CHECK(set_pos->sleep == 0.2f);
+            CHECK(set_pos->monoSleep == 0.2f);
         }
+        const ALLSLTraits::Trait* params_fast = ALLSLTraits::of("llSetLinkPrimitiveParamsFast");
+        REQUIRE(params_fast);
         UNSCOPED_INFO("llSetLinkPrimitiveParamsFast does not");
-        CHECK(ALLSLTraits::of("llSetLinkPrimitiveParamsFast")->sleep == 0.0f);
+        CHECK(params_fast->sleep == 0.0f);
         {
             INFO("llTextBox sleeps under LSO alone");
-            CHECK(ALLSLTraits::of("llTextBox")->sleep == 1.0f);
-            CHECK(ALLSLTraits::of("llTextBox")->monoSleep == 0.0f);
+            const ALLSLTraits::Trait* text_box = ALLSLTraits::of("llTextBox");
+            REQUIRE(text_box);
+            CHECK(text_box->sleep == 1.0f);
+            CHECK(text_box->monoSleep == 0.0f);
         }
         {
             INFO("llOpenFloater under Mono alone");
-            CHECK(ALLSLTraits::of("llOpenFloater")->sleep == 0.0f);
-            CHECK(ALLSLTraits::of("llOpenFloater")->monoSleep == 0.2f);
+            const ALLSLTraits::Trait* open_floater = ALLSLTraits::of("llOpenFloater");
+            REQUIRE(open_floater);
+            CHECK(open_floater->sleep == 0.0f);
+            CHECK(open_floater->monoSleep == 0.2f);
         }
         // What item of the object's an argument names, by its LSL name or SLua's.
         using Item = ALLSLTraits::Item;
@@ -1999,11 +2021,11 @@ namespace
                 UNSCOPED_INFO("no error in what was written: " + p.message + "\n" + r.text);
                 REQUIRE(p.severity != ALScriptProblem::Severity::Error);
             }
-            return r.text;
+            return r;
         };
         const auto has = [](const std::string& text, const std::string& what) { return text.find(what) != std::string::npos; };
 
-        const std::string lso = run(ALLSLOptimizer::Target::LSO);
+        const std::string lso = run(ALLSLOptimizer::Target::LSO).text;
         UNSCOPED_INFO("x != -1 as ~x, in a condition: " + lso);
         CHECK(has(lso, "if (~a)"));
         UNSCOPED_INFO("finds, both ways round, inside &&: " + lso);
@@ -2041,7 +2063,8 @@ namespace
         UNSCOPED_INFO("elements whose order would show stay together");
         CHECK_FALSE(has(lso, "l + llFrand(1) + llFrand(2)"));
 
-        const std::string mono = run(ALLSLOptimizer::Target::Mono);
+        const ALLSLOptimizer::Result monoRun = run(ALLSLOptimizer::Target::Mono);
+        const std::string&           mono    = monoRun.text;
         UNSCOPED_INFO("Mono: x != -1 as ~x: " + mono);
         CHECK(has(mono, "if (~a)"));
         // Mono's ldc.i4 is five bytes, -1 and 1 too.
@@ -2053,10 +2076,17 @@ namespace
         CHECK(has(mono, "g = ~-b;"));
         UNSCOPED_INFO("Mono: ++a");
         CHECK(has(mono, "++a;"));
-        UNSCOPED_INFO("Mono: what it wrote weighs what it says");
-        REQUIRE(mono.find("l = l") != std::string::npos);
+        // Its list's shapes weighed against the helpers they bring in, and
+        // whichever was smaller kept, with its weight.
+        UNSCOPED_INFO("Mono: l still added to, in whichever shape was kept");
+        CHECK(has(mono, "l = l"));
+        {
+            INFO("Mono: what it wrote weighs what it says");
+            CHECK(monoRun.weight.compiled);
+            CHECK(monoRun.weight.total == ALScriptWeigh::mono(mono).total);
+        }
 
-        const std::string luau = run(ALLSLOptimizer::Target::Luau);
+        const std::string luau = run(ALLSLOptimizer::Target::Luau).text;
         UNSCOPED_INFO("Luau: x != -1 stays, ~ a library call there: " + luau);
         CHECK(has(luau, "if (a != -1)"));
         UNSCOPED_INFO("Luau: x - 1 stays");

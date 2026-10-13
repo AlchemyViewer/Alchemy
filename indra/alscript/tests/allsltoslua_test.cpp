@@ -257,7 +257,9 @@ namespace
         CHECK(has(r, "ll.Say(0, `{greet(detected[1]:getName())} {gCount}`)"));
         {
             INFO("state_entry last");
-            CHECK(r.text.find("-- state_entry") > r.text.find("LLEvents:on"));
+            const size_t entered = r.text.find("-- state_entry");
+            CHECK(entered != std::string::npos);
+            CHECK(entered > r.text.find("LLEvents:on"));
             CHECK(has(r, "ll.Say(0, greet(\"world\"))"));
         }
         UNSCOPED_INFO("the note over its line");
@@ -415,7 +417,9 @@ namespace
         {
             INFO("a state not there said");
             REQUIRE(looked != std::string::npos);
-            CHECK(looked < r.text.find("local leaving"));
+            const size_t leaving = r.text.find("local leaving");
+            CHECK(leaving != std::string::npos);
+            CHECK(looked < leaving);
         }
         require_checks_clean(r);
         ALLSLToSLua::Options typed;
@@ -2415,14 +2419,12 @@ namespace
         UNSCOPED_INFO("their SLua apart");
         CHECK((shared[0]->sluaLast < shared[1]->sluaFirst || shared[1]->sluaLast < shared[0]->sluaFirst));
         // The handler, over more than one LSL line, still holds both.
-        for (const ALLSLToSLua::Span& each : r.spans)
+        const auto handler = std::find_if(r.spans.begin(), r.spans.end(), [](const ALLSLToSLua::Span& each) { return each.lslFirst == 4; });
         {
-            if (each.lslFirst == 4)
-            {
-                INFO("the handler over both");
-                REQUIRE(each.sluaFirst < shared[0]->sluaFirst);
-                REQUIRE(each.sluaLast >= shared[1]->sluaLast);
-            }
+            INFO("the handler over both");
+            REQUIRE(handler != r.spans.end());
+            CHECK(handler->sluaFirst < shared[0]->sluaFirst);
+            CHECK(handler->sluaLast >= shared[1]->sluaLast);
         }
     }
 
@@ -2559,8 +2561,11 @@ namespace
         CAPTURE(entry.text);
         {
             INFO("state_entry's, kept");
-            CHECK(has(entry, "-- set up\n"));
-            CHECK(entry.text.find("-- set up") < entry.text.find("ll.OwnerSay"));
+            const size_t set_up = entry.text.find("-- set up\n");
+            const size_t said   = entry.text.find("print(\"hi\")");
+            CHECK(set_up != std::string::npos);
+            CHECK(said != std::string::npos);
+            CHECK(set_up < said);
         }
     }
 

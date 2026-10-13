@@ -384,8 +384,9 @@ namespace
                                  "default { state_entry() { llOwnerSay((string)(a + b + c + d + 4294967297 - 0x1FFFFFFFF)); } }\n";
         std::vector<U8> ours;
         std::string     why;
+        const bool      compiled = ALScriptWeigh::tailslideLSO(text, ours, why);
         UNSCOPED_INFO("Tailslide compiles it: " + why);
-        CHECK(ALScriptWeigh::tailslideLSO(text, ours, why));
+        CHECK(compiled);
         const ALLSLReference::Result ll = ALLSLReference::compile(text, Target::LSO);
         CHECK(ll.ok);
         CHECK(ours == ll.image);

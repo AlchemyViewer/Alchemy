@@ -192,12 +192,13 @@ namespace
             REQUIRE(greet);
             REQUIRE(count);
         }
-        UNSCOPED_INFO("where it is declared");
-        CHECK(greet->line == 0);
-        UNSCOPED_INFO("and where it ends");
-        CHECK(count->line == 4);
-        UNSCOPED_INFO("to its last line");
-        CHECK(count->endLine >= 8);
+        {
+            INFO("where each is declared");
+            CHECK(greet->line == 0);
+            CHECK(count->line == 4);
+        }
+        UNSCOPED_INFO("and where count ends: the line of its end");
+        CHECK(count->endLine == 10);
         const ALScriptWeight::Part* nothing = named(weight, "nothing");
         {
             INFO("a function that does nothing weighs least:" + listed(weight));
@@ -719,8 +720,12 @@ namespace
         REQUIRE(named(lost, "twice") != nullptr);
         UNSCOPED_INFO("without a place");
         CHECK(named(lost, "twice")->line == -1);
-        UNSCOPED_INFO("the handler still placed");
-        CHECK(named(lost, "state_entry")->line == 3);
+        const ALScriptWeight::Part* lost_entry = named(lost, "state_entry");
+        {
+            INFO("the handler still placed" + listed(lost));
+            REQUIRE(lost_entry);
+            CHECK(lost_entry->line == 3);
+        }
     }
 
     // A long list parses on every platform: each element nests the parse two
@@ -1100,8 +1105,9 @@ namespace
         llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
         std::stringstream definitions;
         definitions << in.rdbuf();
+        const bool loaded = service.loadDefinitions(definitions.str(), error);
         UNSCOPED_INFO("definitions: " + error);
-        REQUIRE(service.loadDefinitions(definitions.str(), error));
+        REQUIRE(loaded);
         std::string said;
         for (const ALScriptProblem& p : service.check(after))
         {
@@ -1227,14 +1233,16 @@ namespace
         UNSCOPED_INFO("nothing made of it");
         CHECK(rewrite.edits.empty());
         {
+            const bool made = ALLuauSharedStart::rewrite("ll.OwnerSay(\"" + start + "alpha\")\n", start, strings, rewrite, error);
             INFO("a string not written out: " + error);
-            CHECK_FALSE(ALLuauSharedStart::rewrite("ll.OwnerSay(\"" + start + "alpha\")\n", start, strings, rewrite, error));
+            CHECK_FALSE(made);
             CHECK(error.find("not every one") != std::string::npos);
         }
         {
+            const bool made = ALLuauSharedStart::rewrite("local greeting = \"" + start + "\"\nll.OwnerSay(greeting .. \"alpha\")\nll.OwnerSay(greeting .. \"bravo\")\n",
+                                                         start, strings, rewrite, error);
             INFO("none written out, a local joined on: " + error);
-            CHECK_FALSE(ALLuauSharedStart::rewrite("local greeting = \"" + start + "\"\nll.OwnerSay(greeting .. \"alpha\")\nll.OwnerSay(greeting .. \"bravo\")\n",
-                                           start, strings, rewrite, error));
+            CHECK_FALSE(made);
             CHECK(error.find("none of these strings") != std::string::npos);
         }
 
