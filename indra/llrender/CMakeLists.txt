@@ -133,6 +133,12 @@ if(AL_BUILD_TESTS)
     "LLFONT_TEST_FONTS_XML=\"${font_test_fonts_xml}\""
   )
 
+  # The state guard's checks on what llrender keeps for the process, for
+  # each of its test binaries.
+  add_library(llrender_test_checks OBJECT tests/llrender_test_checks.cpp)
+  target_link_libraries(llrender_test_checks PRIVATE al::flags al_test_support llrender)
+  set_target_properties(llrender_test_checks PROPERTIES FOLDER "Tests/llrender")
+
   # The suites that need no GL: arithmetic (where a local coordinate lands
   # under the UI transform; the matrix stack, the projection helpers and the
   # clip-plane classes), and the font tables and shaping. alfontshaping holds
@@ -150,6 +156,7 @@ if(AL_BUILD_TESTS)
       tests/llrendermatrix_test.cpp
       tests/lluitransform_test.cpp
     LIBRARIES llrender ll::icu
+    SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${font_defines}
   )
 
@@ -169,6 +176,7 @@ if(AL_BUILD_TESTS)
       tests/llfontregistry_gl_test.cpp
       tests/llimagegl_test.cpp
     LIBRARIES llrender ll::icu
+    SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${font_defines}
     GL
   )
@@ -213,6 +221,7 @@ if(AL_BUILD_TESTS)
       tests/llrendertarget_gl_test.cpp
       tests/lluiimage_test.cpp
     LIBRARIES llrender
+    SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${font_defines}
     GL
   )
