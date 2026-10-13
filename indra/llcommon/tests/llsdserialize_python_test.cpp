@@ -109,8 +109,15 @@ namespace tut
         if (waitpid(py->getProcessID(), &status, 0) == -1)
         {
             int waitpid_errno(errno);
-            UNSCOPED_INFO("couldn't retrieve rc: waitpid() failed");
-            REQUIRE(waitpid_errno == ECHILD);
+            // Something else in the process reaped the child first -- a
+            // SIGCHLD handler, as LLProcess allows for -- and took the exit
+            // code this helper exists to check: the case cannot say, so it
+            // skips rather than passing unchecked.
+            if (waitpid_errno == ECHILD)
+            {
+                SKIP(desc << " script's exit code was taken by another waitpid()");
+            }
+            FAIL("couldn't retrieve rc: waitpid() failed with errno " << waitpid_errno);
         }
         else
         {
@@ -160,7 +167,7 @@ namespace tut
                "print('Running on', sys.platform)\n");
     }
 
-    // helper for test<3> - test<7>
+    // helper for the "to Python" cases
     static void writeLLSDArray(const FormatterFunction& serialize,
                                std::ostream& out, const LLSD& array)
     {
@@ -190,7 +197,7 @@ namespace tut
         }
     }
 
-    // helper for test<3> - test<7>
+    // helper for the "to Python" cases
     static void toPythonUsing(const std::string& desc,
                               const FormatterFunction& serialize)
     {
@@ -314,7 +321,7 @@ namespace tut
     }
 |*==========================================================================*/
 
-    // helper for test<8> - test<12>
+    // helper for the "from Python" cases
     static bool itemFromStream(std::istream& istr, LLSD& item, const ParserFunction& parse)
     {
         // reset the output value for debugging clarity
@@ -334,7 +341,7 @@ namespace tut
         return parse(stream, item, length);
     }
 
-    // helper for test<8> - test<12>
+    // helper for the "from Python" cases
     static void fromPythonUsing(const std::string& pyformatter,
                                 const ParserFunction& parse=
                                 [](std::istream& istr, LLSD& data, llssize max_bytes)

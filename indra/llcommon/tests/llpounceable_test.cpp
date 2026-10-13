@@ -212,10 +212,9 @@ namespace
         CHECK(data2 == "def");
     }
 
-    TEST_CASE("llpounceable: an int tag does not compile (uncomment to check)", "[llpounceable]")
-    {
-        // The following declaration should fail: only LLPounceableQueue and
-        // LLPounceableStatic should work as tags.
-//      LLPounceable<Data*, int> pounceable;
-    }
+    // Only LLPounceableQueue and LLPounceableStatic work as tags: any other
+    // tag, such as int, leaves LLPounceableQueueImpl<T, TAG> undefined, so the
+    // following declaration must fail to compile. That is a compile-time
+    // property with nothing to check at run time; uncomment it to see.
+//  LLPounceable<Data*, int> pounceable;
 } // anonymous namespace

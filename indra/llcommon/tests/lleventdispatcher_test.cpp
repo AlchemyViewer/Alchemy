@@ -384,8 +384,8 @@ namespace tut
             // first several params are required, last couple optional
             partial_offset(3)
         {
-            // This object is reconstructed for every test<n> method. But
-            // clear global variables every time too.
+            // This object is reconstructed for every test case. But clear
+            // global variables every time too.
             ::clear();
 
             const char* abs[] = { "a", "b" };
@@ -817,7 +817,7 @@ namespace tut
             metadata = getMetadata(name_req);
             REQUIRE(metadata["name"].asString() == name_req);
             REQUIRE(metadata["desc"].asString() == descs[name_req]);
-            REQUIRE_THAT(required, ll_test::LLSDEquals(metadata["required"]));
+            REQUIRE_THAT(metadata["required"], ll_test::LLSDEquals(required));
             REQUIRE(metadata["optional"].isUndefined());
         }
     }
@@ -893,8 +893,8 @@ namespace tut
             // remove for comparing the rest.
             LLSD ameta(getMetadata(adft));
             LLSD mmeta(getMetadata(mdft));
-            REQUIRE_THAT(adft, ll_test::LLSDEquals(ameta["name"]));
-            REQUIRE_THAT(mdft, ll_test::LLSDEquals(mmeta["name"]));
+            REQUIRE_THAT(ameta["name"], ll_test::LLSDEquals(adft));
+            REQUIRE_THAT(mmeta["name"], ll_test::LLSDEquals(mdft));
             ameta.erase("name");
             mmeta.erase("name");
             REQUIRE_THAT(ameta, ll_test::LLSDEquals(mmeta));
@@ -1111,9 +1111,9 @@ namespace tut
             // Look up the Vars instance for this function.
             Vars* vars(varsfor(name));
             // Both the global and stack Vars instances are automatically
-            // cleared at the start of each test<n> method. But since we're
+            // cleared at the start of each test case. But since we're
             // calling these things several different times in the same
-            // test<n> method, manually reset the Vars between each.
+            // test case, manually reset the Vars between each.
             *vars = Vars();
             REQUIRE(vars->i == 0);
             // call function with empty array (or LLSD(), should be equivalent)

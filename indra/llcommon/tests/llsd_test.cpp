@@ -1,5 +1,5 @@
 /**
- * @file llsd_new_tut.cpp
+ * @file llsd_test.cpp
  * @date   February 2006
  * @brief LLSD unit tests
  *
@@ -65,11 +65,9 @@ namespace tut
         }
     } // anonymous namespace
 
-    // Free functions rather than members of SDTestData: the tests call
-    // them inside the bodies they hand the checks above, and MSVC does
-    // not find a member of the data struct by its bare name in a lambda.
-    // Static in tut rather than in the anonymous namespace, whose TUT
-    // ensure_equals would hide lltut.h's overloads for LLSD's types.
+    // Free functions rather than members of a fixture: the tests call them
+    // inside the bodies they hand the checks above, and MSVC does not find
+    // a member of the fixture by its bare name in a lambda.
     template<class T>
     static void require_type_and_value(const char* what, const LLSD& actual,
         T expectedValue)
@@ -539,14 +537,13 @@ namespace tut
             UNSCOPED_INFO("convert to int, then bool");
             REQUIRE(((int)v ? true : false) == false);
 
+            bool took_if = false;
             if(v)
             {
-                REQUIRE(true);
+                took_if = true;
             }
-            else
-            {
-                FAIL("bool did not convert to a bool in if statement.");
-            }
+            UNSCOPED_INFO("bool did not convert to a bool in if statement.");
+            REQUIRE(took_if);
 
             if(!v)
             {

@@ -15,6 +15,7 @@
 #include "lazyeventapi.h"
 // STL headers
 // std headers
+#include <memory>
 // external library headers
 // other Linden headers
 #include <catch2/catch_test_macros.hpp>
@@ -95,11 +96,12 @@ namespace
         CHECK(data.asString() == "hey");
     }
 
-    TEST_CASE_METHOD(lazyeventapi_data, "lazyeventapi: without a LazyEventAPI no listener answers its pump", "[lazyeventapi]")
+    TEST_CASE_METHOD(lazyeventapi_data, "lazyeventapi: a destroyed LazyEventAPI no longer creates its listener", "[lazyeventapi]")
     {
-        // Because the MyRegistrar declaration in test<1>() is local, because
-        // it has been destroyed, we fully expect NOT to reach a MyListener
-        // instance with this post.
+        // A registrar destroyed before anyone obtains its pump takes its pump
+        // factory with it, so this post must NOT reach a MyListener instance.
+        auto regster{ std::make_unique<MyRegistrar>() };
+        regster.reset();
         LLEventPumps::instance().obtain("Test").post(llsd::map("op", "set", "data", "moot"));
         CHECK_FALSE(data.isDefined());
     }
