@@ -550,8 +550,9 @@ namespace
         // The converter reads Tailslide's table of LSL's builtins, which the
         // LSL service fills for the whole process.
         ALLSLService lsl;
+        const bool   builtins = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error);
         UNSCOPED_INFO("builtins loaded: " + error);
-        CHECK(lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
+        CHECK(builtins);
         Tally tally;
         for (const std::string& name : files)
         {
