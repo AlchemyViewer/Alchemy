@@ -138,14 +138,7 @@ namespace
         auto snap = Keyed::key_snapshot();
         StringVector keys(snap.begin(), snap.end());
         std::sort(keys.begin(), keys.end());
-        StringVector::const_iterator ki(keys.begin());
-        CHECK(*ki++ == "one");
-        CHECK(*ki++ == "three");
-        CHECK(*ki++ == "two");
-        // Use ensure() here because ensure_equals would want to display
-        // mismatched values, and frankly that wouldn't help much.
-        UNSCOPED_INFO("didn't reach end");
-        CHECK(ki == keys.end());
+        CHECK(keys == StringVector{ "one", "three", "two" });
 
         // Use a somewhat different approach to order independence with
         // instance_snapshot(): explicitly capture the instances we know in a
@@ -193,8 +186,6 @@ namespace
         // delete the one instance
         delete keyed;
         // traversing the snapshot should reflect the deletion
-        // avoid ensure_equals() because it requires the ability to stream the
-        // two values to std::ostream
         CHECK(snapshot.begin() == snapshot.end());
     }
 
@@ -207,22 +198,17 @@ namespace
         // delete the one instance
         delete keyed;
         // traversing the snapshot should reflect the deletion
-        // avoid ensure_equals() because it requires the ability to stream the
-        // two values to std::ostream
         CHECK(snapshot.begin() == snapshot.end());
     }
 
     TEST_CASE("llinstancetracker: delete Unkeyed with outstanding instance_snapshot", "[llinstancetracker]")
     {
-        std::string what;
         Unkeyed* unkeyed = new Unkeyed;
         // capture a snapshot but do not yet traverse it
         auto snapshot = Unkeyed::instance_snapshot();
         // delete the one instance
         delete unkeyed;
         // traversing the snapshot should reflect the deletion
-        // avoid ensure_equals() because it requires the ability to stream the
-        // two values to std::ostream
         CHECK(snapshot.begin() == snapshot.end());
     }
 
@@ -231,29 +217,21 @@ namespace
         typedef std::set<Unkeyed*> InstanceSet;
         InstanceSet existing;
         // We can't use the iterator-range InstanceSet constructor because
-        // beginInstances() returns an iterator that dereferences to an
-        // Unkeyed&, not an Unkeyed*.
+        // instance_snapshot() yields an Unkeyed&, not an Unkeyed*.
         for (auto& ref : Unkeyed::instance_snapshot())
         {
             existing.insert(&ref);
         }
-        try
-        {
-            // We don't expect the assignment to take place because we expect
-            // Unkeyed to respond to the non-empty string param by throwing.
-            // We know the LLInstanceTracker base-class constructor will have
-            // run before Unkeyed's constructor, therefore the new instance
-            // will have added itself to the underlying set. The whole
-            // question is, when Unkeyed's constructor throws, will
-            // LLInstanceTracker's destructor remove it from the set? I
-            // realize we're testing the C++ implementation more than
-            // Unkeyed's implementation, but this seems an important point to
-            // nail down.
-            new Unkeyed("throw");
-        }
-        catch (const Badness&)
-        {
-        }
+        // We expect Unkeyed to respond to the non-empty string param by
+        // throwing. We know the LLInstanceTracker base-class constructor will
+        // have run before Unkeyed's constructor, therefore the new instance
+        // will have added itself to the underlying set. The whole question
+        // is, when Unkeyed's constructor throws, will LLInstanceTracker's
+        // destructor remove it from the set? I realize we're testing the C++
+        // implementation more than Unkeyed's implementation, but this seems
+        // an important point to nail down. Made owned, so that one that did
+        // not throw would not outlive the check.
+        CHECK_THROWS_AS(std::make_unique<Unkeyed>("throw"), Badness);
         // Ensure that every member of the new, updated set of Unkeyed
         // instances was also present in the original set. If that's not true,
         // it's because our new Unkeyed ended up in the updated set despite

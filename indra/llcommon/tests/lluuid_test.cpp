@@ -266,21 +266,29 @@ namespace
         CHECK_FALSE(low > low);
     }
 
-    // operator^= is its own inverse (XOR twice cancels) and commutative.
-    TEST_CASE("LLUUID: XOR by an id twice cancels and XOR with itself is null", "[LLUUID]")
+    // XOR, by ^ or in place by ^=, is its own inverse (XOR twice cancels)
+    // and commutative.
+    TEST_CASE("LLUUID: XOR by an id twice cancels either way round and XOR with itself is null", "[LLUUID]")
     {
-        LLUUID a, b, original;
+        LLUUID a, b;
         fill_sample(a);
-        a.set(kSampleStr);
-        original = a;
+        const LLUUID original = a;
 
         b.set("11223344-5566-7788-99aa-bbccddeeff00");
 
         LLUUID xored = a ^ b;
         CHECK(xored != a);
+        UNSCOPED_INFO("commutative");
+        CHECK((b ^ a) == xored);
 
         LLUUID xored_twice = xored ^ b;
         CHECK(xored_twice == original);
+
+        a ^= b;
+        UNSCOPED_INFO("^= is ^ in place");
+        CHECK(a == xored);
+        a ^= b;
+        CHECK(a == original);
 
         LLUUID xored_self = a ^ a;
         CHECK(xored_self.isNull());
@@ -377,6 +385,7 @@ namespace
         std::set<LLUUID> s;
         s.insert(two);
         s.insert(one);
+        REQUIRE(s.size() == 2);
 
         auto it = s.begin();
         CHECK((int)it->mData[0] == 1);

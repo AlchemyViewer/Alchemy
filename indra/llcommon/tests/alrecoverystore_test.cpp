@@ -422,6 +422,7 @@ namespace
         ALRecoveryStore other(folder, "theirs");
         CHECK(other.write(entry("item:x", "left before")));
         const std::optional<ALRecoveryEntry> took = store.leftFor("item:x");
+        CHECK(took.has_value());
         CHECK(store.write(entry("item:x", "typed since")));
         // A file where the folder of the discarded would be: nothing can be
         // written there.
@@ -628,8 +629,10 @@ namespace
         CHECK_FALSE(LLFile::isfile(bare));
 
         CHECK(store.setAside(entry("item:b", "old")));
+        const std::vector<std::string> again = files("/discarded");
+        REQUIRE(again.size() == size_t(1));
         const std::string garbled = folder + "/discarded/0001.mine.soon.llsd";
-        CHECK(LLFile::rename(folder + "/discarded/" + files("/discarded").front(), garbled) == 0);
+        CHECK(LLFile::rename(folder + "/discarded/" + again.front(), garbled) == 0);
         store.prune(60.0, LLDate(LLDate::now().secondsSinceEpoch() + 30.0));
         UNSCOPED_INFO("a stamp that is no number read past");
         CHECK(LLFile::isfile(garbled));
@@ -732,8 +735,10 @@ namespace
     {
         ALRecoveryStore store(folder, "now");
         ALRecoveryEntry went = entry("task:a:b", "typed, then its window went");
-        store.write(went);
-        const LLDate written = store.list().front().when;
+        CHECK(store.write(went));
+        const std::vector<ALRecoveryEntry> own = store.list();
+        REQUIRE(own.size() == size_t(1));
+        const LLDate written = own.front().when;
         UNSCOPED_INFO("not left by another session");
         REQUIRE_FALSE(store.leftFor("task:a:b"));
 
@@ -763,7 +768,7 @@ namespace
         REQUIRE_FALSE(store.reclaim("task:a:b"));
 
         ALRecoveryStore other(folder, "earlier");
-        other.write(entry("task:c:d", "another session's"));
+        CHECK(other.write(entry("task:c:d", "another session's")));
         {
             INFO("another session's is not this one's to reclaim");
             REQUIRE_FALSE(store.reclaim("task:c:d"));
@@ -862,8 +867,10 @@ namespace
         }
         CHECK(require_whole(store, store.leftFor("item:a"))->text == "left");
         store.markOffered(store.left(), LLDate(offered.secondsSinceEpoch() + 100.0));
+        const std::vector<std::string> remarked = files();
+        REQUIRE(remarked.size() == 1);
         UNSCOPED_INFO("marked once");
-        CHECK(files().front() == names.front());
+        CHECK(remarked.front() == names.front());
         store.prune(60.0, LLDate(offered.secondsSinceEpoch() + 30.0));
         UNSCOPED_INFO("young, it stays");
         REQUIRE(files().size() == 1);
@@ -891,14 +898,15 @@ namespace
             ms_sleep(5);
         }
         std::vector<ALRecoveryEntry> kept = require_whole(store, store.list());
-        REQUIRE(files("/discarded").size() == size_t(3));
+        const std::vector<std::string> discarded = files("/discarded");
+        REQUIRE(discarded.size() == size_t(3));
         {
             INFO("the newest");
             CHECK(std::any_of(kept.begin(), kept.end(), [](const ALRecoveryEntry& one) { return one.text == "discarded 4"; }));
             CHECK(std::none_of(kept.begin(), kept.end(), [](const ALRecoveryEntry& one) { return one.text == "discarded 1"; }));
         }
         std::error_code ec;
-        const uintmax_t one = std::filesystem::file_size(fsyspath(folder + "/discarded/" + files("/discarded").front()), ec);
+        const uintmax_t one = std::filesystem::file_size(fsyspath(folder + "/discarded/" + discarded.front()), ec);
         store.limitDiscarded(100, static_cast<size_t>(one * 2 + one / 2));
         store.prune(60.0);
         UNSCOPED_INFO("two, by what they weigh");

@@ -105,10 +105,6 @@ namespace
         };
     };
 
-    TEST_CASE_METHOD(singleton, "LLSingleton: an empty case that checks nothing", "[LLSingleton]")
-    {
-
-    }
     TEST_CASE_METHOD(singleton, "LLSingleton: getInstance() makes an instance", "[LLSingleton]")
     {
         LLSingletonTest* singleton_test = LLSingletonTest::getInstance();
@@ -131,9 +127,11 @@ namespace
         CHECK(LLSingletonTest::instanceExists());
     }
 
-    // Makes CLS, CLS and OTHER depending on each other as the flags say, and
-    // checks the order they were made in, then deletes every singleton and
-    // checks the order they were cleaned up and destroyed in.
+    // Makes CLS, with CLS and OTHER depending on each other as the flags say,
+    // and checks the order they were made in, then deletes every singleton
+    // and checks the order they were cleaned up and destroyed in. CHECKs, so
+    // that a wrong order still deletes them all and leaves the next case its
+    // own to make.
     template <class CLS, class OTHER>
     static void require_order(typename CLS::dep_flag cls_dep, typename OTHER::dep_flag other_dep,
                               const std::string& made, const std::string& deleted)
@@ -143,9 +141,9 @@ namespace
         sLog.clear();
 
         (void)CLS::instance();
-        REQUIRE(sLog == made);
+        CHECK(sLog == made);
         LLSingletonBase::deleteAll();
-        REQUIRE(sLog == made + deleted);
+        CHECK(sLog == made + deleted);
     }
 
     TEST_CASE_METHOD(singleton, "LLSingleton: A alone is made and deleted in order", "[LLSingleton]")
@@ -295,23 +293,24 @@ namespace
     {
         LLSINGLETON_EMPTY_CTOR(CircularPInit);
     public:
-        virtual void initSingleton() override
+        // Whether getInstance() from initSingleton() gave the instance being
+        // initialized. Refused, it would have erred, which WrapLLErrs throws.
+        static inline bool sFoundItself = false;
+
+        void initSingleton() override
         {
             // never mind indirection, just go straight for the circularity
-            CircularPInit *pt = getInstance();
-            if (!pt)
-            {
-                throw;
-            }
+            sFoundItself = getInstance() == this;
         }
     };
 
-    TEST_CASE_METHOD(singleton, "LLSingleton: a circular LLParamSingleton initSingleton() is allowed", "[LLSingleton]")
+    TEST_CASE_METHOD(singleton, "LLSingleton: a circular LLParamSingleton initSingleton() finds the instance", "[LLSingleton]")
     {
         WrapLLErrs catcherr;
         std::string threw = catcherr.catch_llerrs([](){
                 CircularPInit::initParamSingleton();
             });
         CHECK(threw.empty());
+        CHECK(CircularPInit::sFoundItself);
     }
 }

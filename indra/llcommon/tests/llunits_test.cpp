@@ -1,7 +1,7 @@
 /**
- * @file llsingleton_test.cpp
+ * @file llunits_test.cpp
  * @date 2011-08-11
- * @brief Unit test for the LLSingleton class
+ * @brief Unit tests for LLUnit
  *
  * $LicenseInfo:firstyear=2011&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -88,7 +88,8 @@ namespace
         int_quatloos = float_quatloos;
         CHECK(int_quatloos == S32Quatloos(42));
 
-        LLUnit<U32, Quatloos> unsigned_int_quatloos(float_quatloos);
+        // unsigned from signed
+        LLUnit<U32, Quatloos> unsigned_int_quatloos(int_quatloos);
         CHECK(unsigned_int_quatloos == S32Quatloos(42));
 
         S32Solari int_solari(1);
@@ -196,17 +197,17 @@ namespace
 
     }
 
-    static bool accept_explicit_quatloos(S32Quatloos q)
+    static S32 accept_explicit_quatloos(S32Quatloos q)
     {
-        return true;
+        return q.value();
     }
 
     // signature compatibility
     TEST_CASE("LLUnit: unit values pass as function arguments", "[LLUnit]")
     {
         S32Quatloos quatloos(1);
-        CHECK(accept_explicit_quatloos(S32Quatloos(1)));
-        CHECK(accept_explicit_quatloos(quatloos));
+        CHECK(accept_explicit_quatloos(S32Quatloos(1)) == 1);
+        CHECK(accept_explicit_quatloos(quatloos) == 1);
     }
 
     // implicit units
@@ -253,7 +254,9 @@ namespace
         F32 float_val = quatloos_implicit;
         CHECK(float_val == 16);
 
-        S32 int_val = (S32)quatloos_implicit;
+        // and from an integer one to its integer, with no cast
+        const S32QuatloosImplicit int_quatloos_implicit(quatloos_implicit);
+        S32 int_val = int_quatloos_implicit;
         CHECK(int_val == 16);
 
         // conversion of implicits

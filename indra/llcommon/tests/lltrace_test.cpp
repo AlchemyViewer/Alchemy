@@ -1,7 +1,7 @@
 /**
- * @file llsingleton_test.cpp
+ * @file lltrace_test.cpp
  * @date 2011-08-11
- * @brief Unit test for the LLSingleton class
+ * @brief Unit tests for LLTrace's recordings
  *
  * $LicenseInfo:firstyear=2011&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -40,7 +40,8 @@ namespace LLUnits
 {
     namespace
     {
-        // using powers of 2 to allow strict floating point equality
+        // cups of whole ounces, and whole milligrams of caffeine an ounce, so
+        // every value recorded is a whole number and compares exactly
         LL_DECLARE_BASE_UNIT(Ounces, "oz");
         LL_DECLARE_DERIVED_UNIT(TallCup, "", Ounces, / 12);
         LL_DECLARE_DERIVED_UNIT(GrandeCup, "", Ounces, / 16);
@@ -124,18 +125,19 @@ namespace
 
         all_day.start();
         {
-            // warm up with one grande cup
+            // warm up with one tall cup
             drink_coffee(1, S32TallCup(1));
 
             // go to work
             at_work.start();
             {
-                // drink 3 tall cups, 1 after 3 pm
+                // drink 3 grande cups, 1 after 3 pm
                 drink_coffee(2, S32GrandeCup(1));
                 after_3pm.start();
                 drink_coffee(1, S32GrandeCup(1));
             }
             at_work.stop();
+            // and one venti after work
             drink_coffee(1, S32VentiCup(1));
         }
         // don't need to stop recordings to get accurate values out of them

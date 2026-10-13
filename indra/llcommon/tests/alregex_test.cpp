@@ -264,9 +264,19 @@ namespace
         CHECK_FALSE(ALRegex(".*x").firstByteRange(lo, hi));
         UNSCOPED_INFO("nor is a pattern that did not compile");
         CHECK_FALSE(ALRegex("(?=x)").firstByteRange(lo, hi));
-        // After a word, \b is before what is not one.
+        // After a word, \b is before what is not one: here any byte but a
+        // word's, 0 and 0xFF among them. With the start's, a word's byte that
+        // is no small letter, that is every byte, so no range.
         UNSCOPED_INFO("a boundary before a non-letter");
-        CHECK((ALRegex("\\b[^a-z]x").firstByteRange(lo, hi) == false || (lo <= '!' && hi >= '_')));
+        CHECK_FALSE(ALRegex("\\b[^a-z]x").firstByteRange(lo, hi));
+        // One that can begin only after a word: \b at the start wants a
+        // word's byte, and no punctuation is one. The range is what may
+        // follow a word, rounded up one past '/' as RE2 rounds.
+        UNSCOPED_INFO("a boundary before punctuation");
+        CHECK(ALRegex("\\b[!-/]x").firstByteRange(lo, hi));
+        CHECK(lo == '!');
+        CHECK(hi >= '/');
+        CHECK(hi <= '0');
         CHECK(ALRegex("@[A-Za-z_][A-Za-z0-9_]*").firstByteRange(lo, hi));
         CHECK(lo == '@');
         CHECK(hi <= 'A');
