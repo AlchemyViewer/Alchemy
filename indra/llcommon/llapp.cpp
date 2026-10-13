@@ -127,6 +127,12 @@ LLApp::~LLApp()
     setStopped();
 
     SUBSYSTEM_CLEANUP_DBG(LLCommon);
+
+    // Gone, so instance() no longer finds it.
+    if (sApplication == this)
+    {
+        sApplication = NULL;
+    }
 }
 
 // static

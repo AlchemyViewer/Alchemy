@@ -33,7 +33,7 @@
 #include "../lluuid.h"
 #include "../workqueue.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -42,7 +42,7 @@
 #include <thread>
 #include <vector>
 
-namespace tut
+namespace
 {
     namespace fs = std::filesystem;
 
@@ -138,116 +138,112 @@ namespace tut
         }
     };
 
-    typedef test_group<alwatchedfile_data> alwatchedfile_group;
-    typedef alwatchedfile_group::object    alwatchedfile_object;
-    alwatchedfile_group                    alwatchedfile_instance("alwatchedfile");
-
-    template<> template<>
-    void alwatchedfile_object::test<1>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: a write is heard once when it holds still; what was there is not", "[alwatchedfile]")
     {
-        set_test_name("what is there when the watch begins is seen, and a write is heard once, after it holds still");
         put("print(1)\n", 100);
         ALWatchedFile watched(file, hear());
-        ensure("nothing yet", !looked(watched));
-        ensure("nobody told", heard.empty());
+        UNSCOPED_INFO("nothing yet");
+        CHECK_FALSE(looked(watched));
+        REQUIRE(heard.empty());
 
         put("print(2)\n", 200);
-        ensure("the first look finds it moving", !watched.check());
-        ensure("the next finds it still", watched.check());
-        ensure_equals("told once", heard.size(), size_t(1));
-        ensure_equals("of the file", heard[0], file);
-        ensure_equals("which held what was written", held[0], std::string("print(2)\n"));
-        ensure("and not again", !looked(watched));
+        UNSCOPED_INFO("the first look finds it moving");
+        CHECK_FALSE(watched.check());
+        UNSCOPED_INFO("the next finds it still");
+        CHECK(watched.check());
+        UNSCOPED_INFO("told once");
+        REQUIRE(heard.size() == size_t(1));
+        CHECK(heard[0] == file);
+        CHECK(held[0] == std::string("print(2)\n"));
+        UNSCOPED_INFO("and not again");
+        CHECK_FALSE(looked(watched));
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<2>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: two writes in one second are two changes of either size", "[alwatchedfile]")
     {
-        set_test_name("two writes in one second are two changes, of one size or another");
         put("a = 1\n", 100);
         ALWatchedFile watched(file, hear());
         put("a = 2\n", 300);
-        ensure("the first", looked(watched));
+        CHECK(looked(watched));
         // The same size, the same second: the time alone tells them apart.
         put("a = 3\n", 500);
-        ensure("the second", looked(watched));
+        CHECK(looked(watched));
         // The same time, a size of its own.
         put("a = 40\n", 500);
-        ensure("the third", looked(watched));
-        ensure_equals("each heard", heard.size(), size_t(3));
-        ensure_equals("the last as it was written", held[2], std::string("a = 40\n"));
+        CHECK(looked(watched));
+        REQUIRE(heard.size() == size_t(3));
+        CHECK(held[2] == std::string("a = 40\n"));
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<3>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: the owner's own write is not heard but the next one from outside is", "[alwatchedfile]")
     {
-        set_test_name("a write of the owner's own is seen, and the next write from outside is heard all the same");
         put("one\n", 100);
         ALWatchedFile watched(file, hear());
         put("two\n", 200);
-        ensure("from outside", looked(watched));
+        UNSCOPED_INFO("from outside");
+        CHECK(looked(watched));
 
         // The owner's own, in the same second: a flag waiting on the next
         // change would never be taken by a write a time by the second
         // missed, and would take the editor's save after it.
         put("three\n", 300);
         watched.seen();
-        ensure("the owner's own is no change", !looked(watched));
+        UNSCOPED_INFO("the owner's own is no change");
+        CHECK_FALSE(looked(watched));
         put("four\n", 400);
-        ensure("the editor's save after it is heard", looked(watched));
-        ensure_equals("two heard", heard.size(), size_t(2));
-        ensure_equals("the editor's", held[1], std::string("four\n"));
+        UNSCOPED_INFO("the editor's save after it is heard");
+        CHECK(looked(watched));
+        REQUIRE(heard.size() == size_t(2));
+        CHECK(held[1] == std::string("four\n"));
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<4>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: a file caught half written is not read until it holds still", "[alwatchedfile]")
     {
-        set_test_name("a file caught half written is not read until it holds still");
         put("local x = 1\n", 100);
         ALWatchedFile watched(file, hear());
         // An editor saving in two steps: emptied, then filled.
         put("", 200);
-        ensure("emptied: not still yet", !watched.check());
+        UNSCOPED_INFO("emptied: not still yet");
+        CHECK_FALSE(watched.check());
         put("local x = 2\n", 300);
-        ensure("filled: moved again", !watched.check());
-        ensure("still", watched.check());
-        ensure_equals("heard once", heard.size(), size_t(1));
-        ensure_equals("filled", held[0], std::string("local x = 2\n"));
+        UNSCOPED_INFO("filled: moved again");
+        CHECK_FALSE(watched.check());
+        CHECK(watched.check());
+        REQUIRE(heard.size() == size_t(1));
+        CHECK(held[0] == std::string("local x = 2\n"));
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<5>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: a file gone or come back or put back older is each a change", "[alwatchedfile]")
     {
-        set_test_name("a file gone is a change, one come back is another, and one put back older is a third");
         put("kept\n", 500);
         ALWatchedFile watched(file, hear());
         std::error_code ec;
         fs::remove(fsyspath(file), ec);
-        ensure("gone", looked(watched));
+        UNSCOPED_INFO("gone");
+        CHECK(looked(watched));
         put("back\n", 600);
-        ensure("back", looked(watched));
+        UNSCOPED_INFO("back");
+        CHECK(looked(watched));
         // Older than it was: a backup put back, which a later time only
         // would not see.
         fs::last_write_time(fsyspath(file), second, ec);
-        ensure("older", looked(watched));
-        ensure_equals("three heard", heard.size(), size_t(3));
+        UNSCOPED_INFO("older");
+        CHECK(looked(watched));
+        REQUIRE(heard.size() == size_t(3));
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<6>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: a file that is not there yet is heard when it comes", "[alwatchedfile]")
     {
-        set_test_name("a file that is not there yet is heard when it comes");
         ALWatchedFile watched(file, hear());
-        ensure("nothing there, nothing heard", !looked(watched));
+        UNSCOPED_INFO("nothing there, nothing heard");
+        CHECK_FALSE(looked(watched));
         put("made\n", 100);
-        ensure("made", looked(watched));
-        ensure_equals("its text", held.at(0), std::string("made\n"));
+        CHECK(looked(watched));
+        CHECK(held.at(0) == std::string("made\n"));
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<7>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: the owner may let go of the watch as it is told", "[alwatchedfile]")
     {
-        set_test_name("the owner may let go of the watch as it is told");
         put("before\n", 100);
         std::unique_ptr<ALWatchedFile> watched;
         std::string                    told;
@@ -258,16 +254,17 @@ namespace tut
         });
         put("after\n", 200);
         ALWatchedFile& watch = *watched;
-        ensure("moving", !watch.check());
-        ensure("heard, and let go", watch.check());
-        ensure("gone", !watched);
-        ensure_equals("told of the file all the same", told, file);
+        UNSCOPED_INFO("moving");
+        REQUIRE_FALSE(watch.check());
+        UNSCOPED_INFO("heard, and let go");
+        CHECK(watch.check());
+        REQUIRE_FALSE(watched);
+        UNSCOPED_INFO("told of the file all the same");
+        CHECK(told == file);
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<8>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: a polled file is looked at off thread and told on the main loop", "[alwatchedfile]")
     {
-        set_test_name("a polled file is looked at on the watcher's thread, and its owner told on the main loop");
         put("print(1)\n", 100);
         const std::thread::id here = std::this_thread::get_id();
         std::thread::id       told_on;
@@ -278,19 +275,19 @@ namespace tut
         });
         watched.poll(0.05f);
         put("print(2)\n", 200);
-        ensure("heard", pumped([&]() { return !heard.empty(); }));
-        ensure_equals("what was written", held.at(0), std::string("print(2)\n"));
-        ensure("told on the main loop's thread", told_on == here);
+        REQUIRE(pumped([&]() { return !heard.empty(); }));
+        CHECK(held.at(0) == std::string("print(2)\n"));
+        UNSCOPED_INFO("told on the main loop's thread");
+        CHECK(told_on == here);
         // Still: not told again, however many looks go by.
         LLTimer timer;
         pumped([&]() { return timer.getElapsedTimeF32() > 0.5f; });
-        ensure_equals("told once", heard.size(), size_t(1));
+        UNSCOPED_INFO("told once");
+        REQUIRE(heard.size() == size_t(1));
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<9>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: a watch let go of is not told; the last may be let go of as it is told", "[alwatchedfile]")
     {
-        set_test_name("a file let go of is not told, and the others are; the owner may let go of the last as it is told");
         const std::string other = fsyspath(fsyspath(folder) / fsyspath("sl_script_other.lsl")).string();
         put("one\n", 100);
         {
@@ -311,60 +308,64 @@ namespace tut
             llofstream out(other, std::ios::binary | std::ios::trunc);
             out << "default { state_entry() {} }\n";
         }
-        ensure("heard", pumped([&]() { return !heard.empty(); }));
-        ensure("and let go", !kept);
+        REQUIRE(pumped([&]() { return !heard.empty(); }));
+        REQUIRE_FALSE(kept);
         LLTimer timer;
         pumped([&]() { return timer.getElapsedTimeF32() > 0.4f; });
-        ensure_equals("the one kept, only", heard.size(), size_t(1));
-        ensure_equals("which is the file", heard[0], file);
+        UNSCOPED_INFO("the one kept, only");
+        REQUIRE(heard.size() == size_t(1));
+        CHECK(heard[0] == file);
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<10>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: ALFileStamp holds a file's size and time and nothing for a folder", "[alwatchedfile]")
     {
-        set_test_name("a stamp: a file's size and time, and nothing for a folder or nothing at all");
         put("12345", 250);
         const ALFileStamp stamp = ALFileStamp::of(file);
-        ensure("there", stamp.exists);
-        ensure_equals("its size", stamp.size, std::uintmax_t(5));
+        CHECK(stamp.exists);
+        REQUIRE(stamp.size == std::uintmax_t(5));
         put("12345", 251);
-        ensure("a millisecond later is another time", !(ALFileStamp::of(file) == stamp));
-        ensure("a folder is no file", !ALFileStamp::of(folder).exists);
-        ensure("nothing is nothing", !ALFileStamp::of(file + ".gone").exists);
+        UNSCOPED_INFO("a millisecond later is another time");
+        CHECK_FALSE(ALFileStamp::of(file) == stamp);
+        UNSCOPED_INFO("a folder is no file");
+        CHECK_FALSE(ALFileStamp::of(folder).exists);
+        CHECK_FALSE(ALFileStamp::of(file + ".gone").exists);
     }
 
-    template<> template<>
-    void alwatchedfile_object::test<11>()
+    TEST_CASE_METHOD(alwatchedfile_data, "alwatchedfile: a watch made from an earlier stamp starts from what it found", "[alwatchedfile]")
     {
-        set_test_name("a watch made from a look made before takes what that look found, and asks the disk nothing itself");
         put("print(1)\n", 100);
         const ALFileStamp before = ALFileStamp::of(file);
         // Written after the look and before the watch is made: heard, since
         // the watch is from the look, not from the file as it is now.
         put("print(2)\n", 200);
         ALWatchedFile watched(file, before, hear());
-        ensure("as the look found it", watched.stamp() == before);
-        ensure("what came after it heard", looked(watched));
-        ensure_equals("once", heard.size(), size_t(1));
-        ensure_equals("as it is now", held.at(0), std::string("print(2)\n"));
+        UNSCOPED_INFO("as the look found it");
+        CHECK(watched.stamp() == before);
+        UNSCOPED_INFO("what came after it heard");
+        CHECK(looked(watched));
+        REQUIRE(heard.size() == size_t(1));
+        CHECK(held.at(0) == std::string("print(2)\n"));
 
         // From a look that found the file as it is: nothing to hear.
         ALWatchedFile current(file, ALFileStamp::of(file), hear());
-        ensure("nothing", !looked(current));
+        CHECK_FALSE(looked(current));
 
         // From a look that found nothing there -- the stamp of no file,
         // which a look of its own here would not have found: the file there
         // now is heard, which shows the watch took the look it was given.
         ALWatchedFile none(file, ALFileStamp(), hear());
-        ensure("nothing there at the look", !none.there());
-        ensure("the file there now heard", looked(none));
-        ensure_equals("twice in all", heard.size(), size_t(2));
+        UNSCOPED_INFO("nothing there at the look");
+        CHECK_FALSE(none.there());
+        UNSCOPED_INFO("the file there now heard");
+        CHECK(looked(none));
+        REQUIRE(heard.size() == size_t(2));
 
         // And seen() takes the file as it is, whatever look it began from.
         put("print(3)\n", 300);
         ALWatchedFile owned(file, before, hear());
         owned.seen();
-        ensure("the owner's own is no change", !looked(owned));
-        ensure_equals("still twice", heard.size(), size_t(2));
+        UNSCOPED_INFO("the owner's own is no change");
+        CHECK_FALSE(looked(owned));
+        REQUIRE(heard.size() == size_t(2));
     }
 }

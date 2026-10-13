@@ -36,6 +36,7 @@ target_sources(
   al_test_support
   PRIVATE
     altestfatal.cpp
+    altesthelper.cpp
     altestlogreplay.cpp
     altestmain.cpp
     altestmatchers.cpp
@@ -51,6 +52,7 @@ target_sources(
       FILES
         altestfailure.h
         altestfatal.h
+        altesthelper.h
         altestlogreplay.h
         altestmatchers.h
         altestname.h
@@ -169,6 +171,21 @@ al_expect_from_test_support(
   OUTPUT "left the environment changed.*AL_TEST_SUPPORT_SKIP_LEAK=1"
 )
 al_expect_from_test_support(nothing_matched_fails ARGS "no such test case" EXIT 2)
+# A test can launch its own binary as a helper process: the main sets the
+# process up and runs that helper alone, and no test case.
+al_expect_from_test_support(
+  helper_runs_alone
+  ARGS "--al-helper=altestsupport_exit"
+  EXIT 37
+  OUTPUT "the helper ran, with APR up"
+  REJECT "test cases"
+)
+al_expect_from_test_support(
+  helper_unknown
+  ARGS "--al-helper=nonesuch"
+  EXIT 2
+  OUTPUT "No test helper is named nonesuch"
+)
 al_expect_from_test_support(
   isa_gate_skips
   ARGS "--isa-level|9"

@@ -33,7 +33,7 @@
 #pragma warning (disable : 4355) // 'this' used in initializer list: yes, intentionally
 #endif
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include "llerrorcontrol.h"
 #include "llexception.h"
 #include "stringize.h"
@@ -153,9 +153,7 @@ public:
         if (! required)
             return std::string();
 
-        throw tut::failure(STRINGIZE("failed to find '" << search
-                                     << "' in captured log messages:\n"
-                                     << *this));
+        FAIL("failed to find '" << search << "' in captured log messages:\n" << *this);
     }
 
     std::ostream& streamto(std::ostream& out) const

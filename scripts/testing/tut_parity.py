@@ -70,7 +70,10 @@ Parity holds for a file when:
     have stopped early, so neither is held to it; nor is one the build
     leaves out, which the file's compile command in the build's
     compile_commands.json, run as clang++ -E, says. Where there is no such
-    command, one under an #if that never ran is listed.
+    command, one under an #if that never ran is listed. So is one --unrun
+    names, reviewed as never running in a passing case on this host: in a
+    loop that should not turn, or a branch of an if constexpr the build
+    discards;
 
 A test the mapping says TUT never ran (past its group's limit) or this host
 does not compile is listed, not counted against parity, as is an assertion
@@ -276,6 +279,31 @@ def record(args):
 # --------------------------------------------------------------------------
 # check
 # --------------------------------------------------------------------------
+class LegalXml:
+    """A Catch2 XML report as a file to parse. Catch2 writes a value it
+    prints as XML, \\xNN for a control character or a byte that is not
+    UTF-8, but lets through vertical tab, form feed and a UTF-8 surrogate,
+    which XML forbids too: a check on bytes that hold one, as commonmisc's
+    binary LLSD does, would leave its report unreadable. Those are read as
+    Catch2 writes the rest."""
+
+    FORBIDDEN = re.compile(rb"[\x0b\x0c]|\xed[\xa0-\xbf][\x80-\xbf]")
+
+    def __init__(self, raw):
+        self.raw = raw
+
+    def read(self, size=-1):
+        data = self.raw.read(size)
+        # A surrogate's three bytes may straddle two reads; 0xED leads one
+        # and is never a later byte of any.
+        while b"\xed" in data[-2:]:
+            more = self.raw.read(2)
+            if not more:
+                break
+            data += more
+        return self.FORBIDDEN.sub(lambda m: "".join(f"\\x{b:02X}" for b in m.group()).encode(), data)
+
+
 def catch2_results(test, timeout):
     """The cases a Catch2 entry ran, as XML with its passing assertions too
     (-s), in the order it ran them: each {name, tags, line, result: ok | skip
@@ -289,28 +317,29 @@ def catch2_results(test, timeout):
         cases = []
         case = None
         try:
-            for event, element in ElementTree.iterparse(report, events=("start", "end")):
-                if event == "start":
-                    if element.tag == "TestCase":
-                        case = {"name": element.get("name"), "tags": element.get("tags", ""),
-                                "line": int(element.get("line", "0")), "result": "fail", "ran": set()}
-                    continue
-                if case is None:
-                    continue
-                if element.tag in RAN_ELEMENTS:
-                    case["ran"].add((element.get("filename", ""), int(element.get("line", "0"))))
-                    element.clear()
-                elif element.tag == "OverallResult":
-                    if element.get("success") != "true":
-                        case["result"] = "fail"
-                    elif int(element.get("skips", "0")) > 0:
-                        case["result"] = "skip"
-                    else:
-                        case["result"] = "ok"
-                elif element.tag == "TestCase":
-                    cases.append(case)
-                    case = None
-                    element.clear()
+            with open(report, "rb") as raw:
+                for event, element in ElementTree.iterparse(LegalXml(raw), events=("start", "end")):
+                    if event == "start":
+                        if element.tag == "TestCase":
+                            case = {"name": element.get("name"), "tags": element.get("tags", ""),
+                                    "line": int(element.get("line", "0")), "result": "fail", "ran": set()}
+                        continue
+                    if case is None:
+                        continue
+                    if element.tag in RAN_ELEMENTS:
+                        case["ran"].add((element.get("filename", ""), int(element.get("line", "0"))))
+                        element.clear()
+                    elif element.tag == "OverallResult":
+                        if element.get("success") != "true":
+                            case["result"] = "fail"
+                        elif int(element.get("skips", "0")) > 0:
+                            case["result"] = "skip"
+                        else:
+                            case["result"] = "ok"
+                    elif element.tag == "TestCase":
+                        cases.append(case)
+                        case = None
+                        element.clear()
         except (ElementTree.ParseError, FileNotFoundError):
             return code, None, text
         return code, cases, text
@@ -623,7 +652,11 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
                 continue
             here = compiled(first, last, bool(blocks - body["held"]))
             if here:
-                problems.append(f"{label}: {case['name']!r} passed without running the {macro} on line {first}")
+                why = args.expect_unrun.get(path, {}).get(str(first))
+                if why:
+                    notes.append(f"{case['name']!r}: the {macro} on line {first} never ran, as reviewed: {why}")
+                else:
+                    problems.append(f"{label}: {case['name']!r} passed without running the {macro} on line {first}")
             elif here is None:
                 notes.append(f"{case['name']!r}: the {macro} on line {first} never ran, and is under an #if no "
                              f"compile command here says this build compiles")
@@ -716,6 +749,10 @@ def check_run(args, label, path, entry_name, test, recorded, entries, file_cases
 
 def check(args):
     mapping, file_records = read_mapping(args.mapping)
+    args.expect_unrun = {}
+    if args.unrun:
+        with open(args.unrun) as f:
+            args.expect_unrun = json.load(f)
     with open(args.tut) as f:
         tut = json.load(f)
     # By stem and tier, the tier read from each record's CTest name: results
@@ -837,6 +874,8 @@ def main():
     chk.add_argument("--recounted", action="store_true",
                      help="the files were edited by hand since conversion: list each case's assertion count "
                           "rather than hold it to the mapping's (names and results still must match)")
+    chk.add_argument("--unrun", help="JSON of assertion sites reviewed as never running in a passing case on "
+                     "this host, {file: {line: why}}: each is listed rather than a mismatch")
     chk.add_argument("files", nargs="*", help="only these converted files (default: all the mapping has)")
     args = parser.parse_args()
     return record(args) if args.step == "record" else check(args)

@@ -30,602 +30,577 @@
 
 #include "../llstring.h"
 #include "../llsd.h"
-#include "StringVec.h"                  // must come BEFORE lltut.h
-#include "../test/lltut.h"
+#include "StringVec.h"
+#include <catch2/catch_test_macros.hpp>
+#include <string_view>
 
-namespace tut
+namespace
 {
-    struct string_index
-    {
-    };
-    typedef test_group<string_index> string_index_t;
-    typedef string_index_t::object string_index_object_t;
-    tut::string_index_t tut_string_index("LLString");
-
-    template<> template<>
-    void string_index_object_t::test<1>()
-    {
-        std::string llstr1;
-        ensure("Empty std::string", (llstr1.size() == 0) && llstr1.empty());
-
-        std::string llstr2("Hello");
-        ensure("std::string = Hello", (!strcmp(llstr2.c_str(), "Hello")) && (llstr2.size() == 5) && !llstr2.empty());
-
-        std::string llstr3(llstr2);
-        ensure("std::string = std::string(std::string)", (!strcmp(llstr3.c_str(), "Hello")) && (llstr3.size() == 5) && !llstr3.empty());
-
-        std::string str("Hello World");
-        std::string llstr4(str, 6);
-        ensure("std::string = std::string(s, size_type pos, size_type n = npos)", (!strcmp(llstr4.c_str(), "World")) && (llstr4.size() == 5) && !llstr4.empty());
-
-        std::string llstr5(str, str.size());
-        ensure("std::string = std::string(s, size_type pos, size_type n = npos)", (llstr5.size() == 0) && llstr5.empty());
-
-        std::string llstr6(5, 'A');
-        ensure("std::string = std::string(count, c)", (!strcmp(llstr6.c_str(), "AAAAA")) && (llstr6.size() == 5) && !llstr6.empty());
-
-        std::string llstr7("Hello World", 5);
-        ensure("std::string(s, n)", (!strcmp(llstr7.c_str(), "Hello")) && (llstr7.size() == 5) && !llstr7.empty());
-
-        std::string llstr8("Hello World", 6, 5);
-        ensure("std::string(s, n, count)", (!strcmp(llstr8.c_str(), "World")) && (llstr8.size() == 5) && !llstr8.empty());
-
-        std::string llstr9("Hello World", sizeof("Hello World")-1, 5); // go past end
-        ensure("std::string(s, n, count) goes past end", (llstr9.size() == 0) && llstr9.empty());
-    }
-
-    template<> template<>
-    void string_index_object_t::test<3>()
+    TEST_CASE("LLString: isValidIndex accepts indexes up to and including the length", "[LLString]")
     {
         std::string str("Len=5");
-        ensure("isValidIndex failed", LLStringUtil::isValidIndex(str, 0) == true &&
-                                      LLStringUtil::isValidIndex(str, 5) == true &&
-                                      LLStringUtil::isValidIndex(str, 6) == false);
+        CHECK(LLStringUtil::isValidIndex(str, 0));
+        CHECK(LLStringUtil::isValidIndex(str, 5));
+        CHECK_FALSE(LLStringUtil::isValidIndex(str, 6));
 
         std::string str1;
-        ensure("isValidIndex failed fo rempty string", LLStringUtil::isValidIndex(str1, 0) == false);
+        UNSCOPED_INFO("an empty string");
+        CHECK_FALSE(LLStringUtil::isValidIndex(str1, 0));
     }
 
-    template<> template<>
-    void string_index_object_t::test<4>()
+    TEST_CASE("LLString: trimHead removes leading spaces and line ends", "[LLString]")
     {
         std::string str_val("               Testing the extra whitespaces   ");
         LLStringUtil::trimHead(str_val);
-        ensure_equals("1: trimHead failed", str_val, "Testing the extra whitespaces   ");
+        CHECK(str_val == "Testing the extra whitespaces   ");
 
         std::string str_val1("\n\t\r\n  Testing the extra whitespaces   ");
         LLStringUtil::trimHead(str_val1);
-        ensure_equals("2: trimHead failed", str_val1, "Testing the extra whitespaces   ");
+        CHECK(str_val1 == "Testing the extra whitespaces   ");
     }
 
-    template<> template<>
-    void string_index_object_t::test<5>()
+    TEST_CASE("LLString: trimTail removes trailing spaces and line ends", "[LLString]")
     {
         std::string str_val("  Testing the   extra     whitespaces         ");
         LLStringUtil::trimTail(str_val);
-        ensure_equals("1: trimTail failed", str_val, "  Testing the   extra     whitespaces");
+        CHECK(str_val == "  Testing the   extra     whitespaces");
 
         std::string str_val1("\n  Testing the extra whitespaces  \n\t\r\n   ");
         LLStringUtil::trimTail(str_val1);
-        ensure_equals("2: trimTail failed", str_val1, "\n  Testing the extra whitespaces");
+        CHECK(str_val1 == "\n  Testing the extra whitespaces");
     }
 
 
-    template<> template<>
-    void string_index_object_t::test<6>()
+    TEST_CASE("LLString: trim removes whitespace at both ends only", "[LLString]")
     {
         std::string str_val("  \t \r Testing the   extra     \r\n whitespaces     \n \t    ");
         LLStringUtil::trim(str_val);
-        ensure_equals("1: trim failed", str_val, "Testing the   extra     \r\n whitespaces");
+        CHECK(str_val == "Testing the   extra     \r\n whitespaces");
     }
 
-    template<> template<>
-    void string_index_object_t::test<7>()
+    TEST_CASE("LLString: truncate shortens to a length and to nothing", "[LLString]")
     {
         std::string str("Second LindenLabs");
         LLStringUtil::truncate(str, 6);
-        ensure_equals("1: truncate", str, "Second");
+        CHECK(str == "Second");
 
-        // further truncate more than the length
+        // and to nothing at all
         LLStringUtil::truncate(str, 0);
-        ensure_equals("2: truncate", str, "");
+        CHECK(str == "");
     }
 
-    template<> template<>
-    void string_index_object_t::test<8>()
+    TEST_CASE("LLString: toUpper uppercases ASCII", "[LLString]")
     {
         std::string str_val("SecondLife Source");
         LLStringUtil::toUpper(str_val);
-        ensure_equals("toUpper failed", str_val, "SECONDLIFE SOURCE");
+        CHECK(str_val == "SECONDLIFE SOURCE");
     }
 
-    template<> template<>
-    void string_index_object_t::test<9>()
+    TEST_CASE("LLString: toLower lowercases ASCII", "[LLString]")
     {
         std::string str_val("SecondLife Source");
         LLStringUtil::toLower(str_val);
-        ensure_equals("toLower failed", str_val, "secondlife source");
+        CHECK(str_val == "secondlife source");
     }
 
-    template<> template<>
-    void string_index_object_t::test<10>()
+    TEST_CASE("LLString: isHead matches a prefix and never an empty string", "[LLString]")
     {
         std::string str_val("Second");
-        ensure("1. isHead failed", LLStringUtil::isHead(str_val, "SecondLife Source") == true);
-        ensure("2. isHead failed", LLStringUtil::isHead(str_val, " SecondLife Source") == false);
+        CHECK(LLStringUtil::isHead(str_val, "SecondLife Source"));
+        CHECK_FALSE(LLStringUtil::isHead(str_val, " SecondLife Source"));
         std::string str_val2("");
-        ensure("3. isHead failed", LLStringUtil::isHead(str_val2, "") == false);
+        CHECK_FALSE(LLStringUtil::isHead(str_val2, ""));
     }
 
-    template<> template<>
-    void string_index_object_t::test<11>()
+    TEST_CASE("LLString: addCRLF and removeCRLF convert line ends both ways", "[LLString]")
     {
         std::string str_val("Hello.\n\n Lindenlabs. \n This is \na simple test.\n");
         std::string orig_str_val(str_val);
         LLStringUtil::addCRLF(str_val);
-        ensure_equals("addCRLF failed", str_val, "Hello.\r\n\r\n Lindenlabs. \r\n This is \r\na simple test.\r\n");
+        CHECK(str_val == "Hello.\r\n\r\n Lindenlabs. \r\n This is \r\na simple test.\r\n");
         LLStringUtil::removeCRLF(str_val);
-        ensure_equals("removeCRLF failed", str_val, orig_str_val);
+        CHECK(str_val == orig_str_val);
     }
 
-    template<> template<>
-    void string_index_object_t::test<12>()
+    TEST_CASE("LLString: replaceTabsWithSpaces puts n spaces for each tab", "[LLString]")
     {
         std::string str_val("Hello.\n\n\t \t Lindenlabs. \t\t");
         std::string orig_str_val(str_val);
         LLStringUtil::replaceTabsWithSpaces(str_val, 1);
-        ensure_equals("replaceTabsWithSpaces failed", str_val, "Hello.\n\n    Lindenlabs.   ");
+        CHECK(str_val == "Hello.\n\n    Lindenlabs.   ");
         LLStringUtil::replaceTabsWithSpaces(orig_str_val, 0);
-        ensure_equals("replaceTabsWithSpaces failed for 0", orig_str_val, "Hello.\n\n  Lindenlabs. ");
+        UNSCOPED_INFO("a width of zero");
+        CHECK(orig_str_val == "Hello.\n\n  Lindenlabs. ");
 
         str_val = "\t\t\t\t";
         LLStringUtil::replaceTabsWithSpaces(str_val, 0);
-        ensure_equals("replaceTabsWithSpaces failed for all tabs", str_val, "");
+        UNSCOPED_INFO("only tabs");
+        CHECK(str_val == "");
     }
 
-    template<> template<>
-    void string_index_object_t::test<13>()
+    TEST_CASE("LLString: replaceNonstandardASCII replaces controls other than newline", "[LLString]")
     {
         std::string str_val("Hello.\n\n\t\t\r\nLindenlabsX.");
         LLStringUtil::replaceNonstandardASCII(str_val, 'X');
-        ensure_equals("replaceNonstandardASCII failed", str_val, "Hello.\n\nXXX\nLindenlabsX.");
+        CHECK(str_val == "Hello.\n\nXXX\nLindenlabsX.");
     }
 
-    template<> template<>
-    void string_index_object_t::test<14>()
+    TEST_CASE("LLString: replaceChar replaces every instance of a character", "[LLString]")
     {
         std::string str_val("Hello.\n\t\r\nABCDEFGHIABABAB");
         LLStringUtil::replaceChar(str_val, 'A', 'X');
-        ensure_equals("1: replaceChar failed", str_val, "Hello.\n\t\r\nXBCDEFGHIXBXBXB");
-        std::string str_val1("Hello.\n\t\r\nABCDEFGHIABABAB");
+        CHECK(str_val == "Hello.\n\t\r\nXBCDEFGHIXBXBXB");
     }
 
-    template<> template<>
-    void string_index_object_t::test<15>()
+    TEST_CASE("LLString: containsNonprintable finds controls and separators but not text", "[LLString]")
     {
         std::string str_val("Hello.\n\r\t");
-        ensure("containsNonprintable failed", LLStringUtil::containsNonprintable(str_val) == true);
+        CHECK(LLStringUtil::containsNonprintable(str_val));
 
         str_val = "ABC ";
-        ensure("containsNonprintable failed", LLStringUtil::containsNonprintable(str_val) == false);
+        CHECK_FALSE(LLStringUtil::containsNonprintable(str_val));
 
         // Controls above the ASCII range are two bytes, and neither of them
         // looks like a control on its own. U+0085 NEXT LINE.
         str_val = "AB\xC2\x85" "C";
-        ensure("C1 control found", LLStringUtil::containsNonprintable(str_val) == true);
+        UNSCOPED_INFO("C1 control found");
+        CHECK(LLStringUtil::containsNonprintable(str_val));
         // U+2028 LINE SEPARATOR.
         str_val = "AB\xE2\x80\xA8" "C";
-        ensure("line separator found", LLStringUtil::containsNonprintable(str_val) == true);
+        UNSCOPED_INFO("line separator found");
+        CHECK(LLStringUtil::containsNonprintable(str_val));
         // DEL, which a test for "below 0x20" never saw.
         str_val = "AB\x7F" "C";
-        ensure("delete found", LLStringUtil::containsNonprintable(str_val) == true);
+        UNSCOPED_INFO("delete found");
+        CHECK(LLStringUtil::containsNonprintable(str_val));
 
         // Non-ASCII text is printable, and so are the format characters that
         // scripts depend on -- ZWJ here, which Indic conjuncts need.
         str_val = "\xE6\x97\xA5" "\xC3\xA9" "ok";
-        ensure("ordinary text is printable", LLStringUtil::containsNonprintable(str_val) == false);
+        UNSCOPED_INFO("ordinary text is printable");
+        CHECK_FALSE(LLStringUtil::containsNonprintable(str_val));
         str_val = "\xE0\xA4\x95\xE2\x80\x8D\xE0\xA4\xB7";
-        ensure("ZWJ is printable", LLStringUtil::containsNonprintable(str_val) == false);
+        UNSCOPED_INFO("ZWJ is printable");
+        CHECK_FALSE(LLStringUtil::containsNonprintable(str_val));
     }
 
-    template<> template<>
-    void string_index_object_t::test<16>()
+    TEST_CASE("LLString: stripNonprintable removes controls and separators whole", "[LLString]")
     {
         std::string str_val("Hello.\n\r\t Again!");
         LLStringUtil::stripNonprintable(str_val);
-        ensure_equals("stripNonprintable failed", str_val, "Hello. Again!");
+        CHECK(str_val == "Hello. Again!");
 
         str_val = "\r\n\t\t";
         LLStringUtil::stripNonprintable(str_val);
-        ensure_equals("stripNonprintable resulting in empty string failed", str_val, "");
+        UNSCOPED_INFO("only controls");
+        CHECK(str_val == "");
 
         str_val = "";
         LLStringUtil::stripNonprintable(str_val);
-        ensure_equals("stripNonprintable of empty string resulting in empty string failed", str_val, "");
+        UNSCOPED_INFO("empty string");
+        CHECK(str_val == "");
 
         // A control above the ASCII range goes whole, taking both its bytes.
         str_val = "AB\xC2\x85" "C";
         LLStringUtil::stripNonprintable(str_val);
-        ensure_equals("C1 control stripped whole", str_val, "ABC");
+        UNSCOPED_INFO("C1 control stripped whole");
+        CHECK(str_val == "ABC");
 
         // Text either side of it is left alone, bytes and all.
         str_val = "\xE6\x97\xA5" "\xE2\x80\xA8" "\xC3\xA9";
         LLStringUtil::stripNonprintable(str_val);
-        ensure_equals("only the separator goes", str_val, "\xE6\x97\xA5" "\xC3\xA9");
+        UNSCOPED_INFO("only the separator goes");
+        CHECK(str_val == "\xE6\x97\xA5" "\xC3\xA9");
     }
 
-    // Capitalising a byte can only ever reach ASCII, so the narrow form works
-    // in codepoints.
-    template<> template<>
-    void string_index_object_t::test<45>()
-    {
-        std::string str_val("hello world-again_now");
-        LLStringUtil::capitalize(str_val);
-        ensure_equals("ascii words", str_val, "Hello World-Again_Now");
-
-        // U+00E9 -> U+00C9, which uppercasing one byte at a time could not do.
-        str_val = "\xC3\xA9" "cole";
-        LLStringUtil::capitalize(str_val);
-        ensure_equals("accented first letter", str_val, "\xC3\x89" "cole");
-
-        // The word rule is the caller's and still only sees these three.
-        str_val = "a b-c_d.e";
-        LLStringUtil::capitalize(str_val);
-        ensure_equals("dot is not a separator", str_val, "A B-C_D.e");
-
-        str_val = "";
-        LLStringUtil::capitalize(str_val);
-        ensure_equals("empty", str_val, "");
-    }
-
-    template<> template<>
-    void string_index_object_t::test<17>()
+    TEST_CASE("LLString: convertToBOOL reads the true and false spellings", "[LLString]")
     {
         bool value;
         std::string str_val("1");
-        ensure("convertToBOOL 1 failed", LLStringUtil::convertToBOOL(str_val, value) && value);
+        REQUIRE(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "T";
-        ensure("convertToBOOL T failed", LLStringUtil::convertToBOOL(str_val, value) && value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "t";
-        ensure("convertToBOOL t failed", LLStringUtil::convertToBOOL(str_val, value) && value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "TRUE";
-        ensure("convertToBOOL TRUE failed", LLStringUtil::convertToBOOL(str_val, value) && value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "True";
-        ensure("convertToBOOL True failed", LLStringUtil::convertToBOOL(str_val, value) && value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
         str_val = "true";
-        ensure("convertToBOOL true failed", LLStringUtil::convertToBOOL(str_val, value) && value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK(value);
 
         str_val = "0";
-        ensure("convertToBOOL 0 failed", LLStringUtil::convertToBOOL(str_val, value) && !value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "F";
-        ensure("convertToBOOL F failed", LLStringUtil::convertToBOOL(str_val, value) && !value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "f";
-        ensure("convertToBOOL f failed", LLStringUtil::convertToBOOL(str_val, value) && !value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "FALSE";
-        ensure("convertToBOOL FASLE failed", LLStringUtil::convertToBOOL(str_val, value) && !value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "False";
-        ensure("convertToBOOL False failed", LLStringUtil::convertToBOOL(str_val, value) && !value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
         str_val = "false";
-        ensure("convertToBOOL false failed", LLStringUtil::convertToBOOL(str_val, value) && !value);
+        CHECK(LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(value);
 
         str_val = "Tblah";
-        ensure("convertToBOOL false failed", !LLStringUtil::convertToBOOL(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToBOOL(str_val, value));
     }
 
-    template<> template<>
-    void string_index_object_t::test<18>()
+    TEST_CASE("LLString: convertToU8 accepts 0 to 255 only", "[LLString]")
     {
         U8 value;
         std::string str_val("255");
-        ensure("1: convertToU8 failed", LLStringUtil::convertToU8(str_val, value) && value == 255);
+        REQUIRE(LLStringUtil::convertToU8(str_val, value));
+        CHECK(value == 255);
 
         str_val = "0";
-        ensure("2: convertToU8 failed", LLStringUtil::convertToU8(str_val, value) && value == 0);
+        CHECK(LLStringUtil::convertToU8(str_val, value));
+        CHECK(value == 0);
 
         str_val = "-1";
-        ensure("3: convertToU8 failed", !LLStringUtil::convertToU8(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToU8(str_val, value));
 
         str_val = "256"; // bigger than MAX_U8
-        ensure("4: convertToU8 failed", !LLStringUtil::convertToU8(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToU8(str_val, value));
     }
 
-    template<> template<>
-    void string_index_object_t::test<19>()
+    TEST_CASE("LLString: convertToS8 accepts -128 to 127 only", "[LLString]")
     {
         S8 value;
         std::string str_val("127");
-        ensure("1: convertToS8 failed", LLStringUtil::convertToS8(str_val, value) && value == 127);
+        REQUIRE(LLStringUtil::convertToS8(str_val, value));
+        CHECK(value == 127);
 
         str_val = "0";
-        ensure("2: convertToS8 failed", LLStringUtil::convertToS8(str_val, value) && value == 0);
+        CHECK(LLStringUtil::convertToS8(str_val, value));
+        CHECK(value == 0);
 
         str_val = "-128";
-        ensure("3: convertToS8 failed", LLStringUtil::convertToS8(str_val, value) && value == -128);
+        CHECK(LLStringUtil::convertToS8(str_val, value));
+        CHECK(value == -128);
 
         str_val = "128"; // bigger than MAX_S8
-        ensure("4: convertToS8 failed", !LLStringUtil::convertToS8(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToS8(str_val, value));
 
         str_val = "-129";
-        ensure("5: convertToS8 failed", !LLStringUtil::convertToS8(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToS8(str_val, value));
     }
 
-    template<> template<>
-    void string_index_object_t::test<20>()
+    TEST_CASE("LLString: convertToS16 accepts -32768 to 32767 only", "[LLString]")
     {
         S16 value;
         std::string str_val("32767");
-        ensure("1: convertToS16 failed", LLStringUtil::convertToS16(str_val, value) && value == 32767);
+        REQUIRE(LLStringUtil::convertToS16(str_val, value));
+        CHECK(value == 32767);
 
         str_val = "0";
-        ensure("2: convertToS16 failed", LLStringUtil::convertToS16(str_val, value) && value == 0);
+        CHECK(LLStringUtil::convertToS16(str_val, value));
+        CHECK(value == 0);
 
         str_val = "-32768";
-        ensure("3: convertToS16 failed", LLStringUtil::convertToS16(str_val, value) && value == -32768);
+        CHECK(LLStringUtil::convertToS16(str_val, value));
+        CHECK(value == -32768);
 
         str_val = "32768";
-        ensure("4: convertToS16 failed", !LLStringUtil::convertToS16(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToS16(str_val, value));
 
         str_val = "-32769";
-        ensure("5: convertToS16 failed", !LLStringUtil::convertToS16(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToS16(str_val, value));
     }
 
-    template<> template<>
-    void string_index_object_t::test<21>()
+    TEST_CASE("LLString: convertToU16 accepts 0 to 65535 only", "[LLString]")
     {
         U16 value;
         std::string str_val("65535"); //0xFFFF
-        ensure("1: convertToU16 failed", LLStringUtil::convertToU16(str_val, value) && value == 65535);
+        REQUIRE(LLStringUtil::convertToU16(str_val, value));
+        CHECK(value == 65535);
 
         str_val = "0";
-        ensure("2: convertToU16 failed", LLStringUtil::convertToU16(str_val, value) && value == 0);
+        CHECK(LLStringUtil::convertToU16(str_val, value));
+        CHECK(value == 0);
 
         str_val = "-1";
-        ensure("3: convertToU16 failed", !LLStringUtil::convertToU16(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToU16(str_val, value));
 
         str_val = "65536";
-        ensure("4: convertToU16 failed", !LLStringUtil::convertToU16(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToU16(str_val, value));
     }
 
-    template<> template<>
-    void string_index_object_t::test<22>()
+    TEST_CASE("LLString: convertToU32 accepts 0 to 4294967295 and a leading plus", "[LLString]")
     {
         U32 value;
         std::string str_val("4294967295"); //0xFFFFFFFF
-        ensure("1: convertToU32 failed", LLStringUtil::convertToU32(str_val, value) && value == 4294967295UL);
+        REQUIRE(LLStringUtil::convertToU32(str_val, value));
+        CHECK(value == 4294967295UL);
 
         str_val = "0";
-        ensure("2: convertToU32 failed", LLStringUtil::convertToU32(str_val, value) && value == 0);
+        CHECK(LLStringUtil::convertToU32(str_val, value));
+        CHECK(value == 0);
 
         str_val = "4294967296";
-        ensure("3: convertToU32 failed", !LLStringUtil::convertToU32(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToU32(str_val, value));
 
         // A negative is rejected rather than wrapped. convertToU8 and
         // convertToU16 above already answer false for "-1" -- they range-check
         // after parsing as signed -- so this is the unsigned form agreeing with
         // its own siblings. Stream extraction let num_get negate it instead.
         str_val = "-1";
-        ensure("4: convertToU32 failed", !LLStringUtil::convertToU32(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToU32(str_val, value));
 
         // A leading '+' is still accepted, as it was through the stream.
         str_val = "+7";
-        ensure("5: convertToU32 failed", LLStringUtil::convertToU32(str_val, value) && value == 7);
+        CHECK(LLStringUtil::convertToU32(str_val, value));
+        CHECK(value == 7);
     }
 
-    template<> template<>
-    void string_index_object_t::test<23>()
+    TEST_CASE("LLString: convertToS32 reads the S32 range with a sign or spaces or trailing text", "[LLString]")
     {
         S32 value;
         std::string str_val("2147483647"); //0x7FFFFFFF
-        ensure("1: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 2147483647);
+        REQUIRE(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 2147483647);
 
         str_val = "0";
-        ensure("2: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 0);
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 0);
 
         // Avoid "unary minus operator applied to unsigned type" warning on VC++. JC
         S32 min_val = -2147483647 - 1;
         str_val = "-2147483648";
-        ensure("3: convertToS32 failed", LLStringUtil::convertToS32(str_val, value)  && value == min_val);
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == min_val);
 
         str_val = "2147483648";
-        ensure("4: convertToS32 failed", !LLStringUtil::convertToS32(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToS32(str_val, value));
 
         str_val = "-2147483649";
-        ensure("5: convertToS32 failed", !LLStringUtil::convertToS32(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToS32(str_val, value));
 
         // from_chars does not take a leading '+' on its own; the conversions
         // strip it so they keep accepting what stream extraction accepted.
         str_val = "+42";
-        ensure("6: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 42);
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 42);
 
         // Surrounding space is trimmed, and a parse that stops early still
         // reports what it read -- both as the stream did.
         str_val = "  13  ";
-        ensure("7: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 13);
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 13);
 
         str_val = "12abc";
-        ensure("8: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 12);
+        CHECK(LLStringUtil::convertToS32(str_val, value));
+        CHECK(value == 12);
 
         str_val = "abc";
-        ensure("9: convertToS32 failed", !LLStringUtil::convertToS32(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToS32(str_val, value));
     }
 
-    template<> template<>
-    void string_index_object_t::test<24>()
+    TEST_CASE("LLString: convertToF32 reads decimals and exponents and signs from -F32_MAX to F32_MAX only", "[LLString]")
     {
         F32 value;
         std::string str_val("2147483647"); //0x7FFFFFFF
-        ensure("1: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 2147483647.f);
+        REQUIRE(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 2147483647.f);
 
         str_val = "0";
-        ensure("2: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 0);
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 0);
 
-        /* Need to find max/min F32 values
-        str_val = "-2147483648";
-        ensure("3: convertToF32 failed", LLStringUtil::convertToF32(str_val, value)  && value == -2147483648);
+        // The limits are F32_MAX either way, written as the shortest
+        // decimal that reads back as exactly F32_MAX. Past them is a
+        // failure, not an infinity.
+        str_val = "3.4028234663852886e38";
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == F32_MAX);
 
-        str_val = "2147483648";
-        ensure("4: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
+        str_val = "-3.4028234663852886e38";
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == -F32_MAX);
 
-        str_val = "-2147483649";
-        ensure("5: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
-        */
+        str_val = "3.5e38";
+        CHECK_FALSE(LLStringUtil::convertToF32(str_val, value));
+
+        str_val = "-3.5e38";
+        CHECK_FALSE(LLStringUtil::convertToF32(str_val, value));
 
         // The reals go through fast_float now. Decimals, exponents, a sign and
         // a leading '+' all read the same as they did through the stream, and
         // the decimal point stays a point whatever the C locale is set to.
         str_val = "1.5";
-        ensure("6: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 1.5f);
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 1.5f);
 
         str_val = "-2.25";
-        ensure("7: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == -2.25f);
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == -2.25f);
 
         str_val = "+0.5";
-        ensure("8: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 0.5f);
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 0.5f);
 
         str_val = "1.5e2";
-        ensure("9: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 150.f);
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 150.f);
 
         str_val = "  0.25  ";
-        ensure("10: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 0.25f);
+        CHECK(LLStringUtil::convertToF32(str_val, value));
+        CHECK(value == 0.25f);
 
         str_val = "nonsense";
-        ensure("11: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
+        CHECK_FALSE(LLStringUtil::convertToF32(str_val, value));
     }
 
-    template<> template<>
-    void string_index_object_t::test<25>()
+    TEST_CASE("LLString: convertToF64 accepts -F64_MAX to F64_MAX only", "[LLString]")
     {
         F64 value;
         std::string str_val("9223372036854775807"); //0x7FFFFFFFFFFFFFFF
-        ensure("1: convertToF64 failed", LLStringUtil::convertToF64(str_val, value) && value == 9223372036854775807.0);
+        REQUIRE(LLStringUtil::convertToF64(str_val, value));
+        CHECK(value == 9223372036854775807.0);
 
         str_val = "0";
-        ensure("2: convertToF64 failed", LLStringUtil::convertToF64(str_val, value) && value == 0.0F);
+        CHECK(LLStringUtil::convertToF64(str_val, value));
+        CHECK(value == 0.0F);
 
-        /* Need to find max/min F64 values
-        str_val = "-2147483648";
-        ensure("3: convertToF32 failed", LLStringUtil::convertToF32(str_val, value)  && value == -2147483648);
+        // The limits are F64_MAX either way, written as the shortest decimal
+        // that reads back as exactly F64_MAX. Past them is a failure, not an
+        // infinity.
+        str_val = "1.7976931348623157e308";
+        CHECK(LLStringUtil::convertToF64(str_val, value));
+        CHECK(value == F64_MAX);
 
-        str_val = "2147483648";
-        ensure("4: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
+        str_val = "-1.7976931348623157e308";
+        CHECK(LLStringUtil::convertToF64(str_val, value));
+        CHECK(value == -F64_MAX);
 
-        str_val = "-2147483649";
-        ensure("5: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
-        */
+        str_val = "1e309";
+        CHECK_FALSE(LLStringUtil::convertToF64(str_val, value));
+
+        str_val = "-1e309";
+        CHECK_FALSE(LLStringUtil::convertToF64(str_val, value));
     }
 
-    template<> template<>
-    void string_index_object_t::test<26>()
+    TEST_CASE("LLString: compareStrings puts null after text and compares text", "[LLString]")
     {
         const char* str1 = NULL;
         const char* str2 = NULL;
 
-        ensure("1: compareStrings failed", LLStringUtil::compareStrings(str1, str2) == 0);
+        CHECK(LLStringUtil::compareStrings(str1, str2) == 0);
         str2 = "A";
-        ensure("2: compareStrings failed", LLStringUtil::compareStrings(str1, str2) > 0);
-        ensure("3: compareStrings failed", LLStringUtil::compareStrings(str2, str1) < 0);
+        CHECK(LLStringUtil::compareStrings(str1, str2) > 0);
+        CHECK(LLStringUtil::compareStrings(str2, str1) < 0);
 
         str1 = "A is smaller than B";
         str2 = "B is greater than A";
-        ensure("4: compareStrings failed", LLStringUtil::compareStrings(str1, str2) < 0);
+        CHECK(LLStringUtil::compareStrings(str1, str2) < 0);
 
         str2 = "A is smaller than B";
-        ensure("5: compareStrings failed", LLStringUtil::compareStrings(str1, str2) == 0);
+        CHECK(LLStringUtil::compareStrings(str1, str2) == 0);
     }
 
-    template<> template<>
-    void string_index_object_t::test<27>()
+    TEST_CASE("LLString: compareInsensitive ignores case but not accents or sharp s", "[LLString]")
     {
         const char* str1 = NULL;
         const char* str2 = NULL;
 
-        ensure("1: compareInsensitive failed", LLStringUtil::compareInsensitive(str1, str2) == 0);
+        CHECK(LLStringUtil::compareInsensitive(str1, str2) == 0);
         str2 = "A";
-        ensure("2: compareInsensitive failed", LLStringUtil::compareInsensitive(str1, str2) > 0);
-        ensure("3: compareInsensitive failed", LLStringUtil::compareInsensitive(str2, str1) < 0);
+        CHECK(LLStringUtil::compareInsensitive(str1, str2) > 0);
+        CHECK(LLStringUtil::compareInsensitive(str2, str1) < 0);
 
         str1 = "A is equal to a";
         str2 = "a is EQUAL to A";
-        ensure("4: compareInsensitive failed", LLStringUtil::compareInsensitive(str1, str2) == 0);
+        CHECK(LLStringUtil::compareInsensitive(str1, str2) == 0);
 
         // Ignoring case is not the same as uppercasing both sides, which is
         // what this used to do: that turns sharp s into SS and so calls two
         // different words the same word.
-        ensure("sharp s is not ss",
-               LLStringUtil::compareInsensitive(std::string("stra\xC3\x9F""e"),
+        UNSCOPED_INFO("sharp s is not ss");
+        CHECK(LLStringUtil::compareInsensitive(std::string("stra\xC3\x9F""e"),
                                                 std::string("strasse")) != 0);
-        ensure("sharp s is not SS",
-               LLStringUtil::compareInsensitive(std::string("stra\xC3\x9F""e"),
+        UNSCOPED_INFO("sharp s is not SS");
+        CHECK(LLStringUtil::compareInsensitive(std::string("stra\xC3\x9F""e"),
                                                 std::string("STRASSE")) != 0);
 
         // Accents are a secondary difference and survive; case is tertiary
         // and does not.
-        ensure("accents survive",
-               LLStringUtil::compareInsensitive(std::string("ab"),
+        UNSCOPED_INFO("accents survive");
+        CHECK(LLStringUtil::compareInsensitive(std::string("ab"),
                                                 std::string("\xC3\xA4""b")) < 0);
-        ensure("case does not",
-               LLStringUtil::compareInsensitive(std::string("\xC3\x84""B"),
+        UNSCOPED_INFO("case does not");
+        CHECK(LLStringUtil::compareInsensitive(std::string("\xC3\x84""B"),
                                                 std::string("\xC3\xA4""b")) == 0);
     }
 
-    template<> template<>
-    void string_index_object_t::test<28>()
+    TEST_CASE("LLString: compareDict and precedesDict order dictionary style", "[LLString]")
     {
         std::string lhs_str("PROgraM12files");
         std::string rhs_str("PROgram12Files");
-        ensure("compareDict 1 failed", LLStringUtil::compareDict(lhs_str, rhs_str) < 0);
-        ensure("precedesDict 1 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == true);
+        CHECK(LLStringUtil::compareDict(lhs_str, rhs_str) < 0);
+        CHECK(LLStringUtil::precedesDict(lhs_str, rhs_str));
 
         lhs_str = "PROgram12Files";
         rhs_str = "PROgram12Files";
-        ensure("compareDict 2 failed", LLStringUtil::compareDict(lhs_str, rhs_str) == 0);
-        ensure("precedesDict 2 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == false);
+        CHECK(LLStringUtil::compareDict(lhs_str, rhs_str) == 0);
+        CHECK_FALSE(LLStringUtil::precedesDict(lhs_str, rhs_str));
 
         lhs_str = "PROgram12Files";
         rhs_str = "PROgRAM12FILES";
-        ensure("compareDict 3 failed", LLStringUtil::compareDict(lhs_str, rhs_str) > 0);
-        ensure("precedesDict 3 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == false);
+        CHECK(LLStringUtil::compareDict(lhs_str, rhs_str) > 0);
+        CHECK_FALSE(LLStringUtil::precedesDict(lhs_str, rhs_str));
 
         // Uppercase sorts first, which is a tertiary-level ordering. The
         // caseless form drops that level and so sees no difference at all.
-        ensure("compareDictInsensitive case", LLStringUtil::compareDictInsensitive(lhs_str, rhs_str) == 0);
-        ensure("compareDict case", LLStringUtil::compareDict(std::string("abc"), std::string("ABC")) > 0);
-        ensure("compareDict case 2", LLStringUtil::compareDict(std::string("Apple"), std::string("apple")) < 0);
+        CHECK(LLStringUtil::compareDictInsensitive(lhs_str, rhs_str) == 0);
+        CHECK(LLStringUtil::compareDict(std::string("abc"), std::string("ABC")) > 0);
+        CHECK(LLStringUtil::compareDict(std::string("Apple"), std::string("apple")) < 0);
 
         // Digit runs compare as the numbers they spell.
-        ensure("natural 2 before 10",
-               LLStringUtil::compareDict(std::string("item2"), std::string("item10")) < 0);
-        ensure("natural 10 after 9",
-               LLStringUtil::compareDict(std::string("item10"), std::string("item9")) > 0);
+        UNSCOPED_INFO("natural 2 before 10");
+        CHECK(LLStringUtil::compareDict(std::string("item2"), std::string("item10")) < 0);
+        UNSCOPED_INFO("natural 10 after 9");
+        CHECK(LLStringUtil::compareDict(std::string("item10"), std::string("item9")) > 0);
 
         // An accented letter sorts beside the letter it decorates rather than
         // past the end of the alphabet: a < a-diaeresis < b, not merely
         // somewhere before z. Codepoint order put it after z.
-        ensure("accent after plain",
-               LLStringUtil::compareDict(std::string("ab"), std::string("\xC3\xA4" "b")) < 0);
-        ensure("accent before next letter",
-               LLStringUtil::compareDict(std::string("\xC3\xA4" "b"), std::string("bb")) < 0);
-        ensure("accent before z",
-               LLStringUtil::compareDict(std::string("\xC3\xA4" "b"), std::string("zb")) < 0);
+        UNSCOPED_INFO("accent after plain");
+        CHECK(LLStringUtil::compareDict(std::string("ab"), std::string("\xC3\xA4" "b")) < 0);
+        UNSCOPED_INFO("accent before next letter");
+        CHECK(LLStringUtil::compareDict(std::string("\xC3\xA4" "b"), std::string("bb")) < 0);
+        UNSCOPED_INFO("accent before z");
+        CHECK(LLStringUtil::compareDict(std::string("\xC3\xA4" "b"), std::string("zb")) < 0);
         // ... and case-insensitive still keeps accents apart.
-        ensure("caseless keeps accents",
-               LLStringUtil::compareDictInsensitive(std::string("ab"), std::string("\xC3\xA4" "b")) < 0);
+        UNSCOPED_INFO("caseless keeps accents");
+        CHECK(LLStringUtil::compareDictInsensitive(std::string("ab"), std::string("\xC3\xA4" "b")) < 0);
     }
 
-    template<> template<>
-    void string_index_object_t::test<29>()
+    TEST_CASE("LLString: copy copies no more than the destination size", "[LLString]")
     {
         char str1[] = "First String...";
         char str2[100];
 
         LLStringUtil::copy(str2, str1, 100);
-        ensure("LLStringUtil::copy with enough dest length failed", strcmp(str2, str1) == 0);
+        UNSCOPED_INFO("enough room");
+        CHECK(std::string_view(str2) == std::string_view(str1));
         LLStringUtil::copy(str2, str1, sizeof("First"));
-        ensure("LLStringUtil::copy with less dest length failed", strcmp(str2, "First") == 0);
+        UNSCOPED_INFO("too little room");
+        CHECK(std::string_view(str2) == "First");
     }
 
-    template<> template<>
-    void string_index_object_t::test<30>()
+    TEST_CASE("LLString: copyInto inserts at an offset and appends at the end", "[LLString]")
     {
         std::string str1 = "This is the sentence...";
         std::string str2 = "This is the ";
@@ -636,15 +611,14 @@ namespace tut
 
         dest = str1;
         LLStringUtil::copyInto(dest, str3, str2.length());
-        ensure("LLStringUtil::copyInto insert failed", dest == str4);
+        CHECK(dest == str4);
 
         dest = str1;
         LLStringUtil::copyInto(dest, str3, dest.length());
-        ensure("LLStringUtil::copyInto append failed", dest == str5);
+        CHECK(dest == str5);
     }
 
-    template<> template<>
-    void string_index_object_t::test<31>()
+    TEST_CASE("LLString: strip_invalid_xml removes controls other than tab and line ends", "[LLString]")
     {
         std::string stripped;
 
@@ -652,7 +626,8 @@ namespace tut
         // should not be altered.
         std::string simple_text = "Hello, world!";
         stripped = LLStringFn::strip_invalid_xml(simple_text);
-        ensure("Simple text passed unchanged", stripped == simple_text);
+        UNSCOPED_INFO("plain text unchanged");
+        CHECK(stripped == simple_text);
 
         // Control characters should be removed
         // except for 0x09, 0x0a, 0x0d
@@ -667,8 +642,8 @@ namespace tut
         allowed_control_chars.push_back( (char)0x0d );
 
         stripped = LLStringFn::strip_invalid_xml(control_chars);
-        ensure("Only tab, LF, CR control characters allowed",
-            stripped == allowed_control_chars);
+        UNSCOPED_INFO("only tab, LF and CR kept");
+        CHECK(stripped == allowed_control_chars);
 
         // UTF-8 should be passed intact, including high byte
         // characters.  Try Francais (with C squiggle cedilla)
@@ -677,11 +652,11 @@ namespace tut
         french.push_back( (char)0xA7 );
         french += "ais";
         stripped = LLStringFn::strip_invalid_xml( french );
-        ensure("UTF-8 high byte text is allowed", french == stripped );
+        UNSCOPED_INFO("UTF-8 kept");
+        CHECK(french == stripped);
     }
 
-    template<> template<>
-    void string_index_object_t::test<32>()
+    TEST_CASE("LLString: format substitutes keys and counts the substitutions", "[LLString]")
     {
         // Test LLStringUtil::format() string interpolation
         LLStringUtil::format_map_t fmt_map;
@@ -704,17 +679,19 @@ namespace tut
         for (LLStringUtil::format_map_t::const_iterator iter = fmt_map.begin(); iter != fmt_map.end(); ++iter)
         {
             // Test when source string is entirely one key
-            std::string s1 = (std::string)iter->first;
+            const std::string key = (std::string)iter->first;
+            std::string s1 = key;
             std::string s2 = (std::string)iter->second;
+            CAPTURE(key);
             subcount = LLStringUtil::format(s1, fmt_map);
-            ensure_equals("LLStringUtil::format: Raw interpolation result", s1, s2);
-            if (s1 == "?" || s1 == "[]") // no interp expected
+            REQUIRE(s1 == s2);
+            if (key == "?" || key == "[]") // no interp expected
             {
-                ensure_equals("LLStringUtil::format: Raw interpolation result count", 0, subcount);
+                REQUIRE(0 == subcount);
             }
             else
             {
-                ensure_equals("LLStringUtil::format: Raw interpolation result count", 1, subcount);
+                REQUIRE(1 == subcount);
             }
         }
 
@@ -723,16 +700,17 @@ namespace tut
             // Test when source string is one key, duplicated
             std::string s1 = (std::string)iter->first;
             std::string s2 = (std::string)iter->second;
+            CAPTURE(s1);
             s = s1 + s1 + s1 + s1;
             subcount = LLStringUtil::format(s, fmt_map);
-            ensure_equals("LLStringUtil::format: Rawx4 interpolation result", s, s2 + s2 + s2 + s2);
+            REQUIRE(s == s2 + s2 + s2 + s2);
             if (s1 == "?" || s1 == "[]") // no interp expected
             {
-                ensure_equals("LLStringUtil::format: Rawx4 interpolation result count", 0, subcount);
+                REQUIRE(0 == subcount);
             }
             else
             {
-                ensure_equals("LLStringUtil::format: Rawx4 interpolation result count", 4, subcount);
+                REQUIRE(4 == subcount);
             }
         }
 
@@ -740,55 +718,54 @@ namespace tut
         std::string srcs = "!!!!!!!!!!!!!!!!";
         s = srcs;
         subcount = LLStringUtil::format(s, fmt_map);
-        ensure_equals("LLStringUtil::format: No key test result", s, srcs);
-        ensure_equals("LLStringUtil::format: No key test result count", 0, subcount);
+        CHECK(s == srcs);
+        CHECK(0 == subcount);
 
         // Test when source string has no keys and is empty
         std::string srcs3;
         s = srcs3;
         subcount = LLStringUtil::format(s, fmt_map);
-        ensure("LLStringUtil::format: No key test3 result", s.empty());
-        ensure_equals("LLStringUtil::format: No key test3 result count", 0, subcount);
+        CHECK(s.empty());
+        CHECK(0 == subcount);
 
         // Test a substitution where a key is substituted with blankness
         std::string srcs2 = "[DELETE]";
         s = srcs2;
         subcount = LLStringUtil::format(s, fmt_map);
-        ensure("LLStringUtil::format: Delete key test2 result", s.empty());
-        ensure_equals("LLStringUtil::format: Delete key test2 result count", 1, subcount);
+        CHECK(s.empty());
+        CHECK(1 == subcount);
 
         // Test an assorted substitution
         std::string srcs4 = "[TRICK1][A][B][AAA][BBB][TRICK2][KEYLONGER][KEYSHORTER]?[DELETE]";
         s = srcs4;
         subcount = LLStringUtil::format(s, fmt_map);
-        ensure_equals("LLStringUtil::format: Assorted Test1 result", s, "[A]abaaabbb[A]shortAm I not a long string??");
-        ensure_equals("LLStringUtil::format: Assorted Test1 result count", 9, subcount);
+        CHECK(s == "[A]abaaabbb[A]shortAm I not a long string??");
+        CHECK(9 == subcount);
 
         // Test an assorted substitution
         std::string srcs5 = "[DELETE]?[KEYSHORTER][KEYLONGER][TRICK2][BBB][AAA][B][A][TRICK1]";
         s = srcs5;
         subcount = LLStringUtil::format(s, fmt_map);
-        ensure_equals("LLStringUtil::format: Assorted Test2 result", s, "?Am I not a long string?short[A]bbbaaaba[A]");
-        ensure_equals("LLStringUtil::format: Assorted Test2 result count", 9, subcount);
+        CHECK(s == "?Am I not a long string?short[A]bbbaaaba[A]");
+        CHECK(9 == subcount);
 
         // Test on nested brackets
         std::string srcs6 = "[[TRICK1]][[A]][[B]][[AAA]][[BBB]][[TRICK2]][[KEYLONGER]][[KEYSHORTER]]?[[DELETE]]";
         s = srcs6;
         subcount = LLStringUtil::format(s, fmt_map);
-        ensure_equals("LLStringUtil::format: Assorted Test2 result", s, "[[A]][a][b][aaa][bbb][[A]][short][Am I not a long string?]?[]");
-        ensure_equals("LLStringUtil::format: Assorted Test2 result count", 9, subcount);
+        CHECK(s == "[[A]][a][b][aaa][bbb][[A]][short][Am I not a long string?]?[]");
+        CHECK(9 == subcount);
 
 
         // Test an assorted substitution
         std::string srcs8 = "foo[DELETE]bar?";
         s = srcs8;
         subcount = LLStringUtil::format(s, fmt_map);
-        ensure_equals("LLStringUtil::format: Assorted Test3 result", s, "foobar?");
-        ensure_equals("LLStringUtil::format: Assorted Test3 result count", 1, subcount);
+        CHECK(s == "foobar?");
+        CHECK(1 == subcount);
     }
 
-    template<> template<>
-    void string_index_object_t::test<33>()
+    TEST_CASE("LLString: format with an empty map changes nothing", "[LLString]")
     {
         // Test LLStringUtil::format() string interpolation
         LLStringUtil::format_map_t blank_fmt_map;
@@ -799,19 +776,18 @@ namespace tut
         std::string srcs6 = "12345";
         s = srcs6;
         subcount = LLStringUtil::format(s, blank_fmt_map);
-        ensure_equals("LLStringUtil::format: Blankfmt Test1 result", s, "12345");
-        ensure_equals("LLStringUtil::format: Blankfmt Test1 result count", 0, subcount);
+        CHECK(s == "12345");
+        CHECK(0 == subcount);
 
         // Test substituting a blank string out of a blank format_map
         std::string srcs7;
         s = srcs7;
         subcount = LLStringUtil::format(s, blank_fmt_map);
-        ensure("LLStringUtil::format: Blankfmt Test2 result", s.empty());
-        ensure_equals("LLStringUtil::format: Blankfmt Test2 result count", 0, subcount);
+        CHECK(s.empty());
+        CHECK(0 == subcount);
     }
 
-    template<> template<>
-    void string_index_object_t::test<34>()
+    TEST_CASE("LLString: format with an empty key in the map changes nothing", "[LLString]")
     {
         // Test that incorrect LLStringUtil::format() use does not explode.
         LLStringUtil::format_map_t nasty_fmt_map;
@@ -824,222 +800,208 @@ namespace tut
         std::string srcs6 = "12345";
         s = srcs6;
         subcount = LLStringUtil::format(s, nasty_fmt_map);
-        ensure_equals("LLStringUtil::format: Nastyfmt Test1 result", s, "12345");
-        ensure_equals("LLStringUtil::format: Nastyfmt Test1 result count", 0, subcount);
+        CHECK(s == "12345");
+        CHECK(0 == subcount);
 
         // Test substituting a blank string out of a nasty format_map
         std::string srcs7;
         s = srcs7;
         subcount = LLStringUtil::format(s, nasty_fmt_map);
-        ensure("LLStringUtil::format: Nastyfmt Test2 result", s.empty());
-        ensure_equals("LLStringUtil::format: Nastyfmt Test2 result count", 0, subcount);
+        CHECK(s.empty());
+        CHECK(0 == subcount);
     }
 
-    template<> template<>
-    void string_index_object_t::test<35>()
+    TEST_CASE("LLString: startsWith finds a prefix", "[LLString]")
     {
         // Make sure startsWith works
         std::string string("anybody in there?");
         std::string substr("anybody");
-        ensure("startsWith works.", LLStringUtil::startsWith(string, substr));
+        CHECK(LLStringUtil::startsWith(string, substr));
     }
 
-    template<> template<>
-    void string_index_object_t::test<36>()
+    TEST_CASE("LLString: startsWith rejects a word that is not the prefix", "[LLString]")
     {
         // Make sure startsWith correctly fails
         std::string string("anybody in there?");
         std::string substr("there");
-        ensure("startsWith fails.", !LLStringUtil::startsWith(string, substr));
+        CHECK_FALSE(LLStringUtil::startsWith(string, substr));
     }
 
-    template<> template<>
-    void string_index_object_t::test<37>()
+    TEST_CASE("LLString: startsWith is false where either string is empty", "[LLString]")
     {
         // startsWith fails on empty strings
         std::string value("anybody in there?");
         std::string empty;
-        ensure("empty string.", !LLStringUtil::startsWith(value, empty));
-        ensure("empty substr.", !LLStringUtil::startsWith(empty, value));
-        ensure("empty everything.", !LLStringUtil::startsWith(empty, empty));
+        CHECK_FALSE(LLStringUtil::startsWith(value, empty));
+        CHECK_FALSE(LLStringUtil::startsWith(empty, value));
+        CHECK_FALSE(LLStringUtil::startsWith(empty, empty));
     }
 
-    template<> template<>
-    void string_index_object_t::test<38>()
+    TEST_CASE("LLString: endsWith finds a suffix", "[LLString]")
     {
         // Make sure endsWith works correctly
         std::string string("anybody in there?");
         std::string substr("there?");
-        ensure("endsWith works.", LLStringUtil::endsWith(string, substr));
+        CHECK(LLStringUtil::endsWith(string, substr));
     }
 
-    template<> template<>
-    void string_index_object_t::test<39>()
+    TEST_CASE("LLString: endsWith rejects what is not the suffix", "[LLString]")
     {
         // Make sure endsWith correctly fails
         std::string string("anybody in there?");
         std::string substr("anybody");
-        ensure("endsWith fails.", !LLStringUtil::endsWith(string, substr));
+        CHECK_FALSE(LLStringUtil::endsWith(string, substr));
         substr = "there";
-        ensure("endsWith fails.", !LLStringUtil::endsWith(string, substr));
+        CHECK_FALSE(LLStringUtil::endsWith(string, substr));
         substr = "ther?";
-        ensure("endsWith fails.", !LLStringUtil::endsWith(string, substr));
+        CHECK_FALSE(LLStringUtil::endsWith(string, substr));
     }
 
-    template<> template<>
-    void string_index_object_t::test<40>()
+    TEST_CASE("LLString: endsWith is false where either string is empty", "[LLString]")
     {
         // endsWith fails on empty strings
         std::string value("anybody in there?");
         std::string empty;
-        ensure("empty string.", !LLStringUtil::endsWith(value, empty));
-        ensure("empty substr.", !LLStringUtil::endsWith(empty, value));
-        ensure("empty everything.", !LLStringUtil::endsWith(empty, empty));
+        CHECK_FALSE(LLStringUtil::endsWith(value, empty));
+        CHECK_FALSE(LLStringUtil::endsWith(empty, value));
+        CHECK_FALSE(LLStringUtil::endsWith(empty, empty));
     }
 
-    template<> template<>
-    void string_index_object_t::test<41>()
+    TEST_CASE("LLString: getTokens splits on delimiters and drops them", "[LLString]")
     {
-        set_test_name("getTokens(\"delims\")");
-        ensure_equals("empty string", LLStringUtil::getTokens("", " "), StringVec());
-        ensure_equals("only delims",
-                      LLStringUtil::getTokens("   \r\n   ", " \r\n"), StringVec());
-        ensure_equals("sequence of delims",
-                      LLStringUtil::getTokens(",,, one ,,,", ","), StringVec{"one"});
+        UNSCOPED_INFO("empty string");
+        CHECK(LLStringUtil::getTokens("", " ") == StringVec());
+        UNSCOPED_INFO("only delims");
+        CHECK(LLStringUtil::getTokens("   \r\n   ", " \r\n") == StringVec());
+        UNSCOPED_INFO("sequence of delims");
+        CHECK(LLStringUtil::getTokens(",,, one ,,,", ",") == StringVec{"one"});
         // nat considers this a dubious implementation side effect, but I'd
         // hate to change it now...
-        ensure_equals("noncontiguous tokens",
-                      LLStringUtil::getTokens(", ,, , one ,,,", ","), StringVec{ "", "", "one" });
-        ensure_equals("space-padded tokens",
-                      LLStringUtil::getTokens(",    one  ,  two  ,", ","), StringVec{"one", "two"});
-        ensure_equals("no delims", LLStringUtil::getTokens("one", ","), StringVec{ "one" });
+        UNSCOPED_INFO("noncontiguous tokens");
+        CHECK(LLStringUtil::getTokens(", ,, , one ,,,", ",") == StringVec{ "", "", "one" });
+        UNSCOPED_INFO("space-padded tokens");
+        CHECK(LLStringUtil::getTokens(",    one  ,  two  ,", ",") == StringVec{"one", "two"});
+        UNSCOPED_INFO("no delims");
+        CHECK(LLStringUtil::getTokens("one", ",") == StringVec{ "one" });
     }
 
     // Shorthand for verifying that getTokens() behaves the same when you
     // don't pass a string of escape characters, when you pass an empty string
     // (different overloads), and when you pass a string of characters that
     // aren't actually present.
-    static void ensure_getTokens(const std::string& desc,
-                                 const std::string& string,
-                                 const std::string& drop_delims,
-                                 const std::string& keep_delims,
-                                 const std::string& quotes,
-                                 const std::vector<std::string>& expect)
+    static void require_tokens(const std::string& desc,
+                               const std::string& string,
+                               const std::string& drop_delims,
+                               const std::string& keep_delims,
+                               const std::string& quotes,
+                               const std::vector<std::string>& expect)
     {
-        ensure_equals(desc + " - no esc",
-                      LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes),
+        INFO(desc);
+        REQUIRE(LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes) ==
                       expect);
-        ensure_equals(desc + " - empty esc",
-                      LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes, ""),
+        REQUIRE(LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes, "") ==
                       expect);
-        ensure_equals(desc + " - unused esc",
-                      LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes, "!"),
+        REQUIRE(LLStringUtil::getTokens(string, drop_delims, keep_delims, quotes, "!") ==
                       expect);
     }
 
-    static void ensure_getTokens(const std::string& desc,
-                                 const std::string& string,
-                                 const std::string& drop_delims,
-                                 const std::string& keep_delims,
-                                 const std::vector<std::string>& expect)
+    static void require_tokens(const std::string& desc,
+                               const std::string& string,
+                               const std::string& drop_delims,
+                               const std::string& keep_delims,
+                               const std::vector<std::string>& expect)
     {
-        ensure_getTokens(desc, string, drop_delims, keep_delims, "", expect);
+        require_tokens(desc, string, drop_delims, keep_delims, "", expect);
     }
 
-    template<> template<>
-    void string_index_object_t::test<42>()
+    TEST_CASE("LLString: getTokens keeps delimiters and handles quotes and escapes", "[LLString]")
     {
-        set_test_name("getTokens(\"delims\", etc.)");
         // Signatures to test in this method:
         // getTokens(string, drop_delims, keep_delims [, quotes [, escapes]])
         // If you omit keep_delims, you get the older function (test above).
 
         // cases like the getTokens(string, delims) tests above
-        ensure_getTokens("empty string", "", " ", "", StringVec());
-        ensure_getTokens("only delims",
-                         "   \r\n   ", " \r\n", "", StringVec());
-        ensure_getTokens("sequence of delims",
-                         ",,, one ,,,", ", ", "", StringVec{"one"});
+        require_tokens("empty string", "", " ", "", StringVec());
+        require_tokens("only delims",
+                       "   \r\n   ", " \r\n", "", StringVec());
+        require_tokens("sequence of delims",
+                       ",,, one ,,,", ", ", "", StringVec{"one"});
         // Note contrast with the case in the previous method
-        ensure_getTokens("noncontiguous tokens",
-                         ", ,, , one ,,,", ", ", "", StringVec{"one"});
-        ensure_getTokens("space-padded tokens",
-                         ",    one  ,  two  ,", ", ", "",
-                         StringVec{"one", "two"});
-        ensure_getTokens("no delims", "one", ",", "", StringVec{ "one" });
+        require_tokens("noncontiguous tokens",
+                       ", ,, , one ,,,", ", ", "", StringVec{"one"});
+        require_tokens("space-padded tokens",
+                       ",    one  ,  two  ,", ", ", "",
+                       StringVec{"one", "two"});
+        require_tokens("no delims", "one", ",", "", StringVec{ "one" });
 
         // drop_delims vs. keep_delims
-        ensure_getTokens("arithmetic",
-                         " ab+def  / xx*  yy ", " ", "+-*/", { "ab", "+", "def", "/", "xx", "*", "yy" });
+        require_tokens("arithmetic",
+                       " ab+def  / xx*  yy ", " ", "+-*/", { "ab", "+", "def", "/", "xx", "*", "yy" });
 
         // quotes
-        ensure_getTokens("no quotes",
-                         "She said, \"Don't go.\"", " ", ",", "", { "She", "said", ",", "\"Don't", "go.\"" });
-        ensure_getTokens("quotes",
-                         "She said, \"Don't go.\"", " ", ",", "\"", { "She", "said", ",", "Don't go." });
-        ensure_getTokens("quotes and delims",
-                         "run c:/'Documents and Settings'/someone", " ", "", "'",
-                         { "run", "c:/Documents and Settings/someone" });
-        ensure_getTokens("unmatched quote",
-                         "baby don't leave", " ", "", "'", { "baby", "don't", "leave" });
-        ensure_getTokens("adjacent quoted",
-                         "abc'def \"ghi'\"jkl' mno\"pqr", " ", "", "\"'", { "abcdef \"ghijkl' mnopqr" });
-        ensure_getTokens("quoted empty string",
-                         "--set SomeVar ''", " ", "", "'", { "--set", "SomeVar", "" });
+        require_tokens("no quotes",
+                       "She said, \"Don't go.\"", " ", ",", "", { "She", "said", ",", "\"Don't", "go.\"" });
+        require_tokens("quotes",
+                       "She said, \"Don't go.\"", " ", ",", "\"", { "She", "said", ",", "Don't go." });
+        require_tokens("quotes and delims",
+                       "run c:/'Documents and Settings'/someone", " ", "", "'",
+                       { "run", "c:/Documents and Settings/someone" });
+        require_tokens("unmatched quote",
+                       "baby don't leave", " ", "", "'", { "baby", "don't", "leave" });
+        require_tokens("adjacent quoted",
+                       "abc'def \"ghi'\"jkl' mno\"pqr", " ", "", "\"'", { "abcdef \"ghijkl' mnopqr" });
+        require_tokens("quoted empty string",
+                       "--set SomeVar ''", " ", "", "'", { "--set", "SomeVar", "" });
 
         // escapes
         // Don't use backslash as an escape for these tests -- you'll go nuts
         // between the C++ string scanner and getTokens() escapes. Test with
         // something else!
-        ensure_equals("escaped delims",
-                      LLStringUtil::getTokens("^ a - dog^-gone^ phrase", " ", "-", "", "^"),
+        UNSCOPED_INFO("escaped delims");
+        CHECK(LLStringUtil::getTokens("^ a - dog^-gone^ phrase", " ", "-", "", "^") ==
                       StringVec{ " a", "-", "dog-gone phrase" });
-        ensure_equals("escaped quotes",
-                      LLStringUtil::getTokens("say: 'this isn^'t w^orking'.", " ", "", "'", "^"),
+        UNSCOPED_INFO("escaped quotes");
+        CHECK(LLStringUtil::getTokens("say: 'this isn^'t w^orking'.", " ", "", "'", "^") ==
                       StringVec{ "say:", "this isn't working." });
-        ensure_equals("escaped escape",
-                      LLStringUtil::getTokens("want x^^2", " ", "", "", "^"), StringVec{ "want", "x^2" });
-        ensure_equals("escape at end", LLStringUtil::getTokens("it's^ up there^", " ", "", "'", "^"), StringVec{ "it's up", "there^" });
+        UNSCOPED_INFO("escaped escape");
+        CHECK(LLStringUtil::getTokens("want x^^2", " ", "", "", "^") == StringVec{ "want", "x^2" });
+        UNSCOPED_INFO("escape at end");
+        CHECK(LLStringUtil::getTokens("it's^ up there^", " ", "", "'", "^") == StringVec{ "it's up", "there^" });
     }
 
-    template<> template<>
-    void string_index_object_t::test<43>()
+    TEST_CASE("LLString: xml_encode and xml_decode escape element and attribute specials", "[LLString]")
     {
-        set_test_name("xml_encode/xml_decode");
-
-        ensure_equals("encode passthrough",
-                      LLStringFn::xml_encode("plain text"), "plain text");
-        ensure_equals("encode element specials",
-                      LLStringFn::xml_encode("a<b>c&d\"e'f"),
+        UNSCOPED_INFO("encode passthrough");
+        CHECK(LLStringFn::xml_encode("plain text") == "plain text");
+        UNSCOPED_INFO("encode element specials");
+        CHECK(LLStringFn::xml_encode("a<b>c&d\"e'f") ==
                       "a&lt;b&gt;c&amp;d\"e'f");
-        ensure_equals("encode attribute specials",
-                      LLStringFn::xml_encode("a<b>c&d\"e'f", true),
+        UNSCOPED_INFO("encode attribute specials");
+        CHECK(LLStringFn::xml_encode("a<b>c&d\"e'f", true) ==
                       "a&lt;b&gt;c&amp;d&quot;e&apos;f");
-        ensure_equals("encode empty", LLStringFn::xml_encode(""), "");
+        UNSCOPED_INFO("encode empty");
+        CHECK(LLStringFn::xml_encode("") == "");
 
-        ensure_equals("decode element specials",
-                      LLStringFn::xml_decode("a&lt;b&gt;c&amp;d&quot;e&apos;f"),
+        UNSCOPED_INFO("decode element specials");
+        CHECK(LLStringFn::xml_decode("a&lt;b&gt;c&amp;d&quot;e&apos;f") ==
                       "a<b>c&d&quot;e&apos;f");
-        ensure_equals("decode attribute specials",
-                      LLStringFn::xml_decode("a&lt;b&gt;c&amp;d&quot;e&apos;f", true),
+        UNSCOPED_INFO("decode attribute specials");
+        CHECK(LLStringFn::xml_decode("a&lt;b&gt;c&amp;d&quot;e&apos;f", true) ==
                       "a<b>c&d\"e'f");
-        ensure_equals("decode unknown entity untouched",
-                      LLStringFn::xml_decode("a&foo;b&"), "a&foo;b&");
+        UNSCOPED_INFO("decode unknown entity untouched");
+        CHECK(LLStringFn::xml_decode("a&foo;b&") == "a&foo;b&");
 
         // each literal decodes exactly once: &amp;lt; is the text "&lt;",
         // not a doubly-encoded "<"
-        ensure_equals("decode does not cascade",
-                      LLStringFn::xml_decode("a&amp;lt;b"), "a&lt;b");
-        ensure_equals("round trip nested entity text",
-                      LLStringFn::xml_decode(LLStringFn::xml_encode("a&lt;b")),
+        UNSCOPED_INFO("decode does not cascade");
+        CHECK(LLStringFn::xml_decode("a&amp;lt;b") == "a&lt;b");
+        UNSCOPED_INFO("round trip nested entity text");
+        CHECK(LLStringFn::xml_decode(LLStringFn::xml_encode("a&lt;b")) ==
                       "a&lt;b");
     }
 
-    template<> template<>
-    void string_index_object_t::test<44>()
+    TEST_CASE("LLString: format leaves unsubstitutable strings alone", "[LLString]")
     {
-        set_test_name("format leaves unsubstitutable strings alone");
-
         LLStringUtil::format_map_t fmt_map;
         fmt_map["FOO"] = "bar";
 
@@ -1060,30 +1022,143 @@ namespace tut
 
         for (const char* src : untouched)
         {
+            CAPTURE(src);
             std::string s(src);
-            ensure_equals(std::string("format_map count: ") + src,
-                          0, LLStringUtil::format(s, fmt_map));
-            ensure_equals(std::string("format_map result: ") + src, s, std::string(src));
+            REQUIRE(0 == LLStringUtil::format(s, fmt_map));
+            REQUIRE(s == std::string(src));
 
             std::string s2(src);
-            ensure_equals(std::string("LLSD count: ") + src,
-                          0, LLStringUtil::format(s2, sd_map));
-            ensure_equals(std::string("LLSD result: ") + src, s2, std::string(src));
+            REQUIRE(0 == LLStringUtil::format(s2, sd_map));
+            REQUIRE(s2 == std::string(src));
         }
 
         // A real substitution still fires, and the surrounding text — including
         // brackets that are not a key — survives it.
         std::string s("no [FOO] here [MISSING] -=[Stylized Name]=-");
-        ensure_equals("mixed count", 1, LLStringUtil::format(s, fmt_map));
-        ensure_equals("mixed result", s,
+        CHECK(1 == LLStringUtil::format(s, fmt_map));
+        CHECK(s ==
                       std::string("no bar here [MISSING] -=[Stylized Name]=-"));
     }
 
-    template<> template<>
-    void string_index_object_t::test<48>()
+    // Capitalising a byte can only ever reach ASCII, so the narrow form works
+    // in codepoints.
+    TEST_CASE("LLString: capitalize works in codepoints and not bytes", "[LLString]")
     {
-        set_test_name("format over two maps reads the first's value where both have a key, as a merge with the first kept would");
+        std::string str_val("hello world-again_now");
+        LLStringUtil::capitalize(str_val);
+        UNSCOPED_INFO("ascii words");
+        CHECK(str_val == "Hello World-Again_Now");
 
+        // U+00E9 -> U+00C9, which uppercasing one byte at a time could not do.
+        str_val = "\xC3\xA9" "cole";
+        LLStringUtil::capitalize(str_val);
+        UNSCOPED_INFO("accented first letter");
+        CHECK(str_val == "\xC3\x89" "cole");
+
+        // The word rule is the caller's and still only sees these three.
+        str_val = "a b-c_d.e";
+        LLStringUtil::capitalize(str_val);
+        UNSCOPED_INFO("dot is not a separator");
+        CHECK(str_val == "A B-C_D.e");
+
+        str_val = "";
+        LLStringUtil::capitalize(str_val);
+        UNSCOPED_INFO("empty");
+        CHECK(str_val == "");
+    }
+
+    // Both views replaceString takes are allowed to point into the string it is
+    // replacing into, and both are read after a replace that can have moved the
+    // buffer under them. Taking them by value used to make that safe without
+    // saying so; a view does not, so the guard is the only thing holding it up
+    // and nothing was watching the guard.
+    TEST_CASE("LLString: replaceString takes views into the string it replaces in", "[LLString]")
+    {
+        // replacement views the subject: the classic case, and the one the
+        // original guard covered.
+        {
+            std::string s("abcabc");
+            LLStringUtil::replaceString(s, "b", std::string_view(s).substr(0, 3));
+            UNSCOPED_INFO("replacement viewing the subject");
+            CHECK(s == std::string("aabccaabcc"));
+        }
+
+        // target views the subject. This one is read on every turn of the loop,
+        // so it dangles from the second replace onward rather than the first.
+        {
+            std::string s("xyxyxy");
+            LLStringUtil::replaceString(s, std::string_view(s).substr(0, 2), "Q");
+            UNSCOPED_INFO("target viewing the subject");
+            CHECK(s == std::string("QQQ"));
+        }
+
+        // Both at once, and a replacement long enough to force the subject to
+        // reallocate while the views are still live.
+        {
+            std::string s("aXbXc");
+            LLStringUtil::replaceString(s,
+                                        std::string_view(s).substr(1, 1),
+                                        std::string_view(s).substr(0, 1));
+            UNSCOPED_INFO("both viewing the subject");
+            CHECK(s == std::string("aabac"));
+        }
+
+        // And the ordinary path still works.
+        {
+            std::string s("one two one");
+            LLStringUtil::replaceString(s, "one", "three");
+            UNSCOPED_INFO("unrelated arguments");
+            CHECK(s == std::string("three two three"));
+        }
+        {
+            std::string s("aaa");
+            LLStringUtil::replaceString(s, "a", "aa");
+            UNSCOPED_INFO("replacement containing the target terminates");
+            CHECK(s == std::string("aaaaaa"));
+        }
+    }
+
+    // copyInto has the same shape: src may view dst, the append path appends
+    // from it, and the insert path assigns dst out from under it first.
+    TEST_CASE("LLString: copyInto takes a source that views the destination", "[LLString]")
+    {
+        // Append from a view of the destination.
+        {
+            std::string s("abcd");
+            LLStringUtil::copyInto(s, std::string_view(s).substr(0, 2), s.length());
+            UNSCOPED_INFO("append from a view of the destination");
+            CHECK(s == std::string("abcdab"));
+        }
+
+        // Insert from a view of the destination, at the front, so the assign
+        // that shortens dst happens before src is read.
+        {
+            std::string s("abcd");
+            LLStringUtil::copyInto(s, std::string_view(s).substr(2, 2), 0);
+            UNSCOPED_INFO("insert from a view of the destination");
+            CHECK(s == std::string("cdabcd"));
+        }
+
+        // A view of the whole of it, long enough that the growth reallocates.
+        {
+            std::string s("0123456789");
+            LLStringUtil::copyInto(s, std::string_view(s), 5);
+            UNSCOPED_INFO("insert the whole of the destination into itself");
+            CHECK(s == std::string("01234012345678956789"));
+        }
+
+        // Offset at the end is the append fast path; offset past it is not a
+        // case any caller has, so it is simply not exercised here.
+        {
+            std::string s("head");
+            LLStringUtil::copyInto(s, std::string("-tail"), s.length());
+            UNSCOPED_INFO("unrelated source appends");
+            CHECK(s == std::string("head-tail"));
+        }
+    }
+
+    TEST_CASE("LLString: format over two maps reads the first's value as a merge would", "[LLString]")
+    {
         LLStringUtil::format_map_t first;
         first["[APP]"] = "Alchemy";
         first["[BOTH]"] = "first";
@@ -1099,8 +1174,10 @@ namespace tut
         // as the merge's one lookup order had it.
         const char* const text = "[APP] for [NAME]: [BOTH], [BARE], [COUNT,number,2], [MISSING]";
         std::string       s(text);
-        ensure_equals("five put in", 5, LLStringUtil::format(s, first, second));
-        ensure_equals("from either, the first first, a number formatted, what neither has left", s,
+        UNSCOPED_INFO("five put in");
+        CHECK(5 == LLStringUtil::format(s, first, second));
+        UNSCOPED_INFO("from either, the first first, a number formatted, what neither has left");
+        CHECK(s ==
                       std::string("Alchemy for Rye: first, bare in the second, 3.14, [MISSING]"));
 
         // The same as the merge would give.
@@ -1108,17 +1185,22 @@ namespace tut
         merged.insert(second.begin(), second.end());
         std::string m(text);
         LLStringUtil::format(m, merged);
-        ensure_equals("as the merge", s, m);
+        UNSCOPED_INFO("as the merge");
+        CHECK(s == m);
 
         // The maps the other way about: the second's value where both have
         // the key.
         std::string r("[BOTH]");
-        ensure_equals("one put in", 1, LLStringUtil::format(r, second, first));
-        ensure_equals("the other first", r, std::string("second"));
+        UNSCOPED_INFO("one put in");
+        CHECK(1 == LLStringUtil::format(r, second, first));
+        UNSCOPED_INFO("the other first");
+        CHECK(r == std::string("second"));
 
         std::string plain("nothing bracketed");
-        ensure_equals("nothing to do", 0, LLStringUtil::format(plain, first, second));
-        ensure_equals("and nothing done", plain, std::string("nothing bracketed"));
+        UNSCOPED_INFO("nothing to do");
+        CHECK(0 == LLStringUtil::format(plain, first, second));
+        UNSCOPED_INFO("and nothing done");
+        CHECK(plain == std::string("nothing bracketed"));
 
         // A map over an LLSD map, as a notification's substitutions under
         // the defaults: the map first, the LLSD where the map has nothing,
@@ -1128,99 +1210,15 @@ namespace tut
         sd["NAME"] = "Rye";
         sd["[BOTH]"] = "the notification's";
         std::string over("[APP] for [NAME]: [BOTH]");
-        ensure_equals("three put in", 3, LLStringUtil::format(over, first, sd));
-        ensure_equals("the map first, the LLSD after", over, std::string("Alchemy for Rye: first"));
+        UNSCOPED_INFO("three put in");
+        CHECK(3 == LLStringUtil::format(over, first, sd));
+        UNSCOPED_INFO("the map first, the LLSD after");
+        CHECK(over == std::string("Alchemy for Rye: first"));
         LLSD not_a_map;
         std::string alone("[APP] [NAME]");
-        ensure_equals("with no LLSD map, the map alone", 1, LLStringUtil::format(alone, first, not_a_map));
-        ensure_equals("what the map had", alone, std::string("Alchemy [NAME]"));
-    }
-
-    // Both views replaceString takes are allowed to point into the string it is
-    // replacing into, and both are read after a replace that can have moved the
-    // buffer under them. Taking them by value used to make that safe without
-    // saying so; a view does not, so the guard is the only thing holding it up
-    // and nothing was watching the guard.
-    template<> template<>
-    void string_index_object_t::test<46>()
-    {
-        // replacement views the subject: the classic case, and the one the
-        // original guard covered.
-        {
-            std::string s("abcabc");
-            LLStringUtil::replaceString(s, "b", std::string_view(s).substr(0, 3));
-            ensure_equals("replacement viewing the subject",
-                          s, std::string("aabccaabcc"));
-        }
-
-        // target views the subject. This one is read on every turn of the loop,
-        // so it dangles from the second replace onward rather than the first.
-        {
-            std::string s("xyxyxy");
-            LLStringUtil::replaceString(s, std::string_view(s).substr(0, 2), "Q");
-            ensure_equals("target viewing the subject", s, std::string("QQQ"));
-        }
-
-        // Both at once, and a replacement long enough to force the subject to
-        // reallocate while the views are still live.
-        {
-            std::string s("aXbXc");
-            LLStringUtil::replaceString(s,
-                                        std::string_view(s).substr(1, 1),
-                                        std::string_view(s).substr(0, 1));
-            ensure_equals("both viewing the subject", s, std::string("aabac"));
-        }
-
-        // And the ordinary path still works.
-        {
-            std::string s("one two one");
-            LLStringUtil::replaceString(s, "one", "three");
-            ensure_equals("unrelated arguments", s, std::string("three two three"));
-        }
-        {
-            std::string s("aaa");
-            LLStringUtil::replaceString(s, "a", "aa");
-            ensure_equals("replacement containing the target terminates",
-                          s, std::string("aaaaaa"));
-        }
-    }
-
-    // copyInto has the same shape: src may view dst, the append path appends
-    // from it, and the insert path assigns dst out from under it first.
-    template<> template<>
-    void string_index_object_t::test<47>()
-    {
-        // Append from a view of the destination.
-        {
-            std::string s("abcd");
-            LLStringUtil::copyInto(s, std::string_view(s).substr(0, 2), s.length());
-            ensure_equals("append from a view of the destination",
-                          s, std::string("abcdab"));
-        }
-
-        // Insert from a view of the destination, at the front, so the assign
-        // that shortens dst happens before src is read.
-        {
-            std::string s("abcd");
-            LLStringUtil::copyInto(s, std::string_view(s).substr(2, 2), 0);
-            ensure_equals("insert from a view of the destination",
-                          s, std::string("cdabcd"));
-        }
-
-        // A view of the whole of it, long enough that the growth reallocates.
-        {
-            std::string s("0123456789");
-            LLStringUtil::copyInto(s, std::string_view(s), 5);
-            ensure_equals("insert the whole of the destination into itself",
-                          s, std::string("01234012345678956789"));
-        }
-
-        // Offset at the end is the append fast path; offset past it is not a
-        // case any caller has, so it is simply not exercised here.
-        {
-            std::string s("head");
-            LLStringUtil::copyInto(s, std::string("-tail"), s.length());
-            ensure_equals("unrelated source appends", s, std::string("head-tail"));
-        }
+        UNSCOPED_INFO("with no LLSD map, the map alone");
+        CHECK(1 == LLStringUtil::format(alone, first, not_a_map));
+        UNSCOPED_INFO("what the map had");
+        CHECK(alone == std::string("Alchemy [NAME]"));
     }
 }
