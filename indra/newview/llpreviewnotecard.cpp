@@ -29,6 +29,8 @@
 #include "llpreviewnotecard.h"
 
 #include "aldiffview.h"
+#include "alfloaterlightbox.h"
+#include "allookformat.h"
 #include "alscriptstudio.h"
 #include "alnotecardembedded.h"
 #include "alfilewrite.h"
@@ -403,11 +405,16 @@ void LLPreviewNotecard::loaded(const ALScriptLoaded& answer)
     mText->setMaxBytes(LLNotecard::MAX_SIZE);
     showModifiable(mModifiable);
     hideNotice();
-    showLinked();
     if (mCompare && mCompare->getVisible())
     {
         toggleCompare();
     }
+    // After the comparison is put away, which relabels the notice's third
+    // button for its own ends; before the link to a file and the recovery
+    // offers below, which take the line over where there is one: where
+    // saves go, and unsaved work, outrank a Look to try.
+    offerSharedLookImport(answer.text);
+    showLinked();
     mAssetStatus = PREVIEW_ASSET_LOADED;
     mKeeper.forget();
     syncExternal();
@@ -421,6 +428,42 @@ void LLPreviewNotecard::loaded(const ALScriptLoaded& answer)
     {
         offerKept();
     }
+}
+
+void LLPreviewNotecard::offerSharedLookImport(const std::string& notecard_text)
+{
+    // A glance, not a parse: the Lightbox parses once, when asked. And
+    // asked it must be -- a notecard given can open on its own, so opening
+    // one applies nothing; the click is the consent. Asked once: a notecard
+    // saved again elsewhere is loaded again, and the offer is not to come
+    // back every time once it has been answered.
+    if (mLookOfferAnswered || !ALLookFormat::looksLikeLookNotecard(notecard_text))
+    {
+        return;
+    }
+    // The text as it was saved, which is what was shared, rather than
+    // whatever is typed over it here afterwards -- read when the button is
+    // pressed, since a save from this window since then is the text now.
+    // And not while there is typing here nothing has saved: the import
+    // would take the text from before it, with nothing to say so.
+    mLookOfferText = notecard_text;
+    const auto take = [this](ALFloaterLightBox::SharedLookImport what) {
+        if (mText->isDirty())
+        {
+            setStatus(getString("LookSaveFirst"), true);
+            return;
+        }
+        mLookOfferAnswered = true;
+        hideNotice();
+        ALFloaterLightBox::importSharedLookFromText(mLookOfferText, mNoteName, what);
+    };
+    showNotice(getString("LookOffer"),
+               { { getString("LookApply"), [take]() { take(ALFloaterLightBox::SharedLookImport::SaveAndApply); } },
+                 { getString("LookAdd"), [take]() { take(ALFloaterLightBox::SharedLookImport::SaveOnly); } },
+                 { getString("LookNotNow"), [this]() {
+                      mLookOfferAnswered = true;
+                      hideNotice();
+                  } } });
 }
 
 void LLPreviewNotecard::showUnloaded(const std::string& why)
@@ -485,6 +528,7 @@ bool LLPreviewNotecard::saveIfNeeded()
     ALScriptWorkspace& workspace = ALScriptWorkspace::instance();
     mSaveRequest                 = workspace.newRequest();
     mSavePoint                   = mText->savePoint();
+    mSentText                    = text;
     LLHandle<LLFloater> handle   = getHandle();
     std::string         error;
     const bool          sent = workspace.saveNotecard(
@@ -592,6 +636,9 @@ void LLPreviewNotecard::savedHere(const ALScriptCompileResult& result)
     }
     mText->markSavedAt(mSavePoint);
     mItems->saved(mSentItems);
+    // The Look an offer still up would import is the one just saved.
+    mLookOfferText = std::move(mSentText);
+    mSentText.clear();
     if (result.newAssetId.notNull())
     {
         mAssetID = result.newAssetId;
@@ -637,6 +684,9 @@ void LLPreviewNotecard::heard(const ALScriptSaved& saved)
         case ALScriptSaved::Heard::Same:
             mText->resetDirty();
             mKeeper.forget();
+            // What is here is what was saved there, and so what an offer
+            // still up imports.
+            mLookOfferText = saved.text;
             return;
         case ALScriptSaved::Heard::Keep:
             return;

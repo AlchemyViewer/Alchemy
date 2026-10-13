@@ -40,7 +40,6 @@
     <floater.string name="SnippetCopyName">[NAME] (copy)</floater.string>
     <floater.string name="SnippetBuiltin">Built into the viewer. Copy it to make a version you can change.</floater.string>
     <floater.string name="SnippetsNotecardName">Script snippets</floater.string>
-    <floater.string name="SnippetsNotecardNotMade">the notecard could not be made</floater.string>
     <floater.string name="SnippetsOnlyNotecards">Only a notecard in your inventory can bring snippets in</floater.string>
     <floater.string name="SnippetsFollowOnlyNotecards">Only a notecard in your inventory can be followed for snippets</floater.string>
     <floater.string name="SnippetFollowed">From [NAME], the notecard you follow. Copy it to make a version of your own, or change it in the notecard.</floater.string>

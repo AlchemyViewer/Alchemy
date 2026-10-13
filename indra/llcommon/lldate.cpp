@@ -134,9 +134,20 @@ namespace
             s.setstate(std::ios::failbit);
             return false;
         }
-        S32 value = 0;
+        // No more digits than an S32 always holds: a date is read from
+        // documents that come from outside (LLSD XML's <date>), and more
+        // would overflow it, which is undefined. Nine are more than any
+        // field of a date has.
+        constexpr S32 MAX_DIGITS = 9;
+        S32 value  = 0;
+        S32 digits = 0;
         while (c >= '0' && c <= '9')
         {
+            if (++digits > MAX_DIGITS)
+            {
+                s.setstate(std::ios::failbit);
+                return false;
+            }
             value = value * 10 + (c - '0');
             s.rdbuf()->sbumpc();
             c = date_peek(s);
@@ -220,7 +231,10 @@ LLDate::LLDate(const std::string& iso8601_date)
 {
     if(!fromString(iso8601_date))
     {
-        LL_WARNS() << "date " << iso8601_date << " failed to parse; "
+        // As much of it as a date has: the text can come from outside, and
+        // be as long as whatever carried it.
+        constexpr size_t LOGGED = 64;
+        LL_WARNS() << "date " << iso8601_date.substr(0, LOGGED) << (iso8601_date.size() > LOGGED ? "..." : "") << " failed to parse; "
             << "ZEROING IT OUT" << LL_ENDL;
         mSecondsSinceEpoch = DATE_EPOCH;
     }
@@ -392,6 +406,13 @@ bool LLDate::fromStream(std::istream& s)
         if (c == ':')
         {
             s >> offset_minutes;
+        }
+
+        // An offset no clock has is no date: a number too long for an S32
+        // reads as its largest, and multiplied out would overflow it.
+        if (offset_hours < -99 || offset_hours > 99 || offset_minutes < 0 || offset_minutes > 59)
+        {
+            return false;
         }
 
         offset_in_seconds =  (offset_hours * 60 + offset_sign * offset_minutes) * 60;

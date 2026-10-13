@@ -39,6 +39,9 @@ typedef U32 uint32_t;
 
 #include <zlib.h>
 
+#include <limits>
+#include <utility>
+
 #include "llsd.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
@@ -850,6 +853,141 @@ namespace
             "<llsd><binary> \n </binary></llsd>",
             LLSD(LLSD::Binary()),
             1);
+    }
+
+    template<> template<>
+    void TestLLSDXMLParsingObject::test<7>()
+    {
+        // The depth limit counts every element, <llsd> itself included.
+        ensureParse(
+            "two deep fits a limit of two",
+            "<llsd><integer>1</integer></llsd>",
+            LLSD(1),
+            1,
+            2);
+        ensureParse(
+            "two deep fails a limit of one",
+            "<llsd><integer>1</integer></llsd>",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE,
+            1);
+        // A self-closing element past the limit is started and ended in one
+        // scan: it must not pop what it never pushed.
+        ensureParse(
+            "a self-closing element past the limit",
+            "<llsd><integer/></llsd>",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE,
+            1);
+        ensureParse(
+            "a key past the limit inside a map",
+            "<llsd><map><key>a</key><map><key>b</key><undef/></map></map></llsd>",
+            LLSD(),
+            LLSDParser::PARSE_FAILURE,
+            3);
+        LLSD nested = LLSD::emptyMap();
+        nested["a"] = LLSD::emptyMap();
+        nested["a"]["b"] = 1;
+        // Two maps and an integer: three values parsed.
+        ensureParse(
+            "the same within the limit",
+            "<llsd><map><key>a</key><map><key>b</key><integer>1</integer></map></map></llsd>",
+            nested,
+            3,
+            5);
+        ensureParse(
+            "no limit",
+            "<llsd><map><key>a</key><map><key>b</key><integer>1</integer></map></map></llsd>",
+            nested,
+            3,
+            -1);
+    }
+
+    template<> template<>
+    void TestLLSDXMLParsingObject::test<8>()
+    {
+        // Character references must name an XML Char: a surrogate, a
+        // non-character or a C0 control other than tab, newline and return
+        // would otherwise come out as bytes no UTF-8 reader takes.
+        ensureParse(
+            "a tab by reference",
+            "<llsd><string>a&#x9;b</string></llsd>",
+            LLSD("a\tb"),
+            1);
+        ensureParse(
+            "a newline by reference",
+            "<llsd><string>a&#xA;b</string></llsd>",
+            LLSD("a\nb"),
+            1);
+        ensureParse(
+            "a return by reference",
+            "<llsd><string>a&#xD;b</string></llsd>",
+            LLSD("a\rb"),
+            1);
+        ensureParse(
+            "a C1 control by reference is a Char",
+            "<llsd><string>a&#x85;b</string></llsd>",
+            LLSD("a\xC2\x85" "b"),
+            1);
+        ensureParse(
+            "a line separator by reference is a Char",
+            "<llsd><string>a&#x2028;b</string></llsd>",
+            LLSD("a\xE2\x80\xA8" "b"),
+            1);
+        ensureParse(
+            "an astral character by reference",
+            "<llsd><string>&#x1F305;</string></llsd>",
+            LLSD("\xF0\x9F\x8C\x85"),
+            1);
+        for (const char* reference : { "&#xD800;", "&#xDFFF;", "&#xFFFE;", "&#xFFFF;", "&#x1;", "&#0;", "&#x110000;", "&#x1F;", "&#55296;", "&#57343;" })
+        {
+            ensureParse(
+                std::string("not a Char: ") + reference,
+                std::string("<llsd><string>") + reference + "</string></llsd>",
+                LLSD(),
+                LLSDParser::PARSE_FAILURE);
+        }
+        // Each end of each range the production allows, so that a bound off
+        // by one shows: the first after the C0 controls, the last before the
+        // surrogates, the first after them, the last before the
+        // non-characters, and the first and last astral ones.
+        const std::pair<const char*, const char*> edges[] = {
+            { "&#x20;", " " },
+            { "&#xD7FF;", "\xED\x9F\xBF" },
+            { "&#xE000;", "\xEE\x80\x80" },
+            { "&#xFFFD;", "\xEF\xBF\xBD" },
+            { "&#x10000;", "\xF0\x90\x80\x80" },
+            { "&#x10FFFF;", "\xF4\x8F\xBF\xBF" },
+            { "&#65;", "A" },
+        };
+        for (const auto& [reference, utf8] : edges)
+        {
+            ensureParse(
+                std::string("a Char: ") + reference,
+                std::string("<llsd><string>") + reference + "</string></llsd>",
+                LLSD(std::string(utf8)),
+                1);
+        }
+    }
+
+    template<> template<>
+    void TestLLSDXMLParsingObject::test<9>()
+    {
+        // An integer element that does not begin with decimal digits is read
+        // through a real (digits first stop at the first thing that is not
+        // one, so "1.75" and "1e300" are both 1, and a '+' is skipped before
+        // them): what an integer cannot hold is held to its ends, and what is
+        // no number is 0, rather than cast as it is, which is undefined.
+        const LLSD::Integer top    = std::numeric_limits<LLSD::Integer>::max();
+        const LLSD::Integer bottom = std::numeric_limits<LLSD::Integer>::min();
+        ensureParse("a fraction is truncated", "<llsd><integer>.75</integer></llsd>", LLSD(0), 1);
+        ensureParse("digits first stop where the digits do", "<llsd><integer>1e300</integer></llsd>", LLSD(1), 1);
+        ensureParse("past the top", "<llsd><integer>.5e300</integer></llsd>", LLSD(top), 1);
+        ensureParse("past the bottom", "<llsd><integer>-.5e300</integer></llsd>", LLSD(bottom), 1);
+        ensureParse("a decimal past 2^31", "<llsd><integer>99999999999999999999</integer></llsd>", LLSD(top), 1);
+        ensureParse("infinity", "<llsd><integer>inf</integer></llsd>", LLSD(top), 1);
+        ensureParse("minus infinity", "<llsd><integer>-inf</integer></llsd>", LLSD(bottom), 1);
+        ensureParse("not a number", "<llsd><integer>nan</integer></llsd>", LLSD(0), 1);
     }
 
     /*

@@ -277,4 +277,22 @@ namespace tut
         CHECK(day_end != std::string::npos);
         CHECK(day_end > 0);
     }
+
+    // A date read from a document from outside: a field longer than an S32
+    // holds, or an offset no clock has, is no date -- rather than an
+    // overflow, which is undefined.
+    template<> template<>
+    void date_test_object_t::test<11>()
+    {
+        LLDate d;
+        ensure("nine digits of a field still read", d.fromString("2026-01-01T00:00:000000005Z"));
+        ensure_equals("as the number they are", d.asString(), std::string("2026-01-01T00:00:05Z"));
+        ensure("eleven digits of year are no date", !d.fromString("99999999999-01-01T00:00:00Z"));
+        ensure("nor eleven of seconds", !d.fromString("2026-01-01T00:00:99999999999Z"));
+        ensure("an offset of a billion hours is no date", !d.fromString("2026-01-01T00:00:00+999999999999"));
+        ensure("an offset of a hundred hours is none either", !d.fromString("2026-01-01T00:00:00+100:00"));
+        ensure("an ordinary offset still reads", d.fromString("2026-01-01T12:00:00+05:30"));
+        ensure_equals("and moves the time by it", d.asString(), std::string("2026-01-01T06:30:00Z"));
+        ensure("a short field still reads", d.fromString("2006-4-24T1:2:3Z"));
+    }
 }

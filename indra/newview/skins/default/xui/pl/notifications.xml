@@ -3148,7 +3148,7 @@ Zostaną zablokowane na kilka sekund dla bezpieczeństwa.
 		Nie można zapisać zrzutu ekranu do [PATH]: Katalog nie istnieje.
 	</notification>
 	<notification name="PresetNotSaved">
-		Błąd podczas zapisywania ustawienia [NAME].
+		Błąd podczas zapisywania ustawienia &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
 	</notification>
 	<notification name="DefaultPresetNotSaved">
 		Nie można zastąpić domyślnego ustawienia.
@@ -3158,7 +3158,7 @@ Zostaną zablokowane na kilka sekund dla bezpieczeństwa.
 to ustawienie lub wybrać inną nazwę.
 	</notification>
 	<notification name="PresetNotDeleted">
-		Błąd podczas usuwania ustawienia [NAME].
+		Błąd podczas usuwania ustawienia &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
 	</notification>
 	<notification name="UnableToFindHelpTopic">
 		Nie można znaleźć tematu pomocy dla tego elementu.

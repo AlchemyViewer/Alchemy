@@ -3264,13 +3264,13 @@ Güvenliğiniz için birkaç saniye engellenecek.
 		Anlık görüntü [PATH] yoluna kaydedilemedi: Dizin mevcut değil.
 	</notification>
 	<notification name="PresetNotSaved">
-		Ön ayar ([NAME]) kaydedilirken hata oluştu.
+		Ön ayar (&lt;nolink&gt;[NAME]&lt;/nolink&gt;) kaydedilirken hata oluştu.
 	</notification>
 	<notification name="DefaultPresetNotSaved">
 		Varsayılan ön ayarın üzerine yazılamıyor.
 	</notification>
 	<notification name="PresetNotDeleted">
-		Ön ayar ([NAME]) silinirken hata oluştu.
+		Ön ayar (&lt;nolink&gt;[NAME]&lt;/nolink&gt;) silinirken hata oluştu.
 	</notification>
 	<notification name="UnableToFindHelpTopic">
 		Bu öğe için yardım başlığı bulunamıyor.

@@ -31,6 +31,7 @@
 #include "llinventorymodel.h"
 #include "llinventory.h"
 #include "llhandle.h"
+#include "llui.h"
 #include "llwearabletype.h"
 
 // compute_stock_count() return error code
@@ -68,6 +69,13 @@ void show_task_item_profile(const LLUUID& item_uuid, const LLUUID& object_id);
 
 void show_item_original(const LLUUID& item_uuid);
 void reset_inventory_filter();
+
+// The notecard of the agent's own that a drag carries, a link as what it
+// links to -- the notecard's asset is what changes as it is edited; null
+// where it carries anything else. The kind first: a drag of a person or a
+// group carries an id, not an item. For a handleDragAndDrop that takes
+// notecards.
+const LLViewerInventoryItem* get_dropped_notecard(EDragAndDropType cargo_type, void* cargo_data);
 
 // Nudge the listing categories in the inventory to signal that their marketplace status changed
 void update_marketplace_category(const LLUUID& cat_id, bool perform_consistency_enforcement = true, bool skip_clear_listing = false);

@@ -28,15 +28,13 @@
 
 #include "llfloatersaveprefpreset.h"
 
+#include "allookformat.h"
 #include "llbutton.h"
 #include "llcombobox.h"
 #include "llfloaterpreference.h"
 #include "llfloaterreg.h"
 #include "llnotificationsutil.h"
 #include "llpresetsmanager.h"
-#include "lltrans.h"
-
-#include <algorithm>
 
 namespace
 {
@@ -48,27 +46,6 @@ namespace
             args["NAME"] = name;
             LLNotificationsUtil::add("PresetNotSaved", args);
         }
-    }
-
-    bool presetExists(const std::string& subdirectory, const std::string& name)
-    {
-        std::list<std::string> names;
-        LLPresetsManager::getInstance()->loadPresetNamesFromDir(subdirectory, names, DEFAULT_HIDE);
-
-        // Case-insensitively, because the comparison stands in for the
-        // filesystem that will do the overwrite, and on Windows and macOS that
-        // filesystem does not care about case: saving "sunset" over
-        // "Sunset.xml" replaces it. Matching exactly here would let that pair
-        // slip past the confirmation. On Linux this warns for a name that
-        // would actually coexist, which errs the survivable way round.
-        std::string wanted(name);
-        LLStringUtil::toLower(wanted);
-        return std::any_of(names.begin(), names.end(),
-            [&wanted](std::string existing)
-            {
-                LLStringUtil::toLower(existing);
-                return existing == wanted;
-            });
     }
 }
 
@@ -142,10 +119,46 @@ void LLFloaterSavePrefPreset::onBtnSave()
 {
     std::string name = mPresetCombo->getSimple();
 
-    std::string upper_name(name);
-    LLStringUtil::toUpper(upper_name);
+    // A Look is held to the rule a Look from outside is: a file is named
+    // after it, so no name that begins with a dot (the list would never show
+    // it), draws nothing, names a Windows device, or makes a path longer
+    // than Windows opens. A name with nothing to keep is refused; one that
+    // had to change is put back in the field to be looked at, since it would
+    // otherwise save a second Look beside the one meant -- and the floater
+    // stays up either way.
+    if (PRESETS_LOOKS == mSubdirectory)
+    {
+        const std::string clean = ALLookFormat::lookNameFromUntrustedText(name);
+        if (clean.empty())
+        {
+            LLNotificationsUtil::add("LightBoxLookNameRefused");
+            return;
+        }
+        const std::string held = ALLookFormat::numberedLookName(clean, 1, LLPresetsManager::escapedPresetNameLimit(PRESETS_LOOKS));
+        if (held.empty())
+        {
+            LLNotificationsUtil::add("LightBoxLookNameTooLong");
+            return;
+        }
+        std::string typed = name;
+        LLStringUtil::trim(typed);
+        if (held != typed)
+        {
+            mPresetCombo->setTextEntry(held);
+            LLNotificationsUtil::add("LightBoxLookNameChanged");
+            return;
+        }
+        // Neutral is what the Lightbox falls back to; saved over, it would
+        // not be neutral any more.
+        if (LLPresetsManager::isProtectedLookName(held))
+        {
+            LLNotificationsUtil::add("LightBoxLookNeutralProtected");
+            return;
+        }
+        name = held;
+    }
 
-    if ((name == LLTrans::getString(PRESETS_DEFAULT)) || (upper_name == PRESETS_DEFAULT_UPPER))
+    if (LLPresetsManager::isReservedPresetName(name))
     {
         LLNotificationsUtil::add("DefaultPresetNotSaved");
         closeFloater();
@@ -160,7 +173,7 @@ void LLFloaterSavePrefPreset::onBtnSave()
     // option here either -- the Lightbox's own Save button only ever
     // overwrites the *active* Look, so this is the only route to replacing any
     // other one.
-    if (PRESETS_LOOKS == mSubdirectory && presetExists(mSubdirectory, name))
+    if (PRESETS_LOOKS == mSubdirectory && LLPresetsManager::getInstance()->presetExists(mSubdirectory, name))
     {
         LLSD args;
         args["NAME"] = name;

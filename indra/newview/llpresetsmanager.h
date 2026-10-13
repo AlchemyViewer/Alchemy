@@ -38,6 +38,10 @@ static const std::string PRESETS_DIR = "presets";
 static const std::string PRESETS_GRAPHIC = "graphic";
 static const std::string PRESETS_CAMERA = "camera";
 static const std::string PRESETS_LOOKS = "looks";
+/// The Look the Lightbox falls back to -- when the Look in use is deleted --
+/// and so the one Look that may be neither saved over nor deleted: it has to
+/// stay neutral. Bundled in app_settings/looks as "Neutral.xml".
+static const std::string LOOK_NEUTRAL = "Neutral";
 /// Which bundled Looks have already been copied into the user's directory, so a
 /// Look added in a later release still reaches an existing user while one they
 /// deleted stays deleted. Lives in the user settings root and NOT in the looks
@@ -79,9 +83,96 @@ public:
     void loadPresetNamesFromDir(const std::string& subdirectory, preset_name_list_t& presets, EDefaultOptions default_option);
     bool savePreset(const std::string& subdirectory, std::string name, bool createDefault = false);
     void loadPreset(const std::string& subdirectory, std::string name);
+
+    /// Where a preset of that name lives: its subdirectory, and its name
+    /// escaped as a file name.
+    static std::string getPresetFilePath(const std::string& subdirectory, const std::string& name);
+    /// How long a preset's name may be once escaped as a file name, for it
+    /// to be written (as "<name>.xml") in that subdirectory: on
+    /// Windows, what MAX_PATH leaves after the folder's path; elsewhere, what
+    /// a file name holds. 0 where the folder's path leaves nothing.
+    static size_t escapedPresetNameLimit(const std::string& subdirectory);
+    /// A preset file read as the settings map it holds. False, with a
+    /// warning, where there is no such file or it is not a map.
+    bool readPresetFile(const std::string& subdirectory, const std::string& name, LLSD& params);
+    /// A settings map written as a preset file, in the shape every preset
+    /// file has: `name -> {Comment, Persist, Type, Value}`, indented.
+    bool writePresetFile(const std::string& subdirectory, const std::string& name, const LLSD& params);
+    /// Whether a preset of that name exists, ignoring case: the comparison
+    /// stands in for the file system that would overwrite it, and on
+    /// Windows and macOS that file system does not care about case.
+    bool presetExists(const std::string& subdirectory, const std::string& name);
+    /// Whether no preset may be saved under that name: the default preset's,
+    /// in any case and as translated -- the rule the Save As dialog refuses
+    /// by, and the one a Look from outside is held to.
+    static bool isReservedPresetName(const std::string& name);
+    /// Whether a Look of that name may be neither saved over nor deleted:
+    /// LOOK_NEUTRAL, matched as ALLookFormat::lookNameKey matches names.
+    static bool isProtectedLookName(const std::string& name);
+    /// The bundled Neutral copied back into the Looks folder where there is
+    /// none there -- one deleted before it was protected, or never seeded.
+    /// False where there is none and it could not be copied.
+    bool ensureNeutralLook();
+    /// The bundled Neutral copied over the one in the Looks folder: the way
+    /// back for a Neutral saved over before it was protected, which can
+    /// then be neither saved over nor deleted. What Delete does with
+    /// Neutral, once asked. False where it could not be copied.
+    bool restoreNeutralLook();
+
+    /// What a Look's map says about one setting: nothing; a value that is
+    /// refused (ALLookFormat::sanitizeLookValue, by the setting's own type,
+    /// or no such setting, or an entry without a Value); or a value as it
+    /// is to be written, in `clean` -- held to the setting's range, and
+    /// `adjusted`, where asked for, told whether that moved it. `ctrl`, where
+    /// asked for, is the setting itself, null where there is none.
+    enum class LookEntry
+    {
+        Absent,
+        Refused,
+        Taken
+    };
+    LookEntry judgeLookEntry(const LLSD& settings, const std::string& ctrl_name, LLSD& clean, LLControlVariable** ctrl = nullptr,
+                             bool* adjusted = nullptr);
+
+    /// What was taken from a Look as it was applied or saved: written (and
+    /// of those, how many were moved into their setting's range), present
+    /// but malformed, and not a Look's setting at all and so ignored.
+    struct LookSettingCounts
+    {
+        S32 accepted = 0;
+        S32 adjusted = 0;
+        S32 rejected = 0;
+        S32 unknown  = 0;
+    };
     // Looks apply only whitelisted keys from the file (never a raw
-    // loadFromFile), so shared Look files cannot carry unrelated settings.
+    // loadFromFile), so shared Look files cannot carry unrelated settings;
+    // and every value is judged first (ALLookFormat::sanitizeLookValue),
+    // so a file cannot put a NaN, a wrong type or a path into one either.
     bool loadLooksPreset(std::string name);
+    /// The whitelisted settings as they stand, in the shape a Look file has.
+    LLSD captureLookSettings();
+    /// A Look from outside -- `name -> {Type, Value}`, as a notecard carries
+    /// one -- written to the Looks folder under `name`, normalised to the
+    /// shape a saved Look has, with the values that pass judgment and the
+    /// setting's own default in place of each that does not, so that the
+    /// file is the full snapshot a saved Look is.
+    /// Nothing is applied, and the active Look is not changed; the list
+    /// signal fires where it is saved.
+    enum class SharedLookSave
+    {
+        Saved,
+        // Nothing in it this viewer can use: every setting unknown here
+        // (a newer viewer's) or refused. `counts` says how many of each.
+        NothingUsable,
+        // The name is one no Look may have, or the file could not be written.
+        NotWritten
+    };
+    SharedLookSave saveSharedLook(const std::string& name, const LLSD& shared_settings, LookSettingCounts& counts);
+    /// Whether the Look saved under `name` holds exactly the values a Look
+    /// from outside does, setting for setting, as each would be written --
+    /// and, on a side that is a full snapshot (applyLookSettings), a setting
+    /// it lacks as the default applying it would put there.
+    bool lookHoldsSameSettings(const std::string& name, const LLSD& shared_settings);
     // The single source of truth for what a Look carries. Public because the
     // Lightbox's undo stack watches exactly this list: a setting worth saving
     // into a Look is a setting worth undoing, and sharing the list means a new
@@ -122,6 +213,16 @@ public:
     void cameraSettingChanged();
     void looksSettingChanged();
     void copyDefaultLooks();
+
+    /// A setting's entry as a preset file holds it: its Comment, Persist,
+    /// Type and this value. Non-const because LLControlVariable::type() is.
+    static LLSD describeSetting(LLControlVariable& ctrl, const LLSD& value);
+    /// Every named setting's entry, with its live value, put into `params`.
+    void addLiveSettings(const std::vector<std::string>& names, LLSD& params);
+    /// The whitelisted settings a Look's map carries written, each judged
+    /// first, and the rest reset where the map is a full snapshot. The
+    /// body of loadLooksPreset, for a Look that is already a map.
+    LookSettingCounts applyLookSettings(const LLSD& params);
 
     std::vector<boost::signals2::connection> mGraphicsChangedSignals;
     std::vector<boost::signals2::connection> mCameraChangedSignals;

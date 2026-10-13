@@ -29,6 +29,8 @@ statics), so edits preview live with no glue code.
 | Where every section and setting is, found once | `indra/newview/allightboxdirectory.{h,cpp}` |
 | Looks preset system + whitelist | `indra/newview/llpresetsmanager.{h,cpp}` |
 | Bundled starter Looks | `indra/newview/app_settings/looks/` |
+| A Look as a notecard's text: written, read, every value judged (§9b) | `indra/newview/allookformat.{h,cpp}` |
+| A Look notecard made in inventory, and one read back into the Looks | `indra/newview/allooknotecard.{h,cpp}` |
 | Colour wheel widget + its maths | `indra/newview/alcolorwheel{ctrl,model}.{h,cpp}` |
 | Curve/band graph widget + its maths (the spline, the split-tone ramps, and the `ALToneCurveSet` the renderer bakes) | `indra/newview/alcurve{editorctrl,model}.{h,cpp}` |
 | Scopes floater + measurement | `indra/newview/alfloaterscopes.{h,cpp}`, `alscopedata.{h,cpp}` |
@@ -42,11 +44,12 @@ statics), so edits preview live with no glue code.
 | A swatch handing its picker to its owner | `indra/newview/llcolorswatch.{h,cpp}` |
 | Anti-aliased 2D polyline and fill | `indra/llrender/llrender2dutils.{h,cpp}` |
 
-Seven of those have unit tests, and the tests are the reason the maths in them
+Eight of those have unit tests, and the tests are the reason the maths in them
 can be trusted: `alcolorwheelmodel_test`, `alcurvemodel_test`,
-`aldaycyclelandmarks_test`, `algradehistory_test`, `alscopedata_test`,
-`alwhitebalancesolver_test`, `lutcube_test`. Anything with arithmetic in it —
-including a parser fed files from the internet — belongs on that list.
+`aldaycyclelandmarks_test`, `algradehistory_test`, `allookformat_test`,
+`alscopedata_test`, `alwhitebalancesolver_test`, `lutcube_test`. Anything with
+arithmetic in it — including a parser fed files from the internet, which is
+what a Look notecard is — belongs on that list.
 
 ### What v2 added, and what it altered
 
@@ -839,8 +842,8 @@ refresh off each of those is more places to forget than a polled compare costs.
 
 **The bar** (`lightbox_topbar` in `floater_lightbox_settings.xml`) holds every
 button the floater has but one. Left to right: the Looks `combo_box`, then Save
-/ Save As / Delete / Revert, then Undo / Redo / History, then Scopes, then
-Find. **The one button that is not there is Pop-out**, at the right end of the
+/ Save As / Share / Delete / Revert, then Undo / Redo / History, then Scopes,
+then Find. **The one button that is not there is Pop-out**, at the right end of the
 tab strip: it acts on the tab that is up, so it sits at the end of the tabs.
 **Only a button about a tab belongs on the strip**; Scopes and Find were tried
 there and read as out of place, since neither is about a tab. The bar used to
@@ -848,12 +851,13 @@ hold Pop-out as well, and at `min_width` it had spent all 422px it had, which
 had pushed `min_width` from 420 to 430. With Pop-out on the strip, `min_width`
 is back to 420, and the bar has room to spare, which the Looks combo takes: it
 stretches with the floater instead of being the fixed 150px that was left over.
-It is 148 at `min_width` and 188 at the default 460.
+It is 123 at `min_width` and 163 at the default 460 (it was 148 and 188 before
+Share joined the Look group).
 
 The row was sized in XUI Studio: the bar is `left="6" top="16"`, 26 tall, and
 everything in it is 24 tall at `top="0"`. The buttons are 24×24. The combo
-takes `left="1" right="-261"` and follows the right edge; `left="1"` puts it at
-the floater's x 7, over the tab container's left edge. The nine buttons follow
+takes `left="1" right="-286"` and follows the right edge; `left="1"` puts it at
+the floater's x 7, over the tab container's left edge. The ten buttons follow
 `top|right` and are placed by `right` rather than `left_pad`: the last is 6 in
 from the edge, each one before it 25 further in (24 and a gap of 1), and 10 more
 where the group changes. **Four groups, separated by 11px where the buttons
@@ -862,7 +866,7 @@ are different kinds of thing: the first group acts on the Look, the second on
 the grade's own history, the third opens another window, and the fourth finds a
 place in this one. So keep it if you add another kind, and use 1px if you are
 extending a group. A new button here comes out of the combo's width: add 25 to
-the 261, or 35 if it starts a group of its own.
+the 286, or 35 if it starts a group of its own.
 
 **Every `top` in this file is measured from under the title bar**, not from the
 window's top edge. The floater sets no `legacy_header_height`, so once its
@@ -1333,10 +1337,79 @@ so a Look saved before a key existed applies that key at its default — which
 is what keeps "Neutral" neutral for a user whose seeded copies predate the
 key. Three fences: only a file carrying at least half the whitelist counts as
 a snapshot (a truncated or hand-trimmed file applies what it has and touches
-nothing else), a key that is present but malformed is skipped as it always
-was, and the `RenderColorGrade` master switch is never reset by absence. To refresh the bundled
-files after tuning: save the Look in the viewer, then copy the saved file from
-`<user_settings>/presets/looks/` over the bundled one.
+nothing else), a key whose value is refused is skipped (and still counts as
+carried), and the `RenderColorGrade` master switch is never reset by absence.
+To refresh the bundled files after tuning: save the Look in the viewer, then
+copy the saved file from `<user_settings>/presets/looks/` over the bundled one.
+
+**Every value is judged before it is written**, whether it came from a file on
+disk or a notecard from a stranger: `ALLookFormat::sanitizeLookValue` is asked,
+by the setting's own `Type` string, and `applyLookSettings` skips what it
+refuses. **The settings system stores whatever LLSD a widget hands it** and
+coerces on the way out — a dropdown bound to an S32 writes its item's value
+as the *string* `"5"`, and a checkbox's Boolean has been seen stored as the
+*real* `1` (every bundled Look carries `RenderGlowNoise` so) — so the rules
+take exactly what that coercion would make sense of, and no more. By type:
+`F32` takes a Real or Integer, or a text that is a number and nothing else,
+as a Real — finite as the *float* the setting is, not merely as the double
+LLSD holds: `1e39` is a number in LLSD and an infinity by the time
+`convert_from_llsd<F32>` has cast it, which the first fuzz run of the reader
+found; `S32` and `U32` take the same, whole and in range, as an Integer;
+`Boolean` takes a Boolean, 0 or 1 as an Integer or a Real, or the words
+`true`/`false`; `String` takes well-formed UTF-8 that prints
+(`LLStringUtil::containsNonprintable` says what does not), and for
+`RenderColorGradeLUT` either nothing or a bare file name with one of
+`colorLutExtensions()` — a path is cut to its last part, since the renderer
+joins the name to the LUT folder and a path in it would read any file on the
+disk, and a name that is no LUT's at all (the wrong kind of file, or a stem
+Windows opens as a device whatever the folder and whatever follows its first
+dot: `CON`, `NUL.tar`, `COM¹`…, `ALLookFormat::isWindowsDeviceName`) is
+refused rather than quietly made into no LUT, so that it is counted;
+`Vector3` and
+`Color3` take three numbers finite as floats, or four with the last ignored (an
+older colour picker wrote `[r, g, b, a]` into Color3 settings); `LLSD` takes a
+tone curve as `ALToneCurveSet::pointsFromLLSD` reads one, and nothing else.
+**Any other type, and any LLSD-typed setting that is not a curve, is
+refused** — a new kind of setting on the whitelist needs its shape added
+there, with a test in `allookformat_test`. A refused key is named in the log
+(`LL_WARNS("Presets")`) with its value if that is a scalar, and only
+described if it is a map or an array: streaming a nested value recurses once
+per level, and a notecard can nest one fifteen hundred deep in twenty
+kilobytes, which is the whole of the main thread's stack on Windows. The XML
+itself is read with `ALLookFormat::XML_DEPTH_LIMIT` (16; a Look is six deep),
+from a notecard and from a preset file alike — the parser keeps its state on
+the heap, but LLSD frees what it built recursively. The toast only counts the
+refused keys. The first shared Look lost its tonemapper and its glow noise to
+a judgment written for the *declared* types rather than the stored ones,
+which is why `allookformat_test` now carries those two values verbatim.
+**Every number is then held to its row's range** (`ALLookFormat::settingRange`):
+`LLControlVariable` has no range of its own, so the table in
+`allookformat.cpp` carries each row's — a slider's `min_val`/`max_val`, a
+colour wheel's `min_value`/`max_value`, a swatch's 0 to 1 per channel, a
+dropdown's item values — and a value outside it is clamped (moved to the
+nearest choice, for a dropdown) and counted as adjusted, which the import's
+toast says. A Look from outside therefore renders nothing the Lightbox could
+not show, and touching a row never snaps it back.
+`scripts/content_tools/check_look_ranges.py` holds the table to the rows, to
+the whitelist (every number on it has a range) and to the bundled Looks
+(every value inside); run it after moving a row's range or adding a setting.
+A setting that controls *work* rather than appearance
+(`RenderGlowIterations` is the number of full-screen passes) is also clamped
+by the renderer where it is read, which protects Debug Settings and
+hand-edited settings files as well. `RenderLensFlareGhostCount` and `RenderCrossFilterPoints`
+already were. So, since the security sweep, are the values whose *math* an
+absurd number breaks: the exposure range, compensation and speeds (the
+exposure map is a half float whose red channel is the scale 2^-EV, so the
+range is held to ±15 EV — 2^16 is already past the largest half float — and
+`exposureF.glsl` starts over from the target where the history it reads is an
+infinity or a NaN, since mixing from one never comes back; the EV itself is
+not clamped after the mix, so a narrowed range is reached at the adaptation's
+pace rather than in a jump), the tonemap whites and AgX contrast (inf /
+inf is a NaN frame; `tonemap_white_limit` is the one bound) and the tonemap
+mix. These are the renderer's own bounds, for what Debug Settings or a
+settings file can hold; a Look is held to the narrower ranges of the rows
+above. `allookformat_test` test 19 feeds the reader mutated Looks and the
+deepest nesting a notecard can hold.
 
 A Look whose settings have since changed is shown as `Name *` in the combo, via
 the `look_name_modified` string — **on the name, not beside it**. A detached
@@ -1349,6 +1422,161 @@ Seeding is recorded per name in `looks_seeded.xml` (user settings root, *not*
 the looks directory — anything `*.xml` in there is enumerated as a Look), so a
 Look bundled in a later release still reaches an existing user while one they
 deleted stays deleted. Nothing is ever copied over a file that already exists.
+
+With no Look in use (nothing active and nothing last applied) the combo is
+cleared to `look_none` rather than left on the first entry its filling selects,
+which would name a Look the settings are not.
+
+**Neutral is protected** (`LOOK_NEUTRAL`, `isProtectedLookName`). It is what the
+Lightbox falls back to when the Look in use — active or last applied — is
+deleted (`putOnNeutralForDeletedLook`, called by the delete floater), so that
+the settings do not stay the deleted Look's under a bar naming another. With the
+Lightbox open that apply is one undo step, and Ctrl+Z brings the deleted Look's
+settings back to be saved again; with it closed there is no step to take, and
+a note says what happened (`LightBoxLookDeletedNeutralOn`). Deleting the Look in
+use while it carries unsaved changes asks first (`LightBoxLookDeleteModified`).
+Neutral therefore may be neither saved over nor deleted: the bar's Save opens
+Save As with a note instead (`LightBoxLookNeutralProtected`), Save As refuses
+the name, an import never makes a Look called Neutral, and
+`savePreset`/`deletePreset` refuse it as a backstop. Delete, with Neutral
+chosen, offers to put it back as it came with the viewer instead
+(`restoreNeutralLook`, `ALFloaterLightBox::restoreNeutral`) — the way back for
+a Neutral saved over before it was protected, which would otherwise be kept as
+it is for good — and puts it on again where it is in use. Where the Looks folder
+has lost it all the same — deleted before it was protected — `ensureNeutralLook`
+copies the bundled one back before falling back to it, the one exception to
+"deleted stays deleted".
+
+### 9b. Looks as notecards
+
+A Look is given to someone else as a notecard: an inventory item, handed over
+the way any item is. The Share button on the bar writes one; dropping one on
+the Lightbox, or pressing **Apply Look** / **Add to Looks** on the notice line
+the notecard window shows for one, reads it back. Three files divide the work
+so that the part fed text from strangers can be tested without the viewer:
+
+- `allookformat.{h,cpp}` is the text. LLSD XML (`toPrettyXML`, under a static
+  `<!-- -->` note — the formatter writes no XML declaration, so the note comes
+  first, and the reader starts at the first `<llsd` whatever stands above it)
+  holding one reserved key, `@AlchemyLook` — `@` can
+  never begin a setting's name, and sorts first, so the provenance (Format,
+  Name, Author, Viewer, Date) is written under the note — and then every
+  whitelisted setting as `{Type, Value}`. **Not** as a Look file: a Look file
+  carries each setting's `Comment` and `Persist` too, and with 151 settings
+  that is 76 KB against the 65,536 bytes a notecard holds. Without them it is
+  about 32 KB; with four hand-made 64-point curves even that runs over
+  indented, so the writer falls back to `toXML` run together, which the parser
+  reads alike, and refuses only if that is over too. `allookformat_test` keeps
+  the worst case under the limit. The same file judges every value (§9) and
+  cleans every name, decoding it a character at a time (`utf8str_decode_at`)
+  so that what is kept is well-formed UTF-8: control characters, `|` (which an
+  inventory name may not hold), `<` and `>` (so that no name can close the
+  `<nolink>` a notification shows it in; see the rules below), the U+100000+
+  characters the notecard editor shows as embedded items, the bidi overrides,
+  embeddings and isolates (one could make one Look's name read as another's)
+  and the zero-width space, and the characters that only ever draw as
+  nothing (the soft hyphen, the combining grapheme joiner, the Hangul fillers
+  and their kin) — the joiner, the non-joiner and the bidi marks stay, being
+  load-bearing in the scripts and emoji that use them, but count for nothing
+  when two names are compared (`lookNameKey`), so that a name that reads as
+  another Look's is numbered rather than listed twice — and anything
+  malformed come out, and a name is cut on a character boundary to 63 bytes
+  (`DB_INV_ITEM_NAME_STR_LEN`) and trimmed again after the cut. A name loses
+  the dots it begins with, since the Looks are listed from `*.xml`, which
+  leaves out a file whose name begins with one. A name with nothing that
+  draws in it, or one Windows would open as a device (`NUL`, `COM1`,
+  `CON.anything`), is no name at all, since a Look is a file called after it
+  (`isWindowsDeviceName`). The 63 bytes keep a name inside the 255 a file
+  name holds, but not inside Windows' 260-character path once
+  `LLURI::escape` has made three of each byte of a CJK name, so a name is cut
+  further where the Looks folder's path leaves less
+  (`LLPresetsManager::escapedPresetNameLimit`, through `numberedLookName`).
+  Save As holds a typed Look name to the same rules. Well-formed matters more
+  than it looks: the applied Look's name is written into `settings.xml` as
+  `PresetLooksActive`, and a surrogate in it — which a character reference in
+  the XML could spell, until `LLSDXMLParser` was made to refuse those — would
+  have made the settings file unreadable at the next start.
+- `allooknotecard.{h,cpp}` is the inventory. Share composes the text from the
+  live settings (`captureLookSettings`), refuses before anything is made where
+  it does not fit, and creates the notecard through
+  `ALScriptWorkspace::createNotecardWithText`, which Script Studio's snippets
+  use too: it checks the size and the upload capability *first*, so no empty
+  notecard is left where the upload would have refused it, and takes the item
+  away again if the upload then fails. The next owner always gets Copy and
+  Transfer on top of the account's defaults for notecards: the workspace can
+  only read a notecard with Copy, so without it the recipient could not import
+  at all, and without Transfer it could not be given. Import reads through
+  `ALScriptWorkspace::load` (Copy, RLVa `@viewnote`), parses, picks a name —
+  the Look's own, else the notecard's with the `Lightbox Look: ` prefix taken
+  off, else "Shared Look"; a name in use gets ` (2)`, ` (3)`…, **never
+  overwriting a different Look**, and a name whose Look is identical is simply
+  found — names matched without regard to case, as the file systems of
+  Windows and macOS match them, and the spelling on disk kept, with the Looks
+  folder read once for the whole search; and a name the list does not have
+  is still taken where a file answers to it, since Windows opens a file by
+  its 8.3 short name too and a Look called `GOLDEN~1` would otherwise be
+  written over "Golden Hour" — and writes it through
+  `LLPresetsManager::saveSharedLook`, which normalises it to a Look file like
+  any other (live `Comment`, `Persist`, `Type`), holding the values that
+  passed and each setting's own default where a value was refused, so that
+  the file stays the full snapshot a saved Look is. Preset files are written
+  beside themselves and renamed into place, so a disk that fills halfway
+  leaves the old file rather than a short one. Revert, Save and the `*`
+  then work for an imported Look exactly as for one saved here.
+- The Lightbox applies. `importSharedLookFromText` opens the floater if need
+  be and calls `applyLookAsOneUndoStep` (what choosing a Look and Revert call
+  too), so the apply is one step called "Imported Look: …". A drop reads
+  first and applies only if the window is still there; closed in between, the
+  Look joins the list without being put on. The toast says what actually
+  happened — applied and new, applied and already here, added, or already
+  here and left alone (also what an apply that failed comes to) — and the
+  notecard window asks once per window: a reload for a save heard from
+  elsewhere does not bring the offer back once it has been answered.
+
+Rules that fall out of this:
+
+- **Opening a notecard applies nothing.** A notecard given with
+  `AutoAcceptNewInventory` opens on its own, so detection
+  (`looksLikeLookNotecard`, a substring glance at the first 4 KB, no parse)
+  only shows the offer; the click is the consent.
+- **The author line is plain text.** Show it as information, never as
+  verified; the item's creator is who actually shared it.
+- **A name is never a link.** Toasts and alerts parse URLs like any text
+  (`widgets/text.xml` sets `parse_urls`, and the `ExperienceEvent` tip relies
+  on it), so a name that spells a URL or a `secondlife:///app/…` link is one,
+  and `[https://… label]` is a link that reads only "label". Any name a share
+  or an import shows may be a stranger's — the notecard's, the Look's, the
+  LUT's — and so may any Look's name once one has been imported, in the Save
+  As and delete messages Looks share with the graphics presets
+  (`LightBoxLookOverwrite`, `PresetNotSaved`, `PresetNotDeleted`). So each
+  stands inside `<nolink>`, in `notifications.xml` and in the sentences
+  `[NOTE]` is made of; `[NOTE]` itself is not wrapped, since `<nolink>` does
+  not nest. Nothing may close it early: a Look's name and a notecard's lose
+  `<` and `>` (`cleanMetadataText`, which the notecard's own name passes
+  through before an alert shows it), and a LUT's name is a bare file name,
+  without the `/` a closing tag needs. A toast cut short at its length limit
+  is cut after its links are found, so the cut cannot undo one either. The
+  six `notifytip`s also carry `log_to_chat="false"`, so that no name is
+  copied into nearby chat as a line in the system's voice — which was once
+  taken for the whole fix, on the mistaken belief that a toast shows its
+  text plain.
+- **A drop is read only from the inventory's own drags.** `get_dropped_notecard`
+  refuses the sources for which `LLToolDragAndDrop` hands a handler the bare
+  id instead of an item (a person, a toolbar button, an item under neither
+  root), since reading an id as an item is a crash.
+- **Unknown settings are counted, not refused.** A newer viewer's Look applies
+  what this one knows and the toast says how many were left out; an older
+  Look falls under the snapshot rule above. The `Format` number is in the
+  file for the day a reading has to change.
+- **A LUT does not travel.** `RenderColorGradeLUT` names a file; the toast
+  names it when it is not installed. A `.cube` is far over 64 KB, so it cannot
+  ride along.
+- **Import is one-shot.** The Look does not follow the notecard as its author
+  edits it (`ALFollowedNotecard` is deliberately not used): a Look is a thing
+  you have, not a subscription.
+- A notecard in an object's contents cannot be dropped (the drop carries the
+  agent's own items), but its window makes the same offer, since it already
+  has the text.
 
 ### 10. Verify
 

@@ -89,7 +89,18 @@ void main()
     float ev = target;
 #ifdef USE_LAST_EXPOSURE
     float prev = texture(exposureMap, vec2(0.5, 0.5)).g;
+    // The history is a half float. A value past its range -- settings that
+    // were absurd for a frame -- is stored as an infinity, and mixing from an
+    // infinity never comes back, however the settings are mended. Start
+    // over from the target instead.
+    if (isnan(prev) || isinf(prev))
+    {
+        prev = target;
+    }
     float rate = target > prev ? dynamic_exposure_params2.z : dynamic_exposure_params2.w;
+    // Not held to the range itself: the target is, and the EV eases toward
+    // it, so a range the user narrows is reached at the adaptation's pace
+    // rather than in a jump.
     ev = mix(prev, target, 1.0 - exp(-rate * dt));
 #endif
 

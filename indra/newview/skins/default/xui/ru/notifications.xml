@@ -3264,13 +3264,13 @@
 		Не удалось сохранить моментальный снимок на [PATH]: Каталог не существует.
 	</notification>
 	<notification name="PresetNotSaved">
-		Ошибка при сохранении пресета [NAME].
+		Ошибка при сохранении пресета &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
 	</notification>
 	<notification name="DefaultPresetNotSaved">
 		Невозможно изменить настройку по умолчанию.
 	</notification>
 	<notification name="PresetNotDeleted">
-		Ошибка при удалении пресета [NAME].
+		Ошибка при удалении пресета &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
 	</notification>
 	<notification name="UnableToFindHelpTopic">
 		Невозможно найти раздел справки для этого элемента.

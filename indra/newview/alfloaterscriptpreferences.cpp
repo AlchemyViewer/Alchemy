@@ -57,14 +57,13 @@
 #include "llviewermenufile.h"
 #include "lltexteditor.h"
 #include "llfloaterreg.h"
+#include "llinventoryfunctions.h"
 #include "llinventorymodel.h"
 #include "llviewerinventory.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
-#include "llagent.h"
 #include "llfloaterperms.h"
 #include "llnotecard.h"
-#include "llviewerassettype.h"
 
 #include <algorithm>
 #include <functional>
@@ -111,21 +110,6 @@ namespace
 
     // How long after the last keystroke an edited snippet is written.
     const F32 SNIPPET_SETTLE = 0.5f;
-
-    // The notecard of the agent's own that a drop carries, a link as what
-    // it links to -- the notecard's asset is what changes as it is edited;
-    // null where it carries anything else. The kind first: a drag of a
-    // person or a group carries an id, not an item.
-    const LLViewerInventoryItem* droppedNotecard(EDragAndDropType cargo_type, void* cargo_data)
-    {
-        if (cargo_type != DAD_NOTECARD || !cargo_data)
-        {
-            return nullptr;
-        }
-        const LLInventoryItem*       item = static_cast<LLInventoryItem*>(cargo_data);
-        const LLViewerInventoryItem* held = gInventory.getItem(item->getLinkedUUID());
-        return held && held->getType() == LLAssetType::AT_NOTECARD ? held : nullptr;
-    }
 
     const S32 SWATCH_ROW    = 24;
     const S32 SWATCH_WIDTH  = 48;
@@ -958,7 +942,7 @@ bool ALFloaterScriptPreferences::handleDragAndDrop(S32 x, S32 y, MASK mask, bool
         return view && view->isInVisibleChain() && localPointToOtherView(x, y, &local_x, &local_y, view) && view->pointInView(local_x, local_y);
     };
     const auto take = [&](const char* only, const std::function<void(const LLViewerInventoryItem&)>& use) {
-        const LLViewerInventoryItem* held = droppedNotecard(cargo_type, cargo_data);
+        const LLViewerInventoryItem* held = get_dropped_notecard(cargo_type, cargo_data);
         if (!held)
         {
             *accept     = ACCEPT_NO;
@@ -1448,47 +1432,33 @@ void ALFloaterScriptPreferences::onSnippetsToInventory()
     }
     // A new notecard of the account's default permissions, as every other
     // way of making one gives, and the snippets saved in it once it is.
-    const std::string name     = getString("SnippetsNotecardName");
-    const std::string not_made = getString("SnippetsNotecardNotMade");
-    const S32         count    = static_cast<S32>(lsl.size() + slua.size());
+    const std::string name   = getString("SnippetsNotecardName");
+    const S32         count  = static_cast<S32>(lsl.size() + slua.size());
     const auto        failed = [name](const std::string& why) {
         LLSD args;
         args["NAME"]   = name;
         args["REASON"] = why;
         LLNotificationsUtil::add("ScriptStudioSnippetsNotSaved", args);
     };
-    LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_notecard_cb);
-    made->addOnFireFunc([text, name, not_made, count, failed](const LLUUID& item_id) {
-        if (item_id.isNull())
-        {
-            failed(not_made);
-            return;
-        }
-        std::string error;
-        const bool  sent = ALScriptWorkspace::getInstance()->saveNotecard(
-            ALScriptRef(LLUUID::null, item_id), text, {},
-            [name, count, failed](const ALScriptCompileResult& result) {
-                if (!result.success)
-                {
-                    failed(result.error);
-                    return;
-                }
-                LLSD args;
-                args["NAME"]  = name;
-                args["COUNT"] = count;
-                LLNotificationsUtil::add("ScriptStudioSnippetsSaved", args);
-            },
-            error);
-        if (!sent)
-        {
-            failed(error);
-        }
-    });
-    std::string desc;
-    LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_NOTECARD, desc);
-    create_inventory_item(gAgent.getID(), gAgent.getSessionID(), gInventory.findCategoryUUIDForType(LLFolderType::FT_NOTECARD),
-                          LLTransactionID::tnull, name, desc, LLAssetType::AT_NOTECARD, LLInventoryType::IT_NOTECARD, NO_INV_SUBTYPE,
-                          LLFloaterPerms::getNextOwnerPerms("Notecards"), made);
+    std::string error;
+    const bool  sent = ALScriptWorkspace::getInstance()->createNotecardWithText(
+        name, std::string(), gInventory.findCategoryUUIDForType(LLFolderType::FT_NOTECARD), text, LLFloaterPerms::getNextOwnerPerms("Notecards"),
+        [name, count, failed](const ALScriptCompileResult& result) {
+            if (!result.success)
+            {
+                failed(result.error);
+                return;
+            }
+            LLSD args;
+            args["NAME"]  = name;
+            args["COUNT"] = count;
+            LLNotificationsUtil::add("ScriptStudioSnippetsSaved", args);
+        },
+        error);
+    if (!sent)
+    {
+        failed(error);
+    }
 }
 
 void ALFloaterScriptPreferences::refreshConvertPreset()

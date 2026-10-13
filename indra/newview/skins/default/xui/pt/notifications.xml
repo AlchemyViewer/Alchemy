@@ -2449,9 +2449,9 @@ Para sua segurança, os SLurls serão bloqueados por alguns instantes.</notifica
 	<notification name="AppearanceToXMLFailed">Falha ao salvar a aparência como XML.</notification>
 	<notification name="SnapshotToComputerFailed">Falha ao salvar fotografia em [PATH]: Disco cheio. [NEED_MEMORY]KB é necessário, mas somente [FREE_MEMORY]KB está livre.</notification>
 	<notification name="SnapshotToLocalDirNotExist">Falha ao salvar fotografia em [PATH]: O diretório não existe.</notification>
-	<notification name="PresetNotSaved">Erro ao salvar predefinição [NAME].</notification>
+	<notification name="PresetNotSaved">Erro ao salvar predefinição &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="DefaultPresetNotSaved">Não é possível sobrescrever o padrão definido.</notification>
-	<notification name="PresetNotDeleted">Erro ao excluir a predefinição [NAME].</notification>
+	<notification name="PresetNotDeleted">Erro ao excluir a predefinição &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="UnableToFindHelpTopic">Nenhum tópico de ajuda foi encontrado com relação a este elemento.</notification>
 	<notification name="ObjectMediaFailure">
 		Erro do servidor: Falha ao atualizar ou executar a mídia.

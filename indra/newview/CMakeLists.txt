@@ -256,6 +256,8 @@ if(AL_BUILD_VIEWER)
     alhoverglow.cpp
     allegacynotificationwellwindow.cpp
     allightboxdirectory.cpp
+    allookformat.cpp
+    allooknotecard.cpp
     almotionpredictor.cpp
     alobjectproperties.cpp
     alagentlocationformat.cpp
@@ -1136,6 +1138,8 @@ if(AL_BUILD_VIEWER)
     alhuddepth.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h
+    allookformat.h
+    allooknotecard.h
     almotionpredictor.h
     alobjectproperties.h
     alagentlocationformat.h
@@ -2576,6 +2580,16 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES ${test_libs}
     SOURCES alfeedback.cpp
+  )
+  # A Look in a notecard judges its tone curves by the curve model's own
+  # reading of them, so the format test links the model rather than keeping a
+  # second idea of what a curve is.
+  al_add_test(
+    allookformat
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES alcurvemodel.cpp
   )
   al_add_test(
     lllogininstance

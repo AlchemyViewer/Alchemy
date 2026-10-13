@@ -2458,9 +2458,9 @@ Por tu seguridad, serán bloqueadas durante unos segundos.</notification>
 	<notification name="AppearanceToXMLFailed">Error al guardar el aspecto en XML.</notification>
 	<notification name="SnapshotToComputerFailed">Error al guardar la foto en [PATH]: Disco lleno. Se requieren [NEED_MEMORY]KB pero solo hay [FREE_MEMORY]KB libres.</notification>
 	<notification name="SnapshotToLocalDirNotExist">Error al guardar la foto en [PATH]: El directorio no existe.</notification>
-	<notification name="PresetNotSaved">Error al guardar el valor predefinido [NAME].</notification>
+	<notification name="PresetNotSaved">Error al guardar el valor predefinido &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="DefaultPresetNotSaved">No se puede sobrescribir el valor predefinido.</notification>
-	<notification name="PresetNotDeleted">Error al eliminar el valor predefinido [NAME].</notification>
+	<notification name="PresetNotDeleted">Error al eliminar el valor predefinido &lt;nolink&gt;[NAME]&lt;/nolink&gt;.</notification>
 	<notification name="UnableToFindHelpTopic">No se ha podido encontrar un tema de ayuda para este elemento.</notification>
 	<notification name="ObjectMediaFailure">
 		Error del servidor: fallo en la actualización u obtención de los media.

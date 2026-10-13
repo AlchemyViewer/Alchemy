@@ -1251,7 +1251,14 @@ void LLPipeline::refreshCachedSettings()
     RenderGlowLumWeights = gSavedSettings.getVector3("RenderGlowLumWeights");
     RenderGlowWarmthWeights = gSavedSettings.getVector3("RenderGlowWarmthWeights");
     RenderGlowResolutionPow = gSavedSettings.getS32("RenderGlowResolutionPow");
-    RenderGlowIterations = gSavedSettings.getS32("RenderGlowIterations");
+    // Clamped where it is read rather than left to the slider: this is the
+    // number of full-screen blur passes drawn every frame, and a settings
+    // file can carry any number at all -- a million would hang the GPU, and
+    // be saved. The Lightbox's slider runs 1 to 8, and a Look is held to that
+    // (ALLookFormat::settingRange); the cap is higher, at 16, because the
+    // slider ran to 10 in the 7.0.1 betas and the setting persists -- those
+    // who set 9 or 10 keep it -- and a hang takes far more passes than that.
+    RenderGlowIterations = llclamp(gSavedSettings.getS32("RenderGlowIterations"), 1, 16);
     RenderGlowWidth = gSavedSettings.getF32("RenderGlowWidth");
     RenderGlowStrength = gSavedSettings.getF32("RenderGlowStrength");
     RenderGlowNoise = gSavedSettings.getBOOL("RenderGlowNoise");
@@ -7971,6 +7978,14 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
     dst->flush();
 }
 
+// A setting as a number the clamps below can hold: llclamp lets a NaN through
+// -- every comparison with one is false -- and a settings file's <real>nan</real>
+// parses, so a NaN is taken as the setting's default before it is clamped.
+static F32 finite_or(F32 value, F32 fallback)
+{
+    return std::isfinite(value) ? value : fallback;
+}
+
 void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history)
 {
     LL_PROFILE_GPU_ZONE("exposure");
@@ -8009,7 +8024,13 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
         }
 
         const F32 bins_per_ev = (F32)EXPOSURE_HISTOGRAM_BINS / (EXPOSURE_HISTOGRAM_MAX_EV - EXPOSURE_HISTOGRAM_MIN_EV);
-        gExposureHistogramProgram.uniform4f(LLShaderMgr::METER_PARAMS, (F32)metering_mode(), llmax(sky_weight(), 0.f),
+        // The slider runs 0..1; the cap leaves Debug Settings room to weigh
+        // the sky above the ground while keeping a weight a Look carries in
+        // from outside from overflowing the histogram's float sums -- which
+        // would leave nothing kept, or an inf - inf where the EV is taken.
+        // check_exposure.py mirrors it.
+        constexpr F32 EXPOSURE_SKY_WEIGHT_MAX = 16.f;
+        gExposureHistogramProgram.uniform4f(LLShaderMgr::METER_PARAMS, (F32)metering_mode(), llclamp(finite_or(sky_weight(), 1.f), 0.f, EXPOSURE_SKY_WEIGHT_MAX),
                                             EXPOSURE_HISTOGRAM_MIN_EV, bins_per_ev);
 
         mExposureHistogramVB->setBuffer();
@@ -8051,12 +8072,23 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     }
 
     // At least a percent of the weight between the trims, or nothing would be kept.
-    const F32 low = llclamp(low_percent() * 0.01f, 0.f, 0.99f);
-    const F32 high = llclamp(high_percent() * 0.01f, low + 0.01f, 1.f);
+    const F32 low = llclamp(finite_or(low_percent(), 10.f) * 0.01f, 0.f, 0.99f);
+    const F32 high = llclamp(finite_or(high_percent(), 95.f) * 0.01f, low + 0.01f, 1.f);
     shader->uniform1f(LLShaderMgr::DT, gFrameIntervalSeconds);
-    shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS, log2f(EXPOSURE_KEY) + compensation(), llmin(min_ev(), max_ev()),
-                      llmax(min_ev(), max_ev()), meter ? 1.f : 0.f);
-    shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS2, low, high, llmax(speed_up(), 0.f), llmax(speed_down(), 0.f));
+    // Bounded well past the Lightbox's sliders (-8..8 EV, 0.1..10 per
+    // second) but inside what the exposure map holds: a settings file or a
+    // shared Look can carry anything, and the map is a half float whose red
+    // channel is the scale 2^-EV -- 2^16 is already past its largest value
+    // (65504), and an infinity there whites the frame out for as long as
+    // the setting stands. The history in green would take more, but mixing
+    // from an infinity never comes back, so the shader starts over from the
+    // target when it reads one. check_exposure.py mirrors these numbers.
+    const F32 ev_a = llclamp(finite_or(min_ev(), -3.f), -15.f, 15.f);
+    const F32 ev_b = llclamp(finite_or(max_ev(), 4.f), -15.f, 15.f);
+    shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS, log2f(EXPOSURE_KEY) + llclamp(finite_or(compensation(), 0.f), -16.f, 16.f),
+                      llmin(ev_a, ev_b), llmax(ev_a, ev_b), meter ? 1.f : 0.f);
+    shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS2, low, high, llclamp(finite_or(speed_up(), 3.f), 0.f, 100.f),
+                      llclamp(finite_or(speed_down(), 1.f), 0.f, 100.f));
 
     mScreenTriangleVB->setBuffer();
     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -8533,15 +8565,22 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             // Tonemap type and parameters
             static LLCachedControl<S32> tonemap_type_setting(gSavedSettings, "AlchemyRenderTonemapType", 0U);
             shader->uniform1i(LLShaderMgr::TONEMAP_TYPE, tonemap_type_setting);
-            shader->uniform1f(LLShaderMgr::TONEMAP_MIX, psky->getTonemapMix(should_auto_adjust()));
+            // A mix, so 0..1: tonemapUtilF.glsl's mix() extrapolates past
+            // either end, and a sky or a settings file can carry anything.
+            const F32 tonemap_mix = psky->getTonemapMix(should_auto_adjust());
+            shader->uniform1f(LLShaderMgr::TONEMAP_MIX, std::isfinite(tonemap_mix) ? llclamp(tonemap_mix, 0.f, 1.f) : 1.f);
 
             constexpr F32 max_screen_brightness = 1.f;
+            // The most any tonemapper's white may be, from a settings file or
+            // a shared Look: the shaders divide by what is made of it, and an
+            // absurd white would be inf / inf. The sliders run to 16 and 32.
+            constexpr F32 tonemap_white_limit = 1024.f;
             switch (tonemap_type_setting)
             {
                 case 2: // ACES Godot
                 {
                     static LLCachedControl<F32> tonemap_aces_white(gSavedSettings, "RenderTonemapACESWhite", 6.f);
-                    F32                         white = llmax(1.0f, tonemap_aces_white());
+                    F32                         white = llclamp(finite_or(tonemap_aces_white(), 6.f), 1.0f, tonemap_white_limit);
 
                     // These constants must match those in the shader code.
                     const float exposure_bias = 1.8f;
@@ -8565,7 +8604,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                     // parameter, depending on the available dynamic range.
                     static LLCachedControl<F32> tonemap_reinhard_white(gSavedSettings, "RenderTonemapReinhardWhite", 6.f);
 
-                    F32 white         = llmax(max_screen_brightness, tonemap_reinhard_white());
+                    F32 white         = llmin(llmax(max_screen_brightness, finite_or(tonemap_reinhard_white(), 6.f)), tonemap_white_limit);
                     F32 white_squared = (white * white) / max_screen_brightness;
 
                     shader->uniform4f(LLShaderMgr::TONEMAP_PARAMS, white_squared, 0.f, 0.f, 0.f);
@@ -8574,7 +8613,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 case 4: // Filmic
                 {
                     static LLCachedControl<F32> tonemap_filmic_white(gSavedSettings, "RenderTonemapFilmicWhite", 6.f);
-                    F32                         white = llmax(1.0f, tonemap_filmic_white());
+                    F32                         white = llclamp(finite_or(tonemap_filmic_white(), 6.f), 1.0f, tonemap_white_limit);
 
                     // These constants must match those in the shader code.
                     const float exposure_bias = 2.0f;
@@ -8595,7 +8634,13 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                     static LLCachedControl<F32> tonemap_agx_contrast(gSavedSettings, "RenderTonemapAgxContrast", 1.25f);
                     static LLCachedControl<F32> tonemap_agx_white(gSavedSettings, "RenderTonemapAgxWhite", 16.29f);
 
-                    float agx_white = llmax(2.f, tonemap_agx_white());
+                    // Both bounded on either side, as the ACES white is: the
+                    // curve below raises and divides by what is made of
+                    // them, and a value from a settings file or a shared
+                    // Look is not the slider's. The sliders run 0.5..2.5
+                    // and 1..32.
+                    const float agx_contrast = llclamp(finite_or(tonemap_agx_contrast(), 1.25f), 0.05f, 10.f);
+                    float       agx_white    = llclamp(finite_or(tonemap_agx_white(), 16.29f), 2.f, tonemap_white_limit);
 
                     // Calculate allenwp tonemapping curve parameters on the CPU to improve shader performance.
                     // Source and details: https://allenwp.com/blog/2025/05/29/allenwp-tonemapping-curve/
@@ -8610,10 +8655,10 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                     float awp_high_clip = agx_white;
 
                     // awp_toe_a is a solution generated by Mathematica that ensures intersection at awp_crossover_point.
-                    float awp_toe_a = ((1.0f / awp_crossover_point) - 1.0f) * pow(awp_crossover_point, tonemap_agx_contrast);
+                    float awp_toe_a = ((1.0f / awp_crossover_point) - 1.0f) * pow(awp_crossover_point, agx_contrast);
                     // Slope formula is simply the derivative of the toe function with an input of awp_crossover_point.
-                    float awp_slope_denom = pow(awp_crossover_point, tonemap_agx_contrast) + awp_toe_a;
-                    float awp_slope       = (tonemap_agx_contrast * pow(awp_crossover_point, tonemap_agx_contrast - 1.0f) * awp_toe_a) /
+                    float awp_slope_denom = pow(awp_crossover_point, agx_contrast) + awp_toe_a;
+                    float awp_slope       = (agx_contrast * pow(awp_crossover_point, agx_contrast - 1.0f) * awp_toe_a) /
                                       (awp_slope_denom * awp_slope_denom);
 
                     float awp_w = awp_high_clip - awp_crossover_point;
@@ -8621,7 +8666,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                     awp_w       = awp_w / awp_shoulder_max;
                     awp_w       = awp_w * awp_slope;
 
-                    shader->uniform4f(LLShaderMgr::TONEMAP_PARAMS, tonemap_agx_contrast, awp_toe_a, awp_slope, awp_w);
+                    shader->uniform4f(LLShaderMgr::TONEMAP_PARAMS, agx_contrast, awp_toe_a, awp_slope, awp_w);
                     break;
                 }
                 default:

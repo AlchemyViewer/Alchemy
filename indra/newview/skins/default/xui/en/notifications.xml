@@ -1858,6 +1858,17 @@ Your snippets could not be saved to the notecard &quot;[NAME]&quot;: [REASON].
     <tag>fail</tag>
   </notification>
 
+  <!-- A notecard made with text (ALScriptWorkspace::createNotecardWithText):
+       snippets exported, or a Lightbox Look shared. [NAME] can be a Look's,
+       and so a stranger's, so it stands in <nolink> and stays out of chat. -->
+  <notification
+   icon="notifytip.tga"
+   name="NotecardCreateNoAnswerYet"
+   log_to_chat="false"
+   type="notifytip">
+The notecard &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; has not appeared in your inventory yet. The server may still be making it: if it arrives, it will be filled in and you will be told as usual.
+  </notification>
+
   <notification
    icon="notifytip.tga"
    name="ScriptStudioSnippetsSaved"
@@ -9759,11 +9770,14 @@ Screenshot saved to:
 Click to open folder.
   </notification>
 
+  <!-- [NAME] can be a Look's, and so a stranger's: see the Lightbox Looks
+       further down. Not copied to nearby chat for the same reason. -->
   <notification
     icon="notifytip.tga"
     name="PresetNotSaved"
+    log_to_chat="false"
     type="notifytip">
-Error saving preset [NAME].
+Error saving preset &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
   </notification>
     
   <notification
@@ -9771,6 +9785,73 @@ Error saving preset [NAME].
     name="DefaultPresetNotSaved"
     type="notifytip">
 Can not overwrite default preset.
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookRestoreNeutral"
+    type="alertmodal">
+Neutral is what the Lightbox goes back to when the Look in use is deleted, so it can&apos;t be deleted. Put it back as it came with the viewer instead? Any changes saved over it are lost.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Put It Back"/>
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookNeutralRestored"
+    type="notifytip">
+Neutral is back as it came with the viewer.
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookDeleteModified"
+    type="alertmodal">
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; is in use, with changes you haven&apos;t saved. Deleting it puts Neutral on in their place. Delete it?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookDeletedNeutralOn"
+    log_to_chat="false"
+    type="notifytip">
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; was in use, so Neutral is on now.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookNeutralProtected"
+    type="notifytip">
+Neutral can&apos;t be saved over: it is what the Lightbox goes back to when the Look in use is deleted. Save your changes as a new Look instead.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookNameTooLong"
+    type="notifytip">
+That name is too long for a file in your Looks folder, whose own path is already long. Choose a shorter name.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookNameChanged"
+    type="notifytip">
+Some of that name can&apos;t be part of a Look&apos;s name, or it was too long, so it has been changed to the name now shown. Press Save to save under it.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookNameRefused"
+    type="notifytip">
+That name cannot be used for a Look. A Look needs a name with something visible in it besides dots and spaces, and Windows keeps names such as CON, NUL and COM1 for devices.
   </notification>
 
   <notification
@@ -9791,7 +9872,7 @@ Temperature and tint cannot neutralize that. It looks like a colored surface rat
     icon="alertmodal.tga"
     name="LightBoxLookOverwrite"
     type="alertmodal">
-A Look called &apos;[NAME]&apos; already exists. Replace it?
+A Look called &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; already exists. Replace it?
 
 This cannot be undone.
     <tag>confirm</tag>
@@ -9799,6 +9880,113 @@ This cannot be undone.
      name="okcancelbuttons"
      notext="Cancel"
      yestext="Replace"/>
+  </notification>
+
+  <!-- Lightbox Looks shared as notecards. Any name these show may be a
+       stranger's: the notecard's, the Look's, the color LUT's. Toasts and
+       alerts make links of what reads as one, so each name stands inside
+       nolink, and none can close it early: a Look's or a notecard's name
+       loses its angle brackets (ALLookFormat::cleanMetadataText), and a
+       LUT's is a bare file name, without the slash a closing tag needs.
+       [NOTE] holds names too, wrapped in its own strings, so it is not
+       wrapped here: nolink does not nest. [REASON] is the viewer's words
+       or the region's. -->
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookShared"
+    log_to_chat="false"
+    type="notifytip">
+Your Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; is in your Notecards folder as &apos;&lt;nolink&gt;[NOTECARD]&lt;/nolink&gt;&apos;. Give it like any other item: drag it onto someone, or use Share in your inventory.
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNotShared"
+    type="alertmodal">
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; could not be saved to a notecard: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookTooLarge"
+    type="alertmodal">
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; comes to [SIZE] bytes, and a notecard holds [LIMIT].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNotecardUnreadable"
+    type="alertmodal">
+The notecard &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; could not be read: [REASON].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNotecardNotALook"
+    type="alertmodal">
+The notecard &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; does not hold a Lightbox Look, or holds one that is damaged. The Share button on the Lightbox makes one that does.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNotImported"
+    type="alertmodal">
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; could not be saved to your Looks.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookNothingUsable"
+    type="alertmodal">
+The Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; holds nothing this viewer can use: [UNKNOWN] of its settings are not known here, and [REFUSED] were not valid. It may have been made with a newer viewer.
+    <tag>fail</tag>
+  </notification>
+
+  <!-- The four ways an import ends. [NOTE] is empty or holds further
+       sentences, each with its own leading space, so none goes here. -->
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookImported"
+    log_to_chat="false"
+    type="notifytip">
+Applied the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; and added it to your Looks.[NOTE]
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookApplied"
+    log_to_chat="false"
+    type="notifytip">
+Applied the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos;, which you already had.[NOTE]
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookAdded"
+    log_to_chat="false"
+    type="notifytip">
+Added the Look &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos; to your Looks.[NOTE]
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookAlreadyHad"
+    log_to_chat="false"
+    type="notifytip">
+You already have this Look, as &apos;&lt;nolink&gt;[NAME]&lt;/nolink&gt;&apos;; nothing was added.[NOTE]
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxLookLUTMissing"
+    log_to_chat="false"
+    type="notifytip">
+This Look uses the color LUT file &apos;&lt;nolink&gt;[LUT]&lt;/nolink&gt;&apos;, which is not in your colorlut folder. Until it is, the Look is shown without it. Ask whoever gave you the Look for the file, then use Open Folder next to Color LUT on the Look tab.
   </notification>
 
   <notification
@@ -9813,11 +10001,14 @@ this preset or choose another name.
      yestext="OK"/>
   </notification>
 
+  <!-- [NAME] can be a Look's, and so a stranger's: see the Lightbox Looks
+       above. Not copied to nearby chat for the same reason. -->
   <notification
     icon="notifytip.tga"
     name="PresetNotDeleted"
+    log_to_chat="false"
     type="notifytip">
-Error deleting preset [NAME].
+Error deleting preset &lt;nolink&gt;[NAME]&lt;/nolink&gt;.
   </notification>
 
   <notification

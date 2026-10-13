@@ -102,6 +102,10 @@ private:
     void loaded(const ALScriptLoaded& answer);
     // Nothing to show, and why: in place of the text, read-only.
     void showUnloaded(const std::string& why);
+    // A notecard that looks like a Lightbox Look offers to be taken into
+    // the Looks, in the notice line. Offers: opening a notecard applies
+    // nothing, since one given can open on its own.
+    void offerSharedLookImport(const std::string& notecard_text);
     // Whether the text may be changed, and the rest of the window with it:
     // the description, the lock, Edit and Save.
     void showModifiable(bool modifiable);
@@ -218,6 +222,15 @@ private:
     // The notecard loaded again for a Take Theirs, whose text goes in over
     // what was typed rather than as a fresh load.
     bool                       mTakingTheirs = false;
+    // The offer to import the Look this notecard holds, answered one way or
+    // another: not made again for a load of a save heard from elsewhere.
+    bool                       mLookOfferAnswered = false;
+    // The text the offer imports: the notecard as it was loaded, and then
+    // as it is saved from here -- a save made in this window loads nothing,
+    // and the offer would otherwise import the text from before it.
+    std::string                mLookOfferText;
+    // The text a save from here sent, for mLookOfferText once it is saved.
+    std::string                mSentText;
     // Where the caret and the view were, for a load of a save heard from
     // elsewhere to put them back.
     std::optional<std::pair<ALTextPos, S32>> mKeepPlace;

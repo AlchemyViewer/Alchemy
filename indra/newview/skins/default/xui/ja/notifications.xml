@@ -3537,7 +3537,7 @@ Your L$ balance is shown in the upper-right.
 		スナップショットを[PATH]に保存できませんでした：ディレクトリは存在しません。
 	</notification>
 	<notification name="PresetNotSaved">
-		プリセット[NAME]の保存時にエラーが発生しました。
+		プリセット&lt;nolink&gt;[NAME]&lt;/nolink&gt;の保存時にエラーが発生しました。
 	</notification>
 	<notification name="DefaultPresetNotSaved">
 		デフォルトのプリセットを上書きすることはできません。
@@ -3548,7 +3548,7 @@ Your L$ balance is shown in the upper-right.
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="PresetNotDeleted">
-		プリセット[NAME]の削除時にエラーが発生しました。
+		プリセット&lt;nolink&gt;[NAME]&lt;/nolink&gt;の削除時にエラーが発生しました。
 	</notification>
 	<notification name="UnableToFindHelpTopic">
 		ヘルプトピックが見つかりませんでした。

@@ -46,6 +46,50 @@
 		Revert to [NAME]
 	</floater.string>
 	<floater.string
+	 name="history_look_import">
+		Imported Look: [NAME]
+	</floater.string>
+	<floater.string
+	 name="history_look_deleted">
+		Neutral, for deleted Look: [NAME]
+	</floater.string>
+	<floater.string
+	 name="history_look_neutral_restored">
+		Neutral, put back as it came
+	</floater.string>
+	<floater.string
+	 name="look_none">
+		No Look
+	</floater.string>
+	<!-- A Look shared as a notecard: what the settings are called in it
+	     when they have moved since a Look was applied (the state the bar
+	     marks with a *) or no Look was ever applied, and what a notecard
+	     dragged over the window is told. -->
+	<floater.string
+	 name="look_share_modified">
+		[NAME] (edited)
+	</floater.string>
+	<floater.string
+	 name="look_share_unnamed">
+		My Look
+	</floater.string>
+	<floater.string
+	 name="look_drop_tooltip">
+		Drop to add the Look in this notecard to your Looks and apply it
+	</floater.string>
+	<floater.string
+	 name="look_drop_inventory_only">
+		Only a notecard in your inventory can be dropped here. To import a Look from an object, open its notecard and press Apply Look.
+	</floater.string>
+	<floater.string
+	 name="look_drop_one">
+		Drop one Look notecard at a time.
+	</floater.string>
+	<floater.string
+	 name="look_drop_no_copy">
+		This notecard cannot be copied, so its Look cannot be read. Ask whoever gave it for one you can copy.
+	</floater.string>
+	<floater.string
 	 name="history_white_balance">
 		White balance pick
 	</floater.string>
@@ -118,7 +162,7 @@
 	 right="-4"
 	 height="26">
 		<!-- Everything left of the buttons, which are held to the right edge:
-		     261 is the nine of them (24 each) with their gaps, and 6 of margin.
+		     286 is the ten of them (24 each) with their gaps, and 6 of margin.
 		     left="1" puts its left edge at the floater's x 7, over the tab
 		     container's. -->
 		<combo_box
@@ -126,7 +170,7 @@
 		 layout="topleft"
 		 left="1"
 		 top="0"
-		 right="-261"
+		 right="-286"
 		 height="24"
 		 name="looks_combo"
 		 tool_tip="Apply a saved Look (a bundle of the aesthetic settings from the Look and Lens tabs). A * after the name means the settings have been changed since that Look was applied.">
@@ -147,7 +191,7 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-236"
+		 right="-261"
 		 top="0"
 		 width="24"
 		 height="24"
@@ -161,7 +205,7 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-211"
+		 right="-236"
 		 top="0"
 		 width="24"
 		 height="24"
@@ -171,6 +215,25 @@
 		 tool_tip="Save As: save the current settings as a new Look">
 			<button.commit_callback
 			 function="LightBox.LookSaveAs" />
+		</button>
+		<!-- Share: the settings as they stand, into a notecard, to give to
+		     anyone. Inv_Notecard is the glyph inventory draws a notecard
+		     with, so it says what the button makes. The tooltip is also
+		     where the other half is announced: a Look notecard dropped
+		     anywhere on this window is imported. -->
+		<button
+		 follows="top|right"
+		 layout="topleft"
+		 right="-211"
+		 top="0"
+		 width="24"
+		 height="24"
+		 label=""
+		 image_overlay="Inv_Notecard"
+		 name="look_share"
+		 tool_tip="Share: save the settings as they are now to a notecard in your Notecards folder, to give to anyone. To import a Look, drop its notecard anywhere on this window, or open the notecard and press Apply Look.">
+			<button.commit_callback
+			 function="LightBox.LookShare" />
 		</button>
 		<button
 		 follows="top|right"
@@ -200,7 +263,7 @@
 			<button.commit_callback
 			 function="LightBox.LookRevert" />
 		</button>
-		<!-- Set apart from the four above: those act on the Look, these on the
+		<!-- Set apart from the five above: those act on the Look, these on the
 		     grade's own history, and the gap is the only thing that says so. -->
 		<button
 		 follows="top|right"
