@@ -40,7 +40,7 @@
 #include "../llvocache.h"
 
 // Tut header
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 // -------------------------------------------------------------------------------------------
 // Stubbing: Declarations required to link and run the class being tested
@@ -89,7 +89,7 @@ LLVOCache::~LLVOCache() {}
 // TUT
 // -------------------------------------------------------------------------------------------
 
-namespace tut
+namespace
 {
     // Test wrapper declarations
     struct textureinfo_test
@@ -102,12 +102,6 @@ namespace tut
         {
         }
     };
-
-    // Tut templating thingamagic: test group, object and test instance
-    typedef test_group<textureinfo_test> textureinfo_t;
-    typedef textureinfo_t::object textureinfo_object_t;
-    tut::textureinfo_t tut_textureinfo("LLTectureInfo");
-
 
     // ---------------------------------------------------------------------------------------
     // Test functions
@@ -123,28 +117,26 @@ namespace tut
 
 
     // Test instantiation
-    template<> template<>
-    void textureinfo_object_t::test<1>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: an LLTextureInfo is made with logging on", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
-        ensure("have we crashed?", true);
+        UNSCOPED_INFO("have we crashed?");
+        CHECK(true);
     }
 
     // Check lltextureinfo does not contain UUIDs we haven't added
-    template<> template<>
-    void textureinfo_object_t::test<2>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: has() is false for a UUID never added", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
 
         LLUUID nonExistant("3a0efa3b-84dc-4e17-9b8c-79ea028850c1");
-        ensure(!tex_info.has(nonExistant));
+        REQUIRE_FALSE(tex_info.has(nonExistant));
     }
 
     // Check we can add a request time for a texture
-    template<> template<>
-    void textureinfo_object_t::test<3>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: a request start time set is read back", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
@@ -152,34 +144,31 @@ namespace tut
         LLUUID id("10e65d70-46fd-429f-841a-bf698e9424d3");
         tex_info.setRequestStartTime(id, 200);
 
-        ensure_equals(tex_info.getRequestStartTime(id), 200);
+        CHECK(tex_info.getRequestStartTime(id) == 200);
     }
 
     // Check time for non-existant texture
-    template<> template<>
-    void textureinfo_object_t::test<4>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: an unknown texture's request start time is 0", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
 
         LLUUID nonExistant("3a0efa3b-84dc-4e17-9b8c-79ea028850c1");
-        ensure_equals(tex_info.getRequestStartTime(nonExistant), 0);
+        CHECK(tex_info.getRequestStartTime(nonExistant) == 0);
     }
 
     // Check download complete time for non existant texture
-    template<> template<>
-    void textureinfo_object_t::test<5>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: an unknown texture's request complete time is 0", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
 
         LLUUID nonExistant("3a0efa3b-84dc-4e17-9b8c-79ea028850c1");
-        ensure_equals(tex_info.getRequestCompleteTime(nonExistant), 0);
+        CHECK(tex_info.getRequestCompleteTime(nonExistant) == 0);
     }
 
     // requested size is passed in correctly
-    template<> template<>
-    void textureinfo_object_t::test<6>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: a request size set is read back", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
@@ -187,12 +176,11 @@ namespace tut
         LLUUID id("10e65d70-46fd-429f-841a-bf698e9424d3");
         tex_info.setRequestSize(id, 600);
 
-        ensure_equals(tex_info.getRequestSize(id), 600);
+        CHECK(tex_info.getRequestSize(id) == 600);
     }
 
     // transport type is recorded correctly (http)
-    template<> template<>
-    void textureinfo_object_t::test<7>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: an HTTP request type is recorded", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
@@ -200,12 +188,11 @@ namespace tut
         LLUUID id("10e65d70-46fd-429f-841a-bf698e9424d3");
         tex_info.setRequestType(id, LLTextureInfoDetails::REQUEST_TYPE_HTTP);
 
-        ensure_equals(tex_info.getRequestType(id), LLTextureInfoDetails::REQUEST_TYPE_HTTP);
+        CHECK(tex_info.getRequestType(id) == LLTextureInfoDetails::REQUEST_TYPE_HTTP);
     }
 
     // transport type is recorded correctly (udp)
-    template<> template<>
-    void textureinfo_object_t::test<8>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: a UDP request type is recorded", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
@@ -213,12 +200,11 @@ namespace tut
         LLUUID id("10e65d70-46fd-429f-841a-bf698e9424d3");
         tex_info.setRequestType(id, LLTextureInfoDetails::REQUEST_TYPE_UDP);
 
-        ensure_equals(tex_info.getRequestType(id), LLTextureInfoDetails::REQUEST_TYPE_UDP);
+        CHECK(tex_info.getRequestType(id) == LLTextureInfoDetails::REQUEST_TYPE_UDP);
     }
 
     // request offset is recorded correctly
-    template<> template<>
-    void textureinfo_object_t::test<9>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: a request offset set is read back", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
@@ -226,14 +212,13 @@ namespace tut
         LLUUID id("10e65d70-46fd-429f-841a-bf698e9424d3");
         tex_info.setRequestOffset(id, 1234);
 
-        ensure_equals(tex_info.getRequestOffset(id), 1234);
+        CHECK(tex_info.getRequestOffset(id) == 1234);
     }
 
     // ask for averages gives us correct figure
-    template<> template<>
-    void textureinfo_object_t::test<10>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: getAverages gives the bit rate and bytes and transport", "[LLTectureInfo]")
     {
-        skip("Test skipped due to use of LLTrace stats failing in test");
+        SKIP("Test skipped due to use of LLTrace stats failing in test");
 
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
@@ -265,14 +250,16 @@ namespace tut
         S32 totalBytes = requestSizeOne + requestSizeTwo;
 
         LLSD results = tex_info.getAverages();
-        ensure_equals("is average bits per second correct", results["bits_per_second"].asInteger(), averageBitRate);
-        ensure_equals("is total bytes is correct", results["bytes_downloaded"].asInteger(), totalBytes);
-        ensure_equals("is transport correct", results["transport"].asString(), std::string("HTTP"));
+        UNSCOPED_INFO("is average bits per second correct");
+        CHECK(results["bits_per_second"].asInteger() == averageBitRate);
+        UNSCOPED_INFO("is total bytes is correct");
+        CHECK(results["bytes_downloaded"].asInteger() == totalBytes);
+        UNSCOPED_INFO("is transport correct");
+        CHECK(results["transport"].asString() == std::string("HTTP"));
     }
 
     // make sure averages cleared when reset is called
-    template<> template<>
-    void textureinfo_object_t::test<11>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: resetTextureStatistics clears the averages", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
@@ -289,14 +276,16 @@ namespace tut
         tex_info.getAverages();
         tex_info.resetTextureStatistics();
         LLSD results = tex_info.getAverages();
-        ensure_equals("is average bits per second correct", results["bits_per_second"].asInteger(), 0);
-        ensure_equals("is total bytes is correct", results["bytes_downloaded"].asInteger(), 0);
-        ensure_equals("is transport correct", results["transport"].asString(), std::string("NONE"));
+        UNSCOPED_INFO("is average bits per second correct");
+        CHECK(results["bits_per_second"].asInteger() == 0);
+        UNSCOPED_INFO("is total bytes is correct");
+        CHECK(results["bytes_downloaded"].asInteger() == 0);
+        UNSCOPED_INFO("is transport correct");
+        CHECK(results["transport"].asString() == std::string("NONE"));
     }
 
     // make sure map item removed when expired
-    template<> template<>
-    void textureinfo_object_t::test<12>()
+    TEST_CASE_METHOD(textureinfo_test, "LLTectureInfo: a request's map entry goes once it completes", "[LLTectureInfo]")
     {
         LLTextureInfo tex_info;
         tex_info.setLogging(true);
@@ -309,11 +298,13 @@ namespace tut
         tex_info.setRequestSize(id1, requestSizeOne);
         tex_info.setRequestType(id1, LLTextureInfoDetails::REQUEST_TYPE_HTTP);
 
-        ensure_equals("map item created", tex_info.getTextureInfoMapSize(), 1);
+        UNSCOPED_INFO("map item created");
+        CHECK(tex_info.getTextureInfoMapSize() == 1);
 
         tex_info.setRequestCompleteTimeAndLog(id1, requestEndTimeOne);
 
-        ensure_equals("map item removed when consumed", tex_info.getTextureInfoMapSize(), 0);
+        UNSCOPED_INFO("map item removed when consumed");
+        CHECK(tex_info.getTextureInfoMapSize() == 0);
     }
 }
 

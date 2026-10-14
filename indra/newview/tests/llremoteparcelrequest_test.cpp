@@ -26,7 +26,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../llremoteparcelrequest.h"
 
@@ -52,8 +52,6 @@ void LLAgent::sendReliableMessage(void) { }
 LLUUID gAgentSessionID;
 LLUUID gAgentID;
 
-namespace tut
-{
 namespace
 {
     struct TestObserver : public LLRemoteParcelInfoObserver {
@@ -70,7 +68,6 @@ namespace
 
         bool mProcessed;
     };
-} // anonymous namespace
 
     struct RemoteParcelRequestData
     {
@@ -79,15 +76,8 @@ namespace
         }
     };
 
-    typedef test_group<RemoteParcelRequestData> remoteparcelrequest_t;
-    typedef remoteparcelrequest_t::object remoteparcelrequest_object_t;
-    tut::remoteparcelrequest_t tut_remoteparcelrequest("LLRemoteParcelRequest");
-
-    template<> template<>
-    void remoteparcelrequest_object_t::test<1>()
+    TEST_CASE_METHOD(RemoteParcelRequestData, "LLRemoteParcelRequest: an observer is told of the reply for its parcel", "[LLRemoteParcelRequest]")
     {
-        set_test_name("observer pointer");
-
         std::unique_ptr<TestObserver> observer(new TestObserver());
 
         LLRemoteParcelInfoProcessor & processor = LLRemoteParcelInfoProcessor::instance();
@@ -95,14 +85,11 @@ namespace
 
         processor.processParcelData(testParcelData());
 
-        ensure(observer->mProcessed);
+        CHECK(observer->mProcessed);
     }
 
-    template<> template<>
-    void remoteparcelrequest_object_t::test<2>()
+    TEST_CASE_METHOD(RemoteParcelRequestData, "LLRemoteParcelRequest: a reply after its observer is deleted does not crash", "[LLRemoteParcelRequest]")
     {
-        set_test_name("CHOP-220: dangling observer pointer");
-
         LLRemoteParcelInfoObserver * observer = new TestObserver();
 
         LLRemoteParcelInfoProcessor & processor = LLRemoteParcelInfoProcessor::instance();

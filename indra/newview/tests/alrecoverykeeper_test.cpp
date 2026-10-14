@@ -31,12 +31,12 @@
 #include "fsyspath.h"
 #include "llfile.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 #include <string>
 
-namespace tut
+namespace
 {
     struct alrecoverykeeper_data
     {
@@ -95,55 +95,66 @@ namespace tut
             return std::nullopt;
         }
     };
-    typedef test_group<alrecoverykeeper_data> alrecoverykeeper_group;
-    typedef alrecoverykeeper_group::object    alrecoverykeeper_object;
-    alrecoverykeeper_group                    alrecoverykeeper_instance("ALRecoveryKeeper");
 
-    template<> template<>
-    void alrecoverykeeper_object::test<1>()
+    TEST_CASE_METHOD(alrecoverykeeper_data, "ALRecoveryKeeper: unsaved text is written a moment after it changes until it is saved", "[ALRecoveryKeeper]")
     {
-        set_test_name("written a moment after it first changed, under the window's own key, again for each change, and forgotten once saved");
         ALRecoveryKeeper keeper(holder());
         keeper.setItem(object, item);
-        ensure("the window's own key", ALRecoveryStore::isWindowKey(keeper.key()));
+        UNSCOPED_INFO("the window's own key");
+        CHECK(ALRecoveryStore::isWindowKey(keeper.key()));
         keeper.pump(1, 10.0);
-        ensure("nothing unsaved, nothing written", !mine());
+        UNSCOPED_INFO("nothing unsaved, nothing written");
+        REQUIRE_FALSE(mine());
         unsaved = true;
         text    = "typed";
         keeper.pump(2, 10.0);
-        ensure("not at once", !mine());
+        UNSCOPED_INFO("not at once");
+        REQUIRE_FALSE(mine());
         keeper.pump(3, 10.5);
         keeper.pump(3, 10.0 + ALRecoveryKeeper::DELAY);
-        ensure("a moment after it first changed, whatever was typed meanwhile", mine() && mine()->text == "typed" && mine()->name == "Card");
+        {
+            INFO("a moment after it first changed, whatever was typed meanwhile");
+            REQUIRE(mine());
+            CHECK(mine()->text == "typed");
+            CHECK(mine()->name == "Card");
+        }
         text = "typed more";
         keeper.pump(4, 12.0);
         keeper.pump(4, 12.0 + ALRecoveryKeeper::DELAY);
-        ensure("again for the next change", mine() && mine()->text == "typed more");
+        {
+            INFO("again for the next change");
+            REQUIRE(mine());
+            CHECK(mine()->text == "typed more");
+        }
         unsaved = false;
         keeper.pump(4, 20.0);
-        ensure("saved: forgotten", !mine());
-        ensure("nothing failed", failed == 0);
+        UNSCOPED_INFO("saved: forgotten");
+        REQUIRE_FALSE(mine());
+        UNSCOPED_INFO("nothing failed");
+        CHECK(failed == 0);
     }
 
-    template<> template<>
-    void alrecoverykeeper_object::test<2>()
+    TEST_CASE_METHOD(alrecoverykeeper_data, "ALRecoveryKeeper: setAside discards and what another session left is taken up or turned down", "[ALRecoveryKeeper]")
     {
-        set_test_name("thrown away: set aside, and the window's own gone; what another session left offered, taken up once the window's own is written, or turned down");
         ALRecoveryKeeper keeper(holder());
         keeper.setItem(object, item);
         unsaved = true;
         text    = "thrown away";
         keeper.pump(1, 0.0);
         keeper.pump(1, ALRecoveryKeeper::DELAY);
-        ensure("written", mine().has_value());
-        ensure("set aside", keeper.setAside());
-        ensure("its own gone", !mine());
+        UNSCOPED_INFO("written");
+        REQUIRE(mine().has_value());
+        UNSCOPED_INFO("set aside");
+        CHECK(keeper.setAside());
+        UNSCOPED_INFO("its own gone");
+        REQUIRE_FALSE(mine());
         bool discarded = false;
         for (const ALRecoveryEntry& entry : store->list())
         {
             discarded |= entry.state == ALRecoveryEntry::State::Discarded && entry.key == keeper.key();
         }
-        ensure("among the discarded", discarded);
+        UNSCOPED_INFO("among the discarded");
+        CHECK(discarded);
 
         // What a session that ended left of the same item.
         {
@@ -154,14 +165,24 @@ namespace tut
             left.item   = item;
             left.name   = "Card";
             left.text   = "left behind";
-            ensure("left", before.write(left));
+            UNSCOPED_INFO("left");
+            CHECK(before.write(left));
         }
         std::optional<ALRecoveryEntry> offered = keeper.left();
-        ensure("offered", offered && offered->text == "left behind");
+        {
+            INFO("offered");
+            REQUIRE(offered);
+            CHECK(offered->text == "left behind");
+        }
         text = "left behind";
         keeper.took(*offered, 7);
-        ensure("the window's own written", mine() && mine()->text == "left behind");
-        ensure("and the one taken up gone", !keeper.left());
+        {
+            INFO("the window's own written");
+            REQUIRE(mine());
+            CHECK(mine()->text == "left behind");
+        }
+        UNSCOPED_INFO("and the one taken up gone");
+        REQUIRE_FALSE(keeper.left());
 
         // Turned down: among the discarded, and offered no more.
         {
@@ -173,21 +194,25 @@ namespace tut
             before.write(left);
         }
         offered = keeper.left();
-        ensure("offered again", offered && offered->text == "not wanted");
+        {
+            INFO("offered again");
+            REQUIRE(offered);
+            CHECK(offered->text == "not wanted");
+        }
         keeper.turnDown(*offered);
-        ensure("turned down: offered no more", !keeper.left());
+        UNSCOPED_INFO("turned down: offered no more");
+        REQUIRE_FALSE(keeper.left());
     }
 
-    template<> template<>
-    void alrecoverykeeper_object::test<3>()
+    TEST_CASE_METHOD(alrecoverykeeper_data, "ALRecoveryKeeper: a new item or none moves the key and a failed write is said once", "[ALRecoveryKeeper]")
     {
-        set_test_name("another item after a save: the old key forgotten, the new one kept; no item, nothing kept; a write that fails said once");
         ALRecoveryKeeper keeper(holder());
         keeper.setItem(object, item);
         unsaved = true;
         keeper.pump(1, 0.0);
         keeper.pump(1, ALRecoveryKeeper::DELAY);
-        ensure("written", mine().has_value());
+        UNSCOPED_INFO("written");
+        REQUIRE(mine().has_value());
         const LLUUID was = item;
         item             = LLUUID::generateNewID();
         keeper.setItem(object, item);
@@ -197,12 +222,15 @@ namespace tut
         {
             old_left |= entry.key == ALRecoveryStore::windowKeyOf(object, was);
         }
-        ensure("the old key forgotten", !old_left);
+        UNSCOPED_INFO("the old key forgotten");
+        CHECK_FALSE(old_left);
         keeper.pump(2, 5.0);
         keeper.pump(2, 5.0 + ALRecoveryKeeper::DELAY);
-        ensure("the new one kept", mine().has_value());
+        UNSCOPED_INFO("the new one kept");
+        REQUIRE(mine().has_value());
         keeper.setItem(object, LLUUID::null);
-        ensure("no item, no key", keeper.key().empty());
+        UNSCOPED_INFO("no item, no key");
+        REQUIRE(keeper.key().empty());
 
         // Where the store cannot write: said once.
         const std::string blocked = folder + "/blocked";
@@ -218,19 +246,19 @@ namespace tut
         failing.pump(1, ALRecoveryKeeper::DELAY);
         nowhere.flush();
         failing.pump(1, 10.0);
-        ensure_equals("said", failed, 1);
+        UNSCOPED_INFO("said");
+        CHECK(failed == 1);
         failing.pump(2, 11.0);
         failing.pump(2, 11.0 + ALRecoveryKeeper::DELAY);
         nowhere.flush();
         failing.pump(2, 20.0);
-        ensure_equals("once", failed, 1);
+        UNSCOPED_INFO("once");
+        CHECK(failed == 1);
         ALRecovery::useStore(store.get());
     }
 
-    template<> template<>
-    void alrecoverykeeper_object::test<4>()
+    TEST_CASE_METHOD(alrecoverykeeper_data, "ALRecoveryKeeper: the legacy editors' backups are imported as an ended session and removed", "[ALRecoveryKeeper]")
     {
-        set_test_name("the legacy editors' backups taken into the store as a session that ended, named as they named them, a notecard's text out of its format, and the files gone");
         const std::string temp = folder + "/temp";
         std::filesystem::create_directories(fsyspath(temp));
         // Written as the editors wrote them, byte for byte.
@@ -246,19 +274,29 @@ namespace tut
             llofstream other(temp + "/unrelated.txt");
             other << "left alone";
         }
-        ensure_equals("two taken", ALRecovery::importLegacyBackups(temp), 2);
-        ensure("the backups gone", !LLFile::isfile(temp + "/Door Script-1A2B3C4D.lslbackup") && !LLFile::isfile(temp + "/Settings-0000ABCD.ncbackup"));
-        ensure("anything else left alone", LLFile::isfile(temp + "/unrelated.txt"));
+        UNSCOPED_INFO("two taken");
+        CHECK(ALRecovery::importLegacyBackups(temp) == 2);
+        {
+            INFO("the backups gone");
+            CHECK_FALSE(LLFile::isfile(temp + "/Door Script-1A2B3C4D.lslbackup"));
+            CHECK_FALSE(LLFile::isfile(temp + "/Settings-0000ABCD.ncbackup"));
+        }
+        UNSCOPED_INFO("anything else left alone");
+        CHECK(LLFile::isfile(temp + "/unrelated.txt"));
         bool script = false, card = false;
         for (ALRecoveryEntry& entry : store->left())
         {
-            ensure("whole", store->load(entry));
+            UNSCOPED_INFO("whole");
+            REQUIRE(store->load(entry));
             script |= entry.name == "Door Script" && !entry.notecard && entry.text == "default { state_entry() {} }\n" &&
                       entry.state == ALRecoveryEntry::State::Unsaved;
             card |= entry.name == "Settings" && entry.notecard && entry.text == "speed = 2\n";
         }
-        ensure("the script, as left by a session that ended", script);
-        ensure("the notecard, its text out of its format", card);
-        ensure_equals("nothing more the next time", ALRecovery::importLegacyBackups(temp), 0);
+        UNSCOPED_INFO("the script, as left by a session that ended");
+        CHECK(script);
+        UNSCOPED_INFO("the notecard, its text out of its format");
+        CHECK(card);
+        UNSCOPED_INFO("nothing more the next time");
+        CHECK(ALRecovery::importLegacyBackups(temp) == 0);
     }
 }
