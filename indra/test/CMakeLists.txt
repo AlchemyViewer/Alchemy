@@ -50,6 +50,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        altestbenchmark.h
         altestfailure.h
         altestfatal.h
         altesthelper.h
@@ -79,12 +80,13 @@ set_target_properties(al_test_support PROPERTIES FOLDER "Tests")
 # run one at a time by the entries below, which check the exit code and the
 # output CTest sees from the harness: the state guard and what a fixture may
 # tell it, LOGFAIL's replay, a crash and an uncaught LL_ERRS, a fixture's end
-# failing, the skip and no-match codes, the ISA gate, and a listing needing no
-# setup.
+# failing, the skip and no-match codes, the ISA gate, a listing needing no
+# setup, and which runs a benchmark file's cases.
 al_add_test_binary(
   test_support_tests
   PROJECT test
   SOURCES tests/altestsupport_test.cpp
+  BENCH_SOURCES tests/altestsupport_bench.cpp
   LIBRARIES llcommon
 )
 
@@ -199,6 +201,21 @@ al_expect_from_test_support(
   ARGS "--isa-level|9"
   EXIT 125
   OUTPUT "does not run x86-64 level 9"
+)
+# A benchmark file's cases are hidden: the filter a test file's entry runs
+# matches none of them, and the one its benchmark entry runs runs them. Few
+# samples and no warm-up, since the run, not the number, is checked; Catch2
+# still spends about two seconds measuring its clock first.
+al_expect_from_test_support(
+  benchmark_hidden_from_its_file
+  ARGS "[#altestsupport_bench]~[.]"
+  EXIT 2
+)
+al_expect_from_test_support(
+  benchmark_runs_from_its_entry
+  ARGS "[#altestsupport_bench][!benchmark]|--benchmark-samples|2|--benchmark-warmup-time|1"
+  EXIT 0
+  OUTPUT "a word's length"
 )
 # The ISA level is one no host runs: a listing that set up first, or held to
 # the gate, would skip rather than list.

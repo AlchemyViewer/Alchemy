@@ -14,7 +14,7 @@ endif()
 #                    [INCLUDES <dir>...] [DEFINES <define>...] [ENVIRONMENT <VAR=value>...]
 #                    [GL] [PYTHON] [ISA_TIER <tier>] [RESOURCE_LOCK <name>...] [LAUNCHER <command>...]
 #                    [RERUN <run> RERUN_SOURCES <test file>... RERUN_ENVIRONMENT <VAR=value>...]
-#                    [COMBINED])
+#                    [BENCH_SOURCES <benchmark file>...] [COMBINED])
 #
 # Builds the test files into one Catch2 executable, <name>, with the harness
 # (al_test_support: the main, the listeners and the matchers) and SUPPORT's
@@ -69,13 +69,24 @@ endif()
 # with AL_TEST_PER_CASE each of their cases as <name>_<run>/<case>. alscript's
 # tests that check SLua run again under Luau's new type solver, as a scripter
 # may choose it.
+#
+# BENCH_SOURCES are benchmark files, built into the binary beside the tests,
+# whose cases are tagged [!benchmark]: hidden, so no test file's entry, the
+# combined run or the per-case entries run them. Each is an entry of its
+# own, bench/<name>/<file stem>, labelled benchmark and manual, which the
+# default run leaves out and BUILD_AND_RUN_BENCHMARKS runs. It runs alone,
+# since anything beside it would move its numbers, and reports to the
+# console and as XML, Testing/benchmarks/<name>_<file stem>.xml, which keeps
+# the numbers where Catch2's JSON reporter would drop them. A benchmark case
+# skips outside an optimised build (altestbenchmark.h), and the entry then
+# reads as skipped.
 function(al_add_test_binary name)
   cmake_parse_arguments(
     PARSE_ARGV 1
     arg
     "GL;PYTHON;COMBINED"
     "PROJECT;ISA_TIER;RERUN"
-    "SOURCES;UNIT;LIBRARIES;SUPPORT;INCLUDES;DEFINES;ENVIRONMENT;RESOURCE_LOCK;LAUNCHER;RERUN_SOURCES;RERUN_ENVIRONMENT"
+    "SOURCES;UNIT;LIBRARIES;SUPPORT;INCLUDES;DEFINES;ENVIRONMENT;RESOURCE_LOCK;LAUNCHER;RERUN_SOURCES;RERUN_ENVIRONMENT;BENCH_SOURCES"
   )
   if(NOT arg_PROJECT)
     message(FATAL_ERROR "al_add_test_binary(${name}): PROJECT is required")
@@ -107,15 +118,20 @@ function(al_add_test_binary name)
   endif()
 
   set(stems)
-  foreach(source IN LISTS arg_SOURCES)
+  set(bench_stems)
+  foreach(source IN LISTS arg_SOURCES arg_BENCH_SOURCES)
     get_filename_component(stem "${source}" NAME_WLE)
-    if(stem IN_LIST stems)
+    if(stem IN_LIST stems OR stem IN_LIST bench_stems)
       message(
         FATAL_ERROR
         "al_add_test_binary(${name}): two test files are named ${stem}; the stem names a file's entry and its tag"
       )
     endif()
-    list(APPEND stems ${stem})
+    if(source IN_LIST arg_BENCH_SOURCES)
+      list(APPEND bench_stems ${stem})
+    else()
+      list(APPEND stems ${stem})
+    endif()
 
     # A file is in one binary at each tier: the variants of an ISA_TIER
     # binary build the same files at the others.
@@ -145,7 +161,7 @@ function(al_add_test_binary name)
   # vcpkg's toolchain hangs an app-local copy step on every executable it
   # sees declared; a test runs from the build tree, as al_add_test explains.
   set(VCPKG_APPLOCAL_DEPS OFF)
-  add_executable(${target} ${arg_SOURCES} ${arg_UNIT})
+  add_executable(${target} ${arg_SOURCES} ${arg_BENCH_SOURCES} ${arg_UNIT})
   target_link_libraries(${target} PRIVATE al::flags al_test_support ${arg_SUPPORT} ${arg_LIBRARIES})
   target_include_directories(${target} PRIVATE ${arg_INCLUDES} ${INDRA_SOURCE_DIR}/test)
   if(arg_UNIT)
@@ -375,6 +391,35 @@ function(al_add_test_binary name)
         set_tests_properties(${target}/combined PROPERTIES RESOURCE_LOCK "${arg_RESOURCE_LOCK}")
       endif()
     endif()
+  endif()
+
+  # A benchmark file's run, whichever way the tests are registered. It names
+  # the file's tag and Catch2's benchmark tag together, which chooses the
+  # hidden cases a tag alone would leave out.
+  if(arg_BENCH_SOURCES)
+    set(bench_dir "${CMAKE_BINARY_DIR}/Testing/benchmarks")
+    file(MAKE_DIRECTORY "${bench_dir}")
+    foreach(stem IN LISTS bench_stems)
+      add_test(
+        NAME bench/${target}/${stem}
+        COMMAND
+          ${arg_LAUNCHER} $<TARGET_FILE:${target}> "[#${stem}][!benchmark]" --reporter console
+          --reporter "xml::out=${bench_dir}/${target}_${stem}.xml" ${arguments}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      )
+      set_tests_properties(
+        bench/${target}/${stem}
+        PROPERTIES
+          ENVIRONMENT "${environment}"
+          ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+          LABELS "${labels};benchmark;manual"
+          DISABLED ${disabled}
+          SKIP_RETURN_CODE 125
+          RUN_SERIAL TRUE
+          TIMEOUT 3600
+      )
+    endforeach()
+    add_dependencies(BUILD_BENCHMARKS ${target})
   endif()
 
   add_dependencies(BUILD_TESTS ${target})
