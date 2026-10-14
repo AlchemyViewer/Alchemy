@@ -130,8 +130,6 @@ static const LLUUID region1("4e2d81a3-6263-6ffe-ad5c-8ce04bee07e8");
 static const LLUUID region2("68762cc8-b68b-4e45-854b-e830734f2d4a");
 static const U64 region1_handle(0x0000040000003f00ULL);
 static const U64 region2_handle(0x0000030000004200ULL);
-static const std::string region1_handle_str("0000040000003f00");
-static const std::string region2_handle_str("0000030000004200");
 
 #if 0
 static bool
@@ -277,6 +275,11 @@ namespace
 
         ~tst_viewerassetstats_index()
         {
+            // The global stats a case made, where a failed REQUIRE stopped it
+            // before it deleted them, are not left for the cases after it;
+            // deleted while the case's recorder is still there.
+            delete gViewerAssetStats;
+            gViewerAssetStats = nullptr;
             LLTrace::set_master_thread_recorder(NULL);
         }
 
@@ -349,7 +352,7 @@ namespace
         }
     }
 
-    TEST_CASE_METHOD(tst_viewerassetstats_index, "tst_viewerassetstats_test: a new non-global instance's counts start at zero", "[tst_viewerassetstats_test]")
+    TEST_CASE_METHOD(tst_viewerassetstats_index, "tst_viewerassetstats_test: a new non-global instance's counts and response times start at zero", "[tst_viewerassetstats_test]")
     {
         LLViewerAssetStats * it = new LLViewerAssetStats();
         it->setRegion(region1_handle);
@@ -357,7 +360,7 @@ namespace
         LLSD sd = it->asLLSD(false);
         CHECK(is_double_key_map(sd, "regions", "duration"));
         CHECK(is_single_slot_array(sd["regions"], region1_handle));
-        sd = sd[0];
+        sd = sd["regions"][0];
 
         delete it;
 
@@ -392,7 +395,9 @@ namespace
         // Reset and check zeros...
         // Reset leaves current region in place
         gViewerAssetStats->reset();
-        sd = gViewerAssetStats->asLLSD(false)["regions"][region1_handle_str];
+        sd = gViewerAssetStats->asLLSD(false);
+        CHECK(is_single_slot_array(sd["regions"], region1_handle));
+        sd = sd["regions"][0];
 
         delete gViewerAssetStats;
         gViewerAssetStats = NULL;
