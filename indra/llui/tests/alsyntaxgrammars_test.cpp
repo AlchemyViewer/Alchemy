@@ -46,8 +46,9 @@ namespace
             for (const char* name : { "lsl", "slua", "xml", "json", "text", "config" })
             {
                 std::string error;
-                UNSCOPED_INFO(std::string(name) + " loads: " + error);
-                REQUIRE(library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/" + name + ".xml", error));
+                const bool  loaded = library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/" + name + ".xml", error);
+                INFO(name << " loads: " << error);
+                REQUIRE(loaded);
             }
         }
 
@@ -85,10 +86,17 @@ namespace
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: the six grammars load and answer to their extensions", "[alsyntaxgrammars]")
     {
         REQUIRE(library.names().size() == size_t(6));
-        CHECK(library.forExtension(".lsl")->name() == std::string("lsl"));
-        CHECK(library.forExtension("luau")->name() == std::string("slua"));
-        CHECK(library.forExtension("xui")->name() == std::string("xml"));
-        CHECK(library.forExtension("ini")->name() == std::string("config"));
+        const auto named = [this](std::string_view extension)
+        {
+            std::shared_ptr<const ALSyntaxGrammar> grammar = library.forExtension(extension);
+            CAPTURE(extension);
+            REQUIRE(grammar);
+            return grammar->name();
+        };
+        CHECK(named(".lsl") == std::string("lsl"));
+        CHECK(named("luau") == std::string("slua"));
+        CHECK(named("xui") == std::string("xml"));
+        CHECK(named("ini") == std::string("config"));
         REQUIRE_FALSE(library.forExtension("exe"));
     }
 
@@ -258,8 +266,9 @@ namespace
         description["states"] = states;
         ALSyntaxGrammar grammar;
         std::string     error;
-        UNSCOPED_INFO("loads: " + error);
-        REQUIRE(grammar.load(description, error));
+        const bool      loaded = grammar.load(description, error);
+        UNSCOPED_INFO("loads: " << error);
+        REQUIRE(loaded);
         ALSyntaxWords words;
 
         // Nested repeats over a long line, which Boost.Regex gave up on:
@@ -307,8 +316,9 @@ namespace
         regex_description["name"]   = "tested";
         regex_description["states"] = regex_states;
         ALSyntaxGrammar regex_grammar;
-        UNSCOPED_INFO("loads: " + error);
-        REQUIRE(regex_grammar.load(regex_description, error));
+        const bool      regex_loaded = regex_grammar.load(regex_description, error);
+        UNSCOPED_INFO("loads: " << error);
+        REQUIRE(regex_loaded);
         state = regex_grammar.initialState();
         regex_grammar.lexLine("<<ab x ab y", state, tokens, words);
         UNSCOPED_INFO("not closed by the capture alone");
