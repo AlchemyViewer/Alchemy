@@ -2493,6 +2493,17 @@
             <key>Value</key>
             <real>2.0</real>
         </map>
+        <key>AlchemySelectionOutlineContrast</key>
+        <map>
+            <key>Comment</key>
+            <string>Move the lightness of selection outlines and wireframes away from what lies behind them, keeping their hue, so they stay visible on any colour. Off draws the colours as they are. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemySelectionOutlineGeometry</key>
         <map>
             <key>Comment</key>

@@ -203,6 +203,8 @@ namespace
             mScene.release();
             mFar.release();
             mFrame.release();
+            mBackdrop = nullptr;
+            mBackdropTarget.release();
             for (U32* texture : { &mPalette, &mRamp, &mClear, &mGlass, &mSpeck })
             {
                 if (*texture)
@@ -276,6 +278,8 @@ namespace
             mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionWireframeF.glsl", GL_FRAGMENT_SHADER));
             mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER));
             mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
+            mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionContrastF.glsl", GL_FRAGMENT_SHADER));
+            mWireProgram.mShaderFiles.push_back(std::make_pair("environment/srgbF.glsl", GL_FRAGMENT_SHADER));
             mWireProgram.mShaderLevel = 1;
             REQUIRE(mWireProgram.createShader(LLGLSLShader::VARIANT_RIGGED));
             REQUIRE(mWireProgram.mRiggedVariant);
@@ -307,6 +311,11 @@ namespace
                 if (program != &mGlowReachProgram)
                 {
                     program->mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
+                }
+                if (program == &mOutlineProgram || program == &mFullSearchProgram)
+                {
+                    program->mShaderFiles.push_back(std::make_pair("interface/selectionContrastF.glsl", GL_FRAGMENT_SHADER));
+                    program->mShaderFiles.push_back(std::make_pair("environment/srgbF.glsl", GL_FRAGMENT_SHADER));
                 }
                 program->mShaderLevel = 1;
                 program->clearPermutations();
@@ -534,6 +543,63 @@ namespace
                 gGL.getTextureSlot(0)->unbind();
             }
             return mSpeck;
+        }
+
+        // Fills the backdrop stand-in, at the size ALSelectionOutline copies the window at, with `colour`, and has the
+        // edge pass and the wireframe keep their lines apart from it.
+        void backdrop(const LLColor4& colour)
+        {
+            if (!mBackdropTarget.isComplete())
+            {
+                REQUIRE(mBackdropTarget.allocate(W / Outline::BACKDROP_SCALE, H / Outline::BACKDROP_SCALE, GL_RGBA8));
+            }
+            mBackdropTarget.bindTarget();
+            {
+                LLGLSColorMask mask(true, true);
+                LLGLDisable scissor(GL_SCISSOR_TEST);
+                gGL.setClearColor(colour);
+                mBackdropTarget.clear(GL_COLOR_BUFFER_BIT);
+            }
+            mBackdropTarget.flush();
+            mBackdrop = &mBackdropTarget;
+        }
+
+        // The OKLab lightness of a display-encoded pixel.
+        static F32 lightness(const Pixel& p)
+        {
+            auto linear = [](U8 v)
+            {
+                const F32 c = (F32)v / 255.f;
+                return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+            };
+            const F32 r = linear(p.r);
+            const F32 g = linear(p.g);
+            const F32 b = linear(p.b);
+            const F32 l = cbrtf(0.4122214708f * r + 0.5363325363f * g + 0.0514459929f * b);
+            const F32 m = cbrtf(0.2119034982f * r + 0.6806995451f * g + 0.1073969566f * b);
+            const F32 s = cbrtf(0.0883024619f * r + 0.2817188376f * g + 0.6299787005f * b);
+            return 0.2104542553f * l + 0.7936177850f * m - 0.0040720468f * s;
+        }
+
+        // The lightest pixel: a line's colour, where it covers a pixel whole, drawn over a cleared frame.
+        static Pixel lightest(const std::vector<U8>& px)
+        {
+            Pixel most{ 0, 0, 0, 0 };
+            F32 most_l = -1.f;
+            for (S32 y = 0; y < H; ++y)
+            {
+                for (S32 x = 0; x < W; ++x)
+                {
+                    const Pixel p = at(px, x, y);
+                    const F32 l = lightness(p);
+                    if (l > most_l)
+                    {
+                        most = p;
+                        most_l = l;
+                    }
+                }
+            }
+            return most;
         }
 
         struct Draw
@@ -790,11 +856,13 @@ namespace
                 if (scissor)
                 {
                     LLGLSScissor scissored(scissor->mLeft, scissor->mBottom, scissor->getWidth(), scissor->getHeight());
-                    Outline::drawEdges(program, mIdMap, mJumps, tiles, glow_reach, glow_rows, mPalette, lines, *mTriangle);
+                    Outline::drawEdges(program, mIdMap, mJumps, tiles, glow_reach, glow_rows, mBackdrop, mPalette, lines,
+                                       *mTriangle);
                 }
                 else
                 {
-                    Outline::drawEdges(program, mIdMap, mJumps, tiles, glow_reach, glow_rows, mPalette, lines, *mTriangle);
+                    Outline::drawEdges(program, mIdMap, mJumps, tiles, glow_reach, glow_rows, mBackdrop, mPalette, lines,
+                                       *mTriangle);
                 }
                 LLGLSLShader::unbind();
                 px = ll_test::readFramebufferRGBA(W, H);
@@ -857,13 +925,14 @@ namespace
                     Outline::WireState state(pass, Outline::wireOffsetFactor(resample));
                     LLGLSLShader& program = joints ? *mWireProgram.mRiggedVariant : mWireProgram;
                     mWireProgram.bind(joints != nullptr);
-                    Outline::bindWirePass(program, pass, wire_width, W, H, mPalette, &mIdMap);
+                    Outline::bindWirePass(program, pass, wire_width, W, H, mPalette, &mIdMap, mBackdrop);
                     texture_read = drawAll(program, draws, joints, [pass](const Draw& draw)
                                            { return Outline::inWirePass(draw.parts(), draw.mShowHidden, pass); }) &&
                                    texture_read;
                     program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
                     program.unbindTexture(LLShaderMgr::SELECTION_PALETTE);
                     program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
+                    program.unbindTexture(LLShaderMgr::SELECTION_BACKDROP_MAP);
                     LLGLSLShader::unbind();
                 }
                 px = ll_test::readFramebufferRGBA(W, H);
@@ -925,6 +994,10 @@ namespace
         U32 mClear = 0;
         U32 mGlass = 0;
         U32 mSpeck = 0;
+        // What the edge pass and the wireframe keep their lines apart from: none, so they draw the palette's colours,
+        // unless a test fills mBackdropTarget and points this at it.
+        LLRenderTarget* mBackdrop = nullptr;
+        LLRenderTarget mBackdropTarget;
         std::vector<U8> mPaletteTexels;
         LLPointer<LLVertexBuffer> mTriangle;
         std::vector<LLPointer<LLVertexBuffer>> mBuffers;
@@ -3406,6 +3479,72 @@ namespace
             const size_t cut_lines = lit(worldWireframe({ { quadA(), ID_A, Outline::PRIORITY_ROOT, cut, speckTexture() } }));
             UNSCOPED_INFO("its wireframe draws the card's edges");
             REQUIRE(whole_lines > cut_lines);
+        }
+    }
+
+    // Lines are kept apart from the lightness of what lies behind them, their hue as it is: a light blue contour stays
+    // as it is over black, turns lighter over mid grey and darker over white, as contrastLightness says, and the
+    // wireframe's lines with it; without a backdrop the palette's colour is drawn as it is. The backdrop is copied
+    // around the scissor, grown by what the lines read of it, to whole texels of the copy.
+    TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: lines keep their lightness apart from the backdrop's", "[ALSelectionOutline]")
+    {
+        const F32 light = 0.817f;
+        UNSCOPED_INFO("a light line over dark keeps its lightness");
+        CHECK_THAT(Outline::contrastLightness(light, 0.3f), Catch::Matchers::WithinAbs(light, 1e-6f));
+        UNSCOPED_INFO("over mid grey it turns lighter");
+        CHECK_THAT(Outline::contrastLightness(light, 0.6f), Catch::Matchers::WithinAbs(0.9f, 1e-6f));
+        UNSCOPED_INFO("over white darker");
+        CHECK_THAT(Outline::contrastLightness(light, 1.f), Catch::Matchers::WithinAbs(0.7f, 1e-6f));
+        UNSCOPED_INFO("a dark line over darker turns lighter");
+        CHECK_THAT(Outline::contrastLightness(0.3f, 0.2f), Catch::Matchers::WithinAbs(0.5f, 1e-6f));
+        UNSCOPED_INFO("and over light keeps its lightness");
+        CHECK_THAT(Outline::contrastLightness(0.3f, 0.9f), Catch::Matchers::WithinAbs(0.3f, 1e-6f));
+
+        UNSCOPED_INFO("the backdrop around the scissor, to even edges");
+        CHECK(Outline::backdropRect(LLRect(11, 40, 31, 21), true, W, H) == LLRect(6, 44, 34, 16));
+        UNSCOPED_INFO("held to the window");
+        CHECK(Outline::backdropRect(LLRect(1, 63, 63, 1), true, W, H) == LLRect(0, 64, 64, 0));
+        UNSCOPED_INFO("the whole window without a scissor");
+        CHECK(Outline::backdropRect(LLRect(), false, 63, 63) == LLRect(0, 62, 62, 0));
+
+        const LLColor4 sky(66.f / 255.f, 214.f / 255.f, 1.f, 1.f);
+        const F32 sky_l = lightness(Pixel{ 66, 214, 255, 255 });
+        struct Backdrop
+        {
+            const char* mName;
+            LLColor4 mColour;
+            F32 mBack;
+        };
+        const Backdrop backdrops[] = { { "black", LLColor4(0.f, 0.f, 0.f, 1.f), 0.f },
+                                       { "mid grey", LLColor4(0.5f, 0.5f, 0.5f, 1.f), lightness(Pixel{ 128, 128, 128, 255 }) },
+                                       { "white", LLColor4(1.f, 1.f, 1.f, 1.f), 1.f } };
+        for (bool reverse : conventions())
+        {
+            CAPTURE(reverse);
+            setUp(reverse);
+            palette({ { ID_A, sky } }, true);
+            idPass({ { quadA(), ID_A } });
+            Pixel line = lightest(edgePass());
+            UNSCOPED_INFO("without a backdrop the palette's colour");
+            REQUIRE((line.r == 66 && line.g == 214 && line.b == 255));
+
+            for (const Backdrop& back : backdrops)
+            {
+                INFO(back.mName);
+                const F32 expected = Outline::contrastLightness(sky_l, back.mBack);
+                backdrop(back.mColour);
+                line = lightest(edgePass());
+                UNSCOPED_INFO("the contour's lightness");
+                REQUIRE_THAT(lightness(line), Catch::Matchers::WithinAbs(expected, 0.02f));
+                UNSCOPED_INFO("its hue kept");
+                REQUIRE((line.b >= line.g && line.g > line.r));
+
+                windowDepth(nullptr);
+                const Pixel wire = lightest(worldWireframe({ { quadA(), ID_A } }, 3));
+                UNSCOPED_INFO("the wireframe's lightness");
+                REQUIRE_THAT(lightness(wire), Catch::Matchers::WithinAbs(expected, 0.02f));
+                mBackdrop = nullptr;
+            }
         }
     }
 }

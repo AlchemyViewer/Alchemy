@@ -3877,7 +3877,9 @@ bool LLViewerShaderMgr::loadShadersInterface()
                          { "interface/selectionWireframeG.glsl", GL_GEOMETRY_SHADER },
                          { "interface/selectionWireframeF.glsl", GL_FRAGMENT_SHADER },
                          { "interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER },
-                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionContrastF.glsl", GL_FRAGMENT_SHADER },
+                         { "environment/srgbF.glsl", GL_FRAGMENT_SHADER } },
                        LLGLSLShader::VARIANT_RIGGED);
         load_selection(gSelectionJumpProgram, "Selection Jump Shader",
                        { { "interface/copyV.glsl", GL_VERTEX_SHADER },
@@ -3892,7 +3894,9 @@ bool LLViewerShaderMgr::loadShadersInterface()
         load_selection(gSelectionOutlineProgram, "Selection Outline Shader",
                        { { "interface/copyV.glsl", GL_VERTEX_SHADER },
                          { "interface/selectionOutlineF.glsl", GL_FRAGMENT_SHADER },
-                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionContrastF.glsl", GL_FRAGMENT_SHADER },
+                         { "environment/srgbF.glsl", GL_FRAGMENT_SHADER } },
                        0);
         load_selection(gSelectionGlowReachProgram, "Selection Glow Reach Shader",
                        { { "interface/copyV.glsl", GL_VERTEX_SHADER },

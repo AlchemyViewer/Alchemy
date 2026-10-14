@@ -27,6 +27,7 @@
 
 #include "../llgl.h"
 #include "../llglheaders.h"
+#include "../llglstates.h"
 #include "../llimagegl.h"
 #include "../llrendertarget.h"
 
@@ -125,6 +126,7 @@ namespace
             mInteger.release();
             mMixed.release();
             mLent.release();
+            mCopy.release();
             mLentImage = nullptr;
             LLRenderTarget::sUseFBO = mUseFBO;
             if (mVAO)
@@ -213,6 +215,7 @@ namespace
         LLRenderTarget mInteger;
         LLRenderTarget mMixed;
         LLRenderTarget mLent;
+        LLRenderTarget mCopy;
         LLPointer<LLImageGL> mLentImage;
         // setColorAttachment is the FBO path's, which the viewer turns on and a test turns on for itself.
         const bool mUseFBO = LLRenderTarget::sUseFBO;
@@ -365,6 +368,52 @@ namespace
 
         mLent.releaseColorAttachment();
         CHECK(mLent.getInternalFormat(0) == 0u);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // copyFromBound copies the colour of the framebuffer bound now into a target, scaled with the filter asked for, as
+    // the selection outline copies the window behind its lines at half size: a linear halving averages each square of
+    // four. The scissor in force does not clip it, and what was bound is bound after.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: copyFromBound copies the bound framebuffer past the scissor", "[llrendertarget_gl]")
+    {
+        setUp();
+        constexpr U32 HALF = SIZE / 2;
+        REQUIRE(mCopy.allocate(HALF, HALF, GL_RGBA8));
+        mCopy.bindTarget();
+        gGL.setClearColor(LLColor4(0.f, 0.f, 1.f, 1.f));
+        mCopy.clear();
+        mCopy.flush();
+
+        // Black, but for a white first column.
+        mTarget.bindTarget();
+        gGL.setClearColor(LLColor4::black);
+        mTarget.clear();
+        {
+            LLGLSScissor column(0, 0, 1, SIZE);
+            gGL.setClearColor(LLColor4::white);
+            mTarget.clear();
+        }
+        {
+            LLGLSScissor corner(0, 0, 1, 1);
+            mCopy.copyFromBound(0, 0, SIZE, SIZE, 0, 0, HALF, HALF, GL_LINEAR);
+        }
+        UNSCOPED_INFO("what was bound is bound after");
+        CHECK(LLRenderTarget::getCurrentBoundTarget() == &mTarget);
+        mTarget.flush();
+
+        mCopy.bindTarget();
+        std::vector<U8> px((size_t)HALF * HALF * 4);
+        glReadPixels(0, 0, HALF, HALF, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+        mCopy.flush();
+        auto red_at = [&px](U32 x, U32 y) { return (U32)px[((size_t)y * HALF + x) * 4]; };
+        auto blue_at = [&px](U32 x, U32 y) { return (U32)px[((size_t)y * HALF + x) * 4 + 2]; };
+        UNSCOPED_INFO("the white column and the black beside it averaged");
+        CHECK(red_at(0, 0) >= 127u);
+        CHECK(red_at(0, 0) <= 128u);
+        UNSCOPED_INFO("black squares black");
+        CHECK(red_at(1, 0) == 0u);
+        UNSCOPED_INFO("copied outside the scissor too");
+        CHECK(blue_at(HALF - 1, HALF - 1) == 0u);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 }

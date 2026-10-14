@@ -103,6 +103,12 @@ class LLVOAvatar;
 /// hidden colour. On the HUD the window's depth also holds the scene's wherever that is the nearer, so the lines
 /// are tested against the id target's depth instead, and a line behind another selected surface is hidden.
 ///
+/// Lines are kept apart from what lies behind them (View::mContrast, AlchemySelectionOutlineContrast). Before the
+/// wireframe and the outline draw, the bound framebuffer under them is copied at 1 / BACKDROP_SCALE of its size
+/// (backdropRect); where a line is drawn, the edge pass and the wireframe read the mean OKLab lightness of the backdrop
+/// around it and move the line's own to MIN_CONTRAST from it where the two are nearer, its hue kept
+/// (selectionContrastF.glsl, contrastLightness). The glow is left as its colour is.
+///
 /// The disk a pixel searches grows with the square of the contour's width, and most pixels in the scissor are far
 /// from anything to draw. The tile pass (interface/selectionTileF.glsl) records for each TILE_SIZE square of the
 /// id target the lowest and highest nonzero id it holds, whether it holds the near side of a jump and whether
@@ -188,6 +194,8 @@ public:
         /// Whether the glow, which follows the surface the pointer is over, draws every face whole: only under
         /// Highlight Transparent, where the scene itself draws them so.
         bool mWholeGlow = false;
+        /// Whether the lines are kept apart from the lightness of what lies behind them (AlchemySelectionOutlineContrast).
+        bool mContrast = false;
     };
 
     /// What the objects of a frame ask for between them.
@@ -274,6 +282,13 @@ public:
     /// What an edge between two objects keeps of its object's outline opacity (INNER_OPACITY in
     /// selectionOutlineF.glsl).
     static constexpr F32 INNER_OPACITY = 0.6f;
+    /// The window behind the lines is copied at 1 / BACKDROP_SCALE of its resolution, and read up to BACKDROP_REACH
+    /// pixels from where a line is drawn (backdropLightness in selectionContrastF.glsl).
+    static constexpr S32 BACKDROP_SCALE = 2;
+    static constexpr S32 BACKDROP_REACH = 4;
+    /// How far apart in OKLab lightness a line and the backdrop around it are kept (MIN_CONTRAST in
+    /// selectionContrastF.glsl).
+    static constexpr F32 MIN_CONTRAST = 0.3f;
     /// The texture alpha an alpha-blended face is outlined from: wherever it is drawn at all, so a uniformly
     /// translucent texture, as glass is, keeps its face, while the clear texels around a leaf on its card are cut.
     static constexpr F32 BLEND_ALPHA_CUTOFF = 0.1f;
@@ -505,6 +520,27 @@ public:
     /// The tiles of the id target a rect of its texels touches.
     static LLRect tileRect(const LLRect& rect);
 
+    /// The rect of a width x height window the backdrop is copied from before the lines are drawn over it: the
+    /// scissor's grown by BACKDROP_REACH where `scissored`, and the whole window where not, as for the world's
+    /// wireframe drawn without the id pass. Held to the window, and to even edges, so each texel of the copy is the
+    /// mean of a square of BACKDROP_SCALE pixels.
+    static LLRect backdropRect(const LLRect& scissor, bool scissored, S32 width, S32 height);
+
+    /// The OKLab lightness a line of lightness `line` takes over a backdrop of lightness `back`, as
+    /// contrastLightness in selectionContrastF.glsl gives it: its own where the two are MIN_CONTRAST apart; else
+    /// MIN_CONTRAST lighter than the backdrop below the turn and MIN_CONTRAST darker above it. The turn is the line's
+    /// own lightness held to where both sides have room, so a light line stays light over all but light backdrops and
+    /// a dark one dark over all but dark ones.
+    static F32 contrastLightness(F32 line, F32 back)
+    {
+        const F32 turn = llclamp(line, MIN_CONTRAST, 1.f - MIN_CONTRAST);
+        return back < turn ? llmax(line, back + MIN_CONTRAST) : llmin(line, back - MIN_CONTRAST);
+    }
+
+    /// Binds `backdrop`, the window behind the lines (backdropRect), to the bound edge or wireframe program, which
+    /// keeps its lines' lightness apart from it; without one they are drawn as the palette has them.
+    static void bindBackdrop(LLGLSLShader& program, LLRenderTarget* backdrop);
+
     /// The glow reach pass with the bound glow reach program: into `reach`, RGBA16 at the size of `tiles`, the tile
     /// pass's record, for each tile the lowest and highest id of the tiles within `view`'s glow radius of it that hold
     /// a glowing surface, over the tiles under `rect`, a rect of the id target; the others are cleared, and hold no
@@ -519,18 +555,18 @@ public:
                              const LLRect& rect, const View& view, LLVertexBuffer& triangle);
 
     /// Binds what a wireframe pass reads to the bound wireframe program: the pass, the lines' width, the viewport's
-    /// size, the palette, and for WIRE_ID_DEPTH the depth of `ids`, the id target.
+    /// size, the palette, the backdrop (bindBackdrop), and for WIRE_ID_DEPTH the depth of `ids`, the id target.
     static void bindWirePass(LLGLSLShader& program, EWirePass pass, S32 wire_width, S32 width, S32 height, U32 palette,
-                             LLRenderTarget* ids);
+                             LLRenderTarget* ids, LLRenderTarget* backdrop);
 
     /// The edge pass with the bound outline program and `view`'s widths, over the viewport and scissor in force:
     /// ids and their depth from `ids`, the id target, the depth through `view`'s projection, which the id pass drew
     /// with, the jump pass's marks from `jumps` and the tile pass's record from `tiles`. With `glow_reach` and
     /// `glow_rows`, the glow reach and row passes' records, where an object glows, the pass draws the glow; and only
-    /// then.
+    /// then. With `backdrop`, its lines are kept apart from it (bindBackdrop).
     static void drawEdges(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& jumps, LLRenderTarget& tiles,
-                          LLRenderTarget* glow_reach, LLRenderTarget* glow_rows, U32 palette, const View& view,
-                          LLVertexBuffer& triangle);
+                          LLRenderTarget* glow_reach, LLRenderTarget* glow_rows, LLRenderTarget* backdrop, U32 palette,
+                          const View& view, LLVertexBuffer& triangle);
 
 private:
     // The full-screen triangle with the bound program, `projection` loaded for its draw where given: the triangle
@@ -578,8 +614,9 @@ private:
     void drawIds(const View& view, S32 width, S32 height, const LLMatrix4a& mvp);
 
     // The wireframe of what was added with one, over the bound framebuffer under the outline: the world's visible
-    // lines and its hidden ones against the window's depth, the HUD's against the id target's.
-    void drawWireframes(const View& view, S32 width, S32 height);
+    // lines and its hidden ones against the window's depth, the HUD's against the id target's; kept apart from
+    // `backdrop` where there is one.
+    void drawWireframes(const View& view, S32 width, S32 height, LLRenderTarget* backdrop);
 
     // When a target was last drawn with: the frame (LLFrameTimer::getFrameCount) and the time
     // (LLFrameTimer::getTotalSeconds).
@@ -618,13 +655,15 @@ private:
     LLRenderTarget mTileMap;
     LLRenderTarget mGlowReachMap;
     LLRenderTarget mGlowRowMap;
+    LLRenderTarget mBackdropMap;
     U32 mPalette = 0;
     U32 mPaletteRows = 0;
 
-    // When the id target, the jump and tile targets, the glow's, and the palette were last drawn with.
+    // When the id target, the jump and tile targets, the glow's, the backdrop and the palette were last drawn with.
     Use mIdUse;
     Use mEdgeUse;
     Use mGlowUse;
+    Use mBackdropUse;
     Use mPaletteUse;
 
     // The pixels this frame's outlines can touch, and whether any can.
@@ -867,8 +906,9 @@ inline ALSelectionOutline::WireState::~WireState()
 }
 
 inline void ALSelectionOutline::bindWirePass(LLGLSLShader& program, EWirePass pass, S32 wire_width, S32 width, S32 height,
-                                             U32 palette, LLRenderTarget* ids)
+                                             U32 palette, LLRenderTarget* ids, LLRenderTarget* backdrop)
 {
+    bindBackdrop(program, backdrop);
     program.uniform1i(LLShaderMgr::WIREFRAME_PASS, (GLint)pass);
     program.uniform1i(LLShaderMgr::WIREFRAME_WIDTH, llmax(wire_width, 1));
     program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)width, (F32)height);
@@ -960,6 +1000,37 @@ inline LLRect ALSelectionOutline::tileRect(const LLRect& rect)
     return LLRect(left, top, right, bottom);
 }
 
+inline LLRect ALSelectionOutline::backdropRect(const LLRect& scissor, bool scissored, S32 width, S32 height)
+{
+    LLRect rect(0, llmax(height, 0), llmax(width, 0), 0);
+    if (scissored)
+    {
+        rect.intersectWith(LLRect(scissor.mLeft - BACKDROP_REACH, scissor.mTop + BACKDROP_REACH,
+                                  scissor.mRight + BACKDROP_REACH, scissor.mBottom - BACKDROP_REACH));
+    }
+    // Down to whole squares of BACKDROP_SCALE pixels, all of them inside the window.
+    rect.mLeft -= rect.mLeft % BACKDROP_SCALE;
+    rect.mBottom -= rect.mBottom % BACKDROP_SCALE;
+    rect.mRight -= rect.mRight % BACKDROP_SCALE;
+    rect.mTop -= rect.mTop % BACKDROP_SCALE;
+    return rect;
+}
+
+inline void ALSelectionOutline::bindBackdrop(LLGLSLShader& program, LLRenderTarget* backdrop)
+{
+    if (backdrop)
+    {
+        // Filtered: each tap is the mean of the copy's texels around it.
+        program.bindTexture(LLShaderMgr::SELECTION_BACKDROP_MAP, backdrop, ALSamplers::BilinearClamp);
+    }
+    else
+    {
+        // Not read without a backdrop; left empty rather than holding whatever the unit last had.
+        program.unbindTexture(LLShaderMgr::SELECTION_BACKDROP_MAP);
+    }
+    program.uniform1i(LLShaderMgr::SELECTION_CONTRAST, backdrop ? 1 : 0);
+}
+
 inline void ALSelectionOutline::drawTiles(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& jumps,
                                           LLRenderTarget& tiles, const LLRect& rect, LLVertexBuffer& triangle)
 {
@@ -996,11 +1067,12 @@ inline void ALSelectionOutline::drawGlowRows(LLGLSLShader& program, LLRenderTarg
 
 inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget& ids, LLRenderTarget& jumps,
                                           LLRenderTarget& tiles, LLRenderTarget* glow_reach, LLRenderTarget* glow_rows,
-                                          U32 palette, const View& view, LLVertexBuffer& triangle)
+                                          LLRenderTarget* backdrop, U32 palette, const View& view, LLVertexBuffer& triangle)
 {
-    // Point sampled all: the ids, their depth, the jumps, the tiles, the glow's records and the palette are data,
-    // and texelFetch reads them whatever the filter.
+    // Point sampled all but the backdrop: the ids, their depth, the jumps, the tiles, the glow's records and the
+    // palette are data, and texelFetch reads them whatever the filter.
     const bool glow = glow_reach && glow_rows;
+    bindBackdrop(program, backdrop);
     program.bindTexture(LLShaderMgr::SELECTION_ID_MAP, &ids, ALSamplers::PointClamp);
     program.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &ids);
     program.bindTexture(LLShaderMgr::SELECTION_JUMP_MAP, &jumps, ALSamplers::PointClamp);
@@ -1029,6 +1101,7 @@ inline void ALSelectionOutline::drawEdges(LLGLSLShader& program, LLRenderTarget&
 
     drawTriangle(triangle, &view.mProjection);
 
+    program.unbindTexture(LLShaderMgr::SELECTION_BACKDROP_MAP);
     program.unbindTexture(LLShaderMgr::SELECTION_PALETTE);
     program.unbindTexture(LLShaderMgr::SELECTION_GLOW_ROW_MAP);
     program.unbindTexture(LLShaderMgr::SELECTION_GLOW_REACH_MAP);

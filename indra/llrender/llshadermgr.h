@@ -633,6 +633,8 @@ public:
         SELECTION_PALETTE,                  //  "selectionPalette"  each id's visible and hidden colours
         SELECTION_GLOW_REACH_MAP,           //  "selectionGlowReachMap"  the glowing ids within the glow's reach of each tile
         SELECTION_GLOW_ROW_MAP,             //  "selectionGlowRowMap"  the nearest glowing texel along each texel's row
+        SELECTION_BACKDROP_MAP,             //  "selectionBackdrop"  the window behind the lines, at half its resolution
+        SELECTION_CONTRAST,                 //  "selection_contrast"  1 where lines are kept apart from the backdrop's lightness
 
         WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
 

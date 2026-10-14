@@ -92,6 +92,10 @@ bool isDrawn(vec4 texel);
 bool isVisible(vec4 texel);
 float eyeDistance(float depth);
 
+// selectionContrastF.glsl
+float backdropLightness(vec2 pixel, vec2 size);
+vec3 contrastColour(vec3 colour, float back);
+
 vec4 paletteColour(int id, bool visible)
 {
     int row = (id / PALETTE_WIDTH) * 2 + (visible ? 0 : 1);
@@ -380,6 +384,11 @@ void main()
         }
     }
 
+    // What lies behind the lines here, which the edges and the contour are kept apart from, read only where one is
+    // drawn; the glow is left as its colour is.
+    float back = (inner_dist <= float(inner_reach) || top_id != 0) ? backdropLightness(vec2(pos) + vec2(0.5), vec2(size))
+                                                                   : -1.0;
+
     // Premultiplied: the glow, the edge over it, and the contour over both.
     vec3 rgb = vec3(0.0);
     float alpha = 0.0;
@@ -393,8 +402,11 @@ void main()
     {
         vec4 colour = paletteColour(own_id, isVisible(own));
         float inner_alpha = colour.a * INNER_OPACITY * coverage(inner_dist, float(outline_inner_width));
-        rgb = colour.rgb * inner_alpha + rgb * (1.0 - inner_alpha);
-        alpha = inner_alpha + alpha * (1.0 - inner_alpha);
+        if (inner_alpha > 0.0)
+        {
+            rgb = contrastColour(colour.rgb, back) * inner_alpha + rgb * (1.0 - inner_alpha);
+            alpha = inner_alpha + alpha * (1.0 - inner_alpha);
+        }
     }
     if (top_id != 0)
     {
@@ -402,6 +414,8 @@ void main()
         float top_alpha = top_colour.a * coverage(top_dist, float(outline_width));
         vec4 near_colour = paletteColour(near_id, near_visible);
         float near_alpha = (near_id != top_id) ? near_colour.a * coverage(near_dist, float(outline_width)) : 0.0;
+        top_colour.rgb = (top_alpha > 0.0) ? contrastColour(top_colour.rgb, back) : top_colour.rgb;
+        near_colour.rgb = (near_alpha > 0.0) ? contrastColour(near_colour.rgb, back) : near_colour.rgb;
 
         vec3 contour_rgb = top_colour.rgb * top_alpha + near_colour.rgb * near_alpha * (1.0 - top_alpha);
         float contour_alpha = top_alpha + near_alpha * (1.0 - top_alpha);

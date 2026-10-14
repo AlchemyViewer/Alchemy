@@ -58,6 +58,13 @@ float eyeDistance(float depth);
 float faceAlpha(vec2 texcoord);
 bool isCutOut(float alpha);
 
+// selectionContrastF.glsl
+float backdropLightness(vec2 pixel, vec2 size);
+vec3 contrastColour(vec3 colour, float back);
+
+// The viewport's size in pixels, which window_pos is in.
+uniform vec2 screen_res;
+
 void main()
 {
     // Derivatives and the texture are read before anything is discarded; the distance only where the id target's
@@ -98,5 +105,6 @@ void main()
     {
         discard;
     }
-    frag_color = vec4(colour.rgb, colour.a * coverage);
+    // Kept apart from what lies behind the line, as the outline is.
+    frag_color = vec4(contrastColour(colour.rgb, backdropLightness(window_pos, screen_res)), colour.a * coverage);
 }

@@ -85,6 +85,14 @@ namespace
                                                     ALSelectionOutline::DEFAULT_WIREFRAME_CONTOUR_WIDTH);
         return ALSelectionOutline::contourSetting(wireframe, width, wireframe_width);
     }
+
+    // What every view takes from the settings beyond its matrices and widths.
+    void set_view_settings(ALSelectionOutline::View& view)
+    {
+        static LLCachedControl<bool> contrast(gSavedSettings, "AlchemySelectionOutlineContrast", true);
+        set_whole_faces(view);
+        view.mContrast = contrast;
+    }
 }
 
 ALSelectionOutline::View ALSelectionOutline::worldView()
@@ -92,7 +100,7 @@ ALSelectionOutline::View ALSelectionOutline::worldView()
     View view = makeView(LLViewerCamera::getCurrent().getModelview(), gGL.getProjectionMatrix(), contour_setting(),
                          LLUI::getScaleFactor().mV[VX], false, LLPipeline::RenderHighlightThickness,
                          LLPipeline::RenderHighlightBrightness);
-    set_whole_faces(view);
+    set_view_settings(view);
     return view;
 }
 
@@ -106,7 +114,7 @@ bool ALSelectionOutline::hudView(View& view)
     }
     view = makeView(modelview, projection, contour_setting(), LLUI::getScaleFactor().mV[VX], true,
                     LLPipeline::RenderHighlightThickness, LLPipeline::RenderHighlightBrightness);
-    set_whole_faces(view);
+    set_view_settings(view);
     return true;
 }
 
@@ -169,6 +177,10 @@ void ALSelectionOutline::release()
     {
         mGlowRowMap.release();
     }
+    if (mBackdropMap.isComplete())
+    {
+        mBackdropMap.release();
+    }
     if (mPalette)
     {
         LLImageGL::deleteTextures(1, &mPalette);
@@ -205,6 +217,10 @@ void ALSelectionOutline::releaseStale(U32 frame, F64 now)
         {
             mGlowRowMap.release();
         }
+    }
+    if (mBackdropMap.isComplete() && stale(mBackdropUse.mFrame, mBackdropUse.mTime, frame, now))
+    {
+        mBackdropMap.release();
     }
     if (mPalette && stale(mPaletteUse.mFrame, mPaletteUse.mTime, frame, now))
     {
@@ -286,6 +302,19 @@ void ALSelectionOutline::render(const View& view)
         }
         mGlowUse = use;
     }
+    // The window behind the lines, at 1 / BACKDROP_SCALE of its size, where they are kept apart from it.
+    const bool backdrop = view.mContrast && (passes.mEdges || passes.mWireframe);
+    if (backdrop)
+    {
+        const U32 backdrop_width = (U32)((width + BACKDROP_SCALE - 1) / BACKDROP_SCALE);
+        const U32 backdrop_height = (U32)((height + BACKDROP_SCALE - 1) / BACKDROP_SCALE);
+        if (!mBackdropMap.isComplete() || mBackdropMap.getWidth() != backdrop_width ||
+            mBackdropMap.getHeight() != backdrop_height)
+        {
+            allocated = allocated && mBackdropMap.allocate(backdrop_width, backdrop_height, GL_RGBA8);
+        }
+        mBackdropUse = use;
+    }
     mPaletteUse = use;
     releaseStale(use.mFrame, use.mTime);
     if (!allocated)
@@ -339,10 +368,25 @@ void ALSelectionOutline::render(const View& view)
     {
         uploadPalette(mPalette, mPaletteRows, mPaletteTexels, rows);
 
+        // What the lines are drawn over, copied before either draws, around every texel the id pass drew and what
+        // their lines reach; the world's wireframe alone, drawn without it, may be anywhere in the window.
+        LLRenderTarget* backdrop_map = nullptr;
+        if (backdrop)
+        {
+            const LLRect rect = backdropRect(mScissor, mScissorValid, width, height);
+            if (rect.notEmpty())
+            {
+                mBackdropMap.copyFromBound(vp_x + rect.mLeft, vp_y + rect.mBottom, vp_x + rect.mRight, vp_y + rect.mTop,
+                                           rect.mLeft / BACKDROP_SCALE, rect.mBottom / BACKDROP_SCALE,
+                                           rect.mRight / BACKDROP_SCALE, rect.mTop / BACKDROP_SCALE, GL_LINEAR);
+                backdrop_map = &mBackdropMap;
+            }
+        }
+
         // The wireframe first, the outline over it.
         if (wireframe)
         {
-            drawWireframes(view, width, height);
+            drawWireframes(view, width, height, backdrop_map);
         }
 
         if (edges)
@@ -372,7 +416,7 @@ void ALSelectionOutline::render(const View& view)
 
             gSelectionOutlineProgram.bind();
             drawEdges(gSelectionOutlineProgram, mIdMap, mJumpMap, mTileMap, glow ? &mGlowReachMap : nullptr,
-                      glow ? &mGlowRowMap : nullptr, mPalette, view, *gPipeline.mScreenTriangleVB);
+                      glow ? &mGlowRowMap : nullptr, backdrop_map, mPalette, view, *gPipeline.mScreenTriangleVB);
         }
     }
 
@@ -598,7 +642,7 @@ void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U
     }
 }
 
-void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height)
+void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height, LLRenderTarget* backdrop)
 {
     LL_PROFILE_GPU_ZONE("selection wireframe");
 
@@ -646,7 +690,7 @@ void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height)
             }
             LLGLSLShader& program = rigged ? *gSelectionWireframeProgram.mRiggedVariant : gSelectionWireframeProgram;
             gSelectionWireframeProgram.bind(rigged);
-            bindWirePass(program, pass, view.mWireWidth, width, height, mPalette, &mIdMap);
+            bindWirePass(program, pass, view.mWireWidth, width, height, mPalette, &mIdMap, backdrop);
             // Joint palettes are uploaded to the bound program, which this one is not yet.
             mLastAvatar = nullptr;
             mLastMeshId = 0;
@@ -665,6 +709,7 @@ void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height)
             program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
             program.unbindTexture(LLShaderMgr::SELECTION_PALETTE);
             program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
+            program.unbindTexture(LLShaderMgr::SELECTION_BACKDROP_MAP);
         }
     }
 
