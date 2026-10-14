@@ -42,7 +42,10 @@
 #include "lltextureentry.h"
 #include "lltrans.h"           // "(model)" tag for mesh-owned rows
 #include "lltinygltfhelper.h"
+#include "llviewerobject.h"
+#include "llviewerobjectlist.h"
 #include "llviewertexture.h"
+#include "pipeline.h"
 
 /*=======================================*/
 /*  Formal declarations, constants, etc. */
@@ -114,6 +117,28 @@ S32 LLLocalGLTFMaterial::getIndexInFile() const
     return mMaterialIndex;
 }
 
+void LLLocalGLTFMaterial::rebuildObjectsUsing()
+{
+    for (S32 i = 0, count = gObjectList.getNumObjects(); i < count; ++i)
+    {
+        LLViewerObject* object = gObjectList.getObject(i);
+        if (!object || object->isDead())
+        {
+            continue;
+        }
+        for (U8 te = 0; te < object->getNumTEs(); ++te)
+        {
+            if (mTextureEntires.count(object->getTE(te)))
+            {
+                // As LLViewerObject::rebuildMaterial, which is the object's own.
+                object->faceMappingChanged();
+                gPipeline.markTextured(object->mDrawable);
+                break;
+            }
+        }
+    }
+}
+
 /* update functions */
 bool LLLocalGLTFMaterial::updateSelf()
 {
@@ -128,6 +153,7 @@ bool LLLocalGLTFMaterial::updateSelf()
             const std::filesystem::file_time_type new_last_modified = std::filesystem::last_write_time(fsyspath(mFilename));
             if (mLastModified != new_last_modified)
             {
+                const AlphaMode alpha_mode = mAlphaMode;
                 if (loadMaterial())
                 {
                     // decode is successful, we can safely proceed.
@@ -167,6 +193,14 @@ bool LLLocalGLTFMaterial::updateSelf()
 
                     materialBegin();
                     materialComplete(true);
+
+                    // A face's batches are sorted into a pass by its material's alpha mode as they are built, and the
+                    // opaque passes' programs keep no alpha test (LLDrawPoolGLTFPBR): a material whose mode changes in
+                    // place has the objects it is on rebuilt, which nothing else here asks for.
+                    if (mAlphaMode != alpha_mode)
+                    {
+                        rebuildObjectsUsing();
+                    }
                     updated = true;
                 }
 
