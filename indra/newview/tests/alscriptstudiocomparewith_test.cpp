@@ -175,11 +175,11 @@ namespace
             return doc;
         }
         // The tab's text changed since it was saved.
-        void change(Doc& doc, const std::string& text)
+        void require_changed(Doc& doc, const std::string& text)
         {
             doc.editor->selectAll();
             doc.editor->insertText(text);
-            UNSCOPED_INFO("changed since saved");
+            INFO("changed since saved");
             REQUIRE(doc.editor->isDirty());
         }
         // A file in the test's folder, written as it is given.
@@ -199,20 +199,16 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc = tab("door", "default {}\n");
-        UNSCOPED_INFO("it may be compared");
         CHECK(ALScriptStudioCompareWith::canCompare(doc));
         unit->show(doc);
         UNSCOPED_INFO("asked once");
         CHECK(studio.picks == 1);
-        UNSCOPED_INFO("a file, and nothing else");
-        CHECK(listed(studio.values()) == listed(Names{ "file" }));
-        UNSCOPED_INFO("labelled");
+        REQUIRE(listed(studio.values()) == listed(Names{ "file" }));
         CHECK(studio.candidates[0].label == said("CompareWithFile"));
         LLStringUtil::format_map_t args;
         args["[NAME]"] = "door";
         UNSCOPED_INFO("titled by the tab");
         CHECK(studio.picked == said("CompareWithTitle", args));
-        UNSCOPED_INFO("and its hint");
         CHECK(studio.hint == said("CompareWithPlaceholder"));
 
         Doc& loading = tab("lamp", "", false);
@@ -230,25 +226,21 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc = tab("door", "as saved\n");
-        change(doc, "as changed\n");
+        require_changed(doc, "as changed\n");
         unit->show(doc);
-        UNSCOPED_INFO("first");
         CHECK(studio.values().front() == std::string("saved"));
-        UNSCOPED_INFO("labelled");
         CHECK(studio.candidates[0].label == said("CompareSaved"));
         studio.choose("saved");
-        UNSCOPED_INFO("set beside");
         CHECK(listed(studio.did) == listed(Names{ "compare door: as saved\n | as changed\n (" + said("CompareSaved") + " | )" }));
 
         // A change after an undo past the save: nothing reaches it.
         doc.editor->undoJournal().markNeverSaved();
         studio.choose("saved");
         UNSCOPED_INFO("not compared");
-        REQUIRE(studio.did.size() == 1U);
-        UNSCOPED_INFO("said");
+        CHECK(studio.did.size() == 1U);
         CHECK(services().statuses.back() == said("CompareNothingSaved"));
         UNSCOPED_INFO("as a failure");
-        REQUIRE(services().statusFailures.back());
+        CHECK(services().statusFailures.back());
     }
 
     TEST_CASE_METHOD(alscriptstudiocomparewith_data, "alscriptstudiocomparewith: what was saved over it elsewhere is offered until it is settled", "[alscriptstudiocomparewith]")
@@ -260,24 +252,21 @@ namespace
         Doc& doc = tab("door", "mine\n");
         unit->show(doc);
         UNSCOPED_INFO("not where none did");
-        REQUIRE(studio.row("saved_there").value.empty());
+        CHECK(studio.row("saved_there").value.empty());
         doc.savedThere = "theirs\n";
         unit->show(doc);
-        UNSCOPED_INFO("offered");
         CHECK(studio.row("saved_there").label == said("CompareSavedThere"));
         studio.choose("saved_there");
-        UNSCOPED_INFO("set beside");
         CHECK(listed(studio.did) == listed(Names{ "compare door: theirs\n | mine\n (" + said("CompareSavedThere") + " | )" }));
 
         // Settled since the list was made: nothing, and said.
         doc.savedThere.reset();
         studio.choose("saved_there");
         UNSCOPED_INFO("nothing more");
-        REQUIRE(studio.did.size() == 1U);
-        UNSCOPED_INFO("said");
+        CHECK(studio.did.size() == 1U);
         CHECK(services().statuses.back() == said("CompareSavedThereGone"));
         UNSCOPED_INFO("as a failure");
-        REQUIRE(services().statusFailures.back());
+        CHECK(services().statusFailures.back());
     }
 
     TEST_CASE_METHOD(alscriptstudiocomparewith_data, "alscriptstudiocomparewith: other loaded tabs are offered in order and compared as they are now", "[alscriptstudiocomparewith]")
@@ -288,21 +277,18 @@ namespace
         }
         Doc& door = tab("door", "door\n");
         Doc& lamp = tab("lamp", "lamp as saved\n");
-        change(lamp, "lamp now\n");
+        require_changed(lamp, "lamp now\n");
         tab("gate", "", false);
         Doc& sign = tab("sign", "sign\n");
         unit->show(door);
         UNSCOPED_INFO("the others loaded, in order");
         CHECK(listed(studio.values()) == listed(Names{ "tab:lamp", "tab:sign", "file" }));
-        UNSCOPED_INFO("by name");
         CHECK(studio.row("tab:lamp").label == std::string("lamp"));
-        UNSCOPED_INFO("unsaved");
         CHECK(studio.row("tab:lamp").detail == said("CompareWithTabUnsaved"));
-        UNSCOPED_INFO("saved");
         CHECK(studio.row("tab:sign").detail == said("CompareWithTab"));
 
         // Typed since the list was made: what is set beside is the tab now.
-        change(lamp, "lamp later\n");
+        require_changed(lamp, "lamp later\n");
         studio.choose("tab:lamp");
         LLStringUtil::format_map_t unsaved;
         unsaved["[TITLE]"] = "lamp";
@@ -310,7 +296,7 @@ namespace
         const auto snapshot = [this](const std::string& name) { return this->said("CompareTabSnapshot", { { "[NAME]", name } }); };
         UNSCOPED_INFO("unsaved, as it is now");
         CHECK(studio.did.back() ==
-                      "compare door: lamp later\n | door\n (" + snapshot(said("CompareUnsaved", unsaved)) + " | )");
+              "compare door: lamp later\n | door\n (" + snapshot(said("CompareUnsaved", unsaved)) + " | )");
         studio.choose("tab:sign");
         UNSCOPED_INFO("saved, by its name");
         CHECK(studio.did.back() == "compare door: sign\n | door\n (" + snapshot("sign") + " | )");
@@ -321,11 +307,10 @@ namespace
         services().docs.erase(services().docs.begin() + 3);
         studio.choose("tab:sign");
         UNSCOPED_INFO("nothing more");
-        REQUIRE(studio.did.size() == 2U);
-        UNSCOPED_INFO("said");
+        CHECK(studio.did.size() == 2U);
         CHECK(services().statuses.back() == said("CompareTabClosed", { { "[NAME]", "sign" } }));
         UNSCOPED_INFO("as a failure");
-        REQUIRE(services().statusFailures.back());
+        CHECK(services().statusFailures.back());
     }
 
     TEST_CASE_METHOD(alscriptstudiocomparewith_data, "alscriptstudiocomparewith: the clipboard is offered with its line count when it holds text", "[alscriptstudiocomparewith]")
@@ -337,17 +322,15 @@ namespace
         Doc& doc = tab("door", "door\n");
         unit->show(doc);
         UNSCOPED_INFO("not without text");
-        REQUIRE(studio.row("clipboard").value.empty());
+        CHECK(studio.row("clipboard").value.empty());
         studio.clipboard = std::string();
         unit->show(doc);
         UNSCOPED_INFO("not with none");
-        REQUIRE(studio.row("clipboard").value.empty());
+        CHECK(studio.row("clipboard").value.empty());
 
         studio.clipboard = "one\ntwo\n";
         unit->show(doc);
-        UNSCOPED_INFO("labelled");
         CHECK(studio.row("clipboard").label == said("CompareClipboard"));
-        UNSCOPED_INFO("two lines");
         CHECK(studio.row("clipboard").detail == services().counted("CompareWithLines", 2));
         studio.clipboard = "one\ntwo\nthree";
         unit->show(doc);
@@ -361,8 +344,7 @@ namespace
         studio.clipboard.reset();
         studio.choose("clipboard");
         UNSCOPED_INFO("not once emptied");
-        REQUIRE(studio.did.size() == 1U);
-        UNSCOPED_INFO("said");
+        CHECK(studio.did.size() == 1U);
         CHECK(services().statuses.back() == said("CompareWithClipboardEmpty"));
     }
 
@@ -381,11 +363,11 @@ namespace
         CHECK_FALSE(studio.manyAsked);
         studio.files({});
         UNSCOPED_INFO("none picked, nothing");
-        REQUIRE(studio.did.empty());
+        CHECK(studio.did.empty());
 
         const std::string path = file("other.lsl", "one\r\ntwo\r\n");
         studio.files({ path });
-        UNSCOPED_INFO("set beside");
+        UNSCOPED_INFO("its line breaks as an editor keeps them");
         CHECK(listed(studio.did) == listed(Names{ "compare door: one\ntwo\n | door\n (other.lsl | )" }));
 
         unit->show(doc);
@@ -393,13 +375,12 @@ namespace
         const std::string missing = folder + "/missing.lsl";
         studio.files({ missing });
         UNSCOPED_INFO("not compared");
-        REQUIRE(studio.did.size() == 1U);
+        CHECK(studio.did.size() == 1U);
         LLStringUtil::format_map_t args;
         args["[FILE]"] = missing;
-        UNSCOPED_INFO("said");
         CHECK(services().statuses.back() == said("LoadFromFileFailed", args));
         UNSCOPED_INFO("as a failure");
-        REQUIRE(services().statusFailures.back());
+        CHECK(services().statusFailures.back());
 
         // The tab closed while the files were picked: nothing.
         unit->show(doc);
@@ -407,7 +388,7 @@ namespace
         services().docs.clear();
         studio.files({ path });
         UNSCOPED_INFO("nothing more");
-        REQUIRE(studio.did.size() == 1U);
+        CHECK(studio.did.size() == 1U);
     }
 
     TEST_CASE_METHOD(alscriptstudiocomparewith_data, "alscriptstudiocomparewith: recent files but the tab's own are offered by name and folder", "[alscriptstudiocomparewith]")
@@ -424,12 +405,9 @@ namespace
         unit->show(doc);
         UNSCOPED_INFO("the other alone");
         CHECK(listed(studio.values()) == listed(Names{ "file", "recent:0" }));
-        UNSCOPED_INFO("by name");
         CHECK(studio.row("recent:0").label == std::string("lamp.lsl"));
-        UNSCOPED_INFO("and folder");
         CHECK(studio.row("recent:0").detail == gDirUtilp->getDirName(other));
         studio.choose("recent:0");
-        UNSCOPED_INFO("set beside");
         CHECK(listed(studio.did) == listed(Names{ "compare door: lamp\n | door\n (lamp.lsl | )" }));
     }
 
@@ -442,23 +420,20 @@ namespace
         Doc& doc = tab("door", "door\n");
         unit->show(doc);
         UNSCOPED_INFO("not with none kept");
-        REQUIRE(studio.row("history").value.empty());
+        CHECK(studio.row("history").value.empty());
         for (const char* text : { "first", "second" })
         {
             ALSavedText one;
             one.key  = ALScriptStudioHistory::keyOf(doc);
             one.text = text;
             one.when = LLDate::now();
-            UNSCOPED_INFO("kept");
+            CAPTURE(text);
             REQUIRE(history->keep(one));
         }
         unit->show(doc);
-        UNSCOPED_INFO("labelled");
         CHECK(studio.row("history").label == said("CompareWithHistory"));
-        UNSCOPED_INFO("two kept");
         CHECK(studio.row("history").detail == services().counted("CompareWithSaves", 2));
         studio.choose("history");
-        UNSCOPED_INFO("listed");
         CHECK(listed(studio.did) == listed(Names{ "history door" }));
     }
 
@@ -476,15 +451,13 @@ namespace
         unit->show(doc);
         UNSCOPED_INFO("after the rest");
         CHECK(listed(studio.values()) == listed(Names{ "clipboard", "file", "item:0", "item:1" }));
-        UNSCOPED_INFO("by name");
         CHECK(studio.row("item:0").label == std::string("door"));
-        UNSCOPED_INFO("and place");
         CHECK(studio.row("item:0").detail == "House" + sep + "Front");
         studio.choose("item:0");
         studio.choose("item:1");
         UNSCOPED_INFO("each under its place and name");
         CHECK(listed(studio.did) ==
-                      listed(Names{ "item door: door (House" + sep + "Front" + sep + "door)", "item door: door (door)" }));
+              listed(Names{ "item door: door (House" + sep + "Front" + sep + "door)", "item door: door (door)" }));
 
         // Its place is what is typed to find it.
         const std::vector<size_t> ranked = ALQuickOpen::rank(studio.candidates, "front");
@@ -506,7 +479,6 @@ namespace
         unit->show(doc);
         unit.reset();
         studio.choose("clipboard");
-        UNSCOPED_INFO("nothing");
-        REQUIRE(studio.did.empty());
+        CHECK(studio.did.empty());
     }
 }

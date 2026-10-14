@@ -86,23 +86,15 @@ namespace
         CHECK(projectionFar(true, true) == FINITE_PROJECTION_FAR);
         UNSCOPED_INFO("forward cube snapshot");
         CHECK(projectionFar(false, true) == FINITE_PROJECTION_FAR);
-        UNSCOPED_INFO("finite plane is 1024 m");
         CHECK(FINITE_PROJECTION_FAR == 1024.f);
-        UNSCOPED_INFO("1024 is finite");
         CHECK_FALSE(isInfinite(1024.f));
-        {
-            INFO("infinite constant");
-            CHECK(isInfinite(INFINITE_FAR));
-            CHECK(INFINITE_FAR > 0.f);
-        }
+        CHECK(isInfinite(INFINITE_FAR));
+        CHECK(INFINITE_FAR > 0.f);
 
-        UNSCOPED_INFO("auto");
         CHECK(isInfinite(projectionFar(true, false, FORCE_AUTOMATIC, 2048.f)));
-        UNSCOPED_INFO("finite");
         CHECK(projectionFar(true, false, FORCE_FINITE, 2048.f) == 4096.f);
         UNSCOPED_INFO("finite never under the finite plane");
         CHECK(projectionFar(true, false, FORCE_FINITE, 256.f) == FINITE_PROJECTION_FAR);
-        UNSCOPED_INFO("infinite");
         CHECK(isInfinite(projectionFar(true, false, FORCE_INFINITE, 2048.f)));
         UNSCOPED_INFO("unknown mode");
         CHECK(isInfinite(projectionFar(true, false, 7, 2048.f)));
@@ -120,7 +112,6 @@ namespace
     TEST_CASE("alfarplane: how far terrain and water reach and from how high water shows", "[alfarplane]")
     {
         using namespace ALFarPlane;
-        UNSCOPED_INFO("terrain reach under the infinite projection");
         CHECK(terrainReach(INFINITE_FAR) == 8192.f);
         UNSCOPED_INFO("terrain unbounded on forward-Z");
         CHECK(terrainReach(projectionFar(false, false)) == 0.f);
@@ -130,7 +121,6 @@ namespace
         CHECK(edgeWaterStretch(true) == 256000.f);
         UNSCOPED_INFO("edge water, finite keeps 2048");
         CHECK(edgeWaterStretch(false) == 2048.f);
-        UNSCOPED_INFO("edge water covers the terrain reach");
         CHECK(edgeWaterStretch(true) >= TERRAIN_REACH);
 
         UNSCOPED_INFO("finite: below 1024 m");
@@ -164,7 +154,6 @@ namespace
 
         // The sky keeps the cleared depth, 0 under reverse-Z. Anything drawn stores near / distance, which must stay
         // a normal float out to the reconstruction floor so no geometry rounds onto the sky.
-        UNSCOPED_INFO("reconstruction floor past the reach");
         CHECK(MAX_RECONSTRUCT_DISTANCE > TERRAIN_REACH);
         UNSCOPED_INFO("geometry at the floor stores a normal depth");
         CHECK(MIN_NEAR_PLANE / MAX_RECONSTRUCT_DISTANCE >= std::numeric_limits<F32>::min());
@@ -176,9 +165,7 @@ namespace
         REQUIRE_FALSE(util.empty());
         UNSCOPED_INFO("deferredUtil floor");
         CHECK(literal_after(util, "#define RECONSTRUCT_W_FLOOR ") == floor);
-        UNSCOPED_INFO("aoUtil floor");
         CHECK(literal_after(shader_source("class1/deferred/aoUtil.glsl"), "pos.w = max(pos.w, ") == floor);
-        UNSCOPED_INFO("cofF floor");
         CHECK(literal_after(shader_source("class1/deferred/cofF.glsl"), "p.z/max(p.w, ") == floor);
     }
 
@@ -198,9 +185,9 @@ namespace
                                   "class2/deferred/sunLightV.glsl", "class1/deferred/blurLightV.glsl" })
         {
             const std::string v = shader_source(path);
-            UNSCOPED_INFO(std::string(path) + " drawn on the far plane, reversed");
+            UNSCOPED_INFO(path << " drawn on the far plane, reversed");
             REQUIRE(v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
-            UNSCOPED_INFO(std::string(path) + " drawn on the far plane, forward");
+            UNSCOPED_INFO(path << " drawn on the far plane, forward");
             REQUIRE(v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
         }
         const std::string soften = shader_source("class3/deferred/softenLightF.glsl");
@@ -226,7 +213,6 @@ namespace
         // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
         const F64 edge = (F64)ALFarPlane::edgeWaterStretch(true) + MAX_FAR_CLIP;
         const F64 farthest = sqrt(2.0 * edge * edge + (F64)ALFarPlane::EDGE_WATER_STRETCH * ALFarPlane::EDGE_WATER_STRETCH);
-        UNSCOPED_INFO("farthest water inside the floor");
         CHECK(farthest < MAX_RECONSTRUCT_DISTANCE);
         UNSCOPED_INFO("farthest water stores a normal depth");
         CHECK((F32)(MIN_NEAR_PLANE / farthest) >= std::numeric_limits<F32>::min());
@@ -240,17 +226,13 @@ namespace
         const LLVector2 lo(-1000.f, -2000.f);
         const LLVector2 hi(3000.f, 500.f);
         const WaterFar finite = waterFar(FINITE_PROJECTION_FAR, true, lo, hi);
-        UNSCOPED_INFO("finite wave clamp");
         CHECK(finite.mWaveClamp == 2560.f);
-        UNSCOPED_INFO("finite no edge fade");
         CHECK(finite.mEdgeFade == 0.f);
         const WaterFar infinite = waterFar(INFINITE_FAR, true, lo, hi);
         UNSCOPED_INFO("wave clamp at the farthest rim corner");
         CHECK(fabsf(infinite.mWaveClamp - sqrtf(3000.f * 3000.f + 2000.f * 2000.f)) < 0.01f);
-        UNSCOPED_INFO("edge fade over the stretch");
         CHECK(infinite.mEdgeFade == EDGE_WATER_STRETCH);
         const WaterFar rimless = waterFar(INFINITE_FAR, false, LLVector2(), LLVector2());
-        UNSCOPED_INFO("no rim, no fade");
         CHECK(rimless.mEdgeFade == 0.f);
         UNSCOPED_INFO("no rim, waves past the regions");
         CHECK(rimless.mWaveClamp >= EDGE_WATER_STRETCH);
@@ -267,9 +249,9 @@ namespace
         // The per-fragment rebuild scrolls by the offsets waterV takes from the CPU, which sets no wave direction or time.
         for (const char* scroll : { "+ bigWaveScroll;", "+ littleWaveScroll.xy;", "+ littleWaveScroll.zw;" })
         {
-            UNSCOPED_INFO(std::string("waterV scrolls by ") + scroll);
+            UNSCOPED_INFO("waterV scrolls by " << scroll);
             REQUIRE(water_v.find(scroll) != std::string::npos);
-            UNSCOPED_INFO(std::string("rebuilt waves scroll by ") + scroll);
+            UNSCOPED_INFO("rebuilt waves scroll by " << scroll);
             REQUIRE(water_f.find(scroll) != std::string::npos);
         }
     }
@@ -279,43 +261,32 @@ namespace
     TEST_CASE("alfarplane: overlay columns pair up out to 100 km at one angular size", "[alfarplane]")
     {
         const std::vector<ALFarPlane::OverlayColumn>& columns = ALFarPlane::overlayColumns();
-        {
-            INFO("pairs");
-            REQUIRE(columns.size() >= 2);
-            REQUIRE(columns.size() % 2 == 0);
-        }
-        UNSCOPED_INFO("reaches 100 km");
+        REQUIRE(columns.size() >= 2);
+        REQUIRE(columns.size() % 2 == 0);
         REQUIRE(columns[columns.size() - 2].mDistance == 100000.f);
         for (size_t i = 0; i < columns.size(); i += 2)
         {
             const ALFarPlane::OverlayColumn& n = columns[i];
             const ALFarPlane::OverlayColumn& f = columns[i + 1];
-            const std::string at = std::to_string((S32)n.mDistance) + " m";
-            {
-                INFO("nearer first at " + at);
-                REQUIRE(n.mNearer);
-                REQUIRE_FALSE(f.mNearer);
-            }
-            UNSCOPED_INFO("farther behind at " + at);
+            CAPTURE(n.mDistance);
+            REQUIRE(n.mNearer);
+            REQUIRE_FALSE(f.mNearer);
             REQUIRE(f.mDistance > n.mDistance);
-            UNSCOPED_INFO("same bearing at " + at);
             REQUIRE(f.mBearing == n.mBearing);
             // On screen the farther column's near edge sits inside the nearer column.
             const F32 f_left = (f.mOffset - f.mHalfWidth) / f.mDistance;
             const F32 n_right = (n.mOffset + n.mHalfWidth) / n.mDistance;
             const F32 n_left = (n.mOffset - n.mHalfWidth) / n.mDistance;
             {
-                INFO("overlap at " + at);
+                INFO("the farther column overlaps the nearer on screen");
                 REQUIRE(f_left > n_left);
                 REQUIRE(f_left < n_right);
             }
-            UNSCOPED_INFO("same angle at " + at);
+            UNSCOPED_INFO("every column the same angular size");
             REQUIRE(fabsf(n.mHeight / n.mDistance - columns[0].mHeight / columns[0].mDistance) < 1e-6f);
             if (i > 0)
             {
-                UNSCOPED_INFO("own bearing at " + at);
                 REQUIRE(n.mBearing != columns[i - 2].mBearing);
-                UNSCOPED_INFO("receding at " + at);
                 REQUIRE(n.mDistance > columns[i - 2].mDistance);
             }
         }

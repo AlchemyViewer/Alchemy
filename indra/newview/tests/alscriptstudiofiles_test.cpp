@@ -223,7 +223,6 @@ namespace
             unit.noteFile("/f" + std::to_string(i));
         }
         unit.noteFile("/f5");
-        UNSCOPED_INFO("ten");
         REQUIRE(unit.recentFiles().size() == size_t(10));
         const Names& files = unit.recentFiles();
         {
@@ -245,7 +244,7 @@ namespace
         Doc& f = fileTab("f.lsl", "z");
         unit.noteScript(f);
         UNSCOPED_INFO("a file's tab is no script");
-        REQUIRE(unit.recentScripts().size() == 2);
+        CHECK(unit.recentScripts().size() == 2);
         UNSCOPED_INFO("the window told each time");
         CHECK(studio.recentTold == 16);
 
@@ -263,8 +262,8 @@ namespace
         unit.clearRecent();
         {
             INFO("cleared");
-            REQUIRE(unit.recentFiles().empty());
-            REQUIRE(unit.recentScripts().empty());
+            CHECK(unit.recentFiles().empty());
+            CHECK(unit.recentScripts().empty());
             CHECK(studio.recentTold == 17);
         }
         LLSD odd;
@@ -274,7 +273,7 @@ namespace
         {
             INFO("read back: each once, none empty, no script without what holds it");
             CHECK(again.recentFiles() == Names{ "/x", "/y" });
-            REQUIRE(again.recentScripts().empty());
+            CHECK(again.recentScripts().empty());
         }
     }
 
@@ -288,28 +287,27 @@ namespace
         // menus, which there are none of here.
         studio.menu->setVisible(false);
         unit.fillMenu();
-        UNSCOPED_INFO("nothing");
-        REQUIRE(studio.menu->findChild<LLView>("no_recent") != nullptr);
+        CHECK(studio.menu->findChild<LLView>("no_recent") != nullptr);
         unit.noteFile("/one/same.lsl");
         unit.noteFile("/two/same.lsl");
         unit.noteFile("/two/other.lsl");
         {
             INFO("files alone: no heading");
-            REQUIRE(studio.menu->findChild<LLView>("recent_heading_RecentFiles") == nullptr);
-            REQUIRE(studio.menu->findChild<LLView>("recent_/two/other.lsl") != nullptr);
+            CHECK(studio.menu->findChild<LLView>("recent_heading_RecentFiles") == nullptr);
+            CHECK(studio.menu->findChild<LLView>("recent_/two/other.lsl") != nullptr);
         }
         Doc& a = scriptTab("a", "x");
         unit.noteScript(a);
         {
             INFO("both: headings");
-            REQUIRE(studio.menu->findChild<LLView>("recent_heading_RecentScripts") != nullptr);
-            REQUIRE(studio.menu->findChild<LLView>("recent_heading_RecentFiles") != nullptr);
+            CHECK(studio.menu->findChild<LLView>("recent_heading_RecentScripts") != nullptr);
+            CHECK(studio.menu->findChild<LLView>("recent_heading_RecentFiles") != nullptr);
         }
         LLMenuItemCallGL* same = studio.menu->findChild<LLMenuItemCallGL>("recent_/one/same.lsl");
         {
             INFO("a folder after a name two share");
             REQUIRE(same);
-            REQUIRE(same->getLabel().find("(/one)") != std::string::npos);
+            CHECK(same->getLabel().find("(/one)") != std::string::npos);
         }
         LLMenuItemCallGL* other = studio.menu->findChild<LLMenuItemCallGL>("recent_/two/other.lsl");
         {
@@ -335,8 +333,8 @@ namespace
         studio.menu->findChild<LLMenuItemCallGL>("clear_recent")->onCommit();
         {
             INFO("the clear item clears");
-            REQUIRE(unit.recentFiles().empty());
-            REQUIRE(studio.menu->findChild<LLView>("no_recent") != nullptr);
+            CHECK(unit.recentFiles().empty());
+            CHECK(studio.menu->findChild<LLView>("no_recent") != nullptr);
         }
         studio.menu->die();
         studio.menu = nullptr;
@@ -349,11 +347,10 @@ namespace
         unit.watch(f);
         f.editor->setText("new");
         unit.write(f);
-        UNSCOPED_INFO("written");
         CHECK(contents(f.file) == std::string("new"));
         {
             INFO("its own write is no change to the watch");
-            REQUIRE_FALSE(f.watch->check());
+            CHECK_FALSE(f.watch->check());
             CHECK_FALSE(f.watch->check());
         }
         {
@@ -369,7 +366,7 @@ namespace
             INFO("will not go: said and stopped, not settled");
             CHECK(said().failure);
             CHECK(studio.stops == Names{ g.id });
-            REQUIRE(studio.settled.size() == 1);
+            CHECK(studio.settled.size() == 1);
         }
     }
 
@@ -394,10 +391,10 @@ namespace
         // Read in, not written: what it masters is the masters' watch's to
         // send, not the tab's.
         UNSCOPED_INFO("not taken for a write of the studio's");
-        REQUIRE(studio.written.empty());
+        CHECK(studio.written.empty());
         unit.changedOutside(f.id, f.file);
         UNSCOPED_INFO("the same again: nothing");
-        REQUIRE(studio.taken.size() == 1);
+        CHECK(studio.taken.size() == 1);
 
         f.editor->setCaret(f.editor->document().end());
         f.editor->insertText(" typed");
@@ -407,15 +404,15 @@ namespace
             INFO("not clean: said and asked, not taken");
             CHECK(said().failure);
             CHECK(studio.asked == Names{ f.id });
-            REQUIRE(studio.taken.size() == 1);
+            CHECK(studio.taken.size() == 1);
         }
         unit.changedOutside(f.id, f.file);
         UNSCOPED_INFO("asked once while the question is up");
-        REQUIRE(studio.asked.size() == 1);
+        CHECK(studio.asked.size() == 1);
         studio.answer(false);
         {
             INFO("kept: nothing read");
-            REQUIRE(studio.reverted.empty());
+            CHECK(studio.reverted.empty());
             CHECK_FALSE(f.askingReload);
         }
         unit.changedOutside(f.id, f.file);
@@ -427,7 +424,7 @@ namespace
         std::filesystem::remove(fsyspath(f.file));
         unit.changedOutside(f.id, f.file);
         UNSCOPED_INFO("gone or unknown: nothing");
-        REQUIRE(studio.asked.size() == 2);
+        CHECK(studio.asked.size() == 2);
         UNSCOPED_INFO("but what is in reach looked at again");
         CHECK(studio.reachChanges == before + 1);
     }
@@ -436,7 +433,6 @@ namespace
     {
         ALScriptStudioFiles& unit = make();
         unit.openFromDisk();
-        UNSCOPED_INFO("several");
         CHECK(studio.pickedSeveral);
         studio.toOpen({ "/a.lsl", "/b.luau" });
         UNSCOPED_INFO("each opened");
@@ -445,14 +441,13 @@ namespace
         Doc& a = scriptTab("a", "first");
         write(in("load.txt"), "loaded");
         unit.load(false);
-        UNSCOPED_INFO("one");
         CHECK_FALSE(studio.pickedSeveral);
         Doc& b = scriptTab("b", "other");
         services.front = 1;
         studio.toOpen({ in("load.txt") });
         {
             INFO("the tab asked from, brought forward, its text replaced");
-            REQUIRE(a.editor->text() == "loaded");
+            CHECK(a.editor->text() == "loaded");
             CHECK(b.editor->text() == "other");
             CHECK(studio.activated == Names{ "a" });
         }
@@ -465,7 +460,7 @@ namespace
         unit.chosenToLoad("b", { in("nothing.txt") }, false);
         {
             INFO("unreadable: said");
-            REQUIRE_FALSE(services.statuses.empty());
+            CHECK_FALSE(services.statuses.empty());
             CHECK(b.editor->text() == "otloadedher");
         }
         b.modifiable = false;
@@ -519,7 +514,7 @@ namespace
         {
             INFO("its own file again: a save");
             CHECK(contents(f.file) == "changed");
-            REQUIRE(studio.became.size() == 1);
+            CHECK(studio.became.size() == 1);
         }
         Doc& other = fileTab("other.lsl", "o");
         unit.chosenToSaveAs(f.id, { other.file });
@@ -528,7 +523,7 @@ namespace
             REQUIRE_FALSE(services.statuses.empty());
             CHECK(services.statuses.back().find("FileOpenElsewhere") == 0);
             CHECK(contents(other.file) == "o");
-            REQUIRE(studio.became.size() == 1);
+            CHECK(studio.became.size() == 1);
         }
     }
 
@@ -540,10 +535,8 @@ namespace
         const fsyspath    folder_path = fsyspath(in("J\xC3\xBCrgen"));
         std::filesystem::create_directories(folder_path);
         const std::string path = fsyspath(folder_path / fsyspath("\xC3\x9C" "berpr\xC3\xBC" "fung.lsl")).string();
-        UNSCOPED_INFO("written");
         CHECK(ALFileWrite::temp(path, "default\r\n{\r\n}\r\n"));
         std::string text;
-        UNSCOPED_INFO("read back");
         REQUIRE(ALScriptFileIO::readWholeFile(path, text));
         UNSCOPED_INFO("as an editor keeps it");
         CHECK(text == std::string("default\n{\n}\n"));
@@ -554,7 +547,6 @@ namespace
     TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: pruneRecent drops scripts said gone and files no longer on disk", "[alscriptstudiofiles]")
     {
         ALScriptStudioFiles& unit = make();
-        UNSCOPED_INFO("written");
         CHECK(ALFileWrite::temp(in("here.lsl"), "x"));
         unit.noteFile(in("here.lsl"));
         unit.noteFile(in("gone.lsl"));
@@ -567,7 +559,7 @@ namespace
             INFO("the file no longer there let go of");
             CHECK(unit.pruneRecent([](const ALScriptRef&) { return false; }));
             CHECK(unit.recentFiles() == Names{ in("here.lsl") });
-            REQUIRE(unit.recentScripts().size() == 2);
+            CHECK(unit.recentScripts().size() == 2);
             CHECK(studio.recentTold == told + 1);
         }
         {
@@ -576,7 +568,6 @@ namespace
             CHECK(studio.recentTold == told + 1);
         }
         const ALScriptRef lost = b.ref;
-        UNSCOPED_INFO("pruned");
         CHECK(unit.pruneRecent([lost](const ALScriptRef& ref) { return ref == lost; }));
         {
             INFO("the gone script let go of");
@@ -595,17 +586,14 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         typedef ALScriptStudioFiles F;
-        UNSCOPED_INFO("XML");
         CHECK(F::textSyntaxOf("/a/s.XML") == std::string("xml"));
         UNSCOPED_INFO("a skin's file");
         CHECK(F::textSyntaxOf("/a/s.xui") == std::string("xml"));
-        UNSCOPED_INFO("JSON");
         CHECK(F::textSyntaxOf("/a/s.json") == std::string("json"));
         UNSCOPED_INFO("a notecard of settings");
         CHECK(F::textSyntaxOf("/a/door.ini") == std::string("config"));
         UNSCOPED_INFO("and another way of naming one");
         CHECK(F::textSyntaxOf("/a/door.CFG") == std::string("config"));
-        UNSCOPED_INFO("text");
         CHECK(F::textSyntaxOf("/a/s.txt") == std::string("text"));
         UNSCOPED_INFO("a name no grammar knows");
         CHECK(F::textSyntaxOf("/a/s.dat") == std::string("text"));

@@ -68,28 +68,24 @@ namespace
                 continue;
             }
             ++shipped;
-            UNSCOPED_INFO("a name: " + theme.path);
+            CAPTURE(theme.path);
             REQUIRE_FALSE(theme.name.empty());
-            UNSCOPED_INFO("colours: " + theme.name);
             REQUIRE_FALSE(theme.colors.empty());
             for (const auto& [name, color] : theme.colors)
             {
-                UNSCOPED_INFO(theme.name + " colours " + name + ", which no editor is painted by");
+                UNSCOPED_INFO("it colours " << name << ", which no editor is painted by");
                 REQUIRE(spoken(name));
             }
         }
-        UNSCOPED_INFO("the viewer ships themes");
         CHECK(shipped > 1);
     }
 
     TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: editor colours come first and every colour name has a label", "[alscripttheme]")
     {
         const std::vector<std::string>& names = ALScriptTheme::names();
-        UNSCOPED_INFO("names");
         REQUIRE_FALSE(names.empty());
         UNSCOPED_INFO("the text first");
         CHECK(names.front() == std::string("ScriptText"));
-        UNSCOPED_INFO("an editor colour");
         CHECK(ALScriptTheme::isEditorColor("ScriptBackground"));
         UNSCOPED_INFO("read as a person reads it");
         CHECK(ALScriptTheme::labelOf("ScriptBackground") == std::string("Background"));
@@ -99,7 +95,7 @@ namespace
         CHECK(ALScriptTheme::labelOf("ScriptDocComment") == std::string("Doc comment"));
         for (const std::string& name : names)
         {
-            UNSCOPED_INFO("a label for " + name);
+            CAPTURE(name);
             REQUIRE_FALSE(ALScriptTheme::labelOf(name).empty());
         }
     }
@@ -128,10 +124,11 @@ namespace
         UNSCOPED_INFO("and so does the theme");
         CHECK(ALScriptTheme::chosen() == std::string("Monokai"));
         ALScriptTheme::setChosen(std::string());
-        UNSCOPED_INFO("none");
         REQUIRE(ALScriptTheme::chosen().empty());
     }
 
+    // What reads less than it should: code against both grounds, the text against its bands, the line numbers
+    // against the gutter.
     TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: illegible reports each colour too faint against its ground", "[alscripttheme]")
     {
         ALScriptTheme theme;
@@ -189,6 +186,8 @@ namespace
         }
     }
 
+    // Every theme the viewer ships reads: the text and each kind of code at 4.5:1, the line numbers at 3:1; the
+    // high-contrast ones at 7 and 4.5.
     TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: every shipped theme reads at its contrast thresholds", "[alscripttheme]")
     {
         if (!ui.ok())
@@ -202,6 +201,7 @@ namespace
             {
                 continue;
             }
+            CAPTURE(theme.name);
             const bool contrast = theme.name.find("High Contrast") != std::string::npos;
             high += contrast;
             std::string said;
@@ -209,7 +209,7 @@ namespace
             {
                 said += "\n  " + each.name + " on " + each.against + ": " + std::to_string(each.contrast);
             }
-            UNSCOPED_INFO(theme.name + " reads:" + said);
+            UNSCOPED_INFO("colours that read too faintly:" << said);
             REQUIRE(said.empty());
         }
         UNSCOPED_INFO("a dark and a light high-contrast theme");
@@ -227,7 +227,7 @@ namespace
         const std::string strings((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         for (const std::string& name : ALScriptTheme::names())
         {
-            UNSCOPED_INFO("a label for " + name);
+            CAPTURE(name);
             REQUIRE(strings.find("name=\"ScriptColorLabel_" + name + "\"") != std::string::npos);
         }
 #else
@@ -251,12 +251,12 @@ namespace
         }
         for (const char* skin : { "default", "alchemy", "gemini", "heretic", "ionic" })
         {
+            CAPTURE(skin);
             ALColorSheet sheet;
             sheet.read(default_root, "default/colors.xml");
             if (std::string(skin) != "default")
             {
                 LLXMLNodePtr root;
-                UNSCOPED_INFO(std::string(skin) + " parses");
                 REQUIRE(LLXMLNode::parseFile(skins + skin + "/colors.xml", root, nullptr));
                 sheet.read(root, std::string(skin) + "/colors.xml");
             }
@@ -270,26 +270,23 @@ namespace
             {
                 said += "\n  " + each.name + " on " + each.against + ": " + std::to_string(each.contrast);
             }
-            UNSCOPED_INFO(std::string(skin) + "'s script colours read:" + said);
+            UNSCOPED_INFO("script colours that read too faintly:" << said);
             REQUIRE(said.empty());
             // And the studios' parts told apart by what they are: a divider
             // from the panes it divides, a tab not chosen from the chosen
             // one, the notice and the strips from the panes.
-            const auto apart = [&](const char* a, const char* b, F32 least) {
+            const auto require_apart = [&](const char* a, const char* b, F32 least) {
+                CAPTURE(a, b);
                 const LLColor4* x = sheet.find(a);
                 const LLColor4* y = sheet.find(b);
-                {
-                    INFO(std::string(skin) + " has " + a + " and " + b);
-                    REQUIRE(x);
-                    REQUIRE(y);
-                }
-                UNSCOPED_INFO(std::string(skin) + ": " + a + " apart from " + b);
+                REQUIRE(x);
+                REQUIRE(y);
                 REQUIRE(ALSurface::contrast(*x, *y) >= least);
             };
-            apart("StudioDividerColor", "StudioPaneColor", 1.3f);
-            apart("StudioTabColor", "PanelDefaultBackgroundColor", 1.08f);
-            apart("StudioNoticeColor", "StudioPaneColor", 1.08f);
-            apart("StudioStripColor", "StudioPaneColor", 1.05f);
+            require_apart("StudioDividerColor", "StudioPaneColor", 1.3f);
+            require_apart("StudioTabColor", "PanelDefaultBackgroundColor", 1.08f);
+            require_apart("StudioNoticeColor", "StudioPaneColor", 1.08f);
+            require_apart("StudioStripColor", "StudioPaneColor", 1.05f);
         }
 #else
         SKIP("no LLUI_TEST_APP_DIR");

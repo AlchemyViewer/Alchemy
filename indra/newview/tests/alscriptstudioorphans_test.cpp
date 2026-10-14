@@ -177,13 +177,11 @@ namespace
         UNSCOPED_INFO("but not once it is gone");
         CHECK(Orphans::seen(o, reach) == Orphan::Removed);
         reach.offline = true;
-        UNSCOPED_INFO("offline");
         CHECK(Orphans::seen(o, reach) == Orphan::Offline);
 
         Doc&  i    = tab("inventory", true);
         Reach item = inReach();
         item.trashed = true;
-        UNSCOPED_INFO("in the Trash");
         CHECK(Orphans::seen(i, item) == Orphan::Trashed);
         i.orphan->kind = Orphan::Unloaded;
         UNSCOPED_INFO("an unloaded text stays so in the Trash");
@@ -196,7 +194,6 @@ namespace
         f.ref  = ALScriptRef();
         f.file = "/somewhere/f.lsl";
         Reach file;
-        UNSCOPED_INFO("its file gone");
         CHECK(Orphans::seen(f, file) == Orphan::FileGone);
         file.fileThere = true;
         UNSCOPED_INFO("its file there");
@@ -211,11 +208,8 @@ namespace
         make();
         Doc& o = tab("object");
         Doc& i = tab("inventory", true);
-        UNSCOPED_INFO("not permitted");
         CHECK(Orphans::failedAs(o, Failure::NotPermitted, true) == Orphan::Locked);
-        UNSCOPED_INFO("unreadable");
         CHECK(Orphans::failedAs(o, Failure::Unreadable, true) == Orphan::Unloaded);
-        UNSCOPED_INFO("a fetch that failed");
         CHECK(Orphans::failedAs(o, Failure::Fetch, true) == Orphan::Unloaded);
         UNSCOPED_INFO("gone from its object");
         CHECK(Orphans::failedAs(o, Failure::Missing, true) == Orphan::Removed);
@@ -236,12 +230,12 @@ namespace
         CHECK(studio.placed == Names{ "a", "b" });
         {
             INFO("out of sight a moment: not yet away");
-            REQUIRE(a.orphan->kind == Orphan::None);
+            CHECK(a.orphan->kind == Orphan::None);
             CHECK(a.orphan->awaySince > 0.0);
         }
         {
             INFO("and to be looked at again once the moment is past");
-            REQUIRE(due > a.orphan->awaySince);
+            CHECK(due > a.orphan->awaySince);
             CHECK(due <= a.orphan->awaySince + 3.0);
         }
         a.orphan->awaySince -= 5.0;
@@ -249,7 +243,7 @@ namespace
         unit.check();
         {
             INFO("gone a while: away");
-            REQUIRE(a.orphan->kind == Orphan::Away);
+            CHECK(a.orphan->kind == Orphan::Away);
             CHECK_FALSE(a.orphan->noticeDismissed);
             CHECK(studio.toolbars == 1);
         }
@@ -271,7 +265,7 @@ namespace
         unit.check();
         {
             INFO("back: said");
-            REQUIRE(a.orphan->kind == Orphan::None);
+            CHECK(a.orphan->kind == Orphan::None);
             CHECK(services().reports.back().text == said("OrphanBack", "[NAME]", "a"));
             CHECK(a.orphan->awaySince == 0.0);
         }
@@ -279,7 +273,7 @@ namespace
         unit.check();
         {
             INFO("nothing changed: nothing said");
-            REQUIRE(services().reports.size() == said);
+            CHECK(services().reports.size() == said);
             CHECK(studio.toolbars == 3);
         }
         Doc& c                  = tab("c");
@@ -290,7 +284,7 @@ namespace
         {
             INFO("a detached one back: nothing said, its load will");
             CHECK(c.orphan->kind == Orphan::None);
-            REQUIRE(services().reports.size() == said);
+            CHECK(services().reports.size() == said);
         }
     }
 
@@ -306,31 +300,28 @@ namespace
         a.orphan->reattachTries = ALRecoveryRetry::TRIES;
         unit.check();
         UNSCOPED_INFO("tried out: waits for a person");
-        REQUIRE(studio.loads.empty());
+        CHECK(studio.loads.empty());
         a.orphan->reattachTries = 1;
         a.orphan->nextReattach  = LLTimer::getTotalSeconds() + 60.0;
         const F64 next = unit.check();
         UNSCOPED_INFO("to be looked at again when its try is due");
         CHECK(next == a.orphan->nextReattach);
         UNSCOPED_INFO("not due yet");
-        REQUIRE(studio.loads.empty());
+        CHECK(studio.loads.empty());
         a.orphan->nextReattach = 0.0;
         unit.check();
-        {
-            INFO("loaded");
-            REQUIRE(studio.loads.size() == 1);
-            CHECK(studio.loads[0] == a.ref);
-        }
+        REQUIRE(studio.loads.size() == 1);
+        CHECK(studio.loads[0] == a.ref);
         {
             INFO("what it holds kept first, and carried over");
-            REQUIRE(recovery->keptFor(a.recoveryKey) == 1);
+            CHECK(recovery->keptFor(a.recoveryKey) == 1);
             REQUIRE(a.carriedText);
             CHECK(*a.carriedText == "kept text");
         }
         {
             INFO("not loaded, and not to be typed in, until it is");
-            REQUIRE_FALSE(a.loaded);
-            REQUIRE(a.editor->isReadOnly());
+            CHECK_FALSE(a.loaded);
+            CHECK(a.editor->isReadOnly());
             CHECK_FALSE(a.orphan->detached);
         }
         Doc& u = tab("u");
@@ -340,11 +331,11 @@ namespace
         studio.reaches["u"].heldByPrim = true;
         unit.check();
         UNSCOPED_INFO("an unreadable one is not tried on its own");
-        REQUIRE(studio.loads.size() == 1);
+        CHECK(studio.loads.size() == 1);
         u.loadFailure = Failure::Fetch;
         unit.check();
         UNSCOPED_INFO("a fetch that failed is");
-        REQUIRE(studio.loads.size() == 2);
+        CHECK(studio.loads.size() == 2);
     }
 
     TEST_CASE_METHOD(alscriptstudioorphans_data, "alscriptstudioorphans: the notice says a kept text first then each kind's words and buttons", "[alscriptstudioorphans]")
@@ -352,10 +343,9 @@ namespace
         make();
         const al_studio_test::FakeServices& words = services();
         UNSCOPED_INFO("no tab: nothing");
-        REQUIRE(Orphans::noticeFor(nullptr, words).text.empty());
+        CHECK(Orphans::noticeFor(nullptr, words).text.empty());
         Doc& a = tab("a");
-        UNSCOPED_INFO("nothing to say");
-        REQUIRE(Orphans::noticeFor(&a, words).text.empty());
+        CHECK(Orphans::noticeFor(&a, words).text.empty());
         ALRecoveryEntry kept;
         kept.baseAsset = LLUUID::generateNewID();
         a.recoverable  = kept;
@@ -374,25 +364,22 @@ namespace
         CHECK(Orphans::noticeFor(&a, words).text == said("NoticeRecoverableStale", "[WHEN]", when));
         a.recoverable.reset();
         notice = Orphans::noticeFor(&a, words);
-        {
-            INFO("away");
-            CHECK(notice.text == said("NoticeAway"));
-            CHECK(notice.buttons[0].first == "copy");
-            CHECK(notice.buttons[1].first == "export");
-        }
+        CHECK(notice.text == said("NoticeAway"));
+        CHECK(notice.buttons[0].first == "copy");
+        CHECK(notice.buttons[1].first == "export");
         a.orphan->kind = Orphan::Offline;
         notice         = Orphans::noticeFor(&a, words);
         {
             INFO("offline: a copy on disk alone");
             CHECK(notice.buttons[0].first == "export");
-            REQUIRE(notice.buttons[1].first.empty());
+            CHECK(notice.buttons[1].first.empty());
         }
         a.orphan->kind = Orphan::Unloaded;
         a.loadError    = "no such asset";
         notice         = Orphans::noticeFor(&a, words);
         {
             INFO("unloaded: why, and to try again");
-            REQUIRE(notice.text.find("no such asset") != std::string::npos);
+            CHECK(notice.text.find("no such asset") != std::string::npos);
             CHECK(notice.buttons[0].first == "retry_load");
         }
         a.orphan->kind = Orphan::Trashed;
@@ -400,14 +387,14 @@ namespace
         {
             INFO("in the Trash: said, nothing to do");
             CHECK(notice.text == said("NoticeTrashed"));
-            REQUIRE(notice.buttons[0].first.empty());
+            CHECK(notice.buttons[0].first.empty());
         }
         a.orphan->kind = Orphan::FileGone;
         a.file         = "/somewhere/a.lsl";
         notice         = Orphans::noticeFor(&a, words);
         {
             INFO("a file gone: saved again");
-            REQUIRE(notice.text.find("/somewhere/a.lsl") != std::string::npos);
+            CHECK(notice.text.find("/somewhere/a.lsl") != std::string::npos);
             CHECK(notice.buttons[0].first == "save");
         }
         Doc& i = tab("i", true);
@@ -416,7 +403,7 @@ namespace
         CHECK(Orphans::noticeFor(&i, words).text == said("NoticeRemovedInventory"));
         i.orphan->noticeDismissed = true;
         UNSCOPED_INFO("hidden: nothing");
-        REQUIRE(Orphans::noticeFor(&i, words).text.empty());
+        CHECK(Orphans::noticeFor(&i, words).text.empty());
     }
 
     TEST_CASE_METHOD(alscriptstudioorphans_data, "alscriptstudioorphans: the notice's actions act on the tab in front", "[alscriptstudioorphans]")
@@ -429,40 +416,34 @@ namespace
         {
             INFO("restored, the source in front");
             CHECK(studio.did == Names{ "source a", "carried a: restored text" });
-            REQUIRE_FALSE(a.recoverable);
+            CHECK_FALSE(a.recoverable);
             CHECK(services().reports.back().text == said("RecoveryRestored", "[NAME]", "a"));
         }
         a.recoverable = ALRecoveryEntry();
         unit.noticeAction("discard_left");
-        {
-            INFO("discarded");
-            CHECK(studio.did.back() == "discard");
-            REQUIRE_FALSE(a.recoverable);
-        }
+        CHECK(studio.did.back() == "discard");
+        CHECK_FALSE(a.recoverable);
         a.recoverable = ALRecoveryEntry();
         unit.noticeAction("close");
         {
             INFO("hidden, the kept text let go of here");
             CHECK(a.orphan->noticeDismissed);
-            REQUIRE_FALSE(a.recoverable);
+            CHECK_FALSE(a.recoverable);
         }
         unit.noticeAction("copy");
         unit.noticeAction("export");
         unit.noticeAction("save");
-        {
-            INFO("a copy, a file, a save");
-            CHECK(studio.did == Names{ "source a", "carried a: restored text", "source a", "discard", "copy a", "save a" });
-            CHECK(files->picked == Names{ "a" });
-        }
+        CHECK(studio.did == Names{ "source a", "carried a: restored text", "source a", "discard", "copy a", "save a" });
+        CHECK(files->picked == Names{ "a" });
         a.orphan->reattachTries = 3;
         unit.noticeAction("retry_load");
         UNSCOPED_INFO("not detached: nothing to try");
-        REQUIRE(studio.loads.empty());
+        CHECK(studio.loads.empty());
         a.orphan->detached = true;
         unit.noticeAction("retry_load");
         {
             INFO("tried again, from the first try");
-            REQUIRE(studio.loads.size() == 1);
+            CHECK(studio.loads.size() == 1);
             CHECK(a.orphan->reattachTries == 0);
         }
     }
@@ -479,17 +460,15 @@ namespace
         a.orphan->kind    = Orphan::Away;
         unit.refreshNotice();
         LLView* holder = bar->getParent();
-        UNSCOPED_INFO("shown");
         CHECK(holder->getVisible());
-        UNSCOPED_INFO("its words");
         CHECK(bar->getChild<LLTextBox>("notice_text")->getText() == said("NoticeAway"));
         LLButton* first  = bar->getChild<LLButton>("notice_first");
         LLButton* second = bar->getChild<LLButton>("notice_second");
         {
             INFO("its buttons, labelled");
-            REQUIRE(first->getVisible());
+            CHECK(first->getVisible());
             CHECK(second->getVisible());
-            REQUIRE(first->getLabelSelected() == said("NoticeCopy"));
+            CHECK(first->getLabelSelected() == said("NoticeCopy"));
             CHECK(first->getToolTip() == said("NoticeCopyTip"));
         }
         UNSCOPED_INFO("the first left of the second");
@@ -509,7 +488,6 @@ namespace
         }
         a.orphan->kind = Orphan::None;
         unit.refreshNotice();
-        UNSCOPED_INFO("hidden");
         CHECK_FALSE(holder->getVisible());
     }
 
@@ -534,7 +512,7 @@ namespace
         CHECK(studio.did.back() ==
                       "compare a: default { touch_start(integer n) { llDie(); } } | default { } (" + said("CompareCompiled") + " | " + said("CompareMade") + ")");
         UNSCOPED_INFO("the notice stays, to act on after looking");
-        REQUIRE(a.compiledDiffers.has_value());
+        CHECK(a.compiledDiffers.has_value());
         studio.did.clear();
         a.orphan->kind = Orphan::Away;
         UNSCOPED_INFO("a tab gone first");
@@ -544,7 +522,7 @@ namespace
         {
             INFO("the source back in front, then taken as the source");
             CHECK(studio.did == Names{ "source a", "carried a: default { touch_start(integer n) { llDie(); } }" });
-            REQUIRE_FALSE(a.compiledDiffers);
+            CHECK_FALSE(a.compiledDiffers);
         }
         UNSCOPED_INFO("and said");
         CHECK(services().reports.back().text == said("CompiledTaken", "[NAME]", "a"));
@@ -552,11 +530,11 @@ namespace
         unit.noticeAction("keep_source");
         {
             INFO("kept: let go of, the next save replacing it");
-            REQUIRE_FALSE(a.compiledDiffers);
+            CHECK_FALSE(a.compiledDiffers);
             CHECK(studio.did.back() == "source a");
         }
         UNSCOPED_INFO("nothing more to say");
-        REQUIRE(Orphans::noticeFor(&a, words).text.empty());
+        CHECK(Orphans::noticeFor(&a, words).text.empty());
     }
 
     TEST_CASE_METHOD(alscriptstudioorphans_data, "alscriptstudioorphans: a kept text compares with the tab and restores with the source in front", "[alscriptstudioorphans]")
@@ -574,11 +552,11 @@ namespace
         CHECK(studio.did.back() ==
                       "compare a: default {} | default { state_entry() { } } (" + said("CompareNow") + " | " + said("CompareKept", "[WHEN]", kept.whenSaid()) + ")");
         UNSCOPED_INFO("still offered");
-        REQUIRE(a.recoverable.has_value());
+        CHECK(a.recoverable.has_value());
         unit.noticeAction("restore");
         {
             INFO("the source in front first");
-            REQUIRE(studio.did[studio.did.size() - 2] == "source a");
+            CHECK(studio.did[studio.did.size() - 2] == "source a");
             CHECK(studio.did.back() == "carried a: default { state_entry() { } }");
         }
     }
@@ -610,11 +588,11 @@ namespace
         {
             INFO("taken up, and let go of");
             CHECK(studio.did.back() == "offer a: retry");
-            REQUIRE_FALSE(a.offer);
+            CHECK_FALSE(a.offer);
         }
         a.offer = Doc::Offer{ "Saved elsewhere.", { "take_saved", "keep_saved", "merge_saved", "compare_saved" } };
         UNSCOPED_INFO("a conflict with nothing to take: not said");
-        REQUIRE(Orphans::noticeFor(&a, words).text.empty());
+        CHECK(Orphans::noticeFor(&a, words).text.empty());
         a.savedThere = std::string("theirs");
         notice       = Orphans::noticeFor(&a, words);
         {
@@ -627,7 +605,7 @@ namespace
         unit.noticeAction("close");
         {
             INFO("hidden: let go of, and nothing else");
-            REQUIRE_FALSE(a.offer);
+            CHECK_FALSE(a.offer);
             CHECK_FALSE(a.orphan->noticeDismissed);
             CHECK(studio.did.back() == "offer a: retry");
         }
@@ -646,14 +624,14 @@ namespace
         {
             INFO("what a tab gone says of itself, hidden with it");
             CHECK(a.orphan->noticeDismissed);
-            REQUIRE_FALSE(a.offer);
+            CHECK_FALSE(a.offer);
         }
         a.orphan->noticeDismissed = false;
         a.offer                   = Doc::Offer{ "Saving a failed.", { "retry", "copy", "export" } };
         unit.noticeAction("close");
         {
             INFO("more than that: said next");
-            REQUIRE(a.offer);
+            CHECK(a.offer);
             CHECK(Orphans::noticeFor(&a, words).text == "Saving a failed.");
         }
     }
@@ -685,8 +663,8 @@ namespace
         Orphans::become(a, Doc::Orphan::Removed);
         {
             INFO("removed, and said");
-            REQUIRE(a.orphan->kind == Doc::Orphan::Removed);
-            REQUIRE_FALSE(a.orphan->noticeDismissed);
+            CHECK(a.orphan->kind == Doc::Orphan::Removed);
+            CHECK_FALSE(a.orphan->noticeDismissed);
             CHECK_FALSE(a.orphan->detached);
         }
         a.orphan->noticeDismissed = true;
@@ -696,7 +674,7 @@ namespace
         Orphans::detach(a, Doc::Orphan::Unloaded);
         {
             INFO("an item's kept text detached");
-            REQUIRE(a.orphan->detached);
+            CHECK(a.orphan->detached);
             CHECK(a.orphan->kind == Doc::Orphan::Unloaded);
         }
         Doc& f = tab("f");
@@ -704,7 +682,7 @@ namespace
         Orphans::detach(f, Doc::Orphan::FileGone);
         {
             INFO("a file's not: nothing is loaded under it");
-            REQUIRE_FALSE(f.orphan->detached);
+            CHECK_FALSE(f.orphan->detached);
             CHECK(f.orphan->kind == Doc::Orphan::FileGone);
         }
 
@@ -736,7 +714,7 @@ namespace
         {
             INFO("the source back in front, then taken");
             CHECK(studio.did == Names{ "source a", "carried a: default { }" });
-            REQUIRE_FALSE(a.historyShown);
+            CHECK_FALSE(a.historyShown);
         }
         LLStringUtil::format_map_t args;
         args["[NAME]"] = "a";
@@ -750,11 +728,11 @@ namespace
         unit.noticeAction("restore_saved");
         {
             INFO("not into a tab that may not be changed");
-            REQUIRE(studio.did.empty());
-            REQUIRE(a.historyShown);
+            CHECK(studio.did.empty());
+            CHECK(a.historyShown);
         }
         unit.noticeAction("close");
         UNSCOPED_INFO("let go of with the notice");
-        REQUIRE_FALSE(a.historyShown);
+        CHECK_FALSE(a.historyShown);
     }
 }

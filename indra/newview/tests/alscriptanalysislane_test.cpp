@@ -189,20 +189,15 @@ namespace
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, false); }, main());
         ALScriptAnalysisLane lsl("TestLSL", [gate] { return std::make_unique<Held>(gate, false); }, main());
-        UNSCOPED_INFO("taken");
         CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, true)));
-        UNSCOPED_INFO("held");
         CHECK(gate->waitEntered());
-        UNSCOPED_INFO("taken too");
         CHECK(post(lsl, job("other", ALScriptAnalysis::Kind::Hover, true)));
         UNSCOPED_INFO("the other lane's question answered while the check is held");
         CHECK(answers.waitFor(1));
-        UNSCOPED_INFO("it alone");
         CHECK(answers.all() == std::string("other/2"));
         gate->release();
         UNSCOPED_INFO("then the check");
         CHECK(answers.waitFor(2));
-        UNSCOPED_INFO("in that order");
         CHECK(answers.all() == std::string("other/2 slow/0"));
         luau.close();
         lsl.close();
@@ -214,13 +209,9 @@ namespace
     {
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        UNSCOPED_INFO("taken");
         CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, false)));
-        UNSCOPED_INFO("held");
         CHECK(gate->waitEntered());
-        UNSCOPED_INFO("asked");
         CHECK(post(luau, job("front", ALScriptAnalysis::Kind::Complete, true)));
-        UNSCOPED_INFO("both answered");
         CHECK(answers.waitFor(2));
         UNSCOPED_INFO("the question first, then the check, run again");
         CHECK(answers.all() == std::string("front/1 slow/0"));
@@ -231,14 +222,10 @@ namespace
     {
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        UNSCOPED_INFO("taken");
         CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, true)));
-        UNSCOPED_INFO("held");
         CHECK(gate->waitEntered());
-        UNSCOPED_INFO("asked");
         CHECK(post(luau, job("front", ALScriptAnalysis::Kind::Complete, true)));
         gate->release();
-        UNSCOPED_INFO("both answered");
         CHECK(answers.waitFor(2));
         UNSCOPED_INFO("the check first, not stopped");
         CHECK(answers.all() == std::string("slow/0 front/1"));
@@ -250,17 +237,13 @@ namespace
         auto gate    = std::make_shared<Held::Gate>();
         gate->always = true;
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        UNSCOPED_INFO("taken");
         CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, false)));
-        UNSCOPED_INFO("held");
         CHECK(gate->waitEntered());
-        UNSCOPED_INFO("asked");
         CHECK(post(luau, job("front", ALScriptAnalysis::Kind::Complete, true)));
         UNSCOPED_INFO("the question answered");
         CHECK(answers.waitFor(1));
         UNSCOPED_INFO("the check run again, and held");
         CHECK(gate->waitEntered(2));
-        UNSCOPED_INFO("asked again");
         CHECK(post(luau, job("again", ALScriptAnalysis::Kind::Hover, true)));
         // A moment, in which a question that stopped it would be answered.
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -269,9 +252,7 @@ namespace
         UNSCOPED_INFO("not started over");
         CHECK(gate->enteredNow() == 2);
         gate->release();
-        UNSCOPED_INFO("all answered");
         CHECK(answers.waitFor(3));
-        UNSCOPED_INFO("the check, then the question");
         CHECK(answers.all() == std::string("front/1 slow/0 again/2"));
         luau.close();
     }
@@ -280,19 +261,14 @@ namespace
     {
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        UNSCOPED_INFO("taken");
         CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, false)));
-        UNSCOPED_INFO("held");
         CHECK(gate->waitEntered());
         luau.forget("slow");
-        UNSCOPED_INFO("asked");
         CHECK(post(luau, job("front", ALScriptAnalysis::Kind::Hover, true)));
         UNSCOPED_INFO("the question answered");
         CHECK(answers.waitFor(1));
         gate->release();
-        UNSCOPED_INFO("asked again");
         CHECK(post(luau, job("last", ALScriptAnalysis::Kind::Hover, true)));
-        UNSCOPED_INFO("answered");
         CHECK(answers.waitFor(2));
         UNSCOPED_INFO("nothing for the tab let go of");
         CHECK(answers.all() == std::string("front/2 last/2"));
@@ -319,13 +295,9 @@ namespace
 
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        UNSCOPED_INFO("taken");
         CHECK(post(luau, job("slow", Kind::References, false)));
-        UNSCOPED_INFO("held");
         CHECK(gate->waitEntered());
-        UNSCOPED_INFO("asked");
         CHECK(post(luau, job("front", Kind::Complete, true)));
-        UNSCOPED_INFO("both answered");
         CHECK(answers.waitFor(2));
         UNSCOPED_INFO("the question first, then the lookup's, run again");
         CHECK(answers.all() == std::string("front/1 slow/5"));

@@ -150,26 +150,18 @@ namespace
         const LLUUID chair = object(10);
         S32          heard = 0;
         index.onHeard([&heard, chair](const Index::Contents& contents) { heard += contents.prim == chair; });
-        UNSCOPED_INFO("asked");
         CHECK(index.ask(chair));
         UNSCOPED_INFO("not again while it is not answered");
         CHECK_FALSE(index.ask(chair));
-        UNSCOPED_INFO("asking");
         CHECK(index.asking(chair));
-        REQUIRE(asked.size() == size_t(1));
-        {
-            INFO("not known yet");
-            CHECK_FALSE(index.fetched(chair));
-            REQUIRE(index.prim(chair) == nullptr);
-        }
-        UNSCOPED_INFO("answered");
-        CHECK(answer(chair, { "sit.lsl", "readme" }, true, "Chair"));
-        UNSCOPED_INFO("heard once");
+        CHECK(asked.size() == size_t(1));
+        CHECK_FALSE(index.fetched(chair));
+        CHECK(index.prim(chair) == nullptr);
+        // Unanswered, the prim would not be known, and it is read below.
+        REQUIRE(answer(chair, { "sit.lsl", "readme" }, true, "Chair"));
         CHECK(heard == 1);
         CHECK(names(chair) == std::string("sit.lsl readme"));
-        UNSCOPED_INFO("its name");
         CHECK(index.prim(chair)->name == std::string("Chair"));
-        UNSCOPED_INFO("no longer asking");
         CHECK_FALSE(index.asking(chair));
 
         // Known: asked again only where the object's copy is not current,
@@ -183,12 +175,12 @@ namespace
         UNSCOPED_INFO("current, not asked");
         CHECK_FALSE(index.ask(chair));
         {
-            INFO("a refetch is");
+            INFO("a refetch is asked");
             CHECK(index.ask(chair, true));
             CHECK(answer(chair, { "sit.lsl" }));
         }
         {
-            INFO("and of the region");
+            INFO("so is one of the region");
             CHECK(index.ask(chair, false, true));
             CHECK(asked.back().second);
         }
@@ -204,10 +196,9 @@ namespace
         UNSCOPED_INFO("each script asked whether it runs");
         REQUIRE(askedRunning.size() == size_t(2));
         index.running(askedRunning[0], true);
-        UNSCOPED_INFO("known");
         CHECK(index.running(askedRunning[0]) == std::optional<bool>(true));
-        UNSCOPED_INFO("not known");
-        REQUIRE_FALSE(index.running(askedRunning[1]));
+        UNSCOPED_INFO("one not answered is not known");
+        CHECK_FALSE(index.running(askedRunning[1]));
 
         index.ask(chair, true);
         answer(chair, {}, false);
@@ -216,16 +207,16 @@ namespace
         UNSCOPED_INFO("still fetched");
         CHECK(index.fetched(chair));
         UNSCOPED_INFO("only the one not known asked again");
-        REQUIRE(askedRunning.size() == size_t(3));
+        CHECK(askedRunning.size() == size_t(3));
 
         index.forgetRunning({ chair });
-        UNSCOPED_INFO("let go of");
-        REQUIRE_FALSE(index.running(askedRunning[0]));
+        UNSCOPED_INFO("whether it runs let go of");
+        CHECK_FALSE(index.running(askedRunning[0]));
         index.forget(chair);
         {
-            INFO("all of it");
-            REQUIRE(index.prim(chair) == nullptr);
-            REQUIRE(names(chair).empty());
+            INFO("all of the prim let go of");
+            CHECK(index.prim(chair) == nullptr);
+            CHECK(names(chair).empty());
         }
     }
 
@@ -243,23 +234,22 @@ namespace
         std::optional<Index::Listed> listed;
         index.ensureListed(id(23), [&listed](const Index::Listed& out) { listed = out; });
         UNSCOPED_INFO("the root and the one never asked");
-        REQUIRE(asked.size() - before == size_t(2));
-        UNSCOPED_INFO("not yet");
-        REQUIRE_FALSE(listed);
+        CHECK(asked.size() - before == size_t(2));
+        UNSCOPED_INFO("not told yet");
+        CHECK_FALSE(listed);
         answer(id(20), { "main.lsl" });
         answer(id(22), { "light.lsl" });
         UNSCOPED_INFO("not while one is out");
-        REQUIRE_FALSE(listed);
+        CHECK_FALSE(listed);
         answer(id(23), {}, false);
-        UNSCOPED_INFO("told");
         REQUIRE(listed.has_value());
         {
             INFO("by its root");
-            REQUIRE(listed->root == house);
+            CHECK(listed->root == house);
             CHECK(listed->present);
         }
         UNSCOPED_INFO("every prim");
-        REQUIRE(listed->prims.size() == size_t(4));
+        CHECK(listed->prims.size() == size_t(4));
         UNSCOPED_INFO("the one that did not answer said");
         CHECK(listed->unlisted == std::vector<LLUUID>{ id(23) });
 
@@ -275,17 +265,17 @@ namespace
         {
             INFO("at once");
             REQUIRE(listed.has_value());
-            REQUIRE(listed->unlisted.empty());
+            CHECK(listed->unlisted.empty());
         }
 
         // Not in sight: no prims, not present, told at once.
         listed.reset();
         index.ensureListed(id(99), [&listed](const Index::Listed& out) { listed = out; });
         {
-            INFO("away");
+            INFO("not in sight");
             REQUIRE(listed.has_value());
-            REQUIRE_FALSE(listed->present);
-            REQUIRE(listed->prims.empty());
+            CHECK_FALSE(listed->present);
+            CHECK(listed->prims.empty());
         }
     }
 
@@ -319,6 +309,8 @@ namespace
         CHECK(told == 2);
     }
 
+    // The studio's draw looks once a second, and asks a prim at most every
+    // few seconds.
     TEST_CASE_METHOD(alscriptcontentsindex_data, "alscriptcontentsindex: refresh asks a prim again once its serial moved or its copy went", "[alscriptcontentsindex]")
     {
         const LLUUID chair = object(40);
@@ -328,17 +320,17 @@ namespace
         answer(chair, { "sit.lsl" });
         index.refresh(10.0);
         UNSCOPED_INFO("unchanged: not asked");
-        REQUIRE(pending.empty());
+        CHECK(pending.empty());
 
         // A script added from the build tools.
         serials[chair] = 4;
         index.refresh(10.5);
         UNSCOPED_INFO("not looked at again within the second");
-        REQUIRE(pending.empty());
+        CHECK(pending.empty());
         index.refresh(11.0);
         {
             INFO("its serial moved: asked");
-            REQUIRE(pending.size() == 1);
+            CHECK(pending.size() == 1);
             CHECK(asked.back().first == chair);
         }
         answer(chair, { "sit.lsl", "new.lsl" });
@@ -346,28 +338,28 @@ namespace
         CHECK(names(chair) == std::string("sit.lsl new.lsl"));
         index.refresh(12.0);
         UNSCOPED_INFO("heard at its serial: not asked");
-        REQUIRE(pending.empty());
+        CHECK(pending.empty());
 
         // Its object's copy let go of, and no answer coming.
         current.erase(chair);
         index.refresh(13.0);
         UNSCOPED_INFO("not asked again so soon");
-        REQUIRE(pending.empty());
+        CHECK(pending.empty());
         index.refresh(16.0);
         UNSCOPED_INFO("asked");
-        REQUIRE(pending.size() == 1);
+        CHECK(pending.size() == 1);
         index.refresh(17.0);
         UNSCOPED_INFO("not while it is asked");
-        REQUIRE(pending.size() == 1);
+        CHECK(pending.size() == 1);
         answer(chair, {}, false);
         UNSCOPED_INFO("no answer keeps what was known");
         CHECK(names(chair) == std::string("sit.lsl new.lsl"));
         index.refresh(18.0);
         UNSCOPED_INFO("not asked again at once");
-        REQUIRE(pending.empty());
+        CHECK(pending.empty());
         index.refresh(21.0);
         UNSCOPED_INFO("asked again a while after");
-        REQUIRE(pending.size() == 1);
+        CHECK(pending.size() == 1);
         answer(chair, { "sit.lsl" });
 
         // Asked for directly, a prim that changed is asked though known.

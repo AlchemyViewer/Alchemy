@@ -89,44 +89,31 @@ namespace
     // * Remember that you cannot test private methods with tut
     // ---------------------------------------------------------------------------------------
     // Test static methods
-    // Test 1 : scaleToLevel()
     TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: scaleToLevel is MAP_LEVELS at zero and 1 from a tile's size up", "[LLWorldMipmap]")
     {
         S32 level = mMap->scaleToLevel(0.0);
-        UNSCOPED_INFO("scaleToLevel() test 1 failed");
         CHECK(level == LLWorldMipmap::MAP_LEVELS);
         level = mMap->scaleToLevel((F32)LLWorldMipmap::MAP_TILE_SIZE);
-        UNSCOPED_INFO("scaleToLevel() test 2 failed");
         CHECK(level == 1);
         level = mMap->scaleToLevel(10.f * LLWorldMipmap::MAP_TILE_SIZE);
-        UNSCOPED_INFO("scaleToLevel() test 3 failed");
         CHECK(level == 1);
     }
-    // Test 2 : globalToMipmap()
     TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: globalToMipmap gives a position's region grid cell", "[LLWorldMipmap]")
     {
         U32 grid_x, grid_y;
         mMap->globalToMipmap(1000.f*REGION_WIDTH_METERS, 1000.f*REGION_WIDTH_METERS, 1, &grid_x, &grid_y);
-        {
-            INFO("globalToMipmap() test 1 failed");
-            CHECK(grid_x == 1000);
-            CHECK(grid_y == 1000);
-        }
+        CHECK(grid_x == 1000);
+        CHECK(grid_y == 1000);
         mMap->globalToMipmap(0.0, 0.0, LLWorldMipmap::MAP_LEVELS, &grid_x, &grid_y);
-        {
-            INFO("globalToMipmap() test 2 failed");
-            CHECK(grid_x == 0);
-            CHECK(grid_y == 0);
-        }
+        CHECK(grid_x == 0);
+        CHECK(grid_y == 0);
     }
-    // Test 3 : getObjectsTile()
     TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: getObjectsTile (not yet tested)", "[LLWorldMipmap]")
     {
         // Depends on some inline methods in LLViewerImage... Thinking about how to make this work
         // LLPointer<LLViewerImage> img = mMap->getObjectsTile(0, 0, 1);
         // ensure("getObjectsTile() test failed", img.isNull());
     }
-    // Test 4 : equalizeBoostLevels()
     TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: equalizeBoostLevels does not throw", "[LLWorldMipmap]")
     {
         try
@@ -135,10 +122,9 @@ namespace
         }
         catch (...)
         {
-            FAIL("equalizeBoostLevels() test failed");
+            FAIL("equalizeBoostLevels() threw");
         }
     }
-    // Test 5 : dropBoostLevels()
     TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: dropBoostLevels does not throw", "[LLWorldMipmap]")
     {
         try
@@ -147,10 +133,9 @@ namespace
         }
         catch (...)
         {
-            FAIL("dropBoostLevels() test failed");
+            FAIL("dropBoostLevels() threw");
         }
     }
-    // Test 6 : reset()
     TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: reset does not throw", "[LLWorldMipmap]")
     {
         try
@@ -159,7 +144,7 @@ namespace
         }
         catch (...)
         {
-            FAIL("reset() test failed");
+            FAIL("reset() threw");
         }
     }
 }

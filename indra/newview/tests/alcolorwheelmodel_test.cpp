@@ -56,9 +56,7 @@ namespace
         const LLVector3 v = ALColorWheelModel::chromaDirection(F_PI_BY_TWO);
         const LLVector3 grey(1.f, 1.f, 1.f);
 
-        UNSCOPED_INFO("u is unit");
         CHECK_THAT(u.magVec(), ll_test::WithinBits(1.f, 5));
-        UNSCOPED_INFO("v is unit");
         CHECK_THAT(v.magVec(), ll_test::WithinBits(1.f, 5));
         UNSCOPED_INFO("u and v are perpendicular");
         CHECK_THAT(u * v, ll_test::WithinBits(0.f, 5));
@@ -92,10 +90,9 @@ namespace
         F32 hue, sat;
         for (F32 grey : { -0.4f, 0.f, 0.5f, 1.f })
         {
+            CAPTURE(grey);
             ALColorWheelModel::toPolar(LLVector3(grey, grey, grey), hue, sat);
-            UNSCOPED_INFO("no saturation");
             REQUIRE_THAT(sat, ll_test::WithinBits(0.f, 5));
-            UNSCOPED_INFO("hue is finite");
             REQUIRE(std::isfinite(hue));
         }
     }
@@ -114,17 +111,15 @@ namespace
             {
                 for (F32 b : samples)
                 {
+                    CAPTURE(r, g, b);
                     const LLVector3 in(r, g, b);
                     F32 hue, sat;
                     ALColorWheelModel::toPolar(in, hue, sat);
                     const LLVector3 out = ALColorWheelModel::toRGB(
                         ALColorWheelModel::masterOf(in), hue, sat);
 
-                    UNSCOPED_INFO("r round trips");
                     REQUIRE_THAT(out.mV[VX], ll_test::WithinBits(in.mV[VX], 5));
-                    UNSCOPED_INFO("g round trips");
                     REQUIRE_THAT(out.mV[VY], ll_test::WithinBits(in.mV[VY], 5));
-                    UNSCOPED_INFO("b round trips");
                     REQUIRE_THAT(out.mV[VZ], ll_test::WithinBits(in.mV[VZ], 5));
                 }
             }
@@ -137,13 +132,12 @@ namespace
         asLift();
         for (S32 i = 0; i < 24; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 15.f);
             const F32 sat = mWheel.getMaxSat() * 0.6f;
             mWheel.setPolar(hue, sat);
 
-            UNSCOPED_INFO("hue survives");
             REQUIRE_THAT(angleDelta(mWheel.getHue(), hue), ll_test::WithinBits(0.f, 4));
-            UNSCOPED_INFO("saturation survives");
             REQUIRE_THAT(mWheel.getSat(), ll_test::WithinBits(sat, 4));
             UNSCOPED_INFO("master untouched");
             REQUIRE_THAT(mWheel.getMaster(), ll_test::WithinBits(0.f, 5));
@@ -160,11 +154,10 @@ namespace
         const F32 rim = mWheel.getMaxSat();
         for (S32 i = 0; i < 72; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 5.f);
             mWheel.setPolar(hue, rim);
-            UNSCOPED_INFO("rim is reachable at every hue");
             REQUIRE_THAT(mWheel.getSat(), ll_test::WithinBits(rim, 3));
-            UNSCOPED_INFO("and the hue is the one asked for");
             REQUIRE_THAT(angleDelta(mWheel.getHue(), hue), ll_test::WithinBits(0.f, 3));
         }
     }
@@ -174,7 +167,6 @@ namespace
     TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: getMaxSat is the inradius and red on the rim sits on its limit", "[ALColorWheelModel]")
     {
         asLift();
-        UNSCOPED_INFO("inradius");
         CHECK_THAT(mWheel.getMaxSat(), ll_test::WithinBits(sqrtf(1.5f) * 0.5f, 4));
 
         mWheel.setPolar(0.f, mWheel.getMaxSat());
@@ -212,17 +204,16 @@ namespace
 
         for (S32 i = 0; i < 36; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 10.f);
             mWheel.setPolar(hue, rim * 4.f);
 
             const LLVector3& rgb = mWheel.getRGB();
             for (S32 c = 0; c < 3; ++c)
             {
-                {
-                    INFO("channel stayed in range");
-                    REQUIRE(rgb.mV[c] >= -0.5f - 1e-5f);
-                    REQUIRE(rgb.mV[c] <= 0.5f + 1e-5f);
-                }
+                CAPTURE(c);
+                REQUIRE(rgb.mV[c] >= -0.5f - 1e-5f);
+                REQUIRE(rgb.mV[c] <= 0.5f + 1e-5f);
             }
             UNSCOPED_INFO("saturation did not run away");
             REQUIRE(mWheel.getSat() <= widest + 1e-4f);
@@ -248,9 +239,9 @@ namespace
         asLift();
         for (S32 i = 0; i < 12; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 30.f);
             mWheel.setPolar(hue, mWheel.getMaxSat() * 3.f);
-            UNSCOPED_INFO("hue held through the clamp");
             REQUIRE_THAT(angleDelta(mWheel.getHue(), hue), ll_test::WithinBits(0.f, 3));
         }
     }
@@ -267,24 +258,19 @@ namespace
         const F32 sat = mWheel.getSat();
 
         mWheel.setMaster(1.2f);
-        UNSCOPED_INFO("master moved");
         CHECK_THAT(mWheel.getMaster(), ll_test::WithinBits(1.2f, 4));
-        UNSCOPED_INFO("hue kept");
         CHECK_THAT(angleDelta(mWheel.getHue(), hue), ll_test::WithinBits(0.f, 3));
-        UNSCOPED_INFO("saturation kept");
         CHECK_THAT(mWheel.getSat(), ll_test::WithinBits(sat, 3));
     }
 
-    // A master pushed past its range clamps, and the triplet stays legal.
     TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: a master pushed past its range clamps and the triplet stays legal", "[ALColorWheelModel]")
     {
         asGain();
         mWheel.setMaster(9.f);
-        UNSCOPED_INFO("master clamped");
         CHECK(mWheel.getMaster() <= 1.5f + 1e-5f);
         for (S32 c = 0; c < 3; ++c)
         {
-            UNSCOPED_INFO("channel in range");
+            CAPTURE(c);
             REQUIRE(mWheel.getRGB().mV[c] <= 1.5f + 1e-5f);
         }
     }
@@ -317,14 +303,13 @@ namespace
     {
         for (S32 i = 0; i < 36; ++i)
         {
+            CAPTURE(i);
             const F32 hue = deg((F32)i * 10.f);
             const LLVector3 ring = ALColorWheelModel::ringColor(hue);
 
             F32 ring_hue, ring_sat;
             ALColorWheelModel::toPolar(ring, ring_hue, ring_sat);
-            UNSCOPED_INFO("ring hue matches the puck's");
             REQUIRE_THAT(angleDelta(ring_hue, hue), ll_test::WithinBits(0.f, 3));
-            UNSCOPED_INFO("ring is actually coloured");
             REQUIRE(ring_sat > 0.f);
         }
     }
@@ -338,11 +323,9 @@ namespace
             const LLVector3 ring = ALColorWheelModel::ringColor(deg((F32)i * 5.f));
             for (S32 c = 0; c < 3; ++c)
             {
-                {
-                    INFO("ring channel is strictly inside the gamut");
-                    REQUIRE(ring.mV[c] > 0.001f);
-                    REQUIRE(ring.mV[c] < 0.999f);
-                }
+                CAPTURE(i, c);
+                REQUIRE(ring.mV[c] > 0.001f);
+                REQUIRE(ring.mV[c] < 0.999f);
             }
         }
     }
@@ -354,7 +337,6 @@ namespace
     {
         asLift();
         mWheel.setChannel(0, 0.2f);
-        UNSCOPED_INFO("channel written");
         CHECK_THAT(mWheel.getRGB().mV[VX], ll_test::WithinBits(0.2f, 5));
         UNSCOPED_INFO("g untouched");
         CHECK_THAT(mWheel.getRGB().mV[VY], ll_test::WithinBits(0.f, 5));
@@ -374,7 +356,6 @@ namespace
         CHECK_THAT(mWheel.getRGB().mV[VX], ll_test::WithinBits(0.5f, 5));
     }
 
-    // Reset returns the configured neutral for each flavour.
     TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: reset returns the configured neutral for each flavour", "[ALColorWheelModel]")
     {
         asLift();
@@ -407,15 +388,12 @@ namespace
         asGain();
         for (S32 c = 0; c < 3; ++c)
         {
-            {
-                INFO("re-clamped on configure");
-                REQUIRE(mWheel.getRGB().mV[c] >= 0.5f - 1e-5f);
-                REQUIRE(mWheel.getRGB().mV[c] <= 1.5f + 1e-5f);
-            }
+            CAPTURE(c);
+            REQUIRE(mWheel.getRGB().mV[c] >= 0.5f - 1e-5f);
+            REQUIRE(mWheel.getRGB().mV[c] <= 1.5f + 1e-5f);
         }
     }
 
-    // A reversed range is accepted rather than producing a negative width.
     TEST_CASE_METHOD(wheel_data, "ALColorWheelModel: a reversed range is accepted rather than producing a negative width", "[ALColorWheelModel]")
     {
         mWheel.configure(0.f, 0.5f, -0.5f, false);
@@ -423,7 +401,6 @@ namespace
         CHECK_THAT(mWheel.getMin(), ll_test::WithinBits(-0.5f, 5));
         UNSCOPED_INFO("max is the high one");
         CHECK_THAT(mWheel.getMax(), ll_test::WithinBits(0.5f, 5));
-        UNSCOPED_INFO("max saturation is positive");
         CHECK(mWheel.getMaxSat() > 0.f);
     }
 
@@ -435,12 +412,11 @@ namespace
     {
         for (S32 level = 0; level < 256; ++level)
         {
+            CAPTURE(level);
             const F32 grey = (F32)level / 255.f;
             F32 u = 1.f, v = 1.f;
             ALColorWheelModel::toChroma(LLVector3(grey, grey, grey), u, v);
-            UNSCOPED_INFO("grey has no u");
             REQUIRE(u == 0.f);
-            UNSCOPED_INFO("grey has no v");
             REQUIRE(v == 0.f);
         }
 
@@ -448,11 +424,10 @@ namespace
         // side of the unit range.
         for (F32 grey : { -0.4f, 1.5f, 37.f })
         {
+            CAPTURE(grey);
             F32 u = 1.f, v = 1.f;
             ALColorWheelModel::toChroma(LLVector3(grey, grey, grey), u, v);
-            UNSCOPED_INFO("grey has no u");
             REQUIRE(u == 0.f);
-            UNSCOPED_INFO("grey has no v");
             REQUIRE(v == 0.f);
         }
     }

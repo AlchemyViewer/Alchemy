@@ -98,7 +98,7 @@ namespace
         FakeWindow&                               studio   = window.pane();
         ALScriptOutputPane*                 pane = nullptr;
 
-        ALScriptOutputPane& make()
+        ALScriptOutputPane& require_pane()
         {
             if (!window.floater)
             {
@@ -106,7 +106,7 @@ namespace
             }
             // The tab as the skin built it.
             pane = window.find<ALScriptOutputPane>("output_tab");
-            UNSCOPED_INFO("the skin builds the tab as the pane");
+            INFO("the skin builds the tab as the pane");
             REQUIRE(pane != nullptr);
             return *pane;
         }
@@ -158,10 +158,10 @@ namespace
             return out;
         }
         // A filter chosen, as a click on it would.
-        void whose(const std::string& value)
+        void require_whose(const std::string& value)
         {
             LLComboBox* combo = window.find<LLComboBox>("output_filter");
-            UNSCOPED_INFO("offered: " + value);
+            CAPTURE(value);
             REQUIRE(combo->selectByValue(LLSD(value)));
             combo->onCommit();
         }
@@ -176,7 +176,7 @@ namespace
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: the kind filter picks errors or owner words or debug or the studio's", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out  = make();
+        ALScriptOutputPane& out  = require_pane();
         const LLUUID        door = fresh();
         out.heard(said(door, "Door", "opening", Event::Channel::OwnerSay));
         out.heard(said(door, "Door", "tick\n"));
@@ -185,27 +185,23 @@ namespace
         UNSCOPED_INFO("everything, a trailing newline gone");
         CHECK(shown() == std::string("|opening|tick|Stack-Heap Collision|Saved."));
         out.showKind("error");
-        UNSCOPED_INFO("the error");
         CHECK(shown() == std::string("|Stack-Heap Collision"));
         UNSCOPED_INFO("kept as chosen");
         CHECK(out.kind() == std::string("error"));
         out.showKind("owner");
-        UNSCOPED_INFO("what the owner was told");
         CHECK(shown() == std::string("|opening"));
         out.showKind("debug");
-        UNSCOPED_INFO("the debug channel");
         CHECK(shown() == std::string("|tick"));
         out.showKind("studio");
-        UNSCOPED_INFO("the studio");
         CHECK(shown() == std::string("|Saved."));
         out.showKind("");
         UNSCOPED_INFO("everything again");
-        REQUIRE(shownTexts().size() == size_t(4));
+        CHECK(shownTexts().size() == size_t(4));
     }
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: filters by whose it is and by words in either case", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out    = make();
+        ALScriptOutputPane& out    = require_pane();
         const LLUUID        door   = fresh();
         const LLUUID        lamp   = fresh();
         const LLUUID        crate  = fresh();
@@ -218,18 +214,18 @@ namespace
         out.heard(said(crate, "Crate", "crate tells its owner", Event::Channel::OwnerSay));
         out.said("Saved door.lsl.", false, nullptr, {});
 
-        whose(lamp.asString());
+        require_whose(lamp.asString());
         UNSCOPED_INFO("one object's alone, not the studio's");
         CHECK(shown() == std::string("|lamp speaks"));
-        whose("open");
+        require_whose("open");
         UNSCOPED_INFO("the open script's, and the studio's");
         CHECK(shown() == std::string("|door speaks|Saved door.lsl."));
-        whose("mine");
+        require_whose("mine");
         UNSCOPED_INFO("the agent's object's, what an owner was told, and the studio's");
         CHECK(shown() ==
                       std::string("|lamp speaks|crate tells its owner|Saved door.lsl."));
 
-        whose("");
+        require_whose("");
         find("DOOR");
         UNSCOPED_INFO("the words, in the text or whose it is");
         CHECK(shown() == std::string("|door speaks|Saved door.lsl."));
@@ -238,10 +234,10 @@ namespace
         CHECK(shown() == std::string("|lamp speaks"));
         find("");
         UNSCOPED_INFO("everything");
-        REQUIRE(shownTexts().size() == size_t(4));
+        CHECK(shownTexts().size() == size_t(4));
 
         // The script closed: the filter by open scripts follows.
-        whose("open");
+        require_whose("open");
         services.docs.clear();
         out.openChanged();
         UNSCOPED_INFO("the studio's alone");
@@ -250,14 +246,13 @@ namespace
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: the objects offered stop at forty dropping the stalest but the chosen", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out = make();
+        ALScriptOutputPane& out = require_pane();
         std::vector<LLUUID> roots;
         for (S32 i = 0; i < 45; ++i)
         {
             roots.push_back(fresh());
             out.heard(said(roots.back(), llformat("Object %02d", i), "hello"));
         }
-        UNSCOPED_INFO("forty");
         REQUIRE(out.objects().size() == size_t(40));
         UNSCOPED_INFO("the first five gone");
         CHECK(out.objects().front().first == roots[5]);
@@ -265,16 +260,13 @@ namespace
         out.heard(said(roots[5], "Object 05", "again"));
         UNSCOPED_INFO("heard again, last");
         CHECK(out.objects().back().first == roots[5]);
-        UNSCOPED_INFO("still forty");
         REQUIRE(out.objects().size() == size_t(40));
         // Renamed, and heard from under its new name.
         out.heard(said(roots[9], "Renamed", "again"));
-        UNSCOPED_INFO("its new name");
         CHECK(out.objects().back().second == std::string("Renamed"));
         // The one chosen stays, least lately heard from as it is.
-        whose(roots[6].asString());
+        require_whose(roots[6].asString());
         out.heard(said(fresh(), "Newcomer", "hello"));
-        UNSCOPED_INFO("forty still");
         REQUIRE(out.objects().size() == size_t(40));
         UNSCOPED_INFO("the one chosen stayed");
         CHECK(out.objects().front().first == roots[6]);
@@ -286,7 +278,7 @@ namespace
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: an error or failure out of sight is unread until seen or cleared", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out  = make();
+        ALScriptOutputPane& out  = require_pane();
         const LLUUID        door = fresh();
         out.heard(said(door, "Door", "tick"));
         out.said("Saved.", false, nullptr, {});
@@ -319,12 +311,12 @@ namespace
         UNSCOPED_INFO("cleared");
         CHECK_FALSE(out.unread());
         UNSCOPED_INFO("with what was said");
-        REQUIRE(out.view()->entries().empty());
+        CHECK(out.view()->entries().empty());
     }
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: the studio's words link to the tab they name and to its actions", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out = make();
+        ALScriptOutputPane& out = require_pane();
         ALScriptStudioDoc&  doc = services.addDoc("door-script", ALScriptRef(fresh(), fresh()), "door.lsl");
         out.said("Could not save door.lsl.", true, &doc, { "retry", "copy" });
         const ALOutputView::Entry& entry = last();
@@ -351,25 +343,22 @@ namespace
         CHECK(studio.shown[0] == std::string("door-script:problems"));
         UNSCOPED_INFO("what to do, by name");
         REQUIRE(studio.actions.size() == size_t(2));
-        UNSCOPED_INFO("try again");
         CHECK(studio.actions[0] == std::string("door-script:retry"));
-        UNSCOPED_INFO("a copy");
         CHECK(studio.actions[1] == std::string("door-script:copy"));
 
         // Said of no tab: nothing to link.
         out.said("Nothing open.", false, nullptr, { "retry" });
-        UNSCOPED_INFO("no links");
-        REQUIRE(last().links.empty());
+        CHECK(last().links.empty());
         // The tab closed since: nothing asked of the window.
         services.docs.clear();
         out.choose(chosen);
         UNSCOPED_INFO("nothing more");
-        REQUIRE(studio.actions.size() == size_t(2));
+        CHECK(studio.actions.size() == size_t(2));
     }
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: a run's lines map back to the script or an include for each frame", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out    = make();
+        ALScriptOutputPane& out    = require_pane();
         const LLUUID        object = fresh();
         const LLUUID        item   = fresh();
         // Ten lines out: the first four the include's, the rest the
@@ -397,7 +386,7 @@ namespace
         UNSCOPED_INFO("the error's line, the script's");
         CHECK(at.line == 4);
         UNSCOPED_INFO("in the script");
-        REQUIRE(at.file.empty());
+        CHECK(at.file.empty());
         const ALOutputView::Entry& entry = last();
         UNSCOPED_INFO("a link to it");
         CHECK(entry.link);
@@ -421,7 +410,7 @@ namespace
         {
             INFO("the script");
             CHECK(studio.went[0].ref == ALScriptRef(object, item));
-            REQUIRE(studio.went[0].file.empty());
+            CHECK(studio.went[0].file.empty());
         }
         UNSCOPED_INFO("at the error's line");
         CHECK(studio.went[0].line == 4);
@@ -450,7 +439,7 @@ namespace
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: a run's line past the envelope's lines maps back through the code", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out    = make();
+        ALScriptOutputPane& out    = require_pane();
         const LLUUID        object = fresh();
         const LLUUID        item   = fresh();
         ALSourceMap map;
@@ -484,12 +473,12 @@ namespace
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: an error the filters hide is not unread", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out   = make();
+        ALScriptOutputPane& out   = require_pane();
         const LLUUID        lamp  = fresh();
         const LLUUID        crate = fresh();
         out.heard(said(lamp, "Lamp", "lamp speaks"));
         out.heard(said(crate, "Crate", "crate speaks"));
-        whose(lamp.asString());
+        require_whose(lamp.asString());
         out.heard(failed(crate, fresh(), "crate.lsl", "Math Error", -1));
         {
             INFO("a stranger's, hidden: not unread");
@@ -507,7 +496,7 @@ namespace
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: what objects say aloud or to the agent or in IMs gets its own kind", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out  = make();
+        ALScriptOutputPane& out  = require_pane();
         const LLUUID        lamp = fresh();
         Event               aloud = said(lamp, "Lamp", "hello", Event::Channel::Said);
         aloud.primName            = "Bulb";
@@ -515,31 +504,28 @@ namespace
         out.heard(said(lamp, "Lamp", "just you", Event::Channel::SaidTo));
         out.heard(said(lamp, "Lamp", "an IM", Event::Channel::Instant));
         const auto& entries = out.view()->entries();
-        UNSCOPED_INFO("three");
         REQUIRE(entries.size() == size_t(3));
         UNSCOPED_INFO("the prim that spoke, after its object");
         CHECK(entries[0].source == std::string("Lamp \xE2\x96\xB8 Bulb"));
-        UNSCOPED_INFO("said");
         CHECK(entries[0].kind == window.services().words("KindSaid"));
         UNSCOPED_INFO("said to the agent");
         CHECK(entries[1].kind == window.services().words("KindSaidTo"));
         UNSCOPED_INFO("an IM");
         CHECK(entries[2].kind == window.services().words("KindInstant"));
-        whose("mine");
+        require_whose("mine");
         UNSCOPED_INFO("the agent's own, all of them");
-        REQUIRE(shownTexts().size() == size_t(3));
-        whose("");
+        CHECK(shownTexts().size() == size_t(3));
+        require_whose("");
         out.showKind("said");
         UNSCOPED_INFO("aloud and to the agent");
         CHECK(shown() == std::string("|hello|just you"));
         out.showKind("im");
-        UNSCOPED_INFO("IMs");
         CHECK(shown() == std::string("|an IM"));
     }
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: the controls row keeps buttons right and narrows the lists first", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out   = make();
+        ALScriptOutputPane& out   = require_pane();
         const LLRect        whose = out.getChild<LLView>("output_filter")->getRect();
         const LLRect        kind  = out.getChild<LLView>("output_kind")->getRect();
         const auto          row   = [&]() {
@@ -594,7 +580,7 @@ namespace
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: a lone CR breaks a line and links follow it to the shown line", "[ALScriptOutputPane]")
     {
-        ALScriptOutputPane& out    = make();
+        ALScriptOutputPane& out    = require_pane();
         const LLUUID        object = fresh();
         const LLUUID        item   = fresh();
         Event               error  = failed(object, item, "Counter", "bad\rvalue", -1);

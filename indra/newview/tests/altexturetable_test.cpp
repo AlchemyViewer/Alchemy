@@ -87,7 +87,7 @@ namespace
             for (U32 i = 1; i <= count; ++i)
             {
                 Item* item = new Item(i);
-                UNSCOPED_INFO("fill insert");
+                CAPTURE(i);
                 REQUIRE(mTable.insert(key(i), item));
                 items.push_back(item);
             }
@@ -106,23 +106,15 @@ namespace
 
     // --- membership ----------------------------------------------------------
 
-    // An empty table answers every query without touching anything.
     TEST_CASE_METHOD(texturetable_data, "ALTextureTable: an empty table answers every query without touching anything", "[ALTextureTable]")
     {
-        UNSCOPED_INFO("size");
-        REQUIRE(mTable.size() == (size_t)0);
-        UNSCOPED_INFO("empty");
-        REQUIRE(mTable.empty());
-        UNSCOPED_INFO("find");
-        REQUIRE(mTable.find(key(1)) == nullptr);
-        UNSCOPED_INFO("erase");
-        REQUIRE(mTable.erase(key(1)).isNull());
-        UNSCOPED_INFO("window");
-        REQUIRE(window(4).size() == (size_t)0);
+        CHECK(mTable.size() == (size_t)0);
+        CHECK(mTable.empty());
+        CHECK(mTable.find(key(1)) == nullptr);
+        CHECK(mTable.erase(key(1)).isNull());
+        CHECK(window(4).size() == (size_t)0);
         mTable.rewind(3);
-        UNSCOPED_INFO("cursor");
         CHECK(mTable.cursor() == 0u);
-        UNSCOPED_INFO("consistent");
         CHECK(mTable.consistent());
     }
 
@@ -133,33 +125,25 @@ namespace
         mTable.reserve(8);
         std::vector<Item*> items = fill(3);
 
-        UNSCOPED_INFO("size");
         REQUIRE(mTable.size() == (size_t)3);
-        UNSCOPED_INFO("find 2");
         CHECK(mTable.find(key(2)) == items[1]);
-        UNSCOPED_INFO("find type");
-        REQUIRE(mTable.find(key(2, 1)) == nullptr);
-        UNSCOPED_INFO("contains");
+        UNSCOPED_INFO("the same id under another type is another key");
+        CHECK(mTable.find(key(2, 1)) == nullptr);
         CHECK(mTable.contains(key(3)));
         for (S32 i = 0; i < 3; ++i)
         {
-            UNSCOPED_INFO("index");
+            CAPTURE(i);
             REQUIRE(items[i]->getListIndex() == i);
-            UNSCOPED_INFO("position");
             REQUIRE(mTable[i] == items[i]);
-            UNSCOPED_INFO("one ref");
             REQUIRE(items[i]->getNumRefs() == 1);
         }
 
         U32 expected = 1;
         for (const LLPointer<Item>& item : mTable)
         {
-            UNSCOPED_INFO("iteration order");
             REQUIRE(item->mId == expected++);
         }
-        UNSCOPED_INFO("live");
         CHECK(Item::sLive == 3);
-        UNSCOPED_INFO("consistent");
         CHECK(mTable.consistent());
     }
 
@@ -172,52 +156,41 @@ namespace
         LLPointer<Item> other = new Item(9);
         UNSCOPED_INFO("duplicate key refused");
         CHECK_FALSE(mTable.insert(key(2), other));
-        UNSCOPED_INFO("size after key refusal");
-        REQUIRE(mTable.size() == (size_t)3);
+        CHECK(mTable.size() == (size_t)3);
         UNSCOPED_INFO("original kept");
         CHECK(mTable.find(key(2)) == items[1]);
-        UNSCOPED_INFO("refused item index");
         CHECK(other->getListIndex() == -1);
-        UNSCOPED_INFO("refused item refs");
         CHECK(other->getNumRefs() == 1);
 
-        UNSCOPED_INFO("second key refused");
+        UNSCOPED_INFO("an item already in a table refused under a new key");
         CHECK_FALSE(mTable.insert(key(9), items[0]));
-        UNSCOPED_INFO("second key absent");
-        REQUIRE(mTable.find(key(9)) == nullptr);
-        UNSCOPED_INFO("size after item refusal");
-        REQUIRE(mTable.size() == (size_t)3);
-        UNSCOPED_INFO("consistent");
+        CHECK(mTable.find(key(9)) == nullptr);
+        CHECK(mTable.size() == (size_t)3);
         CHECK(mTable.consistent());
     }
 
-    // Erasing the last item needs no patching and hands the reference back.
     TEST_CASE_METHOD(texturetable_data, "ALTextureTable: erasing the last item needs no patching and hands the reference back", "[ALTextureTable]")
     {
         std::vector<Item*> items = fill(3);
 
         {
             LLPointer<Item> removed = mTable.erase(key(3));
-            UNSCOPED_INFO("returned item");
-            CHECK(removed == items[2]);
+            REQUIRE(removed == items[2]);
             UNSCOPED_INFO("returned ref is the only one");
             CHECK(removed->getNumRefs() == 1);
-            UNSCOPED_INFO("removed index");
             CHECK(removed->getListIndex() == -1);
-            UNSCOPED_INFO("size");
-            REQUIRE(mTable.size() == (size_t)2);
-            UNSCOPED_INFO("gone");
-            REQUIRE(mTable.find(key(3)) == nullptr);
-            UNSCOPED_INFO("others untouched 0");
-            CHECK(items[0]->getListIndex() == 0);
-            UNSCOPED_INFO("others untouched 1");
-            CHECK(items[1]->getListIndex() == 1);
-            UNSCOPED_INFO("still live");
+            CHECK(mTable.size() == (size_t)2);
+            CHECK(mTable.find(key(3)) == nullptr);
+            {
+                INFO("others untouched");
+                CHECK(items[0]->getListIndex() == 0);
+                CHECK(items[1]->getListIndex() == 1);
+            }
+            UNSCOPED_INFO("still live while the returned ref is held");
             CHECK(Item::sLive == 3);
         }
         UNSCOPED_INFO("destroyed with the last ref");
         CHECK(Item::sLive == 2);
-        UNSCOPED_INFO("consistent");
         CHECK(mTable.consistent());
     }
 
@@ -228,9 +201,7 @@ namespace
         std::vector<Item*> items = fill(5);
 
         LLPointer<Item> removed = mTable.erase(key(2));
-        UNSCOPED_INFO("returned item");
         CHECK(removed == items[1]);
-        UNSCOPED_INFO("size");
         REQUIRE(mTable.size() == (size_t)4);
         UNSCOPED_INFO("last item fills the hole");
         CHECK(mTable[1] == items[4]);
@@ -238,31 +209,24 @@ namespace
         CHECK(items[4]->getListIndex() == 1);
         UNSCOPED_INFO("moved item still found");
         CHECK(mTable.find(key(5)) == items[4]);
-        UNSCOPED_INFO("erased key gone");
-        REQUIRE(mTable.find(key(2)) == nullptr);
-        UNSCOPED_INFO("unmoved 0");
-        CHECK(items[0]->getListIndex() == 0);
-        UNSCOPED_INFO("unmoved 2");
-        CHECK(items[2]->getListIndex() == 2);
-        UNSCOPED_INFO("unmoved 3");
-        CHECK(items[3]->getListIndex() == 3);
-        UNSCOPED_INFO("consistent");
+        CHECK(mTable.find(key(2)) == nullptr);
+        {
+            INFO("the others unmoved");
+            CHECK(items[0]->getListIndex() == 0);
+            CHECK(items[2]->getListIndex() == 2);
+            CHECK(items[3]->getListIndex() == 3);
+        }
         CHECK(mTable.consistent());
     }
 
-    // An absent key erases nothing.
     TEST_CASE_METHOD(texturetable_data, "ALTextureTable: an absent key erases nothing", "[ALTextureTable]")
     {
         std::vector<Item*> items = fill(3);
-        UNSCOPED_INFO("null");
-        REQUIRE(mTable.erase(key(42)).isNull());
-        UNSCOPED_INFO("null by type");
-        REQUIRE(mTable.erase(key(2, 1)).isNull());
-        UNSCOPED_INFO("size");
-        REQUIRE(mTable.size() == (size_t)3);
-        UNSCOPED_INFO("live");
+        CHECK(mTable.erase(key(42)).isNull());
+        UNSCOPED_INFO("a present id under another type");
+        CHECK(mTable.erase(key(2, 1)).isNull());
+        CHECK(mTable.size() == (size_t)3);
         CHECK(Item::sLive == 3);
-        UNSCOPED_INFO("consistent");
         CHECK(mTable.consistent());
     }
 
@@ -274,43 +238,32 @@ namespace
         mTable.erase(key(2));
 
         Item* added = new Item(6);
-        UNSCOPED_INFO("insert");
         CHECK(mTable.insert(key(6), added));
         UNSCOPED_INFO("at the end");
         CHECK(added->getListIndex() == 3);
-        UNSCOPED_INFO("size");
-        REQUIRE(mTable.size() == (size_t)4);
-        UNSCOPED_INFO("find");
+        CHECK(mTable.size() == (size_t)4);
         CHECK(mTable.find(key(6)) == added);
-        UNSCOPED_INFO("consistent");
         CHECK(mTable.consistent());
     }
 
     // --- the round-robin window ----------------------------------------------
 
-    // Consecutive windows continue from the cursor and wrap.
     TEST_CASE_METHOD(texturetable_data, "ALTextureTable: consecutive windows continue from the cursor and wrap", "[ALTextureTable]")
     {
         fill(5);
-        UNSCOPED_INFO("first");
         CHECK(window(2) == ids({ 1, 2 }));
-        UNSCOPED_INFO("second");
         CHECK(window(2) == ids({ 3, 4 }));
         UNSCOPED_INFO("wraps");
         CHECK(window(2) == ids({ 5, 1 }));
-        UNSCOPED_INFO("cursor");
         CHECK(mTable.cursor() == 1u);
     }
 
-    // A window larger than the table visits every item once.
     TEST_CASE_METHOD(texturetable_data, "ALTextureTable: a window larger than the table visits every item once", "[ALTextureTable]")
     {
         fill(5);
         std::vector<U32> seen;
         U32 visited = mTable.visitWindow(10, [&](Item* item) { seen.push_back(item->mId); });
-        UNSCOPED_INFO("visited");
         CHECK(visited == 5u);
-        UNSCOPED_INFO("each once");
         CHECK(seen == ids({ 1, 2, 3, 4, 5 }));
         UNSCOPED_INFO("cursor back at start");
         CHECK(mTable.cursor() == 0u);
@@ -322,19 +275,15 @@ namespace
     {
         fill(5);
         window(4);
-        UNSCOPED_INFO("cursor");
         CHECK(mTable.cursor() == 4u);
 
         mTable.erase(key(1));
         mTable.erase(key(2));
-        UNSCOPED_INFO("size");
-        REQUIRE(mTable.size() == (size_t)3);
-        UNSCOPED_INFO("consistent");
+        CHECK(mTable.size() == (size_t)3);
         CHECK(mTable.consistent());
 
         UNSCOPED_INFO("restarts");
         CHECK(window(1) == ids({ 5 }));
-        UNSCOPED_INFO("cursor after restart");
         CHECK(mTable.cursor() == 1u);
     }
 
@@ -345,7 +294,6 @@ namespace
         fill(5);
         window(4);
         mTable.rewind(2);
-        UNSCOPED_INFO("cursor");
         CHECK(mTable.cursor() == 2u);
         UNSCOPED_INFO("revisits");
         CHECK(window(1) == ids({ 3 }));
@@ -363,33 +311,29 @@ namespace
     TEST_CASE_METHOD(texturetable_data, "ALTextureTable: after an erase between windows the moved item still comes around", "[ALTextureTable]")
     {
         fill(6);
-        UNSCOPED_INFO("first");
         CHECK(window(3) == ids({ 1, 2, 3 }));
 
         mTable.erase(key(2));
-        UNSCOPED_INFO("consistent");
         CHECK(mTable.consistent());
 
         std::vector<U32> second = window(3);
-        UNSCOPED_INFO("second");
         CHECK(second == ids({ 4, 5, 1 }));
         for (U32 id : second)
         {
-            UNSCOPED_INFO("member");
+            CAPTURE(id);
             REQUIRE(mTable.find(key(id)) != nullptr);
         }
         UNSCOPED_INFO("moved item comes around");
         CHECK(window(3) == ids({ 6, 3, 4 }));
     }
 
-    // Visiting hands out raw pointers and takes no references.
     TEST_CASE_METHOD(texturetable_data, "ALTextureTable: visiting hands out raw pointers and takes no references", "[ALTextureTable]")
     {
         std::vector<Item*> items = fill(3);
         window(3);
         for (Item* item : items)
         {
-            UNSCOPED_INFO("refs after visit");
+            CAPTURE(item->mId);
             REQUIRE(item->getNumRefs() == 1);
         }
     }
@@ -405,26 +349,19 @@ namespace
         window(2);
 
         mTable.clear();
-        UNSCOPED_INFO("size");
-        REQUIRE(mTable.size() == (size_t)0);
-        UNSCOPED_INFO("cursor");
+        CHECK(mTable.size() == (size_t)0);
         CHECK(mTable.cursor() == 0u);
-        UNSCOPED_INFO("kept index");
         CHECK(kept->getListIndex() == -1);
-        UNSCOPED_INFO("kept refs");
         CHECK(kept->getNumRefs() == 1);
         UNSCOPED_INFO("others destroyed");
         CHECK(Item::sLive == 1);
-        UNSCOPED_INFO("consistent");
         CHECK(mTable.consistent());
 
         UNSCOPED_INFO("reinsert after clear");
         CHECK(mTable.insert(key(2), kept));
-        UNSCOPED_INFO("reinserted index");
         CHECK(kept->getListIndex() == 0);
     }
 
-    // Destroying the table releases its references.
     TEST_CASE_METHOD(texturetable_data, "ALTextureTable: destroying the table releases its references", "[ALTextureTable]")
     {
         {
@@ -433,10 +370,8 @@ namespace
             {
                 local.insert(key(i), new Item(i));
             }
-            UNSCOPED_INFO("live");
             CHECK(Item::sLive == 3);
         }
-        UNSCOPED_INFO("released");
         CHECK(Item::sLive == 0);
     }
 
@@ -453,24 +388,23 @@ namespace
         CHECK(mTable.consistent());
         for (U32 i = 1; i <= count; i += 997)
         {
-            UNSCOPED_INFO("found after growth");
+            CAPTURE(i);
             REQUIRE(mTable.find(key(i)) == items[i - 1]);
         }
 
         // erase every third item, then look for all of them
         for (U32 i = 3; i <= count; i += 3)
         {
-            UNSCOPED_INFO("erase");
+            CAPTURE(i);
             REQUIRE(mTable.erase(key(i)).notNull());
         }
-        UNSCOPED_INFO("size after erases");
-        REQUIRE(mTable.size() == (size_t)(count - count / 3));
+        CHECK(mTable.size() == (size_t)(count - count / 3));
         UNSCOPED_INFO("consistent after erases");
         CHECK(mTable.consistent());
         for (U32 i = 1; i <= count; ++i)
         {
             Item* found = mTable.find(key(i));
-            UNSCOPED_INFO("erased gone, kept found");
+            CAPTURE(i);
             REQUIRE(((i % 3 == 0) ? found == nullptr : found == items[i - 1]));
         }
 
@@ -478,12 +412,10 @@ namespace
         reserved.reserve(count);
         for (U32 i = 1; i <= 100; ++i)
         {
-            UNSCOPED_INFO("reserved insert");
+            CAPTURE(i);
             REQUIRE(reserved.insert(key(i), new Item(i)));
         }
-        UNSCOPED_INFO("reserved size");
-        REQUIRE(reserved.size() == (size_t)100);
-        UNSCOPED_INFO("reserved consistent");
+        CHECK(reserved.size() == (size_t)100);
         CHECK(reserved.consistent());
     }
 
@@ -498,7 +430,6 @@ namespace
 
         U32 made = 0;
         Item* hit = mTable.findOrInsert(key(2), [&]() { ++made; return new Item(99); });
-        UNSCOPED_INFO("hit returns existing");
         CHECK(hit == items[1]);
         UNSCOPED_INFO("maker not called on hit");
         CHECK(made == 0u);
@@ -513,29 +444,24 @@ namespace
         CHECK(made == 1u);
         UNSCOPED_INFO("one ref from the table");
         CHECK(fresh->getNumRefs() == 1);
-        UNSCOPED_INFO("position");
         CHECK(fresh->getListIndex() == 2);
-        UNSCOPED_INFO("found afterwards");
         CHECK(mTable.find(key(3)) == fresh);
-        UNSCOPED_INFO("size");
-        REQUIRE(mTable.size() == (size_t)3);
+        CHECK(mTable.size() == (size_t)3);
 
         Item* none = mTable.findOrInsert(key(4), [&]() -> Item* { ++made; return nullptr; });
         UNSCOPED_INFO("null maker yields null");
-        REQUIRE(none == nullptr);
+        CHECK(none == nullptr);
         UNSCOPED_INFO("null maker leaves no key");
         CHECK_FALSE(mTable.contains(key(4)));
-        UNSCOPED_INFO("size after null maker");
-        REQUIRE(mTable.size() == (size_t)3);
+        CHECK(mTable.size() == (size_t)3);
 
         LLPointer<Item> other = new Item(5);
         mTable.insert(key(5), other);
         Item* dup = mTable.findOrInsert(key(6), [&]() { return other.get(); });
         UNSCOPED_INFO("item already in a table refused");
-        REQUIRE(dup == nullptr);
+        CHECK(dup == nullptr);
         UNSCOPED_INFO("refused key absent");
         CHECK_FALSE(mTable.contains(key(6)));
-        UNSCOPED_INFO("consistent");
         CHECK(mTable.consistent());
     }
 }

@@ -140,14 +140,14 @@ namespace
         }
 
         // A save of a tab's item, so long ago.
-        void saved(const Doc& doc, const std::string& text, F64 ago, const LLUUID& asset = LLUUID::generateNewID())
+        void require_saved(const Doc& doc, const std::string& text, F64 ago, const LLUUID& asset = LLUUID::generateNewID())
         {
             ALSavedText one;
             one.key   = ALScriptStudioHistory::keyOf(doc);
             one.text  = text;
             one.when  = LLDate(LLDate::now().secondsSinceEpoch() - ago);
             one.asset = asset;
-            UNSCOPED_INFO("kept");
+            INFO("kept in the history");
             REQUIRE(history->keep(one));
         }
     };
@@ -185,30 +185,28 @@ namespace
         CHECK(services().statuses.back() == said("HistoryNone", args));
 
         const LLUUID current = LLUUID::generateNewID();
-        saved(doc, "12345", 300.0);
-        saved(doc, "1234567", 200.0);
-        saved(doc, "123", 100.0, current);
+        require_saved(doc, "12345", 300.0);
+        require_saved(doc, "1234567", 200.0);
+        require_saved(doc, "123", 100.0, current);
         doc.assetId = current;
         unit.show(doc);
-        UNSCOPED_INFO("three");
         REQUIRE(studio.candidates.size() == 3U);
-        UNSCOPED_INFO("titled");
         CHECK(studio.picked == said("HistoryTitle", args));
         const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
-        UNSCOPED_INFO("labelled by when");
         CHECK(studio.candidates[0].label == ALRecoveryEntry::sayWhen(listed[0].when));
         const std::string& newest = studio.candidates[0].detail;
-        UNSCOPED_INFO("its length" + newest);
-        REQUIRE(newest.find(services().counted("HistoryBytes", 3)) != std::string::npos);
-        UNSCOPED_INFO("shorter than the one before" + newest);
-        REQUIRE(newest.find(services().counted("HistoryShorter", 4)) != std::string::npos);
-        UNSCOPED_INFO("saved now" + newest);
-        REQUIRE(newest.find(said("HistoryCurrent")) != std::string::npos);
+        {
+            CAPTURE(newest);
+            REQUIRE(newest.find(services().counted("HistoryBytes", 3)) != std::string::npos);
+            REQUIRE(newest.find(services().counted("HistoryShorter", 4)) != std::string::npos);
+            REQUIRE(newest.find(said("HistoryCurrent")) != std::string::npos);
+        }
         const std::string& middle = studio.candidates[1].detail;
-        UNSCOPED_INFO("longer" + middle);
-        REQUIRE(middle.find(services().counted("HistoryLonger", 2)) != std::string::npos);
-        UNSCOPED_INFO("not saved now" + middle);
-        REQUIRE(middle.find(said("HistoryCurrent")) == std::string::npos);
+        {
+            CAPTURE(middle);
+            REQUIRE(middle.find(services().counted("HistoryLonger", 2)) != std::string::npos);
+            REQUIRE(middle.find(said("HistoryCurrent")) == std::string::npos);
+        }
         {
             INFO("the first kept says nothing of one before");
             REQUIRE(studio.candidates[2].detail.find(said("HistorySameLength")) == std::string::npos);
@@ -223,7 +221,7 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc = tab("door", "the text now");
-        saved(doc, "the text then", 100.0);
+        require_saved(doc, "the text then", 100.0);
         unit.show(doc);
         studio.choose(studio.candidates[0].value);
         UNSCOPED_INFO("compared");
@@ -243,7 +241,7 @@ namespace
         CHECK(studio.notices == 1);
 
         Doc& loading = tab("lamp", "", false);
-        saved(loading, "a lamp's text", 50.0);
+        require_saved(loading, "a lamp's text", 50.0);
         unit.show(loading);
         studio.choose(studio.candidates[0].value);
         UNSCOPED_INFO("not compared yet");
@@ -269,7 +267,6 @@ namespace
         LLStringUtil::format_map_t args;
         args["[WHEN]"]                         = ALRecoveryEntry::sayWhen(shown.when);
         const ALScriptNoticeBar::Notice notice = ALScriptStudioOrphans::noticeFor(&doc, services());
-        UNSCOPED_INFO("said");
         CHECK(notice.text == said("NoticeHistory", args));
         UNSCOPED_INFO("offered back");
         CHECK(notice.buttons[0].first == std::string("restore_saved"));
@@ -300,7 +297,6 @@ namespace
             return out;
         };
         const std::vector<ALQuickOpen::Candidate> listed = ALScriptStudioHistory::candidatesOf(saves, saves[0].asset, words, joined);
-        UNSCOPED_INFO("each");
         REQUIRE(listed.size() == 3U);
         UNSCOPED_INFO("the newest");
         CHECK(listed[0].detail == std::string("HistoryBytes(10) + HistorySameLength + HistoryCurrent"));
@@ -308,7 +304,6 @@ namespace
         CHECK(listed[1].detail == std::string("HistoryBytes(10) + HistoryShorter(2)"));
         UNSCOPED_INFO("the first says only its length");
         CHECK(listed[2].detail == std::string("HistoryBytes(12)"));
-        UNSCOPED_INFO("by when");
         CHECK(listed[2].label == ALRecoveryEntry::sayWhen(saves[2].when));
         UNSCOPED_INFO("valued by place");
         CHECK(listed[1].value == std::string("1"));
@@ -322,9 +317,9 @@ namespace
         }
         studio.host = window.floater;
         Doc& doc    = tab("door", "now\nsame");
-        saved(doc, "first\nsame", 300.0);
-        saved(doc, "second\nsame", 200.0);
-        saved(doc, "third\nsame", 100.0);
+        require_saved(doc, "first\nsame", 300.0);
+        require_saved(doc, "second\nsame", 200.0);
+        require_saved(doc, "third\nsame", 100.0);
         unit.show(doc);
         // Listed newest first: the middle one.
         studio.choose(studio.candidates[1].value);
@@ -333,7 +328,6 @@ namespace
         CHECK(view.bar()->getChild<LLView>("versions")->getVisible());
         UNSCOPED_INFO("at the middle of three, oldest first");
         CHECK(view.bar()->versionShown() == 1);
-        UNSCOPED_INFO("the second");
         CHECK(view.leftText() == std::string("second\nsame"));
 
         const S32 notices = studio.notices;
@@ -364,7 +358,7 @@ namespace
         ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
         {
             INFO("the oldest");
-            REQUIRE(view.leftText() == "first\nsame");
+            CHECK(view.leftText() == "first\nsame");
             CHECK(doc.historyShown->text == "first\nsame");
             CHECK(view.bar()->versionShown() == 0);
         }
@@ -378,8 +372,8 @@ namespace
         }
         studio.host  = window.floater;
         Doc& loading = tab("lamp", "", false);
-        saved(loading, "one", 200.0);
-        saved(loading, "two", 100.0);
+        require_saved(loading, "one", 200.0);
+        require_saved(loading, "two", 100.0);
         unit.show(loading);
         studio.choose(studio.candidates[0].value);
         {
@@ -396,12 +390,12 @@ namespace
         pending.shown(loading);
         {
             INFO("the slider, at the newest");
-            REQUIRE(loading.compareView->bar()->getChild<LLView>("versions")->getVisible());
+            CHECK(loading.compareView->bar()->getChild<LLView>("versions")->getVisible());
             CHECK(loading.compareView->bar()->versionShown() == 1);
         }
 
         Doc& alone = tab("gate", "now");
-        saved(alone, "only", 100.0);
+        require_saved(alone, "only", 100.0);
         unit.show(alone);
         studio.choose(studio.candidates[0].value);
         {
@@ -419,8 +413,8 @@ namespace
         }
         studio.host = window.floater;
         Doc& doc    = tab("door", "now");
-        saved(doc, "older", 200.0);
-        saved(doc, "newer", 100.0);
+        require_saved(doc, "older", 200.0);
+        require_saved(doc, "newer", 100.0);
         unit.show(doc);
         studio.choose(studio.candidates[0].value);
         ALDiffView& view = *doc.compareView;
@@ -434,7 +428,6 @@ namespace
         LLStringUtil::format_map_t args;
         args["[NAME]"] = "door";
         args["[WHEN]"] = ALRecoveryEntry::sayWhen(listed[1].when);
-        UNSCOPED_INFO("said");
         CHECK(services().statuses.back() == said("HistoryUnreadable", args));
         UNSCOPED_INFO("the slider put back");
         CHECK(view.bar()->versionShown() == 1);
@@ -453,9 +446,9 @@ namespace
         }
         studio.host = window.floater;
         Doc& doc    = tab("door", "now");
-        saved(doc, "first", 300.0);
-        saved(doc, "second", 200.0);
-        saved(doc, "third", 100.0);
+        require_saved(doc, "first", 300.0);
+        require_saved(doc, "second", 200.0);
+        require_saved(doc, "third", 100.0);
         unit.show(doc);
         studio.choose(studio.candidates[1].value);
         ALDiffView&  view  = *doc.compareView;
@@ -470,7 +463,7 @@ namespace
         press("older");
         {
             INFO("the oldest again, as it was read");
-            REQUIRE(view.leftText() == "first");
+            CHECK(view.leftText() == "first");
             CHECK(view.bar()->versionShown() == 0);
             CHECK(doc.historyShown->text == "first");
         }
@@ -484,14 +477,14 @@ namespace
         }
         studio.host = window.floater;
         Doc& doc    = tab("door", "now");
-        saved(doc, "first", 300.0);
-        saved(doc, "second", 200.0);
+        require_saved(doc, "first", 300.0);
+        require_saved(doc, "second", 200.0);
         unit.show(doc);
         studio.choose(studio.candidates[0].value);
         ALDiffView& view = *doc.compareView;
         {
             INFO("the slider");
-            REQUIRE(view.bar()->getChild<LLView>("versions")->getVisible());
+            CHECK(view.bar()->getChild<LLView>("versions")->getVisible());
             CHECK(view.bar()->versionCount() == 2);
         }
         // As leaving the comparison does: Escape, or a keystroke typed into

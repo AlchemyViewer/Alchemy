@@ -55,10 +55,10 @@ namespace
 
         LLPanel* tab() const { return floater ? floater->findChild<LLPanel>("weights_tab", true) : nullptr; }
         // The tab as the skin built it, in its window's words.
-        ALScriptWeightsPane& weights() const
+        ALScriptWeightsPane& require_pane() const
         {
             ALScriptWeightsPane* pane = floater->findChild<ALScriptWeightsPane>("weights_tab", true);
-            UNSCOPED_INFO("the skin builds the tab as the pane");
+            INFO("the skin builds the tab as the pane");
             REQUIRE(pane != nullptr);
             return *pane;
         }
@@ -146,12 +146,11 @@ namespace
         }
         UNSCOPED_INFO("the studio's window builds with its Weights tab");
         REQUIRE(tab() != nullptr);
-        ALScriptWeightsPane& pane = weights();
+        ALScriptWeightsPane& pane = require_pane();
         pane.show(lsl());
         ALPaneList* targets = list("weights_targets");
         ALPaneList* parts   = list("weights_parts");
-        UNSCOPED_INFO("three targets");
-        CHECK(targets->getItemCount() == 3);
+        REQUIRE(targets->getItemCount() == 3);
         UNSCOPED_INFO("its own first");
         CHECK(cell(targets->getAllData()[0], 0) == std::string("LSL (LSO)"));
         UNSCOPED_INFO("its code");
@@ -168,23 +167,22 @@ namespace
             CHECK(targets->getFirstSelected()->getValue().asInteger() == S32(ALScriptWeight::Target::LSO));
         }
 
-        UNSCOPED_INFO("its parts");
         CHECK(parts->getItemCount() == 5);
         const std::vector<std::string> names = column(parts, 0);
         UNSCOPED_INFO("the registers in words" + joined(names));
-        REQUIRE(std::find(names.begin(), names.end(), "Registers") != names.end());
+        CHECK(std::find(names.begin(), names.end(), "Registers") != names.end());
         UNSCOPED_INFO("a handler in its state" + joined(names));
-        REQUIRE(std::find(names.begin(), names.end(), "touch_start in default") != names.end());
+        CHECK(std::find(names.begin(), names.end(), "touch_start in default") != names.end());
         const std::vector<std::string> lines = column(parts, 5);
         UNSCOPED_INFO("an include's part at the include's line" + joined(lines));
-        REQUIRE(std::find(lines.begin(), lines.end(), "lib.lsl:1") != lines.end());
+        CHECK(std::find(lines.begin(), lines.end(), "lib.lsl:1") != lines.end());
         UNSCOPED_INFO("the script's own at its line" + joined(lines));
-        REQUIRE(std::find(lines.begin(), lines.end(), "8") != lines.end());
+        CHECK(std::find(lines.begin(), lines.end(), "8") != lines.end());
         const std::string head = floater->findChild<LLTextBox>("weights_head", true)->getText();
         {
             INFO("the head says whose and on what: " + head);
-            REQUIRE(head.find("Door") != std::string::npos);
-            REQUIRE(head.find("LSO") != std::string::npos);
+            CHECK(head.find("Door") != std::string::npos);
+            CHECK(head.find("LSO") != std::string::npos);
         }
     }
 
@@ -196,7 +194,7 @@ namespace
         {
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ALScriptWeightsPane& pane = weights();
+        ALScriptWeightsPane& pane = require_pane();
         pane.show(lsl());
         ALPaneList* targets = list("weights_targets");
         ALPaneList* parts   = list("weights_parts");
@@ -205,17 +203,13 @@ namespace
         std::optional<ALScriptWeightsPane::Place> place = pane.chosenPlace(parts);
         UNSCOPED_INFO("the include's function has a place");
         REQUIRE(place.has_value());
-        UNSCOPED_INFO("in the include");
         CHECK(place->file == std::string("disk:/lib.lsl"));
-        UNSCOPED_INFO("by its name");
         CHECK(place->fileName == std::string("lib.lsl"));
-        UNSCOPED_INFO("at its line");
         CHECK(place->line == 0);
-        UNSCOPED_INFO("and column");
         CHECK(place->column == 4);
         parts->selectByValue(LLSD(0));
         UNSCOPED_INFO("the registers are nowhere");
-        REQUIRE_FALSE(pane.chosenPlace(parts));
+        CHECK_FALSE(pane.chosenPlace(parts));
 
         targets->selectByValue(LLSD(S32(ALScriptWeight::Target::Mono)));
         targets->onCommit();
@@ -241,7 +235,7 @@ namespace
         {
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ALScriptWeightsPane& pane = weights();
+        ALScriptWeightsPane& pane = require_pane();
         ALScriptWeightsPane::Shown shown = lsl();
         ALScriptWeight             saved = shown.weights[0];
         saved.total                      = 4000;
@@ -288,26 +282,21 @@ namespace
         }
     }
 
-    // Nothing to show says why, and holds nothing to choose.
     TEST_CASE_METHOD(alscriptweightspane_data, "ALScriptWeightsPane: showNothing says why and holds nothing to choose", "[ALScriptWeightsPane]")
     {
         if (!ui.ok())
         {
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ALScriptWeightsPane& pane = weights();
+        ALScriptWeightsPane& pane = require_pane();
         pane.show(lsl());
         pane.showNothing("Nothing open to weigh.");
-        UNSCOPED_INFO("no targets");
         CHECK(list("weights_targets")->getItemCount() == 0);
-        UNSCOPED_INFO("no parts");
         CHECK(list("weights_parts")->getItemCount() == 0);
-        UNSCOPED_INFO("nothing chosen");
-        REQUIRE_FALSE(pane.chosenPlace(pane.partsList()));
-        UNSCOPED_INFO("why");
+        CHECK_FALSE(pane.chosenPlace(pane.partsList()));
         CHECK(floater->findChild<LLTextBox>("weights_head", true)->getText() == std::string("Nothing open to weigh."));
         UNSCOPED_INFO("and whose it is forgotten");
-        REQUIRE(pane.shownId().empty());
+        CHECK(pane.shownId().empty());
     }
 
     // Anonymous functions share an empty name: each is matched to the one
@@ -319,7 +308,7 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         using Kind = ALScriptWeight::Part::Kind;
-        ALScriptWeightsPane&       pane = weights();
+        ALScriptWeightsPane&       pane = require_pane();
         ALScriptWeightsPane::Shown shown;
         shown.id   = "script-3";
         shown.name = "Handlers";
@@ -333,7 +322,7 @@ namespace
         shown.saved   = { slua };
         pane.show(shown);
         std::vector<std::string> changes = column(list("weights_parts"), 4);
-        UNSCOPED_INFO("nothing changed" + joined(changes));
+        UNSCOPED_INFO("nothing changed");
         CHECK(joined(changes) == std::string("|||"));
         // The middle one heavier, and one added after them.
         ALScriptWeight now = slua;
@@ -342,7 +331,7 @@ namespace
         shown.weights = { now };
         pane.show(shown);
         changes = column(list("weights_parts"), 4);
-        UNSCOPED_INFO("the middle one, and one new" + joined(changes));
+        UNSCOPED_INFO("the middle one, and one new");
         CHECK(joined(changes) == std::string("||+50||new"));
     }
 
@@ -353,7 +342,7 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         using Kind = ALScriptWeight::Part::Kind;
-        ALScriptWeightsPane&       pane = weights();
+        ALScriptWeightsPane&       pane = require_pane();
         ALScriptWeightsPane::Shown shown;
         shown.id   = "script-6";
         shown.name = "Handlers";
@@ -368,9 +357,9 @@ namespace
         pane.show(shown);
         const std::string names = joined(column(list("weights_parts"), 0));
         UNSCOPED_INFO("the handler by its event: " + names);
-        REQUIRE(names.find("touch_start") != std::string::npos);
+        CHECK(names.find("touch_start") != std::string::npos);
         UNSCOPED_INFO("the other with none: " + names);
-        REQUIRE(names.find(window.find<LLPanel>("weights_tab")->getString("WeightsPartUnnamed")) != std::string::npos);
+        CHECK(names.find(window.find<LLPanel>("weights_tab")->getString("WeightsPartUnnamed")) != std::string::npos);
     }
 
     // What the region reserves for the script's object, where it has said:
@@ -383,12 +372,12 @@ namespace
         {
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ALScriptWeightsPane&       pane  = weights();
+        ALScriptWeightsPane&       pane  = require_pane();
         ALScriptWeightsPane::Shown shown = lsl();
         LLTextBox*                 head  = floater->findChild<LLTextBox>("weights_head", true);
         pane.show(shown);
         UNSCOPED_INFO("nothing of the region");
-        REQUIRE(head->getText().find("region") == std::string::npos);
+        CHECK(head->getText().find("region") == std::string::npos);
         ALScriptRegionUsage::Usage reserved;
         reserved.memory = 131072;
         reserved.when   = LLDate(1.8e9);
@@ -397,32 +386,32 @@ namespace
         pane.show(shown);
         const std::string said = head->getText();
         UNSCOPED_INFO("reserved, in KB" + said);
-        REQUIRE(said.find("reserves 128 KB for all its scripts") != std::string::npos);
+        CHECK(said.find("reserves 128 KB for all its scripts") != std::string::npos);
         UNSCOPED_INFO("as of when" + said);
-        REQUIRE(said.find(ALRecoveryEntry::sayWhen(reserved.when)) != std::string::npos);
+        CHECK(said.find(ALRecoveryEntry::sayWhen(reserved.when)) != std::string::npos);
         UNSCOPED_INFO("no URLs said where there are none" + said);
-        REQUIRE(said.find("URLs") == std::string::npos);
+        CHECK(said.find("URLs") == std::string::npos);
         UNSCOPED_INFO("the tip says how it counts");
-        REQUIRE(head->getToolTip().find("64 KB for Mono") != std::string::npos);
+        CHECK(head->getToolTip().find("64 KB for Mono") != std::string::npos);
         UNSCOPED_INFO("and nothing of time unasked");
-        REQUIRE(head->getToolTip().find("Top Scripts") == std::string::npos);
+        CHECK(head->getToolTip().find("Top Scripts") == std::string::npos);
         shown.region->urls = 3;
         shown.id           = "script-3";
         pane.show(shown);
         UNSCOPED_INFO("and URLs where there are" + head->getText());
-        REQUIRE(head->getText().find("128 KB and 3 URLs") != std::string::npos);
+        CHECK(head->getText().find("128 KB and 3 URLs") != std::string::npos);
         UNSCOPED_INFO("no time where the region said none" + head->getText());
-        REQUIRE(head->getText().find("ms of the region") == std::string::npos);
+        CHECK(head->getText().find("ms of the region") == std::string::npos);
         shown.region->time     = 0.125f;
         shown.region->timeWhen = LLDate(1.8e9);
         shown.id               = "script-4";
         pane.show(shown);
         UNSCOPED_INFO("its time, said to an estate manager" + head->getText());
-        REQUIRE(head->getText().find("take 0.125 ms of the region's time") != std::string::npos);
+        CHECK(head->getText().find("take 0.125 ms of the region's time") != std::string::npos);
         {
             INFO("the tip says how both are counted");
-            REQUIRE(head->getToolTip().find("64 KB for Mono") != std::string::npos);
-            REQUIRE(head->getToolTip().find("Top Scripts") != std::string::npos);
+            CHECK(head->getToolTip().find("64 KB for Mono") != std::string::npos);
+            CHECK(head->getToolTip().find("Top Scripts") != std::string::npos);
         }
         ALScriptRegionUsage::Usage timed;
         timed.time     = 0.5f;
@@ -432,13 +421,13 @@ namespace
         pane.show(shown);
         {
             INFO("time alone: no memory said" + head->getText());
-            REQUIRE(head->getText().find("reserves") == std::string::npos);
-            REQUIRE(head->getText().find("take 0.500 ms") != std::string::npos);
+            CHECK(head->getText().find("reserves") == std::string::npos);
+            CHECK(head->getText().find("take 0.500 ms") != std::string::npos);
         }
         {
             INFO("and the tip of the time alone");
-            REQUIRE(head->getToolTip().find("64 KB for Mono") == std::string::npos);
-            REQUIRE(head->getToolTip().find("Top Scripts") != std::string::npos);
+            CHECK(head->getToolTip().find("64 KB for Mono") == std::string::npos);
+            CHECK(head->getToolTip().find("Top Scripts") != std::string::npos);
         }
     }
 
@@ -453,7 +442,7 @@ namespace
         }
         UNSCOPED_INFO("the studio's window builds with its Weights tab");
         REQUIRE(tab() != nullptr);
-        ALScriptWeightsPane& pane = weights();
+        ALScriptWeightsPane& pane = require_pane();
         ALScriptWeightsPane::Shown shown = lsl();
         shown.weights[2].compiled = true;
         shown.weights[2].error.clear();
@@ -462,11 +451,11 @@ namespace
         pane.show(shown);
         const std::string luau = floater->findChild<LLTextBox>("weights_head", true)->getText();
         UNSCOPED_INFO("said for LSL on Luau: " + luau);
-        REQUIRE(luau.find("records no lines") != std::string::npos);
+        CHECK(luau.find("records no lines") != std::string::npos);
         pane.show(lsl());
         const std::string lso = floater->findChild<LLTextBox>("weights_head", true)->getText();
         UNSCOPED_INFO("not for LSO: " + lso);
-        REQUIRE(lso.find("records no lines") == std::string::npos);
+        CHECK(lso.find("records no lines") == std::string::npos);
     }
 
     // A Luau target's strings beside its parts: the starts several share
@@ -479,7 +468,7 @@ namespace
         {
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ALScriptWeightsPane&       pane = weights();
+        ALScriptWeightsPane&       pane = require_pane();
         ALScriptWeightsPane::Shown shown;
         shown.id   = "script-2";
         shown.name = "Greeter";
@@ -516,13 +505,13 @@ namespace
             CHECK(strings->getParent()->getVisible());
         }
         UNSCOPED_INFO("a start, then each string");
-        CHECK(strings->getItemCount() == 5);
+        REQUIRE(strings->getItemCount() == 5);
         const std::vector<std::string> texts = column(strings, 0);
         {
             INFO("the start first: " + texts[0]);
             CHECK(texts[0].find("Shared start") == 0);
-            REQUIRE(texts[0].find("\"You have touched me, \"") != std::string::npos);
-            REQUIRE(texts[0].find("2 strings") != std::string::npos);
+            CHECK(texts[0].find("\"You have touched me, \"") != std::string::npos);
+            CHECK(texts[0].find("2 strings") != std::string::npos);
         }
         UNSCOPED_INFO("what it saves, as less");
         CHECK(column(strings, 1)[0] == std::string("-9"));
@@ -531,7 +520,7 @@ namespace
         UNSCOPED_INFO("at the first of them");
         CHECK(column(strings, 4)[0] == std::string("3"));
         UNSCOPED_INFO("then the heaviest first, a break shown as one");
-        REQUIRE(joined(texts).substr(joined({ texts[0] }).size()) ==
+        CHECK(joined(texts).substr(joined({ texts[0] }).size()) ==
                       std::string("|\"You have touched me, alpha\"|\"You have touched me, bravo\"|\"greet\"|\"x\\ny\""));
         UNSCOPED_INFO("each one's uses, a function's name said as one");
         CHECK(joined(column(strings, 2)) == std::string("|3|1|2|name|1"));
@@ -541,7 +530,7 @@ namespace
         {
             INFO("a string chosen: where it is first named");
             REQUIRE(place);
-            REQUIRE(place->file.empty());
+            CHECK(place->file.empty());
             CHECK(place->line == 2);
         }
         strings->selectByValue(LLSD(0));
@@ -552,7 +541,7 @@ namespace
             CHECK(place->line == 2);
         }
         UNSCOPED_INFO("not the parts' choice");
-        REQUIRE_FALSE(pane.chosenPlace(list("weights_parts")));
+        CHECK_FALSE(pane.chosenPlace(list("weights_parts")));
 
         // Kept chosen through a refill, by what it is.
         strings->selectByValue(LLSD(1));
@@ -570,13 +559,13 @@ namespace
         };
         {
             INFO("the start's strings named: " + tip(0));
-            REQUIRE(tip(0).find("\"You have touched me, alpha\"") != std::string::npos);
-            REQUIRE(tip(0).find("\"You have touched me, bravo\"") != std::string::npos);
+            CHECK(tip(0).find("\"You have touched me, alpha\"") != std::string::npos);
+            CHECK(tip(0).find("\"You have touched me, bravo\"") != std::string::npos);
         }
         UNSCOPED_INFO("a string of it says so: " + tip(1));
-        REQUIRE(tip(1).find("shares its start") != std::string::npos);
+        CHECK(tip(1).find("shares its start") != std::string::npos);
         UNSCOPED_INFO("one that is not, nothing: " + tip(4));
-        REQUIRE(tip(4).find("shares its start") == std::string::npos);
+        CHECK(tip(4).find("shares its start") == std::string::npos);
 
         // Since the save: a string not there then, new; a start by how its
         // saving moved, said as its bytes are, as less: saving more since,
@@ -608,19 +597,19 @@ namespace
         strings->selectByValue(LLSD(1));
         floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
         UNSCOPED_INFO("not for a string");
-        REQUIRE(kept.empty());
+        CHECK(kept.empty());
         // Nor in a script that cannot be written to.
         pane.setKeepStart([&](const std::string& start, const std::vector<std::string>&) { kept = start; }, []() { return false; });
         strings->selectByValue(LLSD(0));
         floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
         UNSCOPED_INFO("not where the script cannot be written to");
-        REQUIRE(kept.empty());
+        CHECK(kept.empty());
 
         // Nothing to show hides the list with the rest.
         pane.showNothing("Nothing open to weigh.");
         {
             INFO("hidden with nothing shown");
-            REQUIRE_FALSE(strings->getParent()->getVisible());
+            CHECK_FALSE(strings->getParent()->getVisible());
             CHECK(strings->getItemCount() == 0);
         }
         pane.show(shown);
@@ -631,7 +620,7 @@ namespace
         pane.show(lsl());
         {
             INFO("hidden for LSO");
-            REQUIRE_FALSE(strings->getParent()->getVisible());
+            CHECK_FALSE(strings->getParent()->getVisible());
             CHECK(strings->getItemCount() == 0);
         }
     }

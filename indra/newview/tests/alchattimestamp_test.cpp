@@ -41,9 +41,8 @@ TEST_CASE("alchattimestamp: each date and time form is cut with its spacing as t
                 const std::string message = "Example Resident: text with a colon: and [14:05:09]";
                 const std::string line    = prefix + message;
                 const size_t      length  = ALChatTimestamp::prefixLength(line);
-                UNSCOPED_INFO("timestamp recognized: " + prefix);
+                CAPTURE(prefix);
                 REQUIRE(length == prefix.size());
-                UNSCOPED_INFO("message preserved");
                 REQUIRE(line.substr(length) == message);
             }
         }
@@ -54,9 +53,9 @@ TEST_CASE("alchattimestamp: a timestamp without seconds is left as it is", "[alc
 {
     for (const std::string timestamp : { "14:05", "2:05 PM", "2026/09/25 14:05", "2026/09/25 2:05 pm", "" })
     {
-        UNSCOPED_INFO("missing seconds stay missing");
+        UNSCOPED_INFO("showing seconds invents none");
         REQUIRE(ALChatTimestamp::format(timestamp, true) == timestamp);
-        UNSCOPED_INFO("minute display stays unchanged");
+        UNSCOPED_INFO("hiding seconds changes nothing");
         REQUIRE(ALChatTimestamp::format(timestamp, false) == timestamp);
     }
 }
@@ -72,9 +71,9 @@ TEST_CASE("alchattimestamp: recorded seconds are shown or hidden without moving 
             {
                 const std::string minutes   = date + "2:05" + suffix;
                 const std::string timestamp = date + "2:05" + seconds + suffix;
-                UNSCOPED_INFO("recorded seconds retained");
+                UNSCOPED_INFO("showing seconds keeps those recorded");
                 REQUIRE(ALChatTimestamp::format(timestamp, true) == timestamp);
-                UNSCOPED_INFO("seconds hidden");
+                UNSCOPED_INFO("hiding seconds drops them");
                 REQUIRE(ALChatTimestamp::format(timestamp, false) == minutes);
                 UNSCOPED_INFO("mixed logs share a merge minute");
                 REQUIRE(ALChatTimestamp::format(timestamp, false) ==
@@ -89,10 +88,9 @@ TEST_CASE("alchattimestamp: a malformed timestamp is neither cut nor rewritten",
     for (const std::string line :
          { "", "Example Resident: hello", "text [14:05:09]", "[14:05:9] hello", "[14:05:091] hello", "[14:05:09 hello" })
     {
-        UNSCOPED_INFO("not a timestamp prefix: " + line);
+        CAPTURE(line);
         REQUIRE(ALChatTimestamp::prefixLength(line) == size_t(0));
     }
-    UNSCOPED_INFO("unknown time is not rewritten");
     CHECK(ALChatTimestamp::format("unknown:time:00", false) == "unknown:time:00");
     UNSCOPED_INFO("overlong seconds are not rewritten");
     CHECK(ALChatTimestamp::format("14:05:091", false) == "14:05:091");

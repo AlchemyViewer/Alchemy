@@ -112,10 +112,8 @@ namespace
             CHECK(ALScriptSnippets::readFrom(file, false, none));
             REQUIRE(none.empty());
         }
-        UNSCOPED_INFO("written");
         CHECK(ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"$1\");"), snippet("half", "") }));
         std::vector<ALScriptSnippets::Snippet> back;
-        UNSCOPED_INFO("read");
         REQUIRE(ALScriptSnippets::readFrom(file, false, back));
         {
             INFO("the one with a body");
@@ -134,7 +132,6 @@ namespace
             out << broken;
         }
         std::vector<ALScriptSnippets::Snippet> held;
-        UNSCOPED_INFO("it does not read");
         CHECK_FALSE(ALScriptSnippets::readFrom(file, false, held));
         UNSCOPED_INFO("written all the same");
         CHECK(ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"hi\");") }));
@@ -155,7 +152,6 @@ namespace
             llofstream out(file, std::ios::binary);
             out << "again";
         }
-        UNSCOPED_INFO("written");
         CHECK(ALScriptSnippets::writeTo(file, { snippet("say", "x") }));
         UNSCOPED_INFO("the first kept still");
         CHECK(read(file + ".unreadable") == broken);
@@ -166,7 +162,6 @@ namespace
     TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: a write replaces the file whole and a failed one leaves it as it was", "[alscriptsnippets]")
     {
         const std::string file = folder + "/lsl.xml";
-        UNSCOPED_INFO("written");
         CHECK(ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"one\");") }));
         const std::string first = read(file);
         UNSCOPED_INFO("written again, over it");
@@ -174,7 +169,7 @@ namespace
         {
             INFO("replaced");
             CHECK(read(file) != first);
-            REQUIRE(read(file).find("two") != std::string::npos);
+            CHECK(read(file).find("two") != std::string::npos);
         }
         UNSCOPED_INFO("and nothing half-written beside it");
         CHECK_FALSE(LLFile::isfile(ALFileWrite::besideOf(file)));
@@ -195,7 +190,6 @@ namespace
         const bool wrote = ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"three\");") });
         std::filesystem::permissions(fsyspath(file), std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
                                      std::filesystem::perm_options::replace, ec);
-        UNSCOPED_INFO("not written");
         CHECK_FALSE(wrote);
         UNSCOPED_INFO("and the file as it was");
         CHECK(read(file) == written);
@@ -211,23 +205,16 @@ namespace
         const std::string text = ALScriptSnippets::notecardText({ say, builtin, snippet("", "no name") }, { snippet("print", "print(${1})") });
         std::vector<ALScriptSnippets::Snippet> lsl;
         std::vector<ALScriptSnippets::Snippet> slua;
-        UNSCOPED_INFO("read");
         REQUIRE(ALScriptSnippets::readNotecard(text, false, lsl, slua));
         UNSCOPED_INFO("the LSL one, and not the viewer's or the unnamed");
         REQUIRE(lsl.size() == 1U);
-        UNSCOPED_INFO("its name");
         CHECK(lsl[0].name == std::string("say"));
-        UNSCOPED_INFO("its prefix");
         CHECK(lsl[0].prefix == std::string("say"));
-        UNSCOPED_INFO("its detail");
         CHECK(lsl[0].detail == std::string("Say something"));
-        UNSCOPED_INFO("its body");
         CHECK(lsl[0].body == say.body);
-        UNSCOPED_INFO("not the viewer's");
         CHECK_FALSE(lsl[0].builtin);
         UNSCOPED_INFO("the SLua one in SLua's");
         REQUIRE(slua.size() == 1U);
-        UNSCOPED_INFO("its body");
         CHECK(slua[0].body == std::string("print(${1})"));
 
         // Written by hand or by an older viewer: no language, and a key
@@ -236,7 +223,6 @@ namespace
                                   "<key>colour</key><string>red</string></map></array></llsd>";
         lsl.clear();
         slua.clear();
-        UNSCOPED_INFO("read");
         CHECK(ALScriptSnippets::readNotecard(plain, true, lsl, slua));
         {
             INFO("into the language shown");
@@ -253,7 +239,7 @@ namespace
         for (const char* text : { "Dear diary, today I scripted a door.", "<llsd><map><key>name</key><string>x</string></map></llsd>",
                                   "<llsd><array><map><key>title</key><string>x</string></map></array></llsd>", "<llsd><array /></llsd>", "" })
         {
-            UNSCOPED_INFO(std::string("not snippets: ") + text);
+            CAPTURE(text);
             REQUIRE_FALSE(ALScriptSnippets::readNotecard(text, false, lsl, slua));
             {
                 INFO("and nothing added");
@@ -275,13 +261,9 @@ namespace
         CHECK(merged.renamed == 1U);
         UNSCOPED_INFO("one the same");
         CHECK(merged.skipped == 1U);
-        UNSCOPED_INFO("four now");
         REQUIRE(own.size() == 4U);
-        UNSCOPED_INFO("numbered");
         CHECK(own[2].name == std::string("say (2)"));
-        UNSCOPED_INFO("with its body");
         CHECK(own[2].body == std::string("llSay(0, \"b\");"));
-        UNSCOPED_INFO("and the new one");
         CHECK(own[3].name == std::string("new"));
 
         // The same notecard again brings nothing in.
@@ -292,7 +274,6 @@ namespace
             CHECK(merged.renamed == 0);
             CHECK(merged.skipped == 3);
         }
-        UNSCOPED_INFO("still four");
         REQUIRE(own.size() == 4U);
 
         // A third body takes the next number free.
@@ -308,7 +289,6 @@ namespace
                                  "<map><key>name</key><string>loop</string><key>body</key><string>for</string><key>language</key><string>slua</string></map>"
                                  "<map><key>name</key><string>banner</string><key>body</key><string>x</string></map>"
                                  "</array></llsd>";
-        UNSCOPED_INFO("followed");
         CHECK(ALScriptSnippets::follow(text));
         const std::vector<ALScriptSnippets::Snippet>& lsl  = ALScriptSnippets::followed(false);
         const std::vector<ALScriptSnippets::Snippet>& slua = ALScriptSnippets::followed(true);
@@ -340,10 +320,8 @@ namespace
         // Never written where the scripter's own are, nor carried by their
         // notecard; copied in, one's own.
         const std::string file = folder + "/lsl.xml";
-        UNSCOPED_INFO("written");
         CHECK(ALScriptSnippets::writeTo(file, { snippet("mine", "y"), lsl[0] }));
         std::vector<ALScriptSnippets::Snippet> back;
-        UNSCOPED_INFO("read");
         REQUIRE(ALScriptSnippets::readFrom(file, false, back));
         {
             INFO("one's own alone");
@@ -351,7 +329,7 @@ namespace
             CHECK(back[0].name == "mine");
         }
         UNSCOPED_INFO("not on one's notecard");
-        REQUIRE(ALScriptSnippets::notecardText(lsl, {}).find("banner") == std::string::npos);
+        CHECK(ALScriptSnippets::notecardText(lsl, {}).find("banner") == std::string::npos);
         std::vector<ALScriptSnippets::Snippet> own;
         ALScriptSnippets::merge(own, { lsl[1] });
         {
@@ -374,23 +352,21 @@ namespace
         for (const char* language : { "lsl.xml", "slua.xml" })
         {
             const std::string                      file = std::string(LLUI_TEST_APP_DIR) + "/app_settings/snippets/" + language;
+            CAPTURE(file);
             std::vector<ALScriptSnippets::Snippet> shipped;
-            {
-                INFO(std::string("read: ") + file);
-                REQUIRE(ALScriptSnippets::readFrom(file, true, shipped));
-                REQUIRE_FALSE(shipped.empty());
-            }
+            REQUIRE(ALScriptSnippets::readFrom(file, true, shipped));
+            REQUIRE_FALSE(shipped.empty());
             for (const ALScriptSnippets::Snippet& one : shipped)
             {
-                const std::string                 named    = std::string(language) + ", " + one.name;
+                CAPTURE(one.name);
                 const ALSnippetSession::Expansion expanded = ALSnippetSession::expand(one.body, ALTextPos(0, 0), std::string());
                 const ALTextDocument              text(expanded.text);
-                UNSCOPED_INFO(named + ": no placeholder left in " + expanded.text);
+                UNSCOPED_INFO("no placeholder left in " << expanded.text);
                 REQUIRE(expanded.text.find("${") == std::string::npos);
                 for (size_t i = 0; i < expanded.stops.size(); ++i)
                 {
                     const std::string held = text.text(expanded.stops[i]);
-                    UNSCOPED_INFO(named + ": stop " + std::to_string(i + 1) + " holds the whole of its text, not \"" + held + "\"");
+                    UNSCOPED_INFO("stop " << i + 1 << " holds the whole of its text, not \"" << held << "\"");
                     REQUIRE(whole(held));
                 }
             }

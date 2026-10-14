@@ -50,12 +50,9 @@ namespace
         UNSCOPED_INFO("and one saying nothing of either");
         CHECK(commands.add("close", [this]() { done.push_back("close"); }));
 
-        {
-            INFO("known");
-            REQUIRE(commands.has("save"));
-            REQUIRE(commands.has("word_wrap"));
-            REQUIRE(commands.has("close"));
-        }
+        REQUIRE(commands.has("save"));
+        REQUIRE(commands.has("word_wrap"));
+        REQUIRE(commands.has("close"));
         UNSCOPED_INFO("not enabled while it says it cannot");
         CHECK_FALSE(commands.enabled("save"));
         can = true;
@@ -65,7 +62,6 @@ namespace
         CHECK(commands.enabled("close"));
         commands.run("save");
         commands.run("close");
-        UNSCOPED_INFO("each run");
         CHECK(done == std::vector<std::string>{ "save", "close" });
 
         UNSCOPED_INFO("the toggle on");
@@ -84,7 +80,6 @@ namespace
 
     TEST_CASE_METHOD(alscriptstudiocommands_data, "alscriptstudiocommands: a name registers once and keeps its first command", "[alscriptstudiocommands]")
     {
-        UNSCOPED_INFO("the first");
         CHECK(commands.add("save", [this]() { done.push_back("first"); }));
         UNSCOPED_INFO("the second refused");
         CHECK_FALSE(commands.add("save", [this]() { done.push_back("second"); }));
@@ -96,7 +91,6 @@ namespace
         UNSCOPED_INFO("an unlisted one is a command like any");
         CHECK(commands.addUnlisted("reveal", [this]() { done.push_back("reveal"); }));
         commands.run("reveal");
-        UNSCOPED_INFO("run");
         CHECK(done.back() == std::string("reveal"));
         std::vector<std::string> names = commands.names();
         std::sort(names.begin(), names.end());
@@ -107,13 +101,10 @@ namespace
     TEST_CASE_METHOD(alscriptstudiocommands_data, "alscriptstudiocommands: an unknown name does nothing and is reported once", "[alscriptstudiocommands]")
     {
         commands.run("no_such");
-        UNSCOPED_INFO("not enabled");
         CHECK_FALSE(commands.enabled("no_such"));
-        UNSCOPED_INFO("off");
         CHECK_FALSE(commands.checked("no_such"));
         UNSCOPED_INFO("not done by a key");
         CHECK_FALSE(commands.runIfEnabled("no_such"));
-        UNSCOPED_INFO("nor known");
         REQUIRE_FALSE(commands.has("no_such"));
         UNSCOPED_INFO("said once however often asked");
         CHECK(commands.unknownAsked() == std::vector<std::string>{ "no_such" });

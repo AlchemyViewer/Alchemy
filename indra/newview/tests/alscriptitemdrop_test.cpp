@@ -114,8 +114,8 @@ namespace
         UNSCOPED_INFO("offered");
         CHECK(drop(wood, false, MASK_NONE, &tip) == ACCEPT_YES_SINGLE);
         UNSCOPED_INFO("the tip says what goes in");
-        REQUIRE(tip.find("\"Wood \\\"oak\\\"\"") != std::string::npos);
-        UNSCOPED_INFO("nothing yet");
+        CHECK(tip.find("\"Wood \\\"oak\\\"\"") != std::string::npos);
+        UNSCOPED_INFO("a drag over changes nothing");
         CHECK(doc->editor->text() == "x;");
         drop(wood, true);
         UNSCOPED_INFO("in where it lands");
@@ -127,7 +127,7 @@ namespace
         {
             INFO("its key not to be seen: refused");
             CHECK(drop(wood, false, MASK_SHIFT, &tip) == ACCEPT_NO);
-            REQUIRE_FALSE(tip.empty());
+            CHECK_FALSE(tip.empty());
         }
         shown.generate();
         drop(wood, true, MASK_SHIFT);
@@ -144,7 +144,7 @@ namespace
         {
             INFO("refused, and said why");
             CHECK(drop(wood, true, MASK_NONE, &tip) == ACCEPT_NO);
-            REQUIRE_FALSE(tip.empty());
+            CHECK_FALSE(tip.empty());
             CHECK(doc->editor->text() == "x;");
         }
         doc->modifiable = true;

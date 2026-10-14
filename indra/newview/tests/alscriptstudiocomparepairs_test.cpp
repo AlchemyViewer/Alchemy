@@ -131,16 +131,16 @@ namespace
         const ALScriptAnalysis::Request& left = studio.asked[0].request;
         {
             INFO("the left's shape, as SLua, in front");
-            REQUIRE(left.kind == ALScriptAnalysis::Kind::Shape);
-            REQUIRE(left.lua);
-            REQUIRE(left.front);
+            CHECK(left.kind == ALScriptAnalysis::Kind::Shape);
+            CHECK(left.lua);
+            CHECK(left.front);
             CHECK(*left.text == LEFT);
             CHECK(left.id != studio.asked[1].request.id);
         }
         studio.answer(0);
         {
             INFO("one answered: nothing yet");
-            REQUIRE(doc.compareView->model().pairs().empty());
+            CHECK(doc.compareView->model().pairs().empty());
             CHECK(beside(doc, 0, 0));
         }
         studio.answerAll();
@@ -153,6 +153,7 @@ namespace
         }
     }
 
+    // The pairs are carried while the side typed in is asked about.
     TEST_CASE_METHOD(alscriptstudiocomparepairs_data, "alscriptstudiocomparepairs: a side typed in is asked again alone and a stale answer dropped", "[alscriptstudiocomparepairs]")
     {
         Doc& doc = tab("tab");
@@ -162,7 +163,7 @@ namespace
         {
             INFO("the right alone asked");
             REQUIRE(studio.asked.size() == 1);
-            REQUIRE(studio.asked[0].request.id.find("right") != std::string::npos);
+            CHECK(studio.asked[0].request.id.find("right") != std::string::npos);
         }
         {
             INFO("carried meanwhile");
@@ -185,7 +186,7 @@ namespace
         {
             INFO("the left alone asked");
             REQUIRE(studio.asked.size() == 1);
-            REQUIRE(studio.asked[0].request.id.find("left") != std::string::npos);
+            CHECK(studio.asked[0].request.id.find("left") != std::string::npos);
         }
         studio.answerAll();
         UNSCOPED_INFO("paired again");
@@ -200,18 +201,18 @@ namespace
         doc.compareView->setTexts(LEFT, RIGHT);
         {
             INFO("none asked, paired at once");
-            REQUIRE(studio.asked.empty());
-            REQUIRE_FALSE(doc.compareView->model().pairs().empty());
+            CHECK(studio.asked.empty());
+            CHECK_FALSE(doc.compareView->model().pairs().empty());
         }
         doc.compareView->setTexts(LEFT + "\n", RIGHT, { { 0, 0, 0, 0 } });
         {
             INFO("ranges: none asked");
-            REQUIRE(studio.asked.empty());
-            REQUIRE(doc.compareView->model().pairs().empty());
+            CHECK(studio.asked.empty());
+            CHECK(doc.compareView->model().pairs().empty());
         }
         Doc& card = tab("card", true);
         card.compareView->setTexts(LEFT, RIGHT);
         UNSCOPED_INFO("a notecard: none asked");
-        REQUIRE(studio.asked.empty());
+        CHECK(studio.asked.empty());
     }
 }

@@ -81,30 +81,14 @@ namespace
     {
         std::cout << "What we parsed from CMake: " << LL_VIEWER_VERSION_BUILD << std::endl;
         std::cout << "What we get from llversioninfo: " << LLVersionInfo::instance().getBuild() << std::endl;
-        UNSCOPED_INFO("Major version");
-        CHECK(LLVersionInfo::instance().getMajor() ==
-                      LL_VIEWER_VERSION_MAJOR);
-        UNSCOPED_INFO("Minor version");
-        CHECK(LLVersionInfo::instance().getMinor() ==
-                      LL_VIEWER_VERSION_MINOR);
-        UNSCOPED_INFO("Patch version");
-        CHECK(LLVersionInfo::instance().getPatch() ==
-                      LL_VIEWER_VERSION_PATCH);
-        UNSCOPED_INFO("Build version");
-        CHECK(LLVersionInfo::instance().getBuild() ==
-                      LL_VIEWER_VERSION_BUILD);
-        UNSCOPED_INFO("Channel version");
-        CHECK(LLVersionInfo::instance().getChannel() ==
-                      ll_viewer_channel);
-        UNSCOPED_INFO("Version String");
-        CHECK(LLVersionInfo::instance().getVersion() ==
-                      mVersion);
-        UNSCOPED_INFO("Short Version String");
-        CHECK(LLVersionInfo::instance().getShortVersion() ==
-                      mShortVersion);
-        UNSCOPED_INFO("Version and channel String");
-        CHECK(LLVersionInfo::instance().getChannelAndVersion() ==
-                      mVersionAndChannel);
+        CHECK(LLVersionInfo::instance().getMajor() == LL_VIEWER_VERSION_MAJOR);
+        CHECK(LLVersionInfo::instance().getMinor() == LL_VIEWER_VERSION_MINOR);
+        CHECK(LLVersionInfo::instance().getPatch() == LL_VIEWER_VERSION_PATCH);
+        CHECK(LLVersionInfo::instance().getBuild() == LL_VIEWER_VERSION_BUILD);
+        CHECK(LLVersionInfo::instance().getChannel() == ll_viewer_channel);
+        CHECK(LLVersionInfo::instance().getVersion() == mVersion);
+        CHECK(LLVersionInfo::instance().getShortVersion() == mShortVersion);
+        CHECK(LLVersionInfo::instance().getChannelAndVersion() == mVersionAndChannel);
 
         // The channel is the process's: put back however this ends.
         struct ChannelBack
@@ -113,12 +97,8 @@ namespace
             ~ChannelBack() { LLVersionInfo::instance().resetChannel(was); }
         } channel_back;
         LLVersionInfo::instance().resetChannel(mResetChannel);
-        UNSCOPED_INFO("Reset channel version");
-        CHECK(LLVersionInfo::instance().getChannel() ==
-                      mResetChannel);
+        CHECK(LLVersionInfo::instance().getChannel() == mResetChannel);
 
-        UNSCOPED_INFO("Reset Version and channel String");
-        CHECK(LLVersionInfo::instance().getChannelAndVersion() ==
-                      mResetVersionAndChannel);
+        CHECK(LLVersionInfo::instance().getChannelAndVersion() == mResetVersionAndChannel);
     }
 }

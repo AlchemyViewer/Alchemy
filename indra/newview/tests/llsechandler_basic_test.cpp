@@ -53,15 +53,18 @@
 #include "../llmachineid.h"
 #include <simdutf.h>
 
-#define ensure_throws(str, exc_type, cert, func, ...) \
+#define require_throws_with_cert(str, exc_type, cert, func, ...) \
 try \
 { \
-func(__VA_ARGS__); FAIL(("throws, " str)); \
+func(__VA_ARGS__); \
+FAIL("no exception: " str); \
 } \
 catch(exc_type& except) \
 { \
 LLSD cert_data; \
-cert->getLLSD(cert_data); UNSCOPED_INFO(("Exception cert is incorrect for " str)); REQUIRE((valueCompareLLSD(except.getCertData(), cert_data))); \
+cert->getLLSD(cert_data); \
+UNSCOPED_INFO("Exception cert is incorrect for " str); \
+REQUIRE(valueCompareLLSD(except.getCertData(), cert_data)); \
 }
 
 extern bool _cert_hostname_wildcard_match(const std::string& hostname, const std::string& wildcard_string);
@@ -704,7 +707,6 @@ namespace
     // ---------------------------------------------------------------------------------------
     // Test functions
     // ---------------------------------------------------------------------------------------
-    // test cert data retrieval
     TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: a certificate is made from PEM without throwing", "[LLSecHandler]")
     {
         try
@@ -733,48 +735,30 @@ namespace
         //std::ostringstream llsd_value;
         //llsd_value << LLSDOStreamer<LLSDNotationFormatter>(llsd_cert) << std::endl;
         LL_DEBUGS() << "test 1 cert " << llsd_cert << LL_ENDL;
-        UNSCOPED_INFO("Issuer Name/commonName");
         CHECK((std::string)llsd_cert["issuer_name"]["commonName"] == "Integration Test Intermediate CA");
-        UNSCOPED_INFO("Issuer Name/countryName");
         CHECK((std::string)llsd_cert["issuer_name"]["countryName"] == "US");
-        UNSCOPED_INFO("Issuer Name/state");
         CHECK((std::string)llsd_cert["issuer_name"]["stateOrProvinceName"] == "California");
-        UNSCOPED_INFO("Issuer Name/org name");
         CHECK((std::string)llsd_cert["issuer_name"]["organizationName"] == "Linden Lab");
-        UNSCOPED_INFO("Issuer Name/org unit");
         CHECK((std::string)llsd_cert["issuer_name"]["organizationalUnitName"] == "Second Life Engineering");
-        UNSCOPED_INFO("Issuer name string");
         CHECK((std::string)llsd_cert["issuer_name_string"] ==
                       "emailAddress=noreply@lindenlab.com,CN=Integration Test Intermediate CA,OU=Second Life Engineering,O=Linden Lab,L=San Francisco,ST=California,C=US");
-        UNSCOPED_INFO("subject Name/commonName");
         CHECK((std::string)llsd_cert["subject_name"]["commonName"] ==
                       "Integration Test Server Cert");
-        UNSCOPED_INFO("subject Name/countryName");
         CHECK((std::string)llsd_cert["subject_name"]["countryName"] == "US");
-        UNSCOPED_INFO("subject Name/state");
         CHECK((std::string)llsd_cert["subject_name"]["stateOrProvinceName"] == "California");
-        UNSCOPED_INFO("subject Name/localityName");
         CHECK((std::string)llsd_cert["subject_name"]["localityName"] == "San Francisco");
-        UNSCOPED_INFO("subject Name/org name");
         CHECK((std::string)llsd_cert["subject_name"]["organizationName"] == "Linden Lab");
-        UNSCOPED_INFO("subjectName/org unit");
         CHECK((std::string)llsd_cert["subject_name"]["organizationalUnitName"] == "Second Life Engineering");
 
-        UNSCOPED_INFO("subject name string");
         CHECK((std::string)llsd_cert["subject_name_string"] ==
                       "emailAddress=noreply@lindenlab.com,CN=Integration Test Server Cert,OU=Second Life Engineering,O=Linden Lab,L=San Francisco,ST=California,C=US");
-        UNSCOPED_INFO("serial number");
         CHECK((std::string)llsd_cert["serial_number"] == "9E8D3413E79BF931");
-        UNSCOPED_INFO("valid from");
         CHECK((std::string)llsd_cert["valid_from"] == "2024-07-23T11:46:39Z");
-        UNSCOPED_INFO("valid to");
         CHECK((std::string)llsd_cert["valid_to"] == "2034-07-21T11:46:39Z");
         LLSD expectedKeyUsage = LLSD::emptyArray();
         expectedKeyUsage.append(LLSD((std::string)"digitalSignature"));
         expectedKeyUsage.append(LLSD((std::string)"keyEncipherment"));
-        UNSCOPED_INFO("key usage");
         CHECK(valueCompareLLSD(llsd_cert["keyUsage"], expectedKeyUsage));
-        UNSCOPED_INFO("basic constraints");
         CHECK(llsd_cert["basicConstraints"]["CA"].asInteger() == 0);
 
         UNSCOPED_INFO("x509 is equal");
@@ -782,7 +766,6 @@ namespace
     }
 
 
-    // test protected data
     TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: protected data is kept by type and id and survives a reload", "[LLSecHandler]")
     {
         std::string protected_data = "sUSh3wj77NG9oAMyt3XIhaej3KLZhLZWFZvI6rIGmwUUOmmelrRg0NI9rkOj8ZDpTPxpwToaBT5u"
@@ -821,11 +804,8 @@ namespace
         LLSD data = handler->getProtectedData("test_data_type", "test_data_id");
 
 
-        UNSCOPED_INFO("retrieve existing data1");
         CHECK((std::string)data["data1"] == "test_data_1");
-        UNSCOPED_INFO("retrieve existing data2");
         CHECK((std::string)data["data2"] == "test_data_2");
-        UNSCOPED_INFO("retrieve existing data3");
         CHECK((std::string)data["data3"]["elem1"] == "test element1");
 
         // data storage
@@ -840,30 +820,21 @@ namespace
 
         data = handler->getProtectedData("test_data_type", "test_data_id");
         // verify no overwrite of existing data
-        UNSCOPED_INFO("verify no overwrite 1");
         CHECK((std::string)data["data1"] == "test_data_1");
-        UNSCOPED_INFO("verify no overwrite 2");
         CHECK((std::string)data["data2"] == "test_data_2");
-        UNSCOPED_INFO("verify no overwrite 3");
         CHECK((std::string)data["data3"]["elem1"] == "test element1");
 
         // verify written data is good
         data = handler->getProtectedData("test_data_type", "test_data_id1");
-        UNSCOPED_INFO("verify stored data1");
         CHECK((std::string)data["store_data1"] == "test_store_data1");
-        UNSCOPED_INFO("verify stored data2");
         CHECK((int)data["store_data2"] == 27);
-        UNSCOPED_INFO("verify stored data3");
         CHECK((std::string)data["store_data3"]["subelem1"] == "test_subelem1");
 
         // verify overwrite works
         handler->setProtectedData("test_data_type", "test_data_id", store_data);
         data = handler->getProtectedData("test_data_type", "test_data_id");
-        UNSCOPED_INFO("verify overwrite stored data1");
         CHECK((std::string)data["store_data1"] == "test_store_data1");
-        UNSCOPED_INFO("verify overwrite stored data2");
         CHECK((int)data["store_data2"] == 27);
-        UNSCOPED_INFO("verify overwrite stored data3");
         CHECK((std::string)data["store_data3"]["subelem1"] == "test_subelem1");
 
         // verify other datatype doesn't conflict
@@ -874,17 +845,13 @@ namespace
 
         handler->setProtectedData("test_data_type1", "test_data_id", store_data);
         data = handler->getProtectedData("test_data_type1", "test_data_id");
-        UNSCOPED_INFO("verify datatype stored data3");
         CHECK((std::string)data["store_data3"] == "test_store_data3");
-        UNSCOPED_INFO("verify datatype stored data4");
         CHECK((int)data["store_data4"] == 28);
-        UNSCOPED_INFO("verify datatype stored data5");
         CHECK((std::string)data["store_data5"]["subelem2"] == "test_subelem2");
 
         // test data not found
 
         data = handler->getProtectedData("test_data_type1", "test_data_not_found");
-        UNSCOPED_INFO("not found");
         REQUIRE(data.isUndefined());
 
         // cause a 'write' by using 'LLPointer' to delete then instantiate a handler
@@ -893,11 +860,8 @@ namespace
         handler->init();
 
         data = handler->getProtectedData("test_data_type1", "test_data_id");
-        UNSCOPED_INFO("verify datatype stored data3a");
         CHECK((std::string)data["store_data3"] == "test_store_data3");
-        UNSCOPED_INFO("verify datatype stored data4a");
         CHECK((int)data["store_data4"] == 28);
-        UNSCOPED_INFO("verify datatype stored data5a");
         CHECK((std::string)data["store_data5"]["subelem2"] == "test_subelem2");
 
         // rewrite the initial file to verify reloads
@@ -910,25 +874,21 @@ namespace
         handler = new LLSecAPIBasicHandler("sechandler_settings.tmp", "test_password.dat");
         handler->init();
         data = handler->getProtectedData("test_data_type1", "test_data_id");
-        UNSCOPED_INFO("not found");
         REQUIRE(data.isUndefined());
 
         handler->deleteProtectedData("test_data_type", "test_data_id");
-        UNSCOPED_INFO("Deleted data not found");
         REQUIRE(handler->getProtectedData("test_data_type", "test_data_id").isUndefined());
 
         LLFile::remove("sechandler_settings.tmp");
         handler = new LLSecAPIBasicHandler("sechandler_settings.tmp", "test_password.dat");
         handler->init();
         data = handler->getProtectedData("test_data_type1", "test_data_id");
-        UNSCOPED_INFO("not found");
         REQUIRE(data.isUndefined());
         handler = NULL;
 
         CHECK(LLFile::isfile("sechandler_settings.tmp"));
     }
 
-    // test credenitals
     TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: credentials save and load and delete and fall back to legacy logins", "[LLSecHandler]")
     {
         LLPointer<LLSecAPIBasicHandler> handler = new LLSecAPIBasicHandler("sechandler_settings.tmp", "test_password.dat");
@@ -950,7 +910,7 @@ namespace
         UNSCOPED_INFO("basic credential creation: authenticator");
         CHECK_THAT(my_authenticator, ll_test::LLSDEquals(my_cred->getAuthenticator()));
         UNSCOPED_INFO("basic credential creation: grid");
-        CHECK("my_grid" == my_cred->getGrid());
+        CHECK(my_cred->getGrid() == "my_grid");
 
         // test setting/overwriting of credential components
         my_id["first_name"] = "firstname";
@@ -964,19 +924,18 @@ namespace
         UNSCOPED_INFO("set credential data: authenticator");
         CHECK_THAT(my_authenticator, ll_test::LLSDEquals(my_cred->getAuthenticator()));
         UNSCOPED_INFO("set credential data: grid");
-        CHECK("my_grid" == my_cred->getGrid());
+        CHECK(my_cred->getGrid() == "my_grid");
 
         // test loading of a credential, that hasn't been saved, without
         // any legacy saved credential data
         LLPointer<LLCredential> my_new_cred = handler->loadCredential("my_grid2");
-        UNSCOPED_INFO("unknown credential load test");
-        REQUIRE(my_new_cred->getIdentifier().isMap());
-        UNSCOPED_INFO("unknown credential load test");
-        REQUIRE_FALSE(my_new_cred->getIdentifier().has("type"));
-        UNSCOPED_INFO("unknown credential load test");
-        REQUIRE(my_new_cred->getAuthenticator().isMap());
-        UNSCOPED_INFO("unknown credential load test");
-        REQUIRE_FALSE(my_new_cred->getAuthenticator().has("type"));
+        {
+            INFO("a credential never saved loads empty");
+            REQUIRE(my_new_cred->getIdentifier().isMap());
+            REQUIRE_FALSE(my_new_cred->getIdentifier().has("type"));
+            REQUIRE(my_new_cred->getAuthenticator().isMap());
+            REQUIRE_FALSE(my_new_cred->getAuthenticator().has("type"));
+        }
         // test saving of a credential
         handler->saveCredential(my_cred, true);
 
@@ -987,28 +946,27 @@ namespace
         UNSCOPED_INFO("load a known credential: authenticator");
         CHECK_THAT(my_authenticator, ll_test::LLSDEquals(my_new_cred->getAuthenticator()));
         UNSCOPED_INFO("load a known credential: grid");
-        CHECK("my_grid" == my_cred->getGrid());
+        CHECK(my_cred->getGrid() == "my_grid");
 
         // test deletion of a credential
         handler->deleteCredential(my_new_cred);
 
         UNSCOPED_INFO("delete credential: identifier");
         REQUIRE(my_new_cred->getIdentifier().isUndefined());
-        UNSCOPED_INFO("delete credentialt: authenticator");
+        UNSCOPED_INFO("delete credential: authenticator");
         REQUIRE(my_new_cred->getIdentifier().isUndefined());
         UNSCOPED_INFO("delete credential: grid");
-        CHECK("my_grid" == my_cred->getGrid());
+        CHECK(my_cred->getGrid() == "my_grid");
         // load unknown cred
 
         my_new_cred = handler->loadCredential("my_grid");
-        UNSCOPED_INFO("deleted credential load test");
-        REQUIRE(my_new_cred->getIdentifier().isMap());
-        UNSCOPED_INFO("deleted credential load test");
-        REQUIRE_FALSE(my_new_cred->getIdentifier().has("type"));
-        UNSCOPED_INFO("deleted credential load test");
-        REQUIRE(my_new_cred->getAuthenticator().isMap());
-        UNSCOPED_INFO("deleted credential load test");
-        REQUIRE_FALSE(my_new_cred->getAuthenticator().has("type"));
+        {
+            INFO("a deleted credential loads empty");
+            REQUIRE(my_new_cred->getIdentifier().isMap());
+            REQUIRE_FALSE(my_new_cred->getIdentifier().has("type"));
+            REQUIRE(my_new_cred->getAuthenticator().isMap());
+            REQUIRE_FALSE(my_new_cred->getAuthenticator().has("type"));
+        }
 
         // test loading of an unknown credential with legacy saved username, but without
         // saved password
@@ -1063,13 +1021,13 @@ namespace
         CHECK((const std::string)my_new_cred->getIdentifier()["last_name"] == "mylastname");
 
         LLSD legacy_authenticator = my_new_cred->getAuthenticator();
-        UNSCOPED_INFO("legacy credential with password: type");
+        UNSCOPED_INFO("legacy credential with password: authenticator type");
         CHECK((std::string)legacy_authenticator["type"] ==
                       "hash");
         UNSCOPED_INFO("legacy credential with password: algorithm");
         CHECK((std::string)legacy_authenticator["algorithm"] ==
                       "md5");
-        UNSCOPED_INFO("legacy credential with password: algorithm");
+        UNSCOPED_INFO("legacy credential with password: secret");
         CHECK((std::string)legacy_authenticator["secret"] ==
                       "01234567890123456789012345678901");
 
@@ -1084,19 +1042,15 @@ namespace
         REQUIRE(my_new_cred->getAuthenticator().isUndefined());
     }
 
-    // test cert vector
     TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: a certificate vector adds once and iterates and inserts and finds", "[LLSecHandler]")
     {
         // validate create from empty vector
         LLPointer<LLBasicCertificateVector> test_vector = new LLBasicCertificateVector();
-        UNSCOPED_INFO("when loading with nothing, we should result in no certs in vector");
         REQUIRE(test_vector->size() == 0);
 
         test_vector->add(new LLBasicCertificate(mPemTestCert, &mValidationDate));
-        UNSCOPED_INFO("one element in vector");
         REQUIRE(test_vector->size() == 1);
         test_vector->add(new LLBasicCertificate(mPemChildCert, &mValidationDate));
-        UNSCOPED_INFO("two elements in vector after add");
         REQUIRE(test_vector->size() == 2);
 
         // add duplicate; should be a no-op (and log at DEBUG level)
@@ -1121,36 +1075,25 @@ namespace
         LLBasicCertificateVector::iterator current_cert = test_vector->begin();
         LLBasicCertificateVector::iterator copy_current_cert = current_cert;
         // operator++(int)
-        UNSCOPED_INFO("validate iterator++ element in vector is expected cert");
         CHECK(*current_cert++ == (*test_vector)[0]);
-        UNSCOPED_INFO("validate 2nd iterator++ element in vector is expected cert");
         CHECK(*current_cert++ == (*test_vector)[1]);
-        UNSCOPED_INFO("validate end iterator++");
         REQUIRE(current_cert == test_vector->end());
 
         // copy
-        UNSCOPED_INFO("validate copy iterator element in vector is expected cert");
         CHECK(*copy_current_cert == (*test_vector)[0]);
 
         // operator--(int)
         current_cert--;
-        UNSCOPED_INFO("validate iterator-- element in vector is expected cert");
         CHECK(*current_cert-- == (*test_vector)[1]);
-        UNSCOPED_INFO("validate iterator-- element in vector is expected cert");
         CHECK(*current_cert == (*test_vector)[0]);
 
-        UNSCOPED_INFO("begin iterator is equal");
         CHECK(current_cert == test_vector->begin());
 
         // operator++
-        UNSCOPED_INFO("validate ++iterator element in vector is expected cert");
         CHECK(*++current_cert == (*test_vector)[1]);
-        UNSCOPED_INFO("end of cert vector after ++iterator");
         REQUIRE(++current_cert == test_vector->end());
         // operator--
-        UNSCOPED_INFO("validate --iterator element in vector is expected cert");
         CHECK(*--current_cert == (*test_vector)[1]);
-        UNSCOPED_INFO("validate 2nd --iterator element in vector is expected cert");
         CHECK(*--current_cert == (*test_vector)[0]);
 
         test_vector->erase(test_vector->begin());
@@ -1178,7 +1121,6 @@ namespace
         LLSD find_info = LLSD::emptyMap();
         find_info["subjectKeyIdentifier"] = "7b:1a:f9:2b:c4:b2:f6:ae:d6:f2:8e:b1:73:fb:dd:11:ca:db:f8:87";
         LLBasicCertificateVector::iterator found_cert = test_vector->find(find_info);
-        UNSCOPED_INFO("found some cert");
         REQUIRE(found_cert != test_vector->end());
         X509* found_x509 = (*found_cert).get()->getOpenSSLX509();
         UNSCOPED_INFO("child cert was found");
@@ -1187,24 +1129,20 @@ namespace
 
         find_info["subjectKeyIdentifier"] = "00:00:00:00"; // bogus
         current_cert =test_vector->find(find_info);
-        UNSCOPED_INFO("didn't find cert");
         REQUIRE(current_cert == test_vector->end());
     }
 
-    // test cert store
     TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: a certificate store loads from and saves to its file", "[LLSecHandler]")
     {
         // validate load with nothing
         LLFile::remove("mycertstore.pem");
         LLPointer<LLBasicCertificateStore> test_store = new LLBasicCertificateStore("mycertstore.pem");
-        UNSCOPED_INFO("when loading with nothing, we should result in no certs in store");
         REQUIRE(test_store->size() == 0);
 
         // validate load with empty file
         test_store->save();
         test_store = NULL;
         test_store = new LLBasicCertificateStore("mycertstore.pem");
-        UNSCOPED_INFO("when loading with nothing, we should result in no certs in store");
         REQUIRE(test_store->size() == 0);
         test_store=NULL;
 
@@ -1214,7 +1152,6 @@ namespace
         certstorefile.close();
         // validate loaded certs
         test_store = new LLBasicCertificateStore("mycertstore.pem");
-        UNSCOPED_INFO("two elements in store");
         REQUIRE(test_store->size() == 2);
 
         // operator[]
@@ -1247,15 +1184,12 @@ namespace
         CHECK_FALSE(X509_cmp(test_cert, mX509TestCert));
         X509_free(test_cert);
         current_cert++;
-        UNSCOPED_INFO("end of cert store");
         REQUIRE(current_cert == test_store->end());
 
     }
 
-    // cert name wildcard matching
     TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: hostnames match certificate names with wildcards and end periods", "[LLSecHandler]")
     {
-        UNSCOPED_INFO("simple name match");
         CHECK(_cert_hostname_wildcard_match("foo", "foo"));
 
         UNSCOPED_INFO("simple name match, with end period");
@@ -1297,7 +1231,6 @@ namespace
         UNSCOPED_INFO("simple name match, with dual embedded wildcard");
         CHECK(_cert_hostname_wildcard_match("foobar", "f*o*ar"));
 
-        UNSCOPED_INFO("simple name mismatch");
         CHECK_FALSE(_cert_hostname_wildcard_match("bar", "foo"));
 
         UNSCOPED_INFO("simple name mismatch, with end period");
@@ -1339,28 +1272,21 @@ namespace
         UNSCOPED_INFO("match end period2");
         CHECK(_cert_hostname_wildcard_match("foo.bar.com", "*.b*r.com."));
 
-        UNSCOPED_INFO("wildcard mismatch");
         CHECK_FALSE(_cert_hostname_wildcard_match("bar.com", "*.bar.com"));
 
-        UNSCOPED_INFO("wildcard match");
         CHECK(_cert_hostname_wildcard_match("foo.bar.com", "*.bar.com"));
 
-        UNSCOPED_INFO("wildcard match");
         CHECK(_cert_hostname_wildcard_match("foo.foo.bar.com", "*.bar.com"));
 
-        UNSCOPED_INFO("wildcard match");
         CHECK(_cert_hostname_wildcard_match("foo.foo.bar.com", "*.*.com"));
 
-        UNSCOPED_INFO("wildcard mismatch");
         CHECK_FALSE(_cert_hostname_wildcard_match("foo.foo.bar.com", "*.foo.com"));
     }
 
-    // test cert chain
     TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: a certificate chain follows issuers and drops unrelated certs", "[LLSecHandler]")
     {
         // validate create from empty chain
         LLPointer<LLBasicCertificateChain> test_chain = new LLBasicCertificateChain(NULL);
-        UNSCOPED_INFO("when loading with nothing, we should result in no certs in chain");
         REQUIRE(test_chain->size() == 0);
 
         // Single cert in the chain.
@@ -1369,7 +1295,6 @@ namespace
         X509_STORE_CTX_set0_untrusted(test_store, sk_X509_new_null());
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        UNSCOPED_INFO("two elements in store [1]");
         REQUIRE(test_chain->size() == 1);
         X509* test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");
@@ -1384,7 +1309,6 @@ namespace
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509IntermediateCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        UNSCOPED_INFO("two elements in store [2]");
         REQUIRE(test_chain->size() == 2);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");
@@ -1403,7 +1327,6 @@ namespace
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509TestCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        UNSCOPED_INFO("two elements in store [3]");
         REQUIRE(test_chain->size() == 1);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");
@@ -1418,7 +1341,6 @@ namespace
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509TestCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        UNSCOPED_INFO("two elements in store [4]");
         REQUIRE(test_chain->size() == 2);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");
@@ -1437,7 +1359,6 @@ namespace
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509RootCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        UNSCOPED_INFO("three elements in store");
         REQUIRE(test_chain->size() == 3);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");
@@ -1449,12 +1370,11 @@ namespace
         X509_free(test_cert);
 
         test_cert = (*test_chain)[2]->getOpenSSLX509();
-        UNSCOPED_INFO("validate second element in store is expected cert");
+        UNSCOPED_INFO("validate third element in store is expected cert");
         CHECK_FALSE(X509_cmp(test_cert, mX509RootCert));
         X509_free(test_cert);
     }
 
-    // test cert validation
     TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: validation needs a trusted CA and a valid date and SSL key usage", "[LLSecHandler]")
     {
         // start with a trusted store with our known root cert
@@ -1489,13 +1409,13 @@ namespace
 
         // Validate with child cert but no parent, and no parent in CA store
         test_store = new LLBasicCertificateStore("mycertstore.pem");
-        ensure_throws("no CA, with only a child cert",
-                      LLCertValidationTrustException,
-                      (*test_chain)[0],
-                      test_store->validate,
-                      VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("no CA, with only a child cert",
+                                 LLCertValidationTrustException,
+                                 (*test_chain)[0],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
 
 
         // validate without the trust flag.
@@ -1505,13 +1425,13 @@ namespace
         test_store = new LLBasicCertificateStore("mycertstore.pem");
         // append the intermediate cert
         test_chain->add(new LLBasicCertificate(mX509IntermediateCert, &mValidationDate));
-        ensure_throws("no CA, with child and intermediate certs",
-                      LLCertValidationTrustException,
-                      (*test_chain)[1],
-                      test_store->validate,
-                      VALIDATION_POLICY_TRUSTED | VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("no CA, with child and intermediate certs",
+                                 LLCertValidationTrustException,
+                                 (*test_chain)[1],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_TRUSTED | VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
         // validate without the trust flag
         test_store->validate(0, test_chain, validation_params);
 
@@ -1529,24 +1449,24 @@ namespace
         validation_params[CERT_VALIDATION_DATE] = LLDate(child_info[CERT_VALID_FROM].asDate().secondsSinceEpoch() - 1.0);
 
         // test not yet valid
-        ensure_throws("Child cert not yet valid" ,
-                      LLCertValidationExpirationException,
-                      (*test_chain)[0],
-                      test_store->validate,
-                      VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("Child cert not yet valid" ,
+                                 LLCertValidationExpirationException,
+                                 (*test_chain)[0],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
         validation_params = LLSD::emptyMap();
         validation_params[CERT_VALIDATION_DATE] = LLDate(child_info[CERT_VALID_TO].asDate().secondsSinceEpoch() + 1.0);
 
         // test cert expired
-        ensure_throws("Child cert expired",
-                      LLCertValidationExpirationException,
-                      (*test_chain)[0],
-                      test_store->validate,
-                      VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("Child cert expired",
+                                 LLCertValidationExpirationException,
+                                 (*test_chain)[0],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
 
         // test SSL KU
         // validate basic trust for a chain containing child and intermediate.
@@ -1560,13 +1480,13 @@ namespace
         test_chain->add(new LLBasicCertificate(mX509TestCert, &mValidationDate));
 
         test_store = new LLBasicCertificateStore("mycertstore.pem");
-        ensure_throws("Cert doesn't have ku",
-                      LLCertKeyUsageValidationException,
-                      (*test_chain)[0],
-                      test_store->validate,
-                      VALIDATION_POLICY_SSL_KU | VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("Cert doesn't have ku",
+                                 LLCertKeyUsageValidationException,
+                                 (*test_chain)[0],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_SSL_KU | VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
 
         test_store->validate(0, test_chain, validation_params);
     }

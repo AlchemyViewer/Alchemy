@@ -55,7 +55,6 @@ TEST_CASE_METHOD(alscripttypes_data, "alscripttypes: inSource maps diagnostics b
         return ALPreprocessor::Found::Yes;
     };
     const ALPreprocessor::Result expanded = ALPreprocessor::run("#include \"lib.lsl\"\ndefault\n{\nstate_entry() { x; }\n}\n", options);
-    UNSCOPED_INFO("expanded");
     REQUIRE(expanded.problems.empty());
     // The lines of the expansion that hold each, and the column of `x`.
     S32 entry = -1, second = -1, column = -1, line = 0;
@@ -93,7 +92,6 @@ TEST_CASE_METHOD(alscripttypes_data, "alscripttypes: inSource maps diagnostics b
     result.diagnostics.push_back(unplaced);
 
     const std::vector<ALScriptDiagnostic> source = result.inSource();
-    UNSCOPED_INFO("four");
     REQUIRE(source.size() == size_t(4));
     {
         INFO("the script's own line and column");

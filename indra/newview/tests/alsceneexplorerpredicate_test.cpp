@@ -68,7 +68,6 @@ namespace
         }
     };
 
-    // Default constraints match anything (and a null record never does).
     TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: default constraints match anything but a null record", "[ALSceneExplorerPredicate]")
     {
         UNSCOPED_INFO("defaults match");
@@ -92,7 +91,6 @@ namespace
         CHECK_FALSE(matches(mFacts, mC));
     }
 
-    // Description / UUID / owner searches hit only their own field.
     TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: description / UUID / owner searches hit only their own field", "[ALSceneExplorerPredicate]")
     {
         mC.mSearchType = SEARCH_DESCRIPTION;
@@ -120,14 +118,13 @@ namespace
         CHECK_FALSE(matches(mFacts, mC));
     }
 
-    // ALL searches every field; a miss everywhere fails.
     TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: SEARCH_ALL finds text in any field and fails a miss in all", "[ALSceneExplorerPredicate]")
     {
         mC.mSearchType = SEARCH_ALL;
         for (const char* needle : { "oak", "weathered", "rye" })
         {
             mC.mFilterSubString = needle;
-            UNSCOPED_INFO(std::string("all-search finds ") + needle);
+            CAPTURE(needle);
             REQUIRE(matches(mFacts, mC));
         }
         mC.mFilterSubString = mUUID.substr(4, 8);
@@ -138,7 +135,6 @@ namespace
         CHECK_FALSE(matches(mFacts, mC));
     }
 
-    // Owner modes for an owned object.
     TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: mine / others / group owner modes for an owned object", "[ALSceneExplorerPredicate]")
     {
         mC.mOwnerMode = OWNER_MINE;
@@ -167,7 +163,6 @@ namespace
         CHECK_FALSE(matches(mFacts, mC));
     }
 
-    // OWNER_SPECIFIC: direct owner or the deeding group.
     TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: OWNER_SPECIFIC matches the direct owner or the deeding group", "[ALSceneExplorerPredicate]")
     {
         mC.mOwnerMode = OWNER_SPECIFIC;
@@ -229,7 +224,6 @@ namespace
         CHECK(matches(mFacts, mC));
     }
 
-    // Flag mask requires ALL set bits.
     TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: a flag mask requires every bit it sets", "[ALSceneExplorerPredicate]")
     {
         mC.mFlagMask = ALObjectProperties::FLAG_SCRIPTED;
@@ -298,7 +292,6 @@ namespace
         CHECK(matches(mFacts, mC));
     }
 
-    // Predicates compose: every constraint must hold at once.
     TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: constraints compose and every one must hold at once", "[ALSceneExplorerPredicate]")
     {
         mC.mSearchType = SEARCH_NAME;
@@ -320,7 +313,6 @@ namespace
     // backspacing cases), including the empty-needle transitions.
     TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: classifySubstringChange tells typing from backspacing", "[ALSceneExplorerPredicate]")
     {
-        UNSCOPED_INFO("same needle");
         CHECK(classifySubstringChange("oak", "oak") == CHANGE_NONE);
         UNSCOPED_INFO("typing from empty");
         CHECK(classifySubstringChange("", "oak") == CHANGE_MORE_RESTRICTIVE);
@@ -340,7 +332,6 @@ namespace
         const U32 a = ALObjectProperties::FLAG_SCRIPTED;
         const U32 b = ALObjectProperties::FLAG_LIGHT;
         const U32 c = ALObjectProperties::FLAG_PHANTOM;
-        UNSCOPED_INFO("same mask");
         CHECK(classifyRequireAllMaskChange(a | b, a | b) == CHANGE_NONE);
         UNSCOPED_INFO("first requirement");
         CHECK(classifyRequireAllMaskChange(0, a) == CHANGE_MORE_RESTRICTIVE);
@@ -359,7 +350,6 @@ namespace
     {
         const U32 prim = 1u << ALObjectProperties::GEOM_PRIM;
         const U32 mesh = 1u << ALObjectProperties::GEOM_MESH;
-        UNSCOPED_INFO("same set");
         CHECK(classifyAllowedMaskChange(prim, prim) == CHANGE_NONE);
         UNSCOPED_INFO("any to one kind");
         CHECK(classifyAllowedMaskChange(0, prim) == CHANGE_MORE_RESTRICTIVE);
@@ -376,7 +366,6 @@ namespace
     // Change classification: minimum thresholds (0 = off).
     TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: classifyMinThresholdChange restricts on a raise with 0 as off", "[ALSceneExplorerPredicate]")
     {
-        UNSCOPED_INFO("same threshold");
         CHECK(classifyMinThresholdChange(50.f, 50.f) == CHANGE_NONE);
         UNSCOPED_INFO("enabling");
         CHECK(classifyMinThresholdChange(0.f, 50.f) == CHANGE_MORE_RESTRICTIVE);

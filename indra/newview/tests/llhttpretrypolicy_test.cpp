@@ -39,12 +39,10 @@ TEST_CASE("retry_policy: a policy of zero retries never retries", "[retry_policy
     F32 wait_seconds;
 
     // No retry until we've failed a try.
-    UNSCOPED_INFO("never retry 0");
-    REQUIRE_FALSE(never_retry.shouldRetry(wait_seconds));
+    CHECK_FALSE(never_retry.shouldRetry(wait_seconds));
 
     // 0 retries max.
     never_retry.onFailure(500,headers);
-    UNSCOPED_INFO("never retry 1");
     CHECK_FALSE(never_retry.shouldRetry(wait_seconds));
 }
 
@@ -56,14 +54,12 @@ TEST_CASE("retry_policy: a 404 is retried only when 4xx retries are enabled", "[
     // Normally only retry on server error (5xx)
     LLAdaptiveRetryPolicy noRetry404(1.0,2.0,3.0,10);
     noRetry404.onFailure(404,headers);
-    UNSCOPED_INFO("no retry on 404");
-    REQUIRE_FALSE(noRetry404.shouldRetry(wait_seconds));
+    CHECK_FALSE(noRetry404.shouldRetry(wait_seconds));
 
     // Can retry on 4xx errors if enabled by flag.
     bool do_retry_4xx = true;
     LLAdaptiveRetryPolicy doRetry404(1.0,2.0,3.0,10,do_retry_4xx);
     doRetry404.onFailure(404,headers);
-    UNSCOPED_INFO("do retry on 404");
     CHECK(doRetry404.shouldRetry(wait_seconds));
 }
 
@@ -77,78 +73,61 @@ TEST_CASE("retry_policy: waits double to a cap and retries stop at the limit unt
     U32 frac_bits = 6;
 
     // No retry until we've failed a try.
-    UNSCOPED_INFO("basic_retry 0");
-    REQUIRE_FALSE(basic_retry.shouldRetry(wait_seconds));
+    CHECK_FALSE(basic_retry.shouldRetry(wait_seconds));
 
     // Starting wait 1.0
     basic_retry.onFailure(500,headers);
     should_retry = basic_retry.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("basic_retry 1");
     CHECK(should_retry);
-    UNSCOPED_INFO("basic_retry 1");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(1.0F, frac_bits));
 
     // Double wait to 2.0
     basic_retry.onFailure(500,headers);
     should_retry = basic_retry.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("basic_retry 2");
     CHECK(should_retry);
-    UNSCOPED_INFO("basic_retry 2");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(2.0F, frac_bits));
 
     // Hit max wait of 3.0 (4.0 clamped to max 3)
     basic_retry.onFailure(500,headers);
     should_retry = basic_retry.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("basic_retry 3");
     CHECK(should_retry);
-    UNSCOPED_INFO("basic_retry 3");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(3.0F, frac_bits));
 
     // At max wait, should stay at 3.0
     basic_retry.onFailure(500,headers);
     should_retry = basic_retry.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("basic_retry 4");
     CHECK(should_retry);
-    UNSCOPED_INFO("basic_retry 4");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(3.0F, frac_bits));
 
     // Max retries, should fail now.
     basic_retry.onFailure(500,headers);
     should_retry = basic_retry.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("basic_retry 5");
     CHECK_FALSE(should_retry);
 
     // Max retries, should fail now.
     basic_retry.onFailure(500,headers);
     should_retry = basic_retry.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("basic_retry 5");
     CHECK_FALSE(should_retry);
 
     // After a success, should reset to the starting state.
     basic_retry.onSuccess();
 
     // No retry until we've failed a try.
-    UNSCOPED_INFO("basic_retry 6");
     CHECK_FALSE(basic_retry.shouldRetry(wait_seconds));
 
     // Starting wait 1.0
     basic_retry.onFailure(500,headers);
     should_retry = basic_retry.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("basic_retry 7");
     CHECK(should_retry);
-    UNSCOPED_INFO("basic_retry 7");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(1.0F, frac_bits));
 
     // Double wait to 2.0
     basic_retry.onFailure(500,headers);
     should_retry = basic_retry.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("basic_retry 8");
     CHECK(should_retry);
-    UNSCOPED_INFO("basic_retry 8");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(2.0F, frac_bits));
 }
 
-// Retries should stop as soon as a non-5xx error is received.
 TEST_CASE("retry_policy: retries stop for good at the first non-5xx error", "[retry_policy]")
 {
     // Should retry after 1.0, 2.0, 3.0, 3.0 seconds.
@@ -161,29 +140,23 @@ TEST_CASE("retry_policy: retries stop for good at the first non-5xx error", "[re
     // Starting wait 1.0
     killer404.onFailure(500,headers);
     should_retry = killer404.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("killer404 1");
     CHECK(should_retry);
-    UNSCOPED_INFO("killer404 1");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(1.0F, frac_bits));
 
     // Double wait to 2.0
     killer404.onFailure(500,headers);
     should_retry = killer404.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("killer404 2");
     CHECK(should_retry);
-    UNSCOPED_INFO("killer404 2");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(2.0F, frac_bits));
 
     // Should fail on non-5xx
     killer404.onFailure(404,headers);
     should_retry = killer404.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("killer404 3");
     CHECK_FALSE(should_retry);
 
     // After a non-5xx, should keep failing.
     killer404.onFailure(500,headers);
     should_retry = killer404.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("killer404 4");
     CHECK_FALSE(should_retry);
 }
 
@@ -204,51 +177,38 @@ TEST_CASE("retry_policy: a retry-after header overrides the wait but not its pro
 
     policy.onFailure(500,headers_without_retry);
     should_retry = policy.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("retry header 1");
     CHECK(should_retry);
-    UNSCOPED_INFO("retry header 1");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(1.0F, frac_bits));
 
     policy.onFailure(500,headers_without_retry);
     should_retry = policy.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("retry header 2");
     CHECK(should_retry);
-    UNSCOPED_INFO("retry header 2");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(2.0F, frac_bits));
 
     policy.onFailure(500,headers_with_retry);
     should_retry = policy.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("retry header 3");
     CHECK(should_retry);
     // 4.0 overrides by header -> 666.0
-    UNSCOPED_INFO("retry header 3");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(666.0F, frac_bits));
 
     policy.onFailure(500,headers_with_retry);
     should_retry = policy.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("retry header 4");
     CHECK(should_retry);
     // 8.0 overrides by header -> 666.0
-    UNSCOPED_INFO("retry header 4");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(666.0F, frac_bits));
 
     policy.onFailure(500,headers_without_retry);
     should_retry = policy.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("retry header 5");
     CHECK(should_retry);
-    UNSCOPED_INFO("retry header 5");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(16.0F, frac_bits));
 
     policy.onFailure(500,headers_without_retry);
     should_retry = policy.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("retry header 6");
     CHECK(should_retry);
-    UNSCOPED_INFO("retry header 6");
     CHECK_THAT(wait_seconds, ll_test::WithinBits(25.0F, frac_bits));
 
     policy.onFailure(500,headers_with_retry);
     should_retry = policy.shouldRetry(wait_seconds);
-    UNSCOPED_INFO("retry header 7");
     CHECK_FALSE(should_retry);
 }
 
@@ -262,17 +222,13 @@ TEST_CASE("retry_policy: getSecondsUntilRetryAfter parses seconds and an HTTP da
     std::string str1("0");
     seconds_to_wait = F32_MAX;
     success = LLAdaptiveRetryPolicy::getSecondsUntilRetryAfter(str1, seconds_to_wait);
-    UNSCOPED_INFO("parse 1");
     CHECK(success);
-    UNSCOPED_INFO("parse 1");
     CHECK(seconds_to_wait == 0.0);
 
     std::string str2("999.9");
     seconds_to_wait = F32_MAX;
     success = LLAdaptiveRetryPolicy::getSecondsUntilRetryAfter(str2, seconds_to_wait);
-    UNSCOPED_INFO("parse 2");
     CHECK(success);
-    UNSCOPED_INFO("parse 2");
     CHECK_THAT(seconds_to_wait, ll_test::WithinBits(999.9F, 8));
 
     time_t nowseconds;
@@ -281,13 +237,10 @@ TEST_CASE("retry_policy: getSecondsUntilRetryAfter parses seconds and an HTTP da
     seconds_to_wait = F32_MAX;
     success = LLAdaptiveRetryPolicy::getSecondsUntilRetryAfter(str3, seconds_to_wait);
     std::cerr << " str3 [" << str3 << "]" << std::endl;
-    UNSCOPED_INFO("parse 3");
     CHECK(success);
-    UNSCOPED_INFO("parse 3");
     CHECK_THAT(seconds_to_wait, Catch::Matchers::WithinAbs(44.0F, 2.0F));
 }
 
-// Test retry-after field in both llmessage and CoreHttp headers.
 TEST_CASE("retry_policy: retry-after is honoured in both llmessage and CoreHttp headers", "[retry_policy]")
 {
     std::cerr << "7 starts" << std::endl;
@@ -300,15 +253,12 @@ TEST_CASE("retry_policy: retry-after is honoured in both llmessage and CoreHttp 
     bool should_retry;
 
     // No retry until we've failed a try.
-    UNSCOPED_INFO("header 0");
-    REQUIRE_FALSE(policy.shouldRetry(seconds_to_wait));
+    CHECK_FALSE(policy.shouldRetry(seconds_to_wait));
 
     // no retry header, use default.
     policy.onFailure(500,LLSD());
     should_retry = policy.shouldRetry(seconds_to_wait);
-    UNSCOPED_INFO("header 1");
     CHECK(should_retry);
-    UNSCOPED_INFO("header 1");
     CHECK_THAT(seconds_to_wait, ll_test::WithinBits(17.0F, 6));
 
     // retry header should override, give delay of 0
@@ -316,9 +266,7 @@ TEST_CASE("retry_policy: retry-after is honoured in both llmessage and CoreHttp 
     sd_headers[HTTP_IN_HEADER_RETRY_AFTER] = date_string;
     policy.onFailure(503,sd_headers);
     should_retry = policy.shouldRetry(seconds_to_wait);
-    UNSCOPED_INFO("header 2");
     CHECK(should_retry);
-    UNSCOPED_INFO("header 2");
     CHECK_THAT(seconds_to_wait, Catch::Matchers::WithinAbs(7.0F, 2.0F));
 
     LLCore::HttpResponse *response;
@@ -331,9 +279,7 @@ TEST_CASE("retry_policy: retry-after is honoured in both llmessage and CoreHttp 
     headers->append(HTTP_IN_HEADER_RETRY_AFTER, std::string("600"));
     policy.onFailure(response);
     should_retry = policy.shouldRetry(seconds_to_wait);
-    UNSCOPED_INFO("header 3");
     CHECK(should_retry);
-    UNSCOPED_INFO("header 3");
     CHECK_THAT(seconds_to_wait, ll_test::WithinBits(600.0F, 6));
     response->release();
 
@@ -347,24 +293,19 @@ TEST_CASE("retry_policy: retry-after is honoured in both llmessage and CoreHttp 
     headers->append(HTTP_IN_HEADER_RETRY_AFTER,date_string);
     policy.onFailure(response);
     should_retry = policy.shouldRetry(seconds_to_wait);
-    UNSCOPED_INFO("header 4");
     CHECK(should_retry);
-    UNSCOPED_INFO("header 4");
     CHECK_THAT(seconds_to_wait, Catch::Matchers::WithinAbs(77.0F, 2.0F));
     response->release();
 
     // Timeout should be clamped at max.
     policy.onFailure(500,LLSD());
     should_retry = policy.shouldRetry(seconds_to_wait);
-    UNSCOPED_INFO("header 5");
     CHECK(should_retry);
-    UNSCOPED_INFO("header 5");
     CHECK_THAT(seconds_to_wait, ll_test::WithinBits(644.0F, 6));
 
     // No more retries.
     policy.onFailure(500,LLSD());
     should_retry = policy.shouldRetry(seconds_to_wait);
-    UNSCOPED_INFO("header 6");
     CHECK_FALSE(should_retry);
 }
 

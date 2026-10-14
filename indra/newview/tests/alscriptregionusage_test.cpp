@@ -109,7 +109,6 @@ namespace
         const LLDate          when(1.8e9);
         Usage::usages_t       read;
         Usage::readAttachments(attachments, when, read);
-        UNSCOPED_INFO("both");
         REQUIRE(read.size() == 2U);
         {
             INFO("the chest's");
@@ -167,13 +166,10 @@ namespace
         answer["attachments"][0]["objects"].append(object(id(1), 65536, 2));
         answer["attachments"][0]["objects"].append(object(id(2), 16384, 0));
         attachmentAsks[0](answer);
-        {
-            INFO("heard");
-            CHECK(heard == 1);
-            REQUIRE(usage.usageOf(id(1)));
-            REQUIRE(usage.usageOf(id(1))->urls == 2);
-            CHECK(usage.usageOf(id(2))->memory == 16384);
-        }
+        CHECK(heard == 1);
+        REQUIRE(usage.usageOf(id(1)));
+        REQUIRE(usage.usageOf(id(1))->urls == 2);
+        CHECK(usage.usageOf(id(2))->memory == 16384);
         LLSD parcel;
         parcel["parcels"][0]["objects"].append(object(id(3), 131072, 0));
         parcel["parcels"][0]["objects"].append(object(id(4), 65536, 0));
@@ -191,7 +187,6 @@ namespace
         kinds[id(3)] = Kind::Land;
         kinds[id(4)] = Kind::Land;
         usage.ask({ id(3) }, 100.0);
-        UNSCOPED_INFO("asked");
         REQUIRE(landAsks.size() == 1U);
         usage.ask({ id(3) }, 130.0);
         UNSCOPED_INFO("not again within the minute");
@@ -276,17 +271,13 @@ namespace
         times[id(5)] = 2.0f;
         const S32 before = heard;
         timeAsks[0].second(times);
-        UNSCOPED_INFO("heard");
         CHECK(heard == before + 1);
         const ALScriptRegionUsage::Usage* one = usage.usageOf(id(1));
-        {
-            INFO("its time and its memory");
-            REQUIRE(one);
-            REQUIRE(one->hasTime());
-            REQUIRE(one->time == 0.125f);
-            REQUIRE(one->hasMemory());
-            CHECK(one->memory == 65536);
-        }
+        REQUIRE(one);
+        REQUIRE(one->hasTime());
+        REQUIRE(one->time == 0.125f);
+        REQUIRE(one->hasMemory());
+        CHECK(one->memory == 65536);
         {
             INFO("an object not asked about kept too, time alone");
             REQUIRE(usage.usageOf(id(5)));

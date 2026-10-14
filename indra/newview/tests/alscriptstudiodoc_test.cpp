@@ -116,18 +116,14 @@ namespace
 
     TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: levelOf reads compiler words and severities and ProblemTraits a row", "[ALScriptStudioDoc]")
     {
-        UNSCOPED_INFO("WARNING");
         CHECK(Doc::levelOf("WARNING") == Doc::Level::Warning);
-        UNSCOPED_INFO("WARN");
         CHECK(Doc::levelOf("WARN") == Doc::Level::Warning);
         {
             INFO("anything else is an error, as the server has two");
             CHECK(Doc::levelOf("ERROR") == Doc::Level::Error);
             CHECK(Doc::levelOf("oops") == Doc::Level::Error);
         }
-        UNSCOPED_INFO("a note");
         CHECK(Doc::levelOf(ALScriptProblem::Severity::Note) == Doc::Level::Note);
-        UNSCOPED_INFO("named");
         CHECK(std::string(Doc::levelName(Doc::Level::Warning)) == "WARNING");
 
         Doc::Shown shown;
@@ -149,7 +145,6 @@ namespace
         CHECK_FALSE(Doc::ProblemTraits::mentions(shown, "state"));
         UNSCOPED_INFO("its rule is where it came from");
         CHECK(Doc::ProblemTraits::rule(shown) == "Luau");
-        UNSCOPED_INFO("its level");
         CHECK(Doc::ProblemTraits::level(shown) == ALFindingLevel::Warning);
     }
 
@@ -163,9 +158,7 @@ namespace
         al_studio_test::FakeServices services(window.floater);
         UNSCOPED_INFO("a word of the skin's");
         CHECK(services.words("ObjectNameComing") == std::string("\xE2\x80\xA6"));
-        UNSCOPED_INFO("one");
         CHECK(services.counted("Fixes", 1) == std::string("1 fix"));
-        UNSCOPED_INFO("many");
         CHECK(services.counted("Fixes", 3) == std::string("3 fixes"));
 
         LLUUID object, item;
@@ -181,15 +174,14 @@ namespace
         CHECK(services.findDoc("disk:/lib.lsl") == &file);
         UNSCOPED_INFO("by what it holds");
         CHECK(services.findDoc(ref) == &script);
-        UNSCOPED_INFO("none");
-        REQUIRE(services.findDoc("nothing") == nullptr);
+        CHECK(services.findDoc("nothing") == nullptr);
 
         services.report("Saved", false, &script, { "retry" });
         {
             INFO("said of the tab");
             REQUIRE(services.reports.size() == 1);
             CHECK(services.reports.front().doc == "script");
-            REQUIRE(services.reports.front().actions.size() == 1);
+            CHECK(services.reports.front().actions.size() == 1);
         }
         services.openScript(ref, "Door", std::nullopt, 12);
         {
@@ -207,7 +199,7 @@ namespace
         {
             INFO("on its line, before the #");
             REQUIRE(util.has_value());
-            REQUIRE(util->name == "lib/util.lsl");
+            CHECK(util->name == "lib/util.lsl");
             CHECK_FALSE(util->require);
         }
         UNSCOPED_INFO("the whole line");
@@ -216,8 +208,8 @@ namespace
         CHECK(Doc::namedIn(lsl, ALTextPos(2, 12), false, none)->name == "sys.lsl");
         {
             INFO("not a string elsewhere");
-            REQUIRE_FALSE(Doc::namedIn(lsl, ALTextPos(3, 12), false, none));
-            REQUIRE_FALSE(Doc::namedIn(lsl, ALTextPos(0, 3), false, none));
+            CHECK_FALSE(Doc::namedIn(lsl, ALTextPos(3, 12), false, none));
+            CHECK_FALSE(Doc::namedIn(lsl, ALTextPos(0, 3), false, none));
         }
 
         const std::string                           source = "local m = require(\"mod\")\nlocal n = 1\n";
@@ -227,19 +219,19 @@ namespace
         {
             INFO("in a require call");
             REQUIRE(mod.has_value());
-            REQUIRE(mod->name == "mod");
+            CHECK(mod->name == "mod");
             CHECK(mod->require);
         }
         UNSCOPED_INFO("over the call");
         CHECK(mod->range == ALTextRange(ALTextPos(0, 10), ALTextPos(0, 24)));
         UNSCOPED_INFO("not before it");
-        REQUIRE_FALSE(Doc::namedIn(lua, ALTextPos(0, 3), true, calls));
+        CHECK_FALSE(Doc::namedIn(lua, ALTextPos(0, 3), true, calls));
         UNSCOPED_INFO("not in LSL");
-        REQUIRE_FALSE(Doc::namedIn(lua, ALTextPos(0, 12), false, calls));
+        CHECK_FALSE(Doc::namedIn(lua, ALTextPos(0, 12), false, calls));
 
         Doc doc;
         UNSCOPED_INFO("no run, nothing found");
-        REQUIRE(doc.foundAs("lib/util.lsl").empty());
+        CHECK(doc.foundAs("lib/util.lsl").empty());
         doc.expanded.valid    = true;
         doc.expanded.resolved = { { "", "lib/util.lsl", false, "disk:/s/lib/util.lsl" },
                                   { "disk:/s/lib/util.lsl", "inner.lsl", false, "disk:/s/inner.lsl" },
@@ -247,11 +239,11 @@ namespace
         UNSCOPED_INFO("the script's own");
         CHECK(doc.foundAs("lib/util.lsl") == std::string("disk:/s/lib/util.lsl"));
         UNSCOPED_INFO("not an include's own");
-        REQUIRE(doc.foundAs("inner.lsl").empty());
+        CHECK(doc.foundAs("inner.lsl").empty());
         {
             INFO("a module as a module");
             CHECK(doc.foundAs("mod", true) == "inv:mod");
-            REQUIRE(doc.foundAs("mod", false).empty());
+            CHECK(doc.foundAs("mod", false).empty());
         }
         doc.expanded.valid  = false;
         doc.uploaded.valid  = true;
@@ -287,8 +279,8 @@ namespace
         doc.heardRuntime(said, true);
         {
             INFO("held");
-            REQUIRE(doc.runtime.empty());
-            REQUIRE(doc.runtimeHeld.size() == 1);
+            CHECK(doc.runtime.empty());
+            CHECK(doc.runtimeHeld.size() == 1);
         }
         doc.heardRuntime(said, true);
 
@@ -305,18 +297,18 @@ namespace
         doc.placeHeldRuntime();
         {
             INFO("placed, and let go of");
-            REQUIRE(doc.runtimeHeld.empty());
+            CHECK(doc.runtimeHeld.empty());
             REQUIRE(doc.runtime.size() == 1);
         }
         {
             INFO("at the source's line, said twice");
             CHECK(doc.runtime[0].line == 2);
-            REQUIRE(doc.runtime[0].file.empty());
-            REQUIRE(doc.runtime[0].count == 2);
+            CHECK(doc.runtime[0].file.empty());
+            CHECK(doc.runtime[0].count == 2);
         }
         doc.heardRuntime(said, false);
         UNSCOPED_INFO("said again: counted");
-        REQUIRE(doc.runtime[0].count == 3);
+        CHECK(doc.runtime[0].count == 3);
         said.line = 0;
         doc.heardRuntime(said, false);
         {
@@ -330,7 +322,7 @@ namespace
             INFO("past the map: code the preprocessor made, at its own line");
             CHECK(made.generated);
             CHECK(made.line == 9);
-            REQUIRE(made.file.empty());
+            CHECK(made.file.empty());
         }
         said.line = 9;
         doc.heardRuntime(said, false);
@@ -351,19 +343,13 @@ namespace
         rows[2].level = Doc::Level::Warning;
         rows[3].level = Doc::Level::Note;
         doc.setShown(rows);
-        UNSCOPED_INFO("four rows");
-        REQUIRE(doc.shown().size() == 4);
-        UNSCOPED_INFO("one error");
+        CHECK(doc.shown().size() == 4);
         CHECK(doc.shownErrors == 1);
-        UNSCOPED_INFO("two warnings");
         CHECK(doc.shownWarnings == 2);
         doc.setShown({});
-        {
-            INFO("none");
-            REQUIRE(doc.shown().empty());
-            CHECK(doc.shownErrors == 0);
-            CHECK(doc.shownWarnings == 0);
-        }
+        CHECK(doc.shown().empty());
+        CHECK(doc.shownErrors == 0);
+        CHECK(doc.shownWarnings == 0);
     }
 
     TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: a notecard's items carry into another tab but a script tab has none", "[ALScriptStudioDoc]")
@@ -394,7 +380,7 @@ namespace
         Doc script, after;
         script.carryItemsTo(after);
         UNSCOPED_INFO("a script's tab carries nothing");
-        REQUIRE_FALSE(after.carriedEmbedded);
+        CHECK_FALSE(after.carriedEmbedded);
     }
 
     TEST_CASE_METHOD(alscriptstudiodoc_data, "ALScriptStudioDoc: undo follows the view in front but the tab's own for a comparison of it", "[ALScriptStudioDoc]")
@@ -444,7 +430,7 @@ namespace
 
         const ALScriptEnvelope plain = doc.envelopeFor(expanded, "Test 1.0");
         UNSCOPED_INFO("none unasked");
-        REQUIRE(plain.header.empty());
+        CHECK(plain.header.empty());
 
         ALScriptHeaderOptions asked;
         asked.on      = true;
@@ -456,12 +442,10 @@ namespace
             REQUIRE(said.has_value());
             CHECK(said->ours);
         }
-        UNSCOPED_INFO("its hash");
         CHECK(said->hash == ALUploadHeader::hashOf("mono", doc.editor->text(), expanded));
-        UNSCOPED_INFO("who");
         CHECK(said->creator == std::string("Some One"));
         UNSCOPED_INFO("no file: a tab has no link");
-        REQUIRE(said->file.empty());
+        CHECK(said->file.empty());
         const int lines = static_cast<int>(std::count(with.header.begin(), with.header.end(), '\n'));
         UNSCOPED_INFO("the code its lines down");
         CHECK(with.codeLine() == plain.codeLine() + lines);
@@ -469,7 +453,7 @@ namespace
         {
             INFO("parsed back with it");
             REQUIRE(back.has_value());
-            REQUIRE(back->header == with.header);
+            CHECK(back->header == with.header);
             CHECK(back->expanded == expanded);
         }
     }

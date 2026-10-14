@@ -151,40 +151,33 @@ namespace
     {
         ALScriptReferencesPane* refs = pane();
         refs->show(found());
-        UNSCOPED_INFO("the head");
         CHECK(head() == std::string("3 occurrences of count in 2 scripts."));
         UNSCOPED_INFO("the window told");
         CHECK(window.pane().counts == 1);
-        UNSCOPED_INFO("each place");
         CHECK(lines() == joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
         const std::vector<LLScrollListItem*> rows = refs->list()->getAllData();
-        UNSCOPED_INFO("the declaration");
         CHECK(cell(rows[0], 2) == std::string("declaration"));
         UNSCOPED_INFO("in the script it is declared in only");
         CHECK(cell(rows[2], 2) == std::string());
         UNSCOPED_INFO("its text");
         CHECK(cell(rows[1], 3) == std::string("x = count;"));
         UNSCOPED_INFO("kept");
-        REQUIRE(refs->found().places.size() == size_t(3));
+        CHECK(refs->found().places.size() == size_t(3));
         Found twice = found();
         twice.places.push_back(place("", 0, 20, "integer count; count"));
         refs->show(twice);
         UNSCOPED_INFO("on the declaration's line, not it");
-        REQUIRE(cell(refs->list()->getAllData()[3], 2).empty());
+        CHECK(cell(refs->list()->getAllData()[3], 2).empty());
 
         Found in_b = found();
         in_b.home  = B;
         refs->show(in_b);
         UNSCOPED_INFO("declared in B: A's first line not it");
-        REQUIRE(cell(refs->list()->getAllData()[0], 2).empty());
+        CHECK(cell(refs->list()->getAllData()[0], 2).empty());
         refs->forget();
-        UNSCOPED_INFO("nothing");
         CHECK(head() == std::string("Nothing to show yet. Put the caret on a name and choose Find References."));
-        {
-            INFO("no rows");
-            REQUIRE(refs->list()->getItemCount() == 0);
-            REQUIRE(refs->found().from.empty());
-        }
+        CHECK(refs->list()->getItemCount() == 0);
+        CHECK(refs->found().from.empty());
         UNSCOPED_INFO("told each time");
         CHECK(window.pane().counts == 4);
     }
@@ -258,7 +251,7 @@ namespace
         refs->show(found());
         refs->choose(false);
         UNSCOPED_INFO("nothing chosen, nothing gone to");
-        REQUIRE(window.pane().chosen.empty());
+        CHECK(window.pane().chosen.empty());
         // A row is known by its place's number, counted from one.
         refs->list()->selectByValue(LLSD(3));
         refs->list()->onCommit();
@@ -276,18 +269,12 @@ namespace
 
         // The list's keys: return goes to the place chosen, to type there,
         // escape back to the script; and the rows copy.
-        {
-            INFO("return");
-            CHECK(refs->list()->handleKeyHere(KEY_RETURN, MASK_NONE));
-            CHECK(window.pane().chosen.back() == "a2||0 editor");
-        }
+        CHECK(refs->list()->handleKeyHere(KEY_RETURN, MASK_NONE));
+        CHECK(window.pane().chosen.back() == "a2||0 editor");
         const size_t gone = window.pane().chosen.size();
-        {
-            INFO("escape");
-            CHECK(refs->list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
-            REQUIRE(window.services().reveals.back());
-            REQUIRE(window.pane().chosen.size() == gone);
-        }
+        CHECK(refs->list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+        CHECK(window.services().reveals.back());
+        CHECK(window.pane().chosen.size() == gone);
         UNSCOPED_INFO("copied");
         CHECK(refs->list()->handleKeyHere('C', MASK_CONTROL));
     }
@@ -301,7 +288,6 @@ namespace
         ALPaneList* list = refs->list();
         list->sortByColumn("text", true);
         list->updateSort();
-        UNSCOPED_INFO("by text");
         CHECK(lines() == joined(Names{ "A 3:1", "B 1:9", "A 1:9", "A 2:5" }));
         list->sortByColumn("where", false);
         list->updateSort();
@@ -334,7 +320,7 @@ namespace
         // again until the frame is drawn.
         a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), "total" } });
         UNSCOPED_INFO("one place fewer");
-        REQUIRE(refs->found().places.size() == size_t(2));
+        CHECK(refs->found().places.size() == size_t(2));
         window.pane().chosen.clear();
         refs->choose(false);
         UNSCOPED_INFO("A's second, not what took its index");
@@ -353,7 +339,6 @@ namespace
             made    = kept;
             applied = true;
         });
-        UNSCOPED_INFO("previewing");
         CHECK(refs->previewing());
         UNSCOPED_INFO("what it will do over them");
         CHECK(head() == std::string("Rename 3 places"));
@@ -438,7 +423,7 @@ namespace
         CHECK_FALSE(changes->getVisible());
         {
             INFO("each row as found");
-            REQUIRE(cell(refs->list()->getAllData()[0], 3) == "integer count;");
+            CHECK(cell(refs->list()->getAllData()[0], 3) == "integer count;");
             CHECK(refs->list()->getAllData()[0]->getColumn(2)->getValue().asString() != "1");
         }
     }
@@ -483,7 +468,7 @@ namespace
         CHECK(lines() == joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
         {
             INFO("the same rows");
-            REQUIRE(refs->list()->rowWithKey("2") == second);
+            CHECK(refs->list()->rowWithKey("2") == second);
             CHECK(refs->list()->rowWithKey("3") == in_b);
         }
         UNSCOPED_INFO("one not moved, its cells as they were");
@@ -502,9 +487,8 @@ namespace
         refs->show(many);
         UNSCOPED_INFO("a thousand and one row saying the rest");
         CHECK(refs->list()->getItemCount() == 1001);
-        UNSCOPED_INFO("the rest");
         CHECK(cell(refs->list()->getAllData().back(), 3) == window.services().counted("ReferencesUnlisted", 3));
         UNSCOPED_INFO("all of them counted over the list");
-        REQUIRE(head().find("1003") != std::string::npos);
+        CHECK(head().find("1003") != std::string::npos);
     }
 }

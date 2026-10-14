@@ -327,12 +327,13 @@ namespace
         typedef std::vector<std::string> Names;
     };
 
+    // A tab may be linked where it is an item's, loaded, may be changed and is linked to
+    // nothing yet.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: only a loaded changeable item's unlinked tab may be linked", "[alscriptstudiomasters]")
     {
         make();
         Doc& script = itemTab("door", "default {}\n");
         Doc& card   = itemTab("card", "notes\n", false, true);
-        UNSCOPED_INFO("no tab");
         CHECK_FALSE(unit->canLink(nullptr));
         UNSCOPED_INFO("an item's script");
         CHECK(unit->canLink(&script));
@@ -368,6 +369,8 @@ namespace
         CHECK(unit->mastersAny(services.findDoc("disk:" + in("door.lsl"))));
     }
 
+    // A notecard carrying items is not linked, and says why, before any file is picked; a script,
+    // or a notecard carrying none, carries nothing.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a notecard carrying items is refused with a reason before any pick", "[alscriptstudiomasters]")
     {
         make();
@@ -403,6 +406,8 @@ namespace
         REQUIRE_FALSE(disk.linkOf(card.ref));
     }
 
+    // A file picked of another language is refused, and said, before anything is linked: LSL, SLua,
+    // a notecard's, and a name with no extension.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a file picked of another language is refused and its own is linked", "[alscriptstudiomasters]")
     {
         make();
@@ -468,6 +473,8 @@ namespace
         }
     }
 
+    // A clean tab linked gives way to its file's tab; where the file is what it holds the file's
+    // stamp is taken, else Send File and Compare are offered there.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a linked clean tab gives way and takes the stamp of a matching file", "[alscriptstudiomasters]")
     {
         make();
@@ -477,7 +484,6 @@ namespace
         write(in("door.lsl"), "default {}\n");
         studio->picked = in("door.lsl");
         unit->linkToFile(same);
-        UNSCOPED_INFO("nothing asked");
         REQUIRE(studio->asked.empty());
         const std::optional<ALMasterLink> link = disk.linkOf(ref);
         {
@@ -537,6 +543,8 @@ namespace
         }
     }
 
+    // A tab with unsaved changes linked is asked first: Cancel links nothing, Discard holds the
+    // file up to the text as last saved, Write puts what was typed in the file.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: linking a tab with unsaved changes asks to cancel or discard or write", "[alscriptstudiomasters]")
     {
         make();
@@ -629,6 +637,8 @@ namespace
         }
     }
 
+    // Linked from elsewhere: a clean tab gives way to its file's once the links have changed; one
+    // with something typed is kept and told once, with Compare with File, Open File and Unlink.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a link from elsewhere closes a clean tab and tells a typed one once", "[alscriptstudiomasters]")
     {
         make();
@@ -658,7 +668,7 @@ namespace
             });
         };
         UNSCOPED_INFO("the one with something typed told once");
-        CHECK(told("lamp") == 1);
+        REQUIRE(told("lamp") == 1);
         const al_studio_test::FakeServices::Said& lamp = *std::find_if(services.reports.begin(), services.reports.end(),
                                                                          [](const al_studio_test::FakeServices::Said& one) { return one.doc == "lamp"; });
         {
@@ -690,6 +700,8 @@ namespace
         CHECK(services.findDoc("gone") == &gone);
     }
 
+    // A tab kept for what was typed gives way once that is saved -- its file's tab offering Send
+    // File and Compare where the world now differs -- or reverted.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a tab kept for what was typed gives way once saved or reverted", "[alscriptstudiomasters]")
     {
         make();
@@ -699,7 +711,7 @@ namespace
         const ALScriptRef door_ref = door.ref;
         ALMasterLink      link     = linkFromElsewhere(door, in("door.lsl"));
         settle();
-        UNSCOPED_INFO("kept");
+        UNSCOPED_INFO("the tab with something typed is kept");
         CHECK(services.findDoc("door") == &door);
 
         // Saved from here: the world holds what was typed, and the save
@@ -751,7 +763,6 @@ namespace
         const size_t before = services.reports.size();
         unit->saved(saved);
         settle();
-        UNSCOPED_INFO("nothing");
         REQUIRE(services.reports.size() == before);
 
         // Reverted: loaded again, clean.
@@ -770,6 +781,8 @@ namespace
         }
     }
 
+    // The offers on a tab kept for what was typed: its file on disk set beside it, its file's tab
+    // opened beside it, the link let go of.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a kept tab's offers compare with its file or open it or unlink it", "[alscriptstudiomasters]")
     {
         make();
@@ -780,7 +793,6 @@ namespace
         settle();
 
         unit->offer(door, "master_compare_file");
-        UNSCOPED_INFO("compared once");
         REQUIRE(studio->compared.size() == size_t(1));
         const FakeMastersWindow::Compared& compared = studio->compared.back();
         {
@@ -836,6 +848,8 @@ namespace
         REQUIRE(studio->compared.size() == 1);
     }
 
+    // The file a script names is linked by Link while nothing is typed in its tab; with something
+    // typed, it is to be saved or reverted first, and nothing is written.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: the Link offer links a script's named file only while nothing is typed", "[alscriptstudiomasters]")
     {
         make();
@@ -887,6 +901,9 @@ namespace
         }
     }
 
+    // A tab kept for what was typed, made clean by an undo, is kept and offered to switch to
+    // its file, and told again when typed in; Switch to File gives way, as a revert or a save
+    // of it does.
     TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a kept tab made clean by an undo is offered Switch to File", "[alscriptstudiomasters]")
     {
         make();

@@ -43,29 +43,19 @@ namespace
     // it started from.
     TEST_CASE_METHOD(history_data, "ALGradeHistory: one change is one step whose undo hands back where it started", "[ALGradeHistory]")
     {
-        UNSCOPED_INFO("nothing to undo yet");
         CHECK_FALSE(mHistory.canUndo());
-        UNSCOPED_INFO("nothing to redo yet");
         CHECK_FALSE(mHistory.canRedo());
 
         mHistory.record("RenderColorGradeSaturation", LLSD(1.0), LLSD(1.5), 1.f);
-        UNSCOPED_INFO("something to undo");
         CHECK(mHistory.canUndo());
-        UNSCOPED_INFO("one step");
         CHECK(mHistory.depth() == (size_t)1);
 
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("undo returned a transaction");
         REQUIRE(t != nullptr);
-        UNSCOPED_INFO("covering one control");
         REQUIRE(t->size() == (size_t)1);
-        UNSCOPED_INFO("the right control");
         CHECK(t->front().mName == std::string("RenderColorGradeSaturation"));
-        UNSCOPED_INFO("restoring the original");
         CHECK(t->front().mBefore.asReal() == 1.0);
-        UNSCOPED_INFO("nothing left to undo");
         CHECK_FALSE(mHistory.canUndo());
-        UNSCOPED_INFO("but something to redo");
         CHECK(mHistory.canRedo());
     }
 
@@ -77,11 +67,9 @@ namespace
     {
         drag("RenderColorGradeLift", 100, 0.01f);
 
-        UNSCOPED_INFO("a whole drag is one step");
         CHECK(mHistory.depth() == (size_t)1);
 
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("got the step");
         REQUIRE(t != nullptr);
         UNSCOPED_INFO("from where the drag began");
         CHECK(t->front().mBefore.asReal() == 0.0);
@@ -96,7 +84,6 @@ namespace
         mHistory.record("RenderColorGradeGain", LLSD(1.0), LLSD(1.1), 1.f);
         mHistory.record("RenderColorGradeGain", LLSD(1.1), LLSD(1.2),
                         1.f + ALGradeHistory::COALESCE_SECONDS * 2.f);
-        UNSCOPED_INFO("two separate edits");
         CHECK(mHistory.depth() == (size_t)2);
     }
 
@@ -107,7 +94,6 @@ namespace
     {
         mHistory.record("RenderColorGradeContrast", LLSD(1.0), LLSD(1.2), 1.f);
         mHistory.record("RenderColorGradeSaturation", LLSD(1.0), LLSD(1.2), 1.01f);
-        UNSCOPED_INFO("two steps");
         CHECK(mHistory.depth() == (size_t)2);
     }
 
@@ -121,12 +107,9 @@ namespace
         mHistory.record("C", LLSD(3.0), LLSD(0.0), 1.f);
         mHistory.endGroup();
 
-        UNSCOPED_INFO("one step");
         CHECK(mHistory.depth() == (size_t)1);
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("got it");
         REQUIRE(t != nullptr);
-        UNSCOPED_INFO("covering all three");
         REQUIRE(t->size() == (size_t)3);
     }
 
@@ -141,13 +124,9 @@ namespace
         mHistory.endGroup();
 
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("got it");
         REQUIRE(t != nullptr);
-        UNSCOPED_INFO("still one control");
         REQUIRE(t->size() == (size_t)1);
-        UNSCOPED_INFO("from the original value");
         CHECK(t->front().mBefore.asReal() == 1.0);
-        UNSCOPED_INFO("to the final one");
         CHECK(t->front().mAfter.asReal() == 3.0);
     }
 
@@ -158,11 +137,9 @@ namespace
         mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
         mHistory.record("B", LLSD(0.0), LLSD(1.0), 2.f);
         mHistory.undo();
-        UNSCOPED_INFO("can redo before the new edit");
         CHECK(mHistory.canRedo());
 
         mHistory.record("C", LLSD(0.0), LLSD(1.0), 3.f);
-        UNSCOPED_INFO("redo tail is gone");
         CHECK_FALSE(mHistory.canRedo());
         UNSCOPED_INFO("and the stack was truncated");
         CHECK(mHistory.depth() == (size_t)2);
@@ -175,13 +152,9 @@ namespace
         mHistory.undo();
 
         const auto* t = mHistory.redo();
-        UNSCOPED_INFO("redo returned the step");
         REQUIRE(t != nullptr);
-        UNSCOPED_INFO("with the destination");
         CHECK(t->front().mAfter.asReal() == 1.0);
-        UNSCOPED_INFO("nothing further to redo");
         CHECK_FALSE(mHistory.canRedo());
-        UNSCOPED_INFO("and it is undoable again");
         CHECK(mHistory.canUndo());
     }
 
@@ -198,7 +171,6 @@ namespace
         UNSCOPED_INFO("the undone step was replaced, not extended");
         CHECK(mHistory.depth() == (size_t)1);
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("got the new step");
         REQUIRE(t != nullptr);
         UNSCOPED_INFO("carrying the new values");
         CHECK(t->front().mBefore.asReal() == 1.0);
@@ -212,12 +184,10 @@ namespace
         {
             mHistory.record("A", LLSD((F64)i), LLSD((F64)(i + 1)), (F32)i * 10.f);
         }
-        UNSCOPED_INFO("capped");
         CHECK(mHistory.depth() == ALGradeHistory::MAX_DEPTH);
 
         // The newest is still the newest after the drop.
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("got the newest");
         REQUIRE(t != nullptr);
         UNSCOPED_INFO("which is the last one recorded");
         CHECK(t->front().mAfter.asReal() == (F64)(ALGradeHistory::MAX_DEPTH + 20));
@@ -229,9 +199,7 @@ namespace
     {
         mHistory.beginGroup();
         mHistory.endGroup();
-        UNSCOPED_INFO("no step");
         CHECK_FALSE(mHistory.canUndo());
-        UNSCOPED_INFO("nothing recorded");
         CHECK(mHistory.depth() == (size_t)0);
     }
 
@@ -247,12 +215,9 @@ namespace
         mHistory.record("C", LLSD(0.0), LLSD(1.0), 1.f);
         mHistory.endGroup();
 
-        UNSCOPED_INFO("one step");
         CHECK(mHistory.depth() == (size_t)1);
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("got it");
         REQUIRE(t != nullptr);
-        UNSCOPED_INFO("covering all three");
         REQUIRE(t->size() == (size_t)3);
     }
 
@@ -260,9 +225,7 @@ namespace
     // than misbehaving -- the key handler calls these without checking first.
     TEST_CASE_METHOD(history_data, "ALGradeHistory: undo and redo past either end answer null", "[ALGradeHistory]")
     {
-        UNSCOPED_INFO("undo on empty is null");
         REQUIRE(mHistory.undo() == nullptr);
-        UNSCOPED_INFO("redo on empty is null");
         REQUIRE(mHistory.redo() == nullptr);
 
         mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
@@ -281,7 +244,6 @@ namespace
             CHECK_FALSE(mHistory.canUndo());
             CHECK_FALSE(mHistory.canRedo());
         }
-        UNSCOPED_INFO("really empty");
         CHECK(mHistory.depth() == (size_t)0);
     }
 
@@ -298,16 +260,13 @@ namespace
             mHistory.record("B", LLSD((F64)i), LLSD((F64)(i + 1)), 1.f);
             mHistory.endGroup();
         }
-        UNSCOPED_INFO("capped");
         CHECK(mHistory.depth() == ALGradeHistory::MAX_DEPTH);
         UNSCOPED_INFO("everything on the stack is applied");
         CHECK(mHistory.cursor() == mHistory.depth());
 
         // The newest is still the newest after the drop, and still whole.
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("got the newest");
         REQUIRE(t != nullptr);
-        UNSCOPED_INFO("still covering both controls");
         REQUIRE(t->size() == (size_t)2);
         UNSCOPED_INFO("which is the last group recorded");
         CHECK(t->front().mAfter.asReal() == (F64)(ALGradeHistory::MAX_DEPTH + 20));
@@ -334,8 +293,7 @@ namespace
         mHistory.endGroup();
         mHistory.record("C", LLSD(0.0), LLSD(1.0), 5.f);
 
-        UNSCOPED_INFO("two steps");
-        CHECK(mHistory.depth() == (size_t)2);
+        REQUIRE(mHistory.depth() == (size_t)2);
         UNSCOPED_INFO("the group's step carries its name");
         CHECK(mHistory.labelOf(0) == std::string("Reset Bloom"));
         UNSCOPED_INFO("a lone write's step has none");
@@ -360,9 +318,7 @@ namespace
         mHistory.endGroup();
         mHistory.endGroup();
 
-        UNSCOPED_INFO("one step");
-        CHECK(mHistory.depth() == (size_t)1);
-        UNSCOPED_INFO("named by the outermost group");
+        REQUIRE(mHistory.depth() == (size_t)1);
         CHECK(mHistory.labelOf(0) == std::string("Look: Soft Film"));
     }
 
@@ -377,8 +333,7 @@ namespace
             mHistory.record("A", LLSD((F64)i), LLSD((F64)(i + 1)), 1.f);
             mHistory.endGroup();
         }
-        UNSCOPED_INFO("capped");
-        CHECK(mHistory.depth() == ALGradeHistory::MAX_DEPTH);
+        REQUIRE(mHistory.depth() == ALGradeHistory::MAX_DEPTH);
         UNSCOPED_INFO("the oldest kept is the sixth made");
         CHECK(mHistory.labelOf(0) == std::string("step 5"));
         UNSCOPED_INFO("the newest is the last made");
@@ -398,7 +353,7 @@ namespace
         mHistory.record("four", LLSD(0.0), LLSD(1.0), 1.f);
         mHistory.endGroup();
         UNSCOPED_INFO("the undone two were cut");
-        CHECK(mHistory.depth() == (size_t)2);
+        REQUIRE(mHistory.depth() == (size_t)2);
         UNSCOPED_INFO("the first kept its name");
         CHECK(mHistory.labelOf(0) == std::string("one"));
         UNSCOPED_INFO("and the new one has its own");
@@ -413,9 +368,7 @@ namespace
         mHistory.record("A", LLSD(1.0), LLSD(2.0), 1.f);
         mHistory.record("A", LLSD(2.0), LLSD(1.0), 1.f);
         mHistory.endGroup();
-        UNSCOPED_INFO("no step");
         CHECK_FALSE(mHistory.canUndo());
-        UNSCOPED_INFO("nothing kept");
         CHECK(mHistory.depth() == (size_t)0);
 
         mHistory.beginGroup();
@@ -423,14 +376,11 @@ namespace
         mHistory.record("B", LLSD(0.0), LLSD(5.0), 1.f);
         mHistory.record("A", LLSD(2.0), LLSD(1.0), 1.f);
         mHistory.endGroup();
-        UNSCOPED_INFO("one step");
         CHECK(mHistory.depth() == (size_t)1);
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("got it");
         REQUIRE(t != nullptr);
         UNSCOPED_INFO("holding only what changed");
         REQUIRE(t->size() == (size_t)1);
-        UNSCOPED_INFO("which is B");
         CHECK(t->front().mName == std::string("B"));
     }
 
@@ -440,20 +390,16 @@ namespace
     {
         mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
         mHistory.record("A", LLSD(1.0), LLSD(0.0), 1.1f);
-        UNSCOPED_INFO("back where it started, no step");
         CHECK(mHistory.depth() == (size_t)0);
-        UNSCOPED_INFO("nothing to undo");
         CHECK_FALSE(mHistory.canUndo());
 
         mHistory.record("A", LLSD(0.0), LLSD(2.0), 1.2f);
         UNSCOPED_INFO("carrying on is a step");
         CHECK(mHistory.depth() == (size_t)1);
         const auto* t = mHistory.undo();
-        UNSCOPED_INFO("got it");
         REQUIRE(t != nullptr);
         UNSCOPED_INFO("from the value the drag began at");
         CHECK(t->front().mBefore.asReal() == 0.0);
-        UNSCOPED_INFO("to where it went");
         CHECK(t->front().mAfter.asReal() == 2.0);
 
         // A drag that returns to its start does not take an earlier step with
@@ -463,8 +409,7 @@ namespace
         mHistory.record("A", LLSD(0.0), LLSD(1.0), 5.f);
         mHistory.record("A", LLSD(1.0), LLSD(0.0), 5.1f);
         UNSCOPED_INFO("the earlier step stays");
-        CHECK(mHistory.depth() == (size_t)1);
-        UNSCOPED_INFO("and it is B's");
+        REQUIRE(mHistory.depth() == (size_t)1);
         CHECK(mHistory.at(0).front().mName == std::string("B"));
     }
 
@@ -475,11 +420,9 @@ namespace
         mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
         mHistory.record("B", LLSD(0.0), LLSD(1.0), 2.f);
         mHistory.undo();
-        UNSCOPED_INFO("something to redo");
         CHECK(mHistory.canRedo());
 
         mHistory.record("C", LLSD(5.0), LLSD(5.0), 3.f);
-        UNSCOPED_INFO("still something to redo");
         CHECK(mHistory.canRedo());
         UNSCOPED_INFO("and nothing added");
         CHECK(mHistory.depth() == (size_t)2);
@@ -535,15 +478,10 @@ namespace
 
         const ALGradeHistory::Transaction shown = mHistory.at(1);
         const auto* undone = mHistory.undo();
-        UNSCOPED_INFO("got it");
         REQUIRE(undone != nullptr);
-        UNSCOPED_INFO("the same size");
         REQUIRE(undone->size() == shown.size());
-        UNSCOPED_INFO("the same control");
         CHECK(undone->front().mName == shown.front().mName);
-        UNSCOPED_INFO("the same start");
         CHECK(undone->front().mBefore.asReal() == shown.front().mBefore.asReal());
-        UNSCOPED_INFO("the same end");
         CHECK(undone->front().mAfter.asReal() == shown.front().mAfter.asReal());
         UNSCOPED_INFO("and the cursor says it is no longer in force");
         CHECK(mHistory.cursor() == (size_t)1);
@@ -568,7 +506,7 @@ namespace
         CHECK(mHistory.labelOf(1) == std::string("two"));
         UNSCOPED_INFO("the last redo");
         CHECK(mHistory.labelOf(2) == std::string("three"));
-        UNSCOPED_INFO("its changes");
+        UNSCOPED_INFO("a redo step's changes");
         CHECK(mHistory.at(2).front().mName == std::string("three"));
 
         mHistory.clear();

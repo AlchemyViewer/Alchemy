@@ -153,7 +153,6 @@ namespace
         UNSCOPED_INFO("something to hold");
         CHECK(ALScriptStudioSelections::canHold(door));
         unit->hold(door);
-        UNSCOPED_INFO("held");
         REQUIRE(unit->held().has_value());
         UNSCOPED_INFO("its text, whichever way it was selected");
         CHECK(unit->held()->text == std::string("line 2\nline 3\n"));
@@ -161,7 +160,6 @@ namespace
         CHECK(unit->held()->title == titled("SelectionLines", "door", 3, 4));
         LLStringUtil::format_map_t args;
         args["[TITLE]"] = unit->held()->title;
-        UNSCOPED_INFO("said");
         CHECK(services().statuses.back() == said("SelectionHeld", args));
 
         door.editor->goTo(ALTextRange(ALTextPos(5, 0), ALTextPos(5, 4)));
@@ -236,7 +234,6 @@ namespace
         // Compared again, a change taken back: the stretch made the held's.
         door.editor->goTo(ALTextRange(ALTextPos(5, 0), ALTextPos(7, 0)));
         unit->compare(door);
-        UNSCOPED_INFO("taken back");
         CHECK(view.takeBack(0));
         UNSCOPED_INFO("the stretch made the held's");
         CHECK(door.editor->text() == lines(10, { { 5, "line 1" }, { 6, "line 2" } }));
@@ -254,7 +251,6 @@ namespace
         unit->compare(door);
         UNSCOPED_INFO("two lines made one");
         CHECK(view.takeBack(0));
-        UNSCOPED_INFO("the source");
         CHECK(door.editor->text() == lines(9, { { 5, "line 0" }, { 6, "line 7" }, { 7, "line 8" }, { 8, "line 9" } }));
 
         // The source moved under a comparison: nothing taken back, typing

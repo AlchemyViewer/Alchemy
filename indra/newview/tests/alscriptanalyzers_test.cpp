@@ -52,15 +52,13 @@ namespace
         const ALScriptAnalysis::Request   broken = request(ALScriptAnalysis::Kind::Check, "default { state_entry() { llSay(0, \"x\" } }\n");
         ALScriptAnalysis::Result          checked;
         lsl.answer(broken, *broken.text, setup, checked);
-        UNSCOPED_INFO("builtins loaded: " + checked.definitionsError);
+        UNSCOPED_INFO("builtins loaded: " << checked.definitionsError);
         REQUIRE(checked.definitionsError.empty());
-        UNSCOPED_INFO("the broken text did not parse");
         CHECK_FALSE(checked.parsed);
         ALScriptAnalysis::Request weighing = request(ALScriptAnalysis::Kind::Weigh, "default { state_entry() { llSay(0, \"x\"); } }\n");
         weighing.targets                   = { ALScriptWeight::Target::Mono };
         ALScriptAnalysis::Result weighed;
         lsl.answer(weighing, *weighing.text, setup, weighed);
-        UNSCOPED_INFO("weighed");
         REQUIRE(weighed.weights.size() == size_t(1));
         UNSCOPED_INFO("not the check's parse");
         CHECK(weighed.parsed);
@@ -81,7 +79,7 @@ namespace
             CHECK(lsl_shape.outline[2].depth == 1);
         }
         UNSCOPED_INFO("nothing else answered");
-        REQUIRE(lsl_shape.problems.empty());
+        CHECK(lsl_shape.problems.empty());
 
         ALLuauAnalyzer            luau;
         ALScriptAnalysis::Request slua = request(ALScriptAnalysis::Kind::Shape, "local function half(n: number)\n  return n / 2\nend\n");
@@ -92,9 +90,9 @@ namespace
             INFO("SLua: the function, untyped");
             REQUIRE(luau_shape.outline.size() == 1);
             CHECK(luau_shape.outline[0].name == "half");
-            REQUIRE(luau_shape.outline[0].detail.empty());
+            CHECK(luau_shape.outline[0].detail.empty());
         }
         UNSCOPED_INFO("no definitions asked for");
-        REQUIRE(luau_shape.definitionsError.empty());
+        CHECK(luau_shape.definitionsError.empty());
     }
 }

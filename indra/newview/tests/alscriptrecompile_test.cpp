@@ -149,33 +149,28 @@ namespace
         }
     };
 
+    // SLua goes up as SLua, and what is known of whether each runs is given.
     TEST_CASE_METHOD(alscriptrecompile_data, "alscriptrecompile: a prim's scripts and one chosen go up a few at a time each once", "[alscriptrecompile]")
     {
         house();
         window.runs = { { id(11), false } };
         run.recompile({ one(10, "A") }, { { prim, "House" } }, "mono");
-        {
-            INFO("listed");
-            REQUIRE(window.listedFor.size() == 1);
-            CHECK(window.listedFor[0].front().first == prim);
-        }
-        UNSCOPED_INFO("running");
+        REQUIRE(window.listedFor.size() == 1);
+        CHECK(window.listedFor[0].front().first == prim);
         CHECK(run.running());
-        UNSCOPED_INFO("four at once");
         REQUIRE(window.asked.size() == size_t(Recompile::AT_ONCE));
         {
             INFO("A once, chosen and in its prim");
             CHECK(window.asked[0].ref.item == id(10));
             CHECK(window.asked[1].ref.item == id(11));
         }
-        UNSCOPED_INFO("for the target");
         CHECK(window.asked[0].target == std::string("mono"));
         UNSCOPED_INFO("the SLua one as it compiles");
         CHECK(window.asked[2].target == std::string("auto"));
         UNSCOPED_INFO("B known stopped, stays so");
         CHECK(window.asked[1].running == false);
         UNSCOPED_INFO("A not known: the save asks");
-        REQUIRE_FALSE(window.asked[0].running.has_value());
+        CHECK_FALSE(window.asked[0].running.has_value());
 
         for (size_t i = 0; i < 4; ++i)
         {
@@ -185,22 +180,19 @@ namespace
         REQUIRE(window.asked.size() == size_t(6));
         window.asked[4].told(compiled());
         UNSCOPED_INFO("not done yet");
-        REQUIRE(window.done.empty());
+        CHECK(window.done.empty());
         window.asked[5].told(compiled());
-        UNSCOPED_INFO("done once");
         REQUIRE(window.done.size() == size_t(1));
-        {
-            INFO("all compiled");
-            CHECK(window.done[0].compiled == 6);
-            CHECK(window.done[0].failed == 0);
-            CHECK(window.done[0].target == "mono");
-        }
-        UNSCOPED_INFO("no longer running");
+        CHECK(window.done[0].compiled == 6);
+        CHECK(window.done[0].failed == 0);
+        CHECK(window.done[0].target == "mono");
         CHECK_FALSE(run.running());
         UNSCOPED_INFO("each said");
-        REQUIRE(window.scripts.size() == size_t(6));
+        CHECK(window.scripts.size() == size_t(6));
     }
 
+    // Changes not saved are said too, and a closed script's result carries
+    // its rows.
     TEST_CASE_METHOD(alscriptrecompile_data, "alscriptrecompile: a script being saved is skipped and each result is said in Output", "[alscriptrecompile]")
     {
         house();
@@ -210,7 +202,7 @@ namespace
         run.recompile({}, { { prim, "House" } }, "auto");
         UNSCOPED_INFO("B left alone");
         CHECK(std::none_of(window.asked.begin(), window.asked.end(), [](const auto& a) { return a.ref.item == id(11); }));
-        UNSCOPED_INFO("and said");
+        UNSCOPED_INFO("B's save on its way said");
         CHECK(said("RecompileSkippedSaving", true));
         UNSCOPED_INFO("C's unsaved changes said");
         CHECK(said("RecompileUnsaved", true));
@@ -228,9 +220,7 @@ namespace
         }
         window.asked[4].told(compiled());                    // F
 
-        UNSCOPED_INFO("compiled said");
         CHECK(said("Compiled", false));
-        UNSCOPED_INFO("a failure said");
         CHECK(said("CompileFailed", true));
         UNSCOPED_INFO("one not sent said with why");
         CHECK(said("SaveFailed", true));
@@ -245,18 +235,15 @@ namespace
         {
             INFO("E is open: its tab says it");
             CHECK(window.scripts[3].open);
-            REQUIRE(window.scripts[3].rows.empty());
+            CHECK(window.scripts[3].rows.empty());
         }
         UNSCOPED_INFO("D's why");
         CHECK(window.scripts[2].error == "no such object");
         const Recompile::Done& done = window.done.at(0);
-        {
-            INFO("counted");
-            CHECK(done.compiled == 2);
-            CHECK(done.failed == 2);
-            CHECK(done.notSent == 1);
-            CHECK(done.skipped == 1);
-        }
+        CHECK(done.compiled == 2);
+        CHECK(done.failed == 2);
+        CHECK(done.notSent == 1);
+        CHECK(done.skipped == 1);
     }
 
     TEST_CASE_METHOD(alscriptrecompile_data, "alscriptrecompile: rowsOf reads a compiler's lines back to the source and its includes", "[alscriptrecompile]")
@@ -269,7 +256,6 @@ namespace
             return ALPreprocessor::Found::Yes;
         };
         const ALPreprocessor::Result expanded = ALPreprocessor::run("#include \"lib.lsl\"\ndefault\n{\nstate_entry() { x; }\n}\n", options);
-        UNSCOPED_INFO("expanded");
         REQUIRE(expanded.problems.empty());
         // The lines of the expansion that hold each.
         S32 entry = -1, second = -1, line = 0;
@@ -296,12 +282,11 @@ namespace
         result.diagnostics.push_back(failed(second + 7, "b again").diagnostics[0]);
         result.diagnostics.push_back(failed(5000, "somewhere made").diagnostics[0]);
         const std::vector<ALScriptStudioDoc::Shown> rows = Recompile::rowsOf(result, "Compiler", "made");
-        UNSCOPED_INFO("three");
         REQUIRE(rows.size() == size_t(3));
         {
             INFO("the script's own line");
             CHECK(rows[0].line == 3);
-            REQUIRE(rows[0].file.empty());
+            CHECK(rows[0].file.empty());
             CHECK(rows[0].origin == "Compiler");
         }
         {
@@ -318,10 +303,10 @@ namespace
         // Nothing expanded: as the compiler said it.
         const std::vector<ALScriptStudioDoc::Shown> plain = Recompile::rowsOf(failed(4, "as is"), "Compiler", "made");
         {
-            INFO("as said");
+            INFO("as the compiler said it");
             REQUIRE(plain.size() == 1);
             CHECK(plain[0].line == 4);
-            REQUIRE(plain[0].file.empty());
+            CHECK(plain[0].file.empty());
         }
     }
 
@@ -337,8 +322,8 @@ namespace
         window.asked[0].told(compiled());
         {
             INFO("the old one's answer passed over");
-            REQUIRE(window.scripts.empty());
-            REQUIRE(window.done.empty());
+            CHECK(window.scripts.empty());
+            CHECK(window.done.empty());
         }
         window.asked[first].told(compiled());
         {
@@ -368,7 +353,6 @@ namespace
             return ALPreprocessor::Found::Yes;
         };
         const ALPreprocessor::Result expanded = ALPreprocessor::run("#include \"lib.lsl\"\ndefault\n{\nstate_entry() { x; }\n}\n", options);
-        UNSCOPED_INFO("expanded");
         REQUIRE(expanded.problems.empty());
         S32 entry = -1, second = -1, line = 0;
         for (size_t at = 0, next; at < expanded.text.size(); at = next + 1, ++line)
@@ -408,7 +392,6 @@ namespace
             result.diagnostics.push_back(one);
         }
         const std::vector<ALScriptStudioDoc::Shown> rows = Recompile::rowsOf(result, "Compiler", "made");
-        UNSCOPED_INFO("three");
         REQUIRE(rows.size() == size_t(3));
         {
             INFO("the line, the source's");
@@ -423,7 +406,7 @@ namespace
         {
             INFO("no line named, none");
             CHECK(rows[2].line == -1);
-            REQUIRE(rows[2].file.empty());
+            CHECK(rows[2].file.empty());
             CHECK(rows[2].message == "Math Error");
         }
 

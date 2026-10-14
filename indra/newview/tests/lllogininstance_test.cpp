@@ -412,15 +412,12 @@ namespace
 
         testPump().post(response);
 
-        UNSCOPED_INFO("Success response");
         CHECK(logininstance->authSuccess());
-        UNSCOPED_INFO("Test Response Data");
         CHECK(logininstance->getResponse().asString() == "test_data");
 
         logininstance->disconnect();
 
-        UNSCOPED_INFO("Called Login Module Disconnect");
-        CHECK(gDisconnectCalled == true);
+        CHECK(gDisconnectCalled);
 
         response.clear();
         response["state"] = "offline";
@@ -443,12 +440,11 @@ namespace
         logininstance->connect(test_uri, agentCredential);
 
         // connect should call LLLogin::connect to init gLoginURI and gLoginCreds.
-        UNSCOPED_INFO("Default connect uri");
         CHECK(gLoginURI == "testing-uri");
         UNSCOPED_INFO("Default for agree to tos");
-        CHECK(gLoginCreds["params"]["agree_to_tos"].asBoolean() == false);
+        CHECK_FALSE(gLoginCreds["params"]["agree_to_tos"].asBoolean());
         UNSCOPED_INFO("Default for read critical");
-        CHECK(gLoginCreds["params"]["read_critical"].asBoolean() == false);
+        CHECK_FALSE(gLoginCreds["params"]["read_critical"].asBoolean());
 
         // TOS failure response.
         LLSD response;
@@ -472,7 +468,7 @@ namespace
         testPump().post(response); // Fail for tos again.
         gTOSReplyPump->post(true); // Accept tos, should reconnect w/ agree_to_tos.
         UNSCOPED_INFO("Accepted agree to tos");
-        CHECK(gLoginCreds["params"]["agree_to_tos"].asBoolean() == true);
+        CHECK(gLoginCreds["params"]["agree_to_tos"].asBoolean());
         {
             INFO("Incomplete login status");
             REQUIRE_FALSE(logininstance->authFailure());
@@ -483,12 +479,12 @@ namespace
         // The new request should have reset agree to tos to default.
         response["data"]["reason"] = "key"; // bad creds.
         testPump().post(response);
-        UNSCOPED_INFO("TOS auth failure");
+        UNSCOPED_INFO("Bad credentials, failed auth");
         CHECK(logininstance->authFailure());
 
         logininstance->connect(test_uri, agentCredential);
         UNSCOPED_INFO("Reset to default for agree to tos");
-        CHECK(gLoginCreds["params"]["agree_to_tos"].asBoolean() == false);
+        CHECK_FALSE(gLoginCreds["params"]["agree_to_tos"].asBoolean());
 
         // Critical Message failure response.
         logininstance->connect(test_uri, agentCredential);
@@ -501,7 +497,7 @@ namespace
         REQUIRE(gTOSReplyPump != 0);
         gTOSReplyPump->post(true);
         UNSCOPED_INFO("Accepted read critical message");
-        CHECK(gLoginCreds["params"]["read_critical"].asBoolean() == true);
+        CHECK(gLoginCreds["params"]["read_critical"].asBoolean());
         {
             INFO("Incomplete login status");
             REQUIRE_FALSE(logininstance->authFailure());
@@ -511,10 +507,10 @@ namespace
         // Fail then attempt new connection
         response["data"]["reason"] = "key"; // bad creds.
         testPump().post(response);
-        UNSCOPED_INFO("TOS auth failure");
+        UNSCOPED_INFO("Bad credentials, failed auth");
         CHECK(logininstance->authFailure());
         logininstance->connect(test_uri, agentCredential);
-        UNSCOPED_INFO("Default for agree to tos");
-        CHECK(gLoginCreds["params"]["read_critical"].asBoolean() == false);
+        UNSCOPED_INFO("Reset to default for read critical");
+        CHECK_FALSE(gLoginCreds["params"]["read_critical"].asBoolean());
     }
 }

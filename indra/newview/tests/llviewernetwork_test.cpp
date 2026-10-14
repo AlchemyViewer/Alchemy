@@ -201,67 +201,48 @@ namespace
         manager->initialize(TEST_FILENAME);
         // validate that some of the defaults are available.
         std::map<std::string, std::string> known_grids = manager->getKnownGrids();
-        UNSCOPED_INFO("Known grids is a string-string map of size 2");
         REQUIRE(known_grids.size() == 2);
-        UNSCOPED_INFO("Agni has the right name and label");
         CHECK(known_grids[std::string("util.agni.lindenlab.com")] ==
                       std::string("Second Life Main Grid (Agni)"));
-        UNSCOPED_INFO("Aditi has the right name and label");
         CHECK(known_grids[std::string("util.aditi.lindenlab.com")] ==
                       std::string("Second Life Beta Test Grid (Aditi)"));
-        UNSCOPED_INFO("name for agni");
         CHECK(LLGridManager::getInstance()->getGrid("util.agni.lindenlab.com") ==
                       std::string("util.agni.lindenlab.com"));
-        UNSCOPED_INFO("id for agni");
         CHECK(std::string("Agni") ==
                       LLGridManager::getInstance()->getGridId("util.agni.lindenlab.com"));
         UNSCOPED_INFO("update url base for Agni");
         CHECK(std::string("https://update.secondlife.com/update") ==
                       LLGridManager::getInstance()->getUpdateServiceURL());
-        UNSCOPED_INFO("label for agni");
         CHECK(LLGridManager::getInstance()->getGridLabel("util.agni.lindenlab.com") ==
                       std::string("Second Life Main Grid (Agni)"));
 
         std::vector<std::string> login_uris;
         LLGridManager::getInstance()->getLoginURIs(std::string("util.agni.lindenlab.com"), login_uris);
-        UNSCOPED_INFO("Number of login uris for agni");
         REQUIRE(1 == login_uris.size());
-        UNSCOPED_INFO("Agni login uri");
         CHECK(login_uris[0] ==
                       std::string("https://login.agni.lindenlab.com/cgi-bin/login.cgi"));
-        UNSCOPED_INFO("Agni helper uri");
         CHECK(LLGridManager::getInstance()->getHelperURI("util.agni.lindenlab.com") ==
                       std::string("https://secondlife.com/helpers/"));
-        UNSCOPED_INFO("Agni login page");
         CHECK(LLGridManager::getInstance()->getLoginPage("util.agni.lindenlab.com") ==
                       std::string("https://viewer-splash-v2.secondlife.com/"));
-        UNSCOPED_INFO("Agni is a system grid");
         CHECK(LLGridManager::getInstance()->isSystemGrid("util.agni.lindenlab.com"));
 
-        UNSCOPED_INFO("name for aditi");
         CHECK(LLGridManager::getInstance()->getGrid("util.aditi.lindenlab.com") ==
                       std::string("util.aditi.lindenlab.com"));
-        UNSCOPED_INFO("id for aditi");
         CHECK(LLGridManager::getInstance()->getGridId("util.aditi.lindenlab.com") ==
                       std::string("Aditi"));
-        UNSCOPED_INFO("label for aditi");
         CHECK(LLGridManager::getInstance()->getGridLabel("util.aditi.lindenlab.com") ==
                       std::string("Second Life Beta Test Grid (Aditi)"));
 
         LLGridManager::getInstance()->getLoginURIs(std::string("util.aditi.lindenlab.com"), login_uris);
 
-        UNSCOPED_INFO("Number of login uris for aditi");
         REQUIRE(1 == login_uris.size());
-        UNSCOPED_INFO("Aditi login uri");
         CHECK(login_uris[0] ==
                       std::string("https://login.aditi.lindenlab.com/cgi-bin/login.cgi"));
-        UNSCOPED_INFO("Aditi helper uri");
         CHECK(LLGridManager::getInstance()->getHelperURI("util.aditi.lindenlab.com") ==
                       std::string("https://secondlife.aditi.lindenlab.com/helpers/"));
-        UNSCOPED_INFO("Aditi login page");
         CHECK(LLGridManager::getInstance()->getLoginPage("util.aditi.lindenlab.com") ==
                       std::string("https://viewer-splash-v2.secondlife.com/"));
-        UNSCOPED_INFO("Aditi is a system grid");
         CHECK(LLGridManager::getInstance()->isSystemGrid("util.aditi.lindenlab.com"));
     }
 
@@ -275,124 +256,89 @@ namespace
         LLGridManager::getInstance()->initialize(TEST_FILENAME);
         std::map<std::string, std::string> known_grids = LLGridManager::getInstance()->getKnownGrids();
         UNSCOPED_INFO("adding a grid via a grid file increases known grid size");
-        REQUIRE(4 ==
-                      known_grids.size());
+        REQUIRE(4 == known_grids.size());
 
         // Verify that Agni and Aditi were not overwritten
-        UNSCOPED_INFO("Agni has the right name and label");
         CHECK(known_grids[std::string("util.agni.lindenlab.com")] ==
                       std::string("Second Life Main Grid (Agni)"));
-        UNSCOPED_INFO("Aditi has the right name and label");
         CHECK(known_grids[std::string("util.aditi.lindenlab.com")] ==
                       std::string("Second Life Beta Test Grid (Aditi)"));
-        UNSCOPED_INFO("name for agni");
         CHECK(LLGridManager::getInstance()->getGrid("util.agni.lindenlab.com") ==
                       std::string("util.agni.lindenlab.com"));
-        UNSCOPED_INFO("id for agni");
         CHECK(LLGridManager::getInstance()->getGridId("util.agni.lindenlab.com") ==
                       std::string("Agni"));
         UNSCOPED_INFO("update url base for Agni");
         CHECK(std::string("https://update.secondlife.com/update") ==
                       LLGridManager::getInstance()->getUpdateServiceURL());
-        UNSCOPED_INFO("label for agni");
         CHECK(LLGridManager::getInstance()->getGridLabel("util.agni.lindenlab.com") ==
                       std::string("Second Life Main Grid (Agni)"));
         std::vector<std::string> login_uris;
         LLGridManager::getInstance()->getLoginURIs(std::string("util.agni.lindenlab.com"), login_uris);
-        UNSCOPED_INFO("Number of login uris for agni");
         REQUIRE(1 == login_uris.size());
-        UNSCOPED_INFO("Agni login uri");
         CHECK(login_uris[0] ==
                       std::string("https://login.agni.lindenlab.com/cgi-bin/login.cgi"));
-        UNSCOPED_INFO("Agni helper uri");
         CHECK(LLGridManager::getInstance()->getHelperURI("util.agni.lindenlab.com") ==
                       std::string("https://secondlife.com/helpers/"));
-        UNSCOPED_INFO("Agni login page");
         CHECK(LLGridManager::getInstance()->getLoginPage("util.agni.lindenlab.com") ==
                       std::string("https://viewer-splash-v2.secondlife.com/"));
-        UNSCOPED_INFO("Agni is a system grid");
         CHECK(LLGridManager::getInstance()->isSystemGrid("util.agni.lindenlab.com"));
 
-        UNSCOPED_INFO("name for aditi");
         CHECK(LLGridManager::getInstance()->getGrid("util.aditi.lindenlab.com") ==
                       std::string("util.aditi.lindenlab.com"));
-        UNSCOPED_INFO("id for aditi");
         CHECK(LLGridManager::getInstance()->getGridId("util.aditi.lindenlab.com") ==
                       std::string("Aditi"));
-        UNSCOPED_INFO("label for aditi");
         CHECK(LLGridManager::getInstance()->getGridLabel("util.aditi.lindenlab.com") ==
                       std::string("Second Life Beta Test Grid (Aditi)"));
 
         LLGridManager::getInstance()->getLoginURIs(std::string("util.aditi.lindenlab.com"), login_uris);
-        UNSCOPED_INFO("Number of login uris for aditi");
         REQUIRE(1 == login_uris.size());
-        UNSCOPED_INFO("Aditi login uri");
         CHECK(login_uris[0] ==
                       std::string("https://login.aditi.lindenlab.com/cgi-bin/login.cgi"));
-        UNSCOPED_INFO("Aditi helper uri");
         CHECK(LLGridManager::getInstance()->getHelperURI("util.aditi.lindenlab.com") ==
                       std::string("https://secondlife.aditi.lindenlab.com/helpers/"));
-        UNSCOPED_INFO("Aditi login page");
         CHECK(LLGridManager::getInstance()->getLoginPage("util.aditi.lindenlab.com") ==
                       std::string("https://viewer-splash-v2.secondlife.com/"));
-        UNSCOPED_INFO("Aditi is a system grid");
         CHECK(LLGridManager::getInstance()->isSystemGrid("util.aditi.lindenlab.com"));
 
         // Check the additional grid from the file
         UNSCOPED_INFO("alternative grid is in name<->label map");
         CHECK(known_grids["altgrid.long.name"] ==
                       std::string("Alternative Grid"));
-        UNSCOPED_INFO("alternative grid name is set");
         CHECK(LLGridManager::getInstance()->getGrid("altgrid.long.name") ==
                       std::string("altgrid.long.name"));
-        UNSCOPED_INFO("alternative grid id");
         CHECK(LLGridManager::getInstance()->getGridId("altgrid.long.name") ==
                       std::string("AltGrid"));
-        UNSCOPED_INFO("alternative grid label");
         CHECK(LLGridManager::getInstance()->getGridLabel("altgrid.long.name") ==
                       std::string("Alternative Grid"));
         std::vector<std::string> alt_login_uris;
         LLGridManager::getInstance()->getLoginURIs(std::string("altgrid.long.name"), alt_login_uris);
-        UNSCOPED_INFO("Number of login uris for altgrid");
         REQUIRE(2 == alt_login_uris.size());
-        UNSCOPED_INFO("alternative grid first login uri");
         CHECK(alt_login_uris[0] ==
                       std::string("altgrid/myloginuri1"));
-        UNSCOPED_INFO("alternative grid second login uri");
         CHECK(alt_login_uris[1] ==
                       std::string("altgrid/myloginuri2"));
-        UNSCOPED_INFO("alternative grid helper uri");
         CHECK(LLGridManager::getInstance()->getHelperURI("altgrid.long.name") ==
                       std::string("https://helper1/helpers/"));
-        UNSCOPED_INFO("alternative grid login page");
         CHECK(LLGridManager::getInstance()->getLoginPage("altgrid.long.name") ==
                       std::string("altgrid/loginpage"));
-        UNSCOPED_INFO("alternative grid is NOT a system grid");
         CHECK_FALSE(LLGridManager::getInstance()->isSystemGrid("altgrid.long.name"));
 
         UNSCOPED_INFO("minimal grid is in name<->label map");
         CHECK(known_grids["minimal.long.name"] ==
                       std::string("minimal.long.name"));
-        UNSCOPED_INFO("minimal grid name is set");
         CHECK(LLGridManager::getInstance()->getGrid("minimal.long.name") ==
                       std::string("minimal.long.name"));
-        UNSCOPED_INFO("minimal grid id");
         CHECK(LLGridManager::getInstance()->getGridId("minimal.long.name") ==
                       std::string("minimal.long.name"));
-        UNSCOPED_INFO("minimal grid label");
         CHECK(LLGridManager::getInstance()->getGridLabel("minimal.long.name") ==
                       std::string("minimal.long.name"));
 
         LLGridManager::getInstance()->getLoginURIs(std::string("minimal.long.name"), alt_login_uris);
-        UNSCOPED_INFO("Number of login uris for altgrid");
         REQUIRE(1 == alt_login_uris.size());
-        UNSCOPED_INFO("minimal grid login uri");
         CHECK(alt_login_uris[0] ==
                       std::string("https://minimal.long.name/cgi-bin/login.cgi"));
-        UNSCOPED_INFO("minimal grid helper uri");
         CHECK(LLGridManager::getInstance()->getHelperURI("minimal.long.name") ==
                       std::string("https://minimal.long.name/helpers/"));
-        UNSCOPED_INFO("minimal grid login page");
         CHECK(LLGridManager::getInstance()->getLoginPage("minimal.long.name") ==
                       std::string("https://minimal.long.name/app/login/"));
 
@@ -410,39 +356,30 @@ namespace
         LLGridManager::getInstance()->initialize(TEST_FILENAME);
 
         LLGridManager::getInstance()->setGridChoice("util.agni.lindenlab.com");
-        UNSCOPED_INFO("getGridLabel");
         CHECK(LLGridManager::getInstance()->getGridLabel() ==
                       std::string("Second Life Main Grid (Agni)"));
-        UNSCOPED_INFO("getGridId");
         CHECK(LLGridManager::getInstance()->getGridId() ==
                       std::string("Agni"));
-        UNSCOPED_INFO("getGrid");
         CHECK(LLGridManager::getInstance()->getGrid() ==
                       std::string("util.agni.lindenlab.com"));
-        UNSCOPED_INFO("getHelperURI");
         CHECK(LLGridManager::getInstance()->getHelperURI() ==
                       std::string("https://secondlife.com/helpers/"));
-        UNSCOPED_INFO("getLoginPage");
         CHECK(LLGridManager::getInstance()->getLoginPage() ==
                       std::string("https://viewer-splash-v2.secondlife.com/"));
         UNSCOPED_INFO("update url base for Agni");
         CHECK(std::string("https://update.secondlife.com/update") ==
                       LLGridManager::getInstance()->getUpdateServiceURL());
-        UNSCOPED_INFO("Is Agni a production grid");
+        UNSCOPED_INFO("Agni is a production grid");
         CHECK(LLGridManager::getInstance()->isInProductionGrid());
         std::vector<std::string> uris;
         LLGridManager::getInstance()->getLoginURIs(uris);
-        UNSCOPED_INFO("getLoginURIs size");
         REQUIRE(1 == uris.size());
-        UNSCOPED_INFO("getLoginURIs");
         CHECK(uris[0] ==
                       std::string("https://login.agni.lindenlab.com/cgi-bin/login.cgi"));
 
         LLGridManager::getInstance()->setGridChoice("altgrid.long.name");
-        UNSCOPED_INFO("getGridLabel");
         CHECK(LLGridManager::getInstance()->getGridLabel() ==
                       std::string("Alternative Grid"));
-        UNSCOPED_INFO("getGridId");
         CHECK(LLGridManager::getInstance()->getGridId() ==
                       std::string("AltGrid"));
         UNSCOPED_INFO("alternative grid is not a system grid");
