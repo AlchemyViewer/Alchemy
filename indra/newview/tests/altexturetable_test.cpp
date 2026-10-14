@@ -408,15 +408,30 @@ namespace
             REQUIRE(((i % 3 == 0) ? found == nullptr : found == items[i - 1]));
         }
 
+        // The same inserts and erases with a reservation and without: the
+        // same items, in the same places.
         Table reserved;
         reserved.reserve(count);
+        Table unreserved;
         for (U32 i = 1; i <= 100; ++i)
         {
             CAPTURE(i);
             REQUIRE(reserved.insert(key(i), new Item(i)));
+            REQUIRE(unreserved.insert(key(i), new Item(i)));
         }
         CHECK(reserved.size() == (size_t)100);
+        for (U32 i = 3; i <= 100; i += 3)
+        {
+            reserved.erase(key(i));
+            unreserved.erase(key(i));
+        }
         CHECK(reserved.consistent());
+        REQUIRE(reserved.size() == unreserved.size());
+        for (size_t i = 0; i < reserved.size(); ++i)
+        {
+            CAPTURE(i);
+            REQUIRE(reserved[i]->mId == unreserved[i]->mId);
+        }
     }
 
     // --- find-or-insert ------------------------------------------------------

@@ -17,6 +17,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include "altestmatchers.h"
 
+#include "../alcolorwheelmodel.h"
 #include "../alscopedata.h"
 
 #include <vector>
@@ -120,8 +121,18 @@ namespace
         CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 64), ll_test::WithinBits(1.f, 5));
         CHECK_THAT(mScope.getBin(ALScopeData::CH_GREEN, 128), ll_test::WithinBits(1.f, 5));
         CHECK_THAT(mScope.getBin(ALScopeData::CH_BLUE, 192), ll_test::WithinBits(1.f, 5));
-        UNSCOPED_INFO("nothing anywhere else");
-        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 65), ll_test::WithinBits(0.f, 6));
+
+        // Nothing anywhere else: one bin lit in each channel, luma's too.
+        for (S32 c = 0; c < ALScopeData::CH_COUNT; ++c)
+        {
+            S32 lit = 0;
+            for (S32 i = 0; i < ALScopeData::BIN_COUNT; ++i)
+            {
+                lit += mScope.getBin((ALScopeData::EChannel)c, i) > 0.f ? 1 : 0;
+            }
+            CAPTURE(c);
+            CHECK(lit == 1);
+        }
     }
 
     // Bins are shares of the sample, so they sum to one whatever the size.
@@ -447,7 +458,7 @@ namespace
     // Cell centres run -1 to 1 in units of MAX_CHROMA, and the binning is the
     // inverse of that mapping -- so a plot laid out from chromaCellCentre puts
     // the trace where accumulate() put it, not half a cell away.
-    TEST_CASE_METHOD(scope_data, "ALScopeData: chroma cell centres rise from -1 to 1 and straddle zero", "[ALScopeData]")
+    TEST_CASE_METHOD(scope_data, "ALScopeData: chroma cell centres rise from -1 to 1 and the binning is their inverse", "[ALScopeData]")
     {
         const S32 last = ALScopeData::CHROMA_SIZE - 1;
         UNSCOPED_INFO("first cell is at the low edge");
@@ -462,6 +473,25 @@ namespace
         {
             CAPTURE(i);
             REQUIRE(ALScopeData::chromaCellCentre(i) > ALScopeData::chromaCellCentre(i - 1));
+        }
+
+        // The inverse: a colour lands in the cell whose centre is within half
+        // a cell of its chroma. None of these sits on a cell's edge.
+        struct Colour
+        {
+            S32 r, g, b;
+        };
+        const F32 half_cell = 1.f / (F32)ALScopeData::CHROMA_SIZE;
+        for (const Colour& c : { Colour{ 210, 40, 70 }, Colour{ 30, 160, 90 }, Colour{ 60, 80, 220 }, Colour{ 180, 150, 40 } })
+        {
+            mScope.accumulate(flat((U8)c.r, (U8)c.g, (U8)c.b, 4).data(), 4, 1);
+            S32 u = -1, v = -1;
+            soleCell(mScope, u, v);
+            F32 cu = 0.f, cv = 0.f;
+            ALColorWheelModel::toChroma(LLVector3((F32)c.r / 255.f, (F32)c.g / 255.f, (F32)c.b / 255.f), cu, cv);
+            CAPTURE(c.r, c.g, c.b, u, v);
+            CHECK_THAT(cu / ALColorWheelModel::MAX_CHROMA, ll_test::WithinDistance(ALScopeData::chromaCellCentre(u), half_cell));
+            CHECK_THAT(cv / ALColorWheelModel::MAX_CHROMA, ll_test::WithinDistance(ALScopeData::chromaCellCentre(v), half_cell));
         }
     }
 

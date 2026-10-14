@@ -31,6 +31,8 @@
 #include "linden_common.h"
 #include <catch2/catch_test_macros.hpp>
 
+#include <type_traits>
+
 namespace
 {
 
@@ -130,7 +132,8 @@ TEST_CASE("LLCPPFeatures: range for walks a container or a C array", "[LLCPPFeat
 class Foo
 {
 public:
-    virtual bool is_happy() const = 0;
+    // Not happy itself, so that a happy answer through a Foo is Bar's.
+    virtual bool is_happy() const { return false; }
 };
 
 class Bar: public Foo
@@ -146,8 +149,10 @@ public:
 
 TEST_CASE("LLCPPFeatures: an override specifier marks a virtual override", "[LLCPPFeatures]")
 {
+    // Asked through its base, which only an override answers.
     Bar b;
-    CHECK(b.is_happy());
+    const Foo& as_foo = b;
+    CHECK(as_foo.is_happy());
 }
 
 // final
@@ -160,7 +165,9 @@ TEST_CASE("LLCPPFeatures: an override specifier marks a virtual override", "[LLC
 class Vehicle
 {
 public:
-    virtual bool has_wheels() const = 0;
+    // No wheels itself, so that wheels through a Vehicle are the final
+    // override's.
+    virtual bool has_wheels() const { return false; }
 };
 
 class WheeledVehicle: public Vehicle
@@ -179,8 +186,11 @@ public:
 
 TEST_CASE("LLCPPFeatures: a class derives from one with a final override", "[LLCPPFeatures]")
 {
+    // Asked through the root, a Bicycle answers with the final override it
+    // inherits.
     Bicycle bi;
-    CHECK(bi.has_wheels());
+    const Vehicle& as_vehicle = bi;
+    CHECK(as_vehicle.has_wheels());
 }
 
 // deleted function declaration
@@ -206,11 +216,14 @@ public:
 };
 
 
-TEST_CASE("LLCPPFeatures: a deleted copy constructor leaves default construction", "[LLCPPFeatures]")
+// Default construction is checked by compiling; the copy is asked of the
+// type, since a copy written out would not compile.
+TEST_CASE("LLCPPFeatures: a deleted copy constructor forbids copies but not default construction", "[LLCPPFeatures]")
 {
     DoNotCopy nc; // OK, default constructor
     //DoNotCopy nc2(nc); // No, can't copy
     //DoNotCopy nc3 = nc; // No, this also calls copy constructor (even though it looks like an assignment)
+    CHECK_FALSE(std::is_copy_constructible_v<DoNotCopy>);
 }
 
 // defaulted function declaration
@@ -321,15 +334,15 @@ TEST_CASE("LLCPPFeatures: constexpr functions compute values", "[LLCPPFeatures]"
 //
 // You can add asserts to be checked at compile time. The thing to be checked must be a constexpr.
 // There are two forms:
-// * static_assert(expr);
+// * static_assert(expr); (since C++17)
 // * static_assert(expr, message);
 //
-// Currently only the 2-parameter form works on windows. The 1-parameter form needs a flag we don't set.
+// The case's checks are the compiler's: it passes by compiling, and then by returning.
 
 TEST_CASE("LLCPPFeatures: static_assert checks a constexpr at compile time", "[LLCPPFeatures]")
 {
-    // static_assert(ce_factorial(6)==720); No, needs a flag we don't currently set.
-    static_assert(ce_factorial(6)==720, "bad factorial"); // OK
+    static_assert(ce_factorial(6)==720);
+    static_assert(ce_factorial(6)==720, "bad factorial");
 }
 
 // type aliases

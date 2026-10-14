@@ -121,15 +121,18 @@ namespace
         const LLVector3 position(128.4f, -63.6f, 22.5f);
         char buffer[64];
         size_t length = ALCrashReporter::locationTag(buffer, sizeof(buffer), "Hippotropolis", position);
+        REQUIRE(length < sizeof(buffer));
         CHECK(std::string(buffer, length) == "Hippotropolis/128/-64/23");
         CHECK(buffer[length] == '\0');
 
         char small[12];
         length = ALCrashReporter::locationTag(small, sizeof(small), "Hippotropolis", position);
+        REQUIRE(length < sizeof(small));
         CHECK(std::string(small, length) == "Hippotropol");
         CHECK(small[length] == '\0');
 
         length = ALCrashReporter::locationTag(small, sizeof(small), "Ahern", position);
+        REQUIRE(length < sizeof(small));
         UNSCOPED_INFO("cut in the numbers");
         CHECK(std::string(small, length) == "Ahern/128/-");
     }

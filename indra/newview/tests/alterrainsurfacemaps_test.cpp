@@ -31,6 +31,7 @@
 
 #include "../alterrainsurfacemaps.h"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -60,8 +61,25 @@ namespace
     TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: fill() lays the grid out APRON in with rows along y", "[ALTerrainSurfaceMaps]")
     {
         std::vector<F32> out;
-        ALTerrainSurfaceMaps::fill(out, GPE, 1, [](S32 gx, S32 gy, F32* t) { t[0] = (F32)(gx * 100 + gy); });
+        // How many times each coordinate on the map is visited, and how many
+        // visits are off it.
+        std::vector<S32> visits(static_cast<size_t>(SIZE) * SIZE, 0);
+        S32              off_map = 0;
+        ALTerrainSurfaceMaps::fill(out, GPE, 1, [&visits, &off_map](S32 gx, S32 gy, F32* t) {
+            t[0] = (F32)(gx * 100 + gy);
+            if (gx < -APRON || gx >= GPE + APRON || gy < -APRON || gy >= GPE + APRON)
+            {
+                ++off_map;
+                return;
+            }
+            ++visits[texel(gx, gy)];
+        });
         REQUIRE(out.size() == static_cast<size_t>(SIZE) * SIZE);
+        {
+            INFO("every coordinate visited once, and none off the map");
+            CHECK(off_map == 0);
+            CHECK(std::count_if(visits.begin(), visits.end(), [](S32 n) { return n != 1; }) == 0);
+        }
         UNSCOPED_INFO("first texel is the south-west apron corner");
         CHECK(out[texel(-APRON, -APRON)] == (F32)(-APRON * 100 - APRON));
         UNSCOPED_INFO("grid origin sits APRON in");

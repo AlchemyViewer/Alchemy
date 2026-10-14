@@ -157,6 +157,7 @@ namespace
         }
 
         const LutCube cube = parse(text.str());
+        REQUIRE(cube.size == 2);
         UNSCOPED_INFO("above domain clamps to white");
         CHECK(at(cube, 0, 0) == FULL);
         UNSCOPED_INFO("below domain clamps to black");
