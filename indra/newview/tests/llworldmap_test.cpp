@@ -349,7 +349,7 @@ namespace
     // Test the LLWorldMap interface
     // ---------------------------------------------------------------------------------------
     // Test Setters and Accessors methods
-    TEST_CASE_METHOD(worldmap_test, "LLWorldMap: the image and region calls do not throw and no tile is loaded", "[LLWorldMap]")
+    TEST_CASE_METHOD(worldmap_test, "LLWorldMap: the image and region calls do not throw", "[LLWorldMap]")
     {
         // Test 1 : reset()
         try {
@@ -387,10 +387,10 @@ namespace
         } catch (...) {
             FAIL("LLWorldMap::equalizeBoostLevels() threw");
         }
-        // Test 7 : getObjectsTile()
+        // Test 7 : getObjectsTile(), which the mipmap answers: a stub here,
+        // whose tile says nothing of the map's.
         try {
-            LLPointer<LLViewerFetchedTexture> image = mWorld->getObjectsTile((U32)(X_WORLD_TEST/REGION_WIDTH_METERS), (U32)(Y_WORLD_TEST/REGION_WIDTH_METERS), 1);
-            CHECK(image.isNull());
+            mWorld->getObjectsTile((U32)(X_WORLD_TEST/REGION_WIDTH_METERS), (U32)(Y_WORLD_TEST/REGION_WIDTH_METERS), 1);
         } catch (...) {
             FAIL("LLWorldMap::getObjectsTile() threw");
         }

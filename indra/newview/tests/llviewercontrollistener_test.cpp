@@ -48,11 +48,8 @@ namespace
         }
     };
 
-    TEST_CASE_METHOD(llviewercontrollistener_data, "llviewercontrollistener: CommonControl with no listener is left untested", "[llviewercontrollistener]")
-    {
-        // Not implemented: the linker drags in LLViewerControlListener when
-        // we bring in LLViewerControl.
-    }
+    // CommonControl with no listener is not tested: the linker drags in
+    // LLViewerControlListener when we bring in LLViewerControl.
 
     TEST_CASE_METHOD(llviewercontrollistener_data, "llviewercontrollistener: CommonControl::get of an unknown group names the group", "[llviewercontrollistener]")
     {

@@ -50,12 +50,6 @@
 
 // Constants
 const std::string VIEWERLOGIN_URI("viewerlogin_uri");
-const std::string VIEWERLOGIN_GRIDLABEL("viewerlogin_grid");
-
-const std::string APPVIEWER_SERIALNUMBER("appviewer_serialno");
-
-const std::string VIEWERLOGIN_CHANNEL("invalid_channel");
-const std::string VIEWERLOGIN_VERSION("invalid_version");
 
 // Link seams.
 
@@ -259,16 +253,7 @@ namespace
 {
 class MockNotifications : public LLNotificationsInterface
 {
-    std::function<void (const LLSD&, const LLSD&)> mResponder;
-    int mAddedCount;
-
 public:
-    MockNotifications() :
-        mResponder(0),
-        mAddedCount(0)
-    {
-    }
-
     virtual ~MockNotifications() {}
 
     /* virtual */ LLNotificationPtr add(
@@ -277,36 +262,8 @@ public:
                     const LLSD& payload,
                     LLNotificationFunctorRegistry::ResponseFunctor functor)
     {
-        mResponder = functor;
-        mAddedCount++;
         return LLNotificationPtr((LLNotification*)NULL);
     }
-
-    void sendYesResponse()
-    {
-        LLSD notification;
-        LLSD response;
-        response = 1;
-        mResponder(notification, response);
-    }
-
-    void sendNoResponse()
-    {
-        LLSD notification;
-        LLSD response;
-        response = 2;
-        mResponder(notification, response);
-    }
-
-    void sendBogusResponse()
-    {
-        LLSD notification;
-        LLSD response;
-        response = 666;
-        mResponder(notification, response);
-    }
-
-    int addedCount() { return mAddedCount; }
 };
 } // anonymous namespace
 

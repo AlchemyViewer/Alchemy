@@ -108,11 +108,12 @@ namespace
         CHECK(grid_x == 0);
         CHECK(grid_y == 0);
     }
-    TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: getObjectsTile (not yet tested)", "[LLWorldMipmap]")
+    TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: getObjectsTile without loading gives nothing for a tile not loaded", "[LLWorldMipmap]")
     {
-        // Depends on some inline methods in LLViewerImage... Thinking about how to make this work
-        // LLPointer<LLViewerImage> img = mMap->getObjectsTile(0, 0, 1);
-        // ensure("getObjectsTile() test failed", img.isNull());
+        // Loading is not tested: it boosts the texture the texture manager
+        // fetches, and this binary's stub fetches none.
+        LLPointer<LLViewerFetchedTexture> img = mMap->getObjectsTile(0, 0, 1, false);
+        CHECK(img.isNull());
     }
     TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: equalizeBoostLevels does not throw", "[LLWorldMipmap]")
     {
