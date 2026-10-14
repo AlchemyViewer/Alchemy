@@ -649,11 +649,13 @@ ALWaterSurface::MapStats& ALWaterSurface::mapStats(const LLUUID& id)
         mMaps.back().mID = id;
         return mMaps.back();
     }
-    // The least recently tracked map makes way.
-    MapStats* oldest = &mMaps.front();
+    // The least recently tracked map makes way, but not one still baking while another can: tracked again before its
+    // bake landed, it would be baked a second time and one of the two bakes thrown away.
+    MapStats* oldest = nullptr;
     for (MapStats& stats : mMaps)
     {
-        if (stats.mUsed < oldest->mUsed)
+        if (!oldest || (oldest->mBaking && !stats.mBaking) ||
+            (oldest->mBaking == stats.mBaking && stats.mUsed < oldest->mUsed))
         {
             oldest = &stats;
         }

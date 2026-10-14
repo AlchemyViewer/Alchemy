@@ -81,13 +81,16 @@ void main()
     }
     else
     {
-        // Every level is half the one below exactly, so a texel's two by two lie inside the level read.
+        // Every level is half the one below exactly, so a texel the level holds has its two by two inside the level
+        // read. A work group reaching past the level's edge reads the edge again, for texels never stored: a fetch
+        // past a level's size is undefined.
         ivec2 below = 2 * texel;
         int lod = depthPyramidLevel;
-        depth = farthest4(vec4(texelFetch(depthPyramidSource, below, lod).r,
-                               texelFetch(depthPyramidSource, below + ivec2(1, 0), lod).r,
-                               texelFetch(depthPyramidSource, below + ivec2(0, 1), lod).r,
-                               texelFetch(depthPyramidSource, below + ivec2(1, 1), lod).r));
+        ivec2 last = textureSize(depthPyramidSource, lod) - 1;
+        depth = farthest4(vec4(texelFetch(depthPyramidSource, min(below, last), lod).r,
+                               texelFetch(depthPyramidSource, min(below + ivec2(1, 0), last), lod).r,
+                               texelFetch(depthPyramidSource, min(below + ivec2(0, 1), last), lod).r,
+                               texelFetch(depthPyramidSource, min(below + ivec2(1, 1), last), lod).r));
     }
     store(0, texel, depth);
     tile[local.y][local.x] = depth;

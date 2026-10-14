@@ -219,6 +219,8 @@ public:
     ALGLStencil(GLenum func, GLint ref, GLuint read_mask, GLenum fail, GLenum depth_fail, GLenum pass, GLuint write_mask)
     :   mTest(GL_STENCIL_TEST)
     {
+        llassert(sOpen == 0);
+        ++sOpen;
         gGL.flush();
         glStencilFunc(func, ref, read_mask);
         glStencilOp(fail, depth_fail, pass);
@@ -231,6 +233,7 @@ public:
         glStencilFunc(GL_ALWAYS, 0, ~0u);
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
         glStencilMask(~0u);
+        --sOpen;
     }
 
     ALGLStencil(const ALGLStencil&) = delete;
@@ -238,6 +241,8 @@ public:
 
 private:
     LLGLEnable mTest;
+    // The scopes open, on the thread that draws: one at most.
+    static inline S32 sOpen = 0;
 };
 
 class LLGLSTracker
