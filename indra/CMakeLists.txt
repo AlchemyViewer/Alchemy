@@ -112,13 +112,29 @@ if(NOT AL_ISA_TIER MATCHES "^(baseline|v2|v3|v4)$")
   message(FATAL_ERROR "AL_ISA_TIER must be one of baseline, v2, v3, v4 (got '${AL_ISA_TIER}')")
 endif()
 
-# Sanitizers (GCC and Clang only): any of address, undefined, thread.
+# Sanitizers (GCC and Clang only): any of address, undefined, thread, but not
+# address and thread together, whose runtimes cannot share a process. On
+# Linux, address and thread build with Clang; see cmake/BootstrapVcpkg.cmake.
 set(
   AL_SANITIZERS
   ""
   CACHE STRING
   "Sanitizers to build with: a list drawn from address, undefined, thread"
 )
+foreach(sanitizer IN LISTS AL_SANITIZERS)
+  if(NOT sanitizer MATCHES "^(address|undefined|thread)$")
+    message(
+      FATAL_ERROR
+      "AL_SANITIZERS: unknown sanitizer '${sanitizer}' (address, undefined, thread)"
+    )
+  endif()
+endforeach()
+if("address" IN_LIST AL_SANITIZERS AND "thread" IN_LIST AL_SANITIZERS)
+  message(
+    FATAL_ERROR
+    "AL_SANITIZERS: address and thread cannot be built together; build a tree for each"
+  )
+endif()
 
 # Warnings
 option(AL_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
@@ -229,7 +245,7 @@ cmake_dependent_option(
   OFF
 )
 
-# WebRTC voice. Off in sanitized builds, which cannot link libwebrtc.
+# WebRTC voice. Off in sanitized builds; see below.
 option(AL_USE_WEBRTC "Build with WebRTC voice" ON)
 
 # macOS signing. The install step always signs the bundle: with this
@@ -292,6 +308,21 @@ if(NOT CMAKE_BUILD_TYPE IN_LIST CMAKE_CONFIGURATION_TYPES)
     FATAL_ERROR
     "CMAKE_BUILD_TYPE must be one of ${CMAKE_CONFIGURATION_TYPES} (got '${CMAKE_BUILD_TYPE}')"
   )
+endif()
+
+# A sanitized build turns off what would stand between the sanitizers and
+# what they watch: Tracy replaces operator new and delete, and its queues and
+# Sentry's handler thread are their own synchronisation; Sentry's handler
+# takes the signals a sanitizer reports through. libwebrtc cannot be linked
+# sanitized. Before the feature flags below, so vcpkg installs none of them.
+# Windows builds ignore AL_SANITIZERS (00-Common.cmake).
+if(AL_SANITIZERS AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+  foreach(option IN ITEMS AL_USE_TRACY AL_USE_SENTRY AL_ENABLE_CRASH_REPORTING AL_USE_WEBRTC)
+    if(${option})
+      message(STATUS "${option} is off in a build with AL_SANITIZERS")
+      set(${option} OFF)
+    endif()
+  endforeach()
 endif()
 
 ##########################################################################

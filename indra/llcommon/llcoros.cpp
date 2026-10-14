@@ -50,6 +50,13 @@
 #undef UNDO_BOOST_DISABLE_ASSERTS
 #undef BOOST_DISABLE_ASSERTS
 #endif
+// Boost.Context tells a sanitizer of its fiber switches only when built for
+// ucontext, and ignores BOOST_USE_ASAN and BOOST_USE_TSAN otherwise. The
+// sanitizer triplets build it so; ports from any other would leave every
+// switch unreported, and the sanitizer misreading the fibers' stacks.
+#if (defined(BOOST_USE_ASAN) || defined(BOOST_USE_TSAN)) && !defined(BOOST_USE_UCONTEXT)
+#error "A sanitized build needs Boost.Context built for ucontext: see indra/cmake/triplets/alchemy-sanitizer.cmake"
+#endif
 // other Linden headers
 #include "llapp.h"
 #include "lltimer.h"
