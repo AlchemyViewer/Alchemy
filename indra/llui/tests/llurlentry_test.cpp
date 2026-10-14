@@ -28,30 +28,17 @@
 #include "linden_common.h"
 #include "../llurlentry.h"
 #include "../lluictrl.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../lluicolortable.h"
 #include "../llrender/lluiimage.h"
 #include "../llmessage/llexperiencecache.h"
 
-namespace tut
+namespace
 {
-    struct LLUrlEntryData
-    {
-    };
-
-    typedef test_group<LLUrlEntryData> factory;
-    typedef factory::object object;
 }
 
 namespace
 {
-    tut::factory tf("LLUrlEntry");
-}
-
-namespace tut
-{
-    namespace
-    {
         void testRegex(const std::string &testname, LLUrlEntryBase &entry,
                        const char *text, const std::string &expected)
         {
@@ -63,7 +50,8 @@ namespace tut
             {
                 url = entry.getUrl(result.str(group));
             }
-            ensure_equals(testname, url, expected);
+            UNSCOPED_INFO(testname);
+            REQUIRE(url == expected);
         }
 
         void dummyCallback(const std::string &url, const std::string &label, const std::string& icon)
@@ -82,7 +70,8 @@ namespace tut
                 std::string url = result.str(group);
                 label = entry.getLabel(url, boost::bind(dummyCallback, _1, _2, _3));
             }
-            ensure_equals(testname, label, expected);
+            UNSCOPED_INFO(testname);
+            REQUIRE(label == expected);
         }
 
         void testLocation(const std::string &testname, LLUrlEntryBase &entry,
@@ -97,12 +86,11 @@ namespace tut
                 std::string url = result.str(group);
                 location = entry.getLocation(url);
             }
-            ensure_equals(testname, location, expected);
+            UNSCOPED_INFO(testname);
+            REQUIRE(location == expected);
         }
-    }
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryHTTP finds http and https urls in text", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryHTTP - standard http Urls
@@ -187,8 +175,7 @@ namespace tut
                   "");
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryHTTPLabel finds the url in a labelled wiki-style link", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryHTTPLabel - wiki-style http Urls with labels
@@ -228,8 +215,7 @@ namespace tut
                   "http://www.secondlife.com/?test=Hi%20There");
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE("LLUrlEntry: LLUrlEntrySLURL finds slurl.com location urls", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntrySLURL - second life URLs
@@ -299,8 +285,7 @@ namespace tut
                   "http://slurl.com/secondlife/A%27ksha%20Oasis/41/166/701");
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryAgent finds agent app urls", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryAgent - secondlife://app/agent Urls
@@ -336,8 +321,7 @@ namespace tut
                   "x-grid-location-info://lincoln.lindenlab.com/app/AGENT/0e346d8b-4433-4d66-a6b0-fd37083abc4c/about");
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryGroup finds group app urls", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryGroup - secondlife://app/group Urls
@@ -374,8 +358,7 @@ namespace tut
 
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryPlace finds secondlife location urls", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryPlace - secondlife://<location> URLs
@@ -425,8 +408,7 @@ namespace tut
                   "x-grid-location-info://lincoln.lindenlab.com/region/All%20Hands/50/50/50");
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryParcel finds parcel app urls", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryParcel - secondlife://app/parcel Urls
@@ -449,8 +431,7 @@ namespace tut
                   "XXX secondlife:///APP/Parcel/0000060e-4b39-e00b-d0c3-d98b1934e3a8/About XXX",
                   "secondlife:///APP/Parcel/0000060e-4b39-e00b-d0c3-d98b1934e3a8/About");
     }
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryTeleport finds teleport app urls", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryTeleport - secondlife://app/teleport URLs
@@ -528,8 +509,7 @@ namespace tut
                   "x-grid-location-info://lincoln.lindenlab.com/app/teleport/All%20Hands/50/50/50");
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE("LLUrlEntry: LLUrlEntrySL finds general secondlife urls", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntrySL - general secondlife:// URLs
@@ -565,8 +545,7 @@ namespace tut
                   "secondlife://host:8080/foo/bar");
     }
 
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE("LLUrlEntry: LLUrlEntrySLLabel finds the url in a labelled secondlife link", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntrySLLabel - general secondlife:// URLs with labels
@@ -602,8 +581,7 @@ namespace tut
                   "secondlife:///app/teleport/Ahern/50/50/50/");
     }
 
-    template<> template<>
-    void object::test<11>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryNoLink finds the text inside nolink tags", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryNoLink - turn off hyperlinking
@@ -631,8 +609,7 @@ namespace tut
                   "My Object");
     }
 
-    template<> template<>
-    void object::test<12>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryRegion finds region urls with their labels and locations", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryRegion - secondlife:///app/region/<location> URLs
@@ -736,8 +713,7 @@ namespace tut
             "Product Engine");
     }
 
-    template<> template<>
-    void object::test<13>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryEmail finds e-mail addresses as mailto urls", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryemail - general emails
@@ -770,8 +746,7 @@ namespace tut
                   "");
     }
 
-    template<> template<>
-    void object::test<14>()
+    TEST_CASE("LLUrlEntry: LLUrlEntrySecondlifeURL finds Linden domain urls that have a protocol", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntrySimpleSecondlifeURL - http://*.secondlife.com/* and http://*lindenlab.com/* urls
@@ -807,8 +782,7 @@ namespace tut
                   "");
     }
 
-    template<> template<>
-    void object::test<15>()
+    TEST_CASE("LLUrlEntry: LLUrlEntrySimpleSecondlifeURL finds a bare secondlife or lindenlab host", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntrySimpleSecondlifeURL - http://*.secondlife.com and http://*lindenlab.com urls
@@ -867,8 +841,7 @@ namespace tut
                   "");
     }
 
-    template<> template<>
-    void object::test<16>()
+    TEST_CASE("LLUrlEntry: LLUrlEntryIPv6 finds bracketed IPv6 urls with a protocol", "[LLUrlEntry]")
     {
         //
         // test LLUrlEntryIPv6

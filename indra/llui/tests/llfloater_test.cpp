@@ -31,12 +31,10 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         struct TestFloater : public LLFloater
         {
             TestFloater(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
@@ -46,7 +44,6 @@ namespace tut
         {
             TestView(const LLView::Params& p) : LLView(p) {}
         };
-    }
 
     struct llfloater_data
     {
@@ -61,19 +58,14 @@ namespace tut
         }
     };
 
-    typedef test_group<llfloater_data> llfloater_test;
-    typedef llfloater_test::object     llfloater_object;
-    tut::llfloater_test llfloater_testgroup("llfloater");
-
     // A floater view holds floaters and nothing else. Every loop over its
     // children treats a child as one, so anything else is refused at the
     // door rather than dereferenced later.
-    template<> template<>
-    void llfloater_object::test<1>()
+    TEST_CASE_METHOD(llfloater_data, "llfloater: a floater view refuses a child that is not a floater", "[llfloater]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
@@ -83,15 +75,20 @@ namespace tut
         fp.name = "floater";
         fp.rect = LLRect(0, 100, 200, 0);
         TestFloater* f = new TestFloater(fp);   // parents itself into gFloaterView
-        ensure("a floater is taken", f->getParent() == fv.get());
-        ensure_equals("one child", fv->getChildCount(), 1);
+        UNSCOPED_INFO("a floater is taken");
+        CHECK(f->getParent() == fv.get());
+        UNSCOPED_INFO("one child");
+        CHECK(fv->getChildCount() == 1);
 
         LLView::Params vp;
         vp.name = "plain";
         TestView* v = new TestView(vp);
-        ensure("a plain view is refused", !fv->addChild(v));
-        ensure("and has no parent", v->getParent() == nullptr);
-        ensure_equals("still one child", fv->getChildCount(), 1);
+        UNSCOPED_INFO("a plain view is refused");
+        CHECK_FALSE(fv->addChild(v));
+        UNSCOPED_INFO("and has no parent");
+        REQUIRE(v->getParent() == nullptr);
+        UNSCOPED_INFO("still one child");
+        CHECK(fv->getChildCount() == 1);
         delete v;
 
         fv.reset();
@@ -103,12 +100,11 @@ namespace tut
     // have produced -- and going to the file for a second read of its own
     // builds the version the edit is not in. The name here is of no file,
     // so a build that reached for one could not succeed.
-    template<> template<>
-    void llfloater_object::test<2>()
+    TEST_CASE_METHOD(llfloater_data, "llfloater: buildFromXML builds from the tree it is given and reads no file", "[llfloater]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
@@ -117,15 +113,19 @@ namespace tut
         const std::string xml =
             "<floater name=\"built\" title=\"Held in memory\" width=\"123\" height=\"45\"/>";
         LLXMLNodePtr root;
-        ensure("the tree parses", LLXMLNode::parseBuffer(xml.data(), (U32)xml.size(), root));
+        UNSCOPED_INFO("the tree parses");
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), (U32)xml.size(), root));
 
         LLFloater::Params fp;
         fp.name = "shell";
         fp.rect = LLRect(0, 10, 10, 0);
         TestFloater* f = new TestFloater(fp);
-        ensure("it builds from the tree", f->buildFromXML(root, "floater_of_no_file.xml"));
-        ensure_equals("as wide as the tree says", f->getRect().getWidth(), 123);
-        ensure_equals("and titled what it says", f->getTitle(), std::string("Held in memory"));
+        UNSCOPED_INFO("it builds from the tree");
+        CHECK(f->buildFromXML(root, "floater_of_no_file.xml"));
+        UNSCOPED_INFO("as wide as the tree says");
+        CHECK(f->getRect().getWidth() == 123);
+        UNSCOPED_INFO("and titled what it says");
+        CHECK(f->getTitle() == std::string("Held in memory"));
 
         fv.reset();
     }
@@ -139,12 +139,11 @@ namespace tut
     // and the string it missed reached the factory as a widget it could
     // not build. Panel strings under a nested panel are the same case one
     // level down.
-    template<> template<>
-    void llfloater_object::test<3>()
+    TEST_CASE_METHOD(llfloater_data, "llfloater: buildFromXML reads every string element and takes each out of the tree", "[llfloater]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
@@ -163,7 +162,8 @@ namespace tut
             "</panel>"
             "</floater>";
         LLXMLNodePtr root;
-        ensure("the tree parses", LLXMLNode::parseBuffer(xml.data(), (U32)xml.size(), root));
+        UNSCOPED_INFO("the tree parses");
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), (U32)xml.size(), root));
 
         LLFloater::Params fp;
         fp.name = "shell";
@@ -171,30 +171,37 @@ namespace tut
         TestFloater* f = new TestFloater(fp);
 
         ALXUIDiagnostics sink;
-        ensure("it builds", f->buildFromXML(root, "floater_of_no_file.xml"));
-        ensure_equals("nothing reached the factory that it could not build",
-                      sink.count(ALXUIDiagnostics::Kind::CreateFailed), (size_t)0);
+        UNSCOPED_INFO("it builds");
+        CHECK(f->buildFromXML(root, "floater_of_no_file.xml"));
+        UNSCOPED_INFO("nothing reached the factory that it could not build");
+        REQUIRE(sink.count(ALXUIDiagnostics::Kind::CreateFailed) == (size_t)0);
 
         for (const char* name : { "a", "b", "c", "d" })
         {
             std::string upper(name);
             upper[0] = (char)toupper(upper[0]);
-            ensure_equals(std::string("floater string ") + name, f->getString(name), upper);
+            UNSCOPED_INFO(std::string("floater string ") + name);
+            REQUIRE(f->getString(name) == upper);
         }
         LLPanel* inner = f->findChild<LLPanel>("inner");
-        ensure("the panel was built", inner != nullptr);
+        UNSCOPED_INFO("the panel was built");
+        REQUIRE(inner != nullptr);
         for (const char* name : { "e", "f", "g" })
         {
             std::string upper(name);
             upper[0] = (char)toupper(upper[0]);
-            ensure_equals(std::string("panel string ") + name, inner->getString(name), upper);
+            UNSCOPED_INFO(std::string("panel string ") + name);
+            REQUIRE(inner->getString(name) == upper);
         }
 
         // The strings were taken out of the tree; the panel is what is left.
-        ensure_equals("one child left under the floater", root->getChildCount(), 1u);
+        UNSCOPED_INFO("one child left under the floater");
+        CHECK(root->getChildCount() == 1u);
         LLXMLNodePtr panel_node;
-        ensure("and it is the panel", root->getChild("panel", panel_node));
-        ensure_equals("with nothing left under it", panel_node->getChildCount(), 0u);
+        UNSCOPED_INFO("and it is the panel");
+        REQUIRE(root->getChild("panel", panel_node));
+        UNSCOPED_INFO("with nothing left under it");
+        CHECK(panel_node->getChildCount() == 0u);
 
         fv.reset();
     }

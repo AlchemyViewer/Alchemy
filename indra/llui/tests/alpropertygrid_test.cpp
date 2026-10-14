@@ -41,12 +41,12 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alpropertygrid_data
     {
@@ -86,9 +86,9 @@ namespace tut
             {
                 LLPanel* row = rows->getChild<LLPanel>(name + "_row", true);
                 const LLRect label = row->getChild<LLTextBox>(name + "_label", true)->getRect();
-                ensure(name + ": its label " + where(label) + " is inside the row "
-                           + where(row->getLocalRect()),
-                       row->getLocalRect().contains(label));
+                UNSCOPED_INFO(name + ": its label " + where(label) + " is inside the row "
+                           + where(row->getLocalRect()));
+                REQUIRE(row->getLocalRect().contains(label));
                 out.push_back(row->getRect());
             }
             return out;
@@ -110,30 +110,25 @@ namespace tut
             for (size_t i = 0; i < labels.size(); ++i)
             {
                 const LLRect& r = labels[i];
-                ensure(what + ": row " + std::to_string(i) + " at " + where(r)
-                           + " is inside " + where(within),
-                       within.contains(r));
+                UNSCOPED_INFO(what + ": row " + std::to_string(i) + " at " + where(r)
+                           + " is inside " + where(within));
+                REQUIRE(within.contains(r));
                 if (i > 0)
                 {
-                    ensure_equals(what + ": row " + std::to_string(i) + " is one row below row "
-                                      + std::to_string(i - 1),
-                                  labels[i - 1].mTop - r.mTop, ROW);
+                    UNSCOPED_INFO(what + ": row " + std::to_string(i) + " is one row below row "
+                                      + std::to_string(i - 1));
+                    REQUIRE(labels[i - 1].mTop - r.mTop == ROW);
                 }
             }
         }
     };
 
-    typedef test_group<alpropertygrid_data>  alpropertygrid_test;
-    typedef alpropertygrid_test::object      alpropertygrid_object;
-    tut::alpropertygrid_test alpropertygrid_testgroup("alpropertygrid");
-
     // Freshly filled, the rows of a section are stacked from its top.
-    template<> template<>
-    void alpropertygrid_object::test<1>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: freshly filled rows stack one row apart inside their section", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -150,12 +145,11 @@ namespace tut
 
     // And they are still stacked from its top after the grid is resized, which
     // is the whole reason a resize no longer rebuilds them.
-    template<> template<>
-    void alpropertygrid_object::test<2>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: rows stay stacked inside their section after a resize", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -178,12 +172,11 @@ namespace tut
 
     // A section's panel is exactly as tall as the rows it holds, so the tab it
     // is in is told the right height and nothing is drawn outside it.
-    template<> template<>
-    void alpropertygrid_object::test<3>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a section's panel is exactly as tall as its rows", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -191,21 +184,22 @@ namespace tut
         grid->setFields({ field("name", 0), field("value", 0),
                           field("left", 1), field("top", 1), field("width", 1) });
 
-        ensure_equals("two rows", grid->getChild<LLPanel>("identity_rows", true)->getRect().getHeight(),
+        UNSCOPED_INFO("two rows");
+        CHECK(grid->getChild<LLPanel>("identity_rows", true)->getRect().getHeight() ==
                       2 * ROW);
-        ensure_equals("three rows", grid->getChild<LLPanel>("position_rows", true)->getRect().getHeight(),
+        UNSCOPED_INFO("three rows");
+        CHECK(grid->getChild<LLPanel>("position_rows", true)->getRect().getHeight() ==
                       3 * ROW);
         grid->die();
     }
 
     // The panel a section's rows are in belongs to its tab: it may not stick
     // out of it, in either direction, or it draws over the section above.
-    template<> template<>
-    void alpropertygrid_object::test<4>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a section's rows panel lies inside its tab", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -217,9 +211,9 @@ namespace tut
         {
             LLAccordionCtrlTab* tab = grid->getChild<LLAccordionCtrlTab>(group, true);
             LLPanel* rows = grid->getChild<LLPanel>(group + "_rows", true);
-            ensure(group + ": the panel " + where(rows->getRect()) + " is inside its tab "
-                       + where(tab->getLocalRect()),
-                   tab->getLocalRect().contains(rows->getRect()));
+            UNSCOPED_INFO(group + ": the panel " + where(rows->getRect()) + " is inside its tab "
+                       + where(tab->getLocalRect()));
+            REQUIRE(tab->getLocalRect().contains(rows->getRect()));
         }
         grid->die();
     }
@@ -228,12 +222,11 @@ namespace tut
     // position, and reading them on one line is how anybody says it. The
     // named half gets no row of its own, and the section is as tall as the
     // rows it will hold rather than the fields it was given.
-    template<> template<>
-    void alpropertygrid_object::test<5>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a paired field shares its partner's row", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -247,39 +240,42 @@ namespace tut
         grid->setFields(fields);
 
         LLPanel* rows = grid->getChild<LLPanel>("position_rows", true);
-        ensure("the pair is one row", rows->findChild<LLPanel>("left_row", true) != nullptr);
-        ensure("and the other half has none of its own",
-               rows->findChild<LLPanel>("top_row", true) == nullptr);
-        ensure("the unpaired field still has one",
-               rows->findChild<LLPanel>("name_row", true) != nullptr);
+        UNSCOPED_INFO("the pair is one row");
+        REQUIRE(rows->findChild<LLPanel>("left_row", true) != nullptr);
+        UNSCOPED_INFO("and the other half has none of its own");
+        REQUIRE(rows->findChild<LLPanel>("top_row", true) == nullptr);
+        UNSCOPED_INFO("the unpaired field still has one");
+        REQUIRE(rows->findChild<LLPanel>("name_row", true) != nullptr);
 
         // Both editors are on the one row, and inside it.
         LLPanel* row = rows->getChild<LLPanel>("left_row", true);
         LLView* first = row->findChild<LLView>("left", true);
         LLView* second = row->findChild<LLView>("top", true);
-        ensure("the first editor is on the row", first != nullptr);
-        ensure("and so is the second", second != nullptr);
-        ensure("the first is inside it " + where(first->getRect()),
-               row->getLocalRect().contains(first->getRect()));
-        ensure("the second is inside it " + where(second->getRect()),
-               row->getLocalRect().contains(second->getRect()));
-        ensure("and the second is to the right of the first",
-               second->getRect().mLeft >= first->getRect().mRight);
+        UNSCOPED_INFO("the first editor is on the row");
+        REQUIRE(first != nullptr);
+        UNSCOPED_INFO("and so is the second");
+        REQUIRE(second != nullptr);
+        UNSCOPED_INFO("the first is inside it " + where(first->getRect()));
+        CHECK(row->getLocalRect().contains(first->getRect()));
+        UNSCOPED_INFO("the second is inside it " + where(second->getRect()));
+        CHECK(row->getLocalRect().contains(second->getRect()));
+        UNSCOPED_INFO("and the second is to the right of the first");
+        CHECK(second->getRect().mLeft >= first->getRect().mRight);
 
         // Two rows, not three: the section is as tall as what it shows.
-        ensure_equals("the section holds two rows", rows->getRect().getHeight(), 2 * ROW);
+        UNSCOPED_INFO("the section holds two rows");
+        CHECK(rows->getRect().getHeight() == 2 * ROW);
         grid->die();
     }
 
     // A field whose value is a set of edges is a picture, and a picture
     // needs a taller row than a value does. The rows below it are stacked
     // under what it actually took, not under a row height.
-    template<> template<>
-    void alpropertygrid_object::test<6>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: an edges field draws as a taller picture row", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -300,35 +296,41 @@ namespace tut
         const LLRect second = rows->getChild<LLPanel>("left_row", true)->getRect();
         const LLRect last = rows->getChild<LLPanel>("name_row", true)->getRect();
 
-        ensure_equals("an ordinary row is one row", second.getHeight(), ROW);
-        ensure("a picture takes more than one " + where(picture), picture.getHeight() > ROW);
-        ensure_equals("the picture starts at the top of the section",
-                      picture.mTop, rows->getRect().getHeight());
-        ensure_equals("the row after it begins where it ended", second.mTop, picture.mBottom);
-        ensure_equals("and the one after that where the second ended", last.mTop, second.mBottom);
-        ensure_equals("the section is as tall as the three of them",
-                      rows->getRect().getHeight(), picture.getHeight() + second.getHeight() + last.getHeight());
+        UNSCOPED_INFO("an ordinary row is one row");
+        CHECK(second.getHeight() == ROW);
+        UNSCOPED_INFO("a picture takes more than one " + where(picture));
+        CHECK(picture.getHeight() > ROW);
+        UNSCOPED_INFO("the picture starts at the top of the section");
+        CHECK(picture.mTop == rows->getRect().getHeight());
+        UNSCOPED_INFO("the row after it begins where it ended");
+        CHECK(second.mTop == picture.mBottom);
+        UNSCOPED_INFO("and the one after that where the second ended");
+        CHECK(last.mTop == second.mBottom);
+        UNSCOPED_INFO("the section is as tall as the three of them");
+        CHECK(rows->getRect().getHeight() == picture.getHeight() + second.getHeight() + last.getHeight());
 
         // The label still sits in the ordinary row at the top of the tall
         // one, so the label column reads straight down the pane.
         LLPanel* row = rows->getChild<LLPanel>("follows_row", true);
         const LLRect label = row->getChild<LLTextBox>("follows_label", true)->getRect();
-        ensure("the label is in the top row of it " + where(label),
-               label.mBottom >= picture.getHeight() - ROW && label.mTop <= picture.getHeight());
-        ensure("the picture is on the row " + where(row->getLocalRect()),
-               row->findChild<LLView>("follows", true) != nullptr);
+        {
+            INFO("the label is in the top row of it " + where(label));
+            CHECK(label.mBottom >= picture.getHeight() - ROW);
+            CHECK(label.mTop <= picture.getHeight());
+        }
+        UNSCOPED_INFO("the picture is on the row " + where(row->getLocalRect()));
+        REQUIRE(row->findChild<LLView>("follows", true) != nullptr);
         grid->die();
     }
 
     // A value some other layer writes as well is marked beside its row, and
     // the mark says where. A value nobody disagrees about is not marked: a
     // mark on every row is a column, which is what this replaced.
-    template<> template<>
-    void alpropertygrid_object::test<7>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a value other layers also write gets a gutter mark naming them", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -342,20 +344,25 @@ namespace tut
 
         LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
         LLUICtrl* mark = rows->findChild<LLUICtrl>("label_gutter", true);
-        ensure("the row somebody disagrees about is marked", mark != nullptr);
-        ensure("and the one nobody does is not",
-               rows->findChild<LLUICtrl>("name_gutter", true) == nullptr);
-        ensure("the mark says both places", mark->getToolTip().find("gemini") != std::string::npos
-                                         && mark->getToolTip().find("ja") != std::string::npos);
-        ensure("it is in the margin beside the label " + where(mark->getRect()),
-               mark->getRect().mRight <= rows->getChild<LLPanel>("label_row", true)
+        UNSCOPED_INFO("the row somebody disagrees about is marked");
+        REQUIRE(mark != nullptr);
+        UNSCOPED_INFO("and the one nobody does is not");
+        REQUIRE(rows->findChild<LLUICtrl>("name_gutter", true) == nullptr);
+        {
+            INFO("the mark says both places");
+            REQUIRE(mark->getToolTip().find("gemini") != std::string::npos);
+            REQUIRE(mark->getToolTip().find("ja") != std::string::npos);
+        }
+        UNSCOPED_INFO("it is in the margin beside the label " + where(mark->getRect()));
+        CHECK(mark->getRect().mRight <= rows->getChild<LLPanel>("label_row", true)
                    ->getChild<LLTextBox>("label_label", true)->getRect().mLeft);
 
         // Clicking it is how the caller is asked to show where else.
         std::string asked;
         grid->onFieldGutter([&asked](const std::string& name) { asked = name; });
         mark->handleMouseDown(1, 1, MASK_NONE);
-        ensure_equals("the click names the field", asked, std::string("label"));
+        UNSCOPED_INFO("the click names the field");
+        CHECK(asked == std::string("label"));
         grid->die();
     }
 
@@ -363,12 +370,11 @@ namespace tut
     // caller's words: the two things that have to be said rather than shown
     // are which layer wrote what is in force, and that on an unwritten row
     // nobody wrote it at all.
-    template<> template<>
-    void alpropertygrid_object::test<8>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a row's tooltips say its type and source in the caller's words", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -394,27 +400,29 @@ namespace tut
         LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
         LLPanel* row = rows->getChild<LLPanel>("width_row", true);
         const std::string tip = row->getChild<LLTextBox>("width_label", true)->getToolTip();
-        ensure("it names the field: " + tip, tip.find("width is a S32") != std::string::npos);
-        ensure("and says where what is in force came from: " + tip,
-               tip.find("written in base") != std::string::npos);
-        ensure("a row somebody wrote does not say nobody did: " + tip,
-               tip.find("nobody wrote this") == std::string::npos);
+        UNSCOPED_INFO("it names the field: " + tip);
+        REQUIRE(tip.find("width is a S32") != std::string::npos);
+        UNSCOPED_INFO("and says where what is in force came from: " + tip);
+        REQUIRE(tip.find("written in base") != std::string::npos);
+        UNSCOPED_INFO("a row somebody wrote does not say nobody did: " + tip);
+        REQUIRE(tip.find("nobody wrote this") == std::string::npos);
 
         // The editor answers the same question as the label.
-        ensure_equals("the editor says what the label says",
-                      row->getChild<LLView>("width", true)->getToolTip(), tip);
-        ensure("and the way back says what it takes out",
-               row->getChild<LLView>("width_remove", true)->getToolTip()
+        UNSCOPED_INFO("the editor says what the label says");
+        CHECK(row->getChild<LLView>("width", true)->getToolTip() == tip);
+        UNSCOPED_INFO("and the way back says what it takes out");
+        REQUIRE(row->getChild<LLView>("width_remove", true)->getToolTip()
                    .find("take width out again") != std::string::npos);
 
         // The row nobody wrote says so, and has no way back to offer.
         LLPanel* unwritten = rows->getChild<LLPanel>("height_row", true);
         const std::string quiet = unwritten->getChild<LLTextBox>("height_label", true)->getToolTip();
-        ensure("an unwritten row says nobody wrote it: " + quiet,
-               quiet.find("nobody wrote this") != std::string::npos);
-        ensure("and it names no layer: " + quiet, quiet.find("written in") == std::string::npos);
-        ensure("nor is there anything to take out",
-               !unwritten->getChild<LLView>("height_remove", true)->getVisible());
+        UNSCOPED_INFO("an unwritten row says nobody wrote it: " + quiet);
+        REQUIRE(quiet.find("nobody wrote this") != std::string::npos);
+        UNSCOPED_INFO("and it names no layer: " + quiet);
+        REQUIRE(quiet.find("written in") == std::string::npos);
+        UNSCOPED_INFO("nor is there anything to take out");
+        CHECK_FALSE(unwritten->getChild<LLView>("height_remove", true)->getVisible());
         grid->die();
     }
 
@@ -423,12 +431,11 @@ namespace tut
     // decimals rounds whatever the step leaves it at, so a step of less than
     // one lands back on the number it started from: the arrows write what is
     // already there and only the keyboard can change anything.
-    template<> template<>
-    void alpropertygrid_object::test<9>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a whole number steps by at least one and a real by less", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -446,14 +453,17 @@ namespace tut
         LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
         LLSpinCtrl* whole = rows->getChild<LLPanel>("width_row", true)
                                 ->getChild<LLSpinCtrl>("width", true);
-        ensure("a whole number steps by a whole number: "
-                   + std::to_string(whole->getIncrement()),
-               whole->getIncrement() >= 1.f);
+        UNSCOPED_INFO("a whole number steps by a whole number: "
+                   + std::to_string(whole->getIncrement()));
+        CHECK(whole->getIncrement() >= 1.f);
 
         LLSpinCtrl* real = rows->getChild<LLPanel>("alpha_row", true)
                                ->getChild<LLSpinCtrl>("alpha", true);
-        ensure("and one with decimals steps by less: " + std::to_string(real->getIncrement()),
-               real->getIncrement() > 0.f && real->getIncrement() < 1.f);
+        {
+            INFO("and one with decimals steps by less: " + std::to_string(real->getIncrement()));
+            REQUIRE(real->getIncrement() > 0.f);
+            CHECK(real->getIncrement() < 1.f);
+        }
         grid->die();
     }
 
@@ -461,12 +471,11 @@ namespace tut
     // string is four numbers a reader has to count and a writer has to keep
     // in order; a box each, captioned, is the same value said so that both
     // are obvious.
-    template<> template<>
-    void alpropertygrid_object::test<10>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a several-number value gets a captioned box per part", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -490,10 +499,12 @@ namespace tut
         {
             const std::string name = std::string("rect.") + parts[i];
             LLSpinCtrl* box = row->getChild<LLSpinCtrl>(name, true);
-            ensure("a box for " + name, box != nullptr);
-            ensure_equals("holding its own number", (F32)box->getValue().asReal(), wanted[i]);
-            ensure("and captioned with what it is",
-                   row->findChild<LLView>(name + "_caption", true) != nullptr);
+            UNSCOPED_INFO("a box for " + name);
+            REQUIRE(box != nullptr);
+            UNSCOPED_INFO("holding its own number");
+            REQUIRE((F32)box->getValue().asReal() == wanted[i]);
+            UNSCOPED_INFO("and captioned with what it is");
+            REQUIRE(row->findChild<LLView>(name + "_caption", true) != nullptr);
         }
 
         // Every box commits the whole value, because the field is one field.
@@ -506,8 +517,10 @@ namespace tut
         });
         row->getChild<LLSpinCtrl>("rect.R", true)->setValue(99);
         row->getChild<LLSpinCtrl>("rect.R", true)->onCommit();
-        ensure_equals("the field, not the part", said_name, std::string("rect"));
-        ensure_equals("and the whole of it", said_value, std::string("10 20 99 40"));
+        UNSCOPED_INFO("the field, not the part");
+        CHECK(said_name == std::string("rect"));
+        UNSCOPED_INFO("and the whole of it");
+        CHECK(said_value == std::string("10 20 99 40"));
 
         // A row of parts is taller than a row of one value, since each part
         // carries a line saying which it is.
@@ -521,20 +534,20 @@ namespace tut
         const S32 tall = row->getRect().getHeight();
         const S32 ordinary = other->getChild<LLPanel>("identity_rows", true)
                                   ->getChild<LLPanel>("width_row", true)->getRect().getHeight();
-        ensure("a captioned row is taller: " + std::to_string(tall) + " vs "
-                   + std::to_string(ordinary), tall > ordinary);
+        UNSCOPED_INFO("a captioned row is taller: " + std::to_string(tall) + " vs "
+                   + std::to_string(ordinary));
+        CHECK(tall > ordinary);
         other->die();
         grid->die();
     }
 
     // A value arriving with commas between its parts is the same value: an
     // LLSD one is written that way and a file writes spaces.
-    template<> template<>
-    void alpropertygrid_object::test<11>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: commas between parts split them and missing parts are nought", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -549,8 +562,8 @@ namespace tut
 
         LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
                            ->getChild<LLPanel>("colour_row", true);
-        ensure_equals("split on the commas",
-                      (F32)row->getChild<LLSpinCtrl>("colour.G", true)->getValue().asReal(), 0.25f);
+        UNSCOPED_INFO("split on the commas");
+        CHECK((F32)row->getChild<LLSpinCtrl>("colour.G", true)->getValue().asReal() == 0.25f);
 
         // Fewer parts than boxes is nought in the rest rather than a hole.
         std::vector<ALPropertyGrid::Field> short_one;
@@ -559,10 +572,10 @@ namespace tut
         short_one.back().components = { "X", "Y", "Z" };
         short_one.back().value = "1 2";
         grid->setFields(short_one);
-        ensure_equals("the part nobody gave is nought",
-                      (F32)grid->getChild<LLPanel>("identity_rows", true)
+        UNSCOPED_INFO("the part nobody gave is nought");
+        CHECK((F32)grid->getChild<LLPanel>("identity_rows", true)
                                ->getChild<LLPanel>("short_row", true)
-                               ->getChild<LLSpinCtrl>("short.Z", true)->getValue().asReal(), 0.f);
+                               ->getChild<LLSpinCtrl>("short.Z", true)->getValue().asReal() == 0.f);
         grid->die();
     }
 
@@ -571,12 +584,11 @@ namespace tut
     // the only thing there. And a section with no heading is as tall as its
     // rows -- the tab used to be told to leave room for a header it was not
     // drawing, and handed the difference to its panel as blank space.
-    template<> template<>
-    void alpropertygrid_object::test<12>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a lone section has no heading and two sections have them", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* one = build();
@@ -586,10 +598,12 @@ namespace tut
         one->setFields(fields);
 
         LLAccordionCtrlTab* tab = one->getChild<LLAccordionCtrlTab>("only", true);
-        ensure("the section is there", tab != nullptr);
-        ensure("and says nothing over it", tab->getHeaderHeight() == 0);
-        ensure_equals("so it is as tall as its one row",
-                      one->getChild<LLPanel>("only_rows", true)->getRect().getHeight(), ROW);
+        UNSCOPED_INFO("the section is there");
+        REQUIRE(tab != nullptr);
+        UNSCOPED_INFO("and says nothing over it");
+        CHECK(tab->getHeaderHeight() == 0);
+        UNSCOPED_INFO("so it is as tall as its one row");
+        CHECK(one->getChild<LLPanel>("only_rows", true)->getRect().getHeight() == ROW);
 
         // Two sections is where a heading starts doing something: it says
         // which of them you are looking at, and folds one away from the other.
@@ -599,8 +613,8 @@ namespace tut
         both.push_back(field("name", 0));
         both.push_back(field("width", 1));
         two->setFields(both);
-        ensure("a heading over each",
-               two->getChild<LLAccordionCtrlTab>("first", true)->getHeaderHeight() > 0);
+        UNSCOPED_INFO("a heading over each");
+        CHECK(two->getChild<LLAccordionCtrlTab>("first", true)->getHeaderHeight() > 0);
 
         one->die();
         two->die();
@@ -610,12 +624,11 @@ namespace tut
     // and a picker. A caller that names its parts as well -- because the
     // value really is four numbers -- gets the better editor rather than the
     // more literal one, and does not get the caption line either.
-    template<> template<>
-    void alpropertygrid_object::test<13>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a colour with parts gets the colour field and not boxes", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -631,24 +644,23 @@ namespace tut
 
         LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
                            ->getChild<LLPanel>("tint_row", true);
-        ensure("a colour gets the colour editor",
-               row->findChild<ALColorField>("tint", true) != nullptr);
-        ensure("and not a box per part",
-               row->findChild<LLSpinCtrl>("tint.R", true) == nullptr);
-        ensure_equals("nor the line that would have captioned them",
-                      row->getRect().getHeight(), ROW);
+        UNSCOPED_INFO("a colour gets the colour editor");
+        REQUIRE(row->findChild<ALColorField>("tint", true) != nullptr);
+        UNSCOPED_INFO("and not a box per part");
+        REQUIRE(row->findChild<LLSpinCtrl>("tint.R", true) == nullptr);
+        UNSCOPED_INFO("nor the line that would have captioned them");
+        CHECK(row->getRect().getHeight() == ROW);
         grid->die();
     }
 
     // The field Debug Settings hands the grid for a colour, in the grid the
     // way Debug Settings has it: a colour at its default, in a pane two
     // hundred and forty wide with a labelled row of one section.
-    template<> template<>
-    void alpropertygrid_object::test<14>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a Debug Settings colour row shows its editor in an open section", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid::Params p(LLUICtrlFactory::getDefaultParams<ALPropertyGrid>());
@@ -671,13 +683,20 @@ namespace tut
         grid->setFields({ field });
 
         LLPanel* row = grid->findChild<LLPanel>("RenderVignetteColor_row", true);
-        ensure("the row is there", row != nullptr);
-        ensure("and shown", row->getVisible());
+        UNSCOPED_INFO("the row is there");
+        REQUIRE(row != nullptr);
+        UNSCOPED_INFO("and shown");
+        CHECK(row->getVisible());
         LLView* editor = row->findChild<ALColorField>("RenderVignetteColor", true);
-        ensure("with the colour editor on it", editor != nullptr);
-        ensure("shown", editor->getVisible());
-        ensure("and somewhere to be seen: " + std::to_string(editor->getRect().getWidth()),
-               editor->getRect().getWidth() > 0 && editor->getRect().getHeight() > 0);
+        UNSCOPED_INFO("with the colour editor on it");
+        REQUIRE(editor != nullptr);
+        UNSCOPED_INFO("shown");
+        CHECK(editor->getVisible());
+        {
+            INFO("and somewhere to be seen: " + std::to_string(editor->getRect().getWidth()));
+            REQUIRE(editor->getRect().getWidth() > 0);
+            CHECK(editor->getRect().getHeight() > 0);
+        }
 
         // The part that was actually wrong. A section nothing is written in
         // arrives folded, which is right for a page of eighty fields and is
@@ -685,21 +704,21 @@ namespace tut
         // one section draws no heading, so nothing could unfold it. A value
         // at its default showed a blank strip and nothing else.
         LLAccordionCtrlTab* tab = grid->getChild<LLAccordionCtrlTab>("Setting", true);
-        ensure("the only section is open, written in or not", tab->getDisplayChildren());
-        ensure("and the row is inside a tab tall enough to hold it",
-               tab->getRect().getHeight() >= row->getRect().getHeight());
+        UNSCOPED_INFO("the only section is open, written in or not");
+        CHECK(tab->getDisplayChildren());
+        UNSCOPED_INFO("and the row is inside a tab tall enough to hold it");
+        CHECK(tab->getRect().getHeight() >= row->getRect().getHeight());
         grid->die();
     }
 
     // And with more than one section the rule stands: what is written is
     // open and what is not is folded under its heading, which is there to
     // unfold it with.
-    template<> template<>
-    void alpropertygrid_object::test<15>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: of two sections an unwritten one arrives folded under a heading", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -711,12 +730,12 @@ namespace tut
         fields.back().authored = false;
         grid->setFields(fields);
 
-        ensure("the written section is open",
-               grid->getChild<LLAccordionCtrlTab>("written", true)->getDisplayChildren());
-        ensure("and the quiet one arrives folded",
-               !grid->getChild<LLAccordionCtrlTab>("quiet", true)->getDisplayChildren());
-        ensure("under a heading that can open it",
-               grid->getChild<LLAccordionCtrlTab>("quiet", true)->getHeaderHeight() > 0);
+        UNSCOPED_INFO("the written section is open");
+        CHECK(grid->getChild<LLAccordionCtrlTab>("written", true)->getDisplayChildren());
+        UNSCOPED_INFO("and the quiet one arrives folded");
+        CHECK_FALSE(grid->getChild<LLAccordionCtrlTab>("quiet", true)->getDisplayChildren());
+        UNSCOPED_INFO("under a heading that can open it");
+        CHECK(grid->getChild<LLAccordionCtrlTab>("quiet", true)->getHeaderHeight() > 0);
         grid->die();
     }
 
@@ -724,12 +743,11 @@ namespace tut
     // a caller that has said the name once already, over the pane, says
     // something else on the row rather than the same word smaller. And the
     // way back is called what the caller says too, and is as wide as that.
-    template<> template<>
-    void alpropertygrid_object::test<16>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a row and its way back take the caller's labels over the name", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid::Params p(LLUICtrlFactory::getDefaultParams<ALPropertyGrid>());
@@ -748,22 +766,26 @@ namespace tut
         LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
                            ->getChild<LLPanel>("EmojiSkinTonePreference_row", true);
         LLTextBox* label = row->getChild<LLTextBox>("EmojiSkinTonePreference_label", true);
-        ensure_equals("the row says what the caller said", label->getText(), std::string("S32"));
+        UNSCOPED_INFO("the row says what the caller said");
+        CHECK(label->getText() == std::string("S32"));
 
         LLButton* back = row->getChild<LLButton>("EmojiSkinTonePreference_remove", true);
-        ensure_equals("and so does the way back", back->getLabelUnselected(), std::string("Reset"));
-        ensure("which is wider than a letter", back->getRect().getWidth() > 16);
-        ensure("and still inside the row", row->getLocalRect().contains(back->getRect()));
+        UNSCOPED_INFO("and so does the way back");
+        CHECK(back->getLabelUnselected() == std::string("Reset"));
+        UNSCOPED_INFO("which is wider than a letter");
+        CHECK(back->getRect().getWidth() > 16);
+        UNSCOPED_INFO("and still inside the row");
+        CHECK(row->getLocalRect().contains(back->getRect()));
 
         // Left empty, the row says the name, which is what a row usually calls
         // a field.
         std::vector<ALPropertyGrid::Field> plain;
         plain.push_back(field("width", 0));
         grid->setFields(plain);
-        ensure_equals("the name by default",
-                      grid->getChild<LLPanel>("identity_rows", true)
+        UNSCOPED_INFO("the name by default");
+        CHECK(grid->getChild<LLPanel>("identity_rows", true)
                           ->getChild<LLPanel>("width_row", true)
-                          ->getChild<LLTextBox>("width_label", true)->getText(),
+                          ->getChild<LLTextBox>("width_label", true)->getText() ==
                       std::string("width"));
         grid->die();
     }
@@ -773,12 +795,11 @@ namespace tut
     // without being made again under whoever typed into it. Debug Settings
     // showed a setting changed from its default with no Reset until it was
     // chosen again.
-    template<> template<>
-    void alpropertygrid_object::test<17>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: setAuthored redraws a row in place both ways", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -799,47 +820,53 @@ namespace tut
         LLView* editor = row->getChild<LLView>("width", true);
         LLView* back = row->getChild<LLView>("width_remove", true);
         LLTextBox* label = row->getChild<LLTextBox>("width_label", true);
-        ensure("unwritten, there is no way back to see", !back->getVisible());
+        UNSCOPED_INFO("unwritten, there is no way back to see");
+        CHECK_FALSE(back->getVisible());
         const LLColor4 quiet = label->getColor().get();
 
         grid->setAuthored("width", true, "base");
-        ensure("written now, the way back is there", back->getVisible());
-        ensure("in the other ink", label->getColor().get() != quiet);
-        ensure("saying where from: " + label->getToolTip(),
-               label->getToolTip().find("written in base") != std::string::npos);
-        ensure("and no longer that nobody did: " + label->getToolTip(),
-               label->getToolTip().find("nobody wrote this") == std::string::npos);
-        ensure_equals("the editor says the same", editor->getToolTip(), label->getToolTip());
-        ensure("and it is the same editor, not a new one in its place",
-               row->getChild<LLView>("width", true) == editor);
-        ensure("which the grid remembers", grid->fields().front().authored);
+        UNSCOPED_INFO("written now, the way back is there");
+        CHECK(back->getVisible());
+        UNSCOPED_INFO("in the other ink");
+        CHECK(label->getColor().get() != quiet);
+        UNSCOPED_INFO("saying where from: " + label->getToolTip());
+        REQUIRE(label->getToolTip().find("written in base") != std::string::npos);
+        UNSCOPED_INFO("and no longer that nobody did: " + label->getToolTip());
+        REQUIRE(label->getToolTip().find("nobody wrote this") == std::string::npos);
+        UNSCOPED_INFO("the editor says the same");
+        CHECK(editor->getToolTip() == label->getToolTip());
+        UNSCOPED_INFO("and it is the same editor, not a new one in its place");
+        CHECK(row->getChild<LLView>("width", true) == editor);
+        UNSCOPED_INFO("which the grid remembers");
+        CHECK(grid->fields().front().authored);
 
         // And back, when what was written is taken out again.
         grid->setAuthored("width", false, std::string());
-        ensure("unwritten again, the way back has gone", !back->getVisible());
-        ensure("in the quiet ink", label->getColor().get() == quiet);
-        ensure("saying so: " + label->getToolTip(),
-               label->getToolTip().find("nobody wrote this") != std::string::npos);
+        UNSCOPED_INFO("unwritten again, the way back has gone");
+        CHECK_FALSE(back->getVisible());
+        UNSCOPED_INFO("in the quiet ink");
+        CHECK(label->getColor().get() == quiet);
+        UNSCOPED_INFO("saying so: " + label->getToolTip());
+        REQUIRE(label->getToolTip().find("nobody wrote this") != std::string::npos);
 
         // A grid showing only what is written has a row fewer or more, and
         // that is a rebuild's decision.
         grid->setAuthoredOnly(true);
-        ensure("nothing written, nothing shown",
-               grid->findChild<LLPanel>("width_row", true) == nullptr);
+        UNSCOPED_INFO("nothing written, nothing shown");
+        REQUIRE(grid->findChild<LLPanel>("width_row", true) == nullptr);
         grid->setAuthored("width", true, "base");
-        ensure("written, and the row is back",
-               grid->findChild<LLPanel>("width_row", true) != nullptr);
+        UNSCOPED_INFO("written, and the row is back");
+        REQUIRE(grid->findChild<LLPanel>("width_row", true) != nullptr);
         grid->die();
     }
 
     // A name that works and should not be used says so on the row that uses
     // it, and says what to write where the vocabulary has a word for it.
-    template<> template<>
-    void alpropertygrid_object::test<18>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a deprecated name's tooltip says so and names its replacement", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALPropertyGrid* grid = build();
@@ -862,33 +889,34 @@ namespace tut
         LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
         const std::string spelt = rows->getChild<LLPanel>("dynamicwidth_row", true)
                                       ->getChild<LLTextBox>("dynamicwidth_label", true)->getToolTip();
-        ensure("a deprecated name says so: " + spelt,
-               spelt.find("nothing new should use it") != std::string::npos);
-        ensure("and says what to write: " + spelt,
-               spelt.find("write dynamic_width") != std::string::npos);
+        UNSCOPED_INFO("a deprecated name says so: " + spelt);
+        REQUIRE(spelt.find("nothing new should use it") != std::string::npos);
+        UNSCOPED_INFO("and says what to write: " + spelt);
+        REQUIRE(spelt.find("write dynamic_width") != std::string::npos);
 
         const std::string bare = rows->getChild<LLPanel>("hover_row", true)
                                      ->getChild<LLTextBox>("hover_label", true)->getToolTip();
-        ensure("one with nothing to write instead says only that: " + bare,
-               bare.find("nothing new should use it") != std::string::npos
-               && bare.find("write") == std::string::npos);
+        {
+            INFO("one with nothing to write instead says only that: " + bare);
+            REQUIRE(bare.find("nothing new should use it") != std::string::npos);
+            REQUIRE(bare.find("write") == std::string::npos);
+        }
 
         const std::string fine = rows->getChild<LLPanel>("width_row", true)
                                      ->getChild<LLTextBox>("width_label", true)->getToolTip();
-        ensure("and a name in good standing says nothing of the kind: " + fine,
-               fine.find("should") == std::string::npos);
+        UNSCOPED_INFO("and a name in good standing says nothing of the kind: " + fine);
+        REQUIRE(fine.find("should") == std::string::npos);
         grid->die();
     }
 
     // A paired row has one way back for its two fields: it is shown when
     // either is written, it takes out whichever of them the file writes,
     // and the field that has no row of its own still reaches it.
-    template<> template<>
-    void alpropertygrid_object::test<19>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a paired row's one way back removes whichever half is written", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALPropertyGrid* grid = build();
         grid->setGroups({ "size" });
@@ -905,31 +933,37 @@ namespace tut
 
         LLPanel* row = grid->getChild<LLPanel>("size_rows", true)->getChild<LLPanel>("width_row", true);
         LLView* back = row->getChild<LLView>("width_remove", true);
-        ensure("the way back is there for the half that is written", back->getVisible());
+        UNSCOPED_INFO("the way back is there for the half that is written");
+        CHECK(back->getVisible());
         back->as<LLButton>()->onCommit();
-        ensure_equals("and takes out that half alone", removed.size(), 1u);
-        ensure_equals("which is the second", removed.front(), std::string("height"));
+        UNSCOPED_INFO("and takes out that half alone");
+        REQUIRE(removed.size() == 1u);
+        UNSCOPED_INFO("which is the second");
+        CHECK(removed.front() == std::string("height"));
 
         // The second half told it is unwritten reaches the row it shares.
         grid->setAuthored("height", false, std::string());
-        ensure("and nothing is left to take out", !back->getVisible());
+        UNSCOPED_INFO("and nothing is left to take out");
+        CHECK_FALSE(back->getVisible());
         grid->setAuthored("width", true, "base");
-        ensure("until the first is written", back->getVisible());
+        UNSCOPED_INFO("until the first is written");
+        CHECK(back->getVisible());
         removed.clear();
         back->as<LLButton>()->onCommit();
-        ensure_equals("and then it takes out the first", removed.size(), 1u);
-        ensure_equals("alone", removed.front(), std::string("width"));
+        UNSCOPED_INFO("and then it takes out the first");
+        REQUIRE(removed.size() == 1u);
+        UNSCOPED_INFO("alone");
+        CHECK(removed.front() == std::string("width"));
         grid->die();
     }
 
     // A font row is three fields, and answers by its parts: a name typed
     // into it is written once, not once as a part and again as the whole.
-    template<> template<>
-    void alpropertygrid_object::test<20>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a name typed into a font row is written once", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALPropertyGrid* grid = build();
         grid->setGroups({ "typeface" });
@@ -948,20 +982,22 @@ namespace tut
         LLLineEditor* line = grid->getChild<LLLineEditor>("text", true);
         line->setText(std::string("Monospace"));
         line->onCommit();
-        ensure_equals("one write: " + std::to_string(written.size()), written.size(), 1u);
-        ensure_equals("of the name", written.front().first, std::string("font"));
-        ensure_equals("as typed", written.front().second, std::string("Monospace"));
+        UNSCOPED_INFO("one write: " + std::to_string(written.size()));
+        REQUIRE(written.size() == 1u);
+        UNSCOPED_INFO("of the name");
+        CHECK(written.front().first == std::string("font"));
+        UNSCOPED_INFO("as typed");
+        CHECK(written.front().second == std::string("Monospace"));
         grid->die();
     }
 
     // A field filed under a heading the caller never named goes under the
     // last one, as the field says it will; it used to go nowhere.
-    template<> template<>
-    void alpropertygrid_object::test<21>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a group past either end files under the first or last heading", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALPropertyGrid* grid = build();
         grid->setGroups({ "identity", "position" });
@@ -974,10 +1010,10 @@ namespace tut
 
         LLPanel* position = grid->getChild<LLPanel>("position_rows", true);
         LLPanel* identity = grid->getChild<LLPanel>("identity_rows", true);
-        ensure("a field past the last heading is under the last",
-               position->findChild<LLPanel>("stray_row", true) != nullptr);
-        ensure("and one before the first is under the first",
-               identity->findChild<LLPanel>("below_row", true) != nullptr);
+        UNSCOPED_INFO("a field past the last heading is under the last");
+        REQUIRE(position->findChild<LLPanel>("stray_row", true) != nullptr);
+        UNSCOPED_INFO("and one before the first is under the first");
+        REQUIRE(identity->findChild<LLPanel>("below_row", true) != nullptr);
         grid->die();
     }
 
@@ -987,12 +1023,11 @@ namespace tut
     // editor committing, the grid rebuilt from inside the commit, and the
     // editor's own onCommit carried on into freed memory. The rebuild is held
     // until the commit is over, and done once it is.
-    template<> template<>
-    void alpropertygrid_object::test<22>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: refilling the grid from a commit waits until the commit is over", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALPropertyGrid* grid = build();
         grid->setGroups({ "identity" });
@@ -1016,25 +1051,27 @@ namespace tut
 
         editor->setText(std::string("After"));
         editor->onCommit();
-        ensure("the editor that committed outlives its commit", outlived);
+        UNSCOPED_INFO("the editor that committed outlives its commit");
+        CHECK(outlived);
 
         // And once the commit is over, the grid is what it was asked to be.
         gIdleCallbacks.callFunctions();
         LLLineEditor* now = grid->findChild<LLLineEditor>("label", true);
-        ensure("filled again", now != nullptr);
-        ensure_equals("with what was committed", now->getText(), std::string("After"));
+        UNSCOPED_INFO("filled again");
+        REQUIRE(now != nullptr);
+        UNSCOPED_INFO("with what was committed");
+        CHECK(now->getText() == std::string("After"));
         grid->die();
     }
 
     // The same rows with new values are taken without a rebuild: the
     // editors are the same objects afterwards, saying the new values.
     // Different rows are refused, and then the grid is filled again.
-    template<> template<>
-    void alpropertygrid_object::test<23>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: updateFields keeps the editors of the same rows and refuses others", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALPropertyGrid* grid = build();
         grid->setGroups({ "identity" });
@@ -1053,29 +1090,37 @@ namespace tut
         fields[0].value = "After";
         fields[1].value = "20";
         fields[1].authored = false;
-        ensure("the same rows are taken", grid->updateFields(fields));
-        ensure("the editors are the ones that were there", grid->findChild<LLLineEditor>("label", true) == label
-               && grid->findChild<LLSpinCtrl>("width", true) == width);
-        ensure_equals("saying the new text", label->getText(), std::string("After"));
-        ensure_equals("and the new number", width->getValue().asInteger(), 20);
-        ensure_equals("and the grid knows it", grid->fields()[1].value, std::string("20"));
+        UNSCOPED_INFO("the same rows are taken");
+        CHECK(grid->updateFields(fields));
+        {
+            INFO("the editors are the ones that were there");
+            REQUIRE(grid->findChild<LLLineEditor>("label", true) == label);
+            CHECK(grid->findChild<LLSpinCtrl>("width", true) == width);
+        }
+        UNSCOPED_INFO("saying the new text");
+        CHECK(label->getText() == std::string("After"));
+        UNSCOPED_INFO("and the new number");
+        CHECK(width->getValue().asInteger() == 20);
+        UNSCOPED_INFO("and the grid knows it");
+        CHECK(grid->fields()[1].value == std::string("20"));
 
         fields.push_back(field("height", 0));
-        ensure("a row more is refused", !grid->updateFields(fields));
+        UNSCOPED_INFO("a row more is refused");
+        CHECK_FALSE(grid->updateFields(fields));
         fields.pop_back();
         fields[1].kind = ALParamType::REAL;
-        ensure("a row of another kind is refused", !grid->updateFields(fields));
+        UNSCOPED_INFO("a row of another kind is refused");
+        CHECK_FALSE(grid->updateFields(fields));
         grid->die();
     }
 
     // Rows keep the order they were given when asked to, however they are
     // written: a vocabulary has an order of its own.
-    template<> template<>
-    void alpropertygrid_object::test<24>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: setKeepsOrder keeps fields in the order given", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALPropertyGrid* grid = build();
         grid->setKeepsOrder(true);
@@ -1087,9 +1132,12 @@ namespace tut
         fields.back().authored = false;
         fields.push_back(field("border", 0));
         grid->setFields(fields);
-        ensure_equals("first as given", grid->fields()[0].name, std::string("radius"));
-        ensure_equals("second as given", grid->fields()[1].name, std::string("corners"));
-        ensure_equals("the written one stays where it was", grid->fields()[2].name, std::string("border"));
+        UNSCOPED_INFO("first as given");
+        CHECK(grid->fields()[0].name == std::string("radius"));
+        UNSCOPED_INFO("second as given");
+        CHECK(grid->fields()[1].name == std::string("corners"));
+        UNSCOPED_INFO("the written one stays where it was");
+        CHECK(grid->fields()[2].name == std::string("border"));
         grid->die();
     }
 
@@ -1097,12 +1145,11 @@ namespace tut
     // what its tip says follows the field, a part being scrubbed keeps the
     // number under the hand, and a field that would build a different
     // control -- another step -- is refused rather than kept stale.
-    template<> template<>
-    void alpropertygrid_object::test<25>()
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: an update refreshes a kept row's tip and values but not its step", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALPropertyGrid* grid = build();
         grid->setGroups({ "identity" });
@@ -1119,19 +1166,25 @@ namespace tut
         LLSpinCtrl* top = row->getChild<LLSpinCtrl>("rect.T", true);
 
         fields[0].description = "Where it sits.";
-        ensure("a new description keeps the row", grid->updateFields(fields));
-        ensure("and the tip says it", label->getToolTip().find("Where it sits.") != std::string::npos);
+        UNSCOPED_INFO("a new description keeps the row");
+        CHECK(grid->updateFields(fields));
+        UNSCOPED_INFO("and the tip says it");
+        REQUIRE(label->getToolTip().find("Where it sits.") != std::string::npos);
 
         // Scrubbing T: the update lands in the other three and not in T.
         gFocusMgr.setMouseCapture(top);
         fields[0].value = "11 21 31 41";
-        ensure("a new value keeps the row", grid->updateFields(fields));
-        ensure_equals("the part under the hand keeps its number", top->getValue().asInteger(), 20);
-        ensure_equals("and the others take theirs", row->getChild<LLSpinCtrl>("rect.L", true)->getValue().asInteger(), 11);
+        UNSCOPED_INFO("a new value keeps the row");
+        CHECK(grid->updateFields(fields));
+        UNSCOPED_INFO("the part under the hand keeps its number");
+        CHECK(top->getValue().asInteger() == 20);
+        UNSCOPED_INFO("and the others take theirs");
+        CHECK(row->getChild<LLSpinCtrl>("rect.L", true)->getValue().asInteger() == 11);
         gFocusMgr.setMouseCapture(nullptr);
 
         fields[0].step = 5.f;
-        ensure("another step is another control, so the rows differ", !grid->updateFields(fields));
+        UNSCOPED_INFO("another step is another control, so the rows differ");
+        CHECK_FALSE(grid->updateFields(fields));
         grid->die();
     }
 }

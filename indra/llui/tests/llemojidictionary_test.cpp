@@ -15,7 +15,7 @@
 #include "linden_common.h"
 
 #include "../llemojidictionary.h"
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "llsd.h"
 #include "llstring.h"
 
@@ -94,7 +94,7 @@ LLEmojiDescriptor make_astronaut_descriptor()
 }
 }
 
-namespace tut
+namespace
 {
     // A dictionary for each test, and none left after it -- unless one was
     // there already, which is used as it is and left.
@@ -117,92 +117,90 @@ namespace tut
             }
         }
     };
-    typedef test_group<llemojidictionary_data> factory;
-    typedef factory::object object;
 }
 
 namespace
 {
-    tut::factory tf("llemojidictionary");
-}
-
-namespace tut
-{
     // findVariant: exact tone match wins over partial axis matches.
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: findVariant picks the variant of the tone asked for", "[llemojidictionary]")
     {
         LLEmojiDescriptor d = make_thumbs_up_descriptor();
         const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 3, -1);
-        ensure("tone-3 variant found", v != nullptr);
-        ensure_equals("tone matches", v->Tone, U8(3));
+        UNSCOPED_INFO("tone-3 variant found");
+        REQUIRE(v != nullptr);
+        UNSCOPED_INFO("tone matches");
+        CHECK(v->Tone == U8(3));
     }
 
     // findVariant: tone=0, gender=-1 (no preference) returns nullptr.
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: findVariant with no tone or gender asked for returns null", "[llemojidictionary]")
     {
         LLEmojiDescriptor d = make_thumbs_up_descriptor();
         const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 0, -1);
-        ensure("no preference returns nullptr", v == nullptr);
+        UNSCOPED_INFO("no preference returns nullptr");
+        REQUIRE(v == nullptr);
     }
 
     // findVariant on a base with no variants returns nullptr.
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: findVariant on a base with no variants returns null", "[llemojidictionary]")
     {
         LLEmojiDescriptor empty;
         empty.Character = "\xF0\x9F\x92\xA9"; // 💩
         const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(empty, 3, -1);
-        ensure("no variants returns nullptr", v == nullptr);
+        UNSCOPED_INFO("no variants returns nullptr");
+        REQUIRE(v == nullptr);
     }
 
     // findVariant: with both axes, exact (tone, gender) match wins.
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: findVariant asked for a tone and a gender matches both", "[llemojidictionary]")
     {
         LLEmojiDescriptor d = make_astronaut_descriptor();
         const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 3, 0); // tone=3, man
-        ensure("variant found", v != nullptr);
-        ensure_equals("tone matches", v->Tone, U8(3));
-        ensure_equals("gender matches", v->Gender, S8(0));
+        UNSCOPED_INFO("variant found");
+        REQUIRE(v != nullptr);
+        UNSCOPED_INFO("tone matches");
+        CHECK(v->Tone == U8(3));
+        UNSCOPED_INFO("gender matches");
+        CHECK(v->Gender == S8(0));
     }
 
     // findVariant: prefer the cleanest match — gender=-1 user shouldn't
     // get a gendered variant when a gender-neutral one of the same tone
     // exists.
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: findVariant with no gender asked for picks the gender-neutral variant", "[llemojidictionary]")
     {
         LLEmojiDescriptor d = make_astronaut_descriptor();
         const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 3, -1);
-        ensure("variant found", v != nullptr);
-        ensure_equals("tone matches", v->Tone, U8(3));
+        UNSCOPED_INFO("variant found");
+        REQUIRE(v != nullptr);
+        UNSCOPED_INFO("tone matches");
+        CHECK(v->Tone == U8(3));
         // Gender preference unset — best match should have Gender=2
         // (person, gender-neutral) with the +1 bonus for not asserting a
         // gender we didn't ask for. (Both 'person' and bare 'person'
         // are gender=2 in this fixture.)
-        ensure_equals("gender-neutral preferred", v->Gender, S8(2));
+        UNSCOPED_INFO("gender-neutral preferred");
+        CHECK(v->Gender == S8(2));
     }
 
     // findVariant: partial-axis match still beats nothing — user asks
     // for tone+gender combo we don't have, but a tone-only variant
     // matching the tone is still better than the base.
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: findVariant with no gender match falls back to the tone match", "[llemojidictionary]")
     {
         LLEmojiDescriptor d = make_thumbs_up_descriptor();
         // Ask tone=3, gender=woman, but the descriptor has only
         // gender-neutral variants. Should still return the tone-3
         // variant (partial match).
         const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 3, 1);
-        ensure("partial match accepted", v != nullptr);
-        ensure_equals("tone matches", v->Tone, U8(3));
+        UNSCOPED_INFO("partial match accepted");
+        REQUIRE(v != nullptr);
+        UNSCOPED_INFO("tone matches");
+        CHECK(v->Tone == U8(3));
     }
 
     // loadVariants parses the LLSD blob the generator produces.
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: loadVariants parses the LLSD blob the generator produces", "[llemojidictionary]")
     {
         LLSD parent;
         parent["Character"] = "\xF0\x9F\x91\x8D";
@@ -216,25 +214,28 @@ namespace tut
         parent["Variants"] = variants;
 
         std::vector<LLEmojiVariant> out = LLEmojiDictionary::loadVariants(parent);
-        ensure_equals("one variant", out.size(), size_t(1));
-        ensure_equals("tone parsed", out[0].Tone, U8(5));
-        ensure_equals("gender unset", out[0].Gender, S8(-1));
-        ensure_equals("shortcode parsed", out[0].ShortCodes.size(), size_t(1));
+        UNSCOPED_INFO("one variant");
+        REQUIRE(out.size() == size_t(1));
+        UNSCOPED_INFO("tone parsed");
+        CHECK(out[0].Tone == U8(5));
+        UNSCOPED_INFO("gender unset");
+        CHECK(out[0].Gender == S8(-1));
+        UNSCOPED_INFO("shortcode parsed");
+        REQUIRE(out[0].ShortCodes.size() == size_t(1));
     }
 
     // loadVariants on an empty/missing key returns an empty vector.
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: loadVariants with no Variants key returns none", "[llemojidictionary]")
     {
         LLSD parent;
         parent["Character"] = "\xF0\x9F\x92\xA9";
         std::vector<LLEmojiVariant> out = LLEmojiDictionary::loadVariants(parent);
-        ensure("no variants when key absent", out.empty());
+        UNSCOPED_INFO("no variants when key absent");
+        REQUIRE(out.empty());
     }
 
     // loadVariants skips entries with empty Character.
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: loadVariants skips entries with an empty Character", "[llemojidictionary]")
     {
         LLSD parent;
         parent["Character"] = "\xF0\x9F\x91\x8D";
@@ -249,8 +250,10 @@ namespace tut
         parent["Variants"] = variants;
 
         std::vector<LLEmojiVariant> out = LLEmojiDictionary::loadVariants(parent);
-        ensure_equals("one valid entry", out.size(), size_t(1));
-        ensure_equals("tone parsed", out[0].Tone, U8(1));
+        UNSCOPED_INFO("one valid entry");
+        REQUIRE(out.size() == size_t(1));
+        UNSCOPED_INFO("tone parsed");
+        CHECK(out[0].Tone == U8(1));
     }
 
     // Helper: build a synthetic dictionary with thumbs_up + 5 tone
@@ -300,44 +303,42 @@ namespace tut
     }
 
     // getEmojiFromShortCode returns the BASE character for a base shortcode.
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: getEmojiFromShortCode gives the base character for a base shortcode", "[llemojidictionary]")
     {
         LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
-        ensure("base char returned",
-               LLEmojiDictionary::instance().getEmojiFromShortCode(":thumbs_up:") == "\xF0\x9F\x91\x8D");
+        UNSCOPED_INFO("base char returned");
+        CHECK(LLEmojiDictionary::instance().getEmojiFromShortCode(":thumbs_up:") == "\xF0\x9F\x91\x8D");
     }
 
     // getEmojiFromShortCode returns the VARIANT character for a variant
     // shortcode — this is the regression we're testing for.
-    template<> template<>
-    void object::test<11>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: getEmojiFromShortCode gives a variant shortcode its variant character", "[llemojidictionary]")
     {
         LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
-        ensure("variant char returned",
-               LLEmojiDictionary::instance().getEmojiFromShortCode(":thumbs_up_dark_skin_tone:")
+        UNSCOPED_INFO("variant char returned");
+        CHECK(LLEmojiDictionary::instance().getEmojiFromShortCode(":thumbs_up_dark_skin_tone:")
                    == "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF");
     }
 
     // getEmojiFromShortCode returns empty for an unknown shortcode.
-    template<> template<>
-    void object::test<12>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: getEmojiFromShortCode gives an empty string for an unknown shortcode", "[llemojidictionary]")
     {
         LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
-        ensure("empty for unknown", LLEmojiDictionary::instance().getEmojiFromShortCode(":nonsense:").empty());
+        UNSCOPED_INFO("empty for unknown");
+        REQUIRE(LLEmojiDictionary::instance().getEmojiFromShortCode(":nonsense:").empty());
     }
 
     // findByShortCode prefix-matching now surfaces variants — typing
     // ":thumbs_up_d" should produce results that include the dark variant
     // (with the variant Character, not the base Character).
-    template<> template<>
-    void object::test<13>()
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: findByShortCode on a prefix finds a variant by its own character", "[llemojidictionary]")
     {
         LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
 
         std::vector<LLEmojiSearchResult> results;
         LLEmojiDictionary::instance().findByShortCode(results, ":thumbs_up_d");
-        ensure("at least one result", !results.empty());
+        UNSCOPED_INFO("at least one result");
+        REQUIRE_FALSE(results.empty());
 
         const std::string expected_dark = "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF";
         bool saw_dark = false;
@@ -349,6 +350,7 @@ namespace tut
                 break;
             }
         }
-        ensure("dark variant surfaced in prefix match", saw_dark);
+        UNSCOPED_INFO("dark variant surfaced in prefix match");
+        CHECK(saw_dark);
     }
 }

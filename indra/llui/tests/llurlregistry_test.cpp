@@ -28,9 +28,9 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct llurlregistry_data
     {
@@ -49,44 +49,48 @@ namespace tut
         }
     };
 
-    typedef test_group<llurlregistry_data> llurlregistry_group;
-    typedef llurlregistry_group::object    llurlregistry_object;
-    llurlregistry_group                    llurlregistry_instance("llurlregistry");
-
     // The registry tries only the entries whose patterns its set says match
     // somewhere in the text, so what it finds has to be what trying them
     // all found: the earliest match, ties to the entry registered first.
-    template<> template<>
-    void llurlregistry_object::test<1>()
+    TEST_CASE_METHOD(llurlregistry_data, "llurlregistry: findUrl finds the first Url in a text whichever entry's it is", "[llurlregistry]")
     {
-        set_test_name("the first Url in a text, whichever entry's it is, and none where there is none");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ensure_equals("a Url in the text", found("hello http://www.example.com/x there"), std::string("http://www.example.com/x"));
-        ensure_equals("the first of two", found("see https://secondlife.com/a or http://example.net/b"), std::string("https://secondlife.com/a"));
-        ensure_equals("a bare Secondlife host", found("see https://secondlife.com and go"), std::string("https://secondlife.com"));
-        ensure_equals("a host with a port is the plain Url's", found("at http://secondlife.com:8080 now"), std::string("http://secondlife.com:8080"));
-        ensure_equals("a full stop after one is not its", found("visit http://example.com/index.php."), std::string("http://example.com/index.php"));
-        ensure_equals("an address", found("mail someone@example.org now"), std::string("someone@example.org"));
-        ensure_equals("an app Url in any case", found("go SECONDLIFE:///app/chat/42/hello there"), std::string("SECONDLIFE:///app/chat/42/hello"));
-        ensure_equals("nothing where there is none", found("the :// alone, and www. alone"), std::string(""));
-        ensure_equals("nor in plain words", found("nothing to see here"), std::string(""));
-        ensure_equals("nor where an at or a .com is only a word's", found("meet me @ the club, the .com boom is over"), std::string(""));
+        UNSCOPED_INFO("a Url in the text");
+        CHECK(found("hello http://www.example.com/x there") == std::string("http://www.example.com/x"));
+        UNSCOPED_INFO("the first of two");
+        CHECK(found("see https://secondlife.com/a or http://example.net/b") == std::string("https://secondlife.com/a"));
+        UNSCOPED_INFO("a bare Secondlife host");
+        CHECK(found("see https://secondlife.com and go") == std::string("https://secondlife.com"));
+        UNSCOPED_INFO("a host with a port is the plain Url's");
+        CHECK(found("at http://secondlife.com:8080 now") == std::string("http://secondlife.com:8080"));
+        UNSCOPED_INFO("a full stop after one is not its");
+        CHECK(found("visit http://example.com/index.php.") == std::string("http://example.com/index.php"));
+        UNSCOPED_INFO("an address");
+        CHECK(found("mail someone@example.org now") == std::string("someone@example.org"));
+        UNSCOPED_INFO("an app Url in any case");
+        CHECK(found("go SECONDLIFE:///app/chat/42/hello there") == std::string("SECONDLIFE:///app/chat/42/hello"));
+        UNSCOPED_INFO("nothing where there is none");
+        CHECK(found("the :// alone, and www. alone") == std::string(""));
+        UNSCOPED_INFO("nor in plain words");
+        CHECK(found("nothing to see here") == std::string(""));
+        UNSCOPED_INFO("nor where an at or a .com is only a word's");
+        CHECK(found("meet me @ the club, the .com boom is over") == std::string(""));
     }
 
-    template<> template<>
-    void llurlregistry_object::test<2>()
+    TEST_CASE_METHOD(llurlregistry_data, "llurlregistry: findUrl finds a nolink tag in any case", "[llurlregistry]")
     {
-        set_test_name("a text is asked of every entry as its pattern reads, in any case, with nothing else Url-like in it");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         // A check before the patterns once took only a lowercase tag, where
         // the entry's pattern takes one in any case.
-        ensure_equals("a nolink tag in capitals", found("say <NOLINK>hello</NOLINK> ok"), std::string("<NOLINK>hello</NOLINK>"));
-        ensure_equals("and in lowercase", found("say <nolink>hello</nolink> ok"), std::string("<nolink>hello</nolink>"));
+        UNSCOPED_INFO("a nolink tag in capitals");
+        CHECK(found("say <NOLINK>hello</NOLINK> ok") == std::string("<NOLINK>hello</NOLINK>"));
+        UNSCOPED_INFO("and in lowercase");
+        CHECK(found("say <nolink>hello</nolink> ok") == std::string("<nolink>hello</nolink>"));
     }
 }

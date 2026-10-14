@@ -33,9 +33,9 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alhistorylist_data
     {
@@ -68,64 +68,66 @@ namespace tut
         }
     };
 
-    typedef test_group<alhistorylist_data> alhistorylist_test;
-    typedef alhistorylist_test::object     alhistorylist_object;
-    tut::alhistorylist_test alhistorylist_testgroup("alhistorylist");
-
     // Everything done, newest first, because the thing most likely to be
     // undone is the thing most recently done.
-    template<> template<>
-    void alhistorylist_object::test<1>()
+    TEST_CASE_METHOD(alhistorylist_data, "alhistorylist: every step done is listed newest first", "[alhistorylist]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALHistoryList* history = make();
         history->setSteps(three(), 3);
 
-        ensure_equals("all three", history->count(), 3u);
-        ensure_equals("and all three in force", history->inForce(), 3u);
+        UNSCOPED_INFO("all three");
+        REQUIRE(history->count() == 3u);
+        UNSCOPED_INFO("and all three in force");
+        CHECK(history->inForce() == 3u);
 
         LLScrollListCtrl* list = listOf(history);
-        ensure("the list is there", list != nullptr);
-        ensure_equals("one row each", list->getItemCount(), 3);
-        ensure_equals("newest first", list->getFirstData()->getValue().asInteger(), 2);
+        UNSCOPED_INFO("the list is there");
+        REQUIRE(list != nullptr);
+        UNSCOPED_INFO("one row each");
+        CHECK(list->getItemCount() == 3);
+        UNSCOPED_INFO("newest first");
+        CHECK(list->getFirstData()->getValue().asInteger() == 2);
         delete history;
     }
 
     // A stack with steps put back: the count in force says where the present
     // is, and the steps above it are still listed, because putting one back
     // does not make it never have happened.
-    template<> template<>
-    void alhistorylist_object::test<2>()
+    TEST_CASE_METHOD(alhistorylist_data, "alhistorylist: steps put back stay listed above the count in force", "[alhistorylist]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALHistoryList* history = make();
         history->setSteps(three(), 1);
 
-        ensure_equals("all three are still listed", history->count(), 3u);
-        ensure_equals("one of them in force", history->inForce(), 1u);
-        ensure_equals("and three rows", listOf(history)->getItemCount(), 3);
+        UNSCOPED_INFO("all three are still listed");
+        REQUIRE(history->count() == 3u);
+        UNSCOPED_INFO("one of them in force");
+        CHECK(history->inForce() == 1u);
+        UNSCOPED_INFO("and three rows");
+        CHECK(listOf(history)->getItemCount() == 3);
 
         // More in force than there are steps is not a thing a stack can be.
         history->setSteps(three(), 99);
-        ensure_equals("held to what there is", history->inForce(), 3u);
+        UNSCOPED_INFO("held to what there is");
+        CHECK(history->inForce() == 3u);
         delete history;
     }
 
     // Choosing a step asks for the document to be as it was just after that
     // step, which is one more than its index -- and asks for nothing when
     // that is where it already is.
-    template<> template<>
-    void alhistorylist_object::test<3>()
+    TEST_CASE_METHOD(alhistorylist_data, "alhistorylist: choosing a step goes to just after it unless already there", "[alhistorylist]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALHistoryList* history = make();
         history->setSteps(three(), 3);
@@ -136,24 +138,26 @@ namespace tut
         LLScrollListCtrl* list = listOf(history);
         list->setSelectedByValue(LLSD(0), true);        // the oldest step
         history->goToSelected();
-        ensure_equals("asked once", asked.size(), 1u);
-        ensure_equals("for one step in force", asked.front(), 1u);
+        UNSCOPED_INFO("asked once");
+        REQUIRE(asked.size() == 1u);
+        UNSCOPED_INFO("for one step in force");
+        CHECK(asked.front() == 1u);
 
         // The present, chosen: nothing to ask for.
         list->setSelectedByValue(LLSD(2), true);
         history->goToSelected();
-        ensure_equals("and asked no more", asked.size(), 1u);
+        UNSCOPED_INFO("and asked no more");
+        REQUIRE(asked.size() == 1u);
         delete history;
     }
 
     // A row selected says which step it is about, so a caller can show the
     // element that step touched.
-    template<> template<>
-    void alhistorylist_object::test<4>()
+    TEST_CASE_METHOD(alhistorylist_data, "alhistorylist: selecting a row tells the caller which step it is", "[alhistorylist]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALHistoryList* history = make();
         history->setSteps(three(), 3);
@@ -164,32 +168,40 @@ namespace tut
         // Selecting is what says it: the list commits on a change of
         // selection, since a row chosen is the whole of the gesture.
         listOf(history)->setSelectedByValue(LLSD(1), true);
-        ensure_equals("said which", chosen.size(), 1u);
-        ensure_equals("the middle one", chosen.front(), 1u);
+        UNSCOPED_INFO("said which");
+        REQUIRE(chosen.size() == 1u);
+        UNSCOPED_INFO("the middle one");
+        CHECK(chosen.front() == 1u);
         delete history;
     }
 
     // A pane with nothing in it is still saying something, and a stack that
     // has grown keeps a person's place in the list.
-    template<> template<>
-    void alhistorylist_object::test<5>()
+    TEST_CASE_METHOD(alhistorylist_data, "alhistorylist: an empty list says so and a grown one keeps the selected row", "[alhistorylist]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALHistoryList* history = make();
         history->setSteps({}, 0);
-        ensure_equals("nothing listed", listOf(history)->getItemCount(), 0);
+        UNSCOPED_INFO("nothing listed");
+        CHECK(listOf(history)->getItemCount() == 0);
         ALPaneList* pane = history->getChild<ALPaneList>("steps");
-        ensure("the list says so", pane->saysEmpty());
+        UNSCOPED_INFO("the list says so");
+        CHECK(pane->saysEmpty());
 
         history->setSteps(three(), 3);
-        ensure("and not once there is something", !pane->saysEmpty());
+        UNSCOPED_INFO("and not once there is something");
+        CHECK_FALSE(pane->saysEmpty());
         std::vector<size_t> asked;
         history->onGoTo([&asked](size_t want) { asked.push_back(want); });
         pane->setSelectedByValue(LLSD(0), true);
-        ensure("return goes to the step chosen", pane->handleKeyHere(KEY_RETURN, MASK_NONE) && asked == std::vector<size_t>{ 1 });
+        {
+            INFO("return goes to the step chosen");
+            CHECK(pane->handleKeyHere(KEY_RETURN, MASK_NONE));
+            CHECK(asked == std::vector<size_t>{ 1 });
+        }
 
         LLScrollListCtrl* list = listOf(history);
         list->setSelectedByValue(LLSD(1), true);
@@ -197,23 +209,23 @@ namespace tut
         std::vector<ALHistoryList::Step> more = three();
         more.push_back({ "name on title", "floater_a.xml" });
         history->setSteps(more, 4);
-        ensure_equals("four now", listOf(history)->getItemCount(), 4);
-        ensure("the row a person was on is still the row they are on",
-               listOf(history)->getFirstSelected() != nullptr);
-        ensure_equals("which is the same step",
-                      listOf(history)->getFirstSelected()->getValue().asInteger(), 1);
+        UNSCOPED_INFO("four now");
+        CHECK(listOf(history)->getItemCount() == 4);
+        UNSCOPED_INFO("the row a person was on is still the row they are on");
+        REQUIRE(listOf(history)->getFirstSelected() != nullptr);
+        UNSCOPED_INFO("which is the same step");
+        CHECK(listOf(history)->getFirstSelected()->getValue().asInteger() == 1);
         delete history;
     }
 
     // A refill keeps the row a person was on without choosing it again: a
     // caller told it had been pointed at would go and look at it, and the
     // edit that caused the refill was about something else.
-    template<> template<>
-    void alhistorylist_object::test<6>()
+    TEST_CASE_METHOD(alhistorylist_data, "alhistorylist: a refill keeps the selected row without choosing it again", "[alhistorylist]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALHistoryList* history = make();
         history->setSteps(three(), 3);
@@ -221,33 +233,38 @@ namespace tut
         history->onStepChosen([&chosen](size_t at) { chosen.push_back(at); });
 
         listOf(history)->setSelectedByValue(LLSD(1), true);
-        ensure_equals("choosing a row says so", chosen.size(), 1u);
+        UNSCOPED_INFO("choosing a row says so");
+        REQUIRE(chosen.size() == 1u);
 
         std::vector<ALHistoryList::Step> more = three();
         more.push_back({ "name on title", "floater_a.xml" });
         history->setSteps(more, 4);
-        ensure_equals("the row is kept", listOf(history)->getFirstSelected()->getValue().asInteger(), 1);
-        ensure_equals("and not said again", chosen.size(), 1u);
+        UNSCOPED_INFO("the row is kept");
+        CHECK(listOf(history)->getFirstSelected()->getValue().asInteger() == 1);
+        UNSCOPED_INFO("and not said again");
+        REQUIRE(chosen.size() == 1u);
         delete history;
     }
 
     // The column that says which document is there only where a step names
     // one.
-    template<> template<>
-    void alhistorylist_object::test<7>()
+    TEST_CASE_METHOD(alhistorylist_data, "alhistorylist: the document column shows only where a step names a document", "[alhistorylist]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALHistoryList* history = make();
         history->setSteps({ { "width on close_btn", "" }, { "height on close_btn", "" } }, 2);
         LLScrollListColumn* where = listOf(history)->getColumn("where");
-        ensure("the column exists", where != nullptr);
-        ensure_equals("and takes no room when nothing names a document", where->getWidth(), 0);
+        UNSCOPED_INFO("the column exists");
+        REQUIRE(where != nullptr);
+        UNSCOPED_INFO("and takes no room when nothing names a document");
+        CHECK(where->getWidth() == 0);
 
         history->setSteps(three(), 3);
-        ensure("and is back when something does", where->getWidth() > 0);
+        UNSCOPED_INFO("and is back when something does");
+        CHECK(where->getWidth() > 0);
         delete history;
     }
     // Given words for it, a row under the oldest step is the document
@@ -255,18 +272,19 @@ namespace tut
     // everything, which no step's row can ask for. It is no step, so a
     // caller showing what a step touched is not told of it, and without
     // words, or without steps, there is no such row.
-    template<> template<>
-    void alhistorylist_object::test<8>()
+    TEST_CASE_METHOD(alhistorylist_data, "alhistorylist: a start label adds a row under the oldest step that undoes all", "[alhistorylist]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALHistoryList* history = make("As the files were opened");
         history->setSteps(three(), 2);
         LLScrollListCtrl* list = listOf(history);
-        ensure_equals("a row a step, and the start", list->getItemCount(), 4);
-        ensure_equals("still three steps", history->count(), 3u);
+        UNSCOPED_INFO("a row a step, and the start");
+        CHECK(list->getItemCount() == 4);
+        UNSCOPED_INFO("still three steps");
+        REQUIRE(history->count() == 3u);
 
         std::vector<size_t> asked;
         std::vector<size_t> pointed;
@@ -274,28 +292,39 @@ namespace tut
         history->onStepChosen([&pointed](size_t index) { pointed.push_back(index); });
 
         const std::vector<LLScrollListItem*> rows = list->getAllData();
-        ensure_equals("at the bottom, under the oldest", rows.back()->getColumn(1)->getValue().asString(),
+        UNSCOPED_INFO("at the bottom, under the oldest");
+        CHECK(rows.back()->getColumn(1)->getValue().asString() ==
                       std::string("As the files were opened"));
         list->selectNthItem(3);
-        ensure("pointed at, it tells nobody of a step", pointed.empty());
+        UNSCOPED_INFO("pointed at, it tells nobody of a step");
+        REQUIRE(pointed.empty());
         history->goToSelected();
-        ensure("chosen, it asks for none in force", asked.size() == 1 && asked.back() == 0u);
+        {
+            INFO("chosen, it asks for none in force");
+            REQUIRE(asked.size() == 1);
+            CHECK(asked.back() == 0u);
+        }
 
         // Where none are in force, the mark is on it, and choosing it asks
         // for nothing.
         history->setSteps(three(), 0);
-        ensure_equals("still chosen after a refill", list->getFirstSelectedIndex(), 3);
-        ensure("the present is the start", !list->getAllData().back()->getColumn(0)->getValue().asString().empty());
+        UNSCOPED_INFO("still chosen after a refill");
+        CHECK(list->getFirstSelectedIndex() == 3);
+        UNSCOPED_INFO("the present is the start");
+        REQUIRE_FALSE(list->getAllData().back()->getColumn(0)->getValue().asString().empty());
         history->goToSelected();
-        ensure_equals("and asks for nothing", asked.size(), 1u);
+        UNSCOPED_INFO("and asks for nothing");
+        REQUIRE(asked.size() == 1u);
 
         history->setSteps({}, 0);
-        ensure_equals("no steps, no start", list->getItemCount(), 0);
+        UNSCOPED_INFO("no steps, no start");
+        CHECK(list->getItemCount() == 0);
         delete history;
 
         history = make();
         history->setSteps(three(), 3);
-        ensure_equals("no words, no start", listOf(history)->getItemCount(), 3);
+        UNSCOPED_INFO("no words, no start");
+        CHECK(listOf(history)->getItemCount() == 3);
         delete history;
     }
 }
