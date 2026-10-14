@@ -183,8 +183,12 @@ public:
     std::vector<Outcome> takeUnheard();
     // An outcome told: to the windows listening, or, with none, to the
     // toasts and kept. A send's as it ends, and what came of a question
-    // about many at once.
-    void tell(const Outcome& outcome);
+    // about many at once. Its script by its name now, where that is known.
+    void tell(Outcome outcome);
+    // A linked item's name as it is now, heard -- renamed in the studio, or
+    // listed by its prim since -- which its link takes, for what is said of
+    // it next.
+    void named(const ALScriptRef& ref, const std::string& name);
 
     // The folders a script on disk may read from, as its includes and
     // requires do -- the include folders, what a configuration on disk
@@ -221,6 +225,7 @@ private:
     std::unique_ptr<ALMasterIndex>     mIndex;
     boost::signals2::scoped_connection mIndexConnection;
     boost::signals2::scoped_connection mSavedConnection;
+    boost::signals2::scoped_connection mContentsConnection;
     boost::signals2::scoped_connection mEnabledConnection;
     boost::signals2::scoped_connection mQuietConnection;
     outcome_signal_t                   mOutcome;

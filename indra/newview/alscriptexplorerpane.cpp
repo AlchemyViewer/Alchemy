@@ -1460,9 +1460,10 @@ void ALScriptExplorerPane::renamed(const Choice& row, const std::string& was, st
             mServices->report(error, true);
             return;
         }
-        // The tab, if it is open, and the list, once the tree is done with
-        // the name typed.
+        // The tab, if it is open, the link to a file, if it has one, and the
+        // list, once the tree is done with the name typed.
         mWindow->itemRenamed(ref, name);
+        ALScriptDiskMasters::instance().named(ref, name);
         relistSoon(true);
         return;
     }

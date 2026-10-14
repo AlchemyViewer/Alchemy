@@ -28,6 +28,7 @@
 
 #include "allinelabel.h"
 #include "alluauconfig.h"
+#include "alscriptcontentsindex.h"
 #include "alscriptmasteradopt.h"
 #include "alscriptmasterfanout.h"
 #include "alscriptmastertoasts.h"
@@ -62,6 +63,17 @@ ALScriptDiskMasters::ALScriptDiskMasters()
 : mFanOut(std::make_unique<ALScriptMasterFanOut>()), mAdopt(std::make_unique<ALScriptMasterAdopt>()), mToasts(std::make_unique<ALScriptMasterToasts>())
 {
     mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) { heardSaved(saved); });
+    // A prim's contents as listed: the names of its linked items as they
+    // are, renamed outside the studio -- in the build floater -- too.
+    mContentsConnection = ALScriptWorkspace::instance().contentsIndex().onHeard([this](const ALScriptContents& contents) {
+        if (contents.fetched)
+        {
+            for (const ALScriptContents::Item& item : contents.items)
+            {
+                named(ALScriptRef(contents.prim, item.id), item.name);
+            }
+        }
+    });
 }
 
 ALScriptDiskMasters::~ALScriptDiskMasters() = default;
@@ -342,8 +354,23 @@ void ALScriptDiskMasters::forgetQueued(const std::string& id)
     }
 }
 
-void ALScriptDiskMasters::tell(const Outcome& outcome)
+void ALScriptDiskMasters::named(const ALScriptRef& ref, const std::string& name)
 {
+    if (ALMasterIndex* index = mIndex.get())
+    {
+        index->renamed(ref.object, ref.item, name);
+    }
+}
+
+void ALScriptDiskMasters::tell(Outcome outcome)
+{
+    // By the name the item has now, where it is to be seen: the link keeps
+    // the one it last heard, which a rename since leaves behind.
+    if (LLInventoryItem* item = itemOf(outcome.ref); item && !item->getName().empty() && item->getName() != outcome.itemName)
+    {
+        outcome.itemName = item->getName();
+        named(outcome.ref, outcome.itemName);
+    }
     // Every studio window keeps it in its Output, a hidden one too -- the
     // main window's X only hides it -- and, with none at all, it is kept
     // for the window opened next.

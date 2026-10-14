@@ -394,6 +394,39 @@ namespace
         REQUIRE(made.empty());
     }
 
+    TEST_CASE_METHOD(almasterindex_data, "almasterindex: a linked item renamed is said by its new name and that is written", "[almasterindex]")
+    {
+        ALMasterIndex& made = open();
+        made.link(almasterindex_data::link(1, 2, "/s/door.lsl"));
+        const std::optional<ALMasterLink> linked = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
+        REQUIRE(linked.has_value());
+        const std::string was = linked->itemName;
+        told                  = 0;
+        UNSCOPED_INFO("the name it has: nothing");
+        CHECK_FALSE(made.renamed(almasterindex_data::key(1), almasterindex_data::key(2), was));
+        CHECK(told == 0);
+        UNSCOPED_INFO("Tapple's: renamed, taken");
+        CHECK(made.renamed(almasterindex_data::key(1), almasterindex_data::key(2), "front door"));
+        const std::optional<ALMasterLink> now = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
+        REQUIRE(now.has_value());
+        {
+            INFO("the new name, the rest as it was");
+            CHECK(now->itemName == std::string("front door"));
+            CHECK(now->master == linked->master);
+            CHECK(told == 1);
+        }
+        UNSCOPED_INFO("an item not linked: nothing");
+        CHECK_FALSE(made.renamed(almasterindex_data::key(1), almasterindex_data::key(9), "other"));
+        UNSCOPED_INFO("no name: nothing");
+        CHECK_FALSE(made.renamed(almasterindex_data::key(1), almasterindex_data::key(2), ""));
+        made.flush();
+        ALMasterIndex&                    again = open();
+        const std::optional<ALMasterLink> read  = again.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
+        REQUIRE(read.has_value());
+        UNSCOPED_INFO("written");
+        CHECK(read->itemName == std::string("front door"));
+    }
+
     TEST_CASE_METHOD(almasterindex_data, "almasterindex: what a probe found is kept only by a link of its master knowing nothing yet", "[almasterindex]")
     {
         ALMasterIndex& made = open();
