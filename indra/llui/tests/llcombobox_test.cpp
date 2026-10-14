@@ -198,11 +198,24 @@ namespace
         CHECK_FALSE(text->getTentative());
 
         // A choice made in the control settles it too, without its owner
-        // saying so.
+        // saying so: an item chosen,
         combo->setUnset(true);
         combo->selectFirstItem();
-        UNSCOPED_INFO("and choosing it settles it");
-        CHECK_FALSE(text->getTentative());
+        {
+            INFO("and choosing it settles it");
+            CHECK_FALSE(text->getTentative());
+            CHECK_FALSE(combo->isUnset());
+        }
+
+        // or a value typed that the list does not have.
+        combo->setUnset(true);
+        text->setText(std::string("up"));
+        text->onCommit();
+        {
+            INFO("and typing it settles it");
+            CHECK(combo->getValue().asString() == std::string("up"));
+            CHECK_FALSE(combo->isUnset());
+        }
         combo->die();
     }
 }
