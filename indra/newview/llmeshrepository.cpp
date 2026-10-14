@@ -4624,7 +4624,7 @@ void LLMeshRepository::unregisterAllMeshes()
 
 S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_params, S32 new_lod, S32 last_lod)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     // Manage time-to-load metrics for mesh download operations.
     metricsProgress(1);
@@ -4742,7 +4742,7 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 
 void LLMeshRepository::notifyLoadedMeshes()
 { //called from main thread
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     // GetMesh2 operation with keepalives, etc.  With pipelining,
     // we'll increase this.  See llappcorehttp and llcorehttp for
@@ -5392,7 +5392,7 @@ EMeshSkinInfoResult LLMeshRepository::fetchSkinInfo(const LLUUID& mesh_id, LLVOV
 
 void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     // Local mesh previews have no server-side decomposition; don't queue a repo
     // request that can never resolve (the id would sit in mLoadingPhysicsShapes
@@ -5427,7 +5427,7 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 
 LLModel::Decomposition* LLMeshRepository::getDecomposition(const LLUUID& mesh_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
     LLModel::Decomposition* ret = NULL;
 
