@@ -42,9 +42,9 @@ namespace
     TEST_CASE_METHOD(wb_data, "ALWhiteBalanceSolver: neutral in gives a gain of one", "[ALWhiteBalanceSolver]")
     {
         const LLVector3 g = ALWhiteBalanceSolver::gain(0.f, 0.f);
-        CHECK_THAT(g.mV[VX], ll_test::WithinBits(1.f, 6));
-        CHECK_THAT(g.mV[VY], ll_test::WithinBits(1.f, 6));
-        CHECK_THAT(g.mV[VZ], ll_test::WithinBits(1.f, 6));
+        CHECK(g.mV[VX] == 1.f);
+        CHECK(g.mV[VY] == 1.f);
+        CHECK(g.mV[VZ] == 1.f);
     }
 
     // Green is pinned across the whole range, which is what makes temperature

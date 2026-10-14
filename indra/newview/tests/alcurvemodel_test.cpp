@@ -163,6 +163,7 @@ namespace
 
         mCurve.movePoint(1, 0.95f, 0.5f);
         const auto& p = mCurve.getPoints();
+        REQUIRE(p.size() == size_t(4));
         UNSCOPED_INFO("clamped below its right neighbour");
         CHECK(p[1].mX < p[2].mX);
         UNSCOPED_INFO("clamped to exactly the gap");
@@ -882,6 +883,7 @@ namespace
         const S32 n = ALToneCurveSet::LUT_SIZE;
         std::vector<U16> texels;
         set.bake(texels, n);
+        REQUIRE((S32)texels.size() == n * 4);
 
         std::vector<F32> xs;
         for (S32 i = 0; i <= 4096; ++i)

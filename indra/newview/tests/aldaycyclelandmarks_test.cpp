@@ -129,7 +129,8 @@ namespace
     }
 
     // Landmarks are cycle positions, so they stay inside [0, 1) even when the
-    // crossing they came from sits across the seam.
+    // crossing they came from sits across the seam. Each is found first: an
+    // absent one is left at 0, which is inside the cycle whatever happened.
     TEST_CASE_METHOD(daycycle_landmarks, "ALDayCycleLandmarks: landmarks stay inside the cycle when a crossing is across the seam", "[ALDayCycleLandmarks]")
     {
         for (S32 i = 0; i < 20; ++i)
@@ -138,6 +139,10 @@ namespace
             const auto marks = ALDayCycleLandmarks::find(sine(phase));
             CAPTURE(phase);
 
+            REQUIRE(marks.has_sunrise);
+            REQUIRE(marks.has_noon);
+            REQUIRE(marks.has_sunset);
+            REQUIRE(marks.has_midnight);
             REQUIRE(marks.sunrise >= 0.f);
             REQUIRE(marks.sunrise < 1.f);
             REQUIRE(marks.noon >= 0.f);

@@ -1333,7 +1333,7 @@ namespace
                     if (idAt(ids, x, y) == ID_A)
                     {
                         ++covered;
-                        hidden += at(ids, x, y).b == 0 ? 1 : 0;
+                        hidden += at(ids, x, y).b != 255 ? 1 : 0;
                     }
                 }
             }
@@ -2205,7 +2205,6 @@ namespace
     // read as the sum of its coverage down a column, the line's width over the cosine of its slope.
     TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: the wireframe's lines are as wide in the window wherever they are", "[ALSelectionOutline]")
     {
-        // The rows a column's runs of drawn pixels cover, bottom up.
         // The width down column x of the quad's diagonal, the middle of the three lines a column crosses.
         auto diagonal = [&](const std::vector<U8>& px, S32 x)
         {
@@ -2237,10 +2236,12 @@ namespace
             REQUIRE(fabsf(far_end - near_end) < 0.1f);
 
             const std::vector<U8> far_px = worldWireframe({ { quad(-4.f, 6.f, -4.f, 4.f, -12.f, -48.f), ID_A } });
+            const F32 farther_near_end = diagonal(far_px, 26);
+            const F32 farther_far_end = diagonal(far_px, 34);
             {
                 INFO("the same four times as far");
-                REQUIRE(fabsf(diagonal(far_px, 26) - near_end) < 0.1f);
-                REQUIRE(fabsf(diagonal(far_px, 34) - far_end) < 0.1f);
+                REQUIRE(fabsf(farther_near_end - near_end) < 0.1f);
+                REQUIRE(fabsf(farther_far_end - far_end) < 0.1f);
             }
 
             const std::vector<U8> wide_px = worldWireframe({ { quad(-1.f, 1.5f, -1.f, 1.f, -3.f, -12.f), ID_A } }, 2);
@@ -2254,7 +2255,8 @@ namespace
         }
     }
 
-    // Across a line, coverage falls from its middle on either side, and is gone within a pixel and a half.
+    // Across a line, coverage falls from its middle on either side, and along a row is gone within a pixel and a
+    // half.
     TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: a line's coverage falls from its middle to nothing on either side", "[ALSelectionOutline]")
     {
         for (bool reverse : conventions())
@@ -2272,6 +2274,7 @@ namespace
                 REQUIRE(at(px, y, y).r > 127);
                 for (S32 step : { -1, 1 })
                 {
+                    CAPTURE(step);
                     U32 last = at(px, y, y).r;
                     for (S32 x = y + step; x != y + 4 * step; x += step)
                     {
@@ -2280,8 +2283,8 @@ namespace
                         REQUIRE(r <= last);
                         last = r;
                     }
-                    UNSCOPED_INFO("and is gone");
-                    REQUIRE(last == 0U);
+                    UNSCOPED_INFO("and is gone two pixels along the row");
+                    REQUIRE(at(px, y + 2 * step, y).r == 0U);
                 }
             }
         }

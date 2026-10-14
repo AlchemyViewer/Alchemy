@@ -202,9 +202,21 @@ namespace
     TEST_CASE_METHOD(alagentlocationformat_data, "ALAgentLocationFormat: only LANDMARK truncates a long parcel name", "[ALAgentLocationFormat]")
     {
         const std::string long_name(200, 'y');
-        ALAgentLocationFormat::format(out, LLAgentUI::LOCATION_FORMAT_NORMAL,
-                                      long_name, "Region", "", 0, 0, 0);
+        const auto shown = [&](LLAgentUI::ELocationFormat format) {
+            ALAgentLocationFormat::format(out, format, long_name, "Region", "General", 0, 0, 0);
+            return out;
+        };
         UNSCOPED_INFO("NORMAL does not truncate");
-        CHECK(out == long_name + ", Region");
+        CHECK(shown(LLAgentUI::LOCATION_FORMAT_NORMAL) == long_name + ", Region");
+        UNSCOPED_INFO("NORMAL_COORDS does not truncate");
+        CHECK(shown(LLAgentUI::LOCATION_FORMAT_NORMAL_COORDS) == long_name + " (0, 0, 0)");
+        UNSCOPED_INFO("NO_MATURITY does not truncate");
+        CHECK(shown(LLAgentUI::LOCATION_FORMAT_NO_MATURITY) == long_name + ", Region (0, 0, 0)");
+        UNSCOPED_INFO("NO_COORDS does not truncate");
+        CHECK(shown(LLAgentUI::LOCATION_FORMAT_NO_COORDS) == long_name + ", Region - General");
+        UNSCOPED_INFO("FULL does not truncate");
+        CHECK(shown(LLAgentUI::LOCATION_FORMAT_FULL) == long_name + ", Region (0, 0, 0) - General");
+        UNSCOPED_INFO("LANDMARK does");
+        CHECK(shown(LLAgentUI::LOCATION_FORMAT_LANDMARK) == std::string(ALAgentLocationFormat::LANDMARK_NAME_MAX_BYTES, 'y'));
     }
 }

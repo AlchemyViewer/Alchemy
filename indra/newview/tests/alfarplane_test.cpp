@@ -354,7 +354,12 @@ namespace
         REQUIRE(funcs.find("abs(rel_pos.y)") == std::string::npos);
         UNSCOPED_INFO("the rotation is in the Environment block");
         REQUIRE(shader_source("class1/deferred/environmentBlock.glsl").find("mat3  eyeToSky;") != std::string::npos);
+        // Read, and calling the haze with the position it unprojected, so the turn's absence below is not the
+        // absence of the file.
+        const std::string haze = shader_source("class3/deferred/hazeF.glsl");
         UNSCOPED_INFO("the haze pass hands over eye space");
-        REQUIRE(shader_source("class3/deferred/hazeF.glsl").find("eyeToSky") == std::string::npos);
+        REQUIRE(haze.find("calcAtmosphericVarsLinear(pos.xyz,") != std::string::npos);
+        UNSCOPED_INFO("and does not turn it itself");
+        REQUIRE(haze.find("eyeToSky") == std::string::npos);
     }
 }

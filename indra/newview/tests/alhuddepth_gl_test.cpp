@@ -164,7 +164,6 @@ namespace
         void setUp(bool reverse)
         {
             tearDown();
-            mReverse = reverse;
             setConvention(reverse);
 
             std::map<std::string, std::string> defines;
@@ -396,7 +395,6 @@ namespace
         LLMatrix4a mSceneProjection;
         LLMatrix4a mHUDProjection;
         std::vector<LLRect> mRects;
-        bool mReverse = false;
     };
 
 
@@ -601,8 +599,26 @@ namespace
             blit();
             const std::vector<F32> before = depths(mWindow);
             clearUnderHUD(&unloaded);
+            const std::vector<F32> after = depths(mWindow);
+            // Counted, and the first that differs placed, rather than every depth printed.
+            size_t differing = 0;
+            S32 first_x = -1;
+            S32 first_y = -1;
+            for (size_t i = 0; i < after.size(); ++i)
+            {
+                if (after[i] != before[i])
+                {
+                    if (differing == 0)
+                    {
+                        first_x = (S32)(i % W);
+                        first_y = (S32)(i / W);
+                    }
+                    ++differing;
+                }
+            }
+            CAPTURE(first_x, first_y);
             UNSCOPED_INFO("nothing cleared");
-            REQUIRE(depths(mWindow) == before);
+            REQUIRE(differing == size_t(0));
             drawHUD();
             restoreUnderHUD(&unloaded);
             overlay(40, 24, 8.f);

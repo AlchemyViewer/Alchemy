@@ -71,6 +71,7 @@ namespace
 
         const auto* t = mHistory.undo();
         REQUIRE(t != nullptr);
+        REQUIRE(t->size() == (size_t)1);
         UNSCOPED_INFO("from where the drag began");
         CHECK(t->front().mBefore.asReal() == 0.0);
         UNSCOPED_INFO("to where it ended");
@@ -153,6 +154,7 @@ namespace
 
         const auto* t = mHistory.redo();
         REQUIRE(t != nullptr);
+        REQUIRE(t->size() == (size_t)1);
         CHECK(t->front().mAfter.asReal() == 1.0);
         CHECK_FALSE(mHistory.canRedo());
         CHECK(mHistory.canUndo());
@@ -172,6 +174,7 @@ namespace
         CHECK(mHistory.depth() == (size_t)1);
         const auto* t = mHistory.undo();
         REQUIRE(t != nullptr);
+        REQUIRE(t->size() == (size_t)1);
         UNSCOPED_INFO("carrying the new values");
         CHECK(t->front().mBefore.asReal() == 1.0);
     }
@@ -189,6 +192,7 @@ namespace
         // The newest is still the newest after the drop.
         const auto* t = mHistory.undo();
         REQUIRE(t != nullptr);
+        REQUIRE(t->size() == (size_t)1);
         UNSCOPED_INFO("which is the last one recorded");
         CHECK(t->front().mAfter.asReal() == (F64)(ALGradeHistory::MAX_DEPTH + 20));
     }
@@ -297,14 +301,15 @@ namespace
         UNSCOPED_INFO("the group's step carries its name");
         CHECK(mHistory.labelOf(0) == std::string("Reset Bloom"));
         UNSCOPED_INFO("a lone write's step has none");
-        REQUIRE(mHistory.labelOf(1).empty());
+        CHECK(mHistory.labelOf(1).empty());
 
         // And a group that follows an unnamed one is not named after it.
         mHistory.beginGroup();
         mHistory.record("D", LLSD(0.0), LLSD(1.0), 9.f);
         mHistory.endGroup();
+        REQUIRE(mHistory.depth() == (size_t)3);
         UNSCOPED_INFO("an unnamed group stays unnamed");
-        REQUIRE(mHistory.labelOf(2).empty());
+        CHECK(mHistory.labelOf(2).empty());
     }
 
     // Groups nest, and the one the user started is the one the step is named
@@ -398,6 +403,7 @@ namespace
         CHECK(mHistory.depth() == (size_t)1);
         const auto* t = mHistory.undo();
         REQUIRE(t != nullptr);
+        REQUIRE(t->size() == (size_t)1);
         UNSCOPED_INFO("from the value the drag began at");
         CHECK(t->front().mBefore.asReal() == 0.0);
         CHECK(t->front().mAfter.asReal() == 2.0);
@@ -410,6 +416,7 @@ namespace
         mHistory.record("A", LLSD(1.0), LLSD(0.0), 5.1f);
         UNSCOPED_INFO("the earlier step stays");
         REQUIRE(mHistory.depth() == (size_t)1);
+        REQUIRE(mHistory.at(0).size() == (size_t)1);
         CHECK(mHistory.at(0).front().mName == std::string("B"));
     }
 
@@ -445,7 +452,7 @@ namespace
         UNSCOPED_INFO("a write moves it");
         CHECK(recorded != start);
 
-        mHistory.depth();
+        REQUIRE(mHistory.depth() == (size_t)1);
         mHistory.cursor();
         mHistory.at(0);
         mHistory.labelOf(0);
@@ -476,7 +483,9 @@ namespace
         mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
         mHistory.record("B", LLSD(2.0), LLSD(3.0), 5.f);
 
+        REQUIRE(mHistory.depth() == (size_t)2);
         const ALGradeHistory::Transaction shown = mHistory.at(1);
+        REQUIRE(shown.size() == (size_t)1);
         const auto* undone = mHistory.undo();
         REQUIRE(undone != nullptr);
         REQUIRE(undone->size() == shown.size());
@@ -500,12 +509,14 @@ namespace
         }
         mHistory.undo();
         mHistory.undo();
+        REQUIRE(mHistory.depth() == (size_t)3);
         UNSCOPED_INFO("in force");
         CHECK(mHistory.labelOf(0) == std::string("one"));
         UNSCOPED_INFO("the next redo");
         CHECK(mHistory.labelOf(1) == std::string("two"));
         UNSCOPED_INFO("the last redo");
         CHECK(mHistory.labelOf(2) == std::string("three"));
+        REQUIRE(mHistory.at(2).size() == (size_t)1);
         UNSCOPED_INFO("a redo step's changes");
         CHECK(mHistory.at(2).front().mName == std::string("three"));
 

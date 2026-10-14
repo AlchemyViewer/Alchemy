@@ -509,6 +509,8 @@ namespace
         UNSCOPED_INFO("version line");
         CHECK(bytes.substr(0, line_end) == LLGLTFOverrideCacheEntry::VERSION_LABEL + ":" + std::to_string(LLGLTFOverrideCacheEntry::VERSION));
         size_t cursor = line_end + 1 + UUID_BYTES;
+        UNSCOPED_INFO("the cache id, the count and the first record's length inside the file");
+        REQUIRE(cursor + 2 * sizeof(U32) <= bytes.size());
         U32 count = 0;
         memcpy(&count, bytes.data() + cursor, sizeof(U32));
         cursor += sizeof(U32);
@@ -597,19 +599,15 @@ namespace
         UNSCOPED_INFO("past the cap is still a factor");
         CHECK(factor(2.f * cap, 65536.f, cap, 750.f, 2048.f) == 0.f);
 
-        // settings the wrong way round
+        // settings the wrong way round: the low one is the bound, and the high
+        // one is taken as just past it
         for (F32 allocated : { 0.f, 2000.f, 2500.f, 3000.f, 4000.f })
         {
             const F32 f = factor(allocated, 0.f, no_cap, 3000.f, 2048.f);
-            CAPTURE(allocated);
-            {
-                INFO("inverted settings still give a factor in [0, 1]");
-                REQUIRE(f >= 0.f);
-                REQUIRE(f <= 1.f);
-            }
+            CAPTURE(allocated, f);
+            INFO("inverted settings: up to the low setting nothing is pulled in, past it everything is");
+            CHECK(close_to(f, allocated <= 3000.f ? 1.f : 0.f));
         }
-        UNSCOPED_INFO("inverted settings: below the low setting nothing is pulled in");
-        CHECK(close_to(factor(2000.f, 0.f, no_cap, 3000.f, 2048.f), 1.f));
 
         // a bound set by hand is the bound, tighter than RAM would make it too
         auto explicit_factor = [](F32 allocated, F32 physical, F32 cap, F32 low, F32 high)
@@ -622,8 +620,10 @@ namespace
         CHECK(close_to(explicit_factor(2000.f, 65536.f, no_cap, 1000.f, 2000.f), 0.f));
         UNSCOPED_INFO("explicit bounds on a big machine: halfway is half");
         CHECK(close_to(explicit_factor(1500.f, 65536.f, no_cap, 1000.f, 2000.f), 0.5f));
-        UNSCOPED_INFO("an explicit high with a default low still comes out ordered");
-        CHECK(LLVOCacheEntry::memoryAdjustFactor(16000.f, 65536.f, no_cap, 750.f, 2048.f, false, true) >= 0.f);
+        // The default low follows RAM to 16384, past the explicit high of
+        // 2048, so the high is taken as just past the low.
+        UNSCOPED_INFO("an explicit high with a default low still comes out ordered: below the low one nothing is pulled in");
+        CHECK(close_to(LLVOCacheEntry::memoryAdjustFactor(16000.f, 65536.f, no_cap, 750.f, 2048.f, false, true), 1.f));
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: hostile extras records meet a depth cap and a budget and lose bad faces", "[LLVOCache]")
