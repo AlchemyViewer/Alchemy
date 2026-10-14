@@ -405,6 +405,9 @@ private:
     // The tab's script read as the other language from here: its grammar,
     // its words, its checks; what was made of it as the one it was, gone.
     void readAs(Doc& doc, bool lua);
+    // What the tab's script compiles for changed, as the region said it or
+    // as it was picked: checked, weighed and expanded again for it.
+    void targetChanged(Doc& doc);
     void onRunning();
 
     // --- loading, saving and files -----------------------------------------------------

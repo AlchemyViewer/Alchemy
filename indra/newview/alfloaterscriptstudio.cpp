@@ -8086,9 +8086,11 @@ void ALFloaterScriptStudio::heardRunning(Doc& doc, const ALScriptRunningState& s
     // What it compiles for, as the region knows it, but for one picked
     // here and not saved yet, which is what the next save sends; for a
     // file standing in, of the file's language only.
-    if (!state.compileTarget.empty() && !doc.targetChosen && (doc.file.empty() || (state.compileTarget == "luau") == doc.language.lua))
+    if (!state.compileTarget.empty() && !doc.targetChosen && state.compileTarget != doc.language.compileTarget &&
+        (doc.file.empty() || (state.compileTarget == "luau") == doc.language.lua))
     {
         doc.language.compileTarget = state.compileTarget;
+        targetChanged(doc);
     }
     // The Running box's ask answered: said once the region says it is so,
     // the box left saying what was asked while the region is not there
@@ -9784,16 +9786,34 @@ void ALFloaterScriptStudio::onCompileTarget()
         // Picked, and to stand until it is saved over whatever the region
         // says the script compiles for meanwhile.
         doc->targetChosen = true;
-        // One of the other language: the script is read as that one.
+        // One of the other language: the script is read as that one, and
+        // checked again; else checked and weighed again for its target.
         const bool lua = target == "luau";
         if (lua != doc->language.lua)
         {
             readAs(*doc, lua);
         }
+        else
+        {
+            targetChanged(*doc);
+        }
         // An unsaved change, as the tab says.
         fillTabs();
         refreshToolbar();
     }
+}
+
+void ALFloaterScriptStudio::targetChanged(Doc& doc)
+{
+    // What was weighed, checked and expanded was for the target before,
+    // which the region may have named only after the first check -- an LSO
+    // script weighed as Mono: all of it again, for this one.
+    ALScriptStudioWeighing::sendsDifferently(doc);
+    if (preprocessed(doc))
+    {
+        mSaving.preprocess(doc);
+    }
+    scheduleAnalysis(doc, true);
 }
 
 void ALFloaterScriptStudio::readAs(Doc& doc, bool lua)
