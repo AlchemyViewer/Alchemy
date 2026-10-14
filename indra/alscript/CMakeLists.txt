@@ -299,6 +299,9 @@ if(AL_BUILD_TESTS)
       tests/alscriptweight_test.cpp
       tests/alsourcemap_test.cpp
       tests/aluploadheader_test.cpp
+    # The preprocessor, the formatter, the optimizer and one analysis of each
+    # language over big scripts, with the grid's definitions loaded.
+    BENCH_SOURCES tests/alscript_bench.cpp
     SUPPORT alscript_test_checks llcommon_test_checks
     LIBRARIES alscript llcommon ll::slua ll::tailslide
     DEFINES
@@ -314,14 +317,5 @@ if(AL_BUILD_TESTS)
       tests/alscriptfixes_test.cpp
       tests/alscriptlintpass_test.cpp
     RERUN_ENVIRONMENT AL_TEST_LUAU_SOLVER=new
-  )
-  # The preprocessor, the formatter, the optimizer and one analysis of each
-  # language over big scripts, with the grid's definitions loaded.
-  al_add_bench(
-    alscript
-    PROJECT alscript
-    LIBRARIES alscript llcommon
-    INCLUDES ${INDRA_SOURCE_DIR}/test
-    DEFINES ${definitions_defines}
   )
 endif()
