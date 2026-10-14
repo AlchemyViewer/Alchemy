@@ -26,6 +26,7 @@
 
 #include "alscriptlinkbadges.h"
 
+#include "almainloop.h"
 #include "alscriptdiskmasters.h"
 #include "alserialworker.h"
 #include "workqueue.h"
@@ -173,7 +174,7 @@ void ALScriptLinkBadges::look()
     }
     // Where there is no main loop to hand what was found back to -- a test
     // -- looked at here.
-    const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
+    const LL::WorkQueue::ptr_t main_loop = ALMainLoop::queue();
     if (!main_loop)
     {
         Stamps stamps;
