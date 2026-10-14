@@ -79,6 +79,7 @@ namespace
         {
             INFO("this showing's");
             CHECK(model.note(second, { "-12 bytes", "" }));
+            REQUIRE(model.fixes().size() == 2);
             CHECK(model.fixes()[0].note == "-12 bytes");
         }
         model.close();
@@ -115,6 +116,7 @@ namespace
         model.close();
         model.ask(at, caret);
         joined = model.join(at, caret, { fix("Extract") }, false, -1);
+        REQUIRE(joined.has_value());
         UNSCOPED_INFO("alone, the list having closed");
         CHECK(titles(joined->fixes) == std::string("Extract"));
         model.ask(at, caret);

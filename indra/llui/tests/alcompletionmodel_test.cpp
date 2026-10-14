@@ -45,15 +45,6 @@ namespace
             c.detail = detail;
             return c;
         }
-        static std::vector<std::string> texts(const std::vector<ALCompletion>& list)
-        {
-            std::vector<std::string> out;
-            for (const ALCompletion& c : list)
-            {
-                out.push_back(c.text);
-            }
-            return out;
-        }
         static std::string joined(const std::vector<ALCompletion>& list)
         {
             std::string out;
@@ -225,6 +216,7 @@ namespace
         const ALTextDocument text("pr\n");
         const ALTextPos      start(0, 0);
         model.narrow(start, ALTextPos(0, 2), "pr", std::string(), { word("print"), word("pairs") }, text);
+        REQUIRE_FALSE(model.list().empty());
         UNSCOPED_INFO("guessed until told");
         CHECK(model.list()[0].brackets == ALCompletion::Brackets::Guess);
         ALCompletion told = word("print");
@@ -234,6 +226,7 @@ namespace
         model.narrow(start, ALTextPos(0, 2), "pr", std::string(), {}, text);
         {
             INFO("told it fits, and where its brackets go");
+            REQUIRE_FALSE(model.list().empty());
             CHECK(model.list()[0].text == "print");
             CHECK(model.list()[0].fits);
             CHECK(model.list()[0].brackets == ALCompletion::Brackets::None);

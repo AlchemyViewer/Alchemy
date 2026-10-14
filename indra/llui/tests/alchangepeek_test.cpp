@@ -189,7 +189,7 @@ namespace
     TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: take_back reverts a change as one undo step and other edits close it", "[alchangepeek]")
     {
         ALCodeEditor& e = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
-        e.peekChange(1);
+        CHECK(e.peekChange(1));
         ALChangePeek& peek = *e.changePeek();
         press(peek, "take_back");
         UNSCOPED_INFO("made as saved");
@@ -269,7 +269,7 @@ namespace
     TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: changed words are marked in the peek and the editor until it closes", "[alchangepeek]")
     {
         ALCodeEditor& e = make("integer count = 1;\nstring s;", "integer total = 2;\nstring s;");
-        e.peekChange(0);
+        CHECK(e.peekChange(0));
         ALChangePeek& peek = *e.changePeek();
         const auto    has  = [](const ALTextRange& range, S32 line, S32 begin, S32 end) {
             return range.begin.line == line && range.begin.column <= begin && range.end.column >= end;
@@ -294,7 +294,7 @@ namespace
         editor->die();
         editor          = nullptr;
         ALCodeEditor& f = make("a\nb", "a\nput in\nb");
-        f.peekChange(1);
+        CHECK(f.peekChange(1));
         {
             INFO("nothing marked");
             CHECK(f.highlights(ALCodeEditor::Highlight::Change).empty());
@@ -497,6 +497,7 @@ namespace
             INFO("undone: again, three");
             CHECK(e.perform(ALEditorCommand::Undo));
             CHECK(e.changesSinceSaved() != edited);
+            REQUIRE(e.changesSinceSaved());
             CHECK(e.changesSinceSaved()->changes.size() == 3);
         }
         e.resetDirty();
@@ -507,8 +508,11 @@ namespace
         }
         // Changed by its document, which no journal is told of: again.
         e.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "z");
-        UNSCOPED_INFO("the text as it is");
-        CHECK(e.changesSinceSaved()->now.front() == "za");
+        {
+            INFO("the text as it is");
+            REQUIRE(e.changesSinceSaved());
+            CHECK(e.changesSinceSaved()->now.front() == "za");
+        }
     }
 
     TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: an edit above a peek that adds or takes lines closes it leaving no gap", "[alchangepeek]")
@@ -606,8 +610,8 @@ namespace
             CHECK_FALSE(peek.isOpen());
             CHECK(e.lineAnnotation(2).gap == 0);
         }
-        UNSCOPED_INFO("closed, F7 is the text's again");
-        CHECK_FALSE(peek.isOpen());
+        UNSCOPED_INFO("closed, F7 is the text's again: with no misspelling to go to, nothing takes it");
+        CHECK_FALSE(e.handleKeyHere(KEY_F7, MASK_NONE));
 
         e.setModalKeymap(std::make_unique<ALVimKeymap>());
         {

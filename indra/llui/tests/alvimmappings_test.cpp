@@ -103,9 +103,13 @@ namespace
         }
         UNSCOPED_INFO("shown back as :map lists them");
         CHECK(spelt("a<esc><c-w><Space><lt>") == std::string("a<Esc><C-W><Space><lt>"));
-        CHECK(maps.keysOf("<S-a>").front().isChar);
-        CHECK(maps.keysOf("<S-a>").front().ch == 'A');
-        CHECK(maps.keysOf("<C-[>").front().key == KEY_ESCAPE);
+        const std::vector<ALVimInput> shifted = maps.keysOf("<S-a>");
+        REQUIRE(shifted.size() == size_t(1));
+        CHECK(shifted[0].isChar);
+        CHECK(shifted[0].ch == 'A');
+        const std::vector<ALVimInput> escape = maps.keysOf("<C-[>");
+        REQUIRE(escape.size() == size_t(1));
+        CHECK(escape[0].key == KEY_ESCAPE);
     }
 
     TEST_CASE_METHOD(alvimmappings_data, "alvimmappings: <Leader> is the leader :let set when the mapping was made", "[alvimmappings]")
@@ -162,8 +166,10 @@ namespace
         }
         UNSCOPED_INFO("Q in operator-pending mode too");
         CHECK(maps.match(ALVimMappings::OPERATOR, chars("Q"), true).full != nullptr);
+        const std::vector<ALVimInput> control_l = maps.keysOf("<C-l>");
+        REQUIRE(control_l.size() == size_t(1));
         UNSCOPED_INFO("the : line has <C-l>");
-        CHECK(maps.starts(ALVimMappings::COMMAND_LINE, maps.keysOf("<C-l>").front()));
+        CHECK(maps.starts(ALVimMappings::COMMAND_LINE, control_l[0]));
         CHECK(run("map", ""));
         CHECK(listing.find("Q") != std::string::npos);
         CHECK(listing.find("gj") != std::string::npos);
@@ -249,7 +255,9 @@ namespace
         {
             INFO("<nowait> kept");
             CHECK(run("nnoremap", "<nowait> g G"));
-            CHECK(maps.match(ALVimMappings::NORMAL, chars("g"), true).full->nowait);
+            const ALVimMappings::Match nowait = maps.match(ALVimMappings::NORMAL, chars("g"), true);
+            REQUIRE(nowait.full);
+            CHECK(nowait.full->nowait);
         }
         {
             INFO("<unique> refuses one there");
@@ -264,6 +272,7 @@ namespace
         UNSCOPED_INFO("a bar ends it");
         CHECK(run("nmap", "zb a\\|b|c"));
         const ALVimMappings::Match bar = maps.match(ALVimMappings::NORMAL, chars("zb"), true);
+        REQUIRE(bar.full);
         UNSCOPED_INFO("\\| is one");
         CHECK(ALVimMappings::shown(bar.full->to) == std::string("a<Bar>b"));
     }

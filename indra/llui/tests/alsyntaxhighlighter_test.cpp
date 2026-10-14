@@ -103,8 +103,9 @@ namespace
         {
             auto        grammar = std::make_shared<ALSyntaxGrammar>();
             std::string error;
-            UNSCOPED_INFO("grammar loads: " + error);
-            REQUIRE(grammar->load(description, error));
+            const bool  loaded = grammar->load(description, error);
+            INFO("grammar loads: " << error);
+            REQUIRE(loaded);
             return grammar;
         }
 
@@ -150,6 +151,7 @@ namespace
         UNSCOPED_INFO("the longer operator first");
         CHECK(lexed(*grammar, "a==b", state, words) == std::string("text:a|operator:==|text:b"));
         REQUIRE(grammar->wordTables().size() == size_t(2));
+        REQUIRE_FALSE(grammar->extensions().empty());
         CHECK(grammar->extensions().front() == std::string("mini"));
     }
 
@@ -189,6 +191,7 @@ namespace
         UNSCOPED_INFO("level two ends at level two");
         CHECK(lexed(*grammar, "[==[ a ]=] b ]==] c", state, words) == std::string("string:[==[ a ]=] b ]==]|text: c"));
         CHECK(lexed(*grammar, "[=[ x", state, words) == std::string("string:[=[ x"));
+        REQUIRE_FALSE(state.frames.empty());
         UNSCOPED_INFO("with the level in the state");
         CHECK(state.frames.back().payload == std::string("="));
         UNSCOPED_INFO("and closed on the next");
@@ -243,8 +246,9 @@ namespace
 
         LLSD good = mini();
         good["states"]["main"] = rules({ LLSD().with("regex", "(x)y").with("consume", 1).with("not_after_chars", "a-z").with("kind", "keyword") });
+        const bool both = grammar.load(good, error);
         UNSCOPED_INFO("both on a regex: " << error);
-        CHECK(grammar.load(good, error));
+        CHECK(both);
     }
 
     TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: the highlighter follows a document and re-lexes only what an edit reaches", "[alsyntaxhighlighter]")
@@ -484,10 +488,12 @@ namespace
         LLSD good = mini();
         good["states"]["main"] = rules({ LLSD().with("span", "\"").with("end", "\"").with("escape", "\\").with("multiline", false).with("unless_after", "\\"),
                                          LLSD().with("eol", true).with("unless_after", "\\").with("pop", true) });
+        const bool backslashed = grammar.load(good, error);
         UNSCOPED_INFO("a span its line ends, but for a backslash, and an eol that says the same: " << error);
-        CHECK(grammar.load(good, error));
+        CHECK(backslashed);
+        const bool little = grammar.load(mini(), error);
         UNSCOPED_INFO("and the little language: " << error);
-        CHECK(grammar.load(mini(), error));
+        CHECK(little);
     }
 
     TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a line's revision moves on only when its tokens may have changed", "[alsyntaxhighlighter]")
