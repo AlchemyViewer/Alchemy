@@ -2652,6 +2652,7 @@ void ALFloaterScriptStudio::loadedScript(Doc& doc, const ALScriptLoaded& answer)
     // the author wrote, and what the server compiled goes in a tab
     // of its own.
     doc.envelope = ALScriptEnvelope::parse(answer.text);
+    doc.asset    = std::make_shared<const std::string>(answer.text);
     doc.compareCompiledAt.reset();
     doc.compiledDiffers.reset();
     // Carried in -- recovered, or from another window -- the text is
@@ -9333,6 +9334,20 @@ void ALFloaterScriptStudio::addViewCommands()
                 return !mFolds.collapsed("bottom") && current && current->getName() == tab;
             });
     }
+    // The asset as another viewer opens it, envelope and all, beside the
+    // source.
+    mCommands.add(
+        "compare_asset",
+        [this]() {
+            if (Doc* doc = active(); doc && doc->asset)
+            {
+                compare(*doc, *doc->asset, doc->editor->wholeText(), getString("CompareAsset"), getString("CompareNow"));
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->loaded && !doc->notecard && doc->file.empty() && doc->asset;
+        });
     mCommands.add(
         "compare_saved", [this]() { compareWithSaved(); },
         [this]() {
@@ -9625,6 +9640,27 @@ void ALFloaterScriptStudio::addBuildCommands()
         [this]() {
             Doc* doc = active();
             return doc && doc->loaded && !doc->notecard && !doc->preprocessing;
+        });
+    // Saved as written, its envelope let go of: where nothing in it needs
+    // the preprocessor, and something would wrap it -- the setting, or the
+    // envelope it came in.
+    mCommands.add(
+        "save_plain",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                doc->savePlain = true;
+                mSaving.saveAsked(*doc);
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            if (!doc || !doc->loaded || !doc->modifiable || doc->notecard || !doc->file.empty() || doc->ref.isNull())
+            {
+                return false;
+            }
+            const ALPreprocessor::Wanted why = preprocessedWhy(*doc);
+            return why == ALPreprocessor::Wanted::Setting || (why == ALPreprocessor::Wanted::No && doc->envelope);
         });
     // The settings each turns on and off, heard as the preferences'
     // changes are (pumpPreprocessor).

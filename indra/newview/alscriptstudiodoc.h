@@ -396,6 +396,14 @@ struct ALScriptStudioDoc
     };
     Expanded                                   expanded;
     Expanded                                   uploaded;
+    // The asset as the world holds it, whole -- the envelope and all, as
+    // another viewer opens it: as loaded, and as the last save that went
+    // up sent it; and what the save on its way sent.
+    std::shared_ptr<const std::string>         asset;
+    std::shared_ptr<const std::string>         assetSending;
+    // The next save sends it as written, its envelope let go of, whatever
+    // the setting says (Save Without Preprocessing).
+    bool                                       savePlain = false;
     // The source's require calls, of the text at requiresOf (namedAt).
     mutable std::vector<ALPreprocessor::Required> requiresFound;
     mutable std::optional<U32>                    requiresOf;
