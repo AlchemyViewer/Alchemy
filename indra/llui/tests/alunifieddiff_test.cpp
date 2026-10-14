@@ -26,11 +26,11 @@
 
 #include "alunifieddiff.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct alunifieddiff_data
     {
@@ -68,81 +68,84 @@ namespace tut
         }
     };
 
-    typedef test_group<alunifieddiff_data> alunifieddiff_group;
-    typedef alunifieddiff_group::object    alunifieddiff_object;
-    tut::alunifieddiff_group               alunifieddiff_test("alunifieddiff");
-
-    template<> template<>
-    void alunifieddiff_object::test<1>()
+    TEST_CASE_METHOD(alunifieddiff_data, "alunifieddiff: the same text writes nothing; a change has three lines of context", "[alunifieddiff]")
     {
-        set_test_name("the same, nothing; a line changed, under the names with three lines either side, counted from one");
-        ensure_equals("the same", diff(numbered(9), numbered(9)), std::string());
-        ensure_equals("one changed", diff(numbered(9), numbered(9, { { 5, "five" } })),
+        CHECK(diff(numbered(9), numbered(9)) == std::string());
+        UNSCOPED_INFO("one changed");
+        CHECK(diff(numbered(9), numbered(9, { { 5, "five" } })) ==
                       std::string("--- a\n+++ b\n@@ -2,7 +2,7 @@\n 2\n 3\n 4\n-5\n+five\n 6\n 7\n 8\n"));
-        ensure_equals("at the start, fewer before", diff(numbered(9), numbered(9, { { 1, "one" } })),
+        UNSCOPED_INFO("at the start, fewer before");
+        CHECK(diff(numbered(9), numbered(9, { { 1, "one" } })) ==
                       std::string("--- a\n+++ b\n@@ -1,4 +1,4 @@\n-1\n+one\n 2\n 3\n 4\n"));
     }
 
-    template<> template<>
-    void alunifieddiff_object::test<2>()
+    TEST_CASE_METHOD(alunifieddiff_data, "alunifieddiff: hunk headers for insertions and deletions: empty and one-line ranges", "[alunifieddiff]")
     {
-        set_test_name("lines put in and taken out: a stretch of none counted at the line before it, one line said without a count");
-        ensure_equals("into nothing", diff("", "x\n"), std::string("--- a\n+++ b\n@@ -0,0 +1 @@\n+x\n"));
-        ensure_equals("all taken out", diff("x\n", ""), std::string("--- a\n+++ b\n@@ -1 +0,0 @@\n-x\n"));
-        ensure_equals("taken out at the end", diff("a\nb\nc\n", "a\nb\n"), std::string("--- a\n+++ b\n@@ -1,3 +1,2 @@\n a\n b\n-c\n"));
-        ensure_equals("put in between", diff("a\nb\n", "a\nx\nb\n"), std::string("--- a\n+++ b\n@@ -1,2 +1,3 @@\n a\n+x\n b\n"));
+        UNSCOPED_INFO("into nothing");
+        CHECK(diff("", "x\n") == std::string("--- a\n+++ b\n@@ -0,0 +1 @@\n+x\n"));
+        UNSCOPED_INFO("all taken out");
+        CHECK(diff("x\n", "") == std::string("--- a\n+++ b\n@@ -1 +0,0 @@\n-x\n"));
+        UNSCOPED_INFO("taken out at the end");
+        CHECK(diff("a\nb\nc\n", "a\nb\n") == std::string("--- a\n+++ b\n@@ -1,3 +1,2 @@\n a\n b\n-c\n"));
+        UNSCOPED_INFO("put in between");
+        CHECK(diff("a\nb\n", "a\nx\nb\n") == std::string("--- a\n+++ b\n@@ -1,2 +1,3 @@\n a\n+x\n b\n"));
     }
 
-    template<> template<>
-    void alunifieddiff_object::test<3>()
+    TEST_CASE_METHOD(alunifieddiff_data, "alunifieddiff: changes within twice the context share a hunk; farther apart get one each", "[alunifieddiff]")
     {
-        set_test_name("changes far apart, a stretch each; within twice the context of each other, one");
-        ensure_equals("far apart", hunks(diff(numbered(20), numbered(20, { { 2, "x" }, { 18, "y" } }))), 2);
-        ensure_equals("six lines between: one", hunks(diff(numbered(20), numbered(20, { { 2, "x" }, { 9, "y" } }))), 1);
-        ensure_equals("seven: two", hunks(diff(numbered(20), numbered(20, { { 2, "x" }, { 10, "y" } }))), 2);
-        ensure("the second stretch's lines, to the end", diff(numbered(20), numbered(20, { { 2, "x" }, { 18, "y" } })).find("\n@@ -15,6 +15,6 @@\n") != std::string::npos);
+        UNSCOPED_INFO("far apart");
+        CHECK(hunks(diff(numbered(20), numbered(20, { { 2, "x" }, { 18, "y" } }))) == 2);
+        UNSCOPED_INFO("six lines between: one");
+        CHECK(hunks(diff(numbered(20), numbered(20, { { 2, "x" }, { 9, "y" } }))) == 1);
+        UNSCOPED_INFO("seven: two");
+        CHECK(hunks(diff(numbered(20), numbered(20, { { 2, "x" }, { 10, "y" } }))) == 2);
+        UNSCOPED_INFO("the second stretch's lines, to the end");
+        CHECK(diff(numbered(20), numbered(20, { { 2, "x" }, { 18, "y" } })).find("\n@@ -15,6 +15,6 @@\n") != std::string::npos);
     }
 
-    template<> template<>
-    void alunifieddiff_object::test<4>()
+    TEST_CASE_METHOD(alunifieddiff_data, "alunifieddiff: a missing final newline is marked and differs from the line with one", "[alunifieddiff]")
     {
-        set_test_name("a last line without a line break is said so, and is not the same line with one");
-        ensure_equals("the break taken away", diff("a\nb\n", "a\nb"),
+        UNSCOPED_INFO("the break taken away");
+        CHECK(diff("a\nb\n", "a\nb") ==
                       std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n+b\n\\ No newline at end of file\n"));
-        ensure_equals("the break put in", diff("a\nb", "a\nb\n"),
+        UNSCOPED_INFO("the break put in");
+        CHECK(diff("a\nb", "a\nb\n") ==
                       std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n\\ No newline at end of file\n+b\n"));
-        ensure_equals("a line the same before it, both without", diff("a\nb", "x\nb"),
+        UNSCOPED_INFO("a line the same before it, both without");
+        CHECK(diff("a\nb", "x\nb") ==
                       std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n-a\n+x\n b\n\\ No newline at end of file\n"));
     }
 
-    template<> template<>
-    void alunifieddiff_object::test<5>()
+    TEST_CASE_METHOD(alunifieddiff_data, "alunifieddiff: ignored whitespace and blank-line changes write nothing outside a hunk", "[alunifieddiff]")
     {
-        set_test_name("lines told the same as compared: re-indented, nothing with blanks let go of; a blank line put in, nothing with those let go of");
         ALTextDiff::Options blanks;
         blanks.like.ignoreWhitespace = true;
-        ensure("re-indented: a change as they are", !diff("a\n  b\n", "a\nb\n").empty());
-        ensure_equals("nothing, blanks let go of", diff("a\n  b\n", "a\nb\n", blanks), std::string());
+        UNSCOPED_INFO("re-indented: a change as they are");
+        CHECK_FALSE(diff("a\n  b\n", "a\nb\n").empty());
+        UNSCOPED_INFO("nothing, blanks let go of");
+        CHECK(diff("a\n  b\n", "a\nb\n", blanks) == std::string());
         ALTextDiff::Options lines;
         lines.like.ignoreBlankLines = true;
-        ensure("a blank line: a change as they are", !diff("a\nb\n", "a\n\nb\n").empty());
-        ensure_equals("nothing, blank lines let go of", diff("a\nb\n", "a\n\nb\n", lines), std::string());
-        ensure_equals("but within another's stretch, said", diff("a\nb\n", "a\n\nc\n", lines), std::string("--- a\n+++ b\n@@ -1,2 +1,3 @@\n a\n-b\n+\n+c\n"));
+        UNSCOPED_INFO("a blank line: a change as they are");
+        CHECK_FALSE(diff("a\nb\n", "a\n\nb\n").empty());
+        UNSCOPED_INFO("nothing, blank lines let go of");
+        CHECK(diff("a\nb\n", "a\n\nb\n", lines) == std::string());
+        UNSCOPED_INFO("but within another's stretch, said");
+        CHECK(diff("a\nb\n", "a\n\nc\n", lines) == std::string("--- a\n+++ b\n@@ -1,2 +1,3 @@\n a\n-b\n+\n+c\n"));
     }
 
-    template<> template<>
-    void alunifieddiff_object::test<6>()
+    TEST_CASE_METHOD(alunifieddiff_data, "alunifieddiff: CR LF and a lone CR end lines as in an editor and the last one too", "[alunifieddiff]")
     {
-        set_test_name("lines ended by CR LF or a lone CR read as an editor reads them, a last one ending its line");
-        ensure_equals("CR LF", diff("a\r\nb\r\n", "a\r\nc\r\n"), std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n"));
-        ensure_equals("a lone CR", diff("a\rb\r", "a\rc\r"), std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n"));
+        UNSCOPED_INFO("CR LF");
+        CHECK(diff("a\r\nb\r\n", "a\r\nc\r\n") == std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n"));
+        UNSCOPED_INFO("a lone CR");
+        CHECK(diff("a\rb\r", "a\rc\r") == std::string("--- a\n+++ b\n@@ -1,2 +1,2 @@\n a\n-b\n+c\n"));
     }
 
-    template<> template<>
-    void alunifieddiff_object::test<7>()
+    TEST_CASE_METHOD(alunifieddiff_data, "alunifieddiff: a negative context is taken as none", "[alunifieddiff]")
     {
-        set_test_name("a context below nought as none: a change's own lines alone");
-        ensure_equals("one changed, nothing either side", ALUnifiedDiff::write(numbered(9), numbered(9, { { 5, "five" } }), "a", "b", {}, -2),
+        UNSCOPED_INFO("one changed, nothing either side");
+        CHECK(ALUnifiedDiff::write(numbered(9), numbered(9, { { 5, "five" } }), "a", "b", {}, -2) ==
                       std::string("--- a\n+++ b\n@@ -5 +5 @@\n-5\n+five\n"));
     }
 }

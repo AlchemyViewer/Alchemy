@@ -33,11 +33,11 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct alangledial_data
     {
@@ -57,59 +57,54 @@ namespace tut
         }
     };
 
-    typedef test_group<alangledial_data> alangledial_test;
-    typedef alangledial_test::object     alangledial_object;
-    tut::alangledial_test alangledial_testgroup("alangledial");
-
     // A press turns the dial to the pointer, a drag keeps turning it, and
     // the release commits once.
-    template<> template<>
-    void alangledial_object::test<1>()
+    TEST_CASE_METHOD(alangledial_data, "alangledial: a press and a drag turn the dial and the release commits once", "[alangledial]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALAngleDial* d = dial();
         S32 commits = 0;
         d->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
 
         d->handleMouseDown(60, 35, MASK_NONE);
-        ensure_equals("pressed to the right, it points right", d->getValue().asString(), std::string("1 0"));
-        ensure("and holds the mouse", d->hasMouseCapture());
+        UNSCOPED_INFO("pressed to the right, it points right");
+        CHECK(d->getValue().asString() == std::string("1 0"));
+        CHECK(d->hasMouseCapture());
         d->handleHover(35, 60, MASK_NONE);
-        ensure("dragged up, it points up", d->getValue().asString().ends_with(" 1"));
-        ensure_equals("nothing committed yet", commits, 0);
+        UNSCOPED_INFO("dragged up, it points up");
+        CHECK(d->getValue().asString().ends_with(" 1"));
+        CHECK(commits == 0);
         d->handleMouseUp(35, 60, MASK_NONE);
-        ensure_equals("the release commits once", commits, 1);
-        ensure("and lets the mouse go", !d->hasMouseCapture());
+        CHECK(commits == 1);
+        CHECK_FALSE(d->hasMouseCapture());
         d->die();
     }
 
     // The mouse taken away mid-drag ends the drag: the pointer passing over
     // the dial afterwards, no button held, turns nothing.
-    template<> template<>
-    void alangledial_object::test<2>()
+    TEST_CASE_METHOD(alangledial_data, "alangledial: losing mouse capture mid-drag ends the drag", "[alangledial]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALAngleDial* d = dial();
         d->handleMouseDown(60, 35, MASK_NONE);
         gFocusMgr.setMouseCapture(nullptr);
         d->handleHover(35, 60, MASK_NONE);
-        ensure_equals("a hover after the loss turns nothing", d->getValue().asString(), std::string("1 0"));
+        UNSCOPED_INFO("a hover after the loss turns nothing");
+        CHECK(d->getValue().asString() == std::string("1 0"));
         d->die();
     }
 
-    template<> template<>
-    void alangledial_object::test<3>()
+    TEST_CASE_METHOD(alangledial_data, "alangledial: degrees typed in the box turn the dial and a set value turns the box", "[alangledial]")
     {
-        set_test_name("degrees typed in the box turn the dial, committed once, and a value turns the box");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALAngleDial* d       = dial();
         S32          commits = 0;
@@ -117,10 +112,12 @@ namespace tut
         LLSpinCtrl* degrees = d->getChild<LLSpinCtrl>("degrees");
         degrees->setValue(LLSD(0.0));
         degrees->onCommit();
-        ensure_equals("typed: it points right", d->getValue().asString(), std::string("1 0"));
-        ensure_equals("committed once", commits, 1);
+        UNSCOPED_INFO("typed: it points right");
+        CHECK(d->getValue().asString() == std::string("1 0"));
+        CHECK(commits == 1);
         d->setValue("0 1");
-        ensure_equals("a value pointing up is ninety degrees", degrees->getValue().asInteger(), 90);
+        UNSCOPED_INFO("a value pointing up is ninety degrees");
+        CHECK(degrees->getValue().asInteger() == 90);
         d->die();
     }
 }

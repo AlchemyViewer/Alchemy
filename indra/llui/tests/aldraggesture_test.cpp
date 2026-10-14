@@ -26,91 +26,133 @@
 
 #include "aldraggesture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    struct aldraggesture_data
-    {
-    };
-    typedef test_group<aldraggesture_data> aldraggesture_group;
-    typedef aldraggesture_group::object    aldraggesture_object;
-    aldraggesture_group                    aldraggesture_instance("aldraggesture");
-
     // With no dead zone every press is a drag at once, and a frame where
     // the pointer did not move is no move: a control that commits as it
     // goes commits once for each place the pointer reaches.
-    template<> template<>
-    void aldraggesture_object::test<1>()
+    TEST_CASE("aldraggesture: with no dead zone a press is a drag and each new pixel a move", "[aldraggesture]")
     {
         ALDragGesture drag(0, ALDragGesture::Zone::Distance, ALDragGesture::Commit::AsItGoes);
-        ensure("nothing pressed, nothing moves", !drag.moved(5, 5) && !drag.pressed());
+        {
+            INFO("nothing pressed, nothing moves");
+            CHECK_FALSE(drag.moved(5, 5));
+            CHECK_FALSE(drag.pressed());
+        }
         drag.press(10, 10);
-        ensure("a drag at once", drag.pressed() && drag.dragging());
-        ensure("where it was pressed is no move", !drag.moved(10, 10));
-        ensure("a pixel is", drag.moved(11, 10));
-        ensure("the same pixel again is not", !drag.moved(11, 10));
-        ensure("nor on the next frame", !drag.moved(11, 10));
-        ensure("another is", drag.moved(11, 12));
-        ensure("how far from the press", drag.dx() == 1 && drag.dy() == 2);
-        ensure("as it goes", drag.commitsAsItGoes());
-        ensure("let go, having been pressed", drag.release());
-        ensure("and not again", !drag.release() && !drag.pressed() && !drag.moved(20, 20));
+        {
+            INFO("a drag at once");
+            CHECK(drag.pressed());
+            CHECK(drag.dragging());
+        }
+        UNSCOPED_INFO("where it was pressed is no move");
+        CHECK_FALSE(drag.moved(10, 10));
+        UNSCOPED_INFO("a pixel is");
+        CHECK(drag.moved(11, 10));
+        UNSCOPED_INFO("the same pixel again is not");
+        CHECK_FALSE(drag.moved(11, 10));
+        UNSCOPED_INFO("nor on the next frame");
+        CHECK_FALSE(drag.moved(11, 10));
+        UNSCOPED_INFO("another is");
+        CHECK(drag.moved(11, 12));
+        {
+            INFO("how far from the press");
+            CHECK(drag.dx() == 1);
+            CHECK(drag.dy() == 2);
+        }
+        CHECK(drag.commitsAsItGoes());
+        UNSCOPED_INFO("let go, having been pressed");
+        CHECK(drag.release());
+        {
+            INFO("and not again");
+            CHECK_FALSE(drag.release());
+            CHECK_FALSE(drag.pressed());
+            CHECK_FALSE(drag.moved(20, 20));
+        }
     }
 
     // A dead zone measured by distance: a press that wanders inside it is
     // a click, and once out it is a drag until it is let go, however near
     // the press it comes back.
-    template<> template<>
-    void aldraggesture_object::test<2>()
+    TEST_CASE("aldraggesture: a distance dead zone keeps a click inside and a drag once left", "[aldraggesture]")
     {
         ALDragGesture drag(3);
         drag.press(0, 0);
-        ensure("inside", !drag.moved(2, 2) && !drag.dragging());
-        ensure("on the edge is inside", !drag.moved(3, 0));
-        ensure("past it", drag.moved(3, 1) && drag.dragging());
-        ensure("back near the press, still a drag", drag.moved(1, 0) && drag.dragging());
-        ensure("on release", !drag.commitsAsItGoes());
+        {
+            INFO("inside");
+            CHECK_FALSE(drag.moved(2, 2));
+            CHECK_FALSE(drag.dragging());
+        }
+        UNSCOPED_INFO("on the edge is inside");
+        CHECK_FALSE(drag.moved(3, 0));
+        {
+            INFO("past it");
+            CHECK(drag.moved(3, 1));
+            CHECK(drag.dragging());
+        }
+        {
+            INFO("back near the press, still a drag");
+            CHECK(drag.moved(1, 0));
+            CHECK(drag.dragging());
+        }
+        UNSCOPED_INFO("on release");
+        CHECK_FALSE(drag.commitsAsItGoes());
         drag.release();
         drag.press(0, 0);
-        ensure("a new press starts inside again", !drag.moved(1, 1) && !drag.dragging());
-        ensure("a click let go is still answered", drag.release());
+        {
+            INFO("a new press starts inside again");
+            CHECK_FALSE(drag.moved(1, 1));
+            CHECK_FALSE(drag.dragging());
+        }
+        UNSCOPED_INFO("a click let go is still answered");
+        CHECK(drag.release());
     }
 
     // Across alone, for what moves along a row: up and down is no drag.
-    template<> template<>
-    void aldraggesture_object::test<3>()
+    TEST_CASE("aldraggesture: an across zone ignores movement up and down", "[aldraggesture]")
     {
         ALDragGesture drag(4, ALDragGesture::Zone::Across);
         drag.press(100, 10);
-        ensure("far down is not across", !drag.moved(100, 40));
-        ensure("four across is inside", !drag.moved(104, 10));
-        ensure("five is past", drag.moved(95, 10));
+        UNSCOPED_INFO("far down is not across");
+        CHECK_FALSE(drag.moved(100, 40));
+        UNSCOPED_INFO("four across is inside");
+        CHECK_FALSE(drag.moved(104, 10));
+        UNSCOPED_INFO("five is past");
+        CHECK(drag.moved(95, 10));
     }
 
-    // The farther of the two axes: either past it is a drag.
-    template<> template<>
-    void aldraggesture_object::test<4>()
+    TEST_CASE("aldraggesture: an either-axis zone is left past it on either axis", "[aldraggesture]")
     {
         ALDragGesture drag(2, ALDragGesture::Zone::EitherAxis);
         drag.press(0, 0);
-        ensure("two and two is inside", !drag.moved(2, 2));
-        ensure("three down is past", drag.moved(2, 3));
+        UNSCOPED_INFO("two and two is inside");
+        CHECK_FALSE(drag.moved(2, 2));
+        UNSCOPED_INFO("three down is past");
+        CHECK(drag.moved(2, 3));
         drag.release();
         drag.press(0, 0);
-        ensure("three across too", drag.moved(-3, 0));
+        UNSCOPED_INFO("three across too");
+        CHECK(drag.moved(-3, 0));
     }
 
     // The capture taken away ends what was under way, as a release does,
     // and says whether anything was.
-    template<> template<>
-    void aldraggesture_object::test<5>()
+    TEST_CASE("aldraggesture: cancel ends a press as release does and says whether one was", "[aldraggesture]")
     {
         ALDragGesture drag(3);
-        ensure("nothing under way", !drag.cancel());
+        UNSCOPED_INFO("nothing under way");
+        CHECK_FALSE(drag.cancel());
         drag.press(0, 0);
         drag.moved(10, 0);
-        ensure("a drag under way, cancelled", drag.cancel());
-        ensure("and over", !drag.pressed() && !drag.dragging() && !drag.moved(20, 0));
+        UNSCOPED_INFO("a drag under way, cancelled");
+        CHECK(drag.cancel());
+        {
+            INFO("and over");
+            CHECK_FALSE(drag.pressed());
+            CHECK_FALSE(drag.dragging());
+            CHECK_FALSE(drag.moved(20, 0));
+        }
     }
 }

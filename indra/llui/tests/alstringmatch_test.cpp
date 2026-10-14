@@ -26,48 +26,41 @@
 
 #include "alstringmatch.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    struct alstringmatch_data
+    TEST_CASE("alstringmatch: in and begins and is ignore case and agree on empty strings", "[alstringmatch]")
     {
-    };
-    typedef test_group<alstringmatch_data> alstringmatch_group;
-    typedef alstringmatch_group::object    alstringmatch_object;
-    alstringmatch_group                    alstringmatch_test_group("alstringmatch");
+        CHECK(ALStringMatch::containsNoCase("floater_about.xml", "ABOUT"));
+        CHECK_FALSE(ALStringMatch::containsNoCase("floater_about.xml", "abut"));
+        CHECK(ALStringMatch::containsNoCase("x", ""));
 
-    template<> template<>
-    void alstringmatch_object::test<1>()
-    {
-        set_test_name("in, begins, is: whatever case either is written in; nothing is in everything and begins it, and is only nothing");
-        ensure("in", ALStringMatch::containsNoCase("floater_about.xml", "ABOUT"));
-        ensure("not in", !ALStringMatch::containsNoCase("floater_about.xml", "abut"));
-        ensure("nothing is in anything", ALStringMatch::containsNoCase("x", ""));
+        CHECK(ALStringMatch::startsWithNoCase("llSay", "LLs"));
+        CHECK(ALStringMatch::startsWithNoCase("llSay", "LLSAY"));
+        CHECK_FALSE(ALStringMatch::startsWithNoCase("llSay", "say"));
+        CHECK_FALSE(ALStringMatch::startsWithNoCase("ll", "llSay"));
+        CHECK(ALStringMatch::startsWithNoCase("llSay", ""));
 
-        ensure("begins", ALStringMatch::startsWithNoCase("llSay", "LLs"));
-        ensure("the whole of it", ALStringMatch::startsWithNoCase("llSay", "LLSAY"));
-        ensure("not further in", !ALStringMatch::startsWithNoCase("llSay", "say"));
-        ensure("nor longer than it", !ALStringMatch::startsWithNoCase("ll", "llSay"));
-        ensure("nothing begins anything", ALStringMatch::startsWithNoCase("llSay", ""));
-
-        ensure("is", ALStringMatch::equalsNoCase("FOLLOWS_LEFT", "follows_left"));
-        ensure("not a shorter", !ALStringMatch::equalsNoCase("follows_left", "follows_lef"));
-        ensure("nor a longer", !ALStringMatch::equalsNoCase("follows_lef", "follows_left"));
-        ensure("nor another of the same length", !ALStringMatch::equalsNoCase("follows_left", "follows_rght"));
-        ensure("nothing is nothing", ALStringMatch::equalsNoCase("", ""));
+        CHECK(ALStringMatch::equalsNoCase("FOLLOWS_LEFT", "follows_left"));
+        CHECK_FALSE(ALStringMatch::equalsNoCase("follows_left", "follows_lef"));
+        CHECK_FALSE(ALStringMatch::equalsNoCase("follows_lef", "follows_left"));
+        CHECK_FALSE(ALStringMatch::equalsNoCase("follows_left", "follows_rght"));
+        CHECK(ALStringMatch::equalsNoCase("", ""));
     }
 
-    template<> template<>
-    void alstringmatch_object::test<2>()
+    TEST_CASE("alstringmatch: non-ASCII letters fold by codepoint and never match part of one", "[alstringmatch]")
     {
-        set_test_name("past ASCII as the find bar has it: a letter in either case by its codepoint, and no part of one taken for another");
-        ensure("in", ALStringMatch::containsNoCase("Script \xC3\x89lan", "\xC3\xA9lan"));
-        ensure("not another letter", !ALStringMatch::containsNoCase("\xC3\x88lan", "\xC3\xA9lan"));
-        ensure("nor the half of one", !ALStringMatch::containsNoCase("\xC3\xA9", "\xA9"));
-        ensure("begins", ALStringMatch::startsWithNoCase("\xC3\x89lan vital", "\xC3\xA9LAN"));
-        ensure("is", ALStringMatch::equalsNoCase("\xC3\x89LAN", "\xC3\xA9lan"));
-        ensure("the Kelvin sign is a k, though longer", ALStringMatch::equalsNoCase("\xE2\x84\xAA", "k"));
-        ensure("and begins kelvin", ALStringMatch::startsWithNoCase("kelvin", "\xE2\x84\xAA"));
+        CHECK(ALStringMatch::containsNoCase("Script \xC3\x89lan", "\xC3\xA9lan"));
+        UNSCOPED_INFO("an E with a grave is not an E with an acute");
+        CHECK_FALSE(ALStringMatch::containsNoCase("\xC3\x88lan", "\xC3\xA9lan"));
+        UNSCOPED_INFO("the last byte of an e with an acute is no letter of its own");
+        CHECK_FALSE(ALStringMatch::containsNoCase("\xC3\xA9", "\xA9"));
+        CHECK(ALStringMatch::startsWithNoCase("\xC3\x89lan vital", "\xC3\xA9LAN"));
+        CHECK(ALStringMatch::equalsNoCase("\xC3\x89LAN", "\xC3\xA9lan"));
+        UNSCOPED_INFO("the Kelvin sign is a k, though longer");
+        CHECK(ALStringMatch::equalsNoCase("\xE2\x84\xAA", "k"));
+        UNSCOPED_INFO("the Kelvin sign begins kelvin");
+        CHECK(ALStringMatch::startsWithNoCase("kelvin", "\xE2\x84\xAA"));
     }
 }

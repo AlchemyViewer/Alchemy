@@ -32,9 +32,9 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alcolorpicker_data
     {
@@ -89,43 +89,37 @@ namespace tut
         }
     };
 
-    typedef test_group<alcolorpicker_data> alcolorpicker_test;
-    typedef alcolorpicker_test::object     alcolorpicker_object;
-    tut::alcolorpicker_test alcolorpicker_testgroup("alcolorpicker");
-
     // The value is the text a file writes, and a colour given as one comes
     // back as one.
-    template<> template<>
-    void alcolorpicker_object::test<1>()
+    TEST_CASE_METHOD(alcolorpicker_data, "alcolorpicker: the value reads and writes a colour as four numbers in text", "[alcolorpicker]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALColorPicker* picker = make();
         picker->setValue("0.5, 0.25, 0, 1");
         const LLColor4& c = picker->color();
-        ensure("red read", closeTo(c.mV[VRED], 0.5f));
-        ensure("green read", closeTo(c.mV[VGREEN], 0.25f));
-        ensure("blue read", closeTo(c.mV[VBLUE], 0.f));
-        ensure("alpha read", closeTo(c.mV[VALPHA], 1.f));
-        ensure_equals("written as four numbers", picker->getValue().asString(),
+        CHECK(closeTo(c.mV[VRED], 0.5f));
+        CHECK(closeTo(c.mV[VGREEN], 0.25f));
+        CHECK(closeTo(c.mV[VBLUE], 0.f));
+        CHECK(closeTo(c.mV[VALPHA], 1.f));
+        CHECK(picker->getValue().asString() ==
                       std::string("0.500, 0.250, 0.000, 1.000"));
 
         picker->setColor(LLColor4(0.f, 1.f, 0.f, 0.5f));
-        ensure_equals("and a colour set as one is written the same way",
-                      picker->getValue().asString(), std::string("0.000, 1.000, 0.000, 0.500"));
+        UNSCOPED_INFO("a colour set as one is written the same way");
+        CHECK(picker->getValue().asString() == std::string("0.000, 1.000, 0.000, 0.500"));
         picker->die();
     }
 
     // Hue, saturation and value are the state: a grey keeps the hue it had,
     // so value dragged to nothing and back comes back to the same hue.
-    template<> template<>
-    void alcolorpicker_object::test<2>()
+    TEST_CASE_METHOD(alcolorpicker_data, "alcolorpicker: value dragged to black and back keeps the hue", "[alcolorpicker]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALColorPicker* picker = make();
         picker->setColor(LLColor4(0.f, 0.f, 1.f, 1.f));    // blue: hue two thirds round
@@ -134,27 +128,33 @@ namespace tut
         const S32 value_y = sliderMiddle(2, true);
         picker->handleMouseDown(slidersLeft(), value_y, MASK_NONE);
         picker->handleMouseUp(slidersLeft(), value_y, MASK_NONE);
-        ensure("black", closeTo(picker->color().mV[VRED], 0.f) && closeTo(picker->color().mV[VGREEN], 0.f)
-                        && closeTo(picker->color().mV[VBLUE], 0.f));
+        {
+            INFO("black");
+            CHECK(closeTo(picker->color().mV[VRED], 0.f));
+            CHECK(closeTo(picker->color().mV[VGREEN], 0.f));
+            CHECK(closeTo(picker->color().mV[VBLUE], 0.f));
+        }
 
         // And at its right end: the blue is back, not a red or a grey.
         const S32 right = WIDTH - 1;
         picker->handleMouseDown(right, value_y, MASK_NONE);
         picker->handleMouseUp(right, value_y, MASK_NONE);
-        ensure("blue again: " + picker->getValue().asString(),
-               closeTo(picker->color().mV[VBLUE], 1.f) && closeTo(picker->color().mV[VRED], 0.f)
-               && closeTo(picker->color().mV[VGREEN], 0.f));
+        {
+            INFO("blue again: " << picker->getValue().asString());
+            CHECK(closeTo(picker->color().mV[VBLUE], 1.f));
+            CHECK(closeTo(picker->color().mV[VRED], 0.f));
+            CHECK(closeTo(picker->color().mV[VGREEN], 0.f));
+        }
         picker->die();
     }
 
     // A slider pressed commits, and commits what it moved; the alpha slider
     // is there only where alpha is shown.
-    template<> template<>
-    void alcolorpicker_object::test<3>()
+    TEST_CASE_METHOD(alcolorpicker_data, "alcolorpicker: a pressed slider commits its channel and alpha's is there only if shown", "[alcolorpicker]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         {
             ALColorPicker* picker = make(true);
@@ -164,15 +164,22 @@ namespace tut
 
             const S32 red_y = sliderMiddle(3, true);
             picker->handleMouseDown(slidersLeft(), red_y, MASK_NONE);
-            ensure("pressing a slider commits", commits >= 1);
-            ensure("and moved the channel it is", closeTo(picker->color().mV[VRED], 0.f));
-            ensure("and no other", closeTo(picker->color().mV[VGREEN], 1.f) && closeTo(picker->color().mV[VBLUE], 1.f));
+            UNSCOPED_INFO("pressing a slider commits");
+            CHECK(commits >= 1);
+            UNSCOPED_INFO("and moved the channel it is");
+            CHECK(closeTo(picker->color().mV[VRED], 0.f));
+            {
+                INFO("and no other");
+                CHECK(closeTo(picker->color().mV[VGREEN], 1.f));
+                CHECK(closeTo(picker->color().mV[VBLUE], 1.f));
+            }
             picker->handleMouseUp(slidersLeft(), red_y, MASK_NONE);
 
             const S32 alpha_y = sliderMiddle(6, true);
             picker->handleMouseDown(slidersLeft(), alpha_y, MASK_NONE);
             picker->handleMouseUp(slidersLeft(), alpha_y, MASK_NONE);
-            ensure("the seventh slider is alpha", closeTo(picker->color().mV[VALPHA], 0.f));
+            UNSCOPED_INFO("the seventh slider is alpha");
+            CHECK(closeTo(picker->color().mV[VALPHA], 0.f));
             picker->die();
         }
         {
@@ -182,20 +189,21 @@ namespace tut
             picker->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
             const S32 alpha_y = sliderMiddle(6, false);
             const bool taken = picker->handleMouseDown(slidersLeft(), alpha_y, MASK_NONE);
-            ensure("without alpha there is no seventh slider", !taken || commits == 0);
-            ensure("and alpha stays", closeTo(picker->color().mV[VALPHA], 1.f));
+            UNSCOPED_INFO("without alpha there is no seventh slider");
+            CHECK((!taken || commits == 0));
+            UNSCOPED_INFO("and alpha stays");
+            CHECK(closeTo(picker->color().mV[VALPHA], 1.f));
             picker->die();
         }
     }
 
     // The strip of what goes with the colour: the first cell is the colour,
     // the rest are pressed to be chosen, and choosing keeps the alpha.
-    template<> template<>
-    void alcolorpicker_object::test<4>()
+    TEST_CASE_METHOD(alcolorpicker_data, "alcolorpicker: a harmony cell chooses a colour keeping alpha and the swatch does not", "[alcolorpicker]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALColorPicker* picker = make();
         picker->setColor(LLColor4(1.f, 0.f, 0.f, 0.5f));
@@ -209,26 +217,29 @@ namespace tut
         const S32 left = ringSide() + GAP + cell * 2 + 4;
         const S32 top_row = HEIGHT - cell / 2;
         picker->handleMouseDown(left + 2, top_row, MASK_NONE);
-        ensure("a cell pressed commits", commits == 1);
-        ensure("and is a different colour", !closeTo(picker->color().mV[VGREEN], 0.f) || !closeTo(picker->color().mV[VBLUE], 0.f)
-                                              || !closeTo(picker->color().mV[VRED], 1.f));
-        ensure("keeping the alpha", closeTo(picker->color().mV[VALPHA], 0.5f));
+        UNSCOPED_INFO("a cell pressed commits");
+        CHECK(commits == 1);
+        UNSCOPED_INFO("and is a different colour");
+        CHECK((!closeTo(picker->color().mV[VGREEN], 0.f) || !closeTo(picker->color().mV[VBLUE], 0.f)
+                                              || !closeTo(picker->color().mV[VRED], 1.f)));
+        UNSCOPED_INFO("keeping the alpha");
+        CHECK(closeTo(picker->color().mV[VALPHA], 0.5f));
 
         // The swatch of the current colour is not a choice.
         picker->handleMouseDown(ringSide() + GAP + 2, top_row, MASK_NONE);
-        ensure_equals("pressing the colour itself chooses nothing", commits, 1);
+        UNSCOPED_INFO("pressing the colour itself chooses nothing");
+        CHECK(commits == 1);
         picker->die();
     }
 
     // The viewer hands a held drag a hover every frame, moved or not. A
     // pointer held still commits nothing more; one that moves commits once
     // for the move.
-    template<> template<>
-    void alcolorpicker_object::test<5>()
+    TEST_CASE_METHOD(alcolorpicker_data, "alcolorpicker: a held drag commits once per move and not once per hover", "[alcolorpicker]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALColorPicker* picker = make();
         picker->setColor(LLColor4::white);
@@ -237,31 +248,35 @@ namespace tut
 
         const S32 red_y = sliderMiddle(3, true);
         picker->handleMouseDown(slidersLeft(), red_y, MASK_NONE);
-        ensure_equals("the press commits once", commits, 1);
+        UNSCOPED_INFO("the press commits once");
+        CHECK(commits == 1);
         for (S32 frame = 0; frame < 3; ++frame)
         {
             picker->handleHover(slidersLeft(), red_y, MASK_NONE);
         }
-        ensure_equals("held still, it commits nothing more", commits, 1);
+        UNSCOPED_INFO("held still, it commits nothing more");
+        CHECK(commits == 1);
 
         const S32 middle = (slidersLeft() + WIDTH) / 2;
         picker->handleHover(middle, red_y, MASK_NONE);
-        ensure_equals("moved, it commits once for the move", commits, 2);
-        ensure("and moved the channel to where the pointer went", closeTo(picker->color().mV[VRED], 0.5f));
+        UNSCOPED_INFO("moved, it commits once for the move");
+        CHECK(commits == 2);
+        UNSCOPED_INFO("and moved the channel to where the pointer went");
+        CHECK(closeTo(picker->color().mV[VRED], 0.5f));
         picker->handleHover(middle, red_y, MASK_NONE);
-        ensure_equals("and held still there, nothing more", commits, 2);
+        UNSCOPED_INFO("and held still there, nothing more");
+        CHECK(commits == 2);
         picker->handleMouseUp(middle, red_y, MASK_NONE);
         picker->die();
     }
 
     // The mouse taken away mid-drag ends the drag rather than pausing it:
     // given the mouse back, a hover moves nothing until it is pressed again.
-    template<> template<>
-    void alcolorpicker_object::test<6>()
+    TEST_CASE_METHOD(alcolorpicker_data, "alcolorpicker: losing mouse capture mid-drag ends the drag", "[alcolorpicker]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALColorPicker* picker = make();
         picker->setColor(LLColor4::white);
@@ -272,12 +287,15 @@ namespace tut
         picker->handleMouseDown(slidersLeft(), red_y, MASK_NONE);
         gFocusMgr.setMouseCapture(nullptr);
         picker->handleHover(WIDTH - 1, red_y, MASK_NONE);
-        ensure_equals("a hover after the loss moves nothing", commits, 1);
+        UNSCOPED_INFO("a hover after the loss moves nothing");
+        CHECK(commits == 1);
 
         gFocusMgr.setMouseCapture(picker);
         picker->handleHover(WIDTH - 1, red_y, MASK_NONE);
-        ensure_equals("nor one with the mouse given back", commits, 1);
-        ensure("red stays where the press left it", closeTo(picker->color().mV[VRED], 0.f));
+        UNSCOPED_INFO("nor one with the mouse given back");
+        CHECK(commits == 1);
+        UNSCOPED_INFO("red stays where the press left it");
+        CHECK(closeTo(picker->color().mV[VRED], 0.f));
         gFocusMgr.setMouseCapture(nullptr);
         picker->die();
     }

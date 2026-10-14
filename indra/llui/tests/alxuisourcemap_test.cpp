@@ -33,11 +33,11 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstring>
 
-namespace tut
+namespace
 {
     struct alxuisourcemap_data
     {
@@ -132,16 +132,11 @@ namespace tut
         }
     };
 
-    typedef test_group<alxuisourcemap_data> alxuisourcemap_test;
-    typedef alxuisourcemap_test::object     alxuisourcemap_object;
-    tut::alxuisourcemap_test alxuisourcemap_testgroup("alxuisourcemap");
-
-    template<> template<>
-    void alxuisourcemap_object::test<1>()
+    TEST_CASE_METHOD(alxuisourcemap_data, "alxuisourcemap: the map ties each view the file built to its line and no others", "[alxuisourcemap]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
@@ -149,7 +144,7 @@ namespace tut
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
-        ensure("built", floater != nullptr);
+        REQUIRE(floater != nullptr);
 
         ALXUISourceMap map;
         map.build(floater, root);
@@ -157,8 +152,10 @@ namespace tut
         // The file names eight widgets: the floater, outer, two inners, the
         // leaf, other, and a pair on one line. The floater made more views
         // than that.
-        ensure_equals("eight views come from the file", map.size(), 8u);
-        ensure("the floater built views of its own", countViews(floater) > 8);
+        UNSCOPED_INFO("eight views come from the file");
+        REQUIRE(map.size() == 8u);
+        UNSCOPED_INFO("the floater built views of its own");
+        CHECK(countViews(floater) > 8);
 
         LLView* outer = childNamed(floater, "outer");
         LLView* inner1 = childNamed(outer, "inner", 0);
@@ -166,34 +163,52 @@ namespace tut
         LLView* leaf = childNamed(inner2, "leaf");
         LLView* other = childNamed(floater, "other");
         LLView* same = childNamed(childNamed(floater, "line"), "same");
-        ensure("the tree is as the file says", outer && inner1 && inner2 && leaf && other && same);
+        {
+            INFO("the tree is as the file says");
+            REQUIRE(outer);
+            REQUIRE(inner1);
+            REQUIRE(inner2);
+            REQUIRE(leaf);
+            REQUIRE(other);
+            REQUIRE(same);
+        }
 
-        ensure_equals("the floater's line", map.find(floater)->line, 1);
-        ensure_equals("the floater's tag", map.find(floater)->tag, std::string("floater"));
-        ensure_equals("outer", map.find(outer)->line, 3);
-        ensure_equals("the first inner", map.find(inner1)->line, 4);
-        ensure_equals("the second inner, not the first again", map.find(inner2)->line, 5);
-        ensure_equals("the leaf under the second inner", map.find(leaf)->line, 7);
-        ensure_equals("other, after a parameter element and a subtree", map.find(other)->line, 10);
+        CHECK(map.find(floater)->line == 1);
+        CHECK(map.find(floater)->tag == std::string("floater"));
+        CHECK(map.find(outer)->line == 3);
+        CHECK(map.find(inner1)->line == 4);
+        UNSCOPED_INFO("the second inner, not the first again");
+        CHECK(map.find(inner2)->line == 5);
+        UNSCOPED_INFO("the leaf under the second inner");
+        CHECK(map.find(leaf)->line == 7);
+        UNSCOPED_INFO("other, after a parameter element and a subtree");
+        CHECK(map.find(other)->line == 10);
 
-        ensure("the floater has a drag handle", dragHandle(floater) != nullptr);
-        ensure("which came from no element", !map.isFromXML(dragHandle(floater)));
+        REQUIRE(dragHandle(floater) != nullptr);
+        UNSCOPED_INFO("which came from no element");
+        CHECK_FALSE(map.isFromXML(dragHandle(floater)));
         for (const LLView* child : *floater->getChildList())
         {
             if (child != outer && child != other && child != childNamed(floater, "line"))
             {
-                ensure(std::string("no element for ") + child->getName(), !map.isFromXML(child));
+                UNSCOPED_INFO("no element for " << child->getName());
+                REQUIRE_FALSE(map.isFromXML(child));
             }
         }
 
-        ensure_equals("a line maps to the view starting on it", map.viewAtLine(5), inner2);
-        ensure_equals("a line inside an element maps to the element before it", map.viewAtLine(6), inner2);
-        ensure_equals("a line before the first element maps to nothing", map.viewAtLine(0), (const LLView*)nullptr);
-        ensure_equals("two elements opening on one line: the inner one is the nearer", map.viewAtLine(11), same);
+        UNSCOPED_INFO("a line maps to the view starting on it");
+        CHECK(map.viewAtLine(5) == inner2);
+        UNSCOPED_INFO("a line inside an element maps to the element before it");
+        CHECK(map.viewAtLine(6) == inner2);
+        UNSCOPED_INFO("a line before the first element maps to nothing");
+        CHECK(map.viewAtLine(0) == (const LLView*)nullptr);
+        UNSCOPED_INFO("two elements opening on one line: the inner one is the nearer");
+        CHECK(map.viewAtLine(11) == same);
 
         map.clear();
-        ensure_equals("cleared", map.size(), 0u);
-        ensure("nothing maps after a clear", map.find(outer) == nullptr);
+        CHECK(map.size() == 0u);
+        UNSCOPED_INFO("nothing maps after a clear");
+        CHECK(map.find(outer) == nullptr);
 
         delete floater;
         fv.reset();

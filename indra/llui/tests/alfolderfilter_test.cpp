@@ -26,7 +26,7 @@
 
 #include "alfolderfilter.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace
 {
@@ -39,53 +39,65 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
-    struct alfolderfilter_data
+    TEST_CASE("alfolderfilter: setWords lowercases any script and only new words start a generation", "[alfolderfilter]")
     {
-    };
-    typedef test_group<alfolderfilter_data> alfolderfilter_group;
-    typedef alfolderfilter_group::object    alfolderfilter_object;
-    alfolderfilter_group                    alfolderfilter_test_group("alfolderfilter");
-
-    template<> template<>
-    void alfolderfilter_object::test<1>()
-    {
-        set_test_name("the words lowercased, whatever script they are in; a change a new generation, the same words none");
         TestFilter filter;
-        ensure("nothing asked: not active, the default", !filter.isActive() && filter.isDefault() && !filter.isNotDefault());
+        {
+            INFO("nothing asked: not active, the default");
+            CHECK_FALSE(filter.isActive());
+            CHECK(filter.isDefault());
+            CHECK_FALSE(filter.isNotDefault());
+        }
         const S32 first = filter.getCurrentGeneration();
         filter.setWords("Panel ÄRGER");
-        ensure_equals("lowercased", filter.words(), std::string("panel ärger"));
-        ensure("a new generation, every one of them", filter.getCurrentGeneration() == first + 1
-                                                          && filter.getFirstRequiredGeneration() == first + 1
-                                                          && filter.getFirstSuccessGeneration() == first + 1);
-        ensure("modified", filter.isModified());
-        ensure("active", filter.isActive() && filter.isNotDefault());
+        UNSCOPED_INFO("lowercased");
+        CHECK(filter.words() == std::string("panel ärger"));
+        {
+            INFO("a new generation, every one of them");
+            CHECK(filter.getCurrentGeneration() == first + 1);
+            CHECK(filter.getFirstRequiredGeneration() == first + 1);
+            CHECK(filter.getFirstSuccessGeneration() == first + 1);
+        }
+        CHECK(filter.isModified());
+        CHECK(filter.isActive());
+        CHECK(filter.isNotDefault());
         filter.clearModified();
         filter.setWords("PANEL ärger");
-        ensure("the same words: nothing new", filter.getCurrentGeneration() == first + 1 && !filter.isModified());
-        ensure_equals("said as it is", filter.getFilterText(), std::string("panel ärger"));
-        ensure_equals("named", filter.getName(), std::string("test"));
+        {
+            INFO("the same words: nothing new");
+            CHECK(filter.getCurrentGeneration() == first + 1);
+            CHECK_FALSE(filter.isModified());
+        }
+        CHECK(filter.getFilterText() == std::string("panel ärger"));
+        CHECK(filter.getName() == std::string("test"));
     }
 
-    template<> template<>
-    void alfolderfilter_object::test<2>()
+    TEST_CASE("alfolderfilter: spanIn gives the label's own bytes past a letter lowercasing shrinks", "[alfolderfilter]")
     {
-        set_test_name("where the words are in a label: its bytes as they are, found again past a letter lowercasing changes the length of");
         LLFolderViewFilter::Match plain = ALFolderFilter::spanIn("close_btn", 6, "btn");
-        ensure("in plain letters, where found", plain.mOffset == 6 && plain.mLength == 3);
+        {
+            INFO("in plain letters, where found");
+            CHECK(plain.mOffset == 6);
+            CHECK(plain.mLength == 3);
+        }
         // The Kelvin sign is three bytes and lowercases to a k of one: the
         // words after it are two bytes further on in the label than in its
         // lowercased copy.
         const std::string label = "\xe2\x84\xaa panel";
         const std::string lower = utf8str_tolower(label);
-        ensure("lowercasing moves the bytes", lower.find("panel") != label.find("panel"));
+        UNSCOPED_INFO("lowercasing moves the bytes");
+        CHECK(lower.find("panel") != label.find("panel"));
         const LLFolderViewFilter::Match past = ALFolderFilter::spanIn(label, lower.find("panel"), "panel");
-        ensure_equals("past it, in the label's bytes", label.substr(past.mOffset, past.mLength), std::string("panel"));
+        UNSCOPED_INFO("past it, in the label's bytes");
+        CHECK(label.substr(past.mOffset, past.mLength) == std::string("panel"));
         const LLFolderViewFilter::Match on = ALFolderFilter::spanIn(label, lower.find("k p"), "k p");
-        ensure_equals("over it, the letter as it stands", label.substr(on.mOffset, on.mLength), std::string("\xe2\x84\xaa p"));
-        ensure("not found: nothing lit", ALFolderFilter::spanIn(label, std::string::npos, "x").mLength == 0);
-        ensure("no words: nothing lit", ALFolderFilter::spanIn(label, 0, "").mLength == 0);
+        UNSCOPED_INFO("over it, the letter as it stands");
+        CHECK(label.substr(on.mOffset, on.mLength) == std::string("\xe2\x84\xaa p"));
+        UNSCOPED_INFO("not found: nothing lit");
+        CHECK(ALFolderFilter::spanIn(label, std::string::npos, "x").mLength == 0);
+        UNSCOPED_INFO("no words: nothing lit");
+        CHECK(ALFolderFilter::spanIn(label, 0, "").mLength == 0);
     }
 }

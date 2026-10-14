@@ -42,12 +42,12 @@
 
 #include "llxmlnode.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alxuifill_data
     {
@@ -142,7 +142,7 @@ namespace tut
         // twenty-six is not a defect -- and a stack beside other children is
         // exempt too, because a window puts one between its menu bar and its
         // status line deliberately.
-        static void ensureFills(const std::string& file, LLView* view, std::vector<std::string>& gaps)
+        static void collectGaps(const std::string& file, LLView* view, std::vector<std::string>& gaps)
         {
             for (LLView* child : *view->getChildList())
             {
@@ -171,49 +171,47 @@ namespace tut
                                        + view->getName() + ", which is " + where(want) + bands);
                     }
                 }
-                ensureFills(file, child, gaps);
+                collectGaps(file, child, gaps);
             }
         }
     };
-
-    typedef test_group<alxuifill_data> alxuifill_test;
-    typedef alxuifill_test::object     alxuifill_object;
-    tut::alxuifill_test alxuifill_testgroup("alxuifill");
 
     // The tool's own window. It is the file this rule was learnt on: a
     // stack authored at the width the window used to be, in a window that
     // had grown, left four hundred pixels of nothing down one side -- and
     // no size the developer dragged it to would ever take that back.
-    template<> template<>
-    void alxuifill_object::test<1>()
+    TEST_CASE_METHOD(alxuifill_data, "alxuifill: the XUI Studio window fills its stacks and its band of tables drags", "[alxuifill]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLPanel* stage = nullptr;
         LLFloater* floater = build("floater_xui_studio.xml", stage);
-        ensure("the studio's own window builds", floater != nullptr);
+        UNSCOPED_INFO("the studio's own window builds");
+        REQUIRE(floater != nullptr);
 
         std::vector<std::string> gaps;
-        ensureFills("floater_xui_studio.xml", floater, gaps);
+        collectGaps("floater_xui_studio.xml", floater, gaps);
 
         std::string report;
         for (const std::string& gap : gaps)
         {
             report += "\n  " + gap;
         }
-        ensure("every stack fills what it is in:" + report, gaps.empty());
+        UNSCOPED_INFO("every stack fills what it is in:" + report);
+        CHECK(gaps.empty());
 
         // The band of tables is dragged against the canvas, and the bar that
         // does it belongs to the panel above it. Put anything between them
         // that can give no room -- a toolbar, a status line -- and the bar
         // goes without a word: the drag area is simply not there any more.
         LLLayoutStack* centre = floater->findChild<LLLayoutStack>("centre_stack", true);
-        ensure("the centre is a stack", centre != nullptr);
-        ensure("the band of tables is in it",
-               centre->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
+        UNSCOPED_INFO("the centre is a stack");
+        REQUIRE(centre != nullptr);
+        UNSCOPED_INFO("the band of tables is in it");
+        CHECK(centre->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
 
         S32 draggable = 0;
         for (LLView* child : *centre->getChildList())
@@ -223,67 +221,73 @@ namespace tut
                 draggable += (band->getResizeBar() && band->getResizeBar()->getVisible()) ? 1 : 0;
             }
         }
-        ensure("and there is somewhere to drag it", draggable > 0);
+        UNSCOPED_INFO("and there is somewhere to drag it");
+        CHECK(draggable > 0);
 
         stage->die();
     }
 
     // The library, which is the tool's other window: two panes and a foot,
     // and the same rule about what a container owes what it is in.
-    template<> template<>
-    void alxuifill_object::test<2>()
+    TEST_CASE_METHOD(alxuifill_data, "alxuifill: the XUI library window's stacks fill what they are in", "[alxuifill]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLPanel* stage = nullptr;
         LLFloater* floater = build("floater_xui_library.xml", stage);
-        ensure("the library window builds", floater != nullptr);
+        UNSCOPED_INFO("the library window builds");
+        REQUIRE(floater != nullptr);
 
         std::vector<std::string> gaps;
-        ensureFills("floater_xui_library.xml", floater, gaps);
+        collectGaps("floater_xui_library.xml", floater, gaps);
 
         std::string report;
         for (const std::string& gap : gaps)
         {
             report += "\n  " + gap;
         }
-        ensure("every stack fills what it is in:" + report, gaps.empty());
+        UNSCOPED_INFO("every stack fills what it is in:" + report);
+        CHECK(gaps.empty());
         stage->die();
     }
 
     // Script Studio: a strip of tabs, the editor, and a band of problems
     // under it, all in one stack that is the whole window between its menu
     // bar and its status line.
-    template<> template<>
-    void alxuifill_object::test<3>()
+    TEST_CASE_METHOD(alxuifill_data, "alxuifill: the Script Studio window fills its stacks and its band of problems drags", "[alxuifill]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLPanel* stage = nullptr;
         LLFloater* floater = build("floater_script_studio.xml", stage);
-        ensure("the script studio window builds", floater != nullptr);
+        UNSCOPED_INFO("the script studio window builds");
+        REQUIRE(floater != nullptr);
 
         std::vector<std::string> gaps;
-        ensureFills("floater_script_studio.xml", floater, gaps);
+        collectGaps("floater_script_studio.xml", floater, gaps);
 
         std::string report;
         for (const std::string& gap : gaps)
         {
             report += "\n  " + gap;
         }
-        ensure("every stack fills what it is in:" + report, gaps.empty());
+        UNSCOPED_INFO("every stack fills what it is in:" + report);
+        CHECK(gaps.empty());
 
         LLLayoutStack* main = floater->findChild<LLLayoutStack>("main_stack", true);
-        ensure("the window is a stack", main != nullptr);
-        ensure("the band of problems is in it", main->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
+        UNSCOPED_INFO("the window is a stack");
+        REQUIRE(main != nullptr);
+        UNSCOPED_INFO("the band of problems is in it");
+        CHECK(main->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
         LLLayoutPanel* editor = main->findChild<LLLayoutPanel>("editor_host", true);
-        ensure("the editor is in it", editor != nullptr);
+        UNSCOPED_INFO("the editor is in it");
+        CHECK(editor != nullptr);
         // The bar between the band and what is above it belongs to the panel
         // above the boundary -- the strip under the editor, since the
         // breadcrumb moved there -- so it is that panel's bar that drags
@@ -300,9 +304,13 @@ namespace tut
                 above = panel;
             }
         }
-        ensure("something sits above the band", above != nullptr);
-        ensure("and the band can be dragged from " + above->getName(),
-               above->getResizeBar() && above->getResizeBar()->getVisible());
+        UNSCOPED_INFO("something sits above the band");
+        REQUIRE(above != nullptr);
+        {
+            INFO("and the band can be dragged from " + above->getName());
+            REQUIRE(above->getResizeBar());
+            CHECK(above->getResizeBar()->getVisible());
+        }
 
         stage->die();
     }

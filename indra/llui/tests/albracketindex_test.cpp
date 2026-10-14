@@ -27,14 +27,14 @@
 #include "albracketindex.h"
 #include "alsyntaxhighlighter.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <initializer_list>
 #include <memory>
 #include <string>
 #include <utility>
 
-namespace tut
+namespace
 {
     struct albracketindex_data
     {
@@ -51,7 +51,7 @@ namespace tut
         // Line and block comments, strings, and brackets as punctuation;
         // and with `paths`, a string one word long with a dot or a slash in
         // it a path, as LSL's grammar has it.
-        static std::shared_ptr<const ALSyntaxGrammar> grammar(bool paths = false)
+        static std::shared_ptr<const ALSyntaxGrammar> require_grammar(bool paths = false)
         {
             LLSD description;
             description["name"] = "brackets";
@@ -71,7 +71,9 @@ namespace tut
             description["states"]["line_comment"] = line_comment;
             auto        loaded = std::make_shared<ALSyntaxGrammar>();
             std::string error;
-            ensure("grammar loads: " + error, loaded->load(description, error));
+            const bool  ok = loaded->load(description, error);
+            INFO("grammar loads: " << error);
+            REQUIRE(ok);
             return loaded;
         }
 
@@ -82,7 +84,7 @@ namespace tut
         void make(const char* text, bool paths = false)
         {
             doc.setText(text);
-            highlighter.setGrammar(grammar(paths));
+            highlighter.setGrammar(require_grammar(paths));
             highlighter.attach(&doc);
             index.attach(&doc);
         }
@@ -98,42 +100,47 @@ namespace tut
             return index.enclosing(ALTextPos(line, column), bracket, count, out, lines) ? llformat("%d:%d", out.line, out.column) : std::string("none");
         }
     };
-    typedef test_group<albracketindex_data> albracketindex_group;
-    typedef albracketindex_group::object    albracketindex_object;
-    albracketindex_group                    albracketindex_instance("albracketindex");
 
-    template<> template<>
-    void albracketindex_object::test<1>()
+    TEST_CASE_METHOD(albracketindex_data, "albracketindex: match pairs brackets across lines but none in strings or comments", "[albracketindex]")
     {
-        set_test_name("a bracket's partner, its own kind's nesting counted, across lines, both ways; one in a string or a comment is none");
         make("f(a[1], \"(\" /* ) */\n  { g(x) }\n) // (\n");
-        ensure_equals("the round pair across lines", matched(0, 1), std::string("2:0"));
-        ensure_equals("and back", matched(2, 0), std::string("0:1"));
-        ensure_equals("a square pair inside it", matched(0, 3), std::string("0:5"));
-        ensure_equals("a curly pair on its own line", matched(1, 2), std::string("1:9"));
-        ensure_equals("in a string: none", matched(0, 9), std::string("none"));
-        ensure_equals("in a comment: none", matched(2, 5), std::string("none"));
-        ensure_equals("not a bracket: none", matched(0, 0), std::string("none"));
+        UNSCOPED_INFO("the round pair across lines");
+        CHECK(matched(0, 1) == std::string("2:0"));
+        UNSCOPED_INFO("and back");
+        CHECK(matched(2, 0) == std::string("0:1"));
+        UNSCOPED_INFO("a square pair inside it");
+        CHECK(matched(0, 3) == std::string("0:5"));
+        UNSCOPED_INFO("a curly pair on its own line");
+        CHECK(matched(1, 2) == std::string("1:9"));
+        UNSCOPED_INFO("in a string: none");
+        CHECK(matched(0, 9) == std::string("none"));
+        UNSCOPED_INFO("in a comment: none");
+        CHECK(matched(2, 5) == std::string("none"));
+        UNSCOPED_INFO("not a bracket: none");
+        CHECK(matched(0, 0) == std::string("none"));
     }
 
-    template<> template<>
-    void albracketindex_object::test<2>()
+    TEST_CASE_METHOD(albracketindex_data, "albracketindex: enclosing finds the bracket of a kind left open around a place", "[albracketindex]")
     {
-        set_test_name("the brackets of a kind left open around a place, the count out; for a closer, after it");
         make("a(b(c)d[e(f)g]h)\n");
-        ensure_equals("the one around, the other kind passed through, its own kind's pairs skipped", around(0, 12, '('), std::string("0:1"));
-        ensure_equals("inside the inner pair, its opener", around(0, 11, '('), std::string("0:9"));
-        ensure_equals("inside the square", around(0, 10, '['), std::string("0:7"));
-        ensure_equals("two out", around(0, 5, '(', 2), std::string("0:1"));
-        ensure_equals("not so many", around(0, 5, '(', 3), std::string("none"));
-        ensure_equals("a closer under the place not counted", around(0, 5, ')'), std::string("0:15"));
-        ensure_equals("the closer after, the pair inside skipped", around(0, 2, ')'), std::string("0:15"));
+        UNSCOPED_INFO("the one around, the other kind passed through, its own kind's pairs skipped");
+        CHECK(around(0, 12, '(') == std::string("0:1"));
+        UNSCOPED_INFO("inside the inner pair, its opener");
+        CHECK(around(0, 11, '(') == std::string("0:9"));
+        UNSCOPED_INFO("inside the square");
+        CHECK(around(0, 10, '[') == std::string("0:7"));
+        UNSCOPED_INFO("two out");
+        CHECK(around(0, 5, '(', 2) == std::string("0:1"));
+        UNSCOPED_INFO("not so many");
+        CHECK(around(0, 5, '(', 3) == std::string("none"));
+        UNSCOPED_INFO("a closer under the place not counted");
+        CHECK(around(0, 5, ')') == std::string("0:15"));
+        UNSCOPED_INFO("the closer after, the pair inside skipped");
+        CHECK(around(0, 2, ')') == std::string("0:15"));
     }
 
-    template<> template<>
-    void albracketindex_object::test<3>()
+    TEST_CASE_METHOD(albracketindex_data, "albracketindex: a search stops at its reach and depths count the brackets left open", "[albracketindex]")
     {
-        set_test_name("a search goes only as far as told; the depth at each line's start and at a place, a closer past none closing nothing");
         std::string text = "(\n";
         for (int i = 0; i < 50; ++i)
         {
@@ -141,42 +148,56 @@ namespace tut
         }
         text += ")\n)\n";
         make(text.c_str());
-        ensure_equals("found within reach", matched(0, 0, 60), std::string("51:0"));
-        ensure_equals("not past the reach", matched(0, 0, 10), std::string("none"));
-        ensure_equals("nor back past it", matched(51, 0, 10), std::string("none"));
-        ensure_equals("open inside", index.depthBefore(1), 1);
-        ensure_equals("closed after", index.depthBefore(52), 0);
-        ensure_equals("a closer past none closes nothing", index.depthBefore(53), 0);
-        ensure_equals("at a place of a line", index.depthAt(ALTextPos(0, 1)), 1);
-        ensure_equals("before the bracket", index.depthAt(ALTextPos(0, 0)), 0);
+        UNSCOPED_INFO("found within reach");
+        CHECK(matched(0, 0, 60) == std::string("51:0"));
+        UNSCOPED_INFO("not past the reach");
+        CHECK(matched(0, 0, 10) == std::string("none"));
+        UNSCOPED_INFO("nor back past it");
+        CHECK(matched(51, 0, 10) == std::string("none"));
+        UNSCOPED_INFO("open inside");
+        CHECK(index.depthBefore(1) == 1);
+        UNSCOPED_INFO("closed after");
+        CHECK(index.depthBefore(52) == 0);
+        UNSCOPED_INFO("a closer past none closes nothing");
+        CHECK(index.depthBefore(53) == 0);
+        UNSCOPED_INFO("at a place of a line");
+        CHECK(index.depthAt(ALTextPos(0, 1)) == 1);
+        UNSCOPED_INFO("before the bracket");
+        CHECK(index.depthAt(ALTextPos(0, 0)) == 0);
     }
 
-    template<> template<>
-    void albracketindex_object::test<4>()
+    TEST_CASE_METHOD(albracketindex_data, "albracketindex: the index follows edits to a line's text and to its tokens", "[albracketindex]")
     {
-        set_test_name("kept true through edits: a line's text changed, and its tokens changed under it by a comment opened above");
         make("(a\nb)\nc\n");
-        ensure_equals("paired", matched(0, 0), std::string("1:1"));
-        ensure_equals("depth", index.depthBefore(1), 1);
+        CHECK(matched(0, 0) == std::string("1:1"));
+        CHECK(index.depthBefore(1) == 1);
         doc.insert(ALTextPos(0, 0), "/*");
-        ensure_equals("the opener now in a comment", matched(0, 2), std::string("none"));
-        ensure_equals("the closer too, the comment running on", matched(1, 1), std::string("none"));
-        ensure_equals("and nothing open", index.depthBefore(1), 0);
+        UNSCOPED_INFO("the opener now in a comment");
+        CHECK(matched(0, 2) == std::string("none"));
+        UNSCOPED_INFO("the closer too, the comment running on");
+        CHECK(matched(1, 1) == std::string("none"));
+        UNSCOPED_INFO("and nothing open");
+        CHECK(index.depthBefore(1) == 0);
         doc.remove(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)));
-        ensure_equals("paired again", matched(0, 0), std::string("1:1"));
-        ensure_equals("open again", index.depthBefore(1), 1);
+        UNSCOPED_INFO("paired again");
+        CHECK(matched(0, 0) == std::string("1:1"));
+        UNSCOPED_INFO("open again");
+        CHECK(index.depthBefore(1) == 1);
         doc.replace(ALTextRange(ALTextPos(1, 1), ALTextPos(1, 2)), "]");
-        ensure_equals("a bracket of another kind in its place pairs with nothing", matched(0, 0), std::string("none"));
+        UNSCOPED_INFO("a bracket of another kind in its place pairs with nothing");
+        CHECK(matched(0, 0) == std::string("none"));
     }
 
-    template<> template<>
-    void albracketindex_object::test<5>()
+    TEST_CASE_METHOD(albracketindex_data, "albracketindex: a bracket inside a path is none and those around it pair past it", "[albracketindex]")
     {
-        set_test_name("a bracket in a path, drawn as the string it is, is none: the brackets around it pair as though it were not there");
         make("f(\"v1.0)\", g(x));\n{\n}\n", /*paths*/ true);
-        ensure_equals("the call's opener pairs with its own closer, not the path's", matched(0, 1), std::string("0:15"));
-        ensure_equals("in a path: none", matched(0, 7), std::string("none"));
-        ensure_equals("nothing open after the line", index.depthBefore(1), 0);
-        ensure_equals("nor inside the block below", index.depthBefore(2), 1);
+        UNSCOPED_INFO("the call's opener pairs with its own closer, not the path's");
+        CHECK(matched(0, 1) == std::string("0:15"));
+        UNSCOPED_INFO("in a path: none");
+        CHECK(matched(0, 7) == std::string("none"));
+        UNSCOPED_INFO("nothing open after the line");
+        CHECK(index.depthBefore(1) == 0);
+        UNSCOPED_INFO("nor inside the block below");
+        CHECK(index.depthBefore(2) == 1);
     }
 }

@@ -64,6 +64,14 @@ target_sources(
 # function, so the tests need llmath's headers but not its library.
 target_include_directories(al_test_support PUBLIC ${INDRA_SOURCE_DIR}/llmath)
 target_link_libraries(al_test_support PRIVATE al::flags PUBLIC llcommon ll::catch2)
+# Whatever links the harness is built for Catch2: a test binary and the
+# OBJECT libraries of checks it links alike. The helpers in test/ that TUT
+# tests still share fail a test the way its framework does by it, and so do
+# the fixtures the tests share with their checks -- the headless UI, the
+# shared GL context -- whose one-per-process object is a function's static:
+# an object built without it would have a body of its own, with a static of
+# its own, wherever the compiler inlined it, and a second UI or context.
+target_compile_definitions(al_test_support PUBLIC AL_TEST_CATCH2=1)
 
 set_target_properties(al_test_support PROPERTIES FOLDER "Tests")
 
