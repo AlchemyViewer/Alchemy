@@ -364,6 +364,9 @@ if(AL_BUILD_TESTS)
       tests/threadsafeschedule_test.cpp
       tests/tuple_test.cpp
       tests/workqueue_test.cpp
+    # The viewer's own patterns under Boost.Regex and under RE2, side by
+    # side, over the text each is run on.
+    BENCH_SOURCES tests/alregex_bench.cpp
     SUPPORT llcommon_test_checks
     LIBRARIES llcommon
   )
@@ -455,8 +458,4 @@ if(AL_BUILD_TESTS)
       PROPERTIES COMPILE_OPTIONS -Wno-uninitialized
     )
   endif()
-
-  # The viewer's own patterns under Boost.Regex and under RE2, side by side,
-  # over the text each is run on.
-  al_add_bench(alregex PROJECT llcommon LIBRARIES llcommon)
 endif()
