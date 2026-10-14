@@ -47,6 +47,7 @@
 
 #if LL_WINDOWS
 #include "llwin32headers.h"
+#include <cwctype>
 #include <float.h>
 #elif defined(__x86_64__) || defined(__i386__)
 #include <xmmintrin.h>
@@ -128,6 +129,10 @@ namespace ll_test
         }
 
         // Sorted, one variable a line, so a change reads as the lines it made.
+        // Not Windows' hidden =C:=C:\dir variables, the directory last made
+        // current on each drive: a change of directory makes one for its
+        // drive, as a font or GL driver lookup on the system drive does from
+        // a tree on another, and the working directory has its own check.
         std::string environment()
         {
             std::vector<std::string> variables;
@@ -136,6 +141,10 @@ namespace ll_test
             {
                 for (const wchar_t* entry = block; *entry; entry += wcslen(entry) + 1)
                 {
+                    if (entry[0] == L'=' && std::iswalpha(entry[1]) && entry[2] == L':')
+                    {
+                        continue;
+                    }
                     variables.push_back(ll_convert_wide_to_string(entry));
                 }
                 FreeEnvironmentStringsW(block);
