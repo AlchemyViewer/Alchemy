@@ -77,6 +77,16 @@ namespace
         CHECK(endpoint->publicKey == "key");
     }
 
+    // A path may hold an '@': it is the path's, after the host, and not a
+    // user part.
+    TEST_CASE("alfeedback: an @ in a self-hosted DSN's path stays in its path", "[alfeedback]")
+    {
+        const auto endpoint = ALFeedback::endpointFromDsn("https://k@sentry.example.com/team@blue/7");
+        REQUIRE(endpoint.has_value());
+        CHECK(endpoint->url == "https://sentry.example.com/team@blue/api/7/envelope/");
+        CHECK(endpoint->publicKey == "k");
+    }
+
     TEST_CASE("alfeedback: a DSN missing a part is refused", "[alfeedback]")
     {
         UNSCOPED_INFO("no scheme");
@@ -85,6 +95,8 @@ namespace
         REQUIRE_FALSE(ALFeedback::endpointFromDsn("ftp://key@host/1"));
         UNSCOPED_INFO("no key");
         REQUIRE_FALSE(ALFeedback::endpointFromDsn("https://host/1"));
+        UNSCOPED_INFO("no key, and an @ in the path, which names no user");
+        REQUIRE_FALSE(ALFeedback::endpointFromDsn("https://sentry.example.com/team@blue/7"));
         UNSCOPED_INFO("empty key");
         REQUIRE_FALSE(ALFeedback::endpointFromDsn("https://@host/1"));
         UNSCOPED_INFO("no project");
