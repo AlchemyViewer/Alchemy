@@ -392,6 +392,10 @@ LLSD ALMasterLinks::toLLSD() const
             record["notecard"] = true;
         }
         record["target"]      = link.target;
+        if (link.experience)
+        {
+            record["experience"] = *link.experience;
+        }
         record["base"]        = link.base;
         record["hash"]        = link.hash;
         record["stamp"]       = std::to_string(link.stamp);
@@ -455,6 +459,12 @@ ALMasterLinks ALMasterLinks::fromLLSD(const LLSD& llsd)
         link.lua      = record["lua"].asBoolean();
         link.notecard = record["notecard"].asBoolean();
         link.target = record["target"].asString();
+        if (record.has("experience"))
+        {
+            LLUUID experience;
+            keyIn(record["experience"], experience);
+            link.experience = experience;
+        }
         // A base that is not a key is none: the world is taken to have moved.
         keyIn(record["base"], link.base);
         link.hash  = record["hash"].asString();

@@ -174,6 +174,12 @@ public:
     // later. False where it is not linked, or had the name already.
     bool renamed(const LLUUID& object, const LLUUID& item, const std::string& name);
 
+    // What the item's next send sets, picked in its file's tab: the compile
+    // target, and the experience, each where given. Written at once. False
+    // where it is not linked, or had them already.
+    bool chosen(const LLUUID& object, const LLUUID& item, const std::optional<std::string>& target,
+                const std::optional<std::optional<LLUUID>>& experience);
+
     // A send's link as it stands after the send, put back over the item's,
     // where the item is linked still: one let go of while its send was on
     // its way stays let go of. Saved as another item, one that could not be

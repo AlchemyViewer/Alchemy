@@ -427,6 +427,52 @@ namespace
         CHECK(read->itemName == std::string("front door"));
     }
 
+    TEST_CASE_METHOD(almasterindex_data, "almasterindex: a target and an experience picked for the next send are kept and written", "[almasterindex]")
+    {
+        ALMasterIndex& made = open();
+        made.link(almasterindex_data::link(1, 2, "/s/door.lsl"));
+        told                    = 0;
+        const LLUUID experience = almasterindex_data::key(70);
+        UNSCOPED_INFO("nothing given: nothing");
+        CHECK_FALSE(made.chosen(almasterindex_data::key(1), almasterindex_data::key(2), std::nullopt, std::nullopt));
+        UNSCOPED_INFO("a target");
+        CHECK(made.chosen(almasterindex_data::key(1), almasterindex_data::key(2), std::string("lsl2"), std::nullopt));
+        UNSCOPED_INFO("an experience");
+        CHECK(made.chosen(almasterindex_data::key(1), almasterindex_data::key(2), std::nullopt, std::optional<LLUUID>(experience)));
+        UNSCOPED_INFO("the same again: nothing");
+        CHECK_FALSE(made.chosen(almasterindex_data::key(1), almasterindex_data::key(2), std::string("lsl2"), std::optional<LLUUID>(experience)));
+        CHECK(told == 2);
+        UNSCOPED_INFO("an item not linked: nothing");
+        CHECK_FALSE(made.chosen(almasterindex_data::key(1), almasterindex_data::key(9), std::string("mono"), std::nullopt));
+        UNSCOPED_INFO("written at once");
+        CHECK_FALSE(made.dirty());
+
+        ALMasterIndex&                    again = open();
+        const std::optional<ALMasterLink> read  = again.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
+        REQUIRE(read.has_value());
+        {
+            INFO("read back as picked");
+            CHECK(read->target == std::string("lsl2"));
+            REQUIRE(read->experience.has_value());
+            CHECK(*read->experience == experience);
+        }
+        // None picked: null, which is not the same as none asked.
+        CHECK(again.chosen(almasterindex_data::key(1), almasterindex_data::key(2), std::nullopt, std::optional<LLUUID>(LLUUID::null)));
+        ALMasterIndex&                    third = open();
+        const std::optional<ALMasterLink> none  = third.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
+        REQUIRE(none.has_value());
+        {
+            INFO("none picked, read back as none, not as unasked");
+            REQUIRE(none->experience.has_value());
+            CHECK(none->experience->isNull());
+        }
+        third.link(almasterindex_data::link(1, 3, "/s/lamp.lsl"));
+        const std::optional<ALMasterLink> fresh = third.linkOf(almasterindex_data::key(1), almasterindex_data::key(3));
+        REQUIRE(fresh.has_value());
+        UNSCOPED_INFO("a link never asked: none asked");
+        CHECK_FALSE(fresh->experience.has_value());
+    }
+
     TEST_CASE_METHOD(almasterindex_data, "almasterindex: what a probe found is kept only by a link of its master knowing nothing yet", "[almasterindex]")
     {
         ALMasterIndex& made = open();

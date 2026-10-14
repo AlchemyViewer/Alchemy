@@ -555,6 +555,7 @@ private:
     // Whether a script runs, what it compiles for: the region's word, on a
     // tab that has it open.
     void runningState(const ALScriptRunningState& state);
+    void heardRunning(Doc& doc, const ALScriptRunningState& state);
 
     // --- going places ------------------------------------------------------------------
 
@@ -695,6 +696,22 @@ private:
     // one or the agent has any to give it.
     void askExperienceOf(Doc& doc);
     void refreshExperience();
+    // The script in the world a tab's strip acts on -- Running, Reset, its
+    // experience and what it compiles for: its own; or, for the tab of a
+    // file that masters one script in an object, that one, which the tab
+    // stands in for. Running and Reset act on it at once; a target or an
+    // experience picked goes with the file's next send.
+    ALScriptRef worldRefOf(const Doc& doc) const { return !doc.file.empty() && doc.ref.isNull() ? doc.standsFor : doc.ref; }
+    bool        standsIn(const Doc& doc) const { return !doc.file.empty() && !doc.notecard && !worldRefOf(doc).inInventory(); }
+    // What a file's tab stands in for, found as it opens, as its file
+    // changes and as the links do: by the file's path, which the disk is
+    // asked for, not at every look.
+    void        restand(Doc& doc);
+    void        restandAll();
+    // What a tab standing in compiles for: what its link's next send
+    // takes, else what the region says it compiles for now, else its
+    // language's own.
+    std::string standingTarget(const Doc& doc) const;
     // The strip under the editor laid out for what shows on it and the
     // width it has.
     void layStrip();
@@ -1442,4 +1459,5 @@ private:
     // A file's links made or let go of: its tab says how many scripts it
     // is the master of.
     boost::signals2::scoped_connection mLinkBadgesConnection;
+    boost::signals2::scoped_connection mMastersConnection;
 };

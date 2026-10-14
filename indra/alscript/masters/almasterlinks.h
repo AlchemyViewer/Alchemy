@@ -32,6 +32,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -84,8 +85,12 @@ struct ALMasterLink
     // file has it, nothing expanded or compiled. A notecard that carries
     // items is never linked, since a file cannot hold them.
     bool        notecard = false;
-    // The compile target last sent with: "mono", "lsl2" or "luau".
+    // The compile target last sent with: "mono", "lsl2" or "luau"; or the
+    // one picked for the next send.
     std::string target;
+    // The experience the sends set, where one was picked in the file's tab
+    // -- null for none; unset, each keeps what the script runs under.
+    std::optional<LLUUID> experience;
     // The item's asset after the last upload made through the link, or as
     // it was when linked: the world moved where it holds another.
     LLUUID      base;

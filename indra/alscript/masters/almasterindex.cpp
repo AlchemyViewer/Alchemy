@@ -276,6 +276,28 @@ bool ALMasterIndex::renamed(const LLUUID& object, const LLUUID& item, const std:
     return true;
 }
 
+bool ALMasterIndex::chosen(const LLUUID& object, const LLUUID& item, const std::optional<std::string>& target,
+                           const std::optional<std::optional<LLUUID>>& experience)
+{
+    const ALMasterLink* was = mLinks.of(object, item);
+    if (!was || ((!target || *target == was->target) && (!experience || *experience == was->experience)))
+    {
+        return false;
+    }
+    ALMasterLink now = *was;
+    if (target)
+    {
+        now.target = *target;
+    }
+    if (experience)
+    {
+        now.experience = *experience;
+    }
+    mLinks.put(now);
+    changed(Write::Now, Tell::Now);
+    return true;
+}
+
 bool ALMasterIndex::finished(const LLUUID& object, const LLUUID& item, const ALMasterLink& updated)
 {
     const ALMasterLink* was = mLinks.of(object, item);

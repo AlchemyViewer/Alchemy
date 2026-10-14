@@ -373,6 +373,15 @@ void ALScriptDiskMasters::named(const ALScriptRef& ref, const std::string& name)
     }
 }
 
+void ALScriptDiskMasters::chosen(const ALScriptRef& ref, const std::optional<std::string>& target,
+                                 const std::optional<std::optional<LLUUID>>& experience)
+{
+    if (ALMasterIndex* index = links())
+    {
+        index->chosen(ref.object, ref.item, target, experience);
+    }
+}
+
 void ALScriptDiskMasters::tell(Outcome outcome)
 {
     // By the name the item has now, where it is to be seen: the link keeps

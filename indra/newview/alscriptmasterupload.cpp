@@ -569,6 +569,9 @@ void ALScriptMasterUpload::upload()
     }
     ALScriptSaveOptions options;
     options.compileTarget = mTarget;
+    // The experience picked in the file's tab; none picked, the one it runs
+    // under, which the save asks the region for.
+    options.experience    = mLink.experience;
     options.sender        = ALScriptSender(ALScriptOrigin::Disk);
     options.sourceMap     = mPrepared.map;
     options.codeLine      = mPrepared.codeLine;

@@ -190,6 +190,9 @@ public:
     // listed by its prim since -- which its link takes, for what is said of
     // it next.
     void named(const ALScriptRef& ref, const std::string& name);
+    // What a linked script's next send sets, picked in its file's tab: its
+    // compile target, and its experience (null for none), each where given.
+    void chosen(const ALScriptRef& ref, const std::optional<std::string>& target, const std::optional<std::optional<LLUUID>>& experience);
 
     // The folders a script on disk may read from, as its includes and
     // requires do -- the include folders, what a configuration on disk

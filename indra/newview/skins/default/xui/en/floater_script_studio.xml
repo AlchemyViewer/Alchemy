@@ -669,6 +669,9 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterLinkedUnsaved">[NAME] is linked to [FILE] now, and what was typed here is not in the file: copy it into the file to keep it, or Unlink to save it from here.</floater.string>
     <floater.string name="MasterLinkedClean">[NAME] is linked to [FILE] now, and nothing unsaved is left here: switch to the file to change it there, or Unlink to save it from here.</floater.string>
     <floater.string name="MasterEditedOutside">[NAME] is linked to [FILE]: the file is opened in the external editor in its place.</floater.string>
+    <floater.string name="MasterTargetChosen">[NAME]'s next save sends its script compiled for [TARGET].</floater.string>
+    <floater.string name="MasterExperienceChosen">From [NAME]'s next save, its script runs under [EXPERIENCE].</floater.string>
+    <floater.string name="MasterExperienceCleared">From [NAME]'s next save, its script runs under no experience.</floater.string>
     <floater.string name="MasterNotRead">[FILE] could not be read to compare with [NAME].</floater.string>
     <floater.string name="LinkHeadListing">Asking what [OBJECTS] holds...</floater.string>
     <floater.string name="LinkHeadReading">Reading the scripts of [OBJECTS]: [DONE] of [COUNT]...</floater.string>

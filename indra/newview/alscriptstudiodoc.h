@@ -505,6 +505,12 @@ struct ALScriptStudioDoc
     // more it is asked.
     std::optional<bool>                        runningAsked;
     S32                                        runningAsks = 0;
+    // The script in an object a file's tab stands in for -- its file
+    // masters it and no other -- or none, found again as the links change
+    // (ALFloaterScriptStudio::restand); and the one asked whether it runs
+    // and what experience it runs under, asked again for another.
+    ALScriptRef                                standsFor;
+    ALScriptRef                                worldAsked;
     // A compile target picked here since the last save, which the
     // region's word on what the script compiles for does not put back.
     bool                                       targetChosen = false;
