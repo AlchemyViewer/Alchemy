@@ -194,6 +194,13 @@ namespace
         CHECK(text->getTentative());
 
         combo->setUnset(false);
+        UNSCOPED_INFO("and saying it is set settles it");
+        CHECK_FALSE(text->getTentative());
+
+        // A choice made in the control settles it too, without its owner
+        // saying so.
+        combo->setUnset(true);
+        combo->selectFirstItem();
         UNSCOPED_INFO("and choosing it settles it");
         CHECK_FALSE(text->getTentative());
         combo->die();

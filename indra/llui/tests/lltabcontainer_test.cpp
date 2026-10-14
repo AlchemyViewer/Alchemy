@@ -26,6 +26,7 @@
 
 #include "../lltabcontainer.h"
 
+#include "../llbadge.h"
 #include "../llbutton.h"
 #include "../llfocusmgr.h"
 #include "../lliconctrl.h"
@@ -83,6 +84,24 @@ namespace
             return tabs->findChild<LLButton>((vertical ? "vtab_" : "htab_") + name, true);
         }
 
+        // The badge on a tab. The strip holds it rather than the button, so
+        // that it is drawn over everything, and with one tab there is one.
+        static const LLBadge* badgeIn(const LLView* view)
+        {
+            for (const LLView* child : *view->getChildList())
+            {
+                if (const LLBadge* badge = child->as<LLBadge>())
+                {
+                    return badge;
+                }
+                if (const LLBadge* badge = badgeIn(child))
+                {
+                    return badge;
+                }
+            }
+            return nullptr;
+        }
+
         // A texture with a size and nothing else: what a UI image needs to
         // exist here, where no image provider makes any.
         struct SizedTexture : public LLTexture
@@ -133,7 +152,7 @@ namespace
 
     // A count on the tab, and off it again. A tab with nothing to say looks
     // like one that never had anything.
-    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: setTabBadge makes a badge and keeps it once the count is cleared", "[lltabcontainer]")
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: setTabBadge makes a badge and keeps it hidden once the count is cleared", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
@@ -150,10 +169,19 @@ namespace
 
         tabs->setTabBadge(counted, "12");
         CHECK(button->hasBadge());
+        const LLBadge* badge = badgeIn(tabs);
+        REQUIRE(badge != nullptr);
+        {
+            INFO("showing the count");
+            CHECK(badge->getVisible());
+            CHECK(badge->getLabel() == std::string("12"));
+        }
 
         tabs->setTabBadge(counted, std::string());
         UNSCOPED_INFO("the badge stays made once it is made");
         CHECK(button->hasBadge());
+        UNSCOPED_INFO("and is hidden, as a tab with no count has none showing");
+        CHECK_FALSE(badge->getVisible());
         tabs->die();
     }
 
@@ -684,7 +712,9 @@ namespace
         tabs->addTabPanel(page("g", std::string()));
         LLPanel* last = page("h", std::string());
         tabs->addTabPanel(last);
-        CHECK(tabButton(tabs, "f")->getRect().getWidth() == tabs->getMaxTabWidth());
+        const LLButton* wide_button = tabButton(tabs, "f");
+        REQUIRE(wide_button != nullptr);
+        CHECK(wide_button->getRect().getWidth() == tabs->getMaxTabWidth());
 
         tabs->setTabVisibility(wide, false);
         UNSCOPED_INFO("seven tabs of sixty in four hundred: one more than fit");
@@ -711,7 +741,9 @@ namespace
         tabs->addTabPanel(first);
         tabs->addTabPanel(second);
         tabs->selectTabPanel(first);
-        tabButton(tabs, "first")->setFocus(true);
+        LLButton* first_button = tabButton(tabs, "first");
+        REQUIRE(first_button != nullptr);
+        first_button->setFocus(true);
 
         CHECK_FALSE(tabs->handleKeyHere(KEY_RIGHT, MASK_CONTROL));
         CHECK(tabs->getCurrentPanel() == first);
@@ -735,8 +767,11 @@ namespace
         LLPanel* indented = page("indented", std::string());
         tabs->addTabPanel(plain);
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(indented).indent(10));
-        const S32 pad = tabButton(tabs, "plain")->getLeftHPad();
-        CHECK(tabButton(tabs, "indented")->getLeftHPad() == pad + 10);
+        const LLButton* plain_button = tabButton(tabs, "plain");
+        const LLButton* indented_button = tabButton(tabs, "indented");
+        REQUIRE(plain_button != nullptr);
+        REQUIRE(indented_button != nullptr);
+        CHECK(indented_button->getLeftHPad() == plain_button->getLeftHPad() + 10);
         tabs->die();
     }
 
@@ -829,12 +864,16 @@ namespace
 
         // Four tabs of sixty in the three hundred and ninety-eight between
         // the page's sides: each gets its sixty and a fourth of the rest.
+        // Each tab's button is found here, and the strip keeps it as long as
+        // it keeps the tab, so the reads of them below have it to read.
         const S32 room = 398;
         S32 total = 0;
         for (const char* name : { "a", "b", "c", "d" })
         {
-            const S32 width = tabButton(tabs, name)->getRect().getWidth();
             CAPTURE(name);
+            const LLButton* button = tabButton(tabs, name);
+            REQUIRE(button != nullptr);
+            const S32 width = button->getRect().getWidth();
             REQUIRE(width > 60);
             total += width;
         }
@@ -907,7 +946,10 @@ namespace
         S32 total = 0;
         for (const char* name : { "a", "b", "c", "d" })
         {
-            total += tabButton(tabs, name)->getRect().getWidth();
+            CAPTURE(name);
+            const LLButton* tab = tabButton(tabs, name);
+            REQUIRE(tab != nullptr);
+            total += tab->getRect().getWidth();
         }
         CHECK(total == 398 - KEPT);
         CHECK(1 + total <= button->getRect().mLeft);

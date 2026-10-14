@@ -113,7 +113,8 @@ namespace
 
     TEST_CASE_METHOD(llstatbar_data, "llstatbar: calcTickValue over a tiny range about zero is finite and not negative", "[llstatbar]")
     {
-        // Both bounds tiny enough that their sum rounds to zero.
+        // Bounds a tiny distance either side of zero: normal floats still,
+        // not denormal ones, which start below about 1.2e-38.
         const F32 tick = LLStatBar::calcTickValue(-1e-30f, 1e-30f);
         CHECK(finite(tick));
         CHECK(tick >= 0.f);
@@ -184,13 +185,14 @@ namespace
     }
 
     // A range with nothing in it must not produce a spacing the tick walk would
-    // step forever on, and must stay finite.
-    TEST_CASE_METHOD(llstatbar_data, "llstatbar: an empty range scales to finite bounds and spacing", "[llstatbar]")
+    // step forever on, and must stay finite. No spacing at all is what the bar
+    // walks no ticks for.
+    TEST_CASE_METHOD(llstatbar_data, "llstatbar: an empty range scales to finite bounds and no tick spacing", "[llstatbar]")
     {
         const Scaled empty = scale(0.f, 0.f);
         CHECK(finite(empty.mMin));
         CHECK(finite(empty.mMax));
-        CHECK((empty.mTick == 0.f || finite(empty.mTick)));
+        CHECK(empty.mTick == 0.f);
     }
 
     // Both bounds on the same side of zero and equal: the degenerate case the

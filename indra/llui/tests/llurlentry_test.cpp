@@ -467,8 +467,8 @@ namespace
                   "secondlife:///app/teleport/Ahern/50/50/50");
 
         require_url("Ahern (50,50,50) multicase", url,
-                  "XXX secondlife:///app/teleport/Ahern/50/50/50/ XXX",
-                  "secondlife:///app/teleport/Ahern/50/50/50/");
+                  "XXX SecondLife:///App/Teleport/Ahern/50/50/50/ XXX",
+                  "SecondLife:///App/Teleport/Ahern/50/50/50/");
 
         require_url("Ahern (50,50) [1]", url,
                   "XXX secondlife:///app/teleport/Ahern/50/50/ XXX",
@@ -638,8 +638,8 @@ namespace
                   "secondlife:///app/region/Ahern/50/50/50");
 
         require_url("Ahern (50,50,50) multicase", url,
-                  "XXX secondlife:///app/region/Ahern/50/50/50/ XXX",
-                  "secondlife:///app/region/Ahern/50/50/50/");
+                  "XXX SecondLife:///App/Region/Ahern/50/50/50/ XXX",
+                  "SecondLife:///App/Region/Ahern/50/50/50/");
 
         require_url("Ahern (50,50) [1]", url,
                   "XXX secondlife:///app/region/Ahern/50/50/ XXX",
