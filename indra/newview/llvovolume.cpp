@@ -6279,7 +6279,9 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                                     {
                                         if (gltf_mat->mBaseColor.mV[3] == 0.0f && !LLDrawPoolAlpha::sShowDebugAlpha)
                                         {
-                                            should_render = false;
+                                            // Kept while selected for the selection outline, which draws it from its
+                                            // vertex buffer; genDrawInfo puts it in a pass nothing else draws.
+                                            should_render = vobj->isSelected() && LLVOVolume::isInvisibleFace(te);
                                         }
                                     }
                                     if (should_render)
@@ -7141,9 +7143,18 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 is_alpha |= blinn_phong_transparent;
             }
 
-            if (is_alpha && LLVOVolume::isInvisibleFace(te))
+            // A GLTF material's face blends whatever its pool, which rebuildGeom picks without the diffuse map it takes
+            // away from such a face.
+            if ((is_alpha || gltf_mat) && LLVOVolume::isInvisibleFace(te))
             { //100% transparent, whatever its material, don't render unless we're highlighting transparent
-                registerFace(group, facep, LLRenderPass::PASS_ALPHA_INVISIBLE, material_slots);
+                is_alpha = true;
+                // A reflection probe's volume is shown transparent only where RenderReflectionProbeShowTransparent
+                // says; a selected one is here for its selection outline alone, which draws it from its vertex buffer.
+                static LLCachedControl<bool> render_reflection_object(gSavedSettings, "RenderReflectionProbeShowTransparent", false);
+                if (render_reflection_object || !facep->getViewerObject()->isReflectionProbe())
+                {
+                    registerFace(group, facep, LLRenderPass::PASS_ALPHA_INVISIBLE, material_slots);
+                }
             }
             else if (gltf_mat || (mat && !hud_group))
             {
