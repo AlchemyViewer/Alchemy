@@ -2482,6 +2482,22 @@ if(AL_BUILD_TESTS)
   target_compile_definitions(newview_test_llvocache PRIVATE "LL_TEST=llvocache" "LL_TEST_llvocache")
   target_link_libraries(newview_test_llvocache PRIVATE al::flags llui ${test_libs})
   set_target_properties(newview_test_llvocache PROPERTIES FOLDER "Tests/${test_project}")
+  # What the viewer's tests share a process with, made before the first case
+  # and watched after each: the queue standing in for the main loop's, the
+  # recovery writer's thread, the settings groups, Script Studio's recovery,
+  # history and viewer, and llcommon's checks but for its event pumps made
+  # afresh for each case, which the viewer's own event APIs listen on from
+  # before main. llui's and llrender's checks make the UI and watch it.
+  add_library(newview_test_checks OBJECT tests/newview_test_checks.cpp)
+  target_include_directories(
+    newview_test_checks
+    PRIVATE ${newview_includes} ${INDRA_SOURCE_DIR}/llmath
+  )
+  target_link_libraries(
+    newview_test_checks
+    PRIVATE al::flags al_test_support llui alscript ${test_libs}
+  )
+  set_target_properties(newview_test_checks PROPERTIES FOLDER "Tests/${test_project}")
   # A viewer texture's boost level, which the world map's tests reach.
   add_library(newview_test_viewertexture OBJECT tests/llviewertexture_stub.cpp)
   target_include_directories(
@@ -2652,6 +2668,9 @@ if(AL_BUILD_TESTS)
       newview_test_settings
       newview_studio_test_stubs
       newview_test_llvocache
+      newview_test_checks
+      llui_test_checks
+      llrender_test_checks
     DEFINES
       "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
       "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\""
@@ -2665,6 +2684,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     SOURCES tests/alhuddepth_gl_test.cpp tests/alselectionoutline_gl_test.cpp
     LIBRARIES llrender
+    SUPPORT llrender_test_checks llcommon_test_checks
     INCLUDES ${INDRA_SOURCE_DIR}/llprimitive
     DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
     GL

@@ -31,6 +31,7 @@
 #include "../alscriptlookup.h"
 #include "alincludeidentity.h"
 #include "almainloop.h"
+#include "alteststateguard.h"
 #include "llfile.h"
 #include "workqueue.h"
 
@@ -1405,6 +1406,10 @@ namespace
         const std::string LIB = "disk:/s/lib.luau";
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
                     doc.editor->document().version());
+        // The thread the walks run on, made with the first of them, is the
+        // process's from here, as the viewer's is until it quits.
+        ll_test::StateGuard::accept("the live thread pools");
+        ll_test::StateGuard::accept("the live work queues");
         UNSCOPED_INFO("nothing read here");
         CHECK(studio.expands.empty());
         {

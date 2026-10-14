@@ -115,6 +115,10 @@ namespace
         std::string                                         folder;
         std::unique_ptr<ALRecoveryStore>              store;
 
+        // Every store a case makes, the fixture's or its own, writes on the
+        // process's writer.
+        alscriptstudiorecovery_data() { newview_test::useRecoveryWriter(); }
+
         ~alscriptstudiorecovery_data()
         {
             ALRecovery::useStore(nullptr);
