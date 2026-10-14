@@ -43,7 +43,6 @@
 #include "lldir.h"
 #include "lldrawpoolalpha.h"
 #include "lldrawpoolbump.h"
-#include "lldrawpoolwater.h"
 #include "lldynamictexture.h"
 #include "llenvironment.h"
 #include "llfeaturemanager.h"
@@ -241,12 +240,6 @@ void display_update_camera()
     static LLCachedControl<S32> force_projection(gSavedSettings, "AlchemyRenderFarPlaneForce", ALFarPlane::FORCE_AUTOMATIC);
     LLViewerCamera* camera = LLViewerCamera::getInstance();
     camera->setProjectionFar(ALFarPlane::projectionFar(reverse_z, gCubeSnapshot, force_projection(), gAgentCamera.mDrawDistance));
-    // Edge water stretches with the main view's projection, which reverse-Z or the debug force can switch at runtime.
-    if (!gCubeSnapshot && ALFarPlane::isInfinite(camera->getProjectionFar()) != camera->isMainViewInfinite())
-    {
-        camera->setMainViewInfinite(!camera->isMainViewInfinite());
-        LLWorld::getInstance()->updateWaterObjects();
-    }
     LLVOAvatar::sRenderDistance = llclamp(final_far, 16.f, 256.f);
     gViewerWindow->setup3DRender();
 
@@ -732,6 +725,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     if (!gDisconnected && !LLApp::isExiting())
     {
+        // The water's field around the main camera, before the mirrors, the shadow fit and the probes read it.
+        gPipeline.mWaterSurface.update();
+
         // Render mirrors and associated hero probes before we render the rest of the scene.
         // This ensures the scene state in the hero probes are exactly the same as the rest of the scene before we render it.
         if (gPipeline.RenderMirrors && !gSnapshot)
@@ -1022,7 +1018,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
                 gOcclusionProgram.bind();
                 for (U32 i = 0; i < num_types; i++)
                 {
-                    gPipeline.renderObjects(types[i], LLVertexBuffer::MAP_VERTEX, false);
+                    gPipeline.renderObjects(types[i], false, false);
                 }
 
                 gOcclusionProgram.unbind();

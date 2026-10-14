@@ -2152,6 +2152,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyRenderDepthBoundsTest</key>
+        <map>
+            <key>Comment</key>
+            <string>Hold the full-screen lighting and haze passes, and each local light, to the depths they reach with the depth bounds test where the GPU has it (GL_EXT_depth_bounds_test); off, they keep to the depth test. For diagnosing a driver. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderFarPlaneForce</key>
         <map>
             <key>Comment</key>
@@ -2261,6 +2272,61 @@
             <string>F32</string>
             <key>Value</key>
             <real>0.35</real>
+        </map>
+        <key>AlchemyRenderWaterTessDensity</key>
+        <map>
+            <key>Comment</key>
+            <string>Tessellation density of the water's waves: an edge's level is its length times this over its distance from the camera, as the terrain's. Sets how far the waves reach, where the vertex spacing grows to half the large waves' wavelength. 8 to 256.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>32</real>
+        </map>
+        <key>AlchemyRenderWaterWaveHeight</key>
+        <map>
+            <key>Comment</key>
+            <string>Height of the water's waves over what its normal maps integrate to: 1 raises the surface as its shading says it slopes. 0 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>AlchemyRenderWaterWaves</key>
+        <map>
+            <key>Comment</key>
+            <string>Displace the water near the camera into waves, the heights integrated from the normal maps that shade it, so the surface's crests lie where its shading's are. Needs tessellation (OpenGL 4.0).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderWaterOcclusionCull</key>
+        <map>
+            <key>Comment</key>
+            <string>Cull the water's wave patches the scene hides, against a depth pyramid of the main view built with compute, so they are never tessellated. Needs compute (OpenGL 4.3).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderWaterHextile</key>
+        <map>
+            <key>Comment</key>
+            <string>Which of the water's wave layers are hex-tiled, so their repeat does not show: each cell of a hexagonal lattice fixed in the world shows the normal map at its own offset, never turned. 0 none, 1 the large waves, 2 the large and medium waves. Up to three reads per tiled layer instead of one. Change triggers a shader rebuild.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
         </map>
         <key>AlchemyRenderTonemapType</key>
         <map>

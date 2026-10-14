@@ -55,20 +55,27 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
 
     // GL_FRAMEBUFFER_SRGB is enabled for the whole deferred pass in renderGeomDeferred.
 
+    // Only the alpha-mask pass binds a program that can discard. Its materials are all
+    // masked and the opaque pass's never are, so the opaque pass's programs drop the
+    // test and keep their depth writes ahead of shading.
+    const bool alpha_mask = mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR_ALPHA_MASK;
+    LLGLSLShader& scalar_program = alpha_mask ? gDeferredPBRAlphaMaskProgram : gDeferredPBROpaqueProgram;
+    LLGLSLShader& indexed_program = alpha_mask ? gDeferredPBRAlphaMaskIndexedProgram : gDeferredPBROpaqueIndexedProgram;
+
     // Indexed (multi-material) batching applies to the static opaque and alpha-mask
-    // passes. The indexed program writes the GBuffer the same way for both; the
-    // per-slot gltf_minimum_alpha array drives the mask discard (-1 == opaque).
+    // passes. The indexed programs write the GBuffer the same way for both; in the
+    // alpha-mask one the per-slot gltf_minimum_alpha array drives the discard.
     // Only skip multi-material infos in the scalar sweep once BOTH the indexed
     // program and its rigged variant are complete -- otherwise scalar would skip
     // them and the indexed sweep would bind an incomplete program.
     bool indexed = (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR ||
                     mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR_ALPHA_MASK) &&
                    LLGLSLShader::sIndexedGLTFChannels >= 2 &&
-                   gDeferredPBROpaqueIndexedProgram.isComplete() &&
-                   gDeferredPBROpaqueIndexedProgram.mRiggedVariant &&
-                   gDeferredPBROpaqueIndexedProgram.mRiggedVariant->isComplete();
+                   indexed_program.isComplete() &&
+                   indexed_program.mRiggedVariant &&
+                   indexed_program.mRiggedVariant->isComplete();
 
-    LLGLSLShader* opaque = gDeferredPBROpaqueProgram.selectVariant();
+    LLGLSLShader* opaque = scalar_program.selectVariant();
 
     opaque->bind();
     if (indexed)
@@ -92,7 +99,7 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
 
     if (indexed)
     {
-        LLGLSLShader* opaque_indexed = gDeferredPBROpaqueIndexedProgram.selectVariant();
+        LLGLSLShader* opaque_indexed = indexed_program.selectVariant();
         opaque_indexed->bind();
         pushGLTFBatchesIndexed(mRenderType);
 

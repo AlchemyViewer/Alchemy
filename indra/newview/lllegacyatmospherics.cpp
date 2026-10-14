@@ -500,8 +500,6 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
     mFogColor = sky_fog_color;
     mFogColor.setAlpha(1);
 
-    LLDrawPoolWater::sWaterFogEnd = fog_distance*2.2f;
-
     stop_glerror();
 }
 

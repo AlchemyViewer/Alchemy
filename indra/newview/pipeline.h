@@ -40,6 +40,10 @@
 #include "lldrawpoolmaterials.h"
 #include "llgl.h"
 #include "lldrawable.h"
+#include "aldepthpyramid.h"
+#include "alprimitiveplot.h"
+#include "alsamplesquery.h"
+#include "alwatersurface.h"
 #include "altexture3d.h"
 #include "aluniformbuffer.h"
 #include "llrendertarget.h"
@@ -143,6 +147,10 @@ public:
     void bindScreenToTexture();
     void renderFinalize();
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
+    // The current pack's scene depth (mRT->deferredScreen's, which mRT->screen shares) over the whole of `dst`'s,
+    // stretched as a nearest blit would, through gCopyDepthProgram: mWaterDis and mSceneMap keep depth without the
+    // screen's stencil, which a blit's matching formats would make them carry.
+    void copySceneDepth(LLRenderTarget& dst);
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
     void generateLensFlareState(LLRenderTarget* src);
@@ -426,8 +434,9 @@ public:
     // should be called just before rendering pre-water alpha objects
     void doWaterHaze();
 
-    // Generate the water exclusion surface mask.
-    void doWaterExclusionMask();
+    // Mark where the PASS_INVISIBLE prims remove the water in the bound screen target's stencil
+    // (ALWaterStencil::EXCLUDE_BIT), against the scene's depth, before the water draws.
+    void doWaterExclusion();
 
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
@@ -825,8 +834,6 @@ public:
     /// whoever sets a bit owns clearing it -- see ~ALFloaterLightBox.
     static U32              sGradeBypassMask;
 
-    static LLTrace::EventStatHandle<S64> sStatBatchSize;
-
     class RenderTargetPack
     {
     public:
@@ -883,7 +890,6 @@ public:
     LLRenderTarget          mSpotShadow[2];
 
     LLRenderTarget          mPbrBrdfLut;
-    LLRenderTarget          mWaterExclusionMask;
 
     // copy of the color/depth buffer just before gamma correction
     // for use by SSR
@@ -1018,6 +1024,24 @@ public:
     // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.
     LLRenderTarget              mSkyBehind;
     U32                         mSkyBehindFrame = 0;
+    // Whether any water was in front of the sky's depth when the sky pool drew: the sky behind is drawn only then, and
+    // the haze shades the water's pixels only then. Asked in mSkyBehindQueryFrame.
+    ALSamplesQuery              mSkyBehindQuery;
+    U32                         mSkyBehindQueryFrame = 0;
+
+    // The water's layout around the main camera and its map of cell heights, laid out at the start of each main frame.
+    ALWaterSurface              mWaterSurface;
+
+    // The farthest depth under each texel of the main view's depth, built where a GPU cull asks for it.
+    ALDepthPyramid              mDepthPyramid;
+
+    // Profiling tracks, plotted at the start of each main frame for a frame a few before: the primitives the main view's
+    // terrain and water passes draw, the water's flat field and its waves' patches apart, and the draws of water
+    // geometry in every view and pass.
+    ALPrimitivePlot             mTerrainPrimitives{ "terrain primitives", true };
+    ALPrimitivePlot             mWaterPrimitives{ "water primitives", false };
+    ALPrimitivePlot             mWaterPatchPrimitives{ "water patch primitives", true };
+    U32                         mWaterDraws = 0;
 
     static const U32 MAX_PREVIEW_WIDTH;
 

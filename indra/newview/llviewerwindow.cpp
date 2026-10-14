@@ -614,8 +614,6 @@ public:
         static LLCachedControl<bool> debug_show_render_info(gSavedSettings, "DebugShowRenderInfo", false);
         if (debug_show_render_info())
         {
-            LLTrace::Recording& last_frame_recording = LLTrace::get_frame_recording().getLastRecording();
-
             //show streaming cost/triangle count of known prims in current region OR selection
             {
                 F32 cost = 0.f;
@@ -695,7 +693,8 @@ public:
                 ypos += y_inc;
             }
 
-            addText(xpos, ypos, llformat("%d Render Calls", (U32)last_frame_recording.getSampleCount(LLPipeline::sStatBatchSize)));
+            addText(xpos, ypos, llformat("%d Render Calls (%.0f elements each)", LLRender::sDrawCalls,
+                                         LLRender::sDrawCalls ? (F64)LLRender::sDrawElements / LLRender::sDrawCalls : 0.0));
             ypos += y_inc;
 
             addText(xpos, ypos, llformat("%d/%d Objects Active", gObjectList.getNumActiveObjects(), gObjectList.getNumObjects()));
@@ -714,12 +713,6 @@ public:
             gPipeline.mTextureMatrixOpsProbe = 0;
             gPipeline.mTextureMatrixOpsIdentity = 0;
             gPipeline.mMatrixOpCount = 0;
-
-            if (last_frame_recording.getSampleCount(LLPipeline::sStatBatchSize) > 0)
-            {
-                addText(xpos, ypos, llformat("Batch min/max/mean: %d/%d/%d", (U32)last_frame_recording.getMin(LLPipeline::sStatBatchSize), (U32)last_frame_recording.getMax(LLPipeline::sStatBatchSize), (U32)last_frame_recording.getMean(LLPipeline::sStatBatchSize)));
-            }
-            ypos += y_inc;
 
             addText(xpos, ypos, llformat("UI Verts/Calls: %d/%d", LLRender::sUIVerts, LLRender::sUICalls));
             LLRender::sUICalls = LLRender::sUIVerts = 0;

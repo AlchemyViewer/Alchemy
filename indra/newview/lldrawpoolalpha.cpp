@@ -247,8 +247,7 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
     //enable writing to alpha for emissive effects
     gGL.setColorMask(true, true);
 
-    bool write_depth = rigged ||
-        LLDrawPoolWater::sSkipScreenCopy
+    bool write_depth = rigged
         || getType() == LLDrawPoolAlpha::POOL_ALPHA_PRE_WATER; // needed for accurate water fog
 
 

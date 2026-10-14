@@ -2,9 +2,12 @@
 
 set(
   llrender_SOURCES
+  aldepthbounds.cpp
   algpubuffer.cpp
   alimageslot.cpp
+  alprimitiveplot.cpp
   alsamplerstate.cpp
+  alsamplesquery.cpp
   altexture3d.cpp
   altextureslot.cpp
   alfontcolrv1.cpp
@@ -37,9 +40,12 @@ set(
 
 set(
   llrender_HEADERS
+  aldepthbounds.h
   algpubuffer.h
   alimageslot.h
+  alprimitiveplot.h
   alsamplerstate.h
+  alsamplesquery.h
   altexture3d.h
   altextureslot.h
   alfontcolrv1.h
@@ -189,6 +195,8 @@ if(AL_BUILD_TESTS)
   # - tessellation stages and the quad conventions the terrain relies on;
   # - the infinite reverse-Z projection: stored depth, round trip and depth
   #   order out to 100 km;
+  # - the depth bounds test against the depth test it stands in for, and the
+  #   depths a light's sphere spans;
   # - which fragment output reaches a render target's colour attachment, and
   #   integer attachments cleared and drawn;
   # - LLRender's cached clear colour and scissor box, and LLGLSScissor;
@@ -207,6 +215,7 @@ if(AL_BUILD_TESTS)
     llrender_gl_shared_tests
     PROJECT llrender
     SOURCES
+      tests/aldepthbounds_gl_test.cpp
       tests/algpubuffer_gl_test.cpp
       tests/alimageslot_gl_test.cpp
       tests/alinfiniteprojection_gl_test.cpp

@@ -27,7 +27,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "altestmatchers.h"
+
 #include "../alfarplane.h"
+#include "../alwaterfield.h"
+#include "../alwaterheightbake.h"
 
 #include "llcamera.h"
 
@@ -207,7 +211,9 @@ namespace
         UNSCOPED_INFO("the haze pass's in-scatter is alpha's");
         REQUIRE(haze.find("atmosFragLighting(vec3(0), additive, atten)") != std::string::npos);
         UNSCOPED_INFO("water converges on the sky behind");
-        REQUIRE(haze.find("if (on_water && skyBehindWeight > 0.0)") != std::string::npos);
+        REQUIRE(haze.find("#ifdef HAZE_ON_WATER") != std::string::npos);
+        UNSCOPED_INFO("water converges on the sky behind");
+        REQUIRE(haze.find("additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);") != std::string::npos);
         UNSCOPED_INFO("the sky behind is sampled for water");
         REQUIRE(haze.find("texture(skyBehindMap, tc)") != std::string::npos);
         // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
@@ -237,23 +243,44 @@ namespace
         UNSCOPED_INFO("no rim, waves past the regions");
         CHECK(rimless.mWaveClamp >= EDGE_WATER_STRETCH);
 
-        const std::string water_f = shader_source("class3/environment/waterF.glsl");
         const std::string haze = shader_source("class3/deferred/waterHazeF.glsl");
         UNSCOPED_INFO("sky behind water is held past the surface");
         REQUIRE(haze.find("entry + VOID_WATER_FOG_DEPTH") != std::string::npos);
-        const std::string water_v = shader_source("class1/environment/waterV.glsl");
+        const std::string surface = shader_source("class1/environment/waterSurface.glsl");
         UNSCOPED_INFO("wave clamp from the uniform");
-        REQUIRE(water_v.find("min(d, waterFar.x)") != std::string::npos);
+        REQUIRE(surface.find("min(d, waterFar.x)") != std::string::npos);
         UNSCOPED_INFO("no literal wave clamp");
-        REQUIRE(water_v.find("min(d, 2560.0)") == std::string::npos);
-        // The per-fragment rebuild scrolls by the offsets waterV takes from the CPU, which sets no wave direction or time.
-        for (const char* scroll : { "+ bigWaveScroll;", "+ littleWaveScroll.xy;", "+ littleWaveScroll.zw;" })
+        REQUIRE(surface.find("2560.0") == std::string::npos);
+        // The waves follow the phases the CPU takes, the camera and the scroll folded in, which sets no wave direction
+        // or time; both water programs work them per fragment through the one function.
+        for (const char* phase : { "+ waterBigPhase;", "+ waterLittlePhase.xy;", "+ waterLittlePhase.zw;" })
         {
-            UNSCOPED_INFO("waterV scrolls by " << scroll);
-            REQUIRE(water_v.find(scroll) != std::string::npos);
-            UNSCOPED_INFO("rebuilt waves scroll by " << scroll);
-            REQUIRE(water_f.find(scroll) != std::string::npos);
+            UNSCOPED_INFO("waves take " << phase);
+            REQUIRE(surface.find(phase) != std::string::npos);
         }
+        for (const char* path : { "class3/environment/waterF.glsl", "class3/environment/underWaterF.glsl" })
+        {
+            UNSCOPED_INFO(path << " works the waves per fragment");
+            REQUIRE(shader_source(path).find("water_wave_normals(bumpMap, bumpMap2, view.xy, wave1, wave2, wave3);") != std::string::npos);
+        }
+        UNSCOPED_INFO("the wave reads work the coordinates");
+        REQUIRE(surface.find("water_wave_coords(r, big_uv, little_uv);") != std::string::npos);
+        // The CPU places the camera on the tiled layers' lattices; the shader adds the rest of the way to a point, on
+        // the same lattice.
+        UNSCOPED_INFO("the lattice's density");
+        CHECK((F64)literal_after(surface, "#define WATER_HEX_GRID ") == ALWaterField::HEX_GRID);
+        const std::string lattice = shader_source("class1/deferred/hexLatticeUtil.glsl");
+        UNSCOPED_INFO("the lattice's skew");
+        CHECK_THAT(literal_after(lattice, "mat2(1.0, 0.0, "), ll_test::WithinBits((F32)ALWaterField::HEX_SKEW_XY, 16));
+        UNSCOPED_INFO("and its stretch");
+        CHECK_THAT(literal_after(lattice, "mat2(1.0, 0.0, -0.57735027, "), ll_test::WithinBits((F32)ALWaterField::HEX_SKEW_YY, 16));
+        // The waves' patches a cell side, which the draw counts, and the heights' metres, which the bake's bound uses.
+        UNSCOPED_INFO("the patches a cell side");
+        CHECK((S32)literal_after(surface, "#define WATER_PATCHES ") == ALWaterField::PATCHES_PER_CELL);
+        UNSCOPED_INFO("the big layer's metres");
+        CHECK(literal_after(surface, "#define WATER_BIG_METRES ") == ALWaterHeightBake::BIG_METRES);
+        UNSCOPED_INFO("the mid layer's metres");
+        CHECK(literal_after(surface, "#define WATER_MID_METRES ") == ALWaterHeightBake::MID_METRES);
     }
 
     // The far plane overlay: nearer-first pairs out to 100 km on distinct bearings, each farther column behind its

@@ -312,14 +312,20 @@ public:
     bool isRecentlyVisible() const;
     bool isAnyRecentlyVisible() const;
 
-    static U32 getNewOcclusionQueryObjectName();
-    static void releaseOcclusionQueryObjectName(U32 name);
+    /// Query names from a pool kept by the target they are begun with, which a name keeps for life: one begun with
+    /// a target may not be begun with another.
+    static U32 getNewOcclusionQueryObjectName(U32 target);
+    static void releaseOcclusionQueryObjectName(U32 name, U32 target);
 
 protected:
     void releaseOcclusionQueryObjectNames();
 
 private:
     bool earlyFail(LLCamera* camera, const LLVector4a* bounds);
+    /// The target this group's queries are begun with, for its partition and the context.
+    U32  queryTarget() const;
+    /// Discards the pending queries of the groups below this one that its occlusion hid, as it is found visible.
+    void discardStaleQueriesBelow();
 
 protected:
     U32         mOcclusionState[LLViewerCamera::NUM_CAMERAS];
@@ -330,6 +336,7 @@ protected:
     LLViewerOctreePartition* mSpatialPartition;
     U32                      mOcclusionQuery[LLViewerCamera::NUM_CAMERAS];
     U32                      mOcclusionCheckCount[LLViewerCamera::NUM_CAMERAS];
+    U32                      mQueryTarget = 0; ///< queryTarget(), from the group's first query; its names' pool
 
 public:
     static std::set<U32> sPendingQueries;
@@ -363,7 +370,10 @@ class LLViewerOctreeCull : public OctreeTraveler
 {
 public:
     LLViewerOctreeCull(LLCamera* camera)
-        : mCamera(camera), mRes(0) { }
+        : mCamera(camera), mRes(0), mNearFirst(!camera->getOrigin().isExactlyZero())
+    {
+        mEye.load3(camera->getOrigin().mV);
+    }
 
     virtual void traverse(const OctreeNode* n);
 
@@ -401,7 +411,13 @@ protected:
 
 protected:
     LLCamera *mCamera;
+    // The camera in the octree's own space, which traverse() visits children nearest to first while mNearFirst holds:
+    // the groups it hands on then come roughly front to back, and the depth test rejects what nearer ones hide. Off for
+    // a camera at the origin, which the sun's shadow cameras are placed at, and for culls whose results are not drawn
+    // in the order they are found; those keep the children's own order.
+    LLVector4a mEye;
     S32 mRes;
+    bool mNearFirst;
 };
 
 //scan the octree, output the info of each node for debug use.

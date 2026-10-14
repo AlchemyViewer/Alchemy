@@ -49,6 +49,7 @@
 #include "llnotificationsutil.h"
 #include "llslurl.h"
 #include "llsnapshotlivepreview.h"
+#include "llviewercamera.h"
 #include "lltoolfocus.h"
 #include "llviewercontrol.h"
 #include "llviewermenufile.h"   // upload_new_resource()

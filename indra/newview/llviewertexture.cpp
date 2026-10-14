@@ -2916,6 +2916,12 @@ void LLViewerFetchedTexture::forceToRefetchTexture(S32 desired_discard, F32 kept
 
 void LLViewerFetchedTexture::forceToSaveRawImage(S32 desired_discard, F32 kept_time)
 {
+    // A raw image several users want is kept for the longest any asked, until it is destroyed: one asking for less
+    // after another does not cut the other's short.
+    if (mForceToSaveRawImage || mSavedRawDiscardLevel > -1)
+    {
+        kept_time = llmax(kept_time, mKeptSavedRawImageTime);
+    }
     mKeptSavedRawImageTime = kept_time;
     mLastReferencedSavedRawImageTime = sCurrentTime;
 

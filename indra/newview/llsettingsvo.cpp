@@ -1140,8 +1140,6 @@ void LLSettingsVOWater::updateSettings()
     LLDrawPoolWater* pwaterpool = (LLDrawPoolWater*)gPipeline.getPool(LLDrawPool::POOL_WATER);
     if (pwaterpool)
     {
-        pwaterpool->setTransparentTextures(getTransparentTextureID(), getNextTransparentTextureID());
-        pwaterpool->setOpaqueTexture(GetDefaultOpaqueTextureAssetId());
         pwaterpool->setNormalMaps(getNormalMapID(), getNextNormalMapID());
     }
 }

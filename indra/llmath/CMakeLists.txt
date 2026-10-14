@@ -118,6 +118,7 @@ if(AL_BUILD_TESTS)
       tests/llmatrix3a_test.cpp
       tests/llmatrix4a_test.cpp
       tests/llmodularmath_test.cpp
+      tests/lloctree_test.cpp
       tests/llquaternion2_test.cpp
       tests/llquaternion_test.cpp
       tests/llrect_test.cpp

@@ -29,6 +29,7 @@
 #include <set>
 
 #include "lltextureview.h"
+#include "pipeline.h"
 
 #include "llrect.h"
 #include "llerror.h"

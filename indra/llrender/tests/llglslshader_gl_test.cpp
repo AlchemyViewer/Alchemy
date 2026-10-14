@@ -1075,6 +1075,27 @@ namespace
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
+    // The reserved names the depth pyramid and the water's patches use sit where their enum entries say.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: the depth pyramid's and the water patches' reserved names sit at their entries", "[llglslshader_gl]")
+    {
+        const std::pair<S32, const char*> names[] =
+        {
+            { LLShaderMgr::DEPTH_PYRAMID,        "depthPyramid" },
+            { LLShaderMgr::DEPTH_PYRAMID_SOURCE, "depthPyramidSource" },
+            { LLShaderMgr::DEPTH_PYRAMID_TARGET, "depthPyramidTarget" },
+            { LLShaderMgr::DEPTH_PYRAMID_LEVEL,  "depthPyramidLevel" },
+            { LLShaderMgr::DEPTH_PYRAMID_SIZE,   "depthPyramidSize" },
+            { LLShaderMgr::DEPTH_PYRAMID_COUNT,  "depthPyramidCount" },
+            { LLShaderMgr::WATER_OCCLUSION,      "waterOcclusion" },
+            { LLShaderMgr::WATER_PATCH_ORDER,    "waterPatchOrder" },
+        };
+        for (const auto& entry : names)
+        {
+            CAPTURE(entry.second);
+            CHECK(mShaders.mReservedUniforms[entry.first] == std::string(entry.second));
+        }
+    }
+
     // Where the context has compute, its limits are at least what GL 4.3 promises, which is what the features size
     // themselves by.
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: compute limits are at least what GL 4.3 promises", "[llglslshader_gl]")

@@ -31,6 +31,8 @@
 #include <fstream>
 
 #include "llfeaturemanager.h"
+#include "llprocess.h"
+#include "pipeline.h"
 #include "lldir.h"
 
 #include "llsys.h"

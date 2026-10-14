@@ -146,6 +146,7 @@ if(AL_BUILD_VIEWER)
     alcurveeditorctrl.cpp
     alcurvemodel.cpp
     aldaycyclelandmarks.cpp
+    aldepthpyramid.cpp
     alderenderlist.cpp
     aldroptarget.cpp
     alfarplane.cpp
@@ -247,6 +248,9 @@ if(AL_BUILD_VIEWER)
     alscriptweightspane.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
+    alwaterfield.cpp
+    alwaterheightbake.cpp
+    alwatersurface.cpp
     alfloaterscriptstudio.cpp
     alfloaterwebprofile.cpp
     alfloaterxuilibrary.cpp
@@ -967,7 +971,6 @@ if(AL_BUILD_VIEWER)
     llvosurfacepatch.cpp
     llvotree.cpp
     llvovolume.cpp
-    llvowater.cpp
     llvowlsky.cpp
     llwearableitemslist.cpp
     llwearablelist.cpp
@@ -1017,6 +1020,7 @@ if(AL_BUILD_VIEWER)
     alcurveeditorctrl.h
     alcurvemodel.h
     aldaycyclelandmarks.h
+    aldepthpyramid.h
     alderenderlist.h
     aldroptarget.h
     alfarplane.h
@@ -1125,6 +1129,10 @@ if(AL_BUILD_VIEWER)
     alscriptweightspane.h
     alscriptworkspace.h
     alterrainsurfacemaps.h
+    alwaterfield.h
+    alwaterheightbake.h
+    alwaterstencil.h
+    alwatersurface.h
     altexturetable.h
     alfloaterscriptstudio.h
     alfloaterwebprofile.h
@@ -1841,7 +1849,6 @@ if(AL_BUILD_VIEWER)
     llvosurfacepatch.h
     llvotree.h
     llvovolume.h
-    llvowater.h
     llvowlsky.h
     llwearableitemslist.h
     llwearablelist.h
@@ -2130,6 +2137,7 @@ if(AL_BUILD_VIEWER)
       ll::nvapi
       ll::tinygltf
       ll::tinyexr
+      ll::pocketfft
       ll::minizip
       ll::pugixml
       ll::velopack
@@ -2579,6 +2587,8 @@ if(AL_BUILD_TESTS)
       tests/alscriptweightspane_test.cpp
       tests/alterrainsurfacemaps_test.cpp
       tests/altexturetable_test.cpp
+      tests/alwaterfield_test.cpp
+      tests/alwaterheightbake_test.cpp
       tests/alwhitebalancesolver_test.cpp
       tests/cppfeatures_test.cpp
       tests/llagentaccess_test.cpp
@@ -2656,6 +2666,8 @@ if(AL_BUILD_TESTS)
       alscripttheme.cpp
       alscripttypes.cpp
       alscriptweightspane.cpp
+      alwaterfield.cpp
+      alwaterheightbake.cpp
       alwhitebalancesolver.cpp
       llagentaccess.cpp
       llhttpretrypolicy.cpp
@@ -2664,7 +2676,7 @@ if(AL_BUILD_TESTS)
       llviewercontrollistener.cpp
       lutcube.cpp
       noise.cpp
-    LIBRARIES llui alscript ll::slua llxml ${test_libs}
+    LIBRARIES llui alscript ll::slua llxml ll::pocketfft ${test_libs}
     SUPPORT
       newview_test_fakes
       newview_test_settings
@@ -2678,14 +2690,20 @@ if(AL_BUILD_TESTS)
       "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\""
   )
 
-  # The selection outline's id and edge passes, and the window's depth under
-  # the HUD, the viewer's own shader files read from the source tree, on
-  # llrender's shared hidden window.
+  # The selection outline's id and edge passes, the window's depth under the
+  # HUD, and the water surface's draws over the cells the field lays out, with
+  # the cull and the depth pyramid it reads and the waves displaced by heights
+  # the bake integrates from a normal map: the viewer's own shader files read
+  # from the source tree, on llrender's shared hidden window.
   al_add_test_binary(
     newview_gl_tests
     PROJECT ${test_project}
-    SOURCES tests/alhuddepth_gl_test.cpp tests/alselectionoutline_gl_test.cpp
-    LIBRARIES llrender
+    SOURCES
+      tests/alhuddepth_gl_test.cpp
+      tests/alselectionoutline_gl_test.cpp
+      tests/alwatersurface_gl_test.cpp
+    UNIT aldepthpyramid.cpp alwaterfield.cpp alwaterheightbake.cpp
+    LIBRARIES llrender ll::pocketfft
     SUPPORT llrender_test_checks llcommon_test_checks
     INCLUDES ${INDRA_SOURCE_DIR}/llprimitive
     DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""

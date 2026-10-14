@@ -92,7 +92,6 @@
 #include "llvosurfacepatch.h"
 #include "llvotree.h"
 #include "llvovolume.h"
-#include "llvowater.h"
 #include "llworld.h"
 #include "llui.h"
 #include "pipeline.h"
@@ -163,8 +162,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
     if (gNonInteractive
         && pcode != LL_PCODE_LEGACY_AVATAR
         && pcode != LL_VO_SURFACE_PATCH
-        && pcode != LL_VO_WATER
-        && pcode != LL_VO_VOID_WATER
         && pcode != LL_VO_WL_SKY
         && pcode != LL_VO_SKY
         && pcode != LL_VO_PART_GROUP
@@ -234,10 +231,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
       res = new LLVOSurfacePatch(id, pcode, regionp); break;
     case LL_VO_SKY:
       res = new LLVOSky(id, pcode, regionp); break;
-    case LL_VO_VOID_WATER:
-        res = new LLVOVoidWater(id, pcode, regionp); break;
-    case LL_VO_WATER:
-        res = new LLVOWater(id, pcode, regionp); break;
     case LL_VO_PART_GROUP:
       res = new LLVOPartGroup(id, pcode, regionp); break;
     case LL_VO_HUD_PART_GROUP:
@@ -629,7 +622,6 @@ void LLViewerObject::initVOClasses()
     LLVOTree::initClass();
     LL_INFOS() << "Viewer Object size: " << sizeof(LLViewerObject) << LL_ENDL;
     LLVOGrass::initClass();
-    LLVOWater::initClass();
     LLVOVolume::initClass();
 
     initObjectDataMap();
@@ -638,7 +630,6 @@ void LLViewerObject::initVOClasses()
 void LLViewerObject::cleanupVOClasses()
 {
     SUBSYSTEM_CLEANUP(LLVOGrass);
-    SUBSYSTEM_CLEANUP(LLVOWater);
     SUBSYSTEM_CLEANUP(LLVOTree);
     SUBSYSTEM_CLEANUP(LLVOAvatar);
     SUBSYSTEM_CLEANUP(LLVOVolume);

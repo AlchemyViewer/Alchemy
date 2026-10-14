@@ -961,12 +961,16 @@ void LLVertexBuffer::drawRange(U32 mode, U32 start, U32 end, U32 count, U32 indi
     glDrawRangeElements(sGLMode[mode], start, end, count, mIndicesType,
         (GLvoid*) (indices_offset * (size_t) mIndicesStride));
     STOP_GLERROR;
+    ++LLRender::sDrawCalls;
+    LLRender::sDrawElements += count;
 }
 
 void LLVertexBuffer::drawRangeFast(U32 mode, U32 start, U32 end, U32 count, U32 indices_offset) const
 {
     glDrawRangeElements(sGLMode[mode], start, end, count, mIndicesType,
         (GLvoid*)(indices_offset * (size_t)mIndicesStride));
+    ++LLRender::sDrawCalls;
+    LLRender::sDrawElements += count;
 }
 
 
@@ -987,6 +991,8 @@ void LLVertexBuffer::drawArrays(U32 mode, U32 first, U32 count) const
     STOP_GLERROR;
     glDrawArrays(sGLMode[mode], first, count);
     STOP_GLERROR;
+    ++LLRender::sDrawCalls;
+    LLRender::sDrawElements += count;
 }
 
 //static
