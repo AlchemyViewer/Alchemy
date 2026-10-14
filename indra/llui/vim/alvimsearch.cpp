@@ -49,6 +49,10 @@ bool ALVimSearch::search(ALTextView& view, const std::string& pattern, bool forw
         mVim.noteJump(view, start);
     }
     mVim.moveTo(view, *to);
+    if (!mVim.mOperator)
+    {
+        view.scrollToShow(mVim.cursor(view), ALTextView::FOUND_CONTEXT);
+    }
     return true;
 }
 
@@ -432,7 +436,7 @@ void ALVimSearch::incrementalSearch(ALTextView& view)
         host->setLayer(ALVimHost::Layer::Search, { next });
         mFound.lit = nullptr;
     }
-    view.scrollToShow(next.begin);
+    view.scrollToShow(next.begin, ALTextView::FOUND_CONTEXT);
 }
 
 void ALVimSearch::endIncremental(ALTextView& view)

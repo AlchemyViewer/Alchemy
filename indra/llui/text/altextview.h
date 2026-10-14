@@ -706,8 +706,12 @@ public:
     // A place brought into sight as the caret is, the view moved no
     // further than it must, and not left under what is drawn over the top
     // (coveredAbove): what is shown without the caret going there, such
-    // as a match found ahead of it.
-    void scrollToShow(const ALTextPos& pos);
+    // as a match found ahead of it. With `context` rows of the text kept
+    // in sight above and below it, as far as the page holds them.
+    void scrollToShow(const ALTextPos& pos, S32 context = 0);
+    // The rows kept in sight either side of what a search finds, so that
+    // it is read in its place rather than at the page's edge.
+    static constexpr S32 FOUND_CONTEXT = 3;
     // The line at the top of the view, whatever is drawn over it.
     void scrollToLine(S32 line);
     S32  firstVisibleLine();
