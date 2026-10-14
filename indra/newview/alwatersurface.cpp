@@ -147,13 +147,16 @@ void ALWaterSurface::update()
         reach = ALWaterField::reachAcross(ALWaterField::tessReach(settings.mDensity), (F64)above);
     }
 
-    // The draw distance as the main view takes it: probe captures and mirrors set the camera's own far plane, and the
-    // field is laid out before they draw.
+    // The draw distance and the projection as the main view takes them this frame (display_update_camera): probe
+    // captures and mirrors set the camera's own, and the field is laid out before they draw and before the main view's
+    // are set.
     const LLVector3d eye = gAgent.getPosGlobalFromAgent(eye_agent);
     const F32 draw_distance = ALFarPlane::clampDrawDistance(gAgentCamera.mDrawDistance, LLRender::sReverseZ);
+    static LLCachedControl<S32> force_projection(gSavedSettings, "AlchemyRenderFarPlaneForce", ALFarPlane::FORCE_AUTOMATIC);
+    const bool infinite = ALFarPlane::isInfinite(
+        ALFarPlane::projectionFar(LLRender::sReverseZ, false, force_projection(), gAgentCamera.mDrawDistance));
     const ALWaterField::Layout layout = ALWaterField::layout(eye.mdV[VX], eye.mdV[VY], REGION_WIDTH_METERS, draw_distance,
-                                                             ALFarPlane::edgeWaterStretch(camera->isMainViewInfinite()),
-                                                             mScratch.mRegions, reach);
+                                                             ALFarPlane::edgeWaterStretch(infinite), mScratch.mRegions, reach);
     if (layout.mCells == 0)
     {
         // A camera at no finite place lays out nothing; the last frame's field stays.
