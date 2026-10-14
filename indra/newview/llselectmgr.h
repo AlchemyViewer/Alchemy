@@ -443,11 +443,8 @@ public:
     static bool                 sRenderHiddenSelections;    // do we show selection silhouettes that are occluded?
     static bool                 sRenderLightRadius; // do we show the radius of selected lights?
 
-    static F32                  sHighlightAlpha;
     static LLUIColor            sSilhouetteParentColor;
     static LLUIColor            sSilhouetteChildColor;
-    static LLUIColor            sHighlightParentColor;
-    static LLUIColor            sHighlightChildColor;
     static LLUIColor            sHighlightInspectColor;
     static LLUIColor            sContextSilhouetteColor;
 

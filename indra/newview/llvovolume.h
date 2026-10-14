@@ -203,6 +203,14 @@ public:
     /*virtual*/ void    setSelected(bool sel) override;
     /*virtual*/ bool    setDrawableParent(LLDrawable* parentp) override;
 
+    // Whether a face draws nothing: blended at an alpha of 0, its colour's or, under a GLTF material, its base
+    // colour's, and without glow. An invisible prim. Such a face is given geometry, in
+    // LLRenderPass::PASS_ALPHA_INVISIBLE, only for Highlight Transparent, a scripted beacon or, while its object is
+    // selected, the selection outline (ALSelectionOutline), which draws faces from their vertex buffers.
+    static bool isInvisibleFace(const LLTextureEntry* te);
+    // Whether any of this object's faces is (isInvisibleFace).
+    bool hasInvisibleFace() const;
+
     /*virtual*/ void    setScale(const LLVector3 &scale, bool damped) override;
 
     /*virtual*/ void    changeTEImage(S32 index, LLViewerTexture* new_image) override;

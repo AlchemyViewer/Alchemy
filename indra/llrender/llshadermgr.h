@@ -633,6 +633,11 @@ public:
         SELECTION_PALETTE,                  //  "selectionPalette"  each id's visible and hidden colours
         SELECTION_GLOW_REACH_MAP,           //  "selectionGlowReachMap"  the glowing ids within the glow's reach of each tile
         SELECTION_GLOW_ROW_MAP,             //  "selectionGlowRowMap"  the nearest glowing texel along each texel's row
+        SELECTION_BACKDROP_MAP,             //  "selectionBackdrop"  the window behind the lines, at half its resolution
+        SELECTION_CONTRAST,                 //  "selection_contrast"  how lines are kept apart from the backdrop (EContrast)
+        SELECTION_KEEP_CUT,                 //  "selection_keep_cut"  1 where texels the alpha test cuts are kept as unshown surface
+        SELECTION_TILE_DEPTH_MAP,           //  "selectionTileDepthMap"  each tile's nearest eye distance not glowing
+        OUTLINE_RIM_WIDTH,                  //  "outline_rim_width"  the contour's rim in pixels, 0 for none
 
         WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
 

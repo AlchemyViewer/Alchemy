@@ -917,7 +917,7 @@
     reference="PolarityGreen"/>
    <color
     name="SilhouetteChildColor"
-    value="0.13 0.42 0.77 1"/>
+    value="0.26 0.84 1 1"/>
    <color
     name="SilhouetteParentColor"
     reference="Yellow"/>

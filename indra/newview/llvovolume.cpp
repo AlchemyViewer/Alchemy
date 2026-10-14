@@ -4581,6 +4581,10 @@ void LLVOVolume::updateReflectionProbePtr()
 
 void LLVOVolume::setSelected(bool sel)
 {
+    // An invisible face has geometry only while its object is selected, and its faces are sorted into their passes
+    // when its group is rebuilt (LLVolumeGeometryManager::rebuildGeom), which an update alone does not do.
+    const bool regroup = sel != isSelected() && hasInvisibleFace();
+
     LLViewerObject::setSelected(sel);
     if (isAnimatedObject())
     {
@@ -4593,6 +4597,38 @@ void LLVOVolume::setSelected(bool sel)
             markForUpdate();
         }
     }
+
+    if (regroup)
+    {
+        dirtySpatialGroup();
+    }
+}
+
+// static
+bool LLVOVolume::isInvisibleFace(const LLTextureEntry* te)
+{
+    if (!te || te->getGlow() > 0.f)
+    {
+        return false;
+    }
+    const LLGLTFMaterial* gltf = te->getGLTFRenderMaterial();
+    if (gltf)
+    {
+        return gltf->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_BLEND && gltf->mBaseColor.mV[VALPHA] <= 0.f;
+    }
+    return te->getColor().mV[VALPHA] <= 0.f;
+}
+
+bool LLVOVolume::hasInvisibleFace() const
+{
+    for (U8 te = 0; te < getNumTEs(); ++te)
+    {
+        if (isInvisibleFace(getTE(te)))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void LLVOVolume::updateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
@@ -6212,6 +6248,10 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                             { //draw the transparent face for debugging purposes using a custom texture
                                 add_face(sAlphaFaces, alpha_count, facep);
                             }
+                            else if (vobj->isSelected())
+                            { // the selection outline draws it from its vertex buffer (LLVOVolume::isInvisibleFace)
+                                add_face(sAlphaFaces, alpha_count, facep);
+                            }
                         }
                     }
                     else
@@ -6239,7 +6279,9 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                                     {
                                         if (gltf_mat->mBaseColor.mV[3] == 0.0f && !LLDrawPoolAlpha::sShowDebugAlpha)
                                         {
-                                            should_render = false;
+                                            // Kept while selected for the selection outline, which draws it from its
+                                            // vertex buffer; genDrawInfo puts it in a pass nothing else draws.
+                                            should_render = vobj->isSelected() && LLVOVolume::isInvisibleFace(te);
                                         }
                                     }
                                     if (should_render)
@@ -7101,7 +7143,20 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 is_alpha |= blinn_phong_transparent;
             }
 
-            if (gltf_mat || (mat && !hud_group))
+            // A GLTF material's face blends whatever its pool, which rebuildGeom picks without the diffuse map it takes
+            // away from such a face.
+            if ((is_alpha || gltf_mat) && LLVOVolume::isInvisibleFace(te))
+            { //100% transparent, whatever its material, don't render unless we're highlighting transparent
+                is_alpha = true;
+                // A reflection probe's volume is shown transparent only where RenderReflectionProbeShowTransparent
+                // says; a selected one is here for its selection outline alone, which draws it from its vertex buffer.
+                static LLCachedControl<bool> render_reflection_object(gSavedSettings, "RenderReflectionProbeShowTransparent", false);
+                if (render_reflection_object || !facep->getViewerObject()->isReflectionProbe())
+                {
+                    registerFace(group, facep, LLRenderPass::PASS_ALPHA_INVISIBLE, material_slots);
+                }
+            }
+            else if (gltf_mat || (mat && !hud_group))
             {
                 bool material_pass = false;
 
@@ -7257,11 +7312,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
             else if (is_alpha)
             {
                 // can we safely treat this as an alpha mask?
-                if (facep->getFaceColor().mV[3] <= 0.f)
-                { //100% transparent, don't render unless we're highlighting transparent
-                    registerFace(group, facep, LLRenderPass::PASS_ALPHA_INVISIBLE, material_slots);
-                }
-                else if (facep->canRenderAsMask() && !hud_group)
+                if (facep->canRenderAsMask() && !hud_group)
                 {
                     if (te->getFullbright() || LLPipeline::sNoAlpha)
                     {

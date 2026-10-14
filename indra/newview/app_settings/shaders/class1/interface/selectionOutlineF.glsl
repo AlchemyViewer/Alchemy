@@ -45,6 +45,9 @@ uniform sampler2D selectionPalette;
 // holds the drawn surface of an object that glows.
 uniform sampler2D selectionTileMap;
 
+// The tile pass's other record: each tile's nearest eye distance of a surface that does not glow.
+uniform sampler2D selectionTileDepthMap;
+
 // Where something glows: the glow reach pass's record of the glowing ids within the glow's reach of each tile
 // (selectionGlowReachF.glsl), and the glow row pass's distance along each texel's row to the nearest glowing texel
 // (selectionGlowRowF.glsl).
@@ -55,6 +58,9 @@ uniform sampler2D selectionGlowRowMap;
 // is anti-aliased across.
 uniform int outline_width;
 uniform int outline_inner_width;
+
+// The width in pixels of the rim cased outside the contour under ALSelectionOutline::CONTRAST_RIM, 0 for none.
+uniform int outline_rim_width;
 
 // How far in pixels the glow reaches past its object's silhouette; 0 where nothing glows, and the pass reaches no
 // further than its lines. Its brightness, RenderHighlightBrightness.
@@ -67,7 +73,7 @@ uniform float outline_glow_brightness;
 #define TILE_SIZE 8
 
 // What an edge between two objects keeps of its object's opacity (ALSelectionOutline::INNER_OPACITY).
-const float INNER_OPACITY = 0.6;
+const float INNER_OPACITY = 0.8;
 
 // The glow's profile at its object's silhouette before the brightness (ALSelectionOutline::GLOW_PEAK).
 const float GLOW_PEAK = 0.25;
@@ -92,6 +98,11 @@ bool isDrawn(vec4 texel);
 bool isVisible(vec4 texel);
 float eyeDistance(float depth);
 
+// selectionContrastF.glsl
+vec4 backdropColour(vec2 pixel, bool masked);
+vec3 contrastColour(vec3 colour, vec4 back);
+vec3 rimColour(vec3 line);
+
 vec4 paletteColour(int id, bool visible)
 {
     int row = (id / PALETTE_WIDTH) * 2 + (visible ? 0 : 1);
@@ -105,6 +116,20 @@ vec4 paletteColour(int id, bool visible)
 float coverage(float dist, float width)
 {
     return 1.0 - smoothstep(width, width + 1.0, dist);
+}
+
+// A contour in `colour` `dist` from the centre of its object's nearest texel, premultiplied: the line outline_width
+// wide, and past it the rim, outline_rim_width wide, in the line's rim colour (selectionContrastF.glsl).
+vec4 contourLayer(vec4 colour, float dist)
+{
+    float line = coverage(dist, float(outline_width));
+    vec4 layer = vec4(colour.rgb, 1.0) * (colour.a * line);
+    if (outline_rim_width > 0)
+    {
+        float rim = colour.a * (coverage(dist, float(outline_width + outline_rim_width)) - line);
+        layer += vec4(rimColour(colour.rgb), 1.0) * rim;
+    }
+    return layer;
 }
 
 // The glow's opacity before its colour's alpha, `dist` from the centre of its object's nearest texel, the
@@ -143,18 +168,20 @@ float depthSlope(ivec2 pos, ivec2 size, ivec2 step, int id, float depth)
 // any object; on one, of another object, or of its own where the jump pass marked the near side of a jump. The
 // texel's tile records each: without such a tile the disk search finds nothing to draw. `jump` says whether any of
 // those tiles holds the near side of a jump, without which no texel within the reach is one and the jump pass's
-// marks need not be read.
-bool candidateWithin(ivec2 pos, int reach, int own_id, out bool jump)
+// marks need not be read. `nearest` is the nearest eye distance those tiles record of a surface that does not glow.
+bool candidateWithin(ivec2 pos, int reach, int own_id, out bool jump, out float nearest)
 {
     ivec2 last = textureSize(selectionTileMap, 0) - ivec2(1);
     ivec2 lo = max(pos - ivec2(reach), ivec2(0)) / TILE_SIZE;
     ivec2 hi = min((pos + ivec2(reach)) / TILE_SIZE, last);
     bool found = false;
     jump = false;
+    nearest = 1.0e30;
     for (int y = lo.y; y <= hi.y; ++y)
     {
         for (int x = lo.x; x <= hi.x; ++x)
         {
+            nearest = min(nearest, texelFetch(selectionTileDepthMap, ivec2(x, y), 0).r);
             vec4 tile = texelFetch(selectionTileMap, ivec2(x, y), 0);
             int lowest = int(tile.r * 65535.0 + 0.5);
             int highest = int(tile.g * 65535.0 + 0.5);
@@ -241,17 +268,48 @@ void main()
 
     // Every texel in the disk the lines reach, so features thinner than a line are not stepped over. Texels off the
     // target are not there: clamping them would read the edge's again, nearer than it is.
-    int line_reach = max(outline_width, outline_inner_width) + 1;
+    int line_reach = max(outline_width + outline_rim_width, outline_inner_width) + 1;
     int inner_reach = outline_inner_width + 1;
     int glow_reach = (outline_glow_radius > 0) ? outline_glow_radius + 1 : 0;
     bool glow_near = (glow_reach > 0) && glowWithin(pos, own_id);
     // A texel of the pixel's own object counts only where it is the near side of a jump, and only within the lines'
     // reach, as a glow is never drawn over its own object: the tiles that reach covers say whether one can be.
     bool jump_near = false;
-    bool line_near = candidateWithin(pos, line_reach, own_id, jump_near);
+    float tile_nearest = 0.0;
+    bool line_near = candidateWithin(pos, line_reach, own_id, jump_near, tile_nearest);
     if (!glow_near && !line_near)
     {
         discard;
+    }
+
+    // The plane of this pixel's own surface, found when it is first needed.
+    bool planed = false;
+    float own_depth = 0.0;
+    vec2 slope = vec2(0.0);
+
+    // On an object, another stands in front of the pixel only where it is nearer than the plane of the pixel's own
+    // surface, carried over to it. Where every tile within the lines' reach lies no nearer than that plane does
+    // anywhere in the reach, none can, and only the edges between objects that touch are left to find, within
+    // their own reach. A glowing pixel draws what touches it too, and a jump is its own object in front of itself.
+    int line_search = line_reach;
+    if (line_near && own_id != 0 && !own_glows && !jump_near)
+    {
+        own_depth = texelFetch(depthMap, pos, 0).r;
+        slope = vec2(depthSlope(pos, size, ivec2(1, 0), own_id, own_depth),
+                     depthSlope(pos, size, ivec2(0, 1), own_id, own_depth));
+        planed = true;
+        // Stored depth is affine across the square, and eye distance follows it one way, so the plane is farthest at
+        // a corner.
+        float plane_far = 0.0;
+        for (int corner = 0; corner < 4; ++corner)
+        {
+            vec2 to = vec2(((corner & 1) == 0) ? -line_reach : line_reach, ((corner & 2) == 0) ? -line_reach : line_reach);
+            plane_far = max(plane_far, eyeDistance(clamp(own_depth + dot(slope, to), 0.0, 1.0)));
+        }
+        if (tile_nearest >= plane_far)
+        {
+            line_search = inner_reach;
+        }
     }
 
     // The glow: the nearest drawn texel of a glowing object in front of this pixel, the lower id where two are as
@@ -271,12 +329,7 @@ void main()
     {
         glowFromRows(pos, size, glow_reach, glow_id, glow_d2);
     }
-    int reach = glow_taps ? max(line_reach, glow_reach) : line_reach;
-
-    // The plane of this pixel's own surface, found when the first candidate needs it.
-    bool planed = false;
-    float own_depth = 0.0;
-    vec2 slope = vec2(0.0);
+    int reach = glow_taps ? max(line_search, glow_reach) : line_search;
 
     // The contour: of the drawn objects in front of this pixel, the highest priority's from its nearest texel, and
     // the nearest's. An object not drawn is no candidate, so its hidden shape neither draws nor masks another's.
@@ -296,10 +349,13 @@ void main()
     int disk = (line_near || glow_taps) ? reach : -1;
     for (int dy = -disk; dy <= disk; ++dy)
     {
-        for (int dx = -disk; dx <= disk; ++dx)
+        // The disk's row, the texels within `reach`: the half a texel added keeps a square's root from rounding
+        // below it, and is less than the next square is away.
+        int span = int(sqrt(float(reach * reach - dy * dy) + 0.5));
+        for (int dx = -span; dx <= span; ++dx)
         {
             ivec2 tap_pos = pos + ivec2(dx, dy);
-            if (dx * dx + dy * dy > reach * reach || any(lessThan(tap_pos, ivec2(0))) || any(greaterThanEqual(tap_pos, size)))
+            if (any(lessThan(tap_pos, ivec2(0))) || any(greaterThanEqual(tap_pos, size)))
             {
                 continue;
             }
@@ -380,6 +436,11 @@ void main()
         }
     }
 
+    // What lies behind the lines here, which the edges and the contour are shifted away from, read only where one is
+    // drawn, and of it only what shows no selected surface; the glow is left as its colour is.
+    vec4 back = (inner_dist <= float(inner_reach) || top_id != 0) ? backdropColour(vec2(pos) + vec2(0.5), true)
+                                                                  : vec4(0.0);
+
     // Premultiplied: the glow, the edge over it, and the contour over both.
     vec3 rgb = vec3(0.0);
     float alpha = 0.0;
@@ -393,18 +454,32 @@ void main()
     {
         vec4 colour = paletteColour(own_id, isVisible(own));
         float inner_alpha = colour.a * INNER_OPACITY * coverage(inner_dist, float(outline_inner_width));
-        rgb = colour.rgb * inner_alpha + rgb * (1.0 - inner_alpha);
-        alpha = inner_alpha + alpha * (1.0 - inner_alpha);
+        if (inner_alpha > 0.0)
+        {
+            rgb = contrastColour(colour.rgb, back) * inner_alpha + rgb * (1.0 - inner_alpha);
+            alpha = inner_alpha + alpha * (1.0 - inner_alpha);
+        }
     }
     if (top_id != 0)
     {
+        // Each contour a premultiplied layer, rim and all; the top's over the nearest's.
+        float outer = float(outline_width + outline_rim_width);
         vec4 top_colour = paletteColour(top_id, top_visible);
-        float top_alpha = top_colour.a * coverage(top_dist, float(outline_width));
-        vec4 near_colour = paletteColour(near_id, near_visible);
-        float near_alpha = (near_id != top_id) ? near_colour.a * coverage(near_dist, float(outline_width)) : 0.0;
+        if (coverage(top_dist, outer) > 0.0)
+        {
+            top_colour.rgb = contrastColour(top_colour.rgb, back);
+        }
+        vec4 top_layer = contourLayer(top_colour, top_dist);
+        vec4 near_layer = vec4(0.0);
+        if (near_id != top_id && coverage(near_dist, outer) > 0.0)
+        {
+            vec4 near_colour = paletteColour(near_id, near_visible);
+            near_colour.rgb = contrastColour(near_colour.rgb, back);
+            near_layer = contourLayer(near_colour, near_dist);
+        }
 
-        vec3 contour_rgb = top_colour.rgb * top_alpha + near_colour.rgb * near_alpha * (1.0 - top_alpha);
-        float contour_alpha = top_alpha + near_alpha * (1.0 - top_alpha);
+        vec3 contour_rgb = top_layer.rgb + near_layer.rgb * (1.0 - top_layer.a);
+        float contour_alpha = top_layer.a + near_layer.a * (1.0 - top_layer.a);
         rgb = contour_rgb + rgb * (1.0 - contour_alpha);
         alpha = contour_alpha + alpha * (1.0 - contour_alpha);
     }

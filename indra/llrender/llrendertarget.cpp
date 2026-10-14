@@ -905,6 +905,28 @@ void LLRenderTarget::copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0
     }
 }
 
+void LLRenderTarget::copyFromBound(S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0, S32 dstX1, S32 dstY1,
+                                   U32 filter)
+{
+    // What gGL has batched is drawn into the bound framebuffer before the blit reads it.
+    gGL.flush();
+
+    if (!mFBO)
+    {
+        LL_WARNS() << "Cannot copy into a render target without a framebuffer." << LL_ENDL;
+        return;
+    }
+
+    LL_PROFILE_GPU_ZONE("LLRenderTarget::copyFromBound");
+    // glBlitFramebuffer writes only where the scissor test passes.
+    LLGLDisable scissor(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, sCurFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFBO);
+    glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, GL_COLOR_BUFFER_BIT, filter);
+    stop_glerror();
+    glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
+}
+
 bool LLRenderTarget::isComplete() const
 {
     return !mTex.empty() || mDepth;

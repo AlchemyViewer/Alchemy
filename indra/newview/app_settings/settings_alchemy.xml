@@ -2474,13 +2474,46 @@
         <key>AlchemySelectionOutlineWidth</key>
         <map>
             <key>Comment</key>
-            <string>Width in pixels of the outline around selected objects, in the world and on the HUD, at a UI scale of 1; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <string>Width in pixels of the outline around selected objects, in the world and on the HUD, at a UI scale of 1, while the selection wireframe is off; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>3.0</real>
+        </map>
+        <key>AlchemySelectionOutlineWireframeWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the outline around selected objects while the selection wireframe is on, at a UI scale of 1; it grows with the UI scale. Range 1 to 16. Applies live.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
             <real>2.0</real>
+        </map>
+        <key>AlchemySelectionOutlineContrast</key>
+        <map>
+            <key>Comment</key>
+            <string>How selection outlines stay visible over what lies behind them. 0: drawn in their colours as they are. 1: their lightness, the wireframe's too, moved away from that of what lies around them where the two are too alike, their hue kept. 2: their colours as they are, the outline cased by a thin rim, dark around a light line and light around a dark one. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
+        <key>AlchemySelectionOutlineGeometry</key>
+        <map>
+            <key>Comment</key>
+            <string>Outline and wireframe the whole faces of selected objects, whatever their textures' alpha cuts away, so an alpha card shows its card rather than its leaf. Not while RLVa prevents Highlight Transparent; always while Highlight Transparent is on. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
         </map>
         <key>AlchemySelectionWireframe</key>
         <map>
@@ -2492,6 +2525,17 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>AlchemySelectionWireframeWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the selection wireframe's lines at a UI scale of 1; it grows with the UI scale. Range 1 to 8. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
         </map>
         <key>AlchemyRenderUBOUpdateMode</key>
         <map>
