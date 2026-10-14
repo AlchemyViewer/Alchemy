@@ -290,6 +290,40 @@ namespace
         CHECK(texts(out) == std::vector<std::string>{ "ll.Say" });
     }
 
+    TEST_CASE_METHOD(alscriptstudiowords_data, "alscriptstudiowords: a library's table completes as one, and once where it is a type too", "[alscriptstudiowords]")
+    {
+        slua["functions"]["lljson"]        = LLSD().with("tooltip", "JSON library.");
+        slua["functions"]["lljson.encode"] = LLSD().with("return", "string").with("arguments", LLSD().with(0, argument("value", "any")));
+        slua["functions"]["string"]        = LLSD().with("tooltip", "String library.");
+        slua["types"]["string"]            = LLSD().with("tooltip", "Text.");
+        Words::forget();
+        const Vocab& lljson = known(true, "lljson");
+        {
+            INFO("Tapple's: a table, called by its name alone");
+            CHECK(lljson.table);
+            CHECK(lljson.detail == "lljson");
+        }
+        const ALCodeEditor::Completion c = Words::completionFor(lljson, true);
+        {
+            INFO("completed as a namespace, a dot after it");
+            CHECK(c.table);
+            CHECK(c.kind == ALSyntaxKind::Namespace);
+        }
+        UNSCOPED_INFO("a member of it, a function");
+        CHECK_FALSE(known(true, "lljson.encode").table);
+        UNSCOPED_INFO("one that gives something, a function");
+        CHECK_FALSE(known(true, "math.pi").table);
+
+        ALCodeEditor&                         e = editor("str\n", true);
+        std::vector<ALCodeEditor::Completion> out;
+        Words::complete(true, e, ALTextPos(0, 3), "str", {}, "Snippet", out);
+        {
+            INFO("a table that is a type too: offered once, as the type");
+            REQUIRE(texts(out) == std::vector<std::string>{ "string" });
+            CHECK_FALSE(out[0].table);
+        }
+    }
+
     TEST_CASE_METHOD(alscriptstudiowords_data, "alscriptstudiowords: hover text names a member in full and notes the deprecated", "[alscriptstudiowords]")
     {
         ALCodeEditor& s = editor("ll.Say(0)\nx = math.pi\n", true);

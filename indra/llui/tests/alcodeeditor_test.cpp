@@ -1406,6 +1406,48 @@ namespace
         CHECK(e.text() == std::string("("));
     }
 
+    TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: a library's table completes with a dot and the list again", "[alcodeeditor]")
+    {
+        ALCodeEditor& e = make("", "slua");
+        e.setCompletionProvider([](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            ALCodeEditor::Completion table;
+            table.text   = "lljson";
+            table.detail = "lljson";
+            table.kind   = ALSyntaxKind::Namespace;
+            table.table  = true;
+            ALCodeEditor::Completion member;
+            member.text   = "lljson.encode";
+            member.detail = "lljson.encode(value)";
+            member.kind   = ALSyntaxKind::Function;
+            for (const ALCodeEditor::Completion& c : { table, member })
+            {
+                if (ALCodeEditor::matchTier(c.text, prefix) >= 0)
+                {
+                    out.push_back(c);
+                }
+            }
+        });
+        type("llj");
+        REQUIRE(e.completionOpen());
+        key(KEY_TAB);
+        UNSCOPED_INFO("Tapple's: a dot, not brackets");
+        CHECK(e.text() == std::string("lljson."));
+        CHECK(e.caret() == ALTextPos(0, 7));
+        UNSCOPED_INFO("and the list of what it holds");
+        CHECK(e.completionOpen());
+
+        // A dot there already is gone past.
+        e.setText(".encode(x)");
+        e.setCaret(ALTextPos(0, 0));
+        type("llj");
+        REQUIRE(e.completionOpen());
+        key(KEY_TAB);
+        UNSCOPED_INFO("no second dot");
+        CHECK(e.text() == std::string("lljson.encode(x)"));
+        UNSCOPED_INFO("the caret past the dot");
+        CHECK(e.caret() == ALTextPos(0, 7));
+    }
+
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: completion opens as configured and Return takes it or starts a line", "[alcodeeditor]")
     {
         ALCodeEditor& e = make("integer counter;\n");

@@ -3845,6 +3845,21 @@ void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
         setFocus(true);
         return;
     }
+    // A library's table: a dot after it, or past the one there, and the
+    // list of what it holds.
+    if (chosen.table)
+    {
+        const std::string& line   = document().line(range.end.line);
+        const bool         dotted = range.end.column < static_cast<S32>(line.size()) && line[range.end.column] == '.';
+        insertText(dotted ? chosen.text : chosen.text + ".");
+        if (dotted)
+        {
+            setCaret(ALTextPos(caret().line, caret().column + 1));
+        }
+        setFocus(true);
+        openCompletion(true);
+        return;
+    }
     // A function called: its brackets, unless they are there already,
     // with the caret between them where it takes anything, and the
     // signature asked for.
@@ -3901,6 +3916,16 @@ ALTextEditing::Change ALCodeEditor::completionAt(const Completion& chosen, const
         one.selects = true;
         one.anchor  = land.begin;
         one.caret   = land.end;
+        return one;
+    }
+    // A library's table, as complete() has it: a dot after it, or past the
+    // one there.
+    if (chosen.table)
+    {
+        const std::string& line   = document().line(over.end.line);
+        const bool         dotted = over.end.column < static_cast<S32>(line.size()) && line[over.end.column] == '.';
+        one.replacements.push_back({ over, dotted ? chosen.text : chosen.text + "." });
+        one.caret = ALTextEditing::endOf(over.begin, chosen.text + ".");
         return one;
     }
     // A function called, as complete() calls it: its first parameter
