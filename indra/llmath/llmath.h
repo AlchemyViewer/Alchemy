@@ -35,9 +35,9 @@
 #include <cstdlib>
 #include <limits>
 #include "lldefs.h"
-// lltut.h uses is_approx_equal_fraction(). This was moved to its own header
-// file in llcommon so we can use lltut.h for llcommon tests without making
-// llcommon depend on llmath.
+// The tests' float matchers use is_approx_equal_fraction(). This was moved
+// to its own header file in llcommon so llcommon's tests can use them without
+// making llcommon depend on llmath.
 #include "is_approx_equal_fraction.h"
 
 inline bool llisnan(F32 val) noexcept { return std::isnan(val); }

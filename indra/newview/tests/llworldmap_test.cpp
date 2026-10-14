@@ -36,7 +36,6 @@
 #include "../llworldmapmessage.h"
 // Class to test
 #include "../llworldmap.h"
-// Tut header
 #include <catch2/catch_test_macros.hpp>
 
 // -------------------------------------------------------------------------------------------
@@ -95,7 +94,7 @@ LLControlGroup gSavedSettings("llworldmap");
 // -------------------------------------------------------------------------------------------
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// Tests
 // -------------------------------------------------------------------------------------------
 
 const F32 X_WORLD_TEST = 1000.0f * REGION_WIDTH_METERS;
@@ -163,8 +162,6 @@ namespace
     // Test functions
     // Notes:
     // * Test as many as you possibly can without requiring a full blown simulation of everything
-    // * The tests are executed in sequence so the test instance state may change between calls
-    // * Remember that you cannot test private methods with tut
     // ---------------------------------------------------------------------------------------
 
     // ---------------------------------------------------------------------------------------

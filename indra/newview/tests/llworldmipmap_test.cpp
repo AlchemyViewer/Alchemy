@@ -31,7 +31,6 @@
 #include "../llviewercontrol.h"
 // Class to test
 #include "../llworldmipmap.h"
-// Tut header
 #include <catch2/catch_test_macros.hpp>
 
 // -------------------------------------------------------------------------------------------
@@ -55,7 +54,7 @@ LLControlGroup gSavedSettings("llworldmipmap");
 // -------------------------------------------------------------------------------------------
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// Tests
 // -------------------------------------------------------------------------------------------
 namespace
 {
@@ -85,8 +84,6 @@ namespace
     // Test functions
     // Notes:
     // * Test as many as you possibly can without requiring a full blown simulation of everything
-    // * The tests are executed in sequence so the test instance state may change between calls
-    // * Remember that you cannot test private methods with tut
     // ---------------------------------------------------------------------------------------
     // Test static methods
     TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: scaleToLevel is MAP_LEVELS at zero and 1 from a tile's size up", "[LLWorldMipmap]")

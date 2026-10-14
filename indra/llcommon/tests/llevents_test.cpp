@@ -45,7 +45,7 @@
 // external library headers
 #include <boost/bind.hpp>
 // other Linden headers
-#include "tests/listener.h"             // must PRECEDE lltut.h
+#include "tests/listener.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "catch_and_store_what_in.h"
@@ -57,7 +57,7 @@ static T make(const T& value)
 }
 
 /*****************************************************************************
- *   tut test group
+ *   Tests
  *****************************************************************************/
 namespace
 {
@@ -100,7 +100,7 @@ struct events_data
 TEST_CASE_METHOD(events_data, "events: basic operations", "[events]")
 {
     // Having to modify this to track the statically-
-    // constructed pumps in other TUT modules in this giant monolithic test
+    // constructed pumps in other test files in this giant monolithic test
     // executable isn't such a hot idea.
     // ensure_equals("initial pump", pumps.mPumpMap.size(), 1);
     size_t initial_pumps(pumps.mPumpMap.size());

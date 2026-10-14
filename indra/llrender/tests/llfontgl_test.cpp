@@ -75,7 +75,7 @@ namespace
 
 namespace
 {
-    // The shared GL context. TUT spins fixtures per-test method, but
+    // The shared GL context. Catch2 makes a fixture per test case, but
     // per-fixture HeadlessGL recreation poisons LLFontGL's per-getter
     // static fontp caches after ~10 cycles (the per-test new GL
     // context invalidates LLImageGL textures the fontps reference).

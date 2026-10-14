@@ -2,9 +2,9 @@
  * @file   is_approx_equal_fraction.h
  * @author Nat Goodspeed
  * @date   2009-01-28
- * @brief  lltut.h uses is_approx_equal_fraction(). Moved to this header
- *         file in llcommon so we can use lltut.h for llcommon tests without
- *         making llcommon depend on llmath.
+ * @brief  The tests' float matchers use is_approx_equal_fraction(). Moved
+ *         to this header file in llcommon so llcommon's tests can use them
+ *         without making llcommon depend on llmath.
  *
  * $LicenseInfo:firstyear=2009&license=viewerlgpl$
  * Second Life Viewer Source Code

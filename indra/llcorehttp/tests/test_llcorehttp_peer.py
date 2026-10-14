@@ -315,8 +315,8 @@ if __name__ == "__main__":
 
     # Pass the selected port number to the subject test program via the
     # environment. We don't want to impose requirements on the test program's
-    # command-line parsing -- and anyway, for C++ integration tests, that's
-    # performed in TUT code rather than our own.
+    # command-line parsing -- and anyway, for C++ tests, that's performed in
+    # Catch2's code rather than our own.
     os.environ["LL_TEST_PORT"] = str(httpd.server_port)
     debug("$LL_TEST_PORT = %s", httpd.server_port)
     if do_valgrind:

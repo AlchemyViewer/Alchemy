@@ -79,7 +79,7 @@ void LLSecAPIBasicHandler::removeFromCredentialMap(const std::string& storage, c
 void LLSecAPIBasicHandler::removeCredentialMap(const std::string& storage, const std::string& grid) {}
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// Tests
 // -------------------------------------------------------------------------------------------
 namespace
 {
