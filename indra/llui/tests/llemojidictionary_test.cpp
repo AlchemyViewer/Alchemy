@@ -156,19 +156,26 @@ namespace
     }
 
     // findVariant: prefer the cleanest match — gender=-1 user shouldn't
-    // get a gendered variant when a gender-neutral one of the same tone
-    // exists.
-    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: findVariant with no gender asked for picks the gender-neutral variant", "[llemojidictionary]")
+    // get a gendered variant when one of the same tone that carries no
+    // gender exists.
+    TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: findVariant with no gender asked for picks the variant that carries none", "[llemojidictionary]")
     {
+        // The astronaut's tone-3 variants all carry a gender, person (2)
+        // as much as man (0), and score alike. One that carries none goes
+        // after them all, so that the +1 for not asserting a gender we
+        // didn't ask for is what picks it, and not the order.
         LLEmojiDescriptor d = make_astronaut_descriptor();
+        LLEmojiVariant clean;
+        utf8str_append_cp(clean.Character, (llwchar)0x1F9D1);
+        utf8str_append_cp(clean.Character, (llwchar)(0x1F3FA + 3));
+        clean.Tone = 3;
+        clean.Gender = -1;
+        d.Variants.push_back(clean);
+
         const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 3, -1);
         REQUIRE(v != nullptr);
         CHECK(v->Tone == U8(3));
-        // Gender preference unset — best match should have Gender=2
-        // (person, gender-neutral) with the +1 bonus for not asserting a
-        // gender we didn't ask for. (Both 'person' and bare 'person'
-        // are gender=2 in this fixture.)
-        CHECK(v->Gender == S8(2));
+        CHECK(v->Gender == S8(-1));
     }
 
     // findVariant: partial-axis match still beats nothing — user asks
@@ -203,7 +210,8 @@ namespace
         CHECK(out[0].Tone == U8(5));
         UNSCOPED_INFO("no Gender given: unset");
         CHECK(out[0].Gender == S8(-1));
-        CHECK(out[0].ShortCodes.size() == size_t(1));
+        REQUIRE(out[0].ShortCodes.size() == size_t(1));
+        CHECK(out[0].ShortCodes.front() == std::string(":thumbs_up_dark_skin_tone:"));
     }
 
     TEST_CASE_METHOD(llemojidictionary_data, "llemojidictionary: loadVariants with no Variants key returns none", "[llemojidictionary]")

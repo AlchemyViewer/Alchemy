@@ -118,8 +118,10 @@ namespace
         CHECK(table.getColor("T1Nope", LLColor4::yellow).get() == LLColor4::yellow);
         CHECK_FALSE(table.colorExists("T1Nope"));
         CHECK(table.getLoadedSheet().files().size() == 2u);
+        const ALColorSheet::Declaration* base = table.getLoadedSheet().declarationOf("T1Base");
+        REQUIRE(base != nullptr);
         UNSCOPED_INFO("T1Base was last declared in the second file");
-        CHECK(table.getLoadedSheet().declarationOf("T1Base")->file == 1);
+        CHECK(base->file == 1);
     }
 
     // A handle taken before a reload reads the colour after it. A name the
@@ -192,7 +194,9 @@ namespace
         table.setColor("ColorPaletteEntry99", LLColor4(1, 1, 1, 1));
         CHECK(a.get() == LLColor4(0.5f, 0.25f, 0.f, 1.f));
         CHECK_FALSE(table.isDefault("T4A"));
-        CHECK(table.getLoadedColors().find("T4A")->second.get() == LLColor4(1, 0, 0, 1));
+        const auto loaded = table.getLoadedColors().find("T4A");
+        REQUIRE(loaded != table.getLoadedColors().end());
+        CHECK(loaded->second.get() == LLColor4(1, 0, 0, 1));
 
         const std::string text = written();
         CHECK_THAT(text, Catch::Matchers::ContainsSubstring("name=\"T4A\""));
@@ -214,7 +218,9 @@ namespace
         table.load(documents, round_trip, "user.xml");
         UNSCOPED_INFO("the written document reproduces it");
         CHECK(a.get() == LLColor4(0.5f, 0.25f, 0.f, 1.f));
-        CHECK(table.getUserColors().find("T4A")->second.get() == LLColor4(0.5f, 0.25f, 0.f, 1.f));
+        const auto user = table.getUserColors().find("T4A");
+        REQUIRE(user != table.getUserColors().end());
+        CHECK(user->second.get() == LLColor4(0.5f, 0.25f, 0.f, 1.f));
     }
 
     // What the skins' files have to say reaches the loaded sheet, and a
