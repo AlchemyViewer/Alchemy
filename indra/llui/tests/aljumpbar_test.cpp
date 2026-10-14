@@ -88,8 +88,10 @@ namespace
         bar->setPath(path());
 
         CHECK(crumbsIn(bar) == 4);
+        const LLView* first = bar->findChild<LLView>("crumb_0", false);
+        REQUIRE(first != nullptr);
         UNSCOPED_INFO("a step with nowhere else to be is a plain button");
-        CHECK(bar->getChild<LLView>("crumb_0")->as<LLFlyoutButton>() == nullptr);
+        CHECK(first->as<LLButton>() != nullptr);
         UNSCOPED_INFO("and one with siblings offers them");
         REQUIRE(bar->getChild<LLView>("crumb_2")->as<LLFlyoutButton>() != nullptr);
 
@@ -292,10 +294,12 @@ namespace
         LLTextBox* again = bar->findChild<LLTextBox>("trailer_0", true);
         REQUIRE(again == line);
         CHECK(again->getText() == std::string("Ln 120, Col 14"));
+        const LLTextBox* last = bar->findChild<LLTextBox>("trailer_2", true);
+        REQUIRE(last != nullptr);
         UNSCOPED_INFO("still in order");
-        CHECK(again->getRect().mRight <= bar->findChild<LLTextBox>("trailer_2", true)->getRect().mLeft);
+        CHECK(again->getRect().mRight <= last->getRect().mLeft);
         UNSCOPED_INFO("against the far edge");
-        CHECK(bar->findChild<LLTextBox>("trailer_2", true)->getRect().mRight <= bar->getChild<LLView>("trailer")->getRect().getWidth());
+        CHECK(last->getRect().mRight <= bar->getChild<LLView>("trailer")->getRect().getWidth());
 
         // Another piece, and the trailer is built again.
         moved.push_back({ "1 warning", "problems", "The problems" });
@@ -358,8 +362,10 @@ namespace
             REQUIRE(size);
             CHECK(size->getColor().get() == LLColor4::yellow);
         }
+        const LLTextBox* line = bar->findChild<LLTextBox>("trailer_0", true);
+        REQUIRE(line != nullptr);
         UNSCOPED_INFO("the others as they were");
-        CHECK(bar->findChild<LLTextBox>("trailer_0", true)->getColor().get() == quiet);
+        CHECK(line->getColor().get() == quiet);
 
         parts[1].color = LLColor4::red;
         bar->setTrailer(parts);
@@ -401,7 +407,11 @@ namespace
         const S32       two  = font->getWidth(parts[0].text) + font->getWidth(dot) + font->getWidth(parts[4].text);
         ALJumpBar*      bar  = make(two + 12 + 6 + 4);
         bar->setTrailer(parts);
-        const auto said = [&](size_t i) { return bar->findChild<LLTextBox>("trailer_" + std::to_string(i), true)->getVisible(); };
+        const auto said = [&](size_t i) {
+            const LLTextBox* piece = bar->findChild<LLTextBox>("trailer_" + std::to_string(i), true);
+            REQUIRE(piece != nullptr);
+            return piece->getVisible();
+        };
         {
             INFO("the place and the errors, one separator between");
             CHECK(said(0));
@@ -415,8 +425,10 @@ namespace
             CHECK_FALSE(said(2));
             CHECK_FALSE(said(6));
         }
+        const LLTextBox* errors = bar->findChild<LLTextBox>("trailer_4", true);
+        REQUIRE(errors != nullptr);
         UNSCOPED_INFO("against the far edge");
-        CHECK(bar->findChild<LLTextBox>("trailer_4", true)->getRect().mRight <= bar->getChild<LLView>("trailer")->getRect().getWidth());
+        CHECK(errors->getRect().mRight <= bar->getChild<LLView>("trailer")->getRect().getWidth());
 
         bar->reshape(two * 4, 22);
         for (size_t i = 0; i < parts.size(); ++i)

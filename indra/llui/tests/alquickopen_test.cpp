@@ -107,10 +107,13 @@ namespace
         UNSCOPED_INFO("and that is what comes back first");
         CHECK(best("panel") == std::string("panel_people.xml"));
 
-        // `flbuy` is initials-and-more; the file that is only about buying
-        // wins over the one that is about buying currency.
-        UNSCOPED_INFO("the tighter of two");
+        // `floater_buy` begins both, and `flbuy` is initials-and-more of
+        // both; either way the file that is only about buying wins over the
+        // one that is about buying currency.
+        UNSCOPED_INFO("the tighter of two prefixes");
         CHECK(best("floater_buy") == std::string("floater_buy.xml"));
+        UNSCOPED_INFO("the tighter of two by initials");
+        CHECK(best("flbuy") == std::string("floater_buy.xml"));
     }
 
     // Nothing typed answers everything, in the order it was given, because
@@ -270,7 +273,9 @@ namespace
         REQUIRE(list->count() == 1);
         quick->setHint("Go to line 12.");
         CHECK(list->choices()[0].text == std::string("Go to line 12."));
-        quick->findChild<LLLineEditor>("query")->onCommit();
+        LLLineEditor* field = quick->findChild<LLLineEditor>("query");
+        REQUIRE(field != nullptr);
+        field->onCommit();
         REQUIRE(chosen.size() == 1);
         CHECK(chosen[0] == "12");
         quick->die();
@@ -297,10 +302,11 @@ namespace
         }
         quick->setCandidates(many);
         const ALChoiceList* list = quick->findChild<ALChoiceList>("matches");
+        REQUIRE(list != nullptr);
         UNSCOPED_INFO("nothing typed: the first as many as were asked for");
         REQUIRE(list->count() == 3);
         UNSCOPED_INFO("in the order given");
-        CHECK(quick->listed().front() == "llFunction00");
+        CHECK(quick->listed() == std::vector<std::string>({ "llFunction00", "llFunction01", "llFunction02" }));
         quick->setQuery("func");
         UNSCOPED_INFO("typed: as many as were asked for");
         CHECK(list->count() == 3);
@@ -310,7 +316,7 @@ namespace
             CHECK(quick->listed().size() == 3);
         }
         UNSCOPED_INFO("and nothing to say about it");
-        CHECK(quick->findChild<ALChoiceList>("matches")->placeholder().empty());
+        CHECK(list->placeholder().empty());
         quick->setQuery("zzz");
         CHECK(list->count() == 0);
         UNSCOPED_INFO("and the list says so");
@@ -411,12 +417,15 @@ namespace
         p.name             = "quick_open";
         p.rect             = LLRect(0, 60, 300, 0);
         ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(p);
+        // Found before the popover is up: one left up by a failed REQUIRE
+        // would be escaped after the case, into a callback holding `said`.
+        LLLineEditor* field = quick->findChild<LLLineEditor>("query");
+        REQUIRE(field != nullptr);
         ALPopover*   popover = ALPopover::showOver(window, quick, "Go to line");
         REQUIRE(popover != nullptr);
         std::vector<bool> said;
         popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
         quick->takeFocus();
-        LLLineEditor* field = quick->findChild<LLLineEditor>("query");
         CHECK(gFocusMgr.getKeyboardFocus() == field);
         field->handleKey(KEY_ESCAPE, MASK_NONE, false);
         CHECK((popover->isDead() || !popover->getVisible()));
@@ -462,7 +471,9 @@ namespace
             CHECK(quick->handleKeyHere(KEY_UP, MASK_NONE));
             CHECK(quick->chosenRow() == 1);
         }
-        quick->findChild<LLLineEditor>("query")->onCommit();
+        LLLineEditor* field = quick->findChild<LLLineEditor>("query");
+        REQUIRE(field != nullptr);
+        field->onCommit();
         {
             INFO("return takes the one chosen");
             REQUIRE(chosen.size() == 1);
@@ -470,6 +481,7 @@ namespace
         }
 
         ALChoiceList* list = quick->findChild<ALChoiceList>("matches");
+        REQUIRE(list != nullptr);
         const LLRect  text = list->textRect();
         const S32     y    = text.mTop - list->layout().lineTop(2) - list->layout().rowHeightOf(2, 0) / 2 + list->scrollY();
         CHECK(list->handleDoubleClick(text.mLeft + 4, y, MASK_NONE));

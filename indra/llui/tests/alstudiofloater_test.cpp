@@ -104,10 +104,20 @@ namespace
         return made;
     }
 
+    // Every popover still up escaped while what its callbacks count is still
+    // there: a REQUIRE that ends a case with one up would otherwise leave the
+    // harness to escape it after the case, into a frame that has gone.
+    struct EscapeOnExit
+    {
+        ~EscapeOnExit() { ll_test::escapePopovers(); }
+    };
+
     // Return, as the field gives it: the best answer taken.
     void choose(ALQuickOpen* quick)
     {
-        quick->findChild<LLLineEditor>("query")->onCommit();
+        LLLineEditor* query = quick->findChild<LLLineEditor>("query");
+        REQUIRE(query != nullptr);
+        query->onCommit();
     }
 }
 
@@ -139,11 +149,14 @@ namespace
         TestStudio* window = studio();
         std::vector<std::string> symbols, commands;
         S32 symbols_escaped = 0;
+        EscapeOnExit escape_on_exit;
         ALQuickOpen* first = window->quickOpen(candidates({ "state_entry", "touch_start" }), "Type a symbol", "Go to Symbol",
                                                [&](const std::string& v) { symbols.push_back(v); }, nullptr, 0, 0,
                                                [&]() { ++symbols_escaped; });
         REQUIRE(first != nullptr);
-        const LLHandle<LLFloater> first_up = first->getParentByType<LLFloater>()->getHandle();
+        LLFloater* first_popover = first->getParentByType<LLFloater>();
+        REQUIRE(first_popover != nullptr);
+        const LLHandle<LLFloater> first_up = first_popover->getHandle();
 
         ALQuickOpen* second = window->quickOpen(candidates({ "save", "compile" }), "Type a command", "Commands",
                                                 [&](const std::string& v) { commands.push_back(v); });
@@ -178,10 +191,11 @@ namespace
         std::vector<std::string> first_heard, second_heard;
         ALQuickOpen* first = window->quickOpen(candidates({ "alpha", "beta" }), "Type a name", "Tabs",
                                                [&](const std::string& v) { first_heard.push_back(v); });
+        REQUIRE(first != nullptr);
         first->setQuery("be");
         ALQuickOpen* again = window->quickOpen(candidates({ "alpha", "beta", "beetle" }), "Type a name", "Tabs",
                                                [&](const std::string& v) { second_heard.push_back(v); });
-        CHECK(again == first);
+        REQUIRE(again == first);
         CHECK(again->query() == std::string("be"));
         choose(again);
         REQUIRE(second_heard.size() == 1);
@@ -205,11 +219,15 @@ namespace
         S32 escaped = 0;
         S32 left    = 0;
         std::vector<std::string> chosen;
+        EscapeOnExit escape_on_exit;
         const auto ask = [&]() {
             return window->quickOpen(candidates({ "one" }), "Type", "Ways out", [&](const std::string& v) { chosen.push_back(v); },
                                      nullptr, 0, 0, [&]() { ++escaped; }, {}, [&]() { ++left; });
         };
-        const auto popoverOf = [](ALQuickOpen* quick) { return ALViewType::as<ALPopover>(quick->getParentByType<LLFloater>()); };
+        const auto popoverOf = [](ALQuickOpen* quick)
+        {
+            return quick ? ALViewType::as<ALPopover>(quick->getParentByType<LLFloater>()) : nullptr;
+        };
 
         ALQuickOpen* quick = ask();
         REQUIRE(popoverOf(quick) != nullptr);
@@ -220,12 +238,14 @@ namespace
         CHECK(chosen.empty());
 
         quick = ask();
+        REQUIRE(popoverOf(quick) != nullptr);
         popoverOf(quick)->escape();
         CHECK(escaped == 1);
         UNSCOPED_INFO("escaping is not leaving");
         CHECK(left == 1);
 
         quick = ask();
+        REQUIRE(quick != nullptr);
         choose(quick);
         CHECK(chosen.size() == (size_t)1);
         {
@@ -380,6 +400,7 @@ namespace
         {
             INFO("a second key, not theirs to give, still does");
             CHECK(window->runCommandKey('S', MASK_CONTROL | MASK_SHIFT));
+            REQUIRE_FALSE(ran.empty());
             CHECK(ran.back() == "save again");
         }
         window->closeFloater();
@@ -452,7 +473,9 @@ namespace
 
         // A popover's field, whose keys come home to the window.
         ALQuickOpen* quick = window->quickOpen(candidates({ "one" }), "Type", "Popover", [](const std::string&) {});
+        REQUIRE(quick != nullptr);
         LLLineEditor* query = quick->findChild<LLLineEditor>("query");
+        REQUIRE(query != nullptr);
         query->setFocus(true);
         quick->setQuery("world");
         {

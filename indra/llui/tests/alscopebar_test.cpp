@@ -143,12 +143,19 @@ namespace
         UNSCOPED_INFO("everything fits in the bar");
         CHECK(scope->getRect().mRight <= 500);
 
-        // Narrower, and the field is what gives up the room.
+        // Narrower, and the field is what gives up the room: the choices keep
+        // theirs.
+        const LLComboBox* what = bar->getChild<LLComboBox>("field");
+        const LLComboBox* how = bar->getChild<LLComboBox>("how");
         const S32 was = field->getRect().getWidth();
+        const S32 what_was = what->getRect().getWidth();
+        const S32 how_was = how->getRect().getWidth();
+        const S32 scope_was = scope->getRect().getWidth();
         bar->reshape(360, 30);
         CHECK(field->getRect().getWidth() < was);
-        UNSCOPED_INFO("the last choice still has some width");
-        CHECK(scope->getRect().getWidth() > 0);
+        CHECK(what->getRect().getWidth() == what_was);
+        CHECK(how->getRect().getWidth() == how_was);
+        CHECK(scope->getRect().getWidth() == scope_was);
         delete bar;
     }
 

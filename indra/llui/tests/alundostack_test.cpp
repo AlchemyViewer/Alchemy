@@ -54,6 +54,14 @@ namespace
                 }
             }
         }
+
+        // The step back taken and made the step forward, as an undo does.
+        static void undoOne(ALUndoStack<Step>& stack)
+        {
+            std::optional<Step> taken = stack.takeUndo();
+            REQUIRE(taken);
+            stack.pushRedo(std::move(*taken));
+        }
     };
 
     // A change noted is a step back; taking it makes it a step forward
@@ -128,12 +136,10 @@ namespace
         UNSCOPED_INFO("a frame later names nothing");
         CHECK(stack.undoLabel() == std::string());
 
-        std::optional<Step> back = stack.takeUndo();
-        stack.pushRedo(*back);
+        undoOne(stack);
         UNSCOPED_INFO("the step forward keeps its name");
         CHECK(stack.redoLabel() == std::string());
-        back = stack.takeUndo();
-        stack.pushRedo(*back);
+        undoOne(stack);
         UNSCOPED_INFO("and so does the next");
         CHECK(stack.redoLabel() == std::string("Set the fill"));
     }
@@ -161,8 +167,7 @@ namespace
         ALUndoStack<Step> stack;
         stack.note({ { "a" } }, "slider", 0.0, 1.0, join);
         stack.note({ { "b" } }, "other", 0.1, 1.0, join);
-        auto step = stack.takeUndo();
-        stack.pushRedo(*step);
+        undoOne(stack);
         stack.note({ { "c" } }, "other", 0.2, 1.0, join);
         UNSCOPED_INFO("an edit after undo starts a new step");
         REQUIRE(stack.inForce() == size_t(2));
@@ -258,7 +263,7 @@ namespace
         const auto back_to_start = [](const Step& step) { return step.mNames.size() >= 2 && step.mNames.back() == "start"; };
         stack.note({ { "one" } }, "", 0.0, 1.0, join);
         stack.note({ { "two" } }, "", 5.0, 1.0, join);
-        stack.pushRedo(*stack.takeUndo());
+        undoOne(stack);
         stack.note({ { "drag" } }, "slider", 10.0, 1.0, join, back_to_start);
         UNSCOPED_INFO("a drag is a step");
         CHECK(stack.inForce() == size_t(2));
@@ -334,8 +339,9 @@ namespace
         CHECK_FALSE(stack.closeGroups());
         stack.beginGroup();
         stack.note({ { "6" } }, "", 40.0, 1.0, join);
-        stack.pushRedo(*stack.takeUndo());
+        undoOne(stack);
         stack.note({ { "7" } }, "", 40.0, 1.0, join);
+        REQUIRE(stack.canUndo());
         UNSCOPED_INFO("taken back while open: the next change a step of its own");
         CHECK(stack.undone().back().mNames == std::vector<std::string>{ "7" });
         stack.clear();
@@ -405,10 +411,10 @@ namespace
         }
 
         stack.note({ { "d" } }, "", 20.0, 1.0, join);
-        stack.pushRedo(*stack.takeUndo());
+        undoOne(stack);
         stack.note({ { "e" } }, "", 30.0, 1.0, join);
-        stack.pushRedo(*stack.takeUndo());
-        stack.pushRedo(*stack.takeUndo());
+        undoOne(stack);
+        undoOne(stack);
         std::vector<Step> forward = stack.takeForward();
         {
             INFO("taken out");
