@@ -307,11 +307,14 @@ bool ALScriptProblemsPane::postBuild()
     mList->setBack([this]() { mServices->revealed(mList, true); });
     mList->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showMenu(x, y); });
     // The pane's filters: whose, which levels, which source, which words.
+    // Most pressing first: what keeps the script from compiling, what it
+    // did running, then what the checks say, then the rest.
     mOrigin->add(mServices->words("OriginAny"), LLSD(""));
-    for (const char* origin : { "OriginParser", "OriginTypes", "OriginLint", "OriginMigration", "OriginCompiler", "OriginPreprocessor", "OriginOptimizer",
-                                "OriginRuntime", "OriginDefinitions", "OriginWeight" })
+    for (const char* origin : { "OriginCompiler", "OriginParser", "OriginPreprocessor", "OriginRuntime", "OriginMigration", "OriginTypes", "OriginLint",
+                                "OriginOptimizer", "OriginWeight", "OriginDefinitions" })
     {
-        mOrigin->add(mServices->words(origin), LLSD(mServices->words(origin)));
+        mOrigins.push_back(mServices->words(origin));
+        mOrigin->add(mOrigins.back(), LLSD(mOrigins.back()));
     }
     mOrigin->selectFirstItem();
     mScope->selectFirstItem();
@@ -342,12 +345,17 @@ bool ALScriptProblemsPane::postBuild()
             return x->line != y->line ? (x->line < y->line ? -1 : 1) : x->column < y->column ? -1 : x->column > y->column ? 1 : 0;
         };
         const auto rank = [](const Doc::Shown& one) { return one.level == Doc::Level::Error ? 0 : one.level == Doc::Level::Warning ? 1 : 2; };
+        // A source by how pressing it is (mOrigins), one not among them
+        // last.
+        const auto pressing = [this](const Doc::Shown& one) {
+            return static_cast<S32>(std::find(mOrigins.begin(), mOrigins.end(), one.origin) - mOrigins.begin());
+        };
         S32 said = 0;
         switch (column)
         {
             case 0: said = rank(*x) - rank(*y); break;
             case 1: said = LLStringUtil::compareDict(x->message, y->message); break;
-            case 2: said = LLStringUtil::compareDict(x->origin, y->origin); break;
+            case 2: said = pressing(*x) - pressing(*y); break;
             default: break;
         }
         return said != 0 ? said : place();
