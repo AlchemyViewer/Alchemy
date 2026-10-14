@@ -142,6 +142,8 @@ sudo dnf install @development-tools @c-development cmake fontconfig-devel git gl
 
 To build with Clang instead of GCC, also install: `sudo dnf install clang lld`
 
+For the sanitizer presets, the sanitizers' runtimes and the symbolizer too: `sudo dnf install clang lld compiler-rt llvm`
+
 </details>
 
 <details>
@@ -204,6 +206,7 @@ Most contributors want the `-os` variants.
 | `ninja-os`                                   | Linux    | Ninja Multi-Config |
 | `ninja-os-lld`, `ninja-os-mold`              | Linux    | Ninja Multi-Config |
 | `ninja-os-clang`, `ninja-os-clang-lld`       | Linux    | Ninja Multi-Config |
+| `ninja-os-asan`, `ninja-os-tsan`             | Linux    | Ninja Multi-Config |
 | `ninja-os-arm64`, `ninja-os-x64`             | macOS    | Ninja Multi-Config |
 | `xcode-os`, `xcode-os-arm64`, `xcode-os-x64` | macOS    | Xcode              |
 
@@ -227,7 +230,8 @@ access, retention, and rollout checks.
 - **Windows architecture** — `vs2026-os` (no arch suffix) builds for Visual Studio's default, the host. `vs2026[-os][-fullopt]-arm64` and `vs2026[-os][-fullopt]-x64` name the architecture, natively or cross from the other host; CI builds and tests arm64 natively on an arm64 runner. Cross-compiling for arm64 needs the Visual Studio component *MSVC ARM64 build tools*. Ninja builds for the architecture of the Developer Command Prompt it runs in (`VsDevCmd -arch=arm64`). The triplet follows the architecture the compiler targets, `arm64-windows-alchemy[-release]` with no ISA tier, and a configure whose compiler and triplet disagree stops with an error. NVAPI is x64-only and is left out of arm64 builds, as are the DirectX shader compiler DLLs, which CEF ships for x64 only. The `vlc-bin` port supports only x64 on Windows so far, so an arm64 configure stops at the vcpkg install until it gains an arm64 build.
 - **Linux linker** — `ninja[-os][-fullopt]-lld` and `ninja[-os][-fullopt]-mold` link with lld or mold instead of the toolchain's default, through `CMAKE_LINKER_TYPE`. LTO through lld needs Clang, because lld cannot read GCC's LTO objects; mold reads both.
 - **Linux with Clang** — `ninja[-os][-fullopt]-clang`, with `-lld` or `-mold` after it to pick the linker too. GCC and Clang builds of some ports are not interchangeable, so a viewer built with Clang takes the `-clang` triplets, whose ports Clang builds as well, through [`cmake/toolchains/linux-clang.cmake`](../indra/cmake/toolchains/linux-clang.cmake); the first configure builds that dependency tree from scratch. The triplet follows the compiler however it was chosen — a preset, `-DCMAKE_CXX_COMPILER=clang++`, `CXX=clang++`, or a `c++` that is Clang — and a configure whose compiler and triplet disagree stops with an error. The ports are built with the `clang` and `clang++` on `PATH`. The hidden `clang`, `lld` and `mold` presets set the compiler and `CMAKE_LINKER_TYPE`, and `ccache` and `sccache` set the compiler launcher, for a preset of your own in `CMakeUserPresets.json`, for example `{"name": "mine", "inherits": ["ninja-os", "clang", "mold", "ccache"]}`. A compiler cache needs `/Z7`-style debug info on MSVC, which this tree does not use, so the launcher presets are for Linux and macOS.
-- **vcpkg triplet** — chosen from the generator, the architecture, `AL_ISA_TIER` and, on Linux, the compiler: `<arch>-<os>-alchemy[-clang][-avx2|-avx512][-release]`, where `-release` means a single-configuration tree that is not Debug and skips the debug ports. Pass `-DVCPKG_TARGET_TRIPLET=<name>` to choose one yourself; CI does, to take release-only ports under a multi-config generator.
+- **Linux with the sanitizers** — `ninja-os-asan` builds the tests and the viewer with AddressSanitizer and UndefinedBehaviorSanitizer, `ninja-os-tsan` with ThreadSanitizer, both with Clang and lld. They take the `-asan` and `-tsan` triplets, whose ports are release builds made for that sanitizer (see [`doc/TESTING.md`](TESTING.md#sanitizers)); the first configure of each builds its dependency tree from scratch.
+- **vcpkg triplet** — chosen from the generator, the architecture, `AL_ISA_TIER` and, on Linux, the compiler and `AL_SANITIZERS`: `<arch>-<os>-alchemy[-clang][-avx2|-avx512][-asan|-tsan|-release]`, where `-release` means a single-configuration tree that is not Debug and skips the debug ports, and `-asan` and `-tsan` are the sanitizers' release-only ports. Pass `-DVCPKG_TARGET_TRIPLET=<name>` to choose one yourself; CI does, to take release-only ports under a multi-config generator.
 
 ### Workflow presets (one-shot configure + build)
 
@@ -364,7 +368,7 @@ The registry's README covers CI and adding ports.
 |:--------------------------------------------------|:--------|:-------------------------------------------------------------------|
 | `AL_USE_LTO`                     | OFF     | Link Time Optimization                                                      |
 | `AL_ISA_TIER`                    | `v3`    | x86-64 level for the viewer and its vcpkg ports: `baseline`, `v2` (SSE4.2), `v3` (AVX2), `v4` (AVX-512). Ignored on macOS |
-| `AL_SANITIZERS`                  | empty   | Any of `address`, `undefined`, `thread` (GCC and Clang only)                |
+| `AL_SANITIZERS`                  | empty   | Any of `address`, `undefined`, `thread`, but not `address` with `thread` (GCC and Clang; `address` and `thread` need Clang on Linux). Turns off Tracy, Sentry and WebRTC. See [`TESTING.md`](TESTING.md#sanitizers) |
 | `AL_ENABLE_WARNINGS_AS_ERRORS`   | ON      | Treat compiler warnings as errors                                           |
 | `AL_ENABLE_RELEASE_DEBUG_LOGGING`| Test channel only | Keep debug-level logging in Release builds                        |
 | `AL_USE_WEBRTC`                  | ON      | WebRTC voice (off automatically in sanitized builds)                        |

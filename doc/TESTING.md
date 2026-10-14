@@ -139,6 +139,23 @@ namespace
 - **Keep the measured code's surroundings as the real code has them.** A kernel run over arrays in a static reloads their bounds for every element, since any store might have moved them. Give each call local views.
 - **Name each benchmark** for what one call covers: `"setAllDot3, 4,096 elements, cached"`. The comma rule is for case names; benchmark names are not test specs.
 
+## Sanitizers
+
+The tests also run under AddressSanitizer with UndefinedBehaviorSanitizer, and under ThreadSanitizer, on Linux with Clang. A tree is built for one or the other:
+
+```
+cmake -S indra --preset ninja-os-asan          # or ninja-os-tsan
+cmake --build build-Linux-ninja-os-asan --config RelWithDebInfo --target BUILD_TESTS
+ctest --test-dir build-Linux-ninja-os-asan -C RelWithDebInfo -LE benchmark --output-on-failure
+```
+
+- **CI:** the Sanitizers workflow runs every entry but the benchmarks, the combined runs included: ASan and UBSan on every pull request, ThreadSanitizer as well every night. It reports and never fails the run.
+- **A report fails its entry,** whatever the process's exit code. UBSan reports and carries on, and the process exits 0. Every sanitizer ends a report with a `SUMMARY:` line, which the entry fails on. A child process's report counts where its output is the entry's.
+- **Options:** each entry puts the build's `ASAN_OPTIONS`, `UBSAN_OPTIONS` or `TSAN_OPTIONS` before what the shell holds, so the shell's win: `ASAN_OPTIONS=detect_leaks=1 ctest ...` looks for the leaks the runs leave out. Timeouts are three times as long under ASan, ten times under ThreadSanitizer.
+- **Coroutines:** Boost.Context switches the coroutines' stacks, and tells ASan and ThreadSanitizer of each switch only when built for `ucontext` with `BOOST_USE_ASAN` or `BOOST_USE_TSAN`. The `-asan` and `-tsan` triplets build their ports so ([`alchemy-sanitizer.cmake`](../indra/cmake/triplets/alchemy-sanitizer.cmake)), and `llcoros.cpp` will not compile against any other.
+- **Turned off:** Tracy, which replaces `operator new` and `delete`, Sentry, whose handler takes the signals a sanitizer reports through, and WebRTC.
+- **Suppressions** are in [`indra/test/sanitizers/`](../indra/test/sanitizers/), for code that is not ours: a port's headers, the system's GL driver. Each says what it hides and why it cannot be fixed here. A report in our own code is fixed, not suppressed. LL's LSL compiler in `indra/lscript` is the exception: it is a reference, never shipped, and may be suppressed where a fix would change what it does.
+
 ## Upstream tests
 
 Linden Lab's own tests are TUT. One that arrives in a merge is converted by hand, to the rules above. `scripts/testing/tut2catch.py` did the bulk conversion, but it reads each file through clang with its build flags and TUT's headers, so it runs only in a checkout from before TUT was removed.
