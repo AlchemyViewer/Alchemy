@@ -239,9 +239,10 @@ private:
     // moment after it was last filled.
     bool                    mStale  = false;
     F64                     mFilled = 0.0;
-    // The roots selected in world when last looked, and when; whether the
-    // selection changed since.
+    // The roots selected in world when last looked, the prims selected on
+    // their own, and when; whether the selection changed since.
     std::vector<LLUUID>     mRoots;
+    std::vector<LLUUID>     mParts;
     F64                     mPolled           = 0.0;
     bool                    mSelectionChanged = false;
     // When what the prims hold is asked again after a drop, for what the
