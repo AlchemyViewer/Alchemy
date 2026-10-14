@@ -156,6 +156,7 @@ namespace
         window.runs = { { id(11), false } };
         run.recompile({ one(10, "A") }, { { prim, "House" } }, "mono");
         REQUIRE(window.listedFor.size() == 1);
+        REQUIRE(window.listedFor[0].size() == 1);
         CHECK(window.listedFor[0].front().first == prim);
         CHECK(run.running());
         REQUIRE(window.asked.size() == size_t(Recompile::AT_ONCE));
@@ -172,7 +173,7 @@ namespace
         UNSCOPED_INFO("A not known: the save asks");
         CHECK_FALSE(window.asked[0].running.has_value());
 
-        for (size_t i = 0; i < 4; ++i)
+        for (size_t i = 0; i < size_t(Recompile::AT_ONCE); ++i)
         {
             window.asked[i].told(compiled());
         }
@@ -224,6 +225,8 @@ namespace
         CHECK(said("CompileFailed", true));
         UNSCOPED_INFO("one not sent said with why");
         CHECK(said("SaveFailed", true));
+        UNSCOPED_INFO("each but B said");
+        REQUIRE(window.scripts.size() == 5);
         const Recompile::Script& c = window.scripts[1];
         {
             INFO("C's rows, by the compiler");

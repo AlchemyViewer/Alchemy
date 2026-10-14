@@ -115,17 +115,19 @@ namespace
         keeper.pump(3, 10.0 + ALRecoveryKeeper::DELAY);
         {
             INFO("a moment after it first changed, whatever was typed meanwhile");
-            REQUIRE(mine());
-            CHECK(mine()->text == "typed");
-            CHECK(mine()->name == "Card");
+            const std::optional<ALRecoveryEntry> typed = mine();
+            REQUIRE(typed);
+            CHECK(typed->text == "typed");
+            CHECK(typed->name == "Card");
         }
         text = "typed more";
         keeper.pump(4, 12.0);
         keeper.pump(4, 12.0 + ALRecoveryKeeper::DELAY);
         {
             INFO("again for the next change");
-            REQUIRE(mine());
-            CHECK(mine()->text == "typed more");
+            const std::optional<ALRecoveryEntry> again = mine();
+            REQUIRE(again);
+            CHECK(again->text == "typed more");
         }
         unsaved = false;
         keeper.pump(4, 20.0);
@@ -171,8 +173,9 @@ namespace
         keeper.took(*offered, 7);
         {
             INFO("the window's own written");
-            REQUIRE(mine());
-            CHECK(mine()->text == "left behind");
+            const std::optional<ALRecoveryEntry> own = mine();
+            REQUIRE(own);
+            CHECK(own->text == "left behind");
         }
         UNSCOPED_INFO("and the one taken up gone");
         CHECK_FALSE(keeper.left());
@@ -184,7 +187,7 @@ namespace
             left.key  = keeper.key();
             left.item = item;
             left.text = "not wanted";
-            before.write(left);
+            CHECK(before.write(left));
         }
         offered = keeper.left();
         REQUIRE(offered);
@@ -192,6 +195,15 @@ namespace
         keeper.turnDown(*offered);
         UNSCOPED_INFO("turned down: offered no more");
         CHECK_FALSE(keeper.left());
+        // Among the discarded as the session that left it: told apart so from
+        // this session's own, set aside above.
+        bool turned_down = false;
+        for (const ALRecoveryEntry& entry : store->list())
+        {
+            turned_down |= entry.state == ALRecoveryEntry::State::Discarded && entry.key == keeper.key() &&
+                           entry.session == "another-session";
+        }
+        CHECK(turned_down);
     }
 
     TEST_CASE_METHOD(alrecoverykeeper_data, "ALRecoveryKeeper: a new item or none moves the key and a failed write is said once", "[ALRecoveryKeeper]")

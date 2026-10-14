@@ -169,6 +169,7 @@ namespace
         CHECK(heard == 1);
         REQUIRE(usage.usageOf(id(1)));
         REQUIRE(usage.usageOf(id(1))->urls == 2);
+        REQUIRE(usage.usageOf(id(2)));
         CHECK(usage.usageOf(id(2))->memory == 16384);
         LLSD parcel;
         parcel["parcels"][0]["objects"].append(object(id(3), 131072, 0));
@@ -212,20 +213,21 @@ namespace
         UNSCOPED_INFO("the attachments once a minute, whichever asks");
         REQUIRE(attachmentAsks.size() == 1U);
 
-        // An answer after it is gone goes nowhere.
+        // An answer after its asker is gone goes nowhere, and passes by
+        // returning; one to an asker still here is heard.
         Told late = landAsks.back().second;
-        {
-            Usage gone(fake());
-        }
         std::optional<Usage> other;
         other.emplace(fake());
         other->ask({ id(3) }, 300.0);
+        UNSCOPED_INFO("the other asks for itself");
+        REQUIRE(landAsks.size() == 4U);
         Told orphaned = landAsks.back().second;
         other.reset();
+        const S32 before = heard;
         orphaned(parcel);
         late(parcel);
         UNSCOPED_INFO("the one still here heard");
-        REQUIRE(usage.usageOf(id(3)) != nullptr);
+        CHECK(heard == before + 1);
     }
 
     TEST_CASE_METHOD(alscriptregionusage_data, "ALScriptRegionUsage: an estate manager asks each owner's script time once a minute", "[ALScriptRegionUsage]")
@@ -265,6 +267,7 @@ namespace
         // Memory first, then time: both kept.
         LLSD details;
         details["parcels"][0]["objects"].append(object(id(1), 65536, 0));
+        REQUIRE_FALSE(landAsks.empty());
         landAsks[0].second(details);
         Usage::times_t times;
         times[id(1)] = 0.125f;
@@ -285,6 +288,7 @@ namespace
         }
         // Memory again: the time stays.
         landAsks[0].second(details);
+        REQUIRE(usage.usageOf(id(1)));
         UNSCOPED_INFO("time kept through memory");
         CHECK(usage.usageOf(id(1))->time == 0.125f);
 
@@ -296,9 +300,11 @@ namespace
         timeAsks[0].second(later);
         {
             INFO("left out: no time now, its memory kept");
+            REQUIRE(usage.usageOf(id(1)));
             REQUIRE_FALSE(usage.usageOf(id(1))->hasTime());
             CHECK(usage.usageOf(id(1))->hasMemory());
         }
+        REQUIRE(usage.usageOf(id(2)));
         UNSCOPED_INFO("named: its time");
         CHECK(usage.usageOf(id(2))->time == 0.5f);
         Usage::times_t full;
@@ -307,6 +313,7 @@ namespace
             full[id(100 + n)] = 0.01f;
         }
         timeAsks[0].second(full);
+        REQUIRE(usage.usageOf(id(2)));
         UNSCOPED_INFO("a full answer leaving it out: its time stands");
         CHECK(usage.usageOf(id(2))->time == 0.5f);
     }

@@ -188,8 +188,11 @@ namespace
     {
         const auto a = item("A"), b = item("B"), c = item("C");
         ALNotecardEmbedded& card = make("one " + at(2) + " two " + at(0) + "\n", { a, b, c });
-        UNSCOPED_INFO("a button over each item the text stands");
-        REQUIRE(view->atomAt(ALTextPos(0, 4)) != nullptr);
+        {
+            INFO("a button over each item the text stands");
+            CHECK(view->atomAt(ALTextPos(0, 4)) != nullptr);
+            CHECK(view->atomAt(ALTextPos(0, 13)) != nullptr);
+        }
         std::string                  text;
         ALNotecardEmbedded::items_t items;
         card.forSave(text, items);
@@ -226,8 +229,9 @@ namespace
         UNSCOPED_INFO("a new frame's drop lands where the pointer is");
         CHECK(view->document().line(where.line).substr(where.column, 4) == at(2));
         REQUIRE(tab->items().size() == size_t(3));
+        view->undo();
         UNSCOPED_INFO("one undo takes the last away");
-        CHECK(view->undoJournal().canUndo());
+        CHECK(view->document().line(where.line).substr(where.column, 8) == at(0) + at(1));
     }
 
     TEST_CASE_METHOD(alnotecardembedded_data, "ALNotecardEmbedded: a drop of what a notecard may not carry is refused and says why", "[ALNotecardEmbedded]")
@@ -332,7 +336,9 @@ namespace
         REQUIRE(back[1].isNull());
         {
             INFO("the rest as they were");
+            REQUIRE(back[0].notNull());
             CHECK(back[0]->getUUID() == a->getUUID());
+            REQUIRE(back[2].notNull());
             CHECK(back[2]->getName() == "B");
         }
     }

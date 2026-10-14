@@ -258,6 +258,7 @@ namespace
         }
         {
             INFO("and said, with what can be done");
+            REQUIRE_FALSE(services().reports.empty());
             CHECK(services().reports.back().text == said("OrphanRemovedKept", "[NAME]", "b"));
             CHECK(services().reports.back().actions == Names{ "copy", "export" });
         }
@@ -417,10 +418,12 @@ namespace
             INFO("restored, the source in front");
             CHECK(studio.did == Names{ "source a", "carried a: restored text" });
             CHECK_FALSE(a.recoverable);
+            REQUIRE_FALSE(services().reports.empty());
             CHECK(services().reports.back().text == said("RecoveryRestored", "[NAME]", "a"));
         }
         a.recoverable = ALRecoveryEntry();
         unit.noticeAction("discard_left");
+        REQUIRE_FALSE(studio.did.empty());
         CHECK(studio.did.back() == "discard");
         CHECK_FALSE(a.recoverable);
         a.recoverable = ALRecoveryEntry();
@@ -460,6 +463,7 @@ namespace
         a.orphan->kind    = Orphan::Away;
         unit.refreshNotice();
         LLView* holder = bar->getParent();
+        REQUIRE(holder != nullptr);
         CHECK(holder->getVisible());
         CHECK(bar->getChild<LLTextBox>("notice_text")->getText() == said("NoticeAway"));
         LLButton* first  = bar->getChild<LLButton>("notice_first");
@@ -508,6 +512,7 @@ namespace
         }
         a.uploaded.text = std::make_shared<const std::string>("default { }");
         unit.noticeAction("compare_compiled");
+        REQUIRE_FALSE(studio.did.empty());
         UNSCOPED_INFO("compared: as saved, beside what the source makes");
         CHECK(studio.did.back() ==
                       "compare a: default { touch_start(integer n) { llDie(); } } | default { } (" + said("CompareCompiled") + " | " + said("CompareMade") + ")");
@@ -524,6 +529,7 @@ namespace
             CHECK(studio.did == Names{ "source a", "carried a: default { touch_start(integer n) { llDie(); } }" });
             CHECK_FALSE(a.compiledDiffers);
         }
+        REQUIRE_FALSE(services().reports.empty());
         UNSCOPED_INFO("and said");
         CHECK(services().reports.back().text == said("CompiledTaken", "[NAME]", "a"));
         a.compiledDiffers = std::string("x");
@@ -531,6 +537,7 @@ namespace
         {
             INFO("kept: let go of, the next save replacing it");
             CHECK_FALSE(a.compiledDiffers);
+            REQUIRE_FALSE(studio.did.empty());
             CHECK(studio.did.back() == "source a");
         }
         UNSCOPED_INFO("nothing more to say");
@@ -548,6 +555,7 @@ namespace
         UNSCOPED_INFO("offered as listed");
         CHECK_FALSE(kept.whole);
         unit.noticeAction("compare_kept");
+        REQUIRE_FALSE(studio.did.empty());
         UNSCOPED_INFO("now beside kept");
         CHECK(studio.did.back() ==
                       "compare a: default {} | default { state_entry() { } } (" + said("CompareNow") + " | " + said("CompareKept", "[WHEN]", kept.whenSaid()) + ")");
@@ -556,6 +564,7 @@ namespace
         unit.noticeAction("restore");
         {
             INFO("the source in front first");
+            REQUIRE(studio.did.size() >= 2);
             CHECK(studio.did[studio.did.size() - 2] == "source a");
             CHECK(studio.did.back() == "carried a: default { state_entry() { } }");
         }
@@ -587,6 +596,7 @@ namespace
         unit.noticeAction("retry");
         {
             INFO("taken up, and let go of");
+            REQUIRE_FALSE(studio.did.empty());
             CHECK(studio.did.back() == "offer a: retry");
             CHECK_FALSE(a.offer);
         }
@@ -719,6 +729,7 @@ namespace
         LLStringUtil::format_map_t args;
         args["[NAME]"] = "a";
         args["[WHEN]"] = ALRecoveryEntry::sayWhen(shown.when);
+        REQUIRE_FALSE(services().reports.empty());
         UNSCOPED_INFO("and said");
         CHECK(services().reports.back().text == services().words("HistoryRestored", args));
 

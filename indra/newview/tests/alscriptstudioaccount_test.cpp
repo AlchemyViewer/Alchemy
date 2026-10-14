@@ -37,6 +37,7 @@ namespace
     {
         LLSD state;
         state["rect"]           = LLSD().with(0, 1).with(1, 2);
+        state["scroll_map"]     = true;
         state["open"]["tabs"]   = LLSD::emptyArray();
         state["pinned"]         = LLSD().with(0, "a");
         state["recent_scripts"] = LLSD().with(0, "s");
@@ -52,8 +53,9 @@ namespace
         }
         {
             INFO("the shape, the switches and the files left");
-            REQUIRE(state.has("rect"));
-            REQUIRE(state.has("recent_files"));
+            CHECK(state.has("rect"));
+            CHECK(state.has("scroll_map"));
+            CHECK(state.has("recent_files"));
         }
         {
             INFO("into the account's");

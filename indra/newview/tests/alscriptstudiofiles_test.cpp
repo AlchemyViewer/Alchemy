@@ -330,7 +330,9 @@ namespace
             REQUIRE_FALSE(services.opened.empty());
             CHECK(services.opened.back().ref == a.ref);
         }
-        studio.menu->findChild<LLMenuItemCallGL>("clear_recent")->onCommit();
+        LLMenuItemCallGL* clear = studio.menu->findChild<LLMenuItemCallGL>("clear_recent");
+        REQUIRE(clear != nullptr);
+        clear->onCommit();
         {
             INFO("the clear item clears");
             CHECK(unit.recentFiles().empty());
@@ -350,6 +352,7 @@ namespace
         CHECK(contents(f.file) == std::string("new"));
         {
             INFO("its own write is no change to the watch");
+            REQUIRE(f.watch);
             CHECK_FALSE(f.watch->check());
             CHECK_FALSE(f.watch->check());
         }
@@ -472,8 +475,8 @@ namespace
     TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: Save to File writes a copy and Save As makes the tab the new file", "[alscriptstudiofiles]")
     {
         ALScriptStudioFiles& unit = make();
-        Doc&                 s    = scriptTab("s", "script text");
-        services.front            = 0;
+        scriptTab("s", "script text");
+        services.front = 0;
         unit.saveCopy();
         UNSCOPED_INFO("named after the tab");
         CHECK(studio.savedAs == std::string("s"));
@@ -503,8 +506,11 @@ namespace
         }
         {
             INFO("noted, settled, checked");
+            REQUIRE_FALSE(unit.recentFiles().empty());
             CHECK(unit.recentFiles().front() == in("g.luau"));
+            REQUIRE_FALSE(studio.settled.empty());
             CHECK(studio.settled.back() == f.id);
+            REQUIRE_FALSE(studio.checked.empty());
             CHECK(studio.checked.back() == f.id + " now");
         }
         UNSCOPED_INFO("told of as written");

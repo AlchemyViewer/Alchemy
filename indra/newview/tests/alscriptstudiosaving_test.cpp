@@ -338,6 +338,7 @@ namespace
 
         Doc& unchecked = tab("unchecked", "default {}");
         saving.save(unchecked);
+        REQUIRE_FALSE(studio.tidied.empty());
         UNSCOPED_INFO("no fixes over a text not checked");
         CHECK(studio.tidied.back() == std::string("mt"));
 
@@ -349,6 +350,7 @@ namespace
         // They changed the text: checked again before it goes.
         {
             INFO("checked again");
+            REQUIRE_FALSE(studio.analysed.empty());
             CHECK(studio.analysed.back() == "a");
             CHECK(studio.sent.empty());
         }
@@ -387,7 +389,7 @@ namespace
         CHECK(doc.save.checked());
         saving.save(doc);
         UNSCOPED_INFO("its errors stop it");
-        CHECK(lastSaid() == std::string("PreflightErrors"));
+        REQUIRE(lastSaid() == std::string("PreflightErrors"));
         const al_studio_test::FakeServices::Said& said = services.reports.back();
         {
             INFO("a failure, of the tab, with Save Anyway");
@@ -488,7 +490,7 @@ namespace
         Doc& big = tab("big", too_much);
         saving.save(big);
         UNSCOPED_INFO("too large: said");
-        CHECK(lastSaid() == std::string("SaveTooLarge"));
+        REQUIRE(lastSaid() == std::string("SaveTooLarge"));
         UNSCOPED_INFO("with what would shrink it");
         CHECK(services.reports.back().text.find("SaveTooLargePlain") != std::string::npos);
         {
@@ -539,7 +541,7 @@ namespace
         UNSCOPED_INFO("sent all the same");
         CHECK(studio.sent.size() == size_t(1));
         UNSCOPED_INFO("said as it went");
-        CHECK(lastSaid() == std::string("SavingWithErrors"));
+        REQUIRE(lastSaid() == std::string("SavingWithErrors"));
         {
             INFO("a failure of the tab, nothing to press");
             CHECK(services.reports.back().failure);
@@ -580,6 +582,7 @@ namespace
         REQUIRE(studio.runs.size() == 3);
         type(doc, "\n// b");
         studio.answerRun(made);
+        REQUIRE_FALSE(studio.analysed.empty());
         UNSCOPED_INFO("checked again");
         CHECK(studio.analysed.back() == "a");
         {
@@ -708,7 +711,7 @@ namespace
             CHECK(services.findDoc(std::string_view("typed")));
         }
         UNSCOPED_INFO("and said so");
-        CHECK(lastSaid() == std::string("CopiedToKeptOpen"));
+        REQUIRE(lastSaid() == std::string("CopiedToKeptOpen"));
         UNSCOPED_INFO("said of the tab kept open");
         CHECK(services.reports.back().doc == std::string("typed"));
     }
@@ -923,6 +926,7 @@ namespace
         saving.save(doc);
         UNSCOPED_INFO("on its way");
         CHECK(doc.save.sending());
+        REQUIRE(studio.sent.size() == size_t(1));
         const U64 mine = studio.sent.back().options.sender.request;
         {
             INFO("sent as a request of the studio's");
@@ -972,7 +976,7 @@ namespace
         type(dirty, "\n// mine");
         saving.savedElsewhere(saved(dirty, "default {}\n// theirs", ALScriptOrigin::Bridge));
         UNSCOPED_INFO("asked whose to keep");
-        CHECK(lastSaid() == std::string("SavedElsewhereConflict"));
+        REQUIRE(lastSaid() == std::string("SavedElsewhereConflict"));
         UNSCOPED_INFO("with the four answers");
         CHECK(services.reports.back().actions == Names{ "take_saved", "keep_saved", "merge_saved", "compare_saved" });
         {
@@ -1058,7 +1062,7 @@ namespace
         type(doc, "x");
         saving.save(doc);
         UNSCOPED_INFO("moved: said");
-        CHECK(lastSaid() == std::string("SaveWorldMoved"));
+        REQUIRE(lastSaid() == std::string("SaveWorldMoved"));
         UNSCOPED_INFO("with what can be done");
         CHECK(services.reports.back().actions == Names{ "save_anyway", "reload_world", "merge_world", "compare_world" });
         {

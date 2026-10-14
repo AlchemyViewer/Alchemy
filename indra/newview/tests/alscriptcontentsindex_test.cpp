@@ -157,10 +157,10 @@ namespace
         CHECK(asked.size() == size_t(1));
         CHECK_FALSE(index.fetched(chair));
         CHECK(index.prim(chair) == nullptr);
-        // Unanswered, the prim would not be known, and it is read below.
-        REQUIRE(answer(chair, { "sit.lsl", "readme" }, true, "Chair"));
+        CHECK(answer(chair, { "sit.lsl", "readme" }, true, "Chair"));
         CHECK(heard == 1);
         CHECK(names(chair) == std::string("sit.lsl readme"));
+        REQUIRE(index.prim(chair) != nullptr);
         CHECK(index.prim(chair)->name == std::string("Chair"));
         CHECK_FALSE(index.asking(chair));
 
@@ -330,7 +330,7 @@ namespace
         index.refresh(11.0);
         {
             INFO("its serial moved: asked");
-            CHECK(pending.size() == 1);
+            REQUIRE(pending.size() == 1);
             CHECK(asked.back().first == chair);
         }
         answer(chair, { "sit.lsl", "new.lsl" });

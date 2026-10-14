@@ -332,8 +332,10 @@ namespace
         UNSCOPED_INFO("back on the Mac's Control-minus");
         CHECK(has("back", ALKeyChord{ '-', MASK_MAC_CONTROL }));
 #else
-        UNSCOPED_INFO("back on Alt-Left and forward on Alt-Right");
-        CHECK((has("back", ALKeyChord{ KEY_LEFT, MASK_ALT }) && has("forward", ALKeyChord{ KEY_RIGHT, MASK_ALT })));
+        UNSCOPED_INFO("back on Alt-Left");
+        CHECK(has("back", ALKeyChord{ KEY_LEFT, MASK_ALT }));
+        UNSCOPED_INFO("forward on Alt-Right");
+        CHECK(has("forward", ALKeyChord{ KEY_RIGHT, MASK_ALT }));
 #endif
     }
 
@@ -492,8 +494,8 @@ namespace
         UNSCOPED_INFO("and a problem's");
         CHECK(has(ALScriptKeymap::menuKeys("next_problem"), ALKeyChord{ KEY_F8, MASK_NONE }));
         UNSCOPED_INFO("the editor's command of that name untouched");
-        REQUIRE(ALScriptKeymap::keysOf(ALScriptKeymap::current(), C::NextChange).empty() ==
-                                                                  ALScriptKeymap::keysOf(ALKeymap::standard(), C::NextChange).empty());
+        CHECK(ALScriptKeymap::keysOf(ALScriptKeymap::current(), C::NextChange) ==
+              ALScriptKeymap::keysOf(ALKeymap::standard(), C::NextChange));
         ALScriptKeymap::restoreAll();
     }
 }
