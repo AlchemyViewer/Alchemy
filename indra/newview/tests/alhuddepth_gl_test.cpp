@@ -146,11 +146,6 @@ namespace
             return reverse;
         }
 
-        static std::string named(bool reverse, const std::string& what)
-        {
-            return what + (reverse ? " (reverse-Z)" : " (forward)");
-        }
-
         void setConvention(bool reverse)
         {
             LLRender::sReverseZ = reverse;
@@ -175,12 +170,11 @@ namespace
             std::map<std::string, std::string> defines;
             for (const char* object : { "deferred/textureUtilV.glsl", "objects/nonindexedTextureV.glsl" })
             {
+                CAPTURE(object);
                 S32 level = 1;
-                UNSCOPED_INFO(std::string("compiled ") + object);
                 REQUIRE(mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines) != 0);
             }
             S32 level = 1;
-            UNSCOPED_INFO("compiled deferred/globalF.glsl");
             REQUIRE(mShaders.loadShaderFile("deferred/globalF.glsl", level, GL_FRAGMENT_SHADER, &defines) != 0);
 
             mBlitProgram.mName = "Copy Depth Blit";
@@ -190,7 +184,6 @@ namespace
             mBlitProgram.clearPermutations();
             mBlitProgram.addPermutation("COPY_DEPTH", "1");
             mBlitProgram.mShaderLevel = 1;
-            UNSCOPED_INFO("blit copy builds");
             REQUIRE(mBlitProgram.createShader());
 
             mCopyDepthProgram.mName = "Copy Depth Shader";
@@ -201,7 +194,6 @@ namespace
             mCopyDepthProgram.addPermutation("COPY_DEPTH", "1");
             mCopyDepthProgram.addPermutation("DEPTH_ONLY", "1");
             mCopyDepthProgram.mShaderLevel = 1;
-            UNSCOPED_INFO("depth copy builds");
             REQUIRE(mCopyDepthProgram.createShader());
 
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kQuadVertex);
@@ -224,15 +216,12 @@ namespace
             glGenVertexArrays(1, &mVAO);
             glGenBuffers(1, &mVBO);
 
-            UNSCOPED_INFO("window");
             REQUIRE(mWindow.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
                                               LLRenderTarget::DEPTH_FMT_24));
-            UNSCOPED_INFO("scene");
             REQUIRE(mScene.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
                                             reverse ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24));
 
             mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
-            UNSCOPED_INFO("triangle");
             REQUIRE(mTriangle->allocateBuffer(3, 0));
             LLStrider<LLVector3> vert;
             mTriangle->getVertexStrider(vert);
@@ -416,6 +405,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             blit();
             const std::vector<F32> scene = depths(mScene);
@@ -425,14 +415,14 @@ namespace
             {
                 worst = llmax(worst, std::fabs(scene[i] - window[i]));
             }
-            UNSCOPED_INFO(named(reverse, "the window holds the scene's depth"));
+            UNSCOPED_INFO("the window holds the scene's depth");
             REQUIRE(worst < 1e-6f);
-            UNSCOPED_INFO(named(reverse, "and its colour"));
+            UNSCOPED_INFO("and its colour");
             REQUIRE(colourAt(40, 24) == unorm(MID_COLOUR));
             const F32 cleared = reverse ? 0.f : 1.f;
-            UNSCOPED_INFO(named(reverse, "sky is the cleared depth"));
+            UNSCOPED_INFO("sky is the cleared depth");
             REQUIRE(window[(size_t)40 * W + 40] == cleared);
-            UNSCOPED_INFO(named(reverse, "the near surface is nearer than the mid one"));
+            UNSCOPED_INFO("the near surface is nearer than the mid one");
             REQUIRE((reverse ? window[(size_t)24 * W + 24] > window[(size_t)24 * W + 40] : window[(size_t)24 * W + 24] < window[(size_t)24 * W + 40]));
         }
     }
@@ -443,20 +433,21 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             blit();
             drawHUD();
-            UNSCOPED_INFO(named(reverse, "uncleared, the near world hides the HUD"));
+            UNSCOPED_INFO("uncleared, the near world hides the HUD");
             REQUIRE(colourAt(24, 24) == unorm(NEAR_COLOUR));
-            UNSCOPED_INFO(named(reverse, "where there is sky, the HUD shows anyway"));
+            UNSCOPED_INFO("where there is sky, the HUD shows anyway");
             REQUIRE(colourAt(24, 40) == unorm(HUD_COLOUR));
 
             blit();
             clearUnderHUD();
             drawHUD();
-            UNSCOPED_INFO(named(reverse, "cleared, the HUD shows over the near world"));
+            UNSCOPED_INFO("cleared, the HUD shows over the near world");
             REQUIRE(colourAt(24, 24) == unorm(HUD_COLOUR));
-            UNSCOPED_INFO(named(reverse, "and over the sky"));
+            UNSCOPED_INFO("and over the sky");
             REQUIRE(colourAt(24, 40) == unorm(HUD_COLOUR));
         }
     }
@@ -467,6 +458,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             blit();
             clearUnderHUD();
@@ -476,20 +468,20 @@ namespace
             overlay(44, 20, 3.f);
             overlay(24, 40, 3.f);
             overlay(40, 40, 3.f);
-            UNSCOPED_INFO(named(reverse, "behind the world, off the HUD: hidden"));
+            UNSCOPED_INFO("behind the world, off the HUD: hidden");
             REQUIRE(colourAt(40, 24) == unorm(MID_COLOUR));
-            UNSCOPED_INFO(named(reverse, "in front of the world, off the HUD: shown"));
+            UNSCOPED_INFO("in front of the world, off the HUD: shown");
             REQUIRE(colourAt(44, 20) == unorm(OVERLAY_COLOUR));
-            UNSCOPED_INFO(named(reverse, "on the HUD: hidden behind it"));
+            UNSCOPED_INFO("on the HUD: hidden behind it");
             REQUIRE(colourAt(24, 40) == unorm(HUD_COLOUR));
-            UNSCOPED_INFO(named(reverse, "over sky, off the HUD: shown"));
+            UNSCOPED_INFO("over sky, off the HUD: shown");
             REQUIRE(colourAt(40, 40) == unorm(OVERLAY_COLOUR));
 
             blit();
             clearUnderHUD();
             drawHUD();
             overlay(40, 24, 8.f);
-            UNSCOPED_INFO(named(reverse, "unrestored, what the world hides shows through"));
+            UNSCOPED_INFO("unrestored, what the world hides shows through");
             REQUIRE(colourAt(40, 24) == unorm(OVERLAY_COLOUR));
         }
     }
@@ -500,11 +492,11 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
-            UNSCOPED_INFO(named(reverse, "one rect"));
             REQUIRE(mRects.size() == size_t(1));
             {
-                INFO(named(reverse, "the rect is inside the window and not all of it"));
+                INFO("the rect is inside the window and not all of it");
                 REQUIRE(mRects[0].mLeft > 0);
                 REQUIRE(mRects[0].mRight < W);
                 REQUIRE(mRects[0].mBottom > 0);
@@ -533,9 +525,9 @@ namespace
                     }
                 }
             }
-            UNSCOPED_INFO(named(reverse, "the clear leaves the outside alone"));
+            UNSCOPED_INFO("the clear leaves the outside alone");
             REQUIRE(changed_outside == size_t(0));
-            UNSCOPED_INFO(named(reverse, "and empties the inside"));
+            UNSCOPED_INFO("and empties the inside");
             REQUIRE(uncleared_inside == size_t(0));
 
             restoreUnderHUD();
@@ -545,7 +537,7 @@ namespace
             {
                 differing += restored[i] != before[i] ? 1 : 0;
             }
-            UNSCOPED_INFO(named(reverse, "the restore gives back the blit's depth"));
+            UNSCOPED_INFO("the restore gives back the blit's depth");
             REQUIRE(differing == size_t(0));
         }
     }
@@ -603,19 +595,20 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             LLGLSLShader unloaded;
             blit();
             const std::vector<F32> before = depths(mWindow);
             clearUnderHUD(&unloaded);
-            UNSCOPED_INFO(named(reverse, "nothing cleared"));
+            UNSCOPED_INFO("nothing cleared");
             REQUIRE(depths(mWindow) == before);
             drawHUD();
             restoreUnderHUD(&unloaded);
             overlay(40, 24, 8.f);
-            UNSCOPED_INFO(named(reverse, "behind the world under the HUD's rect: hidden"));
+            UNSCOPED_INFO("behind the world under the HUD's rect: hidden");
             REQUIRE(colourAt(40, 24) == unorm(MID_COLOUR));
-            UNSCOPED_INFO(named(reverse, "the near world still hides the HUD"));
+            UNSCOPED_INFO("the near world still hides the HUD");
             REQUIRE(colourAt(24, 24) == unorm(NEAR_COLOUR));
         }
     }

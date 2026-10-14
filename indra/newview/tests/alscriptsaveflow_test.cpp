@@ -74,12 +74,10 @@ namespace
 
     TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: a Save asked during a send runs once after it however often it was asked", "[ALScriptSaveFlow]")
     {
-        UNSCOPED_INFO("goes");
         CHECK(flow.ask(false, false) == Flow::Start::Go);
         UNSCOPED_INFO("straight up");
         CHECK(flow.route(script(1)) == Route::Send);
         send();
-        UNSCOPED_INFO("sending");
         CHECK(flow.sending());
         UNSCOPED_INFO("asked again: queued");
         CHECK(flow.ask(false, false) == Flow::Start::Queued);
@@ -92,7 +90,6 @@ namespace
             CHECK(landing.markSaved);
             CHECK_FALSE(landing.stopped);
         }
-        UNSCOPED_INFO("nothing on its way");
         CHECK_FALSE(flow.underway());
         UNSCOPED_INFO("the one asked for meanwhile");
         CHECK(flow.takeAgain());
@@ -110,7 +107,6 @@ namespace
     {
         UNSCOPED_INFO("the analyzers' errors stop it");
         CHECK(flow.route(expanded(1, true, true, 2)) == Route::StoppedByAnalyzers);
-        UNSCOPED_INFO("and nothing waits");
         CHECK_FALSE(flow.underway());
         flow.letPast(1);
         UNSCOPED_INFO("asked again: past the errors, on to the preprocessor");
@@ -122,7 +118,6 @@ namespace
         UNSCOPED_INFO("a changed text asks afresh");
         CHECK(flow.route(expanded(2, true, true, 2)) == Route::StoppedByAnalyzers);
         flow.letPast(2);
-        UNSCOPED_INFO("let past");
         CHECK(flow.route(expanded(2, true, true, 2)) == Route::Preprocess);
         flow.preprocessed(run(2, 2));
         send();
@@ -135,7 +130,6 @@ namespace
     {
         UNSCOPED_INFO("not checked yet");
         CHECK(flow.route(script(4, true, false)) == Route::Check);
-        UNSCOPED_INFO("waiting");
         CHECK(flow.stage() == Flow::Stage::Checking);
         UNSCOPED_INFO("the check came: asked again");
         CHECK(flow.checked());
@@ -147,17 +141,14 @@ namespace
 
     TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: a text changed while preprocessed starts over and a running pass is joined", "[ALScriptSaveFlow]")
     {
-        UNSCOPED_INFO("run");
         CHECK(flow.route(expanded(1)) == Route::Preprocess);
         UNSCOPED_INFO("typed in meanwhile: from the start");
         CHECK(flow.preprocessed(run(1, 2)) == Flow::Landed::MovedOn);
-        UNSCOPED_INFO("nothing on its way");
         CHECK_FALSE(flow.underway());
         UNSCOPED_INFO("a view's run, nobody saving");
         CHECK(flow.preprocessed(run(2, 2)) == Flow::Landed::NotForSave);
         UNSCOPED_INFO("a run on its way already: joined");
         CHECK(flow.route(expanded(2, false, true, 0, true)) == Route::JoinPreprocessor);
-        UNSCOPED_INFO("waiting on it");
         CHECK(flow.stage() == Flow::Stage::Preprocessing);
         UNSCOPED_INFO("and sent when it comes");
         CHECK(flow.preprocessed(run(2, 2)) == Flow::Landed::Send);
@@ -212,39 +203,29 @@ namespace
     TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: an external editor's save skips every check and out of reach nothing goes", "[ALScriptSaveFlow]")
     {
         flow.fromExternal(3);
-        UNSCOPED_INFO("the editor's");
         CHECK(flow.external());
         UNSCOPED_INFO("past the errors");
         CHECK(flow.route(expanded(3, true, true, 5)) == Route::Preprocess);
         UNSCOPED_INFO("and sent");
         CHECK(flow.preprocessed(run(3, 3)) == Flow::Landed::Send);
         flow.endExternal();
-        UNSCOPED_INFO("ended");
         CHECK_FALSE(flow.external());
 
         flow.setCloseAfter(true);
-        {
-            INFO("out of reach");
-            CHECK(flow.ask(true, false) == Flow::Start::OutOfReach);
-            CHECK_FALSE(flow.closeAfter());
-        }
+        CHECK(flow.ask(true, false) == Flow::Start::OutOfReach);
+        CHECK_FALSE(flow.closeAfter());
         flow.setCloseAfter(true);
-        {
-            INFO("detached");
-            CHECK(flow.ask(false, true) == Flow::Start::Detached);
-            CHECK_FALSE(flow.closeAfter());
-        }
+        CHECK(flow.ask(false, true) == Flow::Start::Detached);
+        CHECK_FALSE(flow.closeAfter());
     }
 
     TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: files and notecards go as they stand and errors stop only a held save", "[ALScriptSaveFlow]")
     {
         Flow::Tab file = expanded(1, true, false, 3);
         file.file      = true;
-        UNSCOPED_INFO("a file");
         CHECK(flow.route(file) == Route::File);
         Flow::Tab card = expanded(1, true, false, 3);
         card.notecard  = true;
-        UNSCOPED_INFO("a notecard");
         CHECK(flow.route(card) == Route::Notecard);
         UNSCOPED_INFO("not held: sent over errors");
         CHECK(flow.route(script(1, false, true, 3)) == Route::Send);
@@ -254,7 +235,6 @@ namespace
 
     TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: fixOnce is true once a save and again for the next", "[ALScriptSaveFlow]")
     {
-        UNSCOPED_INFO("once");
         CHECK(flow.fixOnce());
         flow.route(script(1, true, false));
         flow.checked();
@@ -278,23 +258,17 @@ namespace
         LLUUID item;
         item.generate();
         flow.sent(at, ALSourceMap(), { item });
-        UNSCOPED_INFO("the save point");
         CHECK(flow.savePoint().serial == 7);
-        UNSCOPED_INFO("the map");
-        REQUIRE(flow.sentMap().has_value());
-        {
-            INFO("the items");
-            REQUIRE(flow.sentItems().size() == 1);
-            CHECK(flow.sentItems().front() == item);
-        }
+        CHECK(flow.sentMap().has_value());
+        REQUIRE(flow.sentItems().size() == 1);
+        CHECK(flow.sentItems().front() == item);
         flow.forgetSentItems();
         UNSCOPED_INFO("let go of");
-        REQUIRE(flow.sentItems().empty());
+        CHECK(flow.sentItems().empty());
         compile(true, true);
         UNSCOPED_INFO("the map stays after, for what the script says as it runs");
-        REQUIRE(flow.sentMap().has_value());
+        CHECK(flow.sentMap().has_value());
         flow.setWarnWeightFor(9);
-        UNSCOPED_INFO("the weight to warn of");
         CHECK(flow.warnWeightFor() == 9);
     }
 

@@ -100,16 +100,15 @@ namespace
     {
         ALRecoveryKeeper keeper(holder());
         keeper.setItem(object, item);
-        UNSCOPED_INFO("the window's own key");
         CHECK(ALRecoveryStore::isWindowKey(keeper.key()));
         keeper.pump(1, 10.0);
         UNSCOPED_INFO("nothing unsaved, nothing written");
-        REQUIRE_FALSE(mine());
+        CHECK_FALSE(mine());
         unsaved = true;
         text    = "typed";
         keeper.pump(2, 10.0);
         UNSCOPED_INFO("not at once");
-        REQUIRE_FALSE(mine());
+        CHECK_FALSE(mine());
         keeper.pump(3, 10.5);
         keeper.pump(3, 10.0 + ALRecoveryKeeper::DELAY);
         {
@@ -129,8 +128,7 @@ namespace
         unsaved = false;
         keeper.pump(4, 20.0);
         UNSCOPED_INFO("saved: forgotten");
-        REQUIRE_FALSE(mine());
-        UNSCOPED_INFO("nothing failed");
+        CHECK_FALSE(mine());
         CHECK(failed == 0);
     }
 
@@ -142,18 +140,15 @@ namespace
         text    = "thrown away";
         keeper.pump(1, 0.0);
         keeper.pump(1, ALRecoveryKeeper::DELAY);
-        UNSCOPED_INFO("written");
         REQUIRE(mine().has_value());
-        UNSCOPED_INFO("set aside");
         CHECK(keeper.setAside());
         UNSCOPED_INFO("its own gone");
-        REQUIRE_FALSE(mine());
+        CHECK_FALSE(mine());
         bool discarded = false;
         for (const ALRecoveryEntry& entry : store->list())
         {
             discarded |= entry.state == ALRecoveryEntry::State::Discarded && entry.key == keeper.key();
         }
-        UNSCOPED_INFO("among the discarded");
         CHECK(discarded);
 
         // What a session that ended left of the same item.
@@ -165,15 +160,11 @@ namespace
             left.item   = item;
             left.name   = "Card";
             left.text   = "left behind";
-            UNSCOPED_INFO("left");
             CHECK(before.write(left));
         }
         std::optional<ALRecoveryEntry> offered = keeper.left();
-        {
-            INFO("offered");
-            REQUIRE(offered);
-            CHECK(offered->text == "left behind");
-        }
+        REQUIRE(offered);
+        CHECK(offered->text == "left behind");
         text = "left behind";
         keeper.took(*offered, 7);
         {
@@ -182,7 +173,7 @@ namespace
             CHECK(mine()->text == "left behind");
         }
         UNSCOPED_INFO("and the one taken up gone");
-        REQUIRE_FALSE(keeper.left());
+        CHECK_FALSE(keeper.left());
 
         // Turned down: among the discarded, and offered no more.
         {
@@ -194,14 +185,11 @@ namespace
             before.write(left);
         }
         offered = keeper.left();
-        {
-            INFO("offered again");
-            REQUIRE(offered);
-            CHECK(offered->text == "not wanted");
-        }
+        REQUIRE(offered);
+        CHECK(offered->text == "not wanted");
         keeper.turnDown(*offered);
         UNSCOPED_INFO("turned down: offered no more");
-        REQUIRE_FALSE(keeper.left());
+        CHECK_FALSE(keeper.left());
     }
 
     TEST_CASE_METHOD(alrecoverykeeper_data, "ALRecoveryKeeper: a new item or none moves the key and a failed write is said once", "[ALRecoveryKeeper]")
@@ -211,7 +199,6 @@ namespace
         unsaved = true;
         keeper.pump(1, 0.0);
         keeper.pump(1, ALRecoveryKeeper::DELAY);
-        UNSCOPED_INFO("written");
         REQUIRE(mine().has_value());
         const LLUUID was = item;
         item             = LLUUID::generateNewID();
@@ -227,10 +214,10 @@ namespace
         keeper.pump(2, 5.0);
         keeper.pump(2, 5.0 + ALRecoveryKeeper::DELAY);
         UNSCOPED_INFO("the new one kept");
-        REQUIRE(mine().has_value());
+        CHECK(mine().has_value());
         keeper.setItem(object, LLUUID::null);
         UNSCOPED_INFO("no item, no key");
-        REQUIRE(keeper.key().empty());
+        CHECK(keeper.key().empty());
 
         // Where the store cannot write: said once.
         const std::string blocked = folder + "/blocked";
@@ -246,13 +233,13 @@ namespace
         failing.pump(1, ALRecoveryKeeper::DELAY);
         nowhere.flush();
         failing.pump(1, 10.0);
-        UNSCOPED_INFO("said");
+        UNSCOPED_INFO("the failed write said");
         CHECK(failed == 1);
         failing.pump(2, 11.0);
         failing.pump(2, 11.0 + ALRecoveryKeeper::DELAY);
         nowhere.flush();
         failing.pump(2, 20.0);
-        UNSCOPED_INFO("once");
+        UNSCOPED_INFO("and not said again");
         CHECK(failed == 1);
         ALRecovery::useStore(store.get());
     }
@@ -274,19 +261,15 @@ namespace
             llofstream other(temp + "/unrelated.txt");
             other << "left alone";
         }
-        UNSCOPED_INFO("two taken");
         CHECK(ALRecovery::importLegacyBackups(temp) == 2);
-        {
-            INFO("the backups gone");
-            CHECK_FALSE(LLFile::isfile(temp + "/Door Script-1A2B3C4D.lslbackup"));
-            CHECK_FALSE(LLFile::isfile(temp + "/Settings-0000ABCD.ncbackup"));
-        }
+        CHECK_FALSE(LLFile::isfile(temp + "/Door Script-1A2B3C4D.lslbackup"));
+        CHECK_FALSE(LLFile::isfile(temp + "/Settings-0000ABCD.ncbackup"));
         UNSCOPED_INFO("anything else left alone");
         CHECK(LLFile::isfile(temp + "/unrelated.txt"));
         bool script = false, card = false;
         for (ALRecoveryEntry& entry : store->left())
         {
-            UNSCOPED_INFO("whole");
+            CAPTURE(entry.name);
             REQUIRE(store->load(entry));
             script |= entry.name == "Door Script" && !entry.notecard && entry.text == "default { state_entry() {} }\n" &&
                       entry.state == ALRecoveryEntry::State::Unsaved;

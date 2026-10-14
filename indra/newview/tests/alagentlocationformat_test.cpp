@@ -88,30 +88,24 @@ namespace
     // behind, and the region takes its place.
     TEST_CASE_METHOD(alagentlocationformat_data, "ALAgentLocationFormat: an unnamed parcel drops out and the region takes its place", "[ALAgentLocationFormat]")
     {
-        UNSCOPED_INFO("NORMAL falls back to the region");
         CHECK(unnamed(LLAgentUI::LOCATION_FORMAT_NORMAL) ==
                       std::string("Hippotropolis"));
 
-        UNSCOPED_INFO("NORMAL_COORDS falls back to the region");
         CHECK(unnamed(LLAgentUI::LOCATION_FORMAT_NORMAL_COORDS) ==
                       std::string("Hippotropolis (128, 64, 22)"));
 
-        UNSCOPED_INFO("LANDMARK falls back to the region");
         CHECK(unnamed(LLAgentUI::LOCATION_FORMAT_LANDMARK) ==
                       std::string("Hippotropolis"));
 
         // The one place the two branches agree on the answer but reach it
         // differently: with no parcel to name, NO_MATURITY has nothing left to
         // distinguish it from NORMAL_COORDS.
-        UNSCOPED_INFO("NO_MATURITY falls back to the region");
         CHECK(unnamed(LLAgentUI::LOCATION_FORMAT_NO_MATURITY) ==
                       std::string("Hippotropolis (128, 64, 22)"));
 
-        UNSCOPED_INFO("NO_COORDS falls back to the region");
         CHECK(unnamed(LLAgentUI::LOCATION_FORMAT_NO_COORDS) ==
                       std::string("Hippotropolis - Adult"));
 
-        UNSCOPED_INFO("FULL falls back to the region");
         CHECK(unnamed(LLAgentUI::LOCATION_FORMAT_FULL) ==
                       std::string("Hippotropolis (128, 64, 22) - Adult"));
     }
@@ -120,19 +114,15 @@ namespace
     // is what forgetting this looks like.
     TEST_CASE_METHOD(alagentlocationformat_data, "ALAgentLocationFormat: no rating leaves no separator for named or unnamed parcels", "[ALAgentLocationFormat]")
     {
-        UNSCOPED_INFO("a named parcel with no rating has no separator");
         CHECK(named(LLAgentUI::LOCATION_FORMAT_NO_COORDS, "") ==
                       std::string("Ye Olde Parcel, Hippotropolis"));
 
-        UNSCOPED_INFO("nor does FULL");
         CHECK(named(LLAgentUI::LOCATION_FORMAT_FULL, "") ==
                       std::string("Ye Olde Parcel, Hippotropolis (128, 64, 22)"));
 
-        UNSCOPED_INFO("nor does an unnamed parcel");
         CHECK(unnamed(LLAgentUI::LOCATION_FORMAT_NO_COORDS, "") ==
                       std::string("Hippotropolis"));
 
-        UNSCOPED_INFO("nor unnamed FULL");
         CHECK(unnamed(LLAgentUI::LOCATION_FORMAT_FULL, "") ==
                       std::string("Hippotropolis (128, 64, 22)"));
     }
@@ -143,7 +133,6 @@ namespace
     {
         ALAgentLocationFormat::format(out, LLAgentUI::LOCATION_FORMAT_FULL,
                                       "Parcel", "Region", "General", -4, 0, 4096);
-        UNSCOPED_INFO("negative and large coordinates survive");
         CHECK(out == std::string("Parcel, Region (-4, 0, 4096) - General"));
     }
 
@@ -152,7 +141,6 @@ namespace
     TEST_CASE_METHOD(alagentlocationformat_data, "ALAgentLocationFormat: the buffer is cleared rather than appended to", "[ALAgentLocationFormat]")
     {
         out = "left over from last time";
-        UNSCOPED_INFO("the previous answer is gone");
         CHECK(named(LLAgentUI::LOCATION_FORMAT_NORMAL) ==
                       std::string("Ye Olde Parcel, Hippotropolis"));
 
@@ -200,7 +188,6 @@ namespace
     {
         ALAgentLocationFormat::format(out, LLAgentUI::LOCATION_FORMAT_LANDMARK,
                                       "Short", "Region", "", 0, 0, 0);
-        UNSCOPED_INFO("a short name is left alone");
         CHECK(out == std::string("Short"));
 
         const std::string exact(ALAgentLocationFormat::LANDMARK_NAME_MAX_BYTES, 'x');

@@ -70,8 +70,8 @@ namespace
             return (int)cube.colorCube[(size_t)index * 4 + channel];
         }
 
-        // constexpr, not const: ensure_equals takes its arguments by reference,
-        // which would odr-use a plain static const and want a definition.
+        // constexpr, not const: an assertion that took its operands by
+        // reference would odr-use a plain static const and want a definition.
         static constexpr int FULL = 65535;
         static constexpr int MID  = 32768;
     };
@@ -81,9 +81,7 @@ namespace
     TEST_CASE_METHOD(lutcube_data, "LutCube: an identity cube parses with red varying fastest", "[LutCube]")
     {
         const LutCube cube = parse(identity(2));
-        UNSCOPED_INFO("size");
         REQUIRE(cube.size == 2);
-        UNSCOPED_INFO("entry count");
         REQUIRE((int)cube.colorCube.size() == 2 * 2 * 2 * 4);
 
         UNSCOPED_INFO("black R");
@@ -114,7 +112,6 @@ namespace
     TEST_CASE_METHOD(lutcube_data, "LutCube: quantisation rounds rather than truncates", "[LutCube]")
     {
         const LutCube cube = parse(identity(3));
-        UNSCOPED_INFO("size");
         REQUIRE(cube.size == 3);
         // Entry 1 is x = 1 of 2, i.e. exactly mid grey on red alone.
         UNSCOPED_INFO("mid rounds up");
@@ -137,14 +134,13 @@ namespace
         }
 
         const LutCube cube = parse(text.str());
-        UNSCOPED_INFO("size");
         REQUIRE(cube.size == 2);
-        UNSCOPED_INFO("domain centre is mid grey");
-        CHECK(at(cube, 0, 0) == MID);
-        UNSCOPED_INFO("domain centre is mid grey");
-        CHECK(at(cube, 0, 1) == MID);
-        UNSCOPED_INFO("domain centre is mid grey");
-        CHECK(at(cube, 0, 2) == MID);
+        {
+            INFO("domain centre is mid grey");
+            CHECK(at(cube, 0, 0) == MID);
+            CHECK(at(cube, 0, 1) == MID);
+            CHECK(at(cube, 0, 2) == MID);
+        }
     }
 
     // The one that shows up as an artefact rather than a failure. "clampTripel"
@@ -203,9 +199,9 @@ namespace
     {
         const LutCube cube = parse("0.0 0.0 0.0\n1.0 1.0 1.0\n");
         UNSCOPED_INFO("data before LUT_3D_SIZE is rejected");
-        REQUIRE(cube.colorCube.empty());
+        CHECK(cube.colorCube.empty());
         UNSCOPED_INFO("and leaves no size");
-        REQUIRE(cube.size == 0);
+        CHECK(cube.size == 0);
     }
 
     // A short file used to be kept. The allocation is prefilled with full
@@ -218,7 +214,7 @@ namespace
 
         const LutCube cube = parse(text);
         UNSCOPED_INFO("an incomplete cube is rejected");
-        REQUIRE(cube.colorCube.empty());
+        CHECK(cube.colorCube.empty());
     }
 
     // stof/stoi throw, and nothing used to catch them, so a corrupt file threw
@@ -227,7 +223,7 @@ namespace
     {
         const LutCube bad_size = parse("LUT_3D_SIZE banana\n");
         UNSCOPED_INFO("a non-numeric size is rejected");
-        REQUIRE(bad_size.colorCube.empty());
+        CHECK(bad_size.colorCube.empty());
 
         std::ostringstream text;
         text << "LUT_3D_SIZE 2\n";
@@ -235,18 +231,18 @@ namespace
         text << "0.5 what 0.5\n";
         const LutCube bad_row = parse(text.str());
         UNSCOPED_INFO("a malformed row is rejected");
-        REQUIRE(bad_row.colorCube.empty());
+        CHECK(bad_row.colorCube.empty());
     }
 
     // An absurd size should be refused before it is allocated, not after.
     TEST_CASE_METHOD(lutcube_data, "LutCube: a huge or degenerate or negative size is refused", "[LutCube]")
     {
         UNSCOPED_INFO("a huge size is rejected");
-        REQUIRE(parse("LUT_3D_SIZE 100000\n").colorCube.empty());
+        CHECK(parse("LUT_3D_SIZE 100000\n").colorCube.empty());
         UNSCOPED_INFO("a degenerate size is rejected");
-        REQUIRE(parse("LUT_3D_SIZE 1\n").colorCube.empty());
+        CHECK(parse("LUT_3D_SIZE 1\n").colorCube.empty());
         UNSCOPED_INFO("a negative size is rejected");
-        REQUIRE(parse("LUT_3D_SIZE -4\n").colorCube.empty());
+        CHECK(parse("LUT_3D_SIZE -4\n").colorCube.empty());
     }
 
     // Values separated by runs of spaces or by tabs, and a file with CRLF line
@@ -291,7 +287,7 @@ namespace
             {
                 text << "0.0 0.0 0.0\n";
             }
-            UNSCOPED_INFO(std::string("a ") + value + " value is rejected");
+            CAPTURE(value);
             REQUIRE(parse(text.str()).colorCube.empty());
         }
 
@@ -305,6 +301,6 @@ namespace
             domain << "0.0 0.0 0.0\n";
         }
         UNSCOPED_INFO("a non-finite domain is rejected");
-        REQUIRE(parse(domain.str()).colorCube.empty());
+        CHECK(parse(domain.str()).colorCube.empty());
     }
 }

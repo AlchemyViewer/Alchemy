@@ -89,14 +89,12 @@ namespace
     TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: cadence converges on a steady rate", "[ALMotionPredictor]")
     {
         feedCadence(0.1f);
-        UNSCOPED_INFO("10 Hz");
         CHECK_THAT(mPredictor.getUpdateInterval(), ll_test::WithinBits(0.1f, 16));
 
         ALMotionPredictor slow;
         // Drive the second one directly so both start clean.
         F64 t = 100.0;
         for (S32 i = 0; i < 12; ++i) { slow.noteUpdate(t); t += 1.0; }
-        UNSCOPED_INFO("1 Hz");
         CHECK_THAT(slow.getUpdateInterval(), ll_test::WithinBits(1.0f, 16));
     }
 
@@ -144,11 +142,9 @@ namespace
             for (S32 i = 0; i < 12; ++i) { p.noteUpdate(t); t += c.mInterval; }
 
             const ALMotionPredictor::Window w = p.phaseOutWindow(mTuning);
-            UNSCOPED_INFO("tapers");
+            CAPTURE(c.mInterval);
             REQUIRE(w.isTapering());
-            UNSCOPED_INFO("start");
             REQUIRE_THAT(w.mStart, ll_test::WithinBits(c.mStart, 16));
-            UNSCOPED_INFO("end");
             REQUIRE_THAT(w.mEnd, ll_test::WithinBits(c.mEnd, 16));
             UNSCOPED_INFO("taper span is preserved");
             REQUIRE(w.mEnd - w.mStart >= 2.f - 1e-4f);
@@ -166,9 +162,7 @@ namespace
         mTuning.mCadenceFactor = 8.f;
 
         const ALMotionPredictor::Window w = p.phaseOutWindow(mTuning);
-        UNSCOPED_INFO("tapers");
         CHECK(w.isTapering());
-        UNSCOPED_INFO("clamped to the cap");
         CHECK_THAT(w.mStart, ll_test::WithinBits(mTuning.mCadenceCap, 16));
         UNSCOPED_INFO("and the taper still follows it");
         CHECK_THAT(w.mEnd, ll_test::WithinBits(mTuning.mCadenceCap + 2.f, 16));
@@ -178,11 +172,8 @@ namespace
     {
         // No cadence observed at all, yet the window still exists -- that is the default.
         const ALMotionPredictor::Window w = mPredictor.phaseOutWindow(mTuning);
-        UNSCOPED_INFO("tapers");
         CHECK(w.isTapering());
-        UNSCOPED_INFO("start");
         CHECK_THAT(w.mStart, ll_test::WithinBits(1.f, 4));
-        UNSCOPED_INFO("end");
         CHECK_THAT(w.mEnd, ll_test::WithinBits(3.f, 4));
     }
 
@@ -213,7 +204,7 @@ namespace
         for (F32 t = 0.f; t < 4.f; t += dt)
         {
             const F32 v = ALMotionPredictor::phaseOutFactor(t, w);
-            UNSCOPED_INFO("monotone non-increasing");
+            CAPTURE(t);
             REQUIRE(v <= prev + 1e-6f);
             worst = llmax(worst, prev - v);
             prev = v;
@@ -228,7 +219,7 @@ namespace
     {
         UNSCOPED_INFO("an ordinary frame passes through");
         CHECK_THAT(ALMotionPredictor::clampFrameStep(1.f / 60.f, mTuning),
-                                    ll_test::WithinBits(1.f / 60.f, 5));
+                   ll_test::WithinBits(1.f / 60.f, 5));
         UNSCOPED_INFO("a 30 s pause is bounded");
         CHECK(ALMotionPredictor::clampFrameStep(30.f, mTuning) == mTuning.mMaxFrameStep);
         UNSCOPED_INFO("time never runs backwards");
@@ -248,7 +239,7 @@ namespace
 
         for (F32 f : fps)
         {
-            UNSCOPED_INFO("same fall at any frame rate");
+            CAPTURE(f);
             REQUIRE_THAT(drop(f, 1.f), ll_test::WithinBits(reference, 8));
         }
     }
@@ -285,7 +276,7 @@ namespace
                 new_vel += accel * dt;
             }
 
-            UNSCOPED_INFO("same trajectory as the form it replaces");
+            CAPTURE(f);
             REQUIRE_THAT(new_pos, ll_test::WithinBits(old_pos, 20));
         }
     }
@@ -326,14 +317,10 @@ namespace
 
         // Half a timestep of gravity, ~0.109 m/s. Direction is deliberately whatever the viewer
         // has always used; see SIGN_AVERAGE_TO_FINAL.
-        UNSCOPED_INFO("offset magnitude");
         CHECK_THAT(fabsf(converted.mV[VZ]),
-                                    ll_test::WithinBits(fabsf(0.5f * GRAVITY * ALMotionPredictor::SIM_TIMESTEP), 16));
-        {
-            INFO("horizontal axes untouched");
-            CHECK(converted.mV[VX] == 0.f);
-            CHECK(converted.mV[VY] == 0.f);
-        }
+                   ll_test::WithinBits(fabsf(0.5f * GRAVITY * ALMotionPredictor::SIM_TIMESTEP), 16));
+        CHECK(converted.mV[VX] == 0.f);
+        CHECK(converted.mV[VY] == 0.f);
 
         // With no acceleration there is nothing to convert, which is the overwhelmingly common
         // case -- an avatar walking, a scripted mover at constant velocity.

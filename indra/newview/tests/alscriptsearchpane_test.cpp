@@ -240,14 +240,13 @@ namespace
         }
         {
             INFO("escape");
-            CHECK(out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
-            REQUIRE(services.reveals.back());
+            REQUIRE(out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            CHECK(services.reveals.back());
         }
         UNSCOPED_INFO("copied");
         CHECK(out.list()->handleKeyHere('C', MASK_CONTROL));
         UNSCOPED_INFO("the line as listed, trimmed");
         CHECK(out.search().found()[0].lines[1] == std::string("timer two"));
-        UNSCOPED_INFO("counted");
         CHECK(counted() == services.words("SearchCount", { { "[HITS]", services.counted("Matches", 2) },
                                                                             { "[FILES]", services.counted("Files", 1) },
                                                                             { "[SHOWN]", "2000" } }));
@@ -284,7 +283,6 @@ namespace
         // No object in hand: none guessed at.
         studio.inHand.setNull();
         find("timer", "object");
-        UNSCOPED_INFO("said");
         CHECK(counted() == services.words("SearchNoObject"));
     }
 
@@ -300,7 +298,7 @@ namespace
         REQUIRE(studio.fetches.size() == size_t(2));
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\nother\n"), false);
         UNSCOPED_INFO("the first search's answer dropped");
-        REQUIRE(out.search().found().empty());
+        CHECK(out.search().found().empty());
         UNSCOPED_INFO("still waiting on the second's");
         CHECK(out.search().pending() == 1);
         out.fetched(studio.fetches[1].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\nother\n"), false);
@@ -366,7 +364,7 @@ namespace
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\n"), false);
         out.fetched(studio.fetches[1].generation, "Thing", card, "card", std::make_shared<const std::string>("a timer\n"), true);
         UNSCOPED_INFO("three found");
-        REQUIRE(out.search().found().size() == size_t(3));
+        CHECK(out.search().found().size() == size_t(3));
         services.whenOpened = [this, card](const ALScriptRef& ref, const std::string&) {
             Doc& opened = ref == card ? doc("card", "a timer\n", true) : doc("away", "timer\n");
             opened.ref  = ref;
@@ -402,8 +400,7 @@ namespace
             CHECK(notecard->pendingEdits[0].now == "clock");
         }
         UNSCOPED_INFO("and each is made");
-        REQUIRE(studio.applied.size() == size_t(2));
-        UNSCOPED_INFO("said");
+        CHECK(studio.applied.size() == size_t(2));
         CHECK(services.reports.back().text ==
                       services.words("SearchReplaced", { { "[PLACES]", services.counted("Places", 3) }, { "[SCRIPTS]", services.counted("ScriptsNotecards", 3) } }) +
                           "; " +
@@ -483,9 +480,9 @@ namespace
         studio.includes["gate.lsl"] = lib;
         find("timer");
         UNSCOPED_INFO("alone: the script's own");
-        REQUIRE(out.search().found().size() == size_t(1));
+        CHECK(out.search().found().size() == size_t(1));
         UNSCOPED_INFO("nothing asked of what it includes");
-        REQUIRE(studio.askedIncludes.empty());
+        CHECK(studio.askedIncludes.empty());
         out.bar()->setValue("includes", "yes");
         const S32 before = studio.apart;
         find("timer");
@@ -501,8 +498,8 @@ namespace
         CHECK(found.file == std::string("disk:/scripts/lib.lsl"));
         {
             INFO("said to be included");
-            REQUIRE(found.where.find(services.words("SearchIncluded")) != std::string::npos);
-            REQUIRE(found.where.find("lib.lsl") != std::string::npos);
+            CHECK(found.where.find(services.words("SearchIncluded")) != std::string::npos);
+            CHECK(found.where.find("lib.lsl") != std::string::npos);
         }
         UNSCOPED_INFO("a row for its place");
         CHECK(out.list()->getItemCount() == 2);
@@ -526,7 +523,7 @@ namespace
         studio.holdListing  = true;
         find("timer", "object");
         UNSCOPED_INFO("nothing fetched while its prims are asked");
-        REQUIRE(studio.fetches.empty());
+        CHECK(studio.fetches.empty());
         UNSCOPED_INFO("waited for");
         CHECK(out.search().pending() == 1);
         studio.heldListing();
@@ -537,7 +534,7 @@ namespace
         UNSCOPED_INFO("none to wait for");
         CHECK(out.search().pending() == 0);
         UNSCOPED_INFO("one read");
-        REQUIRE(out.search().found().size() == size_t(1));
+        CHECK(out.search().found().size() == size_t(1));
         const std::string said = services.words("SearchCount", { { "[HITS]", services.counted("Matches", 1) },
                                                                  { "[FILES]", services.counted("Files", 1) },
                                                                  { "[SHOWN]", "2000" } });
@@ -555,10 +552,10 @@ namespace
         find("other", "object");
         first();
         UNSCOPED_INFO("the earlier listing dropped");
-        REQUIRE(studio.fetches.empty());
+        CHECK(studio.fetches.empty());
         studio.heldListing();
         UNSCOPED_INFO("the later one searched");
-        REQUIRE(studio.fetches.size() == size_t(2));
+        CHECK(studio.fetches.size() == size_t(2));
     }
 
     TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: Sources keeps a script by its text and drops the oldest past the limit", "[ALScriptSearchPane]")
@@ -575,19 +572,19 @@ namespace
         {
             INFO("found by its text");
             REQUIRE(kept);
-            REQUIRE(*kept->text == "timer");
+            CHECK(*kept->text == "timer");
             CHECK(kept->name == "one.lsl");
         }
         {
             INFO("not for another");
-            REQUIRE_FALSE(sources.find(one, LLUUID::generateNewID()));
-            REQUIRE_FALSE(sources.find(one, LLUUID::null));
+            CHECK_FALSE(sources.find(one, LLUUID::generateNewID()));
+            CHECK_FALSE(sources.find(one, LLUUID::null));
         }
         sources.keep(one, LLUUID::generateNewID(), { std::make_shared<const std::string>("saved since"), "one.lsl", false });
         {
             INFO("saved since: in its place");
-            REQUIRE_FALSE(sources.find(one, asset));
-            REQUIRE(sources.bytes() == std::string("saved since").size());
+            CHECK_FALSE(sources.find(one, asset));
+            CHECK(sources.bytes() == std::string("saved since").size());
         }
 
         sources.clear();
@@ -609,9 +606,9 @@ namespace
         CHECK(sources.bytes() <= ALScriptSearch::Sources::MOST);
         {
             INFO("the one used longest ago gone");
-            REQUIRE_FALSE(sources.find(refs[1], assets[1]));
-            REQUIRE(sources.find(refs[0], assets[0]));
-            REQUIRE(sources.find(refs[2], assets[2]));
+            CHECK_FALSE(sources.find(refs[1], assets[1]));
+            CHECK(sources.find(refs[0], assets[0]));
+            CHECK(sources.find(refs[2], assets[2]));
         }
         sources.clear();
     }
@@ -622,13 +619,12 @@ namespace
         const ALScriptRef   away(LLUUID::generateNewID(), LLUUID::generateNewID());
         studio.objects           = { { LLUUID::generateNewID(), "Thing", { away } } };
         find("timer", "listed");
-        UNSCOPED_INFO("fetched");
         REQUIRE(studio.fetches.size() == size_t(1));
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\n"), false);
         {
             INFO("sought apart");
             CHECK(studio.apart == 1);
-            REQUIRE(out.search().found().size() == 1);
+            CHECK(out.search().found().size() == 1);
             CHECK(out.search().pending() == 0);
         }
         const S32 before = studio.apart;

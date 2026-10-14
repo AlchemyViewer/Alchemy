@@ -98,23 +98,15 @@ namespace
         ALFeedbackOutbox box(mDir);
         std::vector<ALFeedback::Queued> given_up;
         const S64 now = now_seconds();
-        UNSCOPED_INFO("kept");
         REQUIRE(box.keep(report(id(1)), "body", now, given_up));
-        UNSCOPED_INFO("has");
         REQUIRE(box.has(id(1)));
-        UNSCOPED_INFO("body");
         CHECK(LLFile::getContents(path(id(1), ".envelope")) == "body");
 
         const auto records = box.records(now, given_up);
-        UNSCOPED_INFO("one");
         REQUIRE(records.size() == 1u);
-        UNSCOPED_INFO("made now");
         CHECK(records[0].created == now);
-        UNSCOPED_INFO("due");
         CHECK(records[0].nextAt == now + ALFeedback::QUEUE_RETRY_SECONDS);
-        UNSCOPED_INFO("what the user wrote");
         CHECK(records[0].message == "It broke");
-        UNSCOPED_INFO("nothing given up");
         REQUIRE(given_up.empty());
     }
 
@@ -122,11 +114,8 @@ namespace
     {
         ALFeedbackOutbox box(mDir);
         std::vector<ALFeedback::Queued> given_up;
-        UNSCOPED_INFO("not kept");
         CHECK_FALSE(box.keep(report("../escape"), "body", now_seconds(), given_up));
-        UNSCOPED_INFO("not claimed");
         CHECK_FALSE(box.claim("../escape"));
-        UNSCOPED_INFO("nothing written");
         REQUIRE(gDirUtilp->getFilesInDir(mDir).empty());
     }
 
@@ -136,16 +125,12 @@ namespace
         ALFeedbackOutbox other(mDir);
         std::vector<ALFeedback::Queued> given_up;
         box.keep(report(id(1)), "body", now_seconds(), given_up);
-        UNSCOPED_INFO("claimed");
         CHECK(box.claim(id(1)));
-        UNSCOPED_INFO("not twice");
         CHECK_FALSE(other.claim(id(1)));
-        UNSCOPED_INFO("its body");
         CHECK(box.claimedBody(id(1)) == "body");
-        UNSCOPED_INFO("still kept");
+        UNSCOPED_INFO("a claimed report is still kept");
         REQUIRE(box.has(id(1)));
         box.release(id(1));
-        UNSCOPED_INFO("free again");
         CHECK(other.claim(id(1)));
     }
 
@@ -157,7 +142,6 @@ namespace
         box.keep(report(id(1)), "body", now, given_up);
         // A report kept for hours: the body's time is old, the claim's is not.
         age(path(id(1), ".envelope"), 3 * 60 * 60);
-        UNSCOPED_INFO("claimed");
         CHECK(box.claim(id(1)));
 
         ALFeedbackOutbox(mDir).records(now, given_up);
@@ -176,7 +160,7 @@ namespace
         box.claim(id(1));
         age(path(id(1), ".sending"), ALFeedbackOutbox::CLAIM_STALE_SECONDS + 60);
         box.records(now, given_up);
-        UNSCOPED_INFO("freed");
+        UNSCOPED_INFO("the stale claim is freed");
         CHECK(LLFile::isfile(path(id(1), ".envelope")));
     }
 
@@ -189,27 +173,21 @@ namespace
         box.keep(report(id(2)), "body", now, given_up);
         box.keep(report(id(3)), "body", now, given_up);
 
-        UNSCOPED_INFO("sent is gone");
         CHECK_FALSE(box.settle(id(1), false, ALFeedback::Outcome::Sent, 0.f, now).kept);
-        UNSCOPED_INFO("forgotten");
         REQUIRE_FALSE(box.has(id(1)));
-        UNSCOPED_INFO("refused is gone");
         CHECK_FALSE(box.settle(id(2), false, ALFeedback::Outcome::Rejected, 0.f, now).kept);
 
         box.claim(id(3));
         const auto settled = box.settle(id(3), true, ALFeedback::Outcome::RateLimited, 7200.f, now);
-        UNSCOPED_INFO("unreached is kept");
+        UNSCOPED_INFO("a rate-limited report is kept");
         CHECK(settled.kept);
-        UNSCOPED_INFO("released");
+        UNSCOPED_INFO("the claim is released");
         CHECK(LLFile::isfile(path(id(3), ".envelope")));
         const auto records = box.records(now, given_up);
-        UNSCOPED_INFO("one left");
         REQUIRE(records.size() == 1u);
-        UNSCOPED_INFO("tried");
         CHECK(records[0].attempts == 1);
-        UNSCOPED_INFO("waits as asked");
+        UNSCOPED_INFO("waits as long as the server asked");
         CHECK(records[0].nextAt == now + 7200);
-        UNSCOPED_INFO("not before");
         CHECK(records[0].notBefore == now + 7200);
     }
 
@@ -224,11 +202,8 @@ namespace
         {
             settled = box.settle(id(1), false, ALFeedback::Outcome::Unreachable, 0.f, now);
         }
-        UNSCOPED_INFO("given up");
         REQUIRE(settled.givenUp.has_value());
-        UNSCOPED_INFO("its words");
         CHECK(settled.givenUp->message == "Lost words");
-        UNSCOPED_INFO("forgotten");
         REQUIRE_FALSE(box.has(id(1)));
     }
 
@@ -240,9 +215,7 @@ namespace
         box.keep(report(id(1)), "body", now, given_up);
         box.claim(id(1));
         box.forget(id(1));
-        UNSCOPED_INFO("not kept");
         CHECK_FALSE(box.settle(id(1), true, ALFeedback::Outcome::Unreachable, 0.f, now).kept);
-        UNSCOPED_INFO("nothing left");
         REQUIRE(gDirUtilp->getFilesInDir(mDir).empty());
     }
 
@@ -255,14 +228,12 @@ namespace
         {
             box.keep(report(id(i)), "body", now + i, given_up);
         }
-        UNSCOPED_INFO("room so far");
+        UNSCOPED_INFO("nothing given up while there is room");
         REQUIRE(given_up.empty());
         box.keep(report(id(99)), "body", now + 99, given_up);
-        UNSCOPED_INFO("one made room");
         REQUIRE(given_up.size() == 1u);
-        UNSCOPED_INFO("the oldest");
+        UNSCOPED_INFO("the oldest is given back");
         CHECK(given_up[0].eventId == id(0));
-        UNSCOPED_INFO("as many as fit");
         REQUIRE(box.records(now + 100, given_up).size() == ALFeedback::QUEUE_MAX_ENTRIES);
     }
 
@@ -299,11 +270,8 @@ namespace
     TEST_CASE_METHOD(alfeedbackoutbox_data, "alfeedbackoutbox: replaceFile replaces a file whole and leaves no parts", "[alfeedbackoutbox]")
     {
         const std::string file = gDirUtilp->add(mDir, "file.json");
-        UNSCOPED_INFO("written");
         CHECK(ALFeedbackOutbox::replaceFile(file, "first"));
-        UNSCOPED_INFO("replaced");
         CHECK(ALFeedbackOutbox::replaceFile(file, "second"));
-        UNSCOPED_INFO("the new");
         CHECK(LLFile::getContents(file) == "second");
         UNSCOPED_INFO("no parts left");
         REQUIRE(gDirUtilp->getFilesInDir(mDir).size() == 1u);

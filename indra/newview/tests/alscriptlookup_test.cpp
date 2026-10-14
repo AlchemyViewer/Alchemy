@@ -400,7 +400,7 @@ namespace
         ALScriptLookup::addPlace(lookup, place("", 1, 2, 7));
         ALScriptLookup::addPlace(lookup, place("x", 1, 2));
         UNSCOPED_INFO("once a file and a start");
-        REQUIRE(lookup.places.size() == size_t(2));
+        CHECK(lookup.places.size() == size_t(2));
 
         std::vector<Doc::Place> places = { place("object:z", 0, 0, 5, "Beta"),  place("", 3, 0, 5, "Zeta"),
                                            place("object:y", 2, 0, 5, "Alpha"), place("object:x", 0, 0, 5, "Beta"),
@@ -452,34 +452,25 @@ namespace
         CHECK_FALSE(doc.preview);
         {
             INFO("nothing else asked");
-            REQUIRE(studio.asked.empty());
-            REQUIRE(studio.loads.empty());
+            CHECK(studio.asked.empty());
+            CHECK(studio.loads.empty());
         }
-        UNSCOPED_INFO("shown");
         CHECK(studio.shows == 1);
-        UNSCOPED_INFO("in its tab");
         CHECK(studio.shownIn == std::string("a"));
-        UNSCOPED_INFO("from");
         CHECK(studio.shown.from == std::string("a"));
-        UNSCOPED_INFO("named");
         CHECK(studio.shown.fromName == std::string("A"));
-        UNSCOPED_INFO("the name");
         CHECK(studio.shown.name == std::string("count"));
         {
             INFO("in order");
             REQUIRE(studio.shown.places.size() == 2);
             CHECK(studio.shown.places[0].span.line == 0);
         }
-        UNSCOPED_INFO("not declared");
         CHECK_FALSE(studio.shown.hasDefinition);
-        {
-            INFO("said");
-            REQUIRE_FALSE(services.statuses.empty());
-            CHECK(has(services.statuses.back(), "ReferencesFound [COUNT]=2"));
-        }
+        REQUIRE_FALSE(services.statuses.empty());
+        CHECK(has(services.statuses.back(), "ReferencesFound [COUNT]=2"));
         {
             INFO("done with");
-            REQUIRE(doc.lookup->command == ALEditorCommand::None);
+            CHECK(doc.lookup->command == ALEditorCommand::None);
             CHECK(doc.lookup->pending == 0);
         }
     }
@@ -492,10 +483,9 @@ namespace
         Doc& doc      = lookUp(ALEditorCommand::FindReferences);
         UNSCOPED_INFO("candidates asked for");
         CHECK(studio.asked == Names{ "a" });
-        UNSCOPED_INFO("one to read");
         REQUIRE(studio.loads.size() == size_t(1));
         UNSCOPED_INFO("the open one passed over");
-        REQUIRE(studio.expands.empty());
+        CHECK(studio.expands.empty());
         UNSCOPED_INFO("waiting said");
         CHECK(has(services.statuses.back(), "LookingAcross [COUNT]=1 [NAME]=count"));
         UNSCOPED_INFO("nothing shown yet");
@@ -503,7 +493,6 @@ namespace
 
         const LLUUID asset("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
         studio.loads[0].loaded(asset, B_TEXT);
-        UNSCOPED_INFO("expanded");
         REQUIRE(studio.expands.size() == size_t(1));
         const ALScriptPreprocessor::Request& request = studio.expands[0].request;
         {
@@ -517,7 +506,6 @@ namespace
 
         studio.expands[0].expanded(
             expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "A", ALScriptPreprocessor::pathOf(a), "integer count;\n"));
-        UNSCOPED_INFO("asked");
         REQUIRE(studio.asks.size() == size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
         {
@@ -532,22 +520,16 @@ namespace
         CHECK(asked.version == doc.lookup->generation);
 
         studio.asks[0].answered(answer({ span(0, 8, 5), span(1, 8, 5) }));
-        UNSCOPED_INFO("shown");
         CHECK(studio.shows == 1);
         UNSCOPED_INFO("its own through the other's expansion left out");
         REQUIRE(studio.shown.places.size() == size_t(3));
         const Doc::Place& other = studio.shown.places[2];
-        UNSCOPED_INFO("in B");
         CHECK(other.file == ALScriptPreprocessor::pathOf(b));
-        UNSCOPED_INFO("named");
         CHECK(other.fileName == std::string("B"));
-        UNSCOPED_INFO("as written");
         CHECK(other.text == std::string("foo() { count = 2; }"));
         UNSCOPED_INFO("the name in it");
         CHECK(other.at == 8);
-        UNSCOPED_INFO("declared");
         CHECK(studio.shown.hasDefinition);
-        UNSCOPED_INFO("across scripts");
         CHECK(has(services.statuses.back(), "ReferencesFoundAcross [COUNT]=3 [FILES]=2"));
     }
 
@@ -585,7 +567,6 @@ namespace
         studio.loads[0].loaded(LLUUID::null, "");
         UNSCOPED_INFO("an empty one passed over");
         CHECK(studio.shows == 1);
-        UNSCOPED_INFO("one place");
         REQUIRE(studio.shown.places.size() == size_t(1));
         const Doc::Place& found = studio.shown.places[0];
         {
@@ -627,7 +608,7 @@ namespace
         studio.loads[0].loaded(LLUUID::null, B_TEXT);
         {
             INFO("the first's answer dropped");
-            REQUIRE(studio.expands.empty());
+            CHECK(studio.expands.empty());
             CHECK(studio.shows == 1);
         }
 
@@ -635,13 +616,12 @@ namespace
         studio.loads.back().loaded(LLUUID::null, B_TEXT);
         studio.expands.back().expanded(expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT));
         UNSCOPED_INFO("no declaration in it: nothing asked");
-        REQUIRE(studio.asks.empty());
+        CHECK(studio.asks.empty());
         UNSCOPED_INFO("shown without it");
         CHECK(studio.shows == 2);
 
         const U32 generation = doc.lookup->generation;
         lookUp(ALEditorCommand::FindReferences);
-        UNSCOPED_INFO("a new generation");
         CHECK(doc.lookup->generation != generation);
         studio.loads.back().loaded(LLUUID::null, B_TEXT);
         // A lookup of another tab's, still waiting on its read, as this
@@ -655,12 +635,12 @@ namespace
             expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "A", ALScriptPreprocessor::pathOf(a), "integer count;\n"));
         {
             INFO("nothing asked once gone");
-            REQUIRE(studio.asks.empty());
+            CHECK(studio.asks.empty());
             CHECK(studio.shows == 2);
         }
         studio.loads.back().loaded(LLUUID::null, B_TEXT);
         UNSCOPED_INFO("nothing read once gone");
-        REQUIRE(studio.expands.size() == expands);
+        CHECK(studio.expands.size() == expands);
     }
 
     TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: Rename says what is not renamable and hints at what return will do", "[alscriptlookup]")
@@ -670,7 +650,7 @@ namespace
         {
             INFO("not renamable");
             CHECK(has(services.statuses.back(), "NotRenamable"));
-            REQUIRE(studio.askedName.empty());
+            CHECK(studio.askedName.empty());
         }
 
         Doc& doc = lookUp(ALEditorCommand::Rename, false);
@@ -681,14 +661,9 @@ namespace
         doc.outline.push_back(entry);
         UNSCOPED_INFO("nothing typed");
         CHECK(has(studio.hint(""), "RenameHint [COUNT]=2 [FILES]=1 [NAME]=count"));
-        {
-            INFO("no name");
-            CHECK(has(studio.hint("9lives"), "RenameBadName"));
-            CHECK(has(studio.hint("9lives"), "[NAME]=9lives"));
-        }
-        UNSCOPED_INFO("reserved");
+        CHECK(has(studio.hint("9lives"), "RenameBadName"));
+        CHECK(has(studio.hint("9lives"), "[NAME]=9lives"));
         CHECK(has(studio.hint("state"), "RenameReserved [NAME]=state"));
-        UNSCOPED_INFO("the same");
         CHECK(has(studio.hint(" count "), "RenameSame"));
         UNSCOPED_INFO("a clash said, allowed");
         CHECK(has(studio.hint("total"), "RenameClash"));
@@ -699,7 +674,7 @@ namespace
         }
         services.docs.clear();
         UNSCOPED_INFO("its tab gone: nothing said");
-        REQUIRE(studio.hint("sum").empty());
+        CHECK(studio.hint("sum").empty());
     }
 
     TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: a rename across scripts edits open tabs and opens others with it pending", "[alscriptlookup]")
@@ -723,22 +698,17 @@ namespace
         moved.editor->insertText("// ");
         UNSCOPED_INFO("asked");
         REQUIRE((bool)studio.chosen);
-        UNSCOPED_INFO("across scripts");
         CHECK(has(studio.hint("sum"), "RenameToAcross [COUNT]=9 [FILES]=6"));
 
         studio.chosen("9lives");
-        {
-            INFO("no name");
-            CHECK(has(services.statuses.back(), "RenameBadName"));
-            CHECK(doc.editor->text() == A_TEXT);
-        }
+        CHECK(has(services.statuses.back(), "RenameBadName"));
+        CHECK(doc.editor->text() == A_TEXT);
         studio.chosen("state");
-        UNSCOPED_INFO("reserved");
         CHECK(has(services.statuses.back(), "RenameReserved"));
         studio.chosen("count");
         {
             INFO("the same: nothing");
-            REQUIRE(services.reports.empty());
+            CHECK(services.reports.empty());
             CHECK(doc.editor->text() == A_TEXT);
         }
 
@@ -754,7 +724,7 @@ namespace
         CHECK(open.editor->undoJournal().undoLabel() == std::string("rename"));
         {
             INFO("moved on since: left");
-            REQUIRE(has(moved.editor->text(), "count"));
+            CHECK(has(moved.editor->text(), "count"));
             CHECK_FALSE(has(moved.editor->text(), "total"));
         }
         {
@@ -777,7 +747,6 @@ namespace
         UNSCOPED_INFO("said once");
         REQUIRE(services.reports.size() == size_t(1));
         const al_studio_test::FakeServices::Said& said = services.reports[0];
-        UNSCOPED_INFO("the counts");
         CHECK(has(said.text, "RenamedIn [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=4"));
         UNSCOPED_INFO("opened, a clause joined on");
         CHECK(has(said.text, "[SECOND]=RenamedOpened [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=2"));
@@ -797,22 +766,17 @@ namespace
         Doc& doc = lookUp(ALEditorCommand::Rename, false);
         doc.editor->insertText(" ");
         studio.chosen("total");
-        {
-            INFO("stale");
-            CHECK(has(services.statuses.back(), "RenameStale [NAME]=total"));
-            REQUIRE(services.reports.empty());
-        }
+        CHECK(has(services.statuses.back(), "RenameStale [NAME]=total"));
+        CHECK(services.reports.empty());
 
         lookUp(ALEditorCommand::Rename, false);
         studio.chosen("total");
-        UNSCOPED_INFO("said");
         REQUIRE(services.reports.size() == size_t(1));
         {
             INFO("here");
             CHECK(has(services.reports[0].text, "RenamedHere"));
             CHECK_FALSE(has(services.reports[0].text, ";"));
         }
-        UNSCOPED_INFO("not a failure");
         CHECK_FALSE(services.reports[0].failure);
 
         Doc& open = tab("b", b, "foo() { count = 2; }\n", "B");
@@ -838,7 +802,7 @@ namespace
         unit->applyPendingEdits(doc);
         {
             INFO("not loaded: kept");
-            REQUIRE(doc.pendingEdits.size() == 2);
+            CHECK(doc.pendingEdits.size() == 2);
             CHECK(doc.editor->text() == "integer count;\nx = count;\n");
         }
 
@@ -847,7 +811,7 @@ namespace
         unit->applyPendingEdits(doc);
         {
             INFO("made");
-            REQUIRE(doc.pendingEdits.empty());
+            CHECK(doc.pendingEdits.empty());
             CHECK(doc.editor->text() == "integer total;\nx = count;\n");
         }
         UNSCOPED_INFO("one step");
@@ -868,11 +832,11 @@ namespace
         unit->applyPendingEdits(doc);
         {
             INFO("a replace");
-            REQUIRE(doc.editor->text() == "integer sum;\nx = count;\n");
+            CHECK(doc.editor->text() == "integer sum;\nx = count;\n");
             CHECK(doc.editor->undoJournal().undoLabel() == "replace");
         }
         UNSCOPED_INFO("nothing missed");
-        REQUIRE(services.reports.size() == 1);
+        CHECK(services.reports.size() == 1);
 
         doc.modifiable   = false;
         doc.pendingEdits = { { span(0, 8, 3), "sum", "total", true } };
@@ -930,7 +894,7 @@ namespace
         REQUIRE(studio.loads.size() == size_t(4));
         studio.loads[2].loaded(LLUUID::null, "");
         UNSCOPED_INFO("the new one's go on");
-        REQUIRE(studio.loads.size() == size_t(5));
+        CHECK(studio.loads.size() == size_t(5));
     }
 
     TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: folderCandidates are the folder's other scripts in the same language", "[alscriptlookup]")
@@ -979,7 +943,7 @@ namespace
         {
             INFO("no name: nothing shown");
             CHECK(has(services.statuses.back(), "RenameBadName"));
-            REQUIRE_FALSE(studio.apply);
+            CHECK_FALSE(studio.apply);
         }
         studio.previewed("sum");
         {
@@ -1040,11 +1004,9 @@ namespace
         studio.unlisted       = 2;
         studio.holdCandidates = true;
         lookUp(ALEditorCommand::FindReferences);
-        UNSCOPED_INFO("asked");
         CHECK(studio.asked == Names{ "a" });
         UNSCOPED_INFO("nothing read while the prims are asked");
-        REQUIRE(studio.loads.empty());
-        UNSCOPED_INFO("nothing shown");
+        CHECK(studio.loads.empty());
         CHECK(studio.shows == 0);
         studio.heldCandidates();
         UNSCOPED_INFO("both read");
@@ -1053,7 +1015,6 @@ namespace
         UNSCOPED_INFO("one still out");
         CHECK(studio.shows == 0);
         studio.loads[1].loaded(LLUUID::null, std::string("default { }\n"));
-        UNSCOPED_INFO("shown");
         CHECK(studio.shows == 1);
         const std::string said = services.statuses.back();
         {
@@ -1087,38 +1048,38 @@ namespace
         const ALScriptPlaces::Lines held(std::make_shared<const std::string>("one\r\ntwo\n\nfour"));
         {
             INFO("four lines");
-            REQUIRE(held.has(0));
-            REQUIRE(held.has(3));
-            REQUIRE_FALSE(held.has(4));
-            REQUIRE_FALSE(held.has(-1));
+            CHECK(held.has(0));
+            CHECK(held.has(3));
+            CHECK_FALSE(held.has(4));
+            CHECK_FALSE(held.has(-1));
         }
         {
             INFO("each as it is");
             CHECK(held.line(0) == "one");
             CHECK(held.line(1) == "two");
-            REQUIRE(held.line(2).empty());
+            CHECK(held.line(2).empty());
             CHECK(held.line(3) == "four");
         }
         UNSCOPED_INFO("none past the end");
-        REQUIRE(held.line(9).empty());
+        CHECK(held.line(9).empty());
         const std::string           text = "a\nb\n";
         const ALScriptPlaces::Lines here(text);
         {
             INFO("read where it is, the last line empty");
             CHECK(here.line(1) == "b");
-            REQUIRE(here.has(2));
-            REQUIRE(here.line(2).empty());
-            REQUIRE_FALSE(here.has(3));
+            CHECK(here.has(2));
+            CHECK(here.line(2).empty());
+            CHECK_FALSE(here.has(3));
         }
         const ALTextDocument        open("x\ny");
         const ALScriptPlaces::Lines tab(&open);
         {
             INFO("a tab's");
             CHECK(tab.line(1) == "y");
-            REQUIRE_FALSE(tab.has(2));
+            CHECK_FALSE(tab.has(2));
         }
         UNSCOPED_INFO("nothing: no lines");
-        REQUIRE_FALSE(ALScriptPlaces::Lines().has(0));
+        CHECK_FALSE(ALScriptPlaces::Lines().has(0));
     }
 
     TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: a rename preview compares an open unchanged file with its renamed text", "[alscriptlookup]")
@@ -1131,7 +1092,6 @@ namespace
                     { place("", 0, 8), place("", 1, 26), place(pb, 0, 8, 5, "B"), place(pb, 1, 16, 5, "B"), place(pd, 2, 4, 5, "D") },
                     doc.editor->document().version());
         studio.previewed("sum");
-        UNSCOPED_INFO("offered");
         REQUIRE((bool)studio.changes);
 
         studio.changes("", { 1, 2, 3 });
@@ -1156,15 +1116,15 @@ namespace
         studio.changes(pd, { 4 });
         {
             INFO("not open: said, not shown");
-            REQUIRE(studio.compared.size() == before);
+            CHECK(studio.compared.size() == before);
             CHECK(has(services.statuses.back(), "RenameChangesNotHere [NAME]=sum [SCRIPT]=D"));
-            REQUIRE(services.statusFailures.back());
+            CHECK(services.statusFailures.back());
         }
         open.editor->insertText("// ");
         studio.changes(pb, { 2, 3 });
         {
             INFO("changed since: said");
-            REQUIRE(studio.compared.size() == before);
+            CHECK(studio.compared.size() == before);
             CHECK(has(services.statuses.back(), "RenameChangesNotHere"));
         }
     }
@@ -1200,11 +1160,8 @@ namespace
             CHECK(module.name == "lib.luau");
             CHECK(module.sourceText() == LIB_TEXT);
         }
-        {
-            INFO("the other script");
-            CHECK(studio.expands[1].request.path == OTHER);
-            CHECK(studio.expands[1].request.sourceText() == B_LUA);
-        }
+        CHECK(studio.expands[1].request.path == OTHER);
+        CHECK(studio.expands[1].request.sourceText() == B_LUA);
 
         // The module read alone is the home itself; the other script has it
         // ahead of its own lines.
@@ -1228,7 +1185,7 @@ namespace
         UNSCOPED_INFO("asked for the new name");
         REQUIRE((bool)studio.chosen);
         UNSCOPED_INFO("each place once: the script's, the module's, the other's");
-        REQUIRE(doc.lookup->places.size() == size_t(3));
+        CHECK(doc.lookup->places.size() == size_t(3));
         UNSCOPED_INFO("the other's, by its path");
         CHECK(std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
                    return place.file == OTHER && place.fileName == "b.luau" && place.span.line == 1 && place.span.column == 10;
@@ -1243,7 +1200,7 @@ namespace
         CHECK(other.editor->text() == std::string("local lib = require(\"./lib\")\nprint(lib.double(4))\n"));
         {
             INFO("each its own step");
-            REQUIRE(lib.editor->undoJournal().undoLabel() == "rename");
+            CHECK(lib.editor->undoJournal().undoLabel() == "rename");
             CHECK(other.editor->undoJournal().undoLabel() == "rename");
         }
         UNSCOPED_INFO("another language's file left alone");
@@ -1339,7 +1296,6 @@ namespace
         UNSCOPED_INFO("apart asked for");
         CHECK(studio.expands[0].request.apart);
         studio.expands[0].expanded(apartExpansion("b.luau", OTHER, B_LUA, "./lib", "lib.luau", LIB, LIB_TEXT));
-        UNSCOPED_INFO("asked");
         REQUIRE(studio.asks.size() == size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
         {
@@ -1357,7 +1313,7 @@ namespace
             INFO("with its modules");
             REQUIRE(asked.modules);
             REQUIRE(asked.modules->modules.size() == 1);
-            REQUIRE(asked.modules->modules[0].key == LIB);
+            CHECK(asked.modules->modules[0].key == LIB);
             REQUIRE(asked.modules->reaches.size() == 1);
             CHECK(asked.modules->reaches[0].name == "./lib");
         }
@@ -1370,7 +1326,7 @@ namespace
                    return place.file == OTHER && place.fileName == "b.luau" && place.span.line == 1 && place.span.column == 10;
                }));
         UNSCOPED_INFO("each once: the script's, the module's, the other's");
-        REQUIRE(doc.lookup->places.size() == size_t(3));
+        CHECK(doc.lookup->places.size() == size_t(3));
     }
 
     TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: a file open under another path to it is read once as its tab has it", "[alscriptlookup]")
@@ -1410,11 +1366,8 @@ namespace
         studio.expands[0].expanded(expansion("lib.luau", LIB_TAB, TYPED));
         UNSCOPED_INFO("the home itself, asked at its declaration");
         REQUIRE(studio.asks.size() == size_t(1));
-        {
-            INFO("there");
-            CHECK(studio.asks[0].request.line == 1);
-            CHECK(studio.asks[0].request.column == 11);
-        }
+        CHECK(studio.asks[0].request.line == 1);
+        CHECK(studio.asks[0].request.column == 11);
         std::error_code ec;
         fs::remove_all(root, ec);
     }
@@ -1453,7 +1406,7 @@ namespace
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
                     doc.editor->document().version());
         UNSCOPED_INFO("nothing read here");
-        REQUIRE(studio.expands.empty());
+        CHECK(studio.expands.empty());
         {
             INFO("held open for the walk");
             CHECK(doc.lookup->pending == 1);
@@ -1491,7 +1444,7 @@ namespace
         unit.reset();
         pumped([] { return false; }, std::chrono::milliseconds(300));
         UNSCOPED_INFO("nothing comes of it");
-        REQUIRE(studio.expands.size() == size_t(2));
+        CHECK(studio.expands.size() == size_t(2));
         std::error_code ec;
         fs::remove_all(root, ec);
     }
@@ -1504,28 +1457,28 @@ namespace
         const ALScriptPlaces::Lines tab(&open);
         {
             INFO("as many as the tab's");
-            REQUIRE(held.has(4));
-            REQUIRE_FALSE(held.has(5));
-            REQUIRE(tab.has(4));
-            REQUIRE_FALSE(tab.has(5));
+            CHECK(held.has(4));
+            CHECK_FALSE(held.has(5));
+            CHECK(tab.has(4));
+            CHECK_FALSE(tab.has(5));
         }
         for (S32 line = 0; line < 5; ++line)
         {
-            UNSCOPED_INFO("line " + std::to_string(line) + " the tab's");
+            CAPTURE(line);
             REQUIRE(held.line(line) == tab.line(line));
         }
         {
             INFO("each as it is");
             CHECK(held.line(1) == "two");
-            REQUIRE(held.line(3).empty());
+            CHECK(held.line(3).empty());
             CHECK(held.line(4) == "five");
         }
         const ALScriptPlaces::Lines here(text);
         {
             INFO("read where it is, the same");
             CHECK(here.line(2) == "three");
-            REQUIRE(here.has(4));
-            REQUIRE_FALSE(here.has(5));
+            CHECK(here.has(4));
+            CHECK_FALSE(here.has(5));
         }
     }
 }

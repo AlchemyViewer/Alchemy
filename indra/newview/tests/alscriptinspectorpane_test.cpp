@@ -136,7 +136,6 @@ namespace
         result.hover.documentation         = "How many.";
         result.hover.link                  = "https://example.com/count";
         inspector->inspected(doc, result, ALTextPos(0, 8));
-        UNSCOPED_INFO("said");
         CHECK(shown() ==
                       std::string("integer count\nDeclared on line 1.\nExpected here: float\n\ninteger\n  count\n\nHow many.\n"
                                   "https://example.com/count"));
@@ -156,7 +155,7 @@ namespace
         }
         {
             INFO("to the line");
-            REQUIRE(to->value["line"].asInteger() == 0);
+            CHECK(to->value["line"].asInteger() == 0);
             CHECK(to->value["column"].asInteger() == 8);
         }
         UNSCOPED_INFO("in the script");
@@ -288,9 +287,8 @@ namespace
         doc.editor->setDecorations({ squiggle(0, 8, 13, "Unused."), squiggle(0, 0, 13, "Twice."), squiggle(0, 8, 13, ""),
                                      squiggle(0, 8, 13, "Lit.", ALCodeEditor::Decoration::Style::Background),
                                      squiggle(1, 0, 5, "Elsewhere.") });
-        UNSCOPED_INFO("each");
+        UNSCOPED_INFO("each squiggle under the caret that says something");
         CHECK(inspector->problemsAt(doc, ALTextPos(0, 9)) == std::string("Problem: Unused.\nProblem: Twice."));
-        UNSCOPED_INFO("none");
         CHECK(inspector->problemsAt(doc, ALTextPos(2, 0)) == std::string());
         inspector->inspected(doc, hover("integer count"), ALTextPos(0, 8));
         UNSCOPED_INFO("under the name");

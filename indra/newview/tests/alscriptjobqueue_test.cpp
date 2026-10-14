@@ -59,7 +59,6 @@ namespace
         CHECK(queue.waiting() == size_t(5));
         UNSCOPED_INFO("by rank, then by when");
         CHECK(drained() == std::string("front-hover front-check-2 front-weigh back-check-1 other-check"));
-        UNSCOPED_INFO("nothing passed over");
         CHECK(queue.passedOver() == size_t(0));
     }
 
@@ -87,7 +86,6 @@ namespace
     TEST_CASE_METHOD(alscriptjobqueue_data, "alscriptjobqueue: the running job is superseded only by its own key or a newer text", "[alscriptjobqueue]")
     {
         queue.add("a/check", "a", 3, 1, "check-3");
-        UNSCOPED_INFO("taken");
         REQUIRE(queue.take().has_value());
         UNSCOPED_INFO("nothing asked since");
         CHECK_FALSE(queue.superseded());
@@ -101,7 +99,6 @@ namespace
         CHECK_FALSE(queue.superseded());
         UNSCOPED_INFO("its own key asked again stops it");
         CHECK(queue.add("a/check", "a", 3, 1, "check-3-again"));
-        UNSCOPED_INFO("unwanted");
         CHECK(queue.superseded());
         UNSCOPED_INFO("said once");
         CHECK_FALSE(queue.add("a/check", "a", 4, 1, "check-4"));
@@ -109,7 +106,6 @@ namespace
         UNSCOPED_INFO("done with");
         CHECK_FALSE(queue.superseded());
         queue.add("x/hover", "x", 1, 0, "x-hover");
-        UNSCOPED_INFO("taken");
         REQUIRE(queue.take().has_value());
         UNSCOPED_INFO("a newer text of its script stops it");
         CHECK(queue.add("x/check", "x", 2, 1, "x-check"));
@@ -119,13 +115,11 @@ namespace
     TEST_CASE_METHOD(alscriptjobqueue_data, "alscriptjobqueue: a yielding job stops for a rank 0 question and runs after it", "[alscriptjobqueue]")
     {
         queue.add("back/check", "back", 1, 4, "back-check", true);
-        UNSCOPED_INFO("taken");
         REQUIRE(queue.take().has_value());
         UNSCOPED_INFO("a check of the front tab leaves it be");
         CHECK_FALSE(queue.add("front/check", "front", 1, 1, "front-check"));
         UNSCOPED_INFO("a question of the front tab stops it");
         CHECK(queue.add("front/hover", "front", 1, 0, "front-hover"));
-        UNSCOPED_INFO("as it yields");
         CHECK(queue.yielded());
         UNSCOPED_INFO("its answer wanted still");
         CHECK_FALSE(queue.superseded());
@@ -138,7 +132,6 @@ namespace
 
         // Asked again while it ran: the newer stands for it.
         queue.add("back/check", "back", 1, 4, "back-check-1", true);
-        UNSCOPED_INFO("taken");
         REQUIRE(queue.take().has_value());
         UNSCOPED_INFO("stopped");
         CHECK(queue.add("front/hover", "front", 2, 0, "front-hover-2"));
@@ -150,7 +143,6 @@ namespace
 
         // One that does not yield runs on.
         queue.add("back/weigh", "back", 3, 3, "back-weigh");
-        UNSCOPED_INFO("taken");
         REQUIRE(queue.take().has_value());
         {
             INFO("left be");
@@ -164,7 +156,6 @@ namespace
     TEST_CASE_METHOD(alscriptjobqueue_data, "alscriptjobqueue: a yielded job keeps its turn and one forgotten while running is dropped", "[alscriptjobqueue]")
     {
         queue.add("back/check", "back", 1, 4, "back-check", true);
-        UNSCOPED_INFO("taken");
         REQUIRE(queue.take().has_value());
         queue.add("other/check", "other", 1, 4, "other-check", true);
         {
@@ -201,14 +192,11 @@ namespace
         // Let go of while it runs: unwanted, said once, and not put back
         // though it was stopped as it yielded.
         queue.add("gone/check", "gone", 1, 4, "gone-check", true);
-        UNSCOPED_INFO("taken");
         REQUIRE(queue.take().has_value());
         queue.add("gone/hover", "gone", 1, 0, "gone-hover");
-        UNSCOPED_INFO("yielded");
         CHECK(queue.yielded());
         UNSCOPED_INFO("let go of: to be stopped");
         CHECK(queue.forget("gone"));
-        UNSCOPED_INFO("unwanted");
         CHECK(queue.superseded());
         UNSCOPED_INFO("said once");
         CHECK_FALSE(queue.forget("gone"));

@@ -230,11 +230,8 @@ namespace
         holds(id(12), {});
         holds(chair, { "sit.lsl" });
         show();
-        {
-            INFO("chosen");
-            CHECK(t.choose(itemRow("a.lsl"), false));
-            REQUIRE(t.chosen().size() == 1);
-        }
+        CHECK(t.choose(itemRow("a.lsl"), false));
+        REQUIRE(t.chosen().size() == 1);
         state = "stopped";
         show();
         {
@@ -319,7 +316,6 @@ namespace
         show();
         UNSCOPED_INFO("folded as the rows say");
         CHECK_FALSE(t.isOpen(primRow(house, id(11))));
-        UNSCOPED_INFO("chosen");
         CHECK(t.choose(itemRow("b.lsl"), false));
         UNSCOPED_INFO("what holds it opened");
         CHECK(t.isOpen(primRow(house, id(11))));
@@ -335,7 +331,6 @@ namespace
             REQUIRE(t.chosen().size() == 1);
         }
         t.chooseNone();
-        UNSCOPED_INFO("none");
         REQUIRE(t.chosen().empty());
     }
 
@@ -386,7 +381,6 @@ namespace
         t.setHooks(std::move(hooks));
         // The folder view drags only from a row that says it may move; the
         // press and the move themselves want a window this has none of.
-        UNSCOPED_INFO("chosen");
         CHECK(t.choose(itemRow("a.lsl"), false));
         LLFolderViewItem* item = t.folderView()->getCurSelectedItem();
         {
@@ -399,7 +393,6 @@ namespace
             CHECK(t.folderView()->startDrag());
             CHECK(drags == 1);
         }
-        UNSCOPED_INFO("chosen");
         CHECK(t.choose(objectRow(house), false));
         UNSCOPED_INFO("an object may not");
         CHECK_FALSE(t.folderView()->getCurSelectedItem()->isMovable());

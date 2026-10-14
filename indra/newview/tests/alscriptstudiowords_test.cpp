@@ -124,15 +124,13 @@ namespace
     TEST_CASE_METHOD(alscriptstudiowords_data, "alscriptstudiowords: the vocabulary gives each kind's detail sorted and skips unknown groups", "[alscriptstudiowords]")
     {
         const std::vector<Vocab>& words = Words::vocabulary(false);
-        UNSCOPED_INFO("six");
-        REQUIRE(words.size() == size_t(6));
-        UNSCOPED_INFO("sorted");
+        CHECK(words.size() == size_t(6));
         CHECK(std::is_sorted(words.begin(), words.end(), [](const Vocab& a, const Vocab& b) { return a.text < b.text; }));
         const Vocab* say = Words::word(false, "llSay");
         {
             INFO("a function's call, with its arguments' types");
             REQUIRE(say);
-            REQUIRE(say->kind == ALSyntaxKind::Function);
+            CHECK(say->kind == ALSyntaxKind::Function);
             CHECK(say->detail == "llSay(integer channel, string msg)");
         }
         {
@@ -146,13 +144,12 @@ namespace
         CHECK(Words::word(false, "PI")->detail == std::string("float PI = 3.14159265"));
         UNSCOPED_INFO("a type's tooltip's first line");
         CHECK(Words::word(false, "integer")->detail == std::string("A whole number."));
-        UNSCOPED_INFO("a control");
         CHECK(Words::word(false, "jump")->kind == ALSyntaxKind::Control);
         {
             INFO("not a word");
-            REQUIRE_FALSE(Words::word(false, "x"));
-            REQUIRE_FALSE(Words::word(false, ""));
-            REQUIRE_FALSE(Words::word(false, "nothing"));
+            CHECK_FALSE(Words::word(false, "x"));
+            CHECK_FALSE(Words::word(false, ""));
+            CHECK_FALSE(Words::word(false, "nothing"));
         }
         UNSCOPED_INFO("SLua's () returns nothing worth saying");
         CHECK(Words::word(true, "ll.Say")->detail == std::string("ll.Say(number channel)"));
@@ -160,27 +157,26 @@ namespace
 
     TEST_CASE_METHOD(alscriptstudiowords_data, "alscriptstudiowords: the vocabulary is kept until forgotten and then built again", "[alscriptstudiowords]")
     {
-        UNSCOPED_INFO("there");
         REQUIRE(Words::word(false, "llSay") != nullptr);
         lsl["functions"].erase("llSay");
         lsl["functions"]["llShout"] = LLSD().with("return", "");
         {
             INFO("kept");
-            REQUIRE(Words::word(false, "llSay") != nullptr);
-            REQUIRE_FALSE(Words::word(false, "llShout"));
+            CHECK(Words::word(false, "llSay") != nullptr);
+            CHECK_FALSE(Words::word(false, "llShout"));
         }
         Words::forget();
         {
             INFO("built again");
-            REQUIRE_FALSE(Words::word(false, "llSay"));
-            REQUIRE(Words::word(false, "llShout") != nullptr);
+            CHECK_FALSE(Words::word(false, "llSay"));
+            CHECK(Words::word(false, "llShout") != nullptr);
         }
         viewer.slots.keywords = [](bool) { return LLSD("not a map"); };
         Words::forget();
         {
             INFO("definitions that are not: no words");
-            REQUIRE(Words::vocabulary(false).empty());
-            REQUIRE_FALSE(Words::word(false, "llShout"));
+            CHECK(Words::vocabulary(false).empty());
+            CHECK_FALSE(Words::word(false, "llShout"));
         }
     }
 
@@ -190,31 +186,24 @@ namespace
         extra           = { "switch", "case" };
         Words::teach(e, false);
         const ALSyntaxWords& tables = e.highlighter().words();
-        {
-            INFO("functions");
-            REQUIRE(tables.has("function", "llSay"));
-            REQUIRE_FALSE(tables.has("function", "llOld"));
-        }
-        UNSCOPED_INFO("the deprecated");
-        REQUIRE(tables.has("deprecated", "llOld"));
-        {
-            INFO("events, constants, types, controls");
-            REQUIRE(tables.has("event", "touch_start"));
-            REQUIRE(tables.has("constant", "PI"));
-            REQUIRE(tables.has("type", "integer"));
-            REQUIRE(tables.has("control", "jump"));
-        }
+        CHECK(tables.has("function", "llSay"));
+        CHECK_FALSE(tables.has("function", "llOld"));
+        CHECK(tables.has("deprecated", "llOld"));
+        CHECK(tables.has("event", "touch_start"));
+        CHECK(tables.has("constant", "PI"));
+        CHECK(tables.has("type", "integer"));
+        CHECK(tables.has("control", "jump"));
         {
             INFO("the preprocessor's");
-            REQUIRE(tables.has("control", "switch"));
-            REQUIRE(tables.has("control", "case"));
+            CHECK(tables.has("control", "switch"));
+            CHECK(tables.has("control", "case"));
         }
         ALCodeEditor& s = editor("x", true);
         Words::teach(s, true);
         {
             INFO("SLua's own, and none of the preprocessor's");
-            REQUIRE(s.highlighter().words().has("function", "ll.Say"));
-            REQUIRE_FALSE(s.highlighter().words().has("control", "switch"));
+            CHECK(s.highlighter().words().has("function", "ll.Say"));
+            CHECK_FALSE(s.highlighter().words().has("control", "switch"));
         }
     }
 
@@ -243,18 +232,18 @@ namespace
         CHECK(slua.snippet == std::string("function LLEvents.touch_start(detected)\n    $0\nend"));
         UNSCOPED_INFO("typed where asked, as the definitions type it");
         CHECK(Words::completionFor(*Words::word(true, "touch_start"), true, true).snippet ==
-                      std::string("function LLEvents.touch_start(detected: {DetectedEvent})\n    $0\nend"));
+              std::string("function LLEvents.touch_start(detected: {DetectedEvent})\n    $0\nend"));
         UNSCOPED_INFO("each parameter typed");
         CHECK(Words::completionFor(*Words::word(true, "listen"), true, true).snippet ==
-                      std::string("function LLEvents.listen(channel: number, name: string, id: uuid, msg: string)\n    $0\nend"));
+              std::string("function LLEvents.listen(channel: number, name: string, id: uuid, msg: string)\n    $0\nend"));
         UNSCOPED_INFO("each untyped");
         CHECK(Words::completionFor(*Words::word(true, "listen"), true).snippet ==
-                      std::string("function LLEvents.listen(channel, name, id, msg)\n    $0\nend"));
+              std::string("function LLEvents.listen(channel, name, id, msg)\n    $0\nend"));
         const ALCodeEditor::Completion say = Words::completionFor(*Words::word(false, "llSay"), false);
         {
             INFO("a function as itself");
-            REQUIRE(say.snippet.empty());
-            REQUIRE(say.text == "llSay");
+            CHECK(say.snippet.empty());
+            CHECK(say.text == "llSay");
             REQUIRE(say.documentation);
             CHECK(*say.documentation == "Says msg on channel.\nMore.");
         }
@@ -267,7 +256,7 @@ namespace
         std::vector<ALCodeEditor::Completion> out;
         Words::complete(false, e, ALTextPos(2, 5), "t", { snippet }, "Snippet", out);
         UNSCOPED_INFO("inside the state: the handler and the snippet");
-        CHECK(texts(out) == std::vector<std::string>{ "touch_start", "timer" });
+        REQUIRE(texts(out) == std::vector<std::string>{ "touch_start", "timer" });
         UNSCOPED_INFO("the snippet said so");
         CHECK(out[1].detail == std::string("Snippet  Timer"));
         out.clear();
@@ -288,7 +277,7 @@ namespace
         std::string   text;
         {
             INFO("ll.Say under Say");
-            REQUIRE(Words::hoverText(true, s.document(), ALTextPos(0, 4), "Say", text));
+            CHECK(Words::hoverText(true, s.document(), ALTextPos(0, 4), "Say", text));
             CHECK(text == "ll.Say(number channel)");
         }
         {
@@ -331,8 +320,7 @@ namespace
             CHECK(functions[0].detail == "Deprecated");
             CHECK(functions[1].detail == "Says msg on channel.");
         }
-        UNSCOPED_INFO("the events");
-        REQUIRE(Words::library(false, "event", {}, "") .size() == 1);
+        CHECK(Words::library(false, "event", {}, "") .size() == 1);
 
         UNSCOPED_INFO("an LSL name");
         CHECK(Words::helpUrl(false, "llSay") == std::string("https://wiki.example/llSay"));
@@ -346,7 +334,7 @@ namespace
         CHECK(Words::helpUrl(false, "") == std::string("https://wiki.example/LSL_Portal"));
         UNSCOPED_INFO("the reference's words");
         CHECK(Words::referenceText(*Words::word(false, "PI"), false) ==
-                      std::string("float PI = 3.14159265\n\nThe ratio.\nhttps://wiki.example/PI"));
+              std::string("float PI = 3.14159265\n\nThe ratio.\nhttps://wiki.example/PI"));
     }
 
     TEST_CASE_METHOD(alscriptstudiowords_data, "alscriptstudiowords: a tab's mark follows what it is and a symbol's its kind", "[alscriptstudiowords]")
@@ -366,7 +354,6 @@ namespace
         doc.name = ".luaurc";
         UNSCOPED_INFO("a config");
         CHECK(std::string(Words::imageNameOf(doc)) == std::string("Studio_Config"));
-        UNSCOPED_INFO("a function");
         CHECK(std::string(Words::imageNameOf(ALScriptSymbolKind::Function)) == std::string("Symbol_Function"));
         UNSCOPED_INFO("a state as a label");
         CHECK(std::string(Words::imageNameOf(ALScriptSymbolKind::State)) == std::string("Symbol_Label"));
@@ -382,16 +369,13 @@ namespace
         for (S32 kind = static_cast<S32>(ALScriptSymbolKind::Keyword); kind <= static_cast<S32>(ALScriptSymbolKind::Module); ++kind)
         {
             const char* word = Words::kindWordOf(static_cast<ALScriptSymbolKind>(kind));
-            {
-                INFO("a word for each");
-                REQUIRE(word != nullptr);
-                REQUIRE(window.floater->hasString(word));
-            }
+            CAPTURE(kind);
+            REQUIRE(word != nullptr);
+            REQUIRE(window.floater->hasString(word));
             said.insert(window.floater->getString(word));
         }
         UNSCOPED_INFO("each its own");
-        REQUIRE(said.size() == size_t(static_cast<S32>(ALScriptSymbolKind::Module) + 1));
-        UNSCOPED_INFO("a function");
+        CHECK(said.size() == size_t(static_cast<S32>(ALScriptSymbolKind::Module) + 1));
         CHECK(window.floater->getString(Words::kindWordOf(ALScriptSymbolKind::Function)) == std::string("function"));
     }
 
@@ -402,36 +386,33 @@ namespace
         slua["functions"]["type"]              = LLSD().with("return", "string").with("tooltip", "What a value is.");
         Words::forget();
         const Vocab* email = Words::word(false, "llEmail");
-        {
-            INFO("the email");
-            REQUIRE(email);
-            REQUIRE(email->sleep == "20.0");
-            CHECK_FALSE(email->godMode);
-        }
+        REQUIRE(email);
+        CHECK(email->sleep == "20.0");
+        CHECK_FALSE(email->godMode);
         const std::string notes = Words::notesOf(*email);
         {
-            INFO("its words and its delay: " + notes);
+            INFO("its words and its delay: " << notes);
             CHECK(notes.find("Sends an email.") == 0);
-            REQUIRE(notes.find("20.0") != std::string::npos);
+            CHECK(notes.find("20.0") != std::string::npos);
         }
         const Vocab* god = Words::word(false, "llGodLikeRezObject");
         {
             INFO("a god's, no delay said for none");
             REQUIRE(god);
-            REQUIRE(god->godMode);
-            REQUIRE(god->sleep.empty());
+            CHECK(god->godMode);
+            CHECK(god->sleep.empty());
         }
-        UNSCOPED_INFO("said");
-        REQUIRE_FALSE(Words::notesOf(*god).empty());
+        UNSCOPED_INFO("that only a god may call it, said");
+        CHECK_FALSE(Words::notesOf(*god).empty());
         // `type` under the mouse in `obj.type` is some table's field.
         ALCodeEditor& s = editor("local t = obj.type\nlocal u = type(t)\n", true);
         std::string   text;
         UNSCOPED_INFO("a member: not the global");
-        REQUIRE_FALSE(Words::hoverText(true, s.document(), ALTextPos(0, 15), "type", text));
+        CHECK_FALSE(Words::hoverText(true, s.document(), ALTextPos(0, 15), "type", text));
         {
             INFO("the global itself");
             CHECK(Words::hoverText(true, s.document(), ALTextPos(1, 11), "type", text));
-            REQUIRE(text.find("What a value is.") != std::string::npos);
+            CHECK(text.find("What a value is.") != std::string::npos);
         }
     }
 
@@ -443,13 +424,10 @@ namespace
         slua["functions"]["ll.MessageLinked"] =
             LLSD().with("return", "()").with("arguments", LLSD().with(0, argument("link", "number")).with(1, argument("num", "number")));
         Words::forget();
-        UNSCOPED_INFO("llSetLinkAlpha's first");
         CHECK(Words::linkArgument(false, "llSetLinkAlpha", 0));
-        UNSCOPED_INFO("not its second");
         CHECK_FALSE(Words::linkArgument(false, "llSetLinkAlpha", 1));
         UNSCOPED_INFO("nor past its last");
         CHECK_FALSE(Words::linkArgument(false, "llSetLinkAlpha", 3));
-        UNSCOPED_INFO("llSay has none");
         CHECK_FALSE(Words::linkArgument(false, "llSay", 0));
         UNSCOPED_INFO("a word not known, none");
         CHECK_FALSE(Words::linkArgument(false, "llNothing", 0));
@@ -459,6 +437,7 @@ namespace
             CHECK_FALSE(Words::linkArgument(true, "ll.MessageLinked", 1));
         }
     }
+
     TEST_CASE_METHOD(alscriptstudiowords_data, "alscriptstudiowords: word tables are shared per language and rebuilt when their sources change", "[alscriptstudiowords]")
     {
         S32         asked   = 0;
@@ -493,7 +472,7 @@ namespace
         {
             INFO("and shared still, with the new word");
             CHECK(&a.highlighter().words() == &b.highlighter().words());
-            REQUIRE(a.highlighter().words().has("function", "llShout"));
+            CHECK(a.highlighter().words().has("function", "llShout"));
         }
 
         const ALSyntaxWords* before = &a.highlighter().words();
@@ -502,7 +481,7 @@ namespace
         {
             INFO("new preprocessor words, new tables");
             CHECK(&a.highlighter().words() != before);
-            REQUIRE(a.highlighter().words().has("control", "switch"));
+            CHECK(a.highlighter().words().has("control", "switch"));
         }
     }
 
@@ -531,7 +510,7 @@ namespace
                               "      - touch\n",
                               found);
         UNSCOPED_INFO("only functions, and those with categories");
-        REQUIRE(found.size() == size_t(1));
+        CHECK(found.size() == size_t(1));
         UNSCOPED_INFO("by the first");
         CHECK(found["llSay"] == std::string("avatar_communication"));
 
@@ -541,13 +520,13 @@ namespace
         UNSCOPED_INFO("LSL, in words");
         CHECK(Words::word(false, "llSay")->group == std::string("Avatar communication"));
         UNSCOPED_INFO("none where none is said");
-        REQUIRE(Words::word(false, "llOld")->group.empty());
+        CHECK(Words::word(false, "llOld")->group.empty());
         UNSCOPED_INFO("an event none");
-        REQUIRE(Words::word(false, "touch_start")->group.empty());
+        CHECK(Words::word(false, "touch_start")->group.empty());
         UNSCOPED_INFO("a constant by family");
         CHECK(Words::word(false, "PRIM_POSITION")->group == std::string("PRIM_..."));
         UNSCOPED_INFO("one without a family none");
-        REQUIRE(Words::word(false, "PI")->group.empty());
+        CHECK(Words::word(false, "PI")->group.empty());
         UNSCOPED_INFO("SLua's ll function as its twin");
         CHECK(Words::word(true, "ll.Say")->group == std::string("Avatar communication"));
         UNSCOPED_INFO("another SLua function by library");
@@ -561,18 +540,11 @@ namespace
         CHECK(&asked == &viewer);
         UNSCOPED_INFO("its words");
         CHECK(asked.lslHelpUrl() == "https://wiki.example/[LSL_STRING]");
-        {
-            INFO("no definitions as YAML, no version");
-            REQUIRE(asked.definitionsYaml().empty());
-            REQUIRE(asked.definitionsVersion().empty());
-        }
-        {
-            INFO("no preprocessor, no transform");
-            CHECK_FALSE(asked.preprocessing());
-            CHECK_FALSE(asked.transformOn(ALPreprocessor::Transform::Switch));
-        }
+        CHECK(asked.definitionsYaml().empty());
+        CHECK(asked.definitionsVersion().empty());
+        CHECK_FALSE(asked.preprocessing());
+        CHECK_FALSE(asked.transformOn(ALPreprocessor::Transform::Switch));
         ALPreprocessor::Include found;
-        UNSCOPED_INFO("no include");
         CHECK(asked.lookUp(ALScriptPreprocessor::Request(), ALPreprocessor::Ask(), found) == ALPreprocessor::Found::No);
         viewer.slots.lslHelpUrl = nullptr;
         UNSCOPED_INFO("the wiki as nothing says it");
@@ -655,7 +627,7 @@ namespace
         CHECK(handler("mapped", false) == std::string("function LLEvents.mapped(pairs, n)\n    $0\nend"));
         UNSCOPED_INFO("a function type's arrow, a table type's colon");
         CHECK(handler("called", true) ==
-                      std::string("function LLEvents.called(back: (number) -> (), data: {[string]: any})\n    $0\nend"));
+              std::string("function LLEvents.called(back: (number) -> (), data: {[string]: any})\n    $0\nend"));
         UNSCOPED_INFO("a variadic typed");
         CHECK(handler("varied", true) == std::string("function LLEvents.varied(first: number, ...: any)\n    $0\nend"));
         UNSCOPED_INFO("and not");

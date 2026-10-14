@@ -114,8 +114,6 @@ namespace
             return count;
         }
 
-        // Of the frame `px`, the sum of a column's coverage in red from row `y0` to `y1` - 1, in pixels: the width
-        // of a line across it.
         // The rows a column's runs of drawn pixels cover, bottom up, each as its first row and one past its last.
         std::vector<std::pair<S32, S32>> columnRuns(const std::vector<U8>& px, S32 x)
         {
@@ -138,6 +136,8 @@ namespace
             return found;
         }
 
+        // Of the frame `px`, the sum of a column's coverage in red from row `y0` to `y1` - 1, in pixels: the width
+        // of a line across it.
         F32 ink(const std::vector<U8>& px, S32 x, S32 y0, S32 y1)
         {
             F32 sum = 0.f;
@@ -227,11 +227,6 @@ namespace
             return reverse;
         }
 
-        static std::string named(bool reverse, const std::string& what)
-        {
-            return what + (reverse ? " (reverse-Z)" : " (forward)");
-        }
-
         void setConvention(bool reverse)
         {
             LLRender::sReverseZ = reverse;
@@ -256,12 +251,11 @@ namespace
             std::map<std::string, std::string> defines = { { "MAX_JOINTS_PER_MESH_OBJECT", "110" } };
             for (const char* object : { "avatar/objectSkinV.glsl", "deferred/textureUtilV.glsl", "objects/nonindexedTextureV.glsl" })
             {
+                CAPTURE(object);
                 S32 level = 1;
-                UNSCOPED_INFO(std::string("compiled ") + object);
                 REQUIRE(mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines) != 0);
             }
             S32 level = 1;
-            UNSCOPED_INFO("compiled deferred/globalF.glsl");
             REQUIRE(mShaders.loadShaderFile("deferred/globalF.glsl", level, GL_FRAGMENT_SHADER, &defines) != 0);
 
             mIdProgram.mName = "Selection Id Shader";
@@ -271,13 +265,9 @@ namespace
             mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER));
             mIdProgram.mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
             mIdProgram.mShaderLevel = 1;
-            UNSCOPED_INFO("id program builds with its rigged variant");
             REQUIRE(mIdProgram.createShader(LLGLSLShader::VARIANT_RIGGED));
-            {
-                INFO("id program has a rigged variant");
-                REQUIRE(mIdProgram.mRiggedVariant);
-                REQUIRE(mIdProgram.mRiggedVariant != &mIdProgram);
-            }
+            REQUIRE(mIdProgram.mRiggedVariant);
+            REQUIRE(mIdProgram.mRiggedVariant != &mIdProgram);
 
             mWireProgram.mName = "Selection Wireframe Shader";
             mWireProgram.mShaderFiles.clear();
@@ -287,13 +277,9 @@ namespace
             mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionAlphaF.glsl", GL_FRAGMENT_SHADER));
             mWireProgram.mShaderFiles.push_back(std::make_pair("interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER));
             mWireProgram.mShaderLevel = 1;
-            UNSCOPED_INFO("wireframe program builds with its rigged variant");
             REQUIRE(mWireProgram.createShader(LLGLSLShader::VARIANT_RIGGED));
-            {
-                INFO("wireframe program has a rigged variant");
-                REQUIRE(mWireProgram.mRiggedVariant);
-                REQUIRE(mWireProgram.mRiggedVariant != &mWireProgram);
-            }
+            REQUIRE(mWireProgram.mRiggedVariant);
+            REQUIRE(mWireProgram.mRiggedVariant != &mWireProgram);
 
             // The final blit's depth copy, as LLViewerShaderMgr builds gCopyDepthProgram.
             mCopyDepthProgram.mName = "Copy Depth Shader";
@@ -304,7 +290,6 @@ namespace
             mCopyDepthProgram.addPermutation("COPY_DEPTH", "1");
             mCopyDepthProgram.addPermutation("DEPTH_ONLY", "1");
             mCopyDepthProgram.mShaderLevel = 1;
-            UNSCOPED_INFO("copy depth program builds");
             REQUIRE(mCopyDepthProgram.createShader());
 
             const std::pair<LLGLSLShader*, const char*> passes[] = { { &mJumpProgram, "selectionJumpF.glsl" },
@@ -330,41 +315,31 @@ namespace
                     // The edge pass searching the disk for the glow too: the full search.
                     program->addPermutation("GLOW_DISK", "1");
                 }
-                UNSCOPED_INFO(std::string(fragment) + "'s program builds");
+                CAPTURE(fragment);
                 REQUIRE(program->createShader());
             }
 
             const LLRenderTarget::eDepthFormat depth = mReverse ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
-            UNSCOPED_INFO("id target");
             REQUIRE(mIdMap.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
-            UNSCOPED_INFO("jump target");
             REQUIRE(mJumps.allocate(W, H, GL_R8));
-            UNSCOPED_INFO("glow reach target");
             REQUIRE(mGlowReach.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_RGBA16));
-            UNSCOPED_INFO("glow row target");
             REQUIRE(mGlowRows.allocate(W, H, GL_R8));
-            UNSCOPED_INFO("frame target");
             REQUIRE(mFrame.allocate(W, H, GL_RGBA8));
-            UNSCOPED_INFO("window target");
             REQUIRE(mWindow.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
-            UNSCOPED_INFO("tile target");
             REQUIRE(mTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_RGBA16));
             // Every tile holding every id and a jump: the edge pass searches every pixel's disk, as it did before
             // the tiles.
-            UNSCOPED_INFO("all tiles target");
             REQUIRE(mAllTiles.allocate(Outline::tileCount(W), Outline::tileCount(H), GL_RGBA16));
             mAllTiles.bindTarget();
             gGL.setClearColor(LLColor4(1.f, 1.f, 1.f, 1.f));
             mAllTiles.clear();
             gGL.setClearColor(LLColor4(0.f, 0.f, 0.f, 0.f));
             mAllTiles.flush();
-            UNSCOPED_INFO("far depth");
             REQUIRE(mFar.allocate(W, H, 0, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
             clearDepth(mFar);
             sceneAt(W, H);
 
             mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
-            UNSCOPED_INFO("triangle");
             REQUIRE(mTriangle->allocateBuffer(3, 0));
             LLStrider<LLVector3> vert;
             mTriangle->getVertexStrider(vert);
@@ -386,7 +361,6 @@ namespace
         void sceneAt(S32 width, S32 height)
         {
             const LLRenderTarget::eDepthFormat depth = mReverse ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
-            UNSCOPED_INFO("scene depth");
             REQUIRE(mScene.allocate(width, height, 0, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth));
             clearDepth(mScene);
         }
@@ -430,7 +404,6 @@ namespace
             const U32 mask = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_COLOR |
                              (weights ? LLVertexBuffer::MAP_WEIGHT4 : 0);
             LLPointer<LLVertexBuffer> buffer = new LLVertexBuffer(mask);
-            UNSCOPED_INFO("quad");
             REQUIRE(buffer->allocateBuffer(4, 6));
             LLStrider<LLVector3> vert;
             LLStrider<LLVector2> texcoord;
@@ -949,63 +922,64 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             idPass({ { quadA(), ID_A }, { quadB(), ID_B } });
 
             const std::vector<U8> ids = read(mIdMap);
-            UNSCOPED_INFO(named(reverse, "A's id"));
+            UNSCOPED_INFO("A's id");
             REQUIRE(idAt(ids, 20, 32) == ID_A);
-            UNSCOPED_INFO(named(reverse, "B's id, past one byte"));
+            UNSCOPED_INFO("B's id, past one byte");
             REQUIRE(idAt(ids, 40, 32) == ID_B);
-            UNSCOPED_INFO(named(reverse, "nothing selected outside"));
+            UNSCOPED_INFO("nothing selected outside");
             REQUIRE(idAt(ids, 2, 2) == 0U);
-            UNSCOPED_INFO(named(reverse, "the priority in alpha"));
+            UNSCOPED_INFO("the priority in alpha");
             REQUIRE((U32)at(ids, 20, 32).a == (U32)Outline::PRIORITY_ROOT);
 
             palette({ { ID_A, RED }, { ID_B, GREEN } }, true);
             const std::vector<U8> px = edgePass();
 
-            UNSCOPED_INFO(named(reverse, "A outlined at full strength beside its contour"));
+            UNSCOPED_INFO("A outlined at full strength beside its contour");
             REQUIRE((U32)at(px, 8, 32).r == 255U);
-            UNSCOPED_INFO(named(reverse, "and a pixel further"));
+            UNSCOPED_INFO("and a pixel further");
             REQUIRE((U32)at(px, 7, 32).r == 255U);
-            UNSCOPED_INFO(named(reverse, "and in its colour"));
+            UNSCOPED_INFO("and in its colour");
             REQUIRE(red(at(px, 7, 32)));
-            UNSCOPED_INFO(named(reverse, "nothing past the line"));
+            UNSCOPED_INFO("nothing past the line");
             REQUIRE(black(at(px, 6, 32)));
             {
-                INFO(named(reverse, "A outlined above"));
+                INFO("A outlined above");
                 REQUIRE(red(at(px, 20, 45)));
                 REQUIRE(black(at(px, 20, 46)));
             }
             {
-                INFO(named(reverse, "A outlined below"));
+                INFO("A outlined below");
                 REQUIRE(red(at(px, 20, 18)));
                 REQUIRE(black(at(px, 20, 17)));
             }
             {
-                INFO(named(reverse, "B outlined right of its contour"));
+                INFO("B outlined right of its contour");
                 REQUIRE(green(at(px, 56, 32)));
                 REQUIRE(black(at(px, 57, 32)));
             }
-            UNSCOPED_INFO(named(reverse, "B outlined above"));
+            UNSCOPED_INFO("B outlined above");
             REQUIRE(green(at(px, 40, 45)));
-            UNSCOPED_INFO(named(reverse, "nothing far away"));
+            UNSCOPED_INFO("nothing far away");
             REQUIRE(black(at(px, 2, 2)));
 
             const Pixel edge = at(px, 31, 32);
-            UNSCOPED_INFO(named(reverse, "the shared edge on A's side, in A's colour"));
+            UNSCOPED_INFO("the shared edge on A's side, in A's colour");
             REQUIRE(red(edge));
             {
-                INFO(named(reverse, "fainter than the contour"));
+                INFO("fainter than the contour");
                 REQUIRE(edge.r >= 150);
                 REQUIRE(edge.r <= 156);
             }
-            UNSCOPED_INFO(named(reverse, "and not on B's"));
+            UNSCOPED_INFO("and not on B's");
             REQUIRE(black(at(px, 32, 32)));
-            UNSCOPED_INFO(named(reverse, "A's inside left alone"));
+            UNSCOPED_INFO("A's inside left alone");
             REQUIRE(black(at(px, 20, 32)));
-            UNSCOPED_INFO(named(reverse, "B's inside left alone"));
+            UNSCOPED_INFO("B's inside left alone");
             REQUIRE(black(at(px, 44, 32)));
         }
     }
@@ -1016,18 +990,19 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             idPass({ { quadA(), ID_A }, { quadB(), ID_A } });
             palette({ { ID_A, RED } }, true);
             const std::vector<U8> px = edgePass();
 
-            UNSCOPED_INFO(named(reverse, "contour still outlined"));
+            UNSCOPED_INFO("contour still outlined");
             REQUIRE(red(at(px, 8, 32)));
-            UNSCOPED_INFO(named(reverse, "contour still outlined on the far side"));
+            UNSCOPED_INFO("contour still outlined on the far side");
             REQUIRE(red(at(px, 55, 32)));
-            UNSCOPED_INFO(named(reverse, "no edge between them on one side"));
+            UNSCOPED_INFO("no edge between them on one side");
             REQUIRE(black(at(px, 31, 32)));
-            UNSCOPED_INFO(named(reverse, "no edge between them on the other"));
+            UNSCOPED_INFO("no edge between them on the other");
             REQUIRE(black(at(px, 32, 32)));
         }
     }
@@ -1038,6 +1013,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
 
             // An occluder three metres out over columns 0 to 19, which covers A's left part.
@@ -1053,21 +1029,21 @@ namespace
 
             idPass({ { quadA(), ID_A } });
             std::vector<U8> ids = read(mIdMap);
-            UNSCOPED_INFO(named(reverse, "covered part marked hidden and drawn"));
+            UNSCOPED_INFO("covered part marked hidden and drawn");
             REQUIRE(drawnHidden(at(ids, 12, 32)));
-            UNSCOPED_INFO(named(reverse, "uncovered part marked visible"));
+            UNSCOPED_INFO("uncovered part marked visible");
             REQUIRE((U32)at(ids, 25, 32).b == 255U);
-            UNSCOPED_INFO(named(reverse, "hidden parts keep their id"));
+            UNSCOPED_INFO("hidden parts keep their id");
             REQUIRE(idAt(ids, 12, 32) == ID_A);
 
             palette({ { ID_A, RED } }, true);
             std::vector<U8> px = edgePass();
             const U32 hidden = at(px, 8, 32).r;
             const U32 visible = at(px, 25, 44).r;
-            UNSCOPED_INFO(named(reverse, "visible outline at full strength"));
+            UNSCOPED_INFO("visible outline at full strength");
             REQUIRE(visible == 255U);
             {
-                INFO(named(reverse, "hidden outline dimmed to the hidden alpha"));
+                INFO("hidden outline dimmed to the hidden alpha");
                 REQUIRE(hidden >= 90);
                 REQUIRE(hidden <= 115);
             }
@@ -1076,15 +1052,15 @@ namespace
             left_out.mShowHidden = false;
             idPass({ left_out });
             ids = read(mIdMap);
-            UNSCOPED_INFO(named(reverse, "covered part marked not drawn"));
+            UNSCOPED_INFO("covered part marked not drawn");
             REQUIRE((U32)at(ids, 12, 32).b == 0U);
-            UNSCOPED_INFO(named(reverse, "uncovered part still visible"));
+            UNSCOPED_INFO("uncovered part still visible");
             REQUIRE((U32)at(ids, 25, 32).b == 255U);
             palette({ { ID_A, RED } }, false);
             px = edgePass();
-            UNSCOPED_INFO(named(reverse, "hidden outline left out"));
+            UNSCOPED_INFO("hidden outline left out");
             REQUIRE(black(at(px, 8, 32)));
-            UNSCOPED_INFO(named(reverse, "visible outline kept"));
+            UNSCOPED_INFO("visible outline kept");
             REQUIRE((U32)at(px, 25, 44).r == 255U);
         }
     }
@@ -1096,10 +1072,12 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
 
             for (S32 divisor : { 1, 2 })
             {
+                CAPTURE(divisor);
                 sceneAt(W / divisor, H / divisor);
                 // Turned about 60 degrees from the eye: five metres deep across its width.
                 LLVertexBuffer* tilted = quad(-1.5f, 1.5f, -1.f, 1.f, -3.5f, -8.5f);
@@ -1122,10 +1100,9 @@ namespace
                         }
                     }
                 }
-                const std::string at_divisor = " at render resolution / " + std::to_string(divisor);
-                UNSCOPED_INFO(named(reverse, "the surface covers pixels" + at_divisor));
+                UNSCOPED_INFO("the surface covers pixels");
                 REQUIRE(covered > 200);
-                UNSCOPED_INFO(named(reverse, "none of its own pixels hidden by itself" + at_divisor));
+                UNSCOPED_INFO("none of its own pixels hidden by itself");
                 REQUIRE(hidden == size_t(0));
             }
         }
@@ -1137,36 +1114,37 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             idPass({ { quadA(), ID_A }, { quadB(), ID_B } });
             palette({ { ID_A, RED }, { ID_B, GREEN } }, true);
 
             const std::vector<U8> full = edgePass();
             const S32 reach = Outline::lineReach(view().mWidth);
-            UNSCOPED_INFO(named(reverse, "the contour reaches its width and a pixel"));
+            UNSCOPED_INFO("the contour reaches its width and a pixel");
             REQUIRE(reach == 3);
             const LLRect rect = boxRect(reach);
-            UNSCOPED_INFO(named(reverse, "left: column 8.57 floored, less the reach"));
+            UNSCOPED_INFO("left: column 8.57 floored, less the reach");
             REQUIRE(rect.mLeft == 8 - reach);
-            UNSCOPED_INFO(named(reverse, "right: column 55.43 ceiled, plus the reach"));
+            UNSCOPED_INFO("right: column 55.43 ceiled, plus the reach");
             REQUIRE(rect.mRight == 56 + reach);
-            UNSCOPED_INFO(named(reverse, "bottom: row 20.28 floored, less the reach"));
+            UNSCOPED_INFO("bottom: row 20.28 floored, less the reach");
             REQUIRE(rect.mBottom == 20 - reach);
-            UNSCOPED_INFO(named(reverse, "top: row 43.72 ceiled, plus the reach"));
+            UNSCOPED_INFO("top: row 43.72 ceiled, plus the reach");
             REQUIRE(rect.mTop == 44 + reach);
 
             const std::vector<U8> scissored = edgePass(&rect);
-            UNSCOPED_INFO(named(reverse, "something is outlined"));
+            UNSCOPED_INFO("something is outlined");
             REQUIRE(lit(full) > 0);
-            UNSCOPED_INFO(named(reverse, "the scissored pass draws every outline pixel"));
+            UNSCOPED_INFO("the scissored pass draws every outline pixel");
             REQUIRE(scissored == full);
 
             const LLRect tight = boxRect(0);
             const std::vector<U8> clipped = edgePass(&tight);
-            UNSCOPED_INFO(named(reverse, "a box without the reach clips the line"));
+            UNSCOPED_INFO("a box without the reach clips the line");
             REQUIRE(lit(clipped) < lit(full));
             {
-                INFO(named(reverse, "the line's outer pixels are what it loses"));
+                INFO("the line's outer pixels are what it loses");
                 REQUIRE_FALSE(black(at(full, 7, 32)));
                 REQUIRE(black(at(clipped, 7, 32)));
             }
@@ -1204,34 +1182,35 @@ namespace
 
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             LLVertexBuffer* bound = quad(-0.5f, 0.5f, -0.5f, 0.5f, QUAD_Z, QUAD_Z, true);
 
             idPass({ { bound, ID_A } }, right);
             std::vector<U8> ids = read(mIdMap);
-            UNSCOPED_INFO(named(reverse, "posed right"));
+            UNSCOPED_INFO("posed right");
             REQUIRE(idAt(ids, 49, 32) == ID_A);
-            UNSCOPED_INFO(named(reverse, "not at the bind pose"));
+            UNSCOPED_INFO("not at the bind pose");
             REQUIRE(idAt(ids, 32, 32) == 0U);
-            UNSCOPED_INFO(named(reverse, "not posed left"));
+            UNSCOPED_INFO("not posed left");
             REQUIRE(idAt(ids, 14, 32) == 0U);
 
             idPass({ { bound, ID_A } }, left);
             ids = read(mIdMap);
-            UNSCOPED_INFO(named(reverse, "posed left"));
+            UNSCOPED_INFO("posed left");
             REQUIRE(idAt(ids, 14, 32) == ID_A);
-            UNSCOPED_INFO(named(reverse, "gone from the right"));
+            UNSCOPED_INFO("gone from the right");
             REQUIRE(idAt(ids, 49, 32) == 0U);
 
             // Posed, it covers columns 9 to 20 and rows 26 to 37.
             palette({ { ID_A, RED } }, true);
             const std::vector<U8> px = edgePass();
-            UNSCOPED_INFO(named(reverse, "outlined above where it is posed"));
+            UNSCOPED_INFO("outlined above where it is posed");
             REQUIRE(red(at(px, 14, 39)));
-            UNSCOPED_INFO(named(reverse, "outlined below where it is posed"));
+            UNSCOPED_INFO("outlined below where it is posed");
             REQUIRE(red(at(px, 14, 24)));
             {
-                INFO(named(reverse, "not where it is not"));
+                INFO("not where it is not");
                 REQUIRE(black(at(px, 49, 39)));
                 REQUIRE(black(at(px, 49, 24)));
             }
@@ -1304,17 +1283,15 @@ namespace
             {
                 const Outline::View in_world = Outline::makeView(identity(), world, setting, ui_scale, false);
                 const Outline::View on_hud = Outline::makeView(identity(), hud, setting, ui_scale, true);
-                const std::string with = " for " + std::to_string(setting) + " at UI scale " + std::to_string(ui_scale);
-                UNSCOPED_INFO("the contour" + with);
+                CAPTURE(setting, ui_scale);
                 REQUIRE(in_world.mWidth == Outline::contourWidth(setting, ui_scale));
-                UNSCOPED_INFO("the edges" + with);
                 REQUIRE(in_world.mInnerWidth == Outline::lineWidth(Outline::INNER_WIDTH, ui_scale));
-                UNSCOPED_INFO("the HUD's contour as the world's" + with);
+                UNSCOPED_INFO("the HUD's contour as the world's");
                 REQUIRE(on_hud.mWidth == in_world.mWidth);
-                UNSCOPED_INFO("the HUD's edges as the world's" + with);
+                UNSCOPED_INFO("the HUD's edges as the world's");
                 REQUIRE(on_hud.mInnerWidth == in_world.mInnerWidth);
                 {
-                    INFO("the HUD's view is the HUD's" + with);
+                    INFO("only the HUD's view is the HUD's");
                     REQUIRE(on_hud.mHUD);
                     REQUIRE_FALSE(in_world.mHUD);
                 }
@@ -1328,6 +1305,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
 
             // An occluder three metres out over the whole view, in front of A.
@@ -1341,7 +1319,7 @@ namespace
             mScene.flush();
 
             idPass({ { quadA(), ID_A } });
-            UNSCOPED_INFO(named(reverse, "the world's pass hides A behind it"));
+            UNSCOPED_INFO("the world's pass hides A behind it");
             REQUIRE(drawnHidden(at(read(mIdMap), 20, 32)));
 
             idPass(mIdMap, nullptr, { { quadA(), ID_A } }, nullptr, &mScene);
@@ -1359,14 +1337,14 @@ namespace
                     }
                 }
             }
-            UNSCOPED_INFO(named(reverse, "the HUD's pass draws A"));
+            UNSCOPED_INFO("the HUD's pass draws A");
             REQUIRE(covered > 200);
-            UNSCOPED_INFO(named(reverse, "and hides none of it"));
+            UNSCOPED_INFO("and hides none of it");
             REQUIRE(hidden == size_t(0));
 
             palette({ { ID_A, RED } }, false);
             const std::vector<U8> px = edgePass();
-            UNSCOPED_INFO(named(reverse, "outlined at full strength"));
+            UNSCOPED_INFO("outlined at full strength");
             REQUIRE((U32)at(px, 8, 32).r == 255U);
         }
     }
@@ -1383,6 +1361,7 @@ namespace
 
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             // Columns and rows 19 to 44, and 6 to 57: the farther shows only around the nearer.
             LLVertexBuffer* nearer = quad(-0.2f, 0.2f, -0.2f, 0.2f, -2.f, -2.f);
@@ -1395,16 +1374,16 @@ namespace
             const LLMatrix4a* projections[] = { &ortho, &flattened };
             for (const LLMatrix4a* projection : projections)
             {
-                const std::string which = projection == &ortho ? "al_ortho" : "the HUD's flattened row";
+                INFO((projection == &ortho ? "al_ortho" : "the HUD's flattened row"));
                 for (bool near_first : { true, false })
                 {
+                    CAPTURE(near_first);
                     const std::vector<U8> ids = near_first
                         ? projectedIds(*projection, { { nearer, ID_NEAR }, { farther, ID_FAR } })
                         : projectedIds(*projection, { { farther, ID_FAR }, { nearer, ID_NEAR } });
-                    const std::string order = near_first ? ", nearer drawn first" : ", farther drawn first";
-                    UNSCOPED_INFO(named(reverse, which + ": the nearer kept" + order));
+                    UNSCOPED_INFO("the nearer kept");
                     REQUIRE(idAt(ids, 32, 32) == ID_NEAR);
-                    UNSCOPED_INFO(named(reverse, which + ": the farther around it" + order));
+                    UNSCOPED_INFO("the farther around it");
                     REQUIRE(idAt(ids, 10, 32) == ID_FAR);
                 }
             }
@@ -1413,7 +1392,7 @@ namespace
             {
                 const LLMatrix4a unreversed = LLMatrix4a::orthoZO(-0.5f, 0.5f, -0.5f, 0.5f, 0.f, HUD_DEPTH);
                 const std::vector<U8> ids = projectedIds(unreversed, { { farther, ID_FAR }, { nearer, ID_NEAR } });
-                UNSCOPED_INFO(named(reverse, "unreversed, the farther wins"));
+                UNSCOPED_INFO("unreversed, the farther wins");
                 REQUIRE(idAt(ids, 32, 32) == ID_FAR);
             }
         }
@@ -1428,11 +1407,12 @@ namespace
                                                  { 4.f, 1.f }, { 1.f, 1.f }, { 2.5f, 1.f }, { 0.25f, 1.f }, { 40.f, 1.f } };
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
             for (const auto& [setting, ui_scale] : settings)
             {
-                const std::string with = " for " + std::to_string(setting) + " at UI scale " + std::to_string((S32)ui_scale);
+                CAPTURE(setting, ui_scale);
                 const S32 width = Outline::contourWidth(setting, ui_scale);
 
                 // The HUD's: its left edge is column 20.
@@ -1443,9 +1423,9 @@ namespace
                 {
                     ++hud_band;
                 }
-                UNSCOPED_INFO(named(reverse, "the HUD's contour is the setting's width" + with));
+                UNSCOPED_INFO("the HUD's contour is the setting's width");
                 REQUIRE(hud_band == width);
-                UNSCOPED_INFO(named(reverse, "nothing past it" + with));
+                UNSCOPED_INFO("nothing past it");
                 REQUIRE(black(at(px, 19 - width - 1, 32)));
 
                 // The world's: A's left edge is column 9, room for a line eight pixels wide.
@@ -1458,7 +1438,7 @@ namespace
                     {
                         ++world_band;
                     }
-                    UNSCOPED_INFO(named(reverse, "the world's is the same" + with));
+                    UNSCOPED_INFO("the world's is the same");
                     REQUIRE(world_band == hud_band);
                 }
             }
@@ -1479,15 +1459,11 @@ namespace
         CHECK(Outline::legacyAlphaCutoff(false, 0, 0, true) == Outline::BLEND_ALPHA_CUTOFF);
         UNSCOPED_INFO("opaque");
         CHECK(Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_NONE, 64, true) == Outline::NO_ALPHA_TEST);
-        UNSCOPED_INFO("emissive");
         CHECK(Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_EMISSIVE, 64, true) == Outline::NO_ALPHA_TEST);
         UNSCOPED_INFO("a texture without alpha");
         CHECK(Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_MASK, 64, false) == Outline::NO_ALPHA_TEST);
-        UNSCOPED_INFO("GLTF mask");
         CHECK(Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_MASK, 0.25f) == 0.25f);
-        UNSCOPED_INFO("GLTF blend");
         CHECK(Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_BLEND, 0.25f) == Outline::BLEND_ALPHA_CUTOFF);
-        UNSCOPED_INFO("GLTF opaque");
         CHECK(Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_OPAQUE, 0.25f) == Outline::NO_ALPHA_TEST);
 
         // Halved along u, as a GLTF transform and as a texture animation: column c samples 2c + 1. The transform is
@@ -1502,6 +1478,7 @@ namespace
 
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             const U32 texture = ramp();
             const F32 mask = Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_MASK, 64, true);
@@ -1510,55 +1487,55 @@ namespace
 
             // Column 15 samples alpha 62, column 16 alpha 66.
             std::vector<U8> ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, texture } });
-            UNSCOPED_INFO(named(reverse, "a mask cuts under its cutoff"));
+            UNSCOPED_INFO("a mask cuts under its cutoff");
             REQUIRE(idAt(ids, 15, 32) == 0U);
-            UNSCOPED_INFO(named(reverse, "and keeps over it"));
+            UNSCOPED_INFO("and keeps over it");
             REQUIRE(idAt(ids, 16, 32) == ID_A);
-            UNSCOPED_INFO(named(reverse, "and keeps the opaque end"));
+            UNSCOPED_INFO("and keeps the opaque end");
             REQUIRE(idAt(ids, 63, 32) == ID_A);
 
             // Column 5 samples alpha 22, column 6 alpha 26: either side of a tenth.
             ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, blend, texture } });
-            UNSCOPED_INFO(named(reverse, "a blend cuts what is all but clear"));
+            UNSCOPED_INFO("a blend cuts what is all but clear");
             REQUIRE(idAt(ids, 5, 32) == 0U);
-            UNSCOPED_INFO(named(reverse, "and keeps the faintest it draws"));
+            UNSCOPED_INFO("and keeps the faintest it draws");
             REQUIRE(idAt(ids, 6, 32) == ID_A);
 
             ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, opaque, texture } });
-            UNSCOPED_INFO(named(reverse, "an opaque face keeps its transparent texels"));
+            UNSCOPED_INFO("an opaque face keeps its transparent texels");
             REQUIRE(idAt(ids, 0, 32) == ID_A);
-            UNSCOPED_INFO(named(reverse, "and the rest"));
+            UNSCOPED_INFO("and the rest");
             REQUIRE(idAt(ids, 40, 32) == ID_A);
 
             ids = pixelIds({ { pixels(0, W, 16, 48, &invisible), ID_A, Outline::PRIORITY_ROOT, mask, texture } });
-            UNSCOPED_INFO(named(reverse, "a transparent face colour cuts nothing more"));
+            UNSCOPED_INFO("a transparent face colour cuts nothing more");
             REQUIRE(idAt(ids, 16, 32) == ID_A);
-            UNSCOPED_INFO(named(reverse, "and its texture still cuts"));
+            UNSCOPED_INFO("and its texture still cuts");
             REQUIRE(idAt(ids, 15, 32) == 0U);
 
             // Column 20 samples alpha 41 halved, 82 not; column 40 81 halved.
             Draw transformed = { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, texture };
             transformed.mTransform = &halved_pack;
             ids = pixelIds({ transformed });
-            UNSCOPED_INFO(named(reverse, "the base colour transform moves the cut"));
+            UNSCOPED_INFO("the base colour transform moves the cut");
             REQUIRE(idAt(ids, 20, 32) == 0U);
-            UNSCOPED_INFO(named(reverse, "and keeps past it"));
+            UNSCOPED_INFO("and keeps past it");
             REQUIRE(idAt(ids, 40, 32) == ID_A);
 
             Draw animated = { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, texture };
             animated.mTextureMatrix = &halved_matrix;
             ids = pixelIds({ animated });
-            UNSCOPED_INFO(named(reverse, "the texture animation moves the cut"));
+            UNSCOPED_INFO("the texture animation moves the cut");
             REQUIRE(idAt(ids, 20, 32) == 0U);
-            UNSCOPED_INFO(named(reverse, "and keeps past it"));
+            UNSCOPED_INFO("and keeps past it");
             REQUIRE(idAt(ids, 40, 32) == ID_A);
 
             // A cut-out face shows what is behind it: here another object, which is outlined through the hole.
             ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, texture },
                              { quad(0.f, (F32)W, 0.f, (F32)H, PIXEL_Z - 1.f, PIXEL_Z - 1.f), ID_B } });
-            UNSCOPED_INFO(named(reverse, "the one behind shows through the cut"));
+            UNSCOPED_INFO("the one behind shows through the cut");
             REQUIRE(idAt(ids, 15, 32) == ID_B);
-            UNSCOPED_INFO(named(reverse, "and not through the rest"));
+            UNSCOPED_INFO("and not through the rest");
             REQUIRE(idAt(ids, 16, 32) == ID_A);
         }
     }
@@ -1570,6 +1547,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             // A diamond about (32.25, 32.25), 24 pixels to each point: its edge from (32.25, 8.25) to
             // (8.25, 32.25) runs through x = 40 - y, between pixel centres, so the pixels it covers are not left to
@@ -1585,30 +1563,30 @@ namespace
             S32 between = 0;
             for (S32 y = 14; y <= 28; ++y)
             {
-                const std::string row = ", row " + std::to_string(y);
+                CAPTURE(y);
                 S32 first = -1;
                 for (S32 x = 0; x < W && first < 0; ++x)
                 {
                     first = idAt(ids, x, y) == ID_A ? x : -1;
                 }
-                UNSCOPED_INFO(named(reverse, "the diamond's edge" + row));
+                UNSCOPED_INFO("the diamond's edge");
                 REQUIRE(first == 40 - y);
 
                 U32 last = 255;
                 for (S32 x = first - 1; x >= first - walk; --x)
                 {
                     const U32 r = at(px, x, y).r;
-                    UNSCOPED_INFO(named(reverse, "coverage never rises away from the edge" + row));
+                    UNSCOPED_INFO("coverage never rises away from the edge");
                     REQUIRE(r <= last);
                     between += (r > 0 && r < 255) ? 1 : 0;
                     last = r;
                 }
-                UNSCOPED_INFO(named(reverse, "solid beside the edge" + row));
+                UNSCOPED_INFO("solid beside the edge");
                 REQUIRE((U32)at(px, first - 1, y).r == 255U);
-                UNSCOPED_INFO(named(reverse, "nothing past the reach" + row));
+                UNSCOPED_INFO("nothing past the reach");
                 REQUIRE(last == 0U);
             }
-            UNSCOPED_INFO(named(reverse, "the edge is anti-aliased"));
+            UNSCOPED_INFO("the edge is anti-aliased");
             REQUIRE(between >= 15);
         }
     }
@@ -1619,6 +1597,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             pixelIds({ { pixels(32, 33, 32, 33), ID_A } });
             palette({ { ID_A, RED } }, true);
@@ -1636,29 +1615,27 @@ namespace
                     }
                     const F32 dist = sqrtf((F32)(dx * dx + dy * dy));
                     const U32 r = at(px, 32 + dx, 32 + dy).r;
-                    const std::string where = " at (" + std::to_string(dx) + ", " + std::to_string(dy) + ")";
+                    CAPTURE(dx, dy);
                     if (dist <= (F32)lines.mWidth)
                     {
-                        UNSCOPED_INFO(named(reverse, "solid within the width" + where));
+                        UNSCOPED_INFO("solid within the width");
                         REQUIRE(r == 255U);
                     }
                     else if (dist < (F32)lines.mWidth + 0.9f)
                     {
-                        {
-                            INFO(named(reverse, "anti-aliased past it" + where));
-                            REQUIRE(r > 0);
-                            REQUIRE(r < 255);
-                        }
+                        INFO("anti-aliased past it");
+                        REQUIRE(r > 0);
+                        REQUIRE(r < 255);
                     }
                     else if (dist >= (F32)reach)
                     {
-                        UNSCOPED_INFO(named(reverse, "nothing at the reach" + where));
+                        UNSCOPED_INFO("nothing at the reach");
                         REQUIRE(r == 0U);
                     }
                 }
             }
             // Two across and one up: off every line of taps in eight directions.
-            UNSCOPED_INFO(named(reverse, "the knight's move is outlined"));
+            UNSCOPED_INFO("the knight's move is outlined");
             REQUIRE(at(px, 34, 33).r > 0);
         }
     }
@@ -1682,11 +1659,12 @@ namespace
         constexpr U32 CHILD = 2;
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             // The root over columns 16 to 31, the child 32 to 47, both rows 16 to 47.
             const std::vector<U8> ids = pixelIds({ { pixels(16, 32, 16, 48), ROOT, Outline::PRIORITY_ROOT },
                                                    { pixels(32, 48, 16, 48), CHILD, Outline::PRIORITY_CHILD } });
-            UNSCOPED_INFO(named(reverse, "the child's priority in alpha"));
+            UNSCOPED_INFO("the child's priority in alpha");
             REQUIRE((U32)at(ids, 40, 32).a == (U32)Outline::PRIORITY_CHILD);
             palette({ { ROOT, RED }, { CHILD, GREEN } }, true);
             const std::vector<U8> px = edgePass();
@@ -1694,38 +1672,38 @@ namespace
             // Above the child, a pixel from it and the root's corner a knight's move away.
             const Pixel over = at(px, 33, 48);
             {
-                INFO(named(reverse, "the root's contour over the child's"));
+                INFO("the root's contour over the child's");
                 REQUIRE(over.r > over.g);
                 REQUIRE(over.r > 200);
             }
-            UNSCOPED_INFO(named(reverse, "the child's under it where it fades"));
+            UNSCOPED_INFO("the child's under it where it fades");
             REQUIRE(over.g > 0);
             {
-                INFO(named(reverse, "the root's alone beside it"));
+                INFO("the root's alone beside it");
                 REQUIRE(red(at(px, 31, 48)));
                 REQUIRE(at(px, 31, 48).r == 255);
             }
             {
-                INFO(named(reverse, "the child's alone past the root's reach"));
+                INFO("the child's alone past the root's reach");
                 REQUIRE(green(at(px, 36, 48)));
                 REQUIRE(at(px, 36, 48).g == 255);
             }
 
             const Pixel edge = at(px, 31, 32);
             const U32 faint = (U32)ll_round(255.f * Outline::INNER_OPACITY);
-            UNSCOPED_INFO(named(reverse, "the edge on the root's side, in its colour"));
+            UNSCOPED_INFO("the edge on the root's side, in its colour");
             REQUIRE(red(edge));
             {
-                INFO(named(reverse, "at INNER_OPACITY"));
+                INFO("at INNER_OPACITY");
                 REQUIRE((U32)edge.r + 2 >= faint);
                 REQUIRE((U32)edge.r <= faint + 2);
             }
-            UNSCOPED_INFO(named(reverse, "a pixel wide, where the contour is two"));
+            UNSCOPED_INFO("a pixel wide, where the contour is two");
             REQUIRE(black(at(px, 30, 32)));
-            UNSCOPED_INFO(named(reverse, "and not on the child's side"));
+            UNSCOPED_INFO("and not on the child's side");
             REQUIRE(black(at(px, 32, 32)));
             {
-                INFO(named(reverse, "the insides left alone"));
+                INFO("the insides left alone");
                 REQUIRE(black(at(px, 20, 32)));
                 REQUIRE(black(at(px, 40, 32)));
             }
@@ -1742,6 +1720,7 @@ namespace
         const std::pair<S32, S32> line_widths[] = { { 1, 1 }, { 2, 1 }, { 4, 1 }, { 8, 2 }, { 16, 2 } };
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { 1, RED }, { 2, GREEN }, { 3, LLColor4(0.f, 0.f, 1.f, 1.f) }, { 4, LLColor4(1.f, 1.f, 0.f, 0.5f) } }, true);
 
@@ -1779,16 +1758,17 @@ namespace
 
             for (const auto& [name, draws] : scenes)
             {
+                INFO(name);
                 pixelIds(draws);
                 for (const auto& [width, inner_width] : line_widths)
                 {
+                    CAPTURE(width, inner_width);
                     const Outline::View lines = widths(width, inner_width);
-                    const std::string what = name + ", lines " + std::to_string(width) + " and " + std::to_string(inner_width);
                     const std::vector<U8> untiled = edgePass(lines, nullptr, true);
                     const std::vector<U8> tiled = edgePass(lines);
-                    UNSCOPED_INFO(named(reverse, what + ": something is drawn"));
+                    UNSCOPED_INFO("something is drawn");
                     REQUIRE(lit(untiled) > 0);
-                    UNSCOPED_INFO(named(reverse, what + ": tiled as untiled"));
+                    UNSCOPED_INFO("tiled as untiled");
                     REQUIRE(tiled == untiled);
                 }
 
@@ -1798,7 +1778,7 @@ namespace
                 {
                     empty += records[i + 1] == 0 ? 1 : 0;
                 }
-                UNSCOPED_INFO(named(reverse, name + ": some tiles hold nothing"));
+                UNSCOPED_INFO("some tiles hold nothing");
                 REQUIRE(empty > 0);
             }
 
@@ -1810,28 +1790,28 @@ namespace
             const S32 columns = (S32)Outline::tileCount(W);
             auto record = [&](S32 column, S32 row, S32 i) { return (U32)records[((size_t)row * columns + column) * 4 + i]; };
             {
-                INFO(named(reverse, "the tile left of the root holds nothing"));
+                INFO("the tile left of the root holds nothing");
                 REQUIRE(record(1, 2, 0) == 0);
                 REQUIRE(record(1, 2, 1) == 0);
             }
             {
-                INFO(named(reverse, "the tile inside the root holds the root alone"));
+                INFO("the tile inside the root holds the root alone");
                 REQUIRE(record(2, 2, 0) == 1);
                 REQUIRE(record(2, 2, 1) == 1);
             }
             {
-                INFO(named(reverse, "the tile inside the child beside it, the child alone"));
+                INFO("the tile inside the child beside it, the child alone");
                 REQUIRE(record(4, 2, 0) == 2);
                 REQUIRE(record(4, 2, 1) == 2);
             }
             {
-                INFO(named(reverse, "the tile under the child above, the root alone"));
+                INFO("the tile under the child above, the root alone");
                 REQUIRE(record(2, 4, 0) == 1);
                 REQUIRE(record(2, 4, 1) == 1);
             }
-            UNSCOPED_INFO(named(reverse, "no jump in it"));
+            UNSCOPED_INFO("no jump in it");
             REQUIRE(record(2, 2, 2) == 0);
-            UNSCOPED_INFO(named(reverse, "a tile far away holds nothing"));
+            UNSCOPED_INFO("a tile far away holds nothing");
             REQUIRE(record(0, 0, 1) == 0);
 
             // The second, across tile borders: the tile at column and row 3 holds both the root and the child.
@@ -1839,7 +1819,7 @@ namespace
             markPasses(view());
             records = tileRecords();
             {
-                INFO(named(reverse, "a tile across the edge holds both"));
+                INFO("a tile across the edge holds both");
                 REQUIRE(record(3, 3, 0) == 1);
                 REQUIRE(record(3, 3, 1) == 2);
             }
@@ -1850,9 +1830,9 @@ namespace
             const LLRect around(12, 62, 54, 20);
             for (const auto& [width, inner_width] : line_widths)
             {
+                CAPTURE(width, inner_width);
                 const Outline::View lines = widths(width, inner_width);
-                const std::string what = "under a rect, lines " + std::to_string(width);
-                UNSCOPED_INFO(named(reverse, what));
+                UNSCOPED_INFO("the tiles under a rect draw as every tile does");
                 REQUIRE(edgePass(lines, nullptr, false, &around) == edgePass(lines, nullptr, true));
             }
         }
@@ -1866,6 +1846,7 @@ namespace
         constexpr U32 REAR = 2;
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { FRONT, RED }, { REAR, GREEN } }, true);
             // The rear over columns and rows 16 to 47; the front over 24 to 39, nearer, wound clockwise: its back.
@@ -1875,26 +1856,26 @@ namespace
             LLVertexBuffer* front = quadAt(back_on);
 
             std::vector<U8> ids = pixelIds({ { rear, REAR, Outline::PRIORITY_CHILD }, { front, FRONT, Outline::PRIORITY_ROOT } });
-            UNSCOPED_INFO(named(reverse, "a single-sided face from behind takes no pixel"));
+            UNSCOPED_INFO("a single-sided face from behind takes no pixel");
             REQUIRE(idAt(ids, 32, 32) == REAR);
             std::vector<U8> px = edgePass();
             {
-                INFO(named(reverse, "nothing traces it"));
+                INFO("nothing traces it");
                 REQUIRE(black(at(px, 23, 32)));
                 REQUIRE(black(at(px, 24, 32)));
                 REQUIRE(black(at(px, 40, 32)));
             }
-            UNSCOPED_INFO(named(reverse, "the rear's contour is whole"));
+            UNSCOPED_INFO("the rear's contour is whole");
             REQUIRE((U32)at(px, 15, 32).g == 255U);
 
             Draw double_sided = { front, FRONT, Outline::PRIORITY_ROOT };
             double_sided.mDoubleSided = true;
             ids = pixelIds({ { rear, REAR, Outline::PRIORITY_CHILD }, double_sided });
-            UNSCOPED_INFO(named(reverse, "a double-sided face from behind is drawn"));
+            UNSCOPED_INFO("a double-sided face from behind is drawn");
             REQUIRE(idAt(ids, 32, 32) == FRONT);
             px = edgePass();
             {
-                INFO(named(reverse, "and outlined over the rear"));
+                INFO("and outlined over the rear");
                 REQUIRE(red(at(px, 23, 32)));
                 REQUIRE(at(px, 23, 32).r == 255);
             }
@@ -1910,6 +1891,7 @@ namespace
         constexpr U32 FROND = 2;
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             // The root, six metres out over columns 12 to 51 and rows 18 to 46, behind something five metres out;
             // the frond four metres out over columns and rows 25 to 38, in front of it.
@@ -1919,7 +1901,7 @@ namespace
 
             for (bool show_hidden : { false, true })
             {
-                const std::string hidden_parts = show_hidden ? ", hidden parts drawn" : ", hidden parts left out";
+                CAPTURE(show_hidden);
                 Draw hidden_root = { root, ROOT, Outline::PRIORITY_ROOT };
                 hidden_root.mShowHidden = show_hidden;
                 idPass({ hidden_root, { frond, FROND, Outline::PRIORITY_CHILD } });
@@ -1927,21 +1909,21 @@ namespace
                 const std::vector<U8> px = edgePass();
 
                 {
-                    INFO(named(reverse, "the frond's contour over the root" + hidden_parts));
+                    INFO("the frond's contour over the root");
                     REQUIRE(green(at(px, 24, 32)));
                     REQUIRE(at(px, 24, 32).g == 255);
                     REQUIRE(green(at(px, 23, 32)));
                     REQUIRE(at(px, 23, 32).g == 255);
                 }
                 {
-                    INFO(named(reverse, "above it too" + hidden_parts));
+                    INFO("above it too");
                     REQUIRE(green(at(px, 32, 39)));
                     REQUIRE(at(px, 32, 39).g == 255);
                 }
-                UNSCOPED_INFO(named(reverse, "as wide as a contour" + hidden_parts));
+                UNSCOPED_INFO("as wide as a contour");
                 REQUIRE(black(at(px, 21, 32)));
                 {
-                    INFO(named(reverse, "nothing inside the frond" + hidden_parts));
+                    INFO("nothing inside the frond");
                     REQUIRE(black(at(px, 32, 32)));
                     REQUIRE(black(at(px, 25, 32)));
                 }
@@ -1949,7 +1931,7 @@ namespace
                 {
                     const U32 dimmed = at(px, 11, 32).r;
                     {
-                        INFO(named(reverse, "the hidden root's contour dimmed"));
+                        INFO("the hidden root's contour dimmed");
                         REQUIRE(red(at(px, 11, 32)));
                         REQUIRE(dimmed >= 90);
                         REQUIRE(dimmed <= 115);
@@ -1957,7 +1939,7 @@ namespace
                 }
                 else
                 {
-                    UNSCOPED_INFO(named(reverse, "the hidden root's contour left out"));
+                    UNSCOPED_INFO("the hidden root's contour left out");
                     REQUIRE(black(at(px, 11, 32)));
                 }
             }
@@ -1972,6 +1954,7 @@ namespace
         const LLColor4 BLUE(0.f, 0.f, 1.f, 1.f);
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
 
             // Six metres out over columns 12 to 51, and four metres out over columns and rows 25 to 38.
@@ -1981,17 +1964,17 @@ namespace
             std::vector<U8> px = edgePass();
             const Pixel over = at(px, 24, 32);
             {
-                INFO(named(reverse, "the front child's contour over the rear"));
+                INFO("the front child's contour over the rear");
                 REQUIRE(over.b == 255);
                 REQUIRE(over.r == 0);
                 REQUIRE(over.g == 0);
             }
             {
-                INFO(named(reverse, "its full width"));
+                INFO("its full width");
                 REQUIRE(at(px, 23, 32).b == 255);
                 REQUIRE(at(px, 32, 39).b == 255);
             }
-            UNSCOPED_INFO(named(reverse, "nothing inside it"));
+            UNSCOPED_INFO("nothing inside it");
             REQUIRE(black(at(px, 32, 32)));
 
             // A wall from four metres out at the left to twelve at the right, split at eight, columns 31 and 32.
@@ -2002,17 +1985,17 @@ namespace
             const Pixel edge = at(px, 31, 32);
             const U32 faint = (U32)ll_round(255.f * Outline::INNER_OPACITY);
             {
-                INFO(named(reverse, "the edge on the root's side"));
+                INFO("the edge on the root's side");
                 REQUIRE(red(edge));
                 REQUIRE((U32)edge.r + 2 >= faint);
                 REQUIRE((U32)edge.r <= faint + 2);
             }
             {
-                INFO(named(reverse, "no contour on the child's side"));
+                INFO("no contour on the child's side");
                 REQUIRE(black(at(px, 32, 32)));
                 REQUIRE(black(at(px, 33, 32)));
             }
-            UNSCOPED_INFO(named(reverse, "none on the root's"));
+            UNSCOPED_INFO("none on the root's");
             REQUIRE(black(at(px, 30, 32)));
         }
     }
@@ -2026,6 +2009,7 @@ namespace
         constexpr U32 FROND = 2;
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             // The root six metres out over columns 12 to 51; the frond five metres out over columns and rows 26 to
             // 37, behind a rock four and a half metres out over exactly those.
@@ -2034,18 +2018,19 @@ namespace
             frond.mShowHidden = false;
             idPass({ { quad(-2.f, 2.f, -1.5f, 1.5f, -6.f, -6.f), ROOT, Outline::PRIORITY_ROOT }, frond });
             const std::vector<U8> ids = read(mIdMap);
-            UNSCOPED_INFO(named(reverse, "the frond is over the root"));
+            UNSCOPED_INFO("the frond is over the root");
             REQUIRE(idAt(ids, 32, 32) == FROND);
-            UNSCOPED_INFO(named(reverse, "and not drawn"));
+            UNSCOPED_INFO("and not drawn");
             REQUIRE((U32)at(ids, 32, 32).b == 0U);
             palette({ { ROOT, RED }, { FROND, GREEN } }, false);
             std::vector<U8> px = edgePass();
             for (const auto& [x, y] : { std::pair<S32, S32>{ 25, 32 }, { 24, 32 }, { 38, 32 }, { 39, 32 }, { 32, 25 }, { 32, 38 }, { 31, 31 } })
             {
-                UNSCOPED_INFO(named(reverse, "nothing traces the frond at (" + std::to_string(x) + ", " + std::to_string(y) + ")"));
+                CAPTURE(x, y);
+                UNSCOPED_INFO("nothing traces the frond");
                 REQUIRE(black(at(px, x, y)));
             }
-            UNSCOPED_INFO(named(reverse, "the root's own contour drawn"));
+            UNSCOPED_INFO("the root's own contour drawn");
             REQUIRE((U32)at(px, 11, 32).r == 255U);
 
             // A root five metres out over columns 9 to 31, hidden, and a child beside it over 32 to 54, visible, both
@@ -2059,7 +2044,7 @@ namespace
             px = edgePass();
             const Pixel above = at(px, 30, 44);
             {
-                INFO(named(reverse, "the child's contour where the hidden root is nearer"));
+                INFO("the child's contour where the hidden root is nearer");
                 REQUIRE(green(above));
                 REQUIRE(above.g > 200);
             }
@@ -2069,12 +2054,12 @@ namespace
             const Pixel edge = at(px, 32, 32);
             const U32 faint = (U32)ll_round(255.f * Outline::INNER_OPACITY);
             {
-                INFO(named(reverse, "the edge on the drawn side"));
+                INFO("the edge on the drawn side");
                 REQUIRE(green(edge));
                 REQUIRE((U32)edge.g + 2 >= faint);
                 REQUIRE((U32)edge.g <= faint + 2);
             }
-            UNSCOPED_INFO(named(reverse, "not on the hidden root's"));
+            UNSCOPED_INFO("not on the hidden root's");
             REQUIRE(black(at(px, 31, 32)));
         }
     }
@@ -2087,6 +2072,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
             // The far part six metres out over columns 12 to 51; the near part over columns and rows 25 to 38 at
@@ -2094,36 +2080,36 @@ namespace
             for (F32 near_z : { -4.f, -5.8f })
             {
                 const F32 half = 0.125f * -near_z;
-                const std::string at_z = " at " + std::to_string(-near_z) + " m";
+                CAPTURE(near_z);
                 idPass({ { quad(-2.f, 2.f, -1.5f, 1.5f, -6.f, -6.f), ID_A }, { quad(-half, half, -half, half, near_z, near_z), ID_A } });
                 const std::vector<U8> px = edgePass();
                 {
-                    INFO(named(reverse, "the near side of the step marked" + at_z));
+                    INFO("the near side of the step marked");
                     REQUIRE(markedAt(25, 32));
                     REQUIRE(markedAt(32, 38));
                 }
                 {
-                    INFO(named(reverse, "not the far side, nor inside" + at_z));
+                    INFO("not the far side, nor inside");
                     REQUIRE_FALSE(markedAt(24, 32));
                     REQUIRE_FALSE(markedAt(32, 32));
                 }
 
                 {
-                    INFO(named(reverse, "the near part's contour over the far part" + at_z));
+                    INFO("the near part's contour over the far part");
                     REQUIRE(red(at(px, 24, 32)));
                     REQUIRE(at(px, 24, 32).r == 255);
                     REQUIRE(at(px, 23, 32).r == 255);
                     REQUIRE(at(px, 32, 39).r == 255);
                 }
-                UNSCOPED_INFO(named(reverse, "as wide as a contour" + at_z));
+                UNSCOPED_INFO("as wide as a contour");
                 REQUIRE(black(at(px, 21, 32)));
                 {
-                    INFO(named(reverse, "nothing inside the near part" + at_z));
+                    INFO("nothing inside the near part");
                     REQUIRE(black(at(px, 25, 32)));
                     REQUIRE(black(at(px, 26, 32)));
                     REQUIRE(black(at(px, 32, 32)));
                 }
-                UNSCOPED_INFO(named(reverse, "nothing over the far part away from it" + at_z));
+                UNSCOPED_INFO("nothing over the far part away from it");
                 REQUIRE(black(at(px, 15, 32)));
             }
 
@@ -2133,9 +2119,9 @@ namespace
             markPasses(view());
             const std::vector<U16> records = tileRecords();
             const S32 columns = (S32)Outline::tileCount(W);
-            UNSCOPED_INFO(named(reverse, "a tile on the near side's edge records the jump"));
+            UNSCOPED_INFO("a tile on the near side's edge records the jump");
             REQUIRE(records[((size_t)3 * columns + 3) * 4 + 2] != 0);
-            UNSCOPED_INFO(named(reverse, "a tile of the far part alone none"));
+            UNSCOPED_INFO("a tile of the far part alone none");
             REQUIRE(records[((size_t)1 * columns + 1) * 4 + 2] == 0);
         }
     }
@@ -2147,6 +2133,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
 
@@ -2181,6 +2168,7 @@ namespace
 
             for (const auto& [name, draws] : surfaces)
             {
+                INFO(name);
                 idPass(draws);
                 const std::vector<U8> ids = read(mIdMap);
                 const std::vector<U8> px = edgePass();
@@ -2202,11 +2190,11 @@ namespace
                         }
                     }
                 }
-                UNSCOPED_INFO(named(reverse, name + ": it covers pixels"));
+                UNSCOPED_INFO("it covers pixels");
                 REQUIRE(covered > 200);
-                UNSCOPED_INFO(named(reverse, name + ": no jump marked"));
+                UNSCOPED_INFO("no jump marked");
                 REQUIRE(marks == size_t(0));
-                UNSCOPED_INFO(named(reverse, name + ": nothing drawn across it"));
+                UNSCOPED_INFO("nothing drawn across it");
                 REQUIRE(drawn == size_t(0));
             }
         }
@@ -2229,6 +2217,7 @@ namespace
 
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
             windowDepth(nullptr);
@@ -2240,16 +2229,16 @@ namespace
             const F32 far_end = diagonal(near_px, 34);
             // The line's slope down the screen is about 0.91: a width of 1 reads as about 1.35 down a column.
             {
-                INFO(named(reverse, "the width down the diagonal, near: " + std::to_string(near_end)));
+                INFO("the width down the diagonal, near");
                 REQUIRE(near_end > 1.15f);
                 REQUIRE(near_end < 1.55f);
             }
-            UNSCOPED_INFO(named(reverse, "the same along the receding edge, far: " + std::to_string(far_end)));
+            UNSCOPED_INFO("the same along the receding edge, far: " << far_end);
             REQUIRE(fabsf(far_end - near_end) < 0.1f);
 
             const std::vector<U8> far_px = worldWireframe({ { quad(-4.f, 6.f, -4.f, 4.f, -12.f, -48.f), ID_A } });
             {
-                INFO(named(reverse, "the same four times as far"));
+                INFO("the same four times as far");
                 REQUIRE(fabsf(diagonal(far_px, 26) - near_end) < 0.1f);
                 REQUIRE(fabsf(diagonal(far_px, 34) - far_end) < 0.1f);
             }
@@ -2258,7 +2247,7 @@ namespace
             const F32 narrow = diagonal(near_px, 30);
             const F32 wide = diagonal(wide_px, 30);
             {
-                INFO(named(reverse, "twice as wide at twice the width: " + std::to_string(wide)));
+                INFO("twice as wide at twice the width");
                 REQUIRE(wide > 1.8f * narrow);
                 REQUIRE(wide < 2.2f * narrow);
             }
@@ -2270,6 +2259,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
             windowDepth(nullptr);
@@ -2277,8 +2267,8 @@ namespace
             const std::vector<U8> px = wireframe({ Outline::WIRE_VISIBLE }, pixelProjection(), { { pixels(8, 56, 8, 56), ID_A } });
             for (S32 y = 16; y < 48; ++y)
             {
-                const std::string row = ", row " + std::to_string(y);
-                UNSCOPED_INFO(named(reverse, "the line is drawn" + row));
+                CAPTURE(y);
+                UNSCOPED_INFO("the line is drawn");
                 REQUIRE(at(px, y, y).r > 127);
                 for (S32 step : { -1, 1 })
                 {
@@ -2286,11 +2276,11 @@ namespace
                     for (S32 x = y + step; x != y + 4 * step; x += step)
                     {
                         const U32 r = at(px, x, y).r;
-                        UNSCOPED_INFO(named(reverse, "coverage falls away from the line" + row));
+                        UNSCOPED_INFO("coverage falls away from the line");
                         REQUIRE(r <= last);
                         last = r;
                     }
-                    UNSCOPED_INFO(named(reverse, "and is gone" + row));
+                    UNSCOPED_INFO("and is gone");
                     REQUIRE(last == 0U);
                 }
             }
@@ -2303,6 +2293,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
 
             // The brightest of a row's pixels between two columns.
@@ -2321,7 +2312,7 @@ namespace
             windowDepth(nullptr);
             std::vector<U8> px = worldWireframe({ { quadA(), ID_A } });
             const U32 open = brightest(px, 25, 11, 18);
-            UNSCOPED_INFO(named(reverse, "the line drawn with nothing in front"));
+            UNSCOPED_INFO("the line drawn with nothing in front");
             REQUIRE(open > 127);
 
             // Then with something three metres out over columns 0 to 19, in front of A's left part.
@@ -2329,10 +2320,10 @@ namespace
             windowDepth(&mScene);
             px = worldWireframe({ { quadA(), ID_A } });
             const U32 hidden = brightest(px, 25, 11, 18);
-            UNSCOPED_INFO(named(reverse, "the line in front drawn"));
+            UNSCOPED_INFO("the line in front drawn");
             REQUIRE(brightest(px, 38, 22, 30) > 127);
             {
-                INFO(named(reverse, "the line behind dimmed: " + std::to_string(hidden) + " of " + std::to_string(open)));
+                INFO("the line behind dimmed: " << hidden << " of " << open);
                 REQUIRE(hidden * 100 >= open * 35);
                 REQUIRE(hidden * 100 <= open * 45);
             }
@@ -2341,9 +2332,9 @@ namespace
             left_out.mShowHidden = false;
             palette({ { ID_A, RED } }, false);
             px = worldWireframe({ left_out });
-            UNSCOPED_INFO(named(reverse, "the line behind left out"));
+            UNSCOPED_INFO("the line behind left out");
             REQUIRE(brightest(px, 25, 11, 18) == 0U);
-            UNSCOPED_INFO(named(reverse, "the line in front kept"));
+            UNSCOPED_INFO("the line in front kept");
             REQUIRE(brightest(px, 38, 22, 30) > 127);
         }
     }
@@ -2356,6 +2347,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
             // Turned about 60 degrees from the eye, five metres deep across its width.
@@ -2379,9 +2371,9 @@ namespace
                     lost += at(alone, x, y).r != at(on_surface, x, y).r ? 1 : 0;
                 }
             }
-            UNSCOPED_INFO(named(reverse, "lines are drawn"));
+            UNSCOPED_INFO("lines are drawn");
             REQUIRE(drawn > 100);
-            UNSCOPED_INFO(named(reverse, "every line pixel drawn on its own surface as on nothing"));
+            UNSCOPED_INFO("every line pixel drawn on its own surface as on nothing");
             REQUIRE(lost == size_t(0));
         }
     }
@@ -2394,6 +2386,7 @@ namespace
         const F32 right[12] = { 1.f, 0.f, 0.f, 1.5f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f };
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
             windowDepth(nullptr);
@@ -2403,12 +2396,12 @@ namespace
             const F32 mask = Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_MASK, 64, true);
             std::vector<U8> px = wireframe({ Outline::WIRE_VISIBLE }, pixelProjection(),
                                            { { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, mask, ramp() } });
-            UNSCOPED_INFO(named(reverse, "no line across the cut-out texels"));
+            UNSCOPED_INFO("no line across the cut-out texels");
             REQUIRE(ink(px, 8, 17, 24) == 0.f);
-            UNSCOPED_INFO(named(reverse, "nor along their edge"));
+            UNSCOPED_INFO("nor along their edge");
             REQUIRE(black(at(px, 8, 16)));
             {
-                INFO(named(reverse, "lines across the kept ones"));
+                INFO("lines across the kept ones");
                 REQUIRE(ink(px, 40, 33, 40) > 0.5f);
                 REQUIRE_FALSE(black(at(px, 40, 16)));
             }
@@ -2416,9 +2409,9 @@ namespace
             // Posed, the quad covers columns 43 to 54 and rows 26 to 37.
             LLVertexBuffer* bound = quad(-0.5f, 0.5f, -0.5f, 0.5f, QUAD_Z, QUAD_Z, true);
             px = worldWireframe({ { bound, ID_A } }, 1, 1.f, right);
-            UNSCOPED_INFO(named(reverse, "the rigged face's lines where it is posed"));
+            UNSCOPED_INFO("the rigged face's lines where it is posed");
             REQUIRE(ink(px, 49, 26, 38) > 0.5f);
-            UNSCOPED_INFO(named(reverse, "not at its bind pose"));
+            UNSCOPED_INFO("not at its bind pose");
             REQUIRE(ink(px, 32, 26, 38) == 0.f);
 
             // A face seen from behind, wound clockwise, as the id pass culls it: no lines unless double-sided.
@@ -2426,11 +2419,11 @@ namespace
                                            LLVector3(48.f, 48.f, PIXEL_Z), LLVector3(48.f, 16.f, PIXEL_Z) };
             Draw back = { quadAt(back_on), ID_A };
             px = wireframe({ Outline::WIRE_VISIBLE }, pixelProjection(), { back });
-            UNSCOPED_INFO(named(reverse, "no lines on a face from behind"));
+            UNSCOPED_INFO("no lines on a face from behind");
             REQUIRE(lit(px) == size_t(0));
             back.mDoubleSided = true;
             px = wireframe({ Outline::WIRE_VISIBLE }, pixelProjection(), { back });
-            UNSCOPED_INFO(named(reverse, "lines on a double-sided one"));
+            UNSCOPED_INFO("lines on a double-sided one");
             REQUIRE(lit(px) > 50);
         }
     }
@@ -2444,6 +2437,7 @@ namespace
         constexpr U32 FRONT = 2;
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             // The rear from 16 to 47 each way, its diagonal through x = y; the front nearer, over columns 28 to 43
             // and rows 20 to 35, its diagonal through x = y + 8. The rear's diagonal passes behind the front at
@@ -2462,7 +2456,7 @@ namespace
 
             for (bool show_hidden : { false, true })
             {
-                const std::string hidden_parts = show_hidden ? ", hidden parts drawn" : ", hidden parts left out";
+                CAPTURE(show_hidden);
                 std::vector<Draw> shown = draws;
                 for (Draw& draw : shown)
                 {
@@ -2471,12 +2465,12 @@ namespace
                 palette({ { REAR, RED }, { FRONT, GREEN } }, show_hidden);
                 const std::vector<U8> px = wireframe({ Outline::WIRE_ID_DEPTH }, pixelProjection(), shown);
                 {
-                    INFO(named(reverse, "the rear's line in the open" + hidden_parts));
+                    INFO("the rear's line in the open");
                     REQUIRE(red(at(px, 20, 20)));
                     REQUIRE(at(px, 20, 20).r > 200);
                 }
                 {
-                    INFO(named(reverse, "the front's line" + hidden_parts));
+                    INFO("the front's line");
                     REQUIRE(green(at(px, 40, 32)));
                     REQUIRE(at(px, 40, 32).g > 200);
                 }
@@ -2485,7 +2479,7 @@ namespace
                     const U32 dimmed = at(px, 32, 32).r;
                     const U32 open = at(px, 20, 20).r;
                     {
-                        INFO(named(reverse, "the rear's line behind the front dimmed: " + std::to_string(dimmed)));
+                        INFO("the rear's line behind the front dimmed: " << dimmed << " of " << open);
                         REQUIRE(red(at(px, 32, 32)));
                         REQUIRE(dimmed * 100 >= open * 35);
                         REQUIRE(dimmed * 100 <= open * 45);
@@ -2493,7 +2487,7 @@ namespace
                 }
                 else
                 {
-                    UNSCOPED_INFO(named(reverse, "the rear's line behind the front left out"));
+                    UNSCOPED_INFO("the rear's line behind the front left out");
                     REQUIRE(black(at(px, 32, 32)));
                 }
             }
@@ -2504,12 +2498,11 @@ namespace
     // the polygon offset its lines need over a resampled depth.
     TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: the wireframe is a pixel wide at UI scale 1 and scales with it", "[ALSelectionOutline]")
     {
-        UNSCOPED_INFO("a pixel at 1");
         CHECK(Outline::lineWidth(Outline::WIRE_WIDTH, 1.f) == 1);
-        UNSCOPED_INFO("two at 2");
         CHECK(Outline::lineWidth(Outline::WIRE_WIDTH, 2.f) == 2);
         for (bool hud : { false, true })
         {
+            CAPTURE(hud);
             const Outline::View scaled = Outline::makeView(identity(), identity(), 2.f, 2.f, hud);
             UNSCOPED_INFO("its width at the UI scale");
             REQUIRE(scaled.mWireWidth == 2);
@@ -2529,6 +2522,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
             windowDepth(nullptr);
@@ -2541,18 +2535,18 @@ namespace
             LLVertexBuffer* reaching = quadAt(one_behind);
             std::vector<U8> px = worldWireframe({ { reaching, ID_A } });
             std::vector<std::pair<S32, S32>> found = columnRuns(px, 40);
-            UNSCOPED_INFO(named(reverse, "column 40 crosses the bottom edge, the diagonal and the top edge"));
+            UNSCOPED_INFO("column 40 crosses the bottom edge, the diagonal and the top edge");
             REQUIRE(found.size() == size_t(3));
             // The diagonal's slope down the screen is about a third: a width of 1 reads as about 1.05 down a column.
             const F32 across = ink(px, 40, found[1].first, found[1].second);
             {
-                INFO(named(reverse, "the diagonal at its width: " + std::to_string(across)));
+                INFO("the diagonal at its width");
                 REQUIRE(across > 0.9f);
                 REQUIRE(across < 1.25f);
             }
             // The top edge, along row 41.8, has one triangle, which draws the half of its line inside the quad.
             {
-                INFO(named(reverse, "the top edge drawn inside the quad"));
+                INFO("the top edge drawn inside the quad");
                 REQUIRE(at(px, 40, 41).r > 127);
                 REQUIRE(black(at(px, 40, 42)));
             }
@@ -2573,18 +2567,18 @@ namespace
                     at_edges += black(at(px, x, y)) ? 0 : 1;
                 }
             }
-            UNSCOPED_INFO(named(reverse, "no line along the near plane's cut"));
+            UNSCOPED_INFO("no line along the near plane's cut");
             REQUIRE(at_cut == size_t(0));
-            UNSCOPED_INFO(named(reverse, "the edges in front drawn: " + std::to_string(at_edges)));
+            UNSCOPED_INFO("the edges in front drawn");
             REQUIRE(at_edges > 40);
 
             // The first quad textured with the ramp, masked at half: its diagonal's texture coordinate runs from 0
             // behind the eye to 1, about 0.43 at column 20 and 0.57 at column 40.
             const F32 mask = Outline::legacyAlphaCutoff(true, LLMaterial::DIFFUSE_ALPHA_MODE_MASK, 128, true);
             px = worldWireframe({ { reaching, ID_A, Outline::PRIORITY_ROOT, mask, ramp() } });
-            UNSCOPED_INFO(named(reverse, "no line where the clipped triangle's texture is cut"));
+            UNSCOPED_INFO("no line where the clipped triangle's texture is cut");
             REQUIRE(ink(px, 20, 24, 32) == 0.f);
-            UNSCOPED_INFO(named(reverse, "a line where it is kept"));
+            UNSCOPED_INFO("a line where it is kept");
             REQUIRE(ink(px, 40, 32, 38) > 0.5f);
         }
     }
@@ -2597,28 +2591,28 @@ namespace
     {
         for (bool hud : { false, true })
         {
-            const std::string where = hud ? " on the HUD" : " in the world";
+            CAPTURE(hud);
             Outline::Wants wants;
             wants.mContour = true;
             Outline::Passes passes = Outline::passesFor(wants, hud, true);
-            UNSCOPED_INFO("the outline alone runs the id pass" + where);
+            UNSCOPED_INFO("the outline alone runs the id pass");
             REQUIRE(passes.mIds);
-            UNSCOPED_INFO("and the edge passes" + where);
+            UNSCOPED_INFO("and the edge passes");
             REQUIRE(passes.mEdges);
-            UNSCOPED_INFO("and no wireframe" + where);
+            UNSCOPED_INFO("and no wireframe");
             REQUIRE_FALSE(passes.mWireframe);
 
             wants.mWireframe = true;
             passes = Outline::passesFor(wants, hud, true);
             {
-                INFO("both run everything" + where);
+                INFO("both run everything");
                 REQUIRE(passes.mIds);
                 REQUIRE(passes.mEdges);
                 REQUIRE(passes.mWireframe);
             }
             passes = Outline::passesFor(wants, hud, false);
             {
-                INFO("a wireframe program that did not load leaves the outline" + where);
+                INFO("a wireframe program that did not load leaves the outline");
                 REQUIRE(passes.mIds);
                 REQUIRE(passes.mEdges);
                 REQUIRE_FALSE(passes.mWireframe);
@@ -2626,20 +2620,20 @@ namespace
 
             wants.mContour = false;
             passes = Outline::passesFor(wants, hud, true);
-            UNSCOPED_INFO("the wireframe alone is drawn" + where);
+            UNSCOPED_INFO("the wireframe alone is drawn");
             REQUIRE(passes.mWireframe);
-            UNSCOPED_INFO("without the edge passes" + where);
+            UNSCOPED_INFO("without the edge passes");
             REQUIRE_FALSE(passes.mEdges);
-            UNSCOPED_INFO("with the id pass only on the HUD" + where);
+            UNSCOPED_INFO("with the id pass only on the HUD");
             REQUIRE(passes.mIds == hud);
             passes = Outline::passesFor(wants, hud, false);
-            UNSCOPED_INFO("nothing when its program did not load" + where);
+            UNSCOPED_INFO("nothing when its program did not load");
             REQUIRE_FALSE(passes.any());
 
             wants.mGlow = true;
             passes = Outline::passesFor(wants, hud, true);
             {
-                INFO("a glow beside a wireframe runs everything" + where);
+                INFO("a glow beside a wireframe runs everything");
                 REQUIRE(passes.mIds);
                 REQUIRE(passes.mEdges);
                 REQUIRE(passes.mWireframe);
@@ -2648,16 +2642,16 @@ namespace
             wants.mWireframe = false;
             passes = Outline::passesFor(wants, hud, true);
             {
-                INFO("a glow with the outline and the wireframe off runs the id and edge passes" + where);
+                INFO("a glow with the outline and the wireframe off runs the id and edge passes");
                 REQUIRE(passes.mIds);
                 REQUIRE(passes.mEdges);
                 REQUIRE_FALSE(passes.mWireframe);
             }
-            UNSCOPED_INFO("and whether or not the wireframe loaded" + where);
+            UNSCOPED_INFO("and whether or not the wireframe loaded");
             REQUIRE(Outline::passesFor(wants, hud, false).mEdges);
 
             wants.mGlow = false;
-            UNSCOPED_INFO("nothing with all three off" + where);
+            UNSCOPED_INFO("nothing with all three off");
             REQUIRE_FALSE(Outline::passesFor(wants, hud, true).any());
         }
 
@@ -2682,6 +2676,7 @@ namespace
 
         for (Outline::EWirePass pass : { Outline::WIRE_VISIBLE, Outline::WIRE_HIDDEN, Outline::WIRE_ID_DEPTH })
         {
+            CAPTURE(pass);
             UNSCOPED_INFO("what glows has no wireframe in any pass");
             REQUIRE_FALSE(Outline::inWirePass(Outline::partsFor(Outline::PRIORITY_HOVER, both), true, pass));
             UNSCOPED_INFO("nor an outline alone");
@@ -2711,7 +2706,6 @@ namespace
     TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: the glow's reach and falloff and the hover fades and target lifetimes", "[ALSelectionOutline]")
     {
         const F32 nan = std::numeric_limits<F32>::quiet_NaN();
-        UNSCOPED_INFO("9 pixels at the default thickness");
         CHECK(Outline::glowRadius(Outline::DEFAULT_GLOW_THICKNESS, 1.f) == 9);
         UNSCOPED_INFO("scaled with the UI");
         CHECK(Outline::glowRadius(Outline::DEFAULT_GLOW_THICKNESS, 2.f) == 18);
@@ -2728,10 +2722,10 @@ namespace
         CHECK(defaults.mGlowBrightness == Outline::DEFAULT_GLOW_BRIGHTNESS);
         UNSCOPED_INFO("a brightness that is not a number is the default");
         CHECK(Outline::makeView(identity(), identity(), 2.f, 1.f, false, 0.6f, nan).mGlowBrightness ==
-                      Outline::DEFAULT_GLOW_BRIGHTNESS);
+              Outline::DEFAULT_GLOW_BRIGHTNESS);
         UNSCOPED_INFO("and one past the brightest held to it");
         CHECK(Outline::makeView(identity(), identity(), 2.f, 1.f, false, 0.6f, 1000.f).mGlowBrightness ==
-                      Outline::MAX_GLOW_BRIGHTNESS);
+              Outline::MAX_GLOW_BRIGHTNESS);
 
         // The silhouette is half a texel out from its texel's centre.
         UNSCOPED_INFO("opaque at the silhouette at the default brightness");
@@ -2739,8 +2733,7 @@ namespace
         UNSCOPED_INFO("half as opaque at half of it");
         CHECK_THAT(Outline::glowOpacity(0.5f, 9, 2.f), Catch::Matchers::WithinAbs(0.5f, 1e-6f));
         UNSCOPED_INFO("half way out, half of the silhouette's");
-        CHECK_THAT(Outline::glowOpacity(5.f, 9, 4.f), Catch::Matchers::WithinAbs(0.5f,
-                                          1e-6f));
+        CHECK_THAT(Outline::glowOpacity(5.f, 9, 4.f), Catch::Matchers::WithinAbs(0.5f, 1e-6f));
         UNSCOPED_INFO("nothing at its reach");
         CHECK(Outline::glowOpacity(9.5f, 9, 4.f) == 0.f);
         UNSCOPED_INFO("nor past it");
@@ -2749,7 +2742,7 @@ namespace
         CHECK(Outline::glowOpacity(2.f, 9, Outline::MAX_GLOW_BRIGHTNESS) == 1.f);
         const F32 last_step = Outline::glowOpacity(9.25f, 9, 4.f);
         {
-            INFO("fading smoothly into nothing: " + std::to_string(last_step));
+            INFO("fading smoothly into nothing");
             CHECK(last_step > 0.f);
             CHECK(last_step < 0.01f);
         }
@@ -2765,8 +2758,7 @@ namespace
         CHECK(falling);
 
         UNSCOPED_INFO("half way in half the fade time");
-        CHECK_THAT(ALHoverGlow::stepFade(0.f, 0.05f, 0.1f, true),
-                                          Catch::Matchers::WithinAbs(0.5f, 1e-6f));
+        CHECK_THAT(ALHoverGlow::stepFade(0.f, 0.05f, 0.1f, true), Catch::Matchers::WithinAbs(0.5f, 1e-6f));
         UNSCOPED_INFO("out as fast");
         CHECK_THAT(ALHoverGlow::stepFade(0.5f, 0.05f, 0.1f, false), Catch::Matchers::WithinAbs(0.f, 1e-6f));
         UNSCOPED_INFO("held to one");
@@ -2914,13 +2906,14 @@ namespace
         constexpr S32 RADIUS = 6;
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             // Columns 20 to 39 and rows 20 to 43, and a fold of the same object nearer over its middle, columns 25 to
             // 34: selected, the near side of a jump in its own surface.
             pixelIds({ { pixels(20, 40, 20, 44), ID_A }, { quad(25.f, 35.f, 25.f, 39.f, -1.f, -1.f), ID_A } });
             markPasses(glowView(RADIUS));
             {
-                INFO(named(reverse, "selected, the fold's edge is the near side of a jump"));
+                INFO("selected, the fold's edge is the near side of a jump");
                 REQUIRE(markedAt(25, 32));
                 REQUIRE(markedAt(34, 32));
             }
@@ -2930,10 +2923,10 @@ namespace
 
             for (F32 brightness : { Outline::DEFAULT_GLOW_BRIGHTNESS, 2.f })
             {
-                const std::string at_brightness = " at brightness " + std::to_string(brightness);
+                CAPTURE(brightness);
                 const std::vector<U8> px = edgePass(glowView(RADIUS, brightness), nullptr, false, nullptr, true);
                 {
-                    INFO(named(reverse, "glowing, its fold's edge is not marked"));
+                    INFO("glowing, its fold's edge is not marked");
                     REQUIRE_FALSE(markedAt(25, 32));
                     REQUIRE_FALSE(markedAt(34, 32));
                 }
@@ -2943,8 +2936,7 @@ namespace
                     const F32 expected = 255.f * Outline::glowOpacity((F32)(k + 1), RADIUS, brightness);
                     const Pixel p = at(px, 40 + k, 32);
                     {
-                        INFO(named(reverse, "the glow " + std::to_string(k + 1) + " pixels out" + at_brightness + ": " +
-                                              std::to_string(p.g) + " for " + std::to_string(expected)));
+                        INFO("the glow " << k + 1 << " pixels out: " << (U32)p.g << " for " << expected);
                         REQUIRE(std::fabs((F32)p.g - expected) <= 2.f);
                         REQUIRE(p.r == 0);
                         REQUIRE(p.b == 0);
@@ -2952,18 +2944,18 @@ namespace
                 }
                 const U8 between = at(px, 43, 32).g;
                 {
-                    INFO(named(reverse, "soft, not a solid band" + at_brightness));
+                    INFO("soft, not a solid band");
                     REQUIRE(between > 10);
                     REQUIRE(between < 245);
                 }
                 {
-                    INFO(named(reverse, "nothing over the object" + at_brightness));
+                    INFO("nothing over the object");
                     REQUIRE(black(at(px, 30, 32)));
                     REQUIRE(black(at(px, 39, 32)));
                     REQUIRE(black(at(px, 20, 20)));
                 }
                 {
-                    INFO(named(reverse, "nor over its far side beside its fold" + at_brightness));
+                    INFO("nor over its far side beside its fold");
                     REQUIRE(black(at(px, 24, 32)));
                     REQUIRE(black(at(px, 35, 32)));
                 }
@@ -2978,6 +2970,7 @@ namespace
         constexpr U32 ID_GLOW = 400;
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED }, { ID_B, RED }, { ID_GLOW, GREEN } }, true);
 
@@ -2986,15 +2979,14 @@ namespace
             std::vector<U8> px = edgePass(glowView(9), nullptr, false, nullptr, true);
             for (S32 x : { 38, 39 })
             {
+                CAPTURE(x);
                 const Pixel p = at(px, x, 32);
-                {
-                    INFO(named(reverse, "the contour opaque over the glow at column " + std::to_string(x)));
-                    REQUIRE(p.r == 255);
-                    REQUIRE(p.g == 0);
-                }
+                INFO("the contour opaque over the glow");
+                REQUIRE(p.r == 255);
+                REQUIRE(p.g == 0);
             }
             {
-                INFO(named(reverse, "the glow past the contour"));
+                INFO("the glow past the contour");
                 REQUIRE(green(at(px, 37, 32)));
                 REQUIRE(green(at(px, 36, 32)));
             }
@@ -3007,15 +2999,14 @@ namespace
             px = edgePass(glowView(9), nullptr, false, nullptr, true);
             for (S32 x : { 37, 38, 39, 40, 41 })
             {
+                CAPTURE(x);
                 const Pixel p = at(px, x, 32);
                 const Pixel q = at(alone, x, 32);
-                {
-                    INFO(named(reverse, "the contour beside it as without it at column " + std::to_string(x)));
-                    REQUIRE(p.r == q.r);
-                    REQUIRE(p.g == q.g);
-                    REQUIRE(p.b == q.b);
-                    REQUIRE(p.a == q.a);
-                }
+                INFO("the contour beside it as without it");
+                REQUIRE(p.r == q.r);
+                REQUIRE(p.g == q.g);
+                REQUIRE(p.b == q.b);
+                REQUIRE(p.a == q.a);
             }
 
             // Two selected objects touching at column 30, their edge on A's side, and a glowing one nearer below
@@ -3026,11 +3017,11 @@ namespace
             // Pixel (29, 20) is a pixel from B and three from the glowing object's top row.
             const F32 glow = Outline::glowOpacity(3.f, 9, Outline::DEFAULT_GLOW_BRIGHTNESS);
             const Pixel edge = at(px, 29, 20);
-            UNSCOPED_INFO(named(reverse, "the edge over the glow: red " + std::to_string(edge.r)));
+            UNSCOPED_INFO("the edge over the glow: red " << (U32)edge.r);
             REQUIRE(std::fabs((F32)edge.r - 255.f * Outline::INNER_OPACITY) <= 2.f);
-            UNSCOPED_INFO(named(reverse, "the glow under it: green " + std::to_string(edge.g)));
+            UNSCOPED_INFO("the glow under it: green " << (U32)edge.g);
             REQUIRE(std::fabs((F32)edge.g - 255.f * glow * (1.f - Outline::INNER_OPACITY)) <= 2.f);
-            UNSCOPED_INFO(named(reverse, "the glow over A's surface, which lies behind it"));
+            UNSCOPED_INFO("the glow over A's surface, which lies behind it");
             REQUIRE(green(at(px, 20, 21)));
         }
     }
@@ -3040,28 +3031,29 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             // A, columns 9 to 31, behind something in the scene over columns 0 to 20.
             occlude(3.f, 0, 0, 21, H);
             idPass({ hoverDraw(quadA(), ID_A) });
             const std::vector<U8> ids = read(mIdMap);
-            UNSCOPED_INFO(named(reverse, "its hidden part left out"));
+            UNSCOPED_INFO("its hidden part left out");
             REQUIRE((U32)at(ids, 12, 32).b == 0U);
             palette({ { ID_A, GREEN } }, false);
             const std::vector<U8> px = edgePass(glowView(6), nullptr, false, nullptr, true);
             {
-                INFO(named(reverse, "a glow past its visible side"));
+                INFO("a glow past its visible side");
                 REQUIRE(green(at(px, 32, 32)));
                 REQUIRE(at(px, 32, 32).g > 200);
             }
             {
-                INFO(named(reverse, "none past its hidden one"));
+                INFO("none past its hidden one");
                 REQUIRE(black(at(px, 8, 32)));
                 REQUIRE(black(at(px, 5, 32)));
             }
-            UNSCOPED_INFO(named(reverse, "nor above it"));
+            UNSCOPED_INFO("nor above it");
             REQUIRE(black(at(px, 12, 46)));
-            UNSCOPED_INFO(named(reverse, "but above the part shown"));
+            UNSCOPED_INFO("but above the part shown");
             REQUIRE(green(at(px, 26, 45)));
         }
     }
@@ -3071,6 +3063,7 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED }, { ID_B, GREEN } }, true);
             windowDepth(nullptr);
@@ -3086,9 +3079,9 @@ namespace
                     glowing += p.g > 0 ? 1 : 0;
                 }
             }
-            UNSCOPED_INFO(named(reverse, "the selection's lines"));
+            UNSCOPED_INFO("the selection's lines");
             REQUIRE(selected > 20);
-            UNSCOPED_INFO(named(reverse, "none for what glows"));
+            UNSCOPED_INFO("none for what glows");
             REQUIRE(glowing == size_t(0));
         }
     }
@@ -3102,6 +3095,7 @@ namespace
         constexpr S32 RADIUS = 9;
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED }, { ID_B, RED }, { ID_GLOW, GREEN }, { ID_FRONT, GREEN } }, true);
             // Two selections, a glowing object apart from them, and another nearer, over a corner of one.
@@ -3109,21 +3103,21 @@ namespace
                        hoverDraw(quad(44.f, 58.f, 22.f, 36.f, -1.f, -1.f), ID_FRONT) });
             const std::vector<U8> tiled = edgePass(glowView(RADIUS), nullptr, false, nullptr, true);
             const std::vector<U8> untiled = edgePass(glowView(RADIUS), nullptr, true, nullptr, true);
-            UNSCOPED_INFO(named(reverse, "the glow reaches past the lines"));
+            UNSCOPED_INFO("the glow reaches past the lines");
             REQUIRE(green(at(tiled, 28, 15)));
-            UNSCOPED_INFO(named(reverse, "the tiles change nothing it draws"));
+            UNSCOPED_INFO("the tiles change nothing it draws");
             REQUIRE(tiled == untiled);
 
             const LLVector4a extents[2] = { LLVector4a(6.f, 6.f, PIXEL_Z), LLVector4a(22.f, 24.f, PIXEL_Z) };
             LLRect rect;
-            UNSCOPED_INFO(named(reverse, "its box is on screen"));
+            UNSCOPED_INFO("its box is on screen");
             REQUIRE(Outline::scissorRect(pixelProjection(), extents, W, H, Outline::lineReach(RADIUS), rect));
             pixelIds({ hoverDraw(pixels(6, 22, 6, 24), ID_GLOW) });
             const std::vector<U8> whole = edgePass(glowView(RADIUS), nullptr, false, nullptr, true);
             const std::vector<U8> scissored = edgePass(glowView(RADIUS), &rect, false, &rect, true);
-            UNSCOPED_INFO(named(reverse, "its glow is drawn"));
+            UNSCOPED_INFO("its glow is drawn");
             REQUIRE(lit(whole) > 100);
-            UNSCOPED_INFO(named(reverse, "and lies in its box grown by its reach"));
+            UNSCOPED_INFO("and lies in its box grown by its reach");
             REQUIRE(whole == scissored);
         }
     }
@@ -3136,8 +3130,7 @@ namespace
         const F32 blend = Outline::legacyAlphaCutoff(false, 0, 0, true);
         const F32 mask = Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_MASK, 0.5f);
         UNSCOPED_INFO("the transparent texture is drawn whole");
-        CHECK(Outline::faceAlphaCutoff(IMG_TRANSPARENT, blend) ==
-                      Outline::NO_ALPHA_TEST);
+        CHECK(Outline::faceAlphaCutoff(IMG_TRANSPARENT, blend) == Outline::NO_ALPHA_TEST);
         UNSCOPED_INFO("as a GLTF base colour too");
         CHECK(Outline::faceAlphaCutoff(IMG_TRANSPARENT, mask) == Outline::NO_ALPHA_TEST);
         UNSCOPED_INFO("any other keeps its cut");
@@ -3147,19 +3140,19 @@ namespace
 
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
             for (const LLUUID& texture : { IMG_TRANSPARENT, other })
             {
                 const bool whole = texture == IMG_TRANSPARENT;
-                const std::string which = whole ? "the transparent texture" : "another clear texture";
+                INFO((whole ? "the transparent texture" : "another clear texture"));
                 idPass({ { quadA(), ID_A, Outline::PRIORITY_ROOT, Outline::faceAlphaCutoff(texture, blend), clearTexture() } });
                 const std::vector<U8> ids = read(mIdMap);
-                UNSCOPED_INFO(named(reverse, which + (whole ? " drawn whole" : " cut away")));
-                REQUIRE(idAt(ids, 20, 32) ==
-                              (whole ? ID_A : 0U));
+                UNSCOPED_INFO((whole ? "drawn whole" : "cut away"));
+                REQUIRE(idAt(ids, 20, 32) == (whole ? ID_A : 0U));
                 const std::vector<U8> px = edgePass();
-                UNSCOPED_INFO(named(reverse, which + (whole ? " outlined" : " not outlined")));
+                UNSCOPED_INFO((whole ? "outlined" : "not outlined"));
                 REQUIRE((whole ? red(at(px, 8, 32)) : black(at(px, 8, 32))));
             }
         }
@@ -3171,26 +3164,27 @@ namespace
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             Draw wire_only{ pixels(36, 50, 20, 44), ID_B };
             wire_only.mParts = Outline::PART_WIREFRAME;
             const std::vector<U8> ids = pixelIds({ { pixels(10, 26, 20, 44), ID_A }, wire_only });
-            UNSCOPED_INFO(named(reverse, "its id is in the target"));
+            UNSCOPED_INFO("its id is in the target");
             REQUIRE(idAt(ids, 40, 32) == ID_B);
-            UNSCOPED_INFO(named(reverse, "drawn nowhere"));
+            UNSCOPED_INFO("drawn nowhere");
             REQUIRE((U32)at(ids, 40, 32).b == 0U);
-            UNSCOPED_INFO(named(reverse, "the other drawn"));
+            UNSCOPED_INFO("the other drawn");
             REQUIRE((U32)at(ids, 20, 32).b == 255U);
 
             palette({ { ID_A, RED }, { ID_B, GREEN } }, true);
             const std::vector<U8> px = edgePass(Outline::makeView(identity(), pixelProjection(), TEST_WIDTH, 1.f, true));
             {
-                INFO(named(reverse, "the other's contour"));
+                INFO("the other's contour");
                 REQUIRE(red(at(px, 9, 32)));
                 REQUIRE(red(at(px, 26, 32)));
             }
             {
-                INFO(named(reverse, "none around it"));
+                INFO("none around it");
                 REQUIRE(black(at(px, 35, 32)));
                 REQUIRE(black(at(px, 50, 32)));
                 REQUIRE(black(at(px, 43, 45)));
@@ -3206,32 +3200,33 @@ namespace
         const F32 half = Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_MASK, 0.5f);
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
             const U32 glass = glassTexture();
 
             idPass({ { quadA(), ID_A, Outline::PRIORITY_ROOT, blend, glass } });
             std::vector<U8> ids = read(mIdMap);
-            UNSCOPED_INFO(named(reverse, "a blended pane of glass drawn whole"));
+            UNSCOPED_INFO("a blended pane of glass drawn whole");
             REQUIRE(idAt(ids, 20, 32) == ID_A);
             std::vector<U8> px = edgePass();
-            UNSCOPED_INFO(named(reverse, "and outlined"));
+            UNSCOPED_INFO("and outlined");
             REQUIRE(red(at(px, 8, 32)));
 
             windowDepth(nullptr);
             px = worldWireframe({ { quadA(), ID_A, Outline::PRIORITY_ROOT, blend, glass } });
-            UNSCOPED_INFO(named(reverse, "and wireframed"));
+            UNSCOPED_INFO("and wireframed");
             REQUIRE(lit(px) > 0);
 
             idPass({ { quadA(), ID_A, Outline::PRIORITY_ROOT, half, glass } });
             ids = read(mIdMap);
-            UNSCOPED_INFO(named(reverse, "under a cutoff of a half it is cut away"));
+            UNSCOPED_INFO("under a cutoff of a half it is cut away");
             REQUIRE(idAt(ids, 20, 32) == 0U);
             px = edgePass();
-            UNSCOPED_INFO(named(reverse, "and not outlined"));
+            UNSCOPED_INFO("and not outlined");
             REQUIRE(black(at(px, 8, 32)));
             px = worldWireframe({ { quadA(), ID_A, Outline::PRIORITY_ROOT, half, glass } });
-            UNSCOPED_INFO(named(reverse, "nor wireframed"));
+            UNSCOPED_INFO("nor wireframed");
             REQUIRE(lit(px) == size_t(0));
         }
     }
@@ -3247,6 +3242,7 @@ namespace
         const LLColor4 BLUE(0.f, 0.f, 1.f, 1.f);
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED }, { ID_B, RED }, { ID_GLOW, GREEN }, { ID_OTHER, BLUE } }, true);
 
@@ -3267,15 +3263,16 @@ namespace
             };
             for (const auto& [name, draws] : scenes)
             {
+                INFO(name);
                 pixelIds(draws);
                 for (S32 radius : { 1, 6, 9, 17, 33 })
                 {
-                    const std::string at_radius = name + ", a reach of " + std::to_string(radius);
+                    CAPTURE(radius);
                     const std::vector<U8> rows = edgePass(glowView(radius), nullptr, false, nullptr, true);
                     const std::vector<U8> full = edgePass(glowView(radius), nullptr, true, nullptr, true);
-                    UNSCOPED_INFO(named(reverse, at_radius + ": it glows"));
+                    UNSCOPED_INFO("it glows");
                     REQUIRE(lit(rows) > 0);
-                    UNSCOPED_INFO(named(reverse, at_radius + ": as the full search draws it"));
+                    UNSCOPED_INFO("as the full search draws it");
                     REQUIRE(rows == full);
                 }
             }
@@ -3283,13 +3280,13 @@ namespace
             // Column 24 is five columns from each of the first scene's objects, column 23 four from the one on the left.
             pixelIds(scenes[0].second);
             const std::vector<U8> between = edgePass(glowView(9), nullptr, false, nullptr, true);
-            UNSCOPED_INFO(named(reverse, "as near both along a row, the lower id's colour"));
+            UNSCOPED_INFO("as near both along a row, the lower id's colour");
             REQUIRE(green(at(between, 24, 32)));
-            UNSCOPED_INFO(named(reverse, "nearer the left, its colour"));
+            UNSCOPED_INFO("nearer the left, its colour");
             REQUIRE(blue(at(between, 23, 32)));
             pixelIds(scenes[4].second);
             const std::vector<U8> across = edgePass(glowView(9), nullptr, false, nullptr, true);
-            UNSCOPED_INFO(named(reverse, "as near both along a column and a row, the lower id's colour"));
+            UNSCOPED_INFO("as near both along a column and a row, the lower id's colour");
             REQUIRE(green(at(across, 30, 30)));
 
             // Behind something in the scene over columns 0 to 20, its hidden part drawing no glow.
@@ -3297,12 +3294,12 @@ namespace
             idPass({ hoverDraw(quadA(), ID_GLOW) });
             for (S32 radius : { 6, 17 })
             {
-                const std::string at_radius = "partly hidden, a reach of " + std::to_string(radius);
+                CAPTURE(radius);
                 const std::vector<U8> rows = edgePass(glowView(radius), nullptr, false, nullptr, true);
                 const std::vector<U8> full = edgePass(glowView(radius), nullptr, true, nullptr, true);
-                UNSCOPED_INFO(named(reverse, at_radius + ": it glows"));
+                UNSCOPED_INFO("partly hidden, it glows");
                 REQUIRE(lit(rows) > 0);
-                UNSCOPED_INFO(named(reverse, at_radius + ": as the full search draws it"));
+                UNSCOPED_INFO("partly hidden, as the full search draws it");
                 REQUIRE(rows == full);
             }
         }

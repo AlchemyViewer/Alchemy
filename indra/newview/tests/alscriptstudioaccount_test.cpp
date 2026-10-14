@@ -31,6 +31,8 @@
 
 namespace
 {
+    // The account's own is taken out of a state written whole, the shape and switches left shared;
+    // a key it no longer has is taken out of the account's too.
     TEST_CASE("alscriptstudioaccount: split takes the account's own out of the state and drops what it lost", "[alscriptstudioaccount]")
     {
         LLSD state;
@@ -63,6 +65,8 @@ namespace
         REQUIRE_FALSE(mine.has("windows"));
     }
 
+    // Read: the account's own over the shared where it has kept any, a key it has not taken out;
+    // the shared as it was where it has kept none.
     TEST_CASE("alscriptstudioaccount: merged lays the account's own over the shared once it has kept any", "[alscriptstudioaccount]")
     {
         LLSD shared;

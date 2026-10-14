@@ -204,11 +204,10 @@ namespace
         ALScriptStudioCaret& caret = make();
         Doc&                 doc   = tab("a");
         const U32            v     = ask(doc, ALEditorCommand::GoToDefinition);
-        UNSCOPED_INFO("asked");
         CHECK(joined(studio.asked) == std::string("references 0:8"));
         {
             INFO("remembered");
-            REQUIRE(doc.caret->symbolCommand == ALEditorCommand::GoToDefinition);
+            CHECK(doc.caret->symbolCommand == ALEditorCommand::GoToDefinition);
             CHECK(doc.caret->symbolVersion == v);
         }
         caret.answered(doc, references(v + 1), ALTextPos(0, 8));
@@ -216,7 +215,6 @@ namespace
         UNSCOPED_INFO("of another text or place: nothing");
         REQUIRE(studio.said.empty());
         caret.answered(doc, references(v), ALTextPos(0, 8));
-        UNSCOPED_INFO("gone");
         CHECK(joined(studio.said) == std::string("go a 0:8-0:13"));
         UNSCOPED_INFO("a jump noted, for Back");
         CHECK(navigation->unit.places(false) == size_t(1));
@@ -240,17 +238,13 @@ namespace
         none.version    = v;
         none.understood = true;
         caret.answered(doc, none, ALTextPos(0, 8));
-        UNSCOPED_INFO("nothing known of it");
         CHECK(services.statuses.back() == std::string("NothingKnown [NAME]=count"));
-        UNSCOPED_INFO("not a failure");
-        REQUIRE_FALSE(services.statusFailures.back());
+        CHECK_FALSE(services.statusFailures.back());
         ask(doc, ALEditorCommand::FindReferences);
         none.understood = false;
         caret.answered(doc, none, ALTextPos(0, 8));
-        UNSCOPED_INFO("nothing read");
         CHECK(services.statuses.back() == std::string("NothingKnownBroken [NAME]=count"));
-        UNSCOPED_INFO("a failure");
-        REQUIRE(services.statusFailures.back());
+        CHECK(services.statusFailures.back());
     }
 
     TEST_CASE_METHOD(alscriptstudiocaret_data, "alscriptstudiocaret: a language word shows its reference unless the script defines it", "[alscriptstudiocaret]")
@@ -263,7 +257,6 @@ namespace
         result.version    = v;
         result.understood = true;
         caret.answered(doc, result, ALTextPos(1, 37));
-        UNSCOPED_INFO("the reference");
         CHECK(joined(studio.said) == std::string("reference llSay"));
         caret.ask(doc, ALEditorCommand::FindReferences, ALTextRange(ALTextPos(1, 37), ALTextPos(1, 42)));
         caret.answered(doc, result, ALTextPos(1, 37));
@@ -305,7 +298,6 @@ namespace
         doc.expanded.version   = v;
         ALScriptAnalysis::Result result = references(v);
         caret.answered(doc, result, ALTextPos(0, 8));
-        UNSCOPED_INFO("opened in the include");
         CHECK(joined(studio.said) == std::string("open disk:/inc.lsl inc.lsl 4:8+5"));
         UNSCOPED_INFO("a jump noted");
         CHECK(navigation->unit.places(false) == size_t(1));
@@ -313,7 +305,6 @@ namespace
         ask(doc, ALEditorCommand::FindReferences);
         result.references.references = { span(0, 8, 5), span(2, 26, 5), span(7, 0, 5) };
         caret.answered(doc, result, ALTextPos(0, 8));
-        UNSCOPED_INFO("the lookup started");
         CHECK(started(doc) == "find in a declared disk:/inc.lsl@4 v" + std::to_string(v));
         UNSCOPED_INFO("the places that map");
         REQUIRE(doc.lookup->places.size() == size_t(2));
@@ -321,15 +312,15 @@ namespace
         {
             INFO("the include's, as held");
             REQUIRE(included);
-            REQUIRE(included->fileName == "inc.lsl");
-            REQUIRE(included->text == "integer count; // held");
+            CHECK(included->fileName == "inc.lsl");
+            CHECK(included->text == "integer count; // held");
             CHECK(included->at == 6);
         }
         const Doc::Place* own = placeIn(doc, std::string());
         {
             INFO("the script's own, as typed");
             REQUIRE(own);
-            REQUIRE(own->span.line == 1);
+            CHECK(own->span.line == 1);
             CHECK(own->at == 26);
         }
         studio.held.clear();
@@ -339,12 +330,11 @@ namespace
         {
             INFO("the include not held: the expansion's line");
             REQUIRE(included);
-            REQUIRE(included->text == "integer count;");
+            CHECK(included->text == "integer count;");
             CHECK(included->at == -1);
         }
         UNSCOPED_INFO("where the include has it");
         CHECK(included->span.line == 4);
-        UNSCOPED_INFO("to rename");
         CHECK(started(doc).find("rename in a") == 0);
 
         doc.expanded.version = v + 7;
@@ -378,7 +368,6 @@ namespace
         doc.editor->setCaret(ALTextPos(0, 10));
         doc.editor->setHighlights(ALCodeEditor::Highlight::References, { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), ALTextRange(ALTextPos(1, 26), ALTextPos(1, 31)) });
         caret.pump(10.0);
-        UNSCOPED_INFO("told");
         CHECK(joined(studio.said) == std::string("path 0:10"));
         UNSCOPED_INFO("the places kept while it is on one");
         REQUIRE(doc.editor->highlights().size() == 2);
@@ -393,7 +382,7 @@ namespace
         CHECK(joined(studio.asked) == std::string("inspect 0:8"));
         {
             INFO("remembered");
-            REQUIRE(doc.caret->inspectAt == ALTextPos(0, 8));
+            CHECK(doc.caret->inspectAt == ALTextPos(0, 8));
             CHECK(doc.caret->inspectVersion == doc.editor->document().version());
         }
         doc.editor->setCaret(ALTextPos(0, 12));
@@ -441,7 +430,6 @@ namespace
         doc.loaded   = true;
         doc.notecard = true;
         caret.pump(1.0);
-        UNSCOPED_INFO("nothing");
         REQUIRE(studio.said.empty());
         doc.notecard       = false;
         doc.expandedEditor = editor("expanded_a", "integer count;\n");
@@ -484,7 +472,6 @@ namespace
         UNSCOPED_INFO("brought out: asked");
         CHECK(joined(studio.asked) == std::string("inspect 0:8"));
         caret.pump(22.0);
-        UNSCOPED_INFO("once");
         REQUIRE(studio.asked.size() == size_t(1));
     }
 
@@ -564,7 +551,7 @@ namespace
         CHECK(studio.asked.back() == std::string("inspect 1:26"));
         {
             INFO("which is what it was last told");
-            REQUIRE(doc.caret->inspectAt == ALTextPos(1, 26));
+            CHECK(doc.caret->inspectAt == ALTextPos(1, 26));
             CHECK(doc.caret->inspectDue == 0.0);
         }
     }
@@ -603,7 +590,6 @@ namespace
         result.references.definitionFile    = "disk:/lib/util.luau";
         result.references.references        = { span(1, 8, 5) };
         caret.answered(doc, result, ALTextPos(0, 8));
-        UNSCOPED_INFO("opened in the module");
         CHECK(joined(studio.said) == std::string("open disk:/lib/util.luau util.luau 3:11+5"));
         UNSCOPED_INFO("a jump noted");
         CHECK(navigation->unit.places(false) == size_t(1));
@@ -672,7 +658,6 @@ namespace
         result.references.references        = { span(1, 26, 5) };
         result.references.elsewhere         = { { "held", span(4, 8, 5) }, { "other", span(1, 12, 5) }, { "gone", span(0, 0, 5) } };
         caret.answered(doc, result, ALTextPos(0, 8));
-        UNSCOPED_INFO("declared in the held module");
         CHECK(started(doc) == "find in a declared disk:/held.luau@4 v" + std::to_string(v));
         UNSCOPED_INFO("the script's, each module's; none of a module not had");
         REQUIRE(doc.lookup->places.size() == size_t(3));
@@ -680,21 +665,21 @@ namespace
         {
             INFO("as the file reads");
             REQUIRE(held);
-            REQUIRE(held->fileName == "held.luau");
-            REQUIRE(held->text == "integer count; // held");
+            CHECK(held->fileName == "held.luau");
+            CHECK(held->text == "integer count; // held");
             CHECK(held->at == 6);
         }
         const Doc::Place* other = placeIn(doc, "disk:/other.luau");
         {
             INFO("as the module's text read, the name not placed");
             REQUIRE(other);
-            REQUIRE(other->fileName == "other.luau");
-            REQUIRE(other->text == "return util.count");
+            CHECK(other->fileName == "other.luau");
+            CHECK(other->text == "return util.count");
             CHECK(other->at == -1);
         }
         {
             INFO("in the module's lines");
-            REQUIRE(other->span.line == 1);
+            CHECK(other->span.line == 1);
             CHECK(other->span.column == 12);
         }
 

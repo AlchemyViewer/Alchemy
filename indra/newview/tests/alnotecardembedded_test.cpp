@@ -198,7 +198,7 @@ namespace
         {
             INFO("C, then A; B left behind");
             REQUIRE(items.size() == 2);
-            REQUIRE(items[0] == c);
+            CHECK(items[0] == c);
             CHECK(items[1] == a);
         }
         UNSCOPED_INFO("the editor's own text as it was");
@@ -211,9 +211,7 @@ namespace
         make("text\n");
         const LLRect    rect  = view->textRect();
         const ALTextPos where = view->posAtLocal(rect.mLeft + 1, rect.mTop - 2, true);
-        UNSCOPED_INFO("taken");
         CHECK(drop(a, true) == ACCEPT_YES_COPY_MULTI);
-        UNSCOPED_INFO("taken");
         CHECK(drop(b, true) == ACCEPT_YES_COPY_MULTI);
         const std::string line = view->document().line(where.line);
         UNSCOPED_INFO("A, then B after it");
@@ -227,7 +225,6 @@ namespace
         drop(c, true);
         UNSCOPED_INFO("a new frame's drop lands where the pointer is");
         CHECK(view->document().line(where.line).substr(where.column, 4) == at(2));
-        UNSCOPED_INFO("three carried");
         REQUIRE(tab->items().size() == size_t(3));
         UNSCOPED_INFO("one undo takes the last away");
         CHECK(view->undoJournal().canUndo());
@@ -284,7 +281,7 @@ namespace
         REQUIRE(world.copies.empty());
         {
             INFO("one saved: asked");
-            REQUIRE(card.copy(saved, LLUUID::null));
+            CHECK(card.copy(saved, LLUUID::null));
             REQUIRE(world.copies.size() == 1);
             CHECK(world.copies.back() == saved->getUUID());
         }
@@ -335,7 +332,7 @@ namespace
         REQUIRE(back[1].isNull());
         {
             INFO("the rest as they were");
-            REQUIRE(back[0]->getUUID() == a->getUUID());
+            CHECK(back[0]->getUUID() == a->getUUID());
             CHECK(back[2]->getName() == "B");
         }
     }
@@ -402,7 +399,7 @@ namespace
         ALNotecardEmbedded& card = make("above\nhere " + at(0) + " it is\nbelow\n", { item("A") });
         (void)card;
         const S32 text_h = view->layout().rowHeight();
-        UNSCOPED_INFO("a row an inventory icon is taller than: " + std::to_string(text_h));
+        UNSCOPED_INFO("a row an inventory icon is taller than: " << text_h);
         CHECK(text_h < 16 + 4);
         view->placeAtomViews();
         UNSCOPED_INFO("the item's line: the icon, a pixel either side, and a pixel off the rows");

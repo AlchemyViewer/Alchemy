@@ -179,7 +179,7 @@ namespace
         }
 
         // An entry another session left for a tab's script.
-        Entry leftFor(const Doc& doc, const std::string& text, const std::string& session = "old-session")
+        Entry require_left_for(const Doc& doc, const std::string& text, const std::string& session = "old-session")
         {
             ALRecoveryStore other(folder, session);
             Entry                 entry = ALScriptStudioRecovery::entryOf(doc);
@@ -222,11 +222,8 @@ namespace
         type(a, "// one");
         type(a, " two");
         const Entry entry = ALScriptStudioRecovery::entryOf(a);
-        {
-            INFO("the text");
-            CHECK(entry.text == "default {}\n// one two");
-            CHECK(entry.key == a.recoveryKey);
-        }
+        CHECK(entry.text == "default {}\n// one two");
+        CHECK(entry.key == a.recoveryKey);
         {
             INFO("where it came from");
             CHECK(entry.object == a.ref.object);
@@ -234,34 +231,24 @@ namespace
             CHECK(entry.name == "a");
             CHECK_FALSE(entry.notecard);
         }
-        {
-            INFO("the caret");
-            CHECK(entry.caretLine == 1);
-            CHECK(entry.caretColumn == 10);
-        }
+        CHECK(entry.caretLine == 1);
+        CHECK(entry.caretColumn == 10);
         {
             INFO("and the steps, as the journal writes them");
-            REQUIRE(entry.historyOf().isMap());
+            CHECK(entry.historyOf().isMap());
             REQUIRE_FALSE(entry.historyWritten.empty());
         }
 
         Doc& b = tab("b", "default {}\n", a.ref);
-        UNSCOPED_INFO("put back");
         CHECK(r.restoreHistory(b, entry));
-        {
-            INFO("its text");
-            REQUIRE(b.editor->text() == entry.text);
-            CHECK(b.editor->isDirty());
-        }
-        {
-            INFO("its caret");
-            REQUIRE(b.editor->caret().line == 1);
-            CHECK(b.editor->caret().column == 10);
-        }
+        CHECK(b.editor->text() == entry.text);
+        CHECK(b.editor->isDirty());
+        CHECK(b.editor->caret().line == 1);
+        CHECK(b.editor->caret().column == 10);
         b.editor->undo();
         {
             INFO("and the steps that led to it, to take back");
-            REQUIRE(b.editor->text() != entry.text);
+            CHECK(b.editor->text() != entry.text);
             CHECK(b.editor->text().starts_with("default {}\n"));
         }
         UNSCOPED_INFO("the tabs told");
@@ -275,7 +262,7 @@ namespace
         wrong.text  = "not where the steps lead\n";
         {
             INFO("nor where the history is not of its text");
-            REQUIRE_FALSE(r.restoreHistory(c, wrong));
+            CHECK_FALSE(r.restoreHistory(c, wrong));
             CHECK(c.editor->text() == "something else\n");
         }
     }
@@ -290,11 +277,8 @@ namespace
             CHECK(keptFor(doc.recoveryKey) == 0);
         }
         type(doc, "y");
-        {
-            INFO("kept");
-            CHECK(r.keep(doc));
-            CHECK(keptFor(doc.recoveryKey) == 1);
-        }
+        CHECK(r.keep(doc));
+        CHECK(keptFor(doc.recoveryKey) == 1);
         doc.editor->resetDirty();
         {
             INFO("clean again: forgotten");
@@ -302,7 +286,7 @@ namespace
             CHECK(keptFor(doc.recoveryKey) == 0);
         }
 
-        doc.recovering = leftFor(doc, "an old session's");
+        doc.recovering = require_left_for(doc, "an old session's");
         UNSCOPED_INFO("the old session's there");
         CHECK(keptFor(doc.recoveryKey, "old-session") == 1);
         type(doc, "z");
@@ -336,15 +320,11 @@ namespace
         ALRecoveryStore nowhere(blocked, "this-session");
         ALRecovery::useStore(&nowhere);
         type(doc, "y");
-        UNSCOPED_INFO("not kept");
         CHECK_FALSE(r.keep(doc));
-        {
-            INFO("said");
-            REQUIRE(services().reports.size() == 1);
-            CHECK(services().reports[0].failure);
-            CHECK(services().reports[0].doc == "a");
-            REQUIRE(services().reports[0].text.find("a") != std::string::npos);
-        }
+        REQUIRE(services().reports.size() == 1);
+        CHECK(services().reports[0].failure);
+        CHECK(services().reports[0].doc == "a");
+        CHECK(services().reports[0].text.find("a") != std::string::npos);
         type(doc, "z");
         {
             INFO("not said again");
@@ -381,12 +361,12 @@ namespace
     {
         ALScriptStudioRecovery& r   = make();
         Doc&                    doc = tab("a", "old\n");
-        const Entry             kept = leftFor(doc, "kept\n");
+        const Entry             kept = require_left_for(doc, "kept\n");
         doc.loaded                   = false;
         r.takeUp(doc, kept);
         {
             INFO("waiting");
-            REQUIRE(doc.carriedText == std::optional<std::string>("kept\n"));
+            CHECK(doc.carriedText == std::optional<std::string>("kept\n"));
             REQUIRE(doc.recovering);
             CHECK(doc.editor->text() == "old\n");
         }
@@ -395,12 +375,9 @@ namespace
         doc.carriedText.reset();
         doc.recovering.reset();
         r.takeUp(doc, kept);
-        {
-            INFO("in");
-            REQUIRE(doc.editor->text() == "kept\n");
-            CHECK(doc.editor->isDirty());
-            REQUIRE_FALSE(doc.carriedText);
-        }
+        CHECK(doc.editor->text() == "kept\n");
+        CHECK(doc.editor->isDirty());
+        REQUIRE_FALSE(doc.carriedText);
         {
             INFO("kept by this session, the old entry let go of");
             CHECK(keptFor(doc.recoveryKey) == 1);
@@ -414,7 +391,7 @@ namespace
 
         Doc& locked      = tab("b", "locked\n");
         locked.modifiable = false;
-        r.takeUp(locked, leftFor(locked, "kept too\n"));
+        r.takeUp(locked, require_left_for(locked, "kept too\n"));
         {
             INFO("held on its own");
             REQUIRE(studio().became.size() == 1);
@@ -517,10 +494,9 @@ namespace
         type(mine, "b");
         r.keep(mine);
         Doc&        theirs = tab("theirs", "c\n");
-        const Entry left   = leftFor(theirs, "left\n");
+        const Entry left   = require_left_for(theirs, "left\n");
         Doc&        gone   = tab("gone", "d\n");
         type(gone, "e");
-        UNSCOPED_INFO("set aside");
         CHECK(r.setAside(gone));
         r.show();
         UNSCOPED_INFO("theirs and what was set aside");
@@ -644,7 +620,6 @@ namespace
         Doc&                    clean = tab("c", "three\n");
         type(a, "x");
         type(b, "y");
-        UNSCOPED_INFO("kept");
         CHECK(r.keepAll({ &a, &b, &clean }, Entry::State::Kept));
         {
             INFO("both written");
@@ -668,12 +643,11 @@ namespace
         ALRecovery::useStore(&nowhere);
         type(a, "z");
         type(b, "w");
-        UNSCOPED_INFO("not kept");
         CHECK_FALSE(r.keepAll({ &a, &b }));
         {
             INFO("each said once");
             REQUIRE(services().reports.size() == 2);
-            REQUIRE(a.recovery->failed);
+            CHECK(a.recovery->failed);
             CHECK(b.recovery->failed);
         }
         ALRecovery::useStore(store.get());
@@ -684,11 +658,8 @@ namespace
         ALScriptStudioRecovery& r = make();
         Doc&                    a = tab("a", "one\n");
         type(a, "x");
-        {
-            INFO("kept");
-            CHECK(r.keep(a));
-            CHECK(keptFor(a.recoveryKey) == 1);
-        }
+        CHECK(r.keep(a));
+        CHECK(keptFor(a.recoveryKey) == 1);
         // Taken away behind its back: not written again while nothing moved.
         for (const Entry& entry : store->list())
         {
@@ -736,11 +707,8 @@ namespace
         Entry                 lost = entry("item:lost", "typed, then a crash");
         Entry                 kept = entry("item:kept", "kept for next time");
         kept.state                 = Entry::State::Kept;
-        {
-            INFO("written");
-            CHECK(earlier.write(lost));
-            CHECK(earlier.write(kept));
-        }
+        CHECK(earlier.write(lost));
+        CHECK(earlier.write(kept));
         const ALRecovery::Offers closed = ALRecovery::offersAt(*store, false);
         {
             INFO("both offered");
@@ -777,7 +745,6 @@ namespace
             CHECK(written.pickedTarget == std::optional<std::string>("lsl2"));
             CHECK(written.pickedExperience == std::optional<LLUUID>(experience));
         }
-        UNSCOPED_INFO("kept");
         CHECK(r.keep(a));
         std::optional<Entry> back = store->leftFor(a.recoveryKey);
         UNSCOPED_INFO("not another session's");
@@ -868,11 +835,8 @@ namespace
         ALScriptStudioRecovery& r = make();
         Doc&                    a = tab("a", "one\n");
         type(a, "x");
-        {
-            INFO("kept");
-            CHECK(r.keep(a));
-            CHECK(keptFor(a.recoveryKey) == 1);
-        }
+        CHECK(r.keep(a));
+        CHECK(keptFor(a.recoveryKey) == 1);
         const std::string was = a.recoveryKey;
         ALScriptStudioRecovery::rekey(a, ALRecoveryStore::keyOf(LLUUID::null, LLUUID::null, "/somewhere/a.lsl"));
         store->flush();
@@ -928,7 +892,6 @@ namespace
         ALRecovery::keepSaved(save("task:p:old", "a", 20.0));
         ALRecovery::keepSaved(save("task:p:new", "b", 10.0), "task:p:old");
         written();
-        UNSCOPED_INFO("kept");
         REQUIRE(history->list("item:x").size() == 1U);
         UNSCOPED_INFO("the old item's moved");
         REQUIRE(history->list("task:p:old").empty());

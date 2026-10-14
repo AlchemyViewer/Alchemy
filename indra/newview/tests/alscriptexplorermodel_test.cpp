@@ -230,13 +230,10 @@ namespace
         {
             INFO("an object by a prim of it, listed by its root");
             CHECK(model.objects().back().root == table);
-            REQUIRE(model.objects().back().prims.size() == 3);
+            CHECK(model.objects().back().prims.size() == 3);
         }
-        {
-            INFO("listed prims");
-            CHECK(model.listed(id(22)));
-            CHECK_FALSE(model.listed(id(90)));
-        }
+        CHECK(model.listed(id(22)));
+        CHECK_FALSE(model.listed(id(90)));
         {
             INFO("what coming or going concerns: a listed prim, a pin away");
             CHECK(model.concerns(id(22)));
@@ -260,7 +257,6 @@ namespace
         UNSCOPED_INFO("what a prim holds not known yet, a folder of it may still be opened");
         CHECK_FALSE(model.rows(std::string()).front().known);
         holds(chair, { "sit.lsl", "readme" });
-        UNSCOPED_INFO("known");
         CHECK(model.rows(std::string()).front().known);
         CHECK(rows() == std::string("O:Chair I:sit.lsl I:readme"));
         list();
@@ -284,13 +280,13 @@ namespace
         holds(id(12), {});
         holds(id(13), {});
         UNSCOPED_INFO("the root, empty, stays first; the two others holding nothing go under one row, folded; one not answered stays");
-        CHECK(rows() ==
+        REQUIRE(rows() ==
                       std::string("O:House P:House P:House.1 I:door.lsl P:House.4 E:2+ P:House.2 P:House.3"));
         const std::vector<Model::Row> all   = model.rows(std::string());
         const Model::Row&             group = all[all.size() - 3];
         {
             INFO("the row of them is of no prim to act on or drop into");
-            REQUIRE_FALSE(Model::Choice::of(group.value));
+            CHECK_FALSE(Model::Choice::of(group.value));
             CHECK(Model::primOf(group.value).isNull());
         }
         UNSCOPED_INFO("opened, it asks only to be filled again");
@@ -331,7 +327,6 @@ namespace
         UNSCOPED_INFO("an object by its name, with every prim, the empty ones by name");
         CHECK(rows("house") ==
                       std::string("O:House P:House I:main.lsl P:House.1 I:door.lsl I:notes P:House.2 P:House.3"));
-        UNSCOPED_INFO("nothing");
         CHECK(rows("zzz") == std::string());
     }
 
@@ -350,26 +345,23 @@ namespace
         {
             INFO("a folded prim is listed, folded, what it holds not known");
             REQUIRE(one);
-            REQUIRE(one->folded);
+            CHECK(one->folded);
             CHECK_FALSE(one->known);
         }
         UNSCOPED_INFO("the linkset's own row is known: its prims are");
         CHECK(all.front().known);
-        {
-            INFO("which");
-            CHECK(asked[0] == id(100));
-            CHECK(asked[1] == id(105));
-        }
+        CHECK(asked[0] == id(100));
+        CHECK(asked[1] == id(105));
         UNSCOPED_INFO("asked, not again until answered");
-        REQUIRE(ask(false, false).empty());
+        CHECK(ask(false, false).empty());
         UNSCOPED_INFO("a filter looks through the rest");
-        REQUIRE(ask(false, true).size() == count - 2);
+        CHECK(ask(false, true).size() == count - 2);
         UNSCOPED_INFO("a refetch asks them all again");
-        REQUIRE(ask(true, true).size() == count);
+        CHECK(ask(true, true).size() == count);
 
         holds(id(100), { "core.lsl" });
         UNSCOPED_INFO("answered and current: not asked");
-        REQUIRE(ask(false, false).empty());
+        CHECK(ask(false, false).empty());
         stale.insert(id(100));
         std::vector<LLUUID> again = ask(false, false);
         {
@@ -403,7 +395,7 @@ namespace
         {
             INFO("not listed yet, nothing opens");
             CHECK(heard.listed);
-            REQUIRE(heard.opening.empty());
+            CHECK(heard.opening.empty());
         }
         UNSCOPED_INFO("the script asked whether it runs");
         CHECK(askedRunning == std::vector<ALScriptRef>{ ALScriptRef(chair, id(500)) });
@@ -422,18 +414,18 @@ namespace
             CHECK(askedRunning[1].item == id(501));
         }
         heard = feed(contents);
-        UNSCOPED_INFO("once");
-        REQUIRE(heard.opening.empty());
+        UNSCOPED_INFO("opened once only");
+        CHECK(heard.opening.empty());
         UNSCOPED_INFO("a prim not listed is no answer");
         CHECK_FALSE(model.contents(ALScriptContents{ id(77) }).listed);
         {
             INFO("what runs, known");
             CHECK(model.knownRunning(ALScriptRef(chair, id(500))) == std::optional<bool>(true));
-            REQUIRE_FALSE(model.knownRunning(ALScriptRef(chair, id(501))));
+            CHECK_FALSE(model.knownRunning(ALScriptRef(chair, id(501))));
         }
         model.forgetRunning();
         UNSCOPED_INFO("let go of for the listed prims, to be asked again");
-        REQUIRE_FALSE(model.knownRunning(ALScriptRef(chair, id(500))));
+        CHECK_FALSE(model.knownRunning(ALScriptRef(chair, id(500))));
     }
 
     TEST_CASE_METHOD(alscriptexplorermodel_data, "alscriptexplorermodel: chosen rows reach their prims and scripts and count each script once", "[alscriptexplorermodel]")
@@ -453,7 +445,7 @@ namespace
             CHECK(whole.prim == house);
         }
         UNSCOPED_INFO("every prim of it");
-        REQUIRE(model.containerPrims({ whole }).size() == size_t(3));
+        CHECK(model.containerPrims({ whole }).size() == size_t(3));
         UNSCOPED_INFO("each script once");
         CHECK(model.scriptsReached({ whole }) == 3);
 
@@ -535,11 +527,8 @@ namespace
         holds(id(10), { "a.lsl" });
         holds(id(11), { "b.lsl" });
         holds(chair, {});
-        {
-            INFO("folded");
-            CHECK(model.fold(house, false) == Model::Refold::Refill);
-            CHECK(model.folded(house));
-        }
+        CHECK(model.fold(house, false) == Model::Refold::Refill);
+        CHECK(model.folded(house));
         CHECK(rows() == std::string("O:House+ P:House I:a.lsl P:House.1 I:b.lsl O:Chair"));
         {
             INFO("a prim revealed unfolds what holds it, and was asked what it holds");
@@ -557,14 +546,14 @@ namespace
         model.pin({ *Model::Choice::of(all[0].value), *Model::Choice::of(rowNamed(all, "b.lsl")->value), *Model::Choice::of(rowNamed(all, "Chair")->value) });
         {
             INFO("both pinned, each once");
-            REQUIRE(model.pins().size() == 2);
+            CHECK(model.pins().size() == 2);
             CHECK(model.isPinned(house));
             CHECK(model.isPinned(chair));
         }
         model.pin({ *Model::Choice::of(rowNamed(all, "Chair")->value) });
         {
             INFO("let go");
-            REQUIRE(model.pins().size() == 1);
+            CHECK(model.pins().size() == 1);
             CHECK_FALSE(model.isPinned(chair));
         }
     }
@@ -575,11 +564,11 @@ namespace
         selected           = { house };
         list();
         UNSCOPED_INFO("both asked first");
-        REQUIRE(ask(false, false).size() == size_t(2));
+        CHECK(ask(false, false).size() == size_t(2));
         holds(id(10), { "a.lsl" });
         holds(id(11), {});
         UNSCOPED_INFO("known and current: nothing asked");
-        REQUIRE(ask(false, false).empty());
+        CHECK(ask(false, false).empty());
         model.askRegion(id(11));
         UNSCOPED_INFO("the one dropped into, though its object says current");
         CHECK(ask(false, false) == std::vector<LLUUID>({ id(11) }));
@@ -596,7 +585,7 @@ namespace
         model.doneAskingRegion();
         {
             INFO("let go of: as any other");
-            REQUIRE(ask(false, false).empty());
+            CHECK(ask(false, false).empty());
             CHECK_FALSE(model.asksRegion(id(11)));
         }
     }
@@ -637,14 +626,11 @@ namespace
         CHECK(model.fold(id(205), true, false) == Model::Refold::None);
         model.renamed(id(203), "Middle");
         UNSCOPED_INFO("renamed in place");
-        REQUIRE(rowNamed(model.rows(std::string()), "Middle") != nullptr);
+        CHECK(rowNamed(model.rows(std::string()), "Middle") != nullptr);
         UNSCOPED_INFO("named by its root");
         CHECK(model.nameOf(big) == std::string("Big"));
-        {
-            INFO("present");
-            CHECK(model.present(big));
-            CHECK_FALSE(model.present(id(203)));
-        }
+        CHECK(model.present(big));
+        CHECK_FALSE(model.present(id(203)));
     }
 
     TEST_CASE_METHOD(alscriptexplorermodel_data, "alscriptexplorermodel: link numbers and the permissions of items and prims", "[alscriptexplorermodel]")
@@ -671,7 +657,7 @@ namespace
         {
             INFO("the second prim is link 2");
             REQUIRE(hinge);
-            REQUIRE(hinge->kind == Model::Row::Kind::Prim);
+            CHECK(hinge->kind == Model::Row::Kind::Prim);
             CHECK(hinge->link == 2);
         }
         const Model::Row* latch = rowNamed(all, "House.2");
@@ -688,7 +674,7 @@ namespace
         {
             INFO("no modify, no copy");
             REQUIRE(item);
-            REQUIRE(item->noModify);
+            CHECK(item->noModify);
             CHECK(item->noCopy);
         }
         {
@@ -721,7 +707,7 @@ namespace
             INFO("pinned with its place");
             REQUIRE(pin);
             REQUIRE(pin->position);
-            REQUIRE(pin->position->mdV[VZ] == 30.0);
+            CHECK(pin->position->mdV[VZ] == 30.0);
             CHECK(pin->region == "Ahern");
         }
 
@@ -730,7 +716,7 @@ namespace
         list();
         {
             INFO("a step is no new place");
-            REQUIRE_FALSE(model.takePinsChanged());
+            CHECK_FALSE(model.takePinsChanged());
             CHECK(model.pinOf(house)->position->mdV[VX] == 256010.0);
         }
         world[house].position = LLVector3d(256000.0 + 100.0, 256000.0 + 20.0, 30.0);
@@ -738,7 +724,7 @@ namespace
         list();
         {
             INFO("far, and elsewhere: kept, and said");
-            REQUIRE(model.takePinsChanged());
+            CHECK(model.takePinsChanged());
             CHECK(model.pinOf(house)->region == "Morris");
         }
 
@@ -750,7 +736,7 @@ namespace
         {
             INFO("read back");
             REQUIRE(again.pinOf(house));
-            REQUIRE(again.pinOf(house)->position);
+            CHECK(again.pinOf(house)->position);
             CHECK(again.pinOf(house)->region == "Morris");
         }
         world.clear();
@@ -815,19 +801,19 @@ namespace
         {
             INFO("two scripts, in their order");
             REQUIRE(pair);
-            REQUIRE(pair->first.ref() == here.ref());
+            CHECK(pair->first.ref() == here.ref());
             CHECK(pair->second.ref() == there.ref());
         }
         UNSCOPED_INFO("not a script and a notecard");
-        REQUIRE_FALSE(Model::comparing({ here, notes }));
+        CHECK_FALSE(Model::comparing({ here, notes }));
         UNSCOPED_INFO("not one");
-        REQUIRE_FALSE(Model::comparing({ here }));
+        CHECK_FALSE(Model::comparing({ here }));
         UNSCOPED_INFO("not three");
-        REQUIRE_FALSE(Model::comparing({ here, there, blink }));
+        CHECK_FALSE(Model::comparing({ here, there, blink }));
         UNSCOPED_INFO("not a prim");
-        REQUIRE_FALSE(Model::comparing({ here, prim }));
+        CHECK_FALSE(Model::comparing({ here, prim }));
         UNSCOPED_INFO("not the same twice");
-        REQUIRE_FALSE(Model::comparing({ here, here }));
+        CHECK_FALSE(Model::comparing({ here, here }));
 
         const std::vector<Model::Choice> others = model.comparableWith(here);
         std::string                      said;
@@ -839,9 +825,9 @@ namespace
         CHECK(said ==
                       "Door" + std::string(Model::PLACE_SEPARATOR) + "Door.1/open.lsl Lamp/open.lsl Lamp/blink.lsl");
         UNSCOPED_INFO("a notecard's are notecards");
-        REQUIRE(model.comparableWith(notes).size() == 1U);
+        CHECK(model.comparableWith(notes).size() == 1U);
         UNSCOPED_INFO("a prim compares with nothing");
-        REQUIRE(model.comparableWith(prim).empty());
+        CHECK(model.comparableWith(prim).empty());
         UNSCOPED_INFO("a root's place is its object");
         CHECK(model.placeOf(here) == std::string("Door"));
         UNSCOPED_INFO("a child's has its prim");

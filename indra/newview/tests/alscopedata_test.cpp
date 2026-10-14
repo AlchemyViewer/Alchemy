@@ -104,13 +104,9 @@ namespace
     // A fresh object measures nothing and reports nothing.
     TEST_CASE_METHOD(scope_data, "ALScopeData: a fresh object measures nothing and reports nothing", "[ALScopeData]")
     {
-        UNSCOPED_INFO("starts empty");
         CHECK(mScope.isEmpty());
-        UNSCOPED_INFO("no samples");
         CHECK(mScope.getSampleCount() == 0);
-        UNSCOPED_INFO("no peak");
         CHECK_THAT(mScope.getPeak(ALScopeData::CH_LUMA), ll_test::WithinBits(0.f, 6));
-        UNSCOPED_INFO("no bins");
         CHECK_THAT(binSum(mScope, ALScopeData::CH_RED), ll_test::WithinBits(0.f, 6));
     }
 
@@ -120,13 +116,9 @@ namespace
         const std::vector<U8> px = flat(64, 128, 192, 100);
         mScope.accumulate(px.data(), 100, 1);
 
-        UNSCOPED_INFO("sample count");
         CHECK(mScope.getSampleCount() == 100);
-        UNSCOPED_INFO("all red in bin 64");
         CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 64), ll_test::WithinBits(1.f, 5));
-        UNSCOPED_INFO("all green in bin 128");
         CHECK_THAT(mScope.getBin(ALScopeData::CH_GREEN, 128), ll_test::WithinBits(1.f, 5));
-        UNSCOPED_INFO("all blue in bin 192");
         CHECK_THAT(mScope.getBin(ALScopeData::CH_BLUE, 192), ll_test::WithinBits(1.f, 5));
         UNSCOPED_INFO("nothing anywhere else");
         CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 65), ll_test::WithinBits(0.f, 6));
@@ -140,7 +132,7 @@ namespace
 
         for (S32 c = 0; c < ALScopeData::CH_COUNT; ++c)
         {
-            UNSCOPED_INFO("bins sum to 1");
+            CAPTURE(c);
             REQUIRE_THAT(binSum(mScope, (ALScopeData::EChannel)c), ll_test::WithinBits(1.f, 4));
         }
         UNSCOPED_INFO("a flat ramp peaks at 1/256");
@@ -161,7 +153,7 @@ namespace
 
         for (S32 i = 0; i < ALScopeData::BIN_COUNT; ++i)
         {
-            UNSCOPED_INFO("size independent");
+            CAPTURE(i);
             REQUIRE_THAT(small_sample.getBin(ALScopeData::CH_RED, i),
                                         ll_test::WithinBits(large_sample.getBin(ALScopeData::CH_RED, i), 5));
         }
@@ -182,9 +174,7 @@ namespace
         grey.accumulate(n.data(), 16, 1);
 
         // 0.7152 * 255 = 182.4; 0.0722 * 255 = 18.4
-        UNSCOPED_INFO("green luma");
         CHECK_THAT(green.getBin(ALScopeData::CH_LUMA, 182), ll_test::WithinBits(1.f, 5));
-        UNSCOPED_INFO("blue luma");
         CHECK_THAT(blue.getBin(ALScopeData::CH_LUMA, 18), ll_test::WithinBits(1.f, 5));
         UNSCOPED_INFO("grey is its own luma");
         CHECK_THAT(grey.getBin(ALScopeData::CH_LUMA, 137), ll_test::WithinBits(1.f, 5));
@@ -203,7 +193,6 @@ namespace
 
         UNSCOPED_INFO("white luma is 255");
         CHECK_THAT(white.getBin(ALScopeData::CH_LUMA, ALScopeData::BIN_COUNT - 1), ll_test::WithinBits(1.f, 5));
-        UNSCOPED_INFO("black luma is 0");
         CHECK_THAT(black.getBin(ALScopeData::CH_LUMA, 0), ll_test::WithinBits(1.f, 5));
     }
 
@@ -217,9 +206,7 @@ namespace
         for (S32 i = 0; i < 60; ++i) { px.insert(px.end(), { 128, 128, 128, 255 }); }
         mScope.accumulate(px.data(), 100, 1);
 
-        UNSCOPED_INFO("10% blown");
         CHECK_THAT(mScope.getClippedHigh(ALScopeData::CH_RED), ll_test::WithinBits(0.10f, 4));
-        UNSCOPED_INFO("30% crushed");
         CHECK_THAT(mScope.getClippedLow(ALScopeData::CH_RED), ll_test::WithinBits(0.30f, 4));
         UNSCOPED_INFO("luma agrees on the blown share");
         CHECK_THAT(mScope.getClippedHigh(ALScopeData::CH_LUMA), ll_test::WithinBits(0.10f, 4));
@@ -234,9 +221,7 @@ namespace
         px[0] = px[1] = px[2] = 255;
         mScope.accumulate(px.data(), 10000, 1);
 
-        UNSCOPED_INFO("one blown pixel is visible");
         CHECK(mScope.getClippedHigh(ALScopeData::CH_RED) > 0.f);
-        UNSCOPED_INFO("and it is 1 in 10000");
         CHECK_THAT(mScope.getClippedHigh(ALScopeData::CH_RED), ll_test::WithinBits(0.0001f, 6));
     }
 
@@ -261,7 +246,6 @@ namespace
     {
         const std::vector<U8> px = flat(60, 60, 60, 8);
         mScope.accumulate(px.data(), 8, 1);
-        UNSCOPED_INFO("measured");
         CHECK_FALSE(mScope.isEmpty());
 
         mScope.accumulate(px.data(), 0, 1);
@@ -288,7 +272,6 @@ namespace
         fresh.accumulate(px.data(), 20, 1);
 
         mScope.blendToward(fresh, 0.25f);
-        UNSCOPED_INFO("taken whole");
         CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 90), ll_test::WithinBits(1.f, 5));
         UNSCOPED_INFO("count carried");
         CHECK(mScope.getSampleCount() == 20);
@@ -340,7 +323,7 @@ namespace
             const F32 peak = mScope.getPeak(ch);
             for (S32 i = 0; i < ALScopeData::BIN_COUNT; ++i)
             {
-                UNSCOPED_INFO("no bin exceeds the peak");
+                CAPTURE(c, i);
                 REQUIRE(mScope.getBin(ch, i) <= peak + 1e-6f);
             }
         }
@@ -355,7 +338,6 @@ namespace
 
         const ALScopeData nothing;
         mScope.blendToward(nothing, 0.5f);
-        UNSCOPED_INFO("unchanged");
         CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 150), ll_test::WithinBits(1.f, 5));
     }
 
@@ -365,13 +347,9 @@ namespace
         const std::vector<U8> px = flat(1, 2, 3, 4);
         mScope.accumulate(px.data(), 4, 1);
 
-        UNSCOPED_INFO("negative bin");
         CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, -1), ll_test::WithinBits(0.f, 6));
-        UNSCOPED_INFO("past the end");
         CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, ALScopeData::BIN_COUNT), ll_test::WithinBits(0.f, 6));
-        UNSCOPED_INFO("bad channel");
         CHECK_THAT(mScope.getBin((ALScopeData::EChannel)99, 0), ll_test::WithinBits(0.f, 6));
-        UNSCOPED_INFO("bad channel peak");
         CHECK_THAT(mScope.getPeak((ALScopeData::EChannel)-3), ll_test::WithinBits(0.f, 6));
     }
     // --- vectorscope ---------------------------------------------------------
@@ -432,13 +410,9 @@ namespace
     TEST_CASE_METHOD(scope_data, "ALScopeData: chroma cells are shares that sum to one and blend like bins", "[ALScopeData]")
     {
         mScope.accumulate(ramp().data(), ALScopeData::BIN_COUNT, 1);
-        UNSCOPED_INFO("cells sum to one");
         CHECK_THAT(chromaSum(mScope), ll_test::WithinBits(1.f, 4));
-        {
-            INFO("peak is a real share");
-            CHECK(mScope.getChromaPeak() > 0.f);
-            CHECK(mScope.getChromaPeak() <= 1.f);
-        }
+        CHECK(mScope.getChromaPeak() > 0.f);
+        CHECK(mScope.getChromaPeak() <= 1.f);
 
         // A ramp is entirely neutral, so all of it is in one place.
         UNSCOPED_INFO("a grey ramp is a point");
@@ -458,22 +432,15 @@ namespace
     TEST_CASE_METHOD(scope_data, "ALScopeData: out-of-range cells answer zero and clear empties the grid", "[ALScopeData]")
     {
         mScope.accumulate(flat(200, 30, 30, 4).data(), 4, 1);
-        UNSCOPED_INFO("something was measured");
         CHECK(mScope.getChromaPeak() > 0.f);
 
-        UNSCOPED_INFO("negative u");
         CHECK_THAT(mScope.getChromaCell(-1, 0), ll_test::WithinBits(0.f, 6));
-        UNSCOPED_INFO("negative v");
         CHECK_THAT(mScope.getChromaCell(0, -1), ll_test::WithinBits(0.f, 6));
-        UNSCOPED_INFO("past the end in u");
         CHECK_THAT(mScope.getChromaCell(ALScopeData::CHROMA_SIZE, 0), ll_test::WithinBits(0.f, 6));
-        UNSCOPED_INFO("past the end in v");
         CHECK_THAT(mScope.getChromaCell(0, ALScopeData::CHROMA_SIZE), ll_test::WithinBits(0.f, 6));
 
         mScope.clear();
-        UNSCOPED_INFO("cleared peak");
         CHECK_THAT(mScope.getChromaPeak(), ll_test::WithinBits(0.f, 6));
-        UNSCOPED_INFO("cleared cells");
         CHECK_THAT(chromaSum(mScope), ll_test::WithinBits(0.f, 6));
     }
 
@@ -493,7 +460,7 @@ namespace
                                     ll_test::WithinBits(0.f, 5));
         for (S32 i = 1; i < ALScopeData::CHROMA_SIZE; ++i)
         {
-            UNSCOPED_INFO("centres increase");
+            CAPTURE(i);
             REQUIRE(ALScopeData::chromaCellCentre(i) > ALScopeData::chromaCellCentre(i - 1));
         }
     }
@@ -634,17 +601,11 @@ namespace
         const S32 column = ALScopeData::WAVE_COLUMNS / 2;
         const S32 top    = ALScopeData::WAVE_LEVELS - 1;
 
-        UNSCOPED_INFO("red is at the top");
         CHECK_THAT(mScope.getWaveCell(ALScopeData::CH_RED, column, top), ll_test::WithinBits(1.f, 5));
-        UNSCOPED_INFO("blue is at the bottom");
         CHECK_THAT(mScope.getWaveCell(ALScopeData::CH_BLUE, column, 0), ll_test::WithinBits(1.f, 5));
-        UNSCOPED_INFO("red is not also at the bottom");
         CHECK(mScope.getWaveCell(ALScopeData::CH_RED, column, 0) == 0.f);
-        {
-            INFO("green is at neither end");
-            CHECK(mScope.getWaveCell(ALScopeData::CH_GREEN, column, 0) == 0.f);
-            CHECK(mScope.getWaveCell(ALScopeData::CH_GREEN, column, top) == 0.f);
-        }
+        CHECK(mScope.getWaveCell(ALScopeData::CH_GREEN, column, 0) == 0.f);
+        CHECK(mScope.getWaveCell(ALScopeData::CH_GREEN, column, top) == 0.f);
     }
 
     // A plot walks the whole grid without checking, so out-of-range reads and a
@@ -653,26 +614,18 @@ namespace
     TEST_CASE_METHOD(scope_data, "ALScopeData: waveform reads answer zero when unmeasured or cleared or out of range", "[ALScopeData]")
     {
         ALScopeData fresh;
-        UNSCOPED_INFO("unmeasured reads zero");
         CHECK(fresh.getWaveCell(ALScopeData::CH_LUMA, 0, 0) == 0.f);
-        UNSCOPED_INFO("unmeasured has no peak");
         CHECK(fresh.getWavePeak(ALScopeData::CH_LUMA) == 0.f);
 
         mScope.accumulate(flat(200, 200, 200, 16).data(), 16, 1);
-        UNSCOPED_INFO("negative column");
         CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, -1, 0) == 0.f);
-        UNSCOPED_INFO("column past the end");
         CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, ALScopeData::WAVE_COLUMNS, 0) == 0.f);
-        UNSCOPED_INFO("level past the end");
         CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, 0, ALScopeData::WAVE_LEVELS) == 0.f);
-        UNSCOPED_INFO("bad channel");
         CHECK(mScope.getWaveCell(ALScopeData::CH_COUNT, 0, 0) == 0.f);
 
         // And clearing has to let go of the grid again.
         mScope.clear();
-        UNSCOPED_INFO("cleared reads zero");
         CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, 0, 0) == 0.f);
-        UNSCOPED_INFO("cleared has no peak");
         CHECK(mScope.getWavePeak(ALScopeData::CH_LUMA) == 0.f);
     }
 }

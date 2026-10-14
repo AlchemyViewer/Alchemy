@@ -145,11 +145,9 @@ namespace
             return entries;
         }
 
-        static void ensureSameEntry(const LLVOCacheEntry& expected, const LLVOCacheEntry& actual)
+        static void requireSameEntry(const LLVOCacheEntry& expected, const LLVOCacheEntry& actual)
         {
-            UNSCOPED_INFO("crc");
             REQUIRE(actual.getCRC() == expected.getCRC());
-            UNSCOPED_INFO("hit count");
             REQUIRE(actual.getHitCount() == expected.getHitCount());
             const LLDataPackerBinaryBuffer* a = expected.getDP();
             const LLDataPackerBinaryBuffer* b = actual.getDP();
@@ -158,7 +156,6 @@ namespace
                 REQUIRE(a);
                 REQUIRE(b);
             }
-            UNSCOPED_INFO("body size");
             REQUIRE(b->getBufferSize() == a->getBufferSize());
             UNSCOPED_INFO("body bytes");
             REQUIRE(memcmp(a->getBuffer(), b->getBuffer(), (size_t)a->getBufferSize()) == 0);
@@ -190,7 +187,7 @@ namespace
             return data;
         }
 
-        static LLGLTFOverrideCacheEntry makeOverride(U32 local_id, U64 handle, int sides)
+        static LLGLTFOverrideCacheEntry requireOverride(U32 local_id, U64 handle, int sides)
         {
             LLGLTFOverrideCacheEntry entry;
             UNSCOPED_INFO("override parses");
@@ -265,22 +262,18 @@ namespace
             LLVOCache::instance().initCache(LL_PATH_CACHE, CACHE_NUMBER_OF_REGIONS, CACHE_VERSION);
         }
 
-        static void ensureSameOverride(const LLGLTFOverrideCacheEntry& expected, const LLGLTFOverrideCacheEntry& actual)
+        static void requireSameOverride(const LLGLTFOverrideCacheEntry& expected, const LLGLTFOverrideCacheEntry& actual)
         {
-            UNSCOPED_INFO("object id");
             REQUIRE(actual.mObjectId == expected.mObjectId);
-            UNSCOPED_INFO("local id");
             REQUIRE(actual.mLocalId == expected.mLocalId);
-            UNSCOPED_INFO("region handle");
             REQUIRE(actual.mRegionHandle == expected.mRegionHandle);
-            UNSCOPED_INFO("side count");
             REQUIRE(actual.mSides.size() == expected.mSides.size());
             for (const auto& [side, llsd] : expected.mSides)
             {
+                CAPTURE(side);
                 auto found = actual.mSides.find(side);
                 UNSCOPED_INFO("side present");
                 REQUIRE(found != actual.mSides.end());
-                UNSCOPED_INFO("side llsd");
                 REQUIRE(llsd_equals(found->second, llsd));
             }
         }
@@ -297,18 +290,13 @@ namespace
         LLSD data = makeOverrideLLSD(42, handle, object_id, 3);
 
         LLGLTFOverrideCacheEntry entry;
-        UNSCOPED_INFO("fromLLSD");
         REQUIRE(entry.fromLLSD(data));
-        UNSCOPED_INFO("object id");
         CHECK(entry.mObjectId == object_id);
-        UNSCOPED_INFO("local id");
         CHECK(entry.mLocalId == 42u);
-        UNSCOPED_INFO("region handle");
         CHECK(entry.mRegionHandle == handle);
-        UNSCOPED_INFO("sides");
         REQUIRE(entry.mSides.size() == (size_t)3);
         UNSCOPED_INFO("materials not built by loading");
-        REQUIRE(entry.mGLTFMaterial.empty());
+        CHECK(entry.mGLTFMaterial.empty());
 
         // toLLSD walks a hash map, so compare per side rather than as arrays.
         LLSD back = entry.toLLSD();
@@ -325,6 +313,7 @@ namespace
         for (size_t i = 0; i < back["sides"].size(); ++i)
         {
             S32 side = back["sides"][i].asInteger();
+            CAPTURE(side);
             UNSCOPED_INFO("side llsd survives");
             REQUIRE(llsd_equals(back["gltf_llsd"][i], data["gltf_llsd"][side]));
         }
@@ -334,6 +323,7 @@ namespace
         REQUIRE(entry.mGLTFMaterial.size() == entry.mSides.size());
         for (const auto& [side, llsd] : entry.mSides)
         {
+            CAPTURE(side);
             UNSCOPED_INFO("material for side");
             REQUIRE(entry.mGLTFMaterial.find(side) != entry.mGLTFMaterial.end());
             UNSCOPED_INFO("material built");
@@ -348,7 +338,7 @@ namespace
         LLSD headless = data;
         headless.erase("region_handle_x");
         UNSCOPED_INFO("no region handle is rejected");
-        REQUIRE_FALSE(rejected.fromLLSD(headless));
+        CHECK_FALSE(rejected.fromLLSD(headless));
         headless = data;
         headless.erase("local_id");
         UNSCOPED_INFO("no local id is rejected");
@@ -372,17 +362,18 @@ namespace
         REQUIRE(read.size() == written.size());
         for (const auto& [local_id, entry] : written)
         {
+            CAPTURE(local_id);
             auto found = read.find(local_id);
             UNSCOPED_INFO("entry present");
             REQUIRE(found != read.end());
-            ensureSameEntry(*entry, *found->second);
+            requireSameEntry(*entry, *found->second);
         }
 
         LLVOCacheEntry::vocache_entry_map_t other;
         UNSCOPED_INFO("another region's id is refused");
-        REQUIRE_FALSE(LLVOCache::instance().readFromCache(handle, LLUUID::generateNewID(), other));
+        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, LLUUID::generateNewID(), other));
         UNSCOPED_INFO("nothing loaded for it");
-        REQUIRE(other.empty());
+        CHECK(other.empty());
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: a save with removal enabled counts only what it wrote", "[LLVOCache]")
@@ -426,9 +417,9 @@ namespace
 
         LLVOCacheEntry::vocache_entry_map_t read;
         UNSCOPED_INFO("truncated file fails the read");
-        REQUIRE_FALSE(LLVOCache::instance().readFromCache(handle, id, read));
+        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, id, read));
         UNSCOPED_INFO("fewer entries than written");
-        REQUIRE(read.size() < written.size());
+        CHECK(read.size() < written.size());
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: the header survives a restart", "[LLVOCache]")
@@ -446,7 +437,7 @@ namespace
         UNSCOPED_INFO("region known after restart");
         REQUIRE(LLVOCache::instance().readFromCache(handle, id, read));
         UNSCOPED_INFO("entries after restart");
-        REQUIRE(read.size() == written.size());
+        CHECK(read.size() == written.size());
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: the override cache round-trips and drops overrides with no object", "[LLVOCache]")
@@ -459,10 +450,10 @@ namespace
         LLVOCacheEntry::vocache_gltf_overrides_map_t written;
         for (U32 local_id = 1; local_id <= 20; local_id += 3)
         {
-            written[local_id] = makeOverride(local_id, handle, 1 + (int)(local_id % 4));
+            written[local_id] = requireOverride(local_id, handle, 1 + (int)(local_id % 4));
         }
         // An override for an object the primary cache does not hold is dropped on load.
-        written[999] = makeOverride(999, handle, 2);
+        written[999] = requireOverride(999, handle, 2);
 
         LLVOCache::instance().writeGenericExtrasToCache(handle, id, written, true, false);
         UNSCOPED_INFO("extras file written");
@@ -472,12 +463,13 @@ namespace
         UNSCOPED_INFO("read succeeds");
         REQUIRE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, read, objects));
         UNSCOPED_INFO("all overrides with an object came back");
-        REQUIRE(read.size() == written.size() - 1);
+        CHECK(read.size() == written.size() - 1);
         UNSCOPED_INFO("orphan override dropped");
-        REQUIRE(read.find(999) == read.end());
+        CHECK(read.find(999) == read.end());
         for (const auto& [local_id, entry] : read)
         {
-            ensureSameOverride(written.at(local_id), entry);
+            CAPTURE(local_id);
+            requireSameOverride(written.at(local_id), entry);
             UNSCOPED_INFO("materials not built by loading");
             REQUIRE(entry.mGLTFMaterial.empty());
         }
@@ -485,9 +477,9 @@ namespace
         LLVOCacheEntry::vocache_gltf_overrides_map_t none;
         LLVOCacheEntry::vocache_entry_map_t no_objects;
         UNSCOPED_INFO("empty primary cache is not a failure");
-        REQUIRE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, none, no_objects));
+        CHECK(LLVOCache::instance().readGenericExtrasFromCache(handle, id, none, no_objects));
         UNSCOPED_INFO("and loads nothing");
-        REQUIRE(none.empty());
+        CHECK(none.empty());
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: a corrupt override record is skipped and a truncated file refused", "[LLVOCache]")
@@ -500,7 +492,7 @@ namespace
         LLVOCacheEntry::vocache_gltf_overrides_map_t written;
         for (U32 local_id = 1; local_id <= 10; ++local_id)
         {
-            written[local_id] = makeOverride(local_id, handle, 2);
+            written[local_id] = requireOverride(local_id, handle, 2);
         }
         LLVOCache::instance().writeGenericExtrasToCache(handle, id, written, true, false);
 
@@ -541,10 +533,11 @@ namespace
         UNSCOPED_INFO("corrupt record does not fail the file");
         REQUIRE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, read, objects));
         UNSCOPED_INFO("one record skipped");
-        REQUIRE(read.size() == written.size() - 1);
+        CHECK(read.size() == written.size() - 1);
         for (const auto& [local_id, entry] : read)
         {
-            ensureSameOverride(written.at(local_id), entry);
+            CAPTURE(local_id);
+            requireSameOverride(written.at(local_id), entry);
         }
 
         // Cut the last record short.
@@ -563,9 +556,9 @@ namespace
         }
         LLVOCacheEntry::vocache_gltf_overrides_map_t old;
         UNSCOPED_INFO("old version is refused");
-        REQUIRE_FALSE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, old, objects));
+        CHECK_FALSE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, old, objects));
         UNSCOPED_INFO("old version loads nothing");
-        REQUIRE(old.empty());
+        CHECK(old.empty());
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: memoryAdjustFactor bounds follow RAM and stay under the heap cap", "[LLVOCache]")
@@ -608,6 +601,7 @@ namespace
         for (F32 allocated : { 0.f, 2000.f, 2500.f, 3000.f, 4000.f })
         {
             const F32 f = factor(allocated, 0.f, no_cap, 3000.f, 2048.f);
+            CAPTURE(allocated);
             {
                 INFO("inverted settings still give a factor in [0, 1]");
                 REQUIRE(f >= 0.f);
@@ -651,9 +645,9 @@ namespace
         UNSCOPED_INFO("a file with one bad record is still a cache");
         REQUIRE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, objects));
         UNSCOPED_INFO("the shallow record loaded, the deep one did not");
-        REQUIRE(overrides.size() == 1u);
+        CHECK(overrides.size() == 1u);
         UNSCOPED_INFO("it is the shallow one");
-        REQUIRE(overrides.find(1) != overrides.end());
+        CHECK(overrides.find(1) != overrides.end());
 
         // up to the budget, unreadable records are skipped; past it the file is refused
         std::vector<std::string> garbage(16, std::string("\xff\xfe\xfd\xfc", 4));
@@ -663,7 +657,7 @@ namespace
         UNSCOPED_INFO("sixteen unreadable records are within the budget");
         CHECK(LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, objects));
         UNSCOPED_INFO("and the good record after them loaded");
-        REQUIRE(overrides.size() == 1u);
+        CHECK(overrides.size() == 1u);
 
         garbage.insert(garbage.begin(), std::string("\xff\xfe\xfd\xfc", 4));
         writeExtrasFile(handle, id, garbage);
@@ -678,15 +672,15 @@ namespace
         UNSCOPED_INFO("the record still parses");
         REQUIRE(entry.fromLLSD(faces));
         UNSCOPED_INFO("only the face in range is kept");
-        REQUIRE(entry.mSides.size() == 1u);
+        CHECK(entry.mSides.size() == 1u);
         UNSCOPED_INFO("and it is face 0");
-        REQUIRE(entry.mSides.find(0) != entry.mSides.end());
+        CHECK(entry.mSides.find(0) != entry.mSides.end());
         faces["sides"][1] = -1;
         LLGLTFOverrideCacheEntry negative;
         UNSCOPED_INFO("a negative face parses");
         REQUIRE(negative.fromLLSD(faces));
         UNSCOPED_INFO("and is dropped too");
-        REQUIRE(negative.mSides.size() == 1u);
+        CHECK(negative.mSides.size() == 1u);
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: header slots survive a removal followed by a crash", "[LLVOCache]")
@@ -714,7 +708,7 @@ namespace
         CHECK(LLVOCache::instance().getCacheEntries() == 3u);
         LLVOCacheEntry::vocache_entry_map_t read;
         UNSCOPED_INFO("the first region is still there");
-        REQUIRE(LLVOCache::instance().readFromCache(first, id, read));
+        CHECK(LLVOCache::instance().readFromCache(first, id, read));
         read.clear();
         UNSCOPED_INFO("the third region was not overwritten");
         CHECK(LLVOCache::instance().readFromCache(third, id, read));
@@ -731,8 +725,8 @@ namespace
         LLVOCache::instance().writeToCache(handle, id, objects, true, false);
 
         LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
-        overrides[1] = makeOverride(1, handle, 2);
-        overrides[2] = makeOverride(2, handle, 3);
+        overrides[1] = requireOverride(1, handle, 2);
+        overrides[2] = requireOverride(2, handle, 3);
         LLVOCache::instance().writeGenericExtrasToCache(handle, id, overrides, true, false);
 
         // a save with nothing dirty leaves the file as it was, whatever it is handed
@@ -744,8 +738,8 @@ namespace
         REQUIRE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, read, objects));
         UNSCOPED_INFO("and still holds both overrides");
         REQUIRE(read.size() == 2u);
-        ensureSameOverride(overrides[1], read[1]);
-        ensureSameOverride(overrides[2], read[2]);
+        requireSameOverride(overrides[1], read[1]);
+        requireSameOverride(overrides[2], read[2]);
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: staysInMemory keeps entries seen lately or inside the rear sphere", "[LLVOCache]")
@@ -864,6 +858,7 @@ namespace
         for (F32 rear_far : rear_radii)
         {
             const F32 radius = evict(rear_far);
+            CAPTURE(rear_far);
             UNSCOPED_INFO("the eviction radius clears the load radius");
             REQUIRE(radius >= rear_far * 1.25f);
             UNSCOPED_INFO("and never reaches inside SceneLoadMinRadius");
@@ -889,6 +884,7 @@ namespace
         // it has been out of sight. Turning around cannot cross both at once.
         for (F32 rear_far : rear_radii)
         {
+            CAPTURE(rear_far);
             LLVOCacheEntry::VisibilityFacts facts;
             facts.mCurrentFrame = 5000;
             facts.mEntryVisibleFrame = 0;

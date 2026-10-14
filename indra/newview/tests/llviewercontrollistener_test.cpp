@@ -31,9 +31,8 @@
 *****************************************************************************/
 namespace
 {
-    void ensure_contains(const std::string& msg, const std::string& substr)
+    void require_contains(const std::string& msg, const std::string& substr)
     {
-        UNSCOPED_INFO("Exception does not contain " + substr);
         REQUIRE_THAT(msg, Catch::Matchers::ContainsSubstring(substr));
     }
 
@@ -59,32 +58,32 @@ namespace
     {
         std::string threw{ catch_what<LL::CommonControl::ParamError>(
                 [](){ LL::CommonControl::get("Nonexistent", "Variable"); }) };
-        ensure_contains(threw, "group");
-        ensure_contains(threw, "Nonexistent");
+        require_contains(threw, "group");
+        require_contains(threw, "Nonexistent");
     }
 
     TEST_CASE_METHOD(llviewercontrollistener_data, "llviewercontrollistener: CommonControl::get of an unknown variable names the key", "[llviewercontrollistener]")
     {
         std::string threw{ catch_what<LL::CommonControl::ParamError>(
                 [](){ LL::CommonControl::get("FakeGlobal", "Nonexistent"); }) };
-        ensure_contains(threw, "key");
-        ensure_contains(threw, "Nonexistent");
+        require_contains(threw, "key");
+        require_contains(threw, "Nonexistent");
     }
 
     TEST_CASE_METHOD(llviewercontrollistener_data, "llviewercontrollistener: CommonControl::toggle of a string variable says it is non-boolean", "[llviewercontrollistener]")
     {
         std::string threw{ catch_what<LL::CommonControl::ParamError>(
                 [](){ LL::CommonControl::toggle("FakeGlobal", "strvar"); }) };
-        ensure_contains(threw, "non-boolean");
-        ensure_contains(threw, "strvar");
+        require_contains(threw, "non-boolean");
+        require_contains(threw, "strvar");
     }
 
     TEST_CASE_METHOD(llviewercontrollistener_data, "llviewercontrollistener: CommonControl::get_vars of an unknown group names the group", "[llviewercontrollistener]")
     {
         std::string threw{ catch_what<LL::CommonControl::ParamError>(
                 [](){ LL::CommonControl::get_vars("Nonexistent"); }) };
-        ensure_contains(threw, "group");
-        ensure_contains(threw, "Nonexistent");
+        require_contains(threw, "group");
+        require_contains(threw, "Nonexistent");
     }
 
     TEST_CASE_METHOD(llviewercontrollistener_data, "llviewercontrollistener: CommonControl::get returns each variable's value", "[llviewercontrollistener]")
@@ -125,14 +124,11 @@ namespace
         // been made -- HeadlessUI's, another test's gSavedSettings. So the
         // fixture's is there once, and one more group made adds its name.
         const std::vector<std::string> groups{ LL::CommonControl::get_groups() };
-        UNSCOPED_INFO("FakeGlobal");
         CHECK(std::count(groups.begin(), groups.end(), "FakeGlobal") == std::ptrdiff_t(1));
         {
             LLControlGroup another{ "FakeAnother" };
             const std::vector<std::string> more{ LL::CommonControl::get_groups() };
-            UNSCOPED_INFO("one more");
             REQUIRE(more.size() == groups.size() + 1);
-            UNSCOPED_INFO("FakeAnother");
             CHECK(std::count(more.begin(), more.end(), "FakeAnother") == std::ptrdiff_t(1));
         }
         UNSCOPED_INFO("one fewer once it goes");

@@ -88,6 +88,7 @@ namespace
         CHECK(observer->mProcessed);
     }
 
+    // CHOP-220: a dangling observer pointer.
     TEST_CASE_METHOD(RemoteParcelRequestData, "LLRemoteParcelRequest: a reply after its observer is deleted does not crash", "[LLRemoteParcelRequest]")
     {
         LLRemoteParcelInfoObserver * observer = new TestObserver();

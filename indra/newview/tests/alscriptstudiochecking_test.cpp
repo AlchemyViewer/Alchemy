@@ -381,16 +381,16 @@ namespace
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
         {
             INFO("a check of the text as it stands");
-            REQUIRE(asked.kind == Kind::Check);
-            REQUIRE(asked.id == "a");
-            REQUIRE(asked.version == version(doc));
+            CHECK(asked.kind == Kind::Check);
+            CHECK(asked.id == "a");
+            CHECK(asked.version == version(doc));
             CHECK(*asked.text == doc.editor->text());
         }
         UNSCOPED_INFO("with the window's settings");
         CHECK(asked.hintTypes);
         {
             INFO("remembered");
-            REQUIRE(doc.check->requestedVersion == version(doc));
+            CHECK(doc.check->requestedVersion == version(doc));
             CHECK(doc.check->analysisDue == 0.0);
         }
         checking.pump(1e9);
@@ -400,7 +400,7 @@ namespace
         checking.pump(1.0);
         UNSCOPED_INFO("at once");
         REQUIRE(studio.asks.size() == size_t(2));
-        // A notecard is checked here, as scripts read it (test 20).
+        // A notecard is checked here, as scripts read it (the notecard case below).
         doc.notecard = true;
         checking.schedule(doc, true);
         checking.pump(1e9);
@@ -523,7 +523,7 @@ namespace
         {
             INFO("taken");
             REQUIRE(doc.expanded.valid);
-            REQUIRE(doc.expanded.version == version(doc));
+            CHECK(doc.expanded.version == version(doc));
             CHECK(doc.check->expansions == 1);
         }
         UNSCOPED_INFO("then asked");
@@ -558,7 +558,7 @@ namespace
         studio.asks[2].answered(answer(doc));
         {
             INFO("an answer of an expansion since replaced: the check asked again");
-            REQUIRE(doc.check->analysisDue == 1.0);
+            CHECK(doc.check->analysisDue == 1.0);
             REQUIRE(doc.check->analysis.empty());
         }
         preprocessing = false;
@@ -693,12 +693,11 @@ namespace
         Doc&                    doc      = tab("disk:/lib.lsl", "integer helper;\nhelp() { }\n");
         doc.file                         = "/lib.lsl";
         doc.editor->setSyntax("lsl");
-        UNSCOPED_INFO("a fragment");
         CHECK(checking.lslFragment(doc));
         {
             INFO("kept for the text it was asked of");
             REQUIRE(doc.check->fragment);
-            REQUIRE(doc.check->fragment->first == doc.editor->document().version());
+            CHECK(doc.check->fragment->first == doc.editor->document().version());
             CHECK(doc.check->fragment->second);
         }
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
@@ -867,7 +866,7 @@ namespace
         Doc& marked   = tab("m", "integer f() inline { return 1; }\n");
         checking.ask(marked, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
-        UNSCOPED_INFO("inline explained: " + marked.check->analysis[0].message);
+        UNSCOPED_INFO("inline explained: " << marked.check->analysis[0].message);
         CHECK(marked.check->analysis[0].message.find("syntax error PreprocHintInline [WORD]=inline") == 0);
         preprocessing         = true;
         marked.expanded.valid = false;
@@ -886,7 +885,7 @@ namespace
         Doc& constant = tab("c", "f(const integer n) { }\n");
         checking.ask(constant, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(constant, { problem(0, "syntax error") }));
-        UNSCOPED_INFO("const explained: " + constant.check->analysis[0].message);
+        UNSCOPED_INFO("const explained: " << constant.check->analysis[0].message);
         CHECK(constant.check->analysis[0].message.find("syntax error PreprocHintConst [WORD]=const") == 0);
 
         // A script with a directive is preprocessed, the setting off or
@@ -920,9 +919,9 @@ namespace
         missing.fixes.push_back(fix("Insert '('", 0, 2, 2, "("));
         studio.asks.back().answered(answer(stray, { missing, problem(1, "syntax error") }));
         {
-            INFO("the line explained: " + (stray.check->analysis.empty() ? std::string() : stray.check->analysis[0].message));
+            INFO("the line explained: " << (stray.check->analysis.empty() ? std::string() : stray.check->analysis[0].message));
             REQUIRE(stray.check->analysis.size() == 2);
-            REQUIRE(stray.check->analysis[0].message == "Missing '('. PreprocHintDirective");
+            CHECK(stray.check->analysis[0].message == "Missing '('. PreprocHintDirective");
             REQUIRE(stray.check->analysis[0].fixes.empty());
         }
         UNSCOPED_INFO("a line of code: as the parser said");
@@ -952,7 +951,7 @@ namespace
         {
             INFO("said, checked again");
             CHECK(services.statuses.back() == "FixStale");
-            REQUIRE(services.statusFailures.back());
+            CHECK(services.statusFailures.back());
             CHECK(doc.check->analysisDue == 1.0);
         }
         UNSCOPED_INFO("past the end: refused");
@@ -961,7 +960,7 @@ namespace
         refactor.kind        = ALScriptFix::Kind::Refactor;
         {
             INFO("a refactor");
-            REQUIRE(checking.applyFix(doc, refactor, version(doc)));
+            CHECK(checking.applyFix(doc, refactor, version(doc)));
             CHECK(doc.editor->undoJournal().undoLabel() == "refactor");
         }
         doc.modifiable = false;
@@ -985,7 +984,7 @@ namespace
         studio.asks[0].answered(answer(doc, { one }));
         {
             INFO("then made");
-            REQUIRE(doc.editor->document().line(0) == "float count;");
+            CHECK(doc.editor->document().line(0) == "float count;");
             REQUIRE_FALSE(doc.check->fixAllAfterCheck);
         }
 
@@ -1007,7 +1006,7 @@ namespace
         studio.confirm();
         {
             INFO("made");
-            REQUIRE(doc.editor->document().line(0) == "integer count;");
+            CHECK(doc.editor->document().line(0) == "integer count;");
             CHECK(doc.editor->document().line(3) == "    touch_start() { count = 1; }");
         }
         {
@@ -1018,7 +1017,6 @@ namespace
         checking.pump(1.0);
         studio.asks.back().answered(answer(doc));
         checking.askFixAll(doc, Doc::FixPick{});
-        UNSCOPED_INFO("none");
         CHECK(services.statuses.back() == std::string("FixNone"));
         unit.reset();
         studio.confirm();
@@ -1085,7 +1083,7 @@ namespace
         checking.pump(10.1 + 0.35);
         {
             INFO("afresh");
-            REQUIRE_FALSE(doc.expanded.valid);
+            CHECK_FALSE(doc.expanded.valid);
             CHECK_FALSE(doc.weighing->sent);
         }
         UNSCOPED_INFO("run for a save");
@@ -1110,7 +1108,7 @@ namespace
         CHECK(studio.asks[0].request.endColumn == 13);
         {
             INFO("kept, to offer them over");
-            REQUIRE(doc.check->actionsAsked.begin == ALTextPos(0, 8));
+            CHECK(doc.check->actionsAsked.begin == ALTextPos(0, 8));
             CHECK(doc.check->actionsAsked.end == ALTextPos(0, 13));
         }
         ALScriptAnalysis::Result result;
@@ -1127,7 +1125,7 @@ namespace
         {
             INFO("kept");
             REQUIRE(doc.check->actions.size() == 1);
-            REQUIRE(doc.check->actions[0].title == "Rename");
+            CHECK(doc.check->actions[0].title == "Rename");
             CHECK(doc.check->actionsVersion == version(doc));
         }
         result.version = version(doc) + 1;
@@ -1330,7 +1328,7 @@ namespace
         {
             INFO("and which require reaches it");
             REQUIRE(asked.modules->reaches.size() == 1);
-            REQUIRE(asked.modules->reaches[0].name == "util");
+            CHECK(asked.modules->reaches[0].name == "util");
             CHECK(asked.modules->reaches[0].key == "object:util");
         }
         {
@@ -1463,18 +1461,17 @@ namespace
         checking.pump(2.0);
         UNSCOPED_INFO("no analyzer asked");
         REQUIRE(studio.asks.empty());
-        UNSCOPED_INFO("two");
         REQUIRE(card.check->analysis.size() == size_t(2));
         {
             INFO("the items, at the first");
-            REQUIRE(card.check->analysis[0].line == 0);
-            REQUIRE(card.check->analysis[0].column == 4);
+            CHECK(card.check->analysis[0].line == 0);
+            CHECK(card.check->analysis[0].column == 4);
             CHECK(card.check->analysis[0].severity == ALScriptProblem::Severity::Warning);
         }
         {
             INFO("the long line, from where it is cut");
-            REQUIRE(card.check->analysis[1].line == 1);
-            REQUIRE(card.check->analysis[1].column == 1024);
+            CHECK(card.check->analysis[1].line == 1);
+            CHECK(card.check->analysis[1].column == 1024);
             CHECK(card.check->analysis[1].endColumn == 1030);
         }
         UNSCOPED_INFO("no outline as plain text");
@@ -1522,7 +1519,7 @@ namespace
         CHECK(doc.editor->wholeText() == before);
         const std::string& compared = studio.told.back();
         {
-            INFO("the text now beside it after" + compared);
+            INFO("the text now beside it after: " << compared);
             CHECK(compared.rfind("compare a: " + before + " | float count;", 0) == 0);
             REQUIRE(compared.find("    touch_start() { count = 1; }") != std::string::npos);
             REQUIRE(compared.find("(CompareNow | FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos);
@@ -1534,8 +1531,8 @@ namespace
         }
         {
             INFO("made");
-            REQUIRE(checking.applyPreviewed(doc));
-            REQUIRE(doc.editor->document().line(0) == "float count;");
+            CHECK(checking.applyPreviewed(doc));
+            CHECK(doc.editor->document().line(0) == "float count;");
             CHECK(doc.editor->undoJournal().undoLabel() == "fix");
         }
         UNSCOPED_INFO("once");
@@ -1555,13 +1552,13 @@ namespace
         doc.editor->setText("default {}\n");
         {
             INFO("changed since: not made");
-            REQUIRE_FALSE(checking.applyPreviewed(doc));
+            CHECK_FALSE(checking.applyPreviewed(doc));
             CHECK(doc.editor->wholeText() == "default {}\n");
         }
         {
             INFO("said");
             CHECK(services.statuses.back() == "FixAllChangedSince");
-            REQUIRE(services.statusFailures.back());
+            CHECK(services.statusFailures.back());
         }
     }
 
@@ -1606,7 +1603,7 @@ namespace
         }
         {
             INFO("made");
-            REQUIRE(checking.applyFix(doc, said[0].fixes[0], version(doc)));
+            CHECK(checking.applyFix(doc, said[0].fixes[0], version(doc)));
             CHECK(doc.editor->wholeText() == "local s = \"abc\"\nprint(ll.GetSubString(s, 1, 3))\n-- LSL: something else\nprint(s)\n");
         }
 
@@ -1652,7 +1649,7 @@ namespace
         REQUIRE_FALSE(studio.preview);
         const std::string& compared = studio.told.back();
         {
-            INFO("the two from LSL, not the other: " + compared);
+            INFO("the two from LSL, not the other: " << compared);
             REQUIRE(compared.find("FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos);
             REQUIRE(compared.find("float count;") != std::string::npos);
         }
@@ -1660,7 +1657,7 @@ namespace
         CHECK(services.reports.back().actions == Names{ "apply_fixes" });
         {
             INFO("made");
-            REQUIRE(checking.applyPreviewed(doc));
+            CHECK(checking.applyPreviewed(doc));
             CHECK(doc.editor->document().line(0) == "float count;");
         }
 
@@ -1707,7 +1704,7 @@ namespace
             INFO("Apply again: nothing waiting, and said");
             CHECK_FALSE(checking.applyPreviewed(doc));
             CHECK(services.statuses.back() == "FixAllNotPreviewed");
-            REQUIRE(services.statusFailures.back());
+            CHECK(services.statusFailures.back());
         }
     }
 
@@ -1759,11 +1756,11 @@ namespace
         {
             INFO("said");
             CHECK(services.statuses.back().find("AliasTaken [NAME]=inc") == 0);
-            REQUIRE(services.statusFailures.back());
+            CHECK(services.statusFailures.back());
         }
         {
             INFO("nothing changed");
-            REQUIRE(version(doc) == was_at);
+            CHECK(version(doc) == was_at);
             CHECK(doc.editor->document().line(0) == "integer total;");
         }
         UNSCOPED_INFO("nothing to redo");
@@ -1790,7 +1787,6 @@ namespace
         Doc& doc = tab("disk:/lib.lsl", text);
         doc.file = "/lib.lsl";
         doc.editor->setSyntax("lsl");
-        UNSCOPED_INFO("a fragment");
         CHECK(checking.lslFragment(doc));
         ALSyntaxHighlighter& highlighter = doc.editor->highlighter();
         const S32            last        = doc.editor->document().lineCount() - 1;
@@ -1801,13 +1797,13 @@ namespace
         UNSCOPED_INFO("asked again at once: a fragment");
         CHECK(checking.lslFragment(doc));
         highlighter.tokens(last);
-        UNSCOPED_INFO("the text not lexed to its end for it: " + std::to_string(highlighter.lastLexed()) + " of " + std::to_string(last + 1) + " left");
+        UNSCOPED_INFO("the text not lexed to its end for it: " << highlighter.lastLexed() << " of " << last + 1 << " left");
         CHECK(highlighter.lastLexed() > last / 2);
         UNSCOPED_INFO("nor kept for the text as it stands");
         CHECK(doc.check->fragment->first != version(doc));
         {
             INFO("lexed to its end: what it is, kept");
-            REQUIRE(checking.lslFragment(doc));
+            CHECK(checking.lslFragment(doc));
             CHECK(doc.check->fragment->first == version(doc));
         }
 

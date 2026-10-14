@@ -130,6 +130,8 @@ namespace
         static void waitToSettle() { std::this_thread::sleep_for(std::chrono::milliseconds(400)); }
     };
 
+    // A view of a line is a place of its own, and a place noted drops the
+    // way forward.
     TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: the history notes a line once and keeps the fifty latest places", "[alscriptnavigation]")
     {
         ALNavHistory history;
@@ -176,6 +178,7 @@ namespace
         CHECK_FALSE(history.canGo(true));
     }
 
+    // Where it goes from is put on the other way.
     TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: back and forward pass closed tabs over and follow renamed ones", "[alscriptnavigation]")
     {
         ALNavHistory history;
@@ -195,10 +198,10 @@ namespace
         UNSCOPED_INFO("forward again");
         CHECK(lines(history.take(true, at("a", 1), open)) == "b:3");
         history.rekey("c", "renamed");
-        UNSCOPED_INFO("followed");
+        UNSCOPED_INFO("the renamed tab followed");
         CHECK(lines(history.take(true, std::nullopt, open)) == "renamed:4");
         UNSCOPED_INFO("nowhere left");
-        REQUIRE_FALSE(history.take(true, std::nullopt, open));
+        CHECK_FALSE(history.take(true, std::nullopt, open));
     }
 
     TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: a walk is noted as one jump and back and forward are shown by the window", "[alscriptnavigation]")
@@ -231,7 +234,7 @@ namespace
         a.loaded = false;
         unit.noteJump();
         UNSCOPED_INFO("a tab not loaded: nothing noted");
-        REQUIRE((!unit.canGo(false) || studio.shown.size() == 3));
+        CHECK((!unit.canGo(false) || studio.shown.size() == 3));
     }
 
     TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: a row stayed on opens as a preview unless already open or passed or left", "[alscriptnavigation]")
@@ -289,7 +292,7 @@ namespace
             INFO("typed in: held");
             CHECK_FALSE(b.preview);
             CHECK(studio.tabs == 1);
-            REQUIRE(studio.letGo.size() == 1);
+            CHECK(studio.letGo.size() == 1);
         }
         Doc& c        = tab("c");
         c.preview     = true;
@@ -298,7 +301,7 @@ namespace
         {
             INFO("worked from: held");
             CHECK_FALSE(c.preview);
-            REQUIRE(studio.letGo.size() == 1);
+            CHECK(studio.letGo.size() == 1);
         }
         Doc& d         = tab("d");
         d.preview      = true;

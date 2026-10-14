@@ -57,8 +57,7 @@ namespace
     {
         const std::string& first = ALCrashReporter::runId();
         UNSCOPED_INFO("a UUID");
-        REQUIRE(first.size() == 36u);
-        UNSCOPED_INFO("stable");
+        CHECK(first.size() == 36u);
         CHECK(ALCrashReporter::runId() == first);
     }
 
@@ -87,12 +86,9 @@ namespace
     TEST_CASE("alcrashreporter: a file from before run ids reads as empty fields", "[alcrashreporter]")
     {
         ALCrashReporter::PreviousRun run = ALCrashReporter::previousRun(LLSD());
-        UNSCOPED_INFO("no run id");
-        REQUIRE(run.runId.empty());
-        UNSCOPED_INFO("no log");
-        REQUIRE(run.logFile.empty());
-        UNSCOPED_INFO("no name");
-        REQUIRE(run.agentName.empty());
+        CHECK(run.runId.empty());
+        CHECK(run.logFile.empty());
+        CHECK(run.agentName.empty());
     }
 
     TEST_CASE("alcrashreporter: consent is a sentinel file that allowing makes and withdrawing removes", "[alcrashreporter]")
@@ -125,16 +121,12 @@ namespace
         const LLVector3 position(128.4f, -63.6f, 22.5f);
         char buffer[64];
         size_t length = ALCrashReporter::locationTag(buffer, sizeof(buffer), "Hippotropolis", position);
-        UNSCOPED_INFO("whole");
         CHECK(std::string(buffer, length) == "Hippotropolis/128/-64/23");
-        UNSCOPED_INFO("terminated");
         CHECK(buffer[length] == '\0');
 
         char small[12];
         length = ALCrashReporter::locationTag(small, sizeof(small), "Hippotropolis", position);
-        UNSCOPED_INFO("cut");
         CHECK(std::string(small, length) == "Hippotropol");
-        UNSCOPED_INFO("cut and terminated");
         CHECK(small[length] == '\0');
 
         length = ALCrashReporter::locationTag(small, sizeof(small), "Ahern", position);
@@ -144,21 +136,17 @@ namespace
 
     TEST_CASE("alcrashreporter: an event id is its 32 hex digits however it is spelled", "[alcrashreporter]")
     {
-        UNSCOPED_INFO("dashed");
         CHECK(ALCrashReporter::compactEventId("0123ABCD-89ab-cdef-0123-456789ABCDEF") ==
                       "0123abcd89abcdef0123456789abcdef");
-        UNSCOPED_INFO("braced");
         CHECK(ALCrashReporter::compactEventId("{0123abcd-89ab-cdef-0123-456789abcdef}") ==
                       "0123abcd89abcdef0123456789abcdef");
-        UNSCOPED_INFO("already compact");
         CHECK(ALCrashReporter::compactEventId("0123abcd89abcdef0123456789abcdef") ==
                       "0123abcd89abcdef0123456789abcdef");
         UNSCOPED_INFO("too short");
-        REQUIRE(ALCrashReporter::compactEventId("0123abcd").empty());
+        CHECK(ALCrashReporter::compactEventId("0123abcd").empty());
         UNSCOPED_INFO("not hex");
-        REQUIRE(ALCrashReporter::compactEventId("0123abcd89abcdef0123456789abcdeg").empty());
-        UNSCOPED_INFO("empty");
-        REQUIRE(ALCrashReporter::compactEventId("").empty());
+        CHECK(ALCrashReporter::compactEventId("0123abcd89abcdef0123456789abcdeg").empty());
+        CHECK(ALCrashReporter::compactEventId("").empty());
     }
 
     TEST_CASE("alcrashreporter: a freeze's report is recorded for the next run to take once", "[alcrashreporter]")
@@ -168,35 +156,29 @@ namespace
             (std::filesystem::temp_directory_path() / ("alcrashreporter_test_last_report_" + LLUUID::generateNewID().asString())).string();
         ALCrashReporter::takeRecordedReport(record);
         UNSCOPED_INFO("nothing to begin with");
-        REQUIRE_FALSE(ALCrashReporter::takeRecordedReport(record));
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
 
         ALCrashReporter::recordReport(record, { "freeze", "0123abcd89abcdef0123456789abcdef" });
         const auto taken = ALCrashReporter::takeRecordedReport(record);
-        UNSCOPED_INFO("taken");
         REQUIRE(taken.has_value());
-        UNSCOPED_INFO("kind");
         CHECK(taken->kind == "freeze");
-        UNSCOPED_INFO("id");
         CHECK(taken->eventId == "0123abcd89abcdef0123456789abcdef");
-        UNSCOPED_INFO("once");
-        REQUIRE_FALSE(ALCrashReporter::takeRecordedReport(record));
+        UNSCOPED_INFO("taken only once");
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
 
         ALCrashReporter::recordReport(record, { "lunch", "0123abcd89abcdef0123456789abcdef" });
         UNSCOPED_INFO("an unknown kind is not a report");
-        REQUIRE_FALSE(ALCrashReporter::takeRecordedReport(record));
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
         ALCrashReporter::recordReport(record, { "crash", "nonsense" });
         UNSCOPED_INFO("nor is a broken id");
-        REQUIRE_FALSE(ALCrashReporter::takeRecordedReport(record));
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
     }
 
     TEST_CASE("alcrashreporter: the nil UUID is no event however it is spelled", "[alcrashreporter]")
     {
-        UNSCOPED_INFO("dashed");
-        REQUIRE(ALCrashReporter::compactEventId("00000000-0000-0000-0000-000000000000").empty());
-        UNSCOPED_INFO("braced");
-        REQUIRE(ALCrashReporter::compactEventId("{00000000-0000-0000-0000-000000000000}").empty());
-        UNSCOPED_INFO("compact");
-        REQUIRE(ALCrashReporter::compactEventId("00000000000000000000000000000000").empty());
+        CHECK(ALCrashReporter::compactEventId("00000000-0000-0000-0000-000000000000").empty());
+        CHECK(ALCrashReporter::compactEventId("{00000000-0000-0000-0000-000000000000}").empty());
+        CHECK(ALCrashReporter::compactEventId("00000000000000000000000000000000").empty());
         UNSCOPED_INFO("one digit set is an event");
         CHECK(ALCrashReporter::compactEventId("00000000-0000-0000-0000-000000000001") ==
                       "00000000000000000000000000000001");
@@ -205,7 +187,7 @@ namespace
             (std::filesystem::temp_directory_path() / ("alcrashreporter_test_nil_report_" + LLUUID::generateNewID().asString())).string();
         ALCrashReporter::recordReport(record, { "freeze", "00000000000000000000000000000000" });
         UNSCOPED_INFO("a nil report is not taken");
-        REQUIRE_FALSE(ALCrashReporter::takeRecordedReport(record));
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
     }
 
     TEST_CASE("alcrashreporter: a crash found at start is the previous run's only if it carries its id", "[alcrashreporter]")
@@ -216,22 +198,20 @@ namespace
         const auto crash = ALCrashReporter::previousRunCrash(event, previous, previous);
         UNSCOPED_INFO("the previous run's");
         REQUIRE(crash.has_value());
-        UNSCOPED_INFO("a crash");
         CHECK(crash->kind == "crash");
-        UNSCOPED_INFO("its id");
         CHECK(crash->eventId == "0123abcd89abcdef0123456789abcdef");
         UNSCOPED_INFO("the run id however it is spelled");
-        REQUIRE(ALCrashReporter::previousRunCrash(event, "6F4B1B2E9D8C4D0FA5B72C3E4F5A6B7C", previous).has_value());
+        CHECK(ALCrashReporter::previousRunCrash(event, "6F4B1B2E9D8C4D0FA5B72C3E4F5A6B7C", previous).has_value());
 
         UNSCOPED_INFO("another run's");
-        REQUIRE_FALSE(ALCrashReporter::previousRunCrash(event, "7f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c",
+        CHECK_FALSE(ALCrashReporter::previousRunCrash(event, "7f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c",
                                                                    previous));
         UNSCOPED_INFO("one that carries no run id");
-        REQUIRE_FALSE(ALCrashReporter::previousRunCrash(event, "", previous));
-        UNSCOPED_INFO("any, when the previous run is not known");
-        REQUIRE_FALSE(ALCrashReporter::previousRunCrash(event, previous, ""));
+        CHECK_FALSE(ALCrashReporter::previousRunCrash(event, "", previous));
+        UNSCOPED_INFO("any when the previous run is not known");
+        CHECK_FALSE(ALCrashReporter::previousRunCrash(event, previous, ""));
         UNSCOPED_INFO("one filed as nothing");
-        REQUIRE_FALSE(ALCrashReporter::previousRunCrash("00000000-0000-0000-0000-000000000000", previous, previous));
+        CHECK_FALSE(ALCrashReporter::previousRunCrash("00000000-0000-0000-0000-000000000000", previous, previous));
     }
 
     TEST_CASE("alcrashreporter: a record replaces the last whole and leaves nothing beside it", "[alcrashreporter]")
@@ -250,7 +230,6 @@ namespace
         UNSCOPED_INFO("the record alone");
         CHECK(entries() == 1);
         const auto taken = ALCrashReporter::takeRecordedReport(record);
-        UNSCOPED_INFO("taken");
         REQUIRE(taken.has_value());
         UNSCOPED_INFO("the later kind");
         CHECK(taken->kind == "crash");

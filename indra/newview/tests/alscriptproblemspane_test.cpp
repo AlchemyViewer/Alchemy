@@ -237,7 +237,7 @@ namespace
         void pick(const char* combo, const std::string& value)
         {
             LLComboBox* box = window.find<LLComboBox>(combo);
-            UNSCOPED_INFO("offered: " + value);
+            INFO("the combo offers " << value);
             REQUIRE(box->selectByValue(LLSD(value)));
             box->onCommit();
         }
@@ -278,7 +278,6 @@ namespace
         {
             messages.push_back(row.message);
         }
-        UNSCOPED_INFO("six rows");
         REQUIRE(made.rows.size() == size_t(6));
         UNSCOPED_INFO("the weight first, at no line");
         CHECK(made.rows[0].origin == services.words("OriginWeight"));
@@ -317,12 +316,9 @@ namespace
         }
         UNSCOPED_INFO("the run-time mark on its line");
         REQUIRE(std::find(made.marks.begin(), made.marks.end(), std::make_pair(S32(8), ALCodeEditor::Mark::Runtime)) != made.marks.end());
-        {
-            INFO("each level's mark");
-            CHECK(ALScriptProblemsPane::markOf(Doc::Level::Error) == ALCodeEditor::Mark::Error);
-            CHECK(ALScriptProblemsPane::markOf(Doc::Level::Warning) == ALCodeEditor::Mark::Warning);
-            CHECK(ALScriptProblemsPane::markOf(Doc::Level::Note) == ALCodeEditor::Mark::Note);
-        }
+        CHECK(ALScriptProblemsPane::markOf(Doc::Level::Error) == ALCodeEditor::Mark::Error);
+        CHECK(ALScriptProblemsPane::markOf(Doc::Level::Warning) == ALCodeEditor::Mark::Warning);
+        CHECK(ALScriptProblemsPane::markOf(Doc::Level::Note) == ALCodeEditor::Mark::Note);
         UNSCOPED_INFO("the lint's line offers its fix");
         REQUIRE(made.fixable.size() == size_t(1));
         UNSCOPED_INFO("which changes the script");
@@ -333,7 +329,6 @@ namespace
         // again.
         d.editor->setText("line 0\nline 1\n");
         made = gather(d);
-        UNSCOPED_INFO("no fix offered");
         REQUIRE(made.fixable.empty());
         UNSCOPED_INFO("the compiler's error said");
         CHECK(std::any_of(made.rows.begin(), made.rows.end(), [](const Doc::Shown& row) { return row.message == "syntax error"; }));
@@ -356,7 +351,6 @@ namespace
         out.fill(&door);
         UNSCOPED_INFO("the one in front's");
         CHECK(shown() == std::string("|door error|door warning|door note"));
-        UNSCOPED_INFO("three to list");
         CHECK(out.held() == 3);
         UNSCOPED_INFO("said on the tab");
         CHECK(studio.counts > 0);
@@ -390,7 +384,6 @@ namespace
                       "|#door.lsl   \xC2\xB7   " + services.counted("ProblemErrors", 1) + ", " + services.counted("ProblemWarnings", 1) + ", " +
                           services.counted("ProblemNotes", 1) + "|door error|door warning|door note|#lamp.lsl   \xC2\xB7   " +
                           services.counted("ProblemErrors", 1) + "|lamp error");
-        UNSCOPED_INFO("four to list");
         CHECK(out.held() == 4);
         // Another script's problems gathered again: listed, since every
         // one's are.
@@ -407,7 +400,6 @@ namespace
 
         // Closed, it is let go of.
         out.closed("door");
-        UNSCOPED_INFO("forgotten");
         REQUIRE(out.listedId().empty());
         LLSD state;
         out.saveState(state);
@@ -442,7 +434,6 @@ namespace
         out.selectFirstError(true);
         UNSCOPED_INFO("the checkers' own");
         CHECK(studio.chosen.back().line == 5);
-        UNSCOPED_INFO("its stretch");
         CHECK(studio.chosen.back().endColumn == 6);
 
         choose("a warning before");
@@ -451,7 +442,6 @@ namespace
         CHECK(studio.chosen.back().line == 0);
         UNSCOPED_INFO("the keyboard left in the list");
         REQUIRE_FALSE(studio.toEditor.back());
-        UNSCOPED_INFO("whose it is");
         CHECK(studio.chosen.back().doc == std::string("door"));
 
         // The list's keys: return goes there to type, escape back to the
@@ -526,23 +516,19 @@ namespace
         UNSCOPED_INFO("and back");
         CHECK_FALSE(out.lintIsError());
         out.act("off");
-        UNSCOPED_INFO("turned off");
         CHECK(studio.levels["LocalShadow"] == ALScriptLints::Level::Off);
         out.act("settings");
-        UNSCOPED_INFO("the settings");
         CHECK(studio.settings == 1);
         UNSCOPED_INFO("every one of its kind");
         CHECK(out.fixShown("kind"));
         out.act("fix:0");
         UNSCOPED_INFO("its fix made");
         REQUIRE(studio.fixed.size() == size_t(1));
-        UNSCOPED_INFO("which");
         CHECK(studio.fixed[0] == std::string("door:Rename"));
         out.act("fix_kind");
         out.act("fix_all");
         UNSCOPED_INFO("of its kind, then of all");
         REQUIRE(studio.kinds.size() == size_t(2));
-        UNSCOPED_INFO("by its kind");
         CHECK(studio.kinds[0] == std::string("door:shadow"));
         UNSCOPED_INFO("then every kind");
         CHECK(studio.kinds[1] == std::string("door:"));
@@ -555,7 +541,6 @@ namespace
         UNSCOPED_INFO("run-time errors to let go of");
         CHECK(out.enabled("clear_runtime"));
         out.act("clear_runtime");
-        UNSCOPED_INFO("let go of");
         REQUIRE(d.runtime.empty());
         UNSCOPED_INFO("and not recalled when it is opened again");
         CHECK(studio.cleared == std::vector<std::string>{ d.id });
@@ -648,7 +633,6 @@ namespace
         std::vector<Doc::Shown> rows = weights(gather(d));
         UNSCOPED_INFO("near: one row");
         REQUIRE(rows.size() == size_t(1));
-        UNSCOPED_INFO("a warning");
         CHECK(rows[0].level == Doc::Level::Warning);
         UNSCOPED_INFO("what is left");
         CHECK(rows[0].message == services.words("WeightNear", { { "[SIZE]", "14.0" }, { "[LIMIT]", "16" }, { "[LEFT]", "2.0" }, { "[TARGET]", "LSL (LSO)" } }));
@@ -676,15 +660,10 @@ namespace
         d.check->analysis          = { made_here };
         d.check->analysisVersion   = d.editor->document().version();
         const ALScriptProblemsPane::Made made = gather(d);
-        UNSCOPED_INFO("one row");
         REQUIRE(made.rows.size() == size_t(1));
-        UNSCOPED_INFO("named so");
         CHECK(made.rows[0].fileName == services.words("InGeneratedCode"));
-        {
-            INFO("no mark, no squiggle");
-            REQUIRE(made.marks.empty());
-            REQUIRE(made.decorations.empty());
-        }
+        REQUIRE(made.marks.empty());
+        REQUIRE(made.decorations.empty());
     }
 
     TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: a checked script with no tab is listed after open ones and chosen by its item", "[ALScriptProblemsPane]")
@@ -728,7 +707,6 @@ namespace
         CHECK(at >= 0);
         list()->selectNthItem(at);
         pane->choose(false);
-        UNSCOPED_INFO("chosen");
         REQUIRE_FALSE(studio.chosen.empty());
         const ALScriptProblemsPane::Place& place = studio.chosen.back();
         {
@@ -779,12 +757,8 @@ namespace
 
         pane->checkedScript(closed, "hinge.lsl", false, { row("the check's", "Lint") }, "House");
         pane->compiledScript(closed, "hinge.lsl", false, { row("the compiler's", "Compiler") }, "House");
-        {
-            INFO("both listed");
-            REQUIRE(shown().find("the check's") != std::string::npos);
-            REQUIRE(shown().find("the compiler's") != std::string::npos);
-        }
-        UNSCOPED_INFO("counted");
+        REQUIRE(shown().find("the check's") != std::string::npos);
+        REQUIRE(shown().find("the compiler's") != std::string::npos);
         CHECK(pane->held() == 2);
 
         pane->compiledScript(closed, "hinge.lsl", false, { row("again", "Compiler") }, "House");
@@ -805,10 +779,8 @@ namespace
         other.generate();
         const ALScriptRef lone(object, other);
         pane->compiledScript(lone, "latch.lsl", false, { row("latch", "Compiler") }, "House");
-        UNSCOPED_INFO("listed");
         CHECK(pane->checkedCount() == size_t(2));
         pane->compiledScript(lone, "latch.lsl", false, {}, "House");
-        UNSCOPED_INFO("gone");
         CHECK(pane->checkedCount() == size_t(1));
     }
 
@@ -821,7 +793,6 @@ namespace
         Doc&            door       = doc("door");
         door.check->analysis       = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning") };
         tabs->selectTabByName("references_tab");
-        UNSCOPED_INFO("out of sight");
         CHECK_FALSE(ALPaneFolds::inSight(&out));
         const S32 said = studio.counts;
         gather(door);
@@ -879,16 +850,13 @@ namespace
         door.check->analysis = { problem(S::Parser, V::Error, 1, "first"), problem(S::Lint, V::Warning, 3, "second") };
         gather(door);
         LLScrollListItem* second = row_saying("second");
-        {
-            INFO("listed");
-            REQUIRE(second != nullptr);
-            CHECK(second->getColumn(3)->getValue().asString().rfind("4:", 0) == 0);
-        }
+        REQUIRE(second != nullptr);
+        CHECK(second->getColumn(3)->getValue().asString().rfind("4:", 0) == 0);
         choose("second");
         door.check->analysis = { problem(S::Parser, V::Error, 2, "first"), problem(S::Lint, V::Warning, 4, "second") };
         gather(door);
         UNSCOPED_INFO("moved a line: the same row");
-        CHECK(row_saying("second") == second);
+        REQUIRE(row_saying("second") == second);
         UNSCOPED_INFO("where it is now");
         CHECK(second->getColumn(3)->getValue().asString().rfind("5:", 0) == 0);
         UNSCOPED_INFO("still chosen");
@@ -908,7 +876,6 @@ namespace
         {
             rows += item->getValue().has("heading") ? 0 : 1;
         }
-        UNSCOPED_INFO("a thousand listed");
         CHECK(rows == 1000);
         UNSCOPED_INFO("the rest said");
         REQUIRE(shown().find(services.counted("ProblemsUnlisted", 5)) != std::string::npos);
@@ -1013,7 +980,6 @@ namespace
         UNSCOPED_INFO("the three");
         CHECK(from_lsl == std::string("a no;a nu;llco;"));
         d.setShown(made.rows);
-        UNSCOPED_INFO("counted");
         CHECK(d.shownMigration == 3);
         pane->showOrigin("OriginMigration");
         LLComboBox* origins = window.find<LLComboBox>("problems_origin");
@@ -1042,14 +1008,10 @@ namespace
         UNSCOPED_INFO("not of another");
         CHECK_FALSE(out.fixShown("migration"));
         choose("reads nothing at 0 [SlZeroIndex]");
-        UNSCOPED_INFO("offered");
         CHECK(out.fixShown("migration"));
         out.act("fix_migration");
-        {
-            INFO("asked");
-            REQUIRE_FALSE(studio.kinds.empty());
-            CHECK(studio.kinds.back() == "door:from LSL");
-        }
+        REQUIRE_FALSE(studio.kinds.empty());
+        CHECK(studio.kinds.back() == "door:from LSL");
     }
 
     TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: a problem naming no line is listed and chosen at none and marked nowhere", "[ALScriptProblemsPane]")
@@ -1060,7 +1022,6 @@ namespace
         d.problems.push_back({ 3, 0, false, std::string(), "WARN", "the compiler's, at 3" });
         d.runtime.push_back({ -1, -1, std::string(), "Stack-Heap Collision", 1 });
         const ALScriptProblemsPane::Made made = gather(d);
-        UNSCOPED_INFO("all three");
         REQUIRE(made.rows.size() == size_t(3));
         {
             INFO("at none, first");
@@ -1086,7 +1047,7 @@ namespace
         {
             const std::string message = item->getColumn(1)->getValue().asString();
             const std::string where   = item->getColumn(3)->getValue().asString();
-            UNSCOPED_INFO("where: " + message + " " + where);
+            CAPTURE(message, where);
             REQUIRE((message == "the compiler's, at 3" ? where == "4" : where.empty()));
         }
         choose("the compiler's, nowhere");

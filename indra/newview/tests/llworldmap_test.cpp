@@ -174,33 +174,26 @@ namespace
     {
         // Test 1 : setCount() / getCount()
         mItem->setCount(10);
-        UNSCOPED_INFO("LLItemInfo::setCount() test failed");
         CHECK(mItem->getCount() == 10);
         // Test 2 : setTooltip() / getToolTip()
         std::string tooltip = TOOLTIP_TEST;
         mItem->setTooltip(tooltip);
-        UNSCOPED_INFO("LLItemInfo::setTooltip() test failed");
         CHECK(mItem->getToolTip() == TOOLTIP_TEST);
         // Test 3 : setElevation() / getGlobalPosition()
         mItem->setElevation(Z_WORLD_TEST);
         LLVector3d pos = mItem->getGlobalPosition();
         LLVector3d ref(X_WORLD_TEST, Y_WORLD_TEST, Z_WORLD_TEST);
-        UNSCOPED_INFO("LLItemInfo::getGlobalPosition() test failed");
         CHECK(pos == ref);
         // Test 4 : getName()
         std::string name = mItem->getName();
-        UNSCOPED_INFO("LLItemInfo::getName() test failed");
         CHECK(name == ITEM_NAME_TEST);
         // Test 5 : isName()
-        UNSCOPED_INFO("LLItemInfo::isName() test failed");
         CHECK(mItem->isName(name));
         // Test 6 : getUUID()
         LLUUID id;
-        UNSCOPED_INFO("LLItemInfo::getUUID() test failed");
         CHECK(mItem->getUUID() == id);
         // Test 7 : getRegionHandle()
         U64 handle = to_region_handle_global(X_WORLD_TEST, Y_WORLD_TEST);
-        UNSCOPED_INFO("LLItemInfo::getRegionHandle() test failed");
         CHECK(mItem->getRegionHandle() == handle);
     }
     // ---------------------------------------------------------------------------------------
@@ -212,56 +205,48 @@ namespace
         // Test 1 : setName() / getName()
         std::string name = SIM_NAME_TEST;
         mSim->setName(name);
-        UNSCOPED_INFO("LLSimInfo::setName() test failed");
         CHECK(mSim->getName() == SIM_NAME_TEST);
         // Test 2 : isName()
-        UNSCOPED_INFO("LLSimInfo::isName() test failed");
         CHECK(mSim->isName(name));
         // Test 3 : getGlobalPos()
         LLVector3 local;
         LLVector3d ref(X_WORLD_TEST, Y_WORLD_TEST, 0.0f);
         LLVector3d pos = mSim->getGlobalPos(local);
-        UNSCOPED_INFO("LLSimInfo::getGlobalPos() test failed");
         CHECK(pos == ref);
         // Test 4 : getGlobalOrigin()
         pos = mSim->getGlobalOrigin();
-        UNSCOPED_INFO("LLSimInfo::getGlobalOrigin() test failed");
         CHECK(pos == ref);
         // Test 5 : clearImage()
         try {
             mSim->clearImage();
         } catch (...) {
-            FAIL("LLSimInfo::clearImage() test failed");
+            FAIL("LLSimInfo::clearImage() threw");
         }
         // Test 6 : dropImagePriority()
         try {
             mSim->dropImagePriority();
         } catch (...) {
-            FAIL("LLSimInfo::dropImagePriority() test failed");
+            FAIL("LLSimInfo::dropImagePriority() threw");
         }
         // Test 7 : updateAgentCount()
         try {
             mSim->updateAgentCount(0.0f);
         } catch (...) {
-            FAIL("LLSimInfo::updateAgentCount() test failed");
+            FAIL("LLSimInfo::updateAgentCount() threw");
         }
         // Test 8 : getAgentCount()
         S32 agents = mSim->getAgentCount();
-        UNSCOPED_INFO("LLSimInfo::getAgentCount() test failed");
         CHECK(agents == 0);
         // Test 9 : setLandForSaleImage() / getLandForSaleImage()
         LLUUID id;
         mSim->setLandForSaleImage(id);
         LLPointer<LLViewerFetchedTexture> image = mSim->getLandForSaleImage();
-        UNSCOPED_INFO("LLSimInfo::getLandForSaleImage() test failed");
         REQUIRE(image.isNull());
         // Test 10 : isPG()
         mSim->setAccess(SIM_ACCESS_PG);
-        UNSCOPED_INFO("LLSimInfo::isPG() test failed");
         CHECK(mSim->isPG());
         // Test 11 : isDown()
         mSim->setAccess(SIM_ACCESS_DOWN);
-        UNSCOPED_INFO("LLSimInfo::isDown() test failed");
         CHECK(mSim->isDown());
         // Test 12 : Access strings can't be accessed from unit test...
         //ensure("LLSimInfo::getAccessString() test failed", mSim->getAccessString() == "Offline");
@@ -276,28 +261,28 @@ namespace
         try {
             mSim->clearItems();
         } catch (...) {
-            FAIL("LLSimInfo::clearItems() at init test failed");
+            FAIL("LLSimInfo::clearItems() threw at init");
         }
 
         // Test 15 : Verify that all the lists are empty
         LLSimInfo::item_info_list_t list;
         list = mSim->getTeleHub();
-        UNSCOPED_INFO("LLSimInfo::getTeleHub() empty at init test failed");
+        UNSCOPED_INFO("telehubs");
         REQUIRE(list.empty());
         list = mSim->getInfoHub();
-        UNSCOPED_INFO("LLSimInfo::getInfoHub() empty at init test failed");
+        UNSCOPED_INFO("infohubs");
         REQUIRE(list.empty());
         list = mSim->getPGEvent();
-        UNSCOPED_INFO("LLSimInfo::getPGEvent() empty at init test failed");
+        UNSCOPED_INFO("PG events");
         REQUIRE(list.empty());
         list = mSim->getMatureEvent();
-        UNSCOPED_INFO("LLSimInfo::getMatureEvent() empty at init test failed");
+        UNSCOPED_INFO("mature events");
         REQUIRE(list.empty());
         list = mSim->getLandForSale();
-        UNSCOPED_INFO("LLSimInfo::getLandForSale() empty at init test failed");
+        UNSCOPED_INFO("land for sale");
         REQUIRE(list.empty());
         list = mSim->getAgentLocation();
-        UNSCOPED_INFO("LLSimInfo::getAgentLocation() empty at init test failed");
+        UNSCOPED_INFO("agent locations");
         REQUIRE(list.empty());
 
         // Create an item to be inserted
@@ -314,49 +299,49 @@ namespace
 
         // Test 16 : Verify that the lists contain 1 item each
         list = mSim->getTeleHub();
-        UNSCOPED_INFO("LLSimInfo::insertTeleHub() test failed");
+        UNSCOPED_INFO("telehubs");
         REQUIRE(list.size() == 1);
         list = mSim->getInfoHub();
-        UNSCOPED_INFO("LLSimInfo::insertInfoHub() test failed");
+        UNSCOPED_INFO("infohubs");
         REQUIRE(list.size() == 1);
         list = mSim->getPGEvent();
-        UNSCOPED_INFO("LLSimInfo::insertPGEvent() test failed");
+        UNSCOPED_INFO("PG events");
         REQUIRE(list.size() == 1);
         list = mSim->getMatureEvent();
-        UNSCOPED_INFO("LLSimInfo::insertMatureEvent() test failed");
+        UNSCOPED_INFO("mature events");
         REQUIRE(list.size() == 1);
         list = mSim->getLandForSale();
-        UNSCOPED_INFO("LLSimInfo::insertLandForSale() test failed");
+        UNSCOPED_INFO("land for sale");
         REQUIRE(list.size() == 1);
         list = mSim->getAgentLocation();
-        UNSCOPED_INFO("LLSimInfo::insertAgentLocation() test failed");
+        UNSCOPED_INFO("agent locations");
         REQUIRE(list.size() == 1);
 
         // Test 17 : clearItems()
         try {
             mSim->clearItems();
         } catch (...) {
-            FAIL("LLSimInfo::clearItems() at end test failed");
+            FAIL("LLSimInfo::clearItems() threw at end");
         }
 
         // Test 18 : Verify that all the lists are empty again... *except* agent which is persisted!! (on purpose)
         list = mSim->getTeleHub();
-        UNSCOPED_INFO("LLSimInfo::getTeleHub() empty after clear test failed");
+        UNSCOPED_INFO("telehubs");
         REQUIRE(list.empty());
         list = mSim->getInfoHub();
-        UNSCOPED_INFO("LLSimInfo::getInfoHub() empty after clear test failed");
+        UNSCOPED_INFO("infohubs");
         REQUIRE(list.empty());
         list = mSim->getPGEvent();
-        UNSCOPED_INFO("LLSimInfo::getPGEvent() empty after clear test failed");
+        UNSCOPED_INFO("PG events");
         REQUIRE(list.empty());
         list = mSim->getMatureEvent();
-        UNSCOPED_INFO("LLSimInfo::getMatureEvent() empty after clear test failed");
+        UNSCOPED_INFO("mature events");
         REQUIRE(list.empty());
         list = mSim->getLandForSale();
-        UNSCOPED_INFO("LLSimInfo::getLandForSale() empty after clear test failed");
+        UNSCOPED_INFO("land for sale");
         REQUIRE(list.empty());
         list = mSim->getAgentLocation();
-        UNSCOPED_INFO("LLSimInfo::getAgentLocation() empty after clear test failed");
+        UNSCOPED_INFO("agent locations, which clearItems() keeps");
         REQUIRE(list.size() == 1);
     }
 
@@ -370,45 +355,44 @@ namespace
         try {
             mWorld->reset();
         } catch (...) {
-            FAIL("LLWorldMap::reset() at init test failed");
+            FAIL("LLWorldMap::reset() threw at init");
         }
         // Test 2 : clearImageRefs()
         try {
             mWorld->clearImageRefs();
         } catch (...) {
-            FAIL("LLWorldMap::clearImageRefs() test failed");
+            FAIL("LLWorldMap::clearImageRefs() threw");
         }
         // Test 3 : dropImagePriorities()
         try {
             mWorld->dropImagePriorities();
         } catch (...) {
-            FAIL("LLWorldMap::dropImagePriorities() test failed");
+            FAIL("LLWorldMap::dropImagePriorities() threw");
         }
         // Test 4 : reloadItems()
         try {
             mWorld->reloadItems(true);
         } catch (...) {
-            FAIL("LLWorldMap::reloadItems() test failed");
+            FAIL("LLWorldMap::reloadItems() threw");
         }
         // Test 5 : updateRegions()
         try {
             mWorld->updateRegions(1000, 1000, 1004, 1004);
         } catch (...) {
-            FAIL("LLWorldMap::updateRegions() test failed");
+            FAIL("LLWorldMap::updateRegions() threw");
         }
         // Test 6 : equalizeBoostLevels()
         try {
             mWorld->equalizeBoostLevels();
         } catch (...) {
-            FAIL("LLWorldMap::equalizeBoostLevels() test failed");
+            FAIL("LLWorldMap::equalizeBoostLevels() threw");
         }
         // Test 7 : getObjectsTile()
         try {
             LLPointer<LLViewerFetchedTexture> image = mWorld->getObjectsTile((U32)(X_WORLD_TEST/REGION_WIDTH_METERS), (U32)(Y_WORLD_TEST/REGION_WIDTH_METERS), 1);
-            UNSCOPED_INFO("LLWorldMap::getObjectsTile() failed");
-            REQUIRE(image.isNull());
+            CHECK(image.isNull());
         } catch (...) {
-            FAIL("LLWorldMap::getObjectsTile() test failed with exception");
+            FAIL("LLWorldMap::getObjectsTile() threw");
         }
     }
     // Test management of LLSimInfo lists
@@ -418,13 +402,12 @@ namespace
         try {
             mWorld->reset();
         } catch (...) {
-            FAIL("LLWorldMap::reset() at init test failed");
+            FAIL("LLWorldMap::reset() threw at init");
         }
 
         // Test 9 : Verify that all the region list is empty
         LLWorldMap::sim_info_map_t list;
         list = mWorld->getRegionMap();
-        UNSCOPED_INFO("LLWorldMap::getRegionMap() empty at init test failed");
         REQUIRE(list.empty());
 
         // Test 10 : Insert a region
@@ -439,7 +422,7 @@ namespace
                                         REGION_FLAGS_SANDBOX);
         list = mWorld->getRegionMap();
         {
-            INFO("LLWorldMap::insertRegion() failed");
+            INFO("insertRegion()");
             CHECK(success);
             REQUIRE(list.size() == 1);
         }
@@ -454,7 +437,7 @@ namespace
                                         0, 0);
         list = mWorld->getRegionMap();
         {
-            INFO("LLWorldMap::insertItem() in existing region failed");
+            INFO("insertItem() in the same region");
             CHECK(success);
             REQUIRE(list.size() == 1);
         }
@@ -468,7 +451,7 @@ namespace
                                         0, 0);
         list = mWorld->getRegionMap();
         {
-            INFO("LLWorldMap::insertItem() in unexisting region failed");
+            INFO("insertItem() in another region");
             CHECK(success);
             REQUIRE(list.size() == 2);
         }
@@ -479,7 +462,7 @@ namespace
                             0.0f);
         LLSimInfo* sim;
         sim = mWorld->simInfoFromPosGlobal(pos1);
-        UNSCOPED_INFO("LLWorldMap::simInfoFromPosGlobal() test on existing region failed");
+        UNSCOPED_INFO("simInfoFromPosGlobal() in a region");
         REQUIRE(sim != NULL);
 
         // Test 14 : simInfoFromPosGlobal() outside region
@@ -487,18 +470,18 @@ namespace
                             Y_WORLD_TEST + REGION_WIDTH_METERS*4 + REGION_WIDTH_METERS/2,
                             0.0f);
         sim = mWorld->simInfoFromPosGlobal(pos2);
-        UNSCOPED_INFO("LLWorldMap::simInfoFromPosGlobal() test outside region failed");
+        UNSCOPED_INFO("simInfoFromPosGlobal() outside any region");
         REQUIRE(sim == NULL);
 
         // Test 15 : simInfoFromName()
         sim = mWorld->simInfoFromName(name_sim);
-        UNSCOPED_INFO("LLWorldMap::simInfoFromName() test on existing region failed");
+        UNSCOPED_INFO("simInfoFromName()");
         REQUIRE(sim != NULL);
 
         // Test 16 : simInfoFromHandle()
         U64 handle = to_region_handle_global(X_WORLD_TEST, Y_WORLD_TEST);
         sim = mWorld->simInfoFromHandle(handle);
-        UNSCOPED_INFO("LLWorldMap::simInfoFromHandle() test on existing region failed");
+        UNSCOPED_INFO("simInfoFromHandle()");
         REQUIRE(sim != NULL);
 
         // Test 17 : simNameFromPosGlobal()
@@ -507,7 +490,7 @@ namespace
                             0.0f);
         success = mWorld->simNameFromPosGlobal(pos3, name_sim);
         {
-            INFO("LLWorldMap::simNameFromPosGlobal() test on existing region failed");
+            INFO("simNameFromPosGlobal() in a region");
             CHECK(success);
             CHECK(name_sim == SIM_NAME_TEST);
         }
@@ -516,12 +499,11 @@ namespace
         try {
             mWorld->reset();
         } catch (...) {
-            FAIL("LLWorldMap::reset() at end test failed");
+            FAIL("LLWorldMap::reset() threw at end");
         }
 
         // Test 19 : Verify that all the region list is empty
         list = mWorld->getRegionMap();
-        UNSCOPED_INFO("LLWorldMap::getRegionMap() empty at end test failed");
         REQUIRE(list.empty());
     }
     // Test tracking
@@ -532,60 +514,46 @@ namespace
 
         // Test 20 : no tracking
         mWorld->cancelTracking();
-        UNSCOPED_INFO("LLWorldMap::cancelTracking() at begin test failed");
         CHECK_FALSE(mWorld->isTracking());
 
         // Test 21 : set tracking
         mWorld->setTracking(pos);
-        {
-            INFO("LLWorldMap::setTracking() failed");
-            REQUIRE(mWorld->isTracking());
-            CHECK_FALSE(mWorld->isTrackingValidLocation());
-        }
+        REQUIRE(mWorld->isTracking());
+        CHECK_FALSE(mWorld->isTrackingValidLocation());
 
         // Test 22 : set click and commit flags
         mWorld->setTrackingDoubleClick();
-        UNSCOPED_INFO("LLWorldMap::setTrackingDoubleClick() failed");
         CHECK(mWorld->isTrackingDoubleClick());
         mWorld->setTrackingCommit();
-        UNSCOPED_INFO("LLWorldMap::setTrackingCommit() failed");
         CHECK(mWorld->isTrackingCommit());
 
         // Test 23 : in rectangle test
         bool inRect = mWorld->isTrackingInRectangle(    X_WORLD_TEST, Y_WORLD_TEST,
                                                         X_WORLD_TEST + REGION_WIDTH_METERS,
                                                         Y_WORLD_TEST + REGION_WIDTH_METERS);
-        UNSCOPED_INFO("LLWorldMap::isTrackingInRectangle() in rectangle failed");
+        UNSCOPED_INFO("inside the rectangle");
         CHECK(inRect);
         inRect = mWorld->isTrackingInRectangle(         X_WORLD_TEST + REGION_WIDTH_METERS,
                                                         Y_WORLD_TEST + REGION_WIDTH_METERS,
                                                         X_WORLD_TEST + 2 * REGION_WIDTH_METERS,
                                                         Y_WORLD_TEST + 2 * REGION_WIDTH_METERS);
-        UNSCOPED_INFO("LLWorldMap::isTrackingInRectangle() outside rectangle failed");
+        UNSCOPED_INFO("outside the rectangle");
         CHECK_FALSE(inRect);
 
         // Test 24 : set tracking to valid and invalid
         mWorld->setTrackingValid();
-        {
-            INFO("LLWorldMap::setTrackingValid() failed");
-            REQUIRE(mWorld->isTrackingValidLocation());
-            CHECK_FALSE(mWorld->isTrackingInvalidLocation());
-        }
+        REQUIRE(mWorld->isTrackingValidLocation());
+        CHECK_FALSE(mWorld->isTrackingInvalidLocation());
         mWorld->setTrackingInvalid();
-        {
-            INFO("LLWorldMap::setTrackingInvalid() failed");
-            REQUIRE_FALSE(mWorld->isTrackingValidLocation());
-            CHECK(mWorld->isTrackingInvalidLocation());
-        }
+        REQUIRE_FALSE(mWorld->isTrackingValidLocation());
+        CHECK(mWorld->isTrackingInvalidLocation());
 
         // Test 25 : getTrackedPositionGlobal()
         LLVector3d res = mWorld->getTrackedPositionGlobal();
-        UNSCOPED_INFO("LLWorldMap::getTrackedPositionGlobal() failed");
         CHECK(res == pos);
 
         // Test 26 : reset tracking
         mWorld->cancelTracking();
-        UNSCOPED_INFO("LLWorldMap::cancelTracking() at end test failed");
         CHECK_FALSE(mWorld->isTracking());
     }
     // Test updateRegions() request grouping, size limits, and bounds
@@ -595,20 +563,16 @@ namespace
         mWorld->reset();
         gMapBlockRequests.clear();
         mWorld->updateRegions(0, 0, 3, 3);
-        UNSCOPED_INFO("updateRegions 1x1 block: expected 1 request");
+        UNSCOPED_INFO("1x1 block: one request");
         REQUIRE(gMapBlockRequests.size() == 1);
         {
+            INFO("1x1 block");
             const MapBlockRequest& req = gMapBlockRequests[0];
-            UNSCOPED_INFO("updateRegions 1x1 block: min_x");
             CHECK(req.min_x == 0);
-            UNSCOPED_INFO("updateRegions 1x1 block: min_y");
             CHECK(req.min_y == 0);
-            UNSCOPED_INFO("updateRegions 1x1 block: max_x");
             CHECK(req.max_x == 3);
-            UNSCOPED_INFO("updateRegions 1x1 block: max_y");
             CHECK(req.max_y == 3);
             S32 regions = (req.max_x - req.min_x + 1) * (req.max_y - req.min_y + 1);
-            UNSCOPED_INFO("updateRegions 1x1 block: must not exceed 64 regions");
             CHECK(regions <= 64);
         }
 
@@ -616,20 +580,16 @@ namespace
         mWorld->reset();
         gMapBlockRequests.clear();
         mWorld->updateRegions(0, 0, 7, 7);
-        UNSCOPED_INFO("updateRegions 2x2 blocks: expected 1 request");
+        UNSCOPED_INFO("2x2 blocks: one request");
         REQUIRE(gMapBlockRequests.size() == 1);
         {
+            INFO("2x2 blocks");
             const MapBlockRequest& req = gMapBlockRequests[0];
-            UNSCOPED_INFO("updateRegions 2x2 blocks: min_x");
             CHECK(req.min_x == 0);
-            UNSCOPED_INFO("updateRegions 2x2 blocks: min_y");
             CHECK(req.min_y == 0);
-            UNSCOPED_INFO("updateRegions 2x2 blocks: max_x");
             CHECK(req.max_x == 7);
-            UNSCOPED_INFO("updateRegions 2x2 blocks: max_y");
             CHECK(req.max_y == 7);
             S32 regions = (req.max_x - req.min_x + 1) * (req.max_y - req.min_y + 1);
-            UNSCOPED_INFO("updateRegions 2x2 blocks: must not exceed 64 regions");
             CHECK(regions <= 64);
         }
 
@@ -638,36 +598,26 @@ namespace
         mWorld->reset();
         gMapBlockRequests.clear();
         mWorld->updateRegions(0, 0, 15, 15);
-        UNSCOPED_INFO("updateRegions 4x4 blocks: expected 4 requests");
+        UNSCOPED_INFO("4x4 blocks: split into four strips");
         REQUIRE(gMapBlockRequests.size() == 4);
         for (size_t i = 0; i < gMapBlockRequests.size(); ++i)
         {
+            CAPTURE(i);
             const MapBlockRequest& req = gMapBlockRequests[i];
             S32 regions = (req.max_x - req.min_x + 1) * (req.max_y - req.min_y + 1);
-            UNSCOPED_INFO("updateRegions 4x4 blocks: each request must not exceed 64 regions");
             REQUIRE(regions <= 64);
             // Requests must stay within the requested area (0..15)
-            UNSCOPED_INFO("updateRegions 4x4 blocks: max_x in bounds");
             REQUIRE(req.max_x <= 15);
-            UNSCOPED_INFO("updateRegions 4x4 blocks: max_y in bounds");
             REQUIRE(req.max_y <= 15);
         }
         // Each request covers one horizontal strip of 4 blocks (rows 0..3, 4..7, 8..11, 12..15)
-        UNSCOPED_INFO("updateRegions 4x4 blocks: request[0] min_y");
         CHECK(gMapBlockRequests[0].min_y == 0);
-        UNSCOPED_INFO("updateRegions 4x4 blocks: request[0] max_y");
         CHECK(gMapBlockRequests[0].max_y == 3);
-        UNSCOPED_INFO("updateRegions 4x4 blocks: request[1] min_y");
         CHECK(gMapBlockRequests[1].min_y == 4);
-        UNSCOPED_INFO("updateRegions 4x4 blocks: request[1] max_y");
         CHECK(gMapBlockRequests[1].max_y == 7);
-        UNSCOPED_INFO("updateRegions 4x4 blocks: request[2] min_y");
         CHECK(gMapBlockRequests[2].min_y == 8);
-        UNSCOPED_INFO("updateRegions 4x4 blocks: request[2] max_y");
         CHECK(gMapBlockRequests[2].max_y == 11);
-        UNSCOPED_INFO("updateRegions 4x4 blocks: request[3] min_y");
         CHECK(gMapBlockRequests[3].min_y == 12);
-        UNSCOPED_INFO("updateRegions 4x4 blocks: request[3] max_y");
         CHECK(gMapBlockRequests[3].max_y == 15);
     }
 }

@@ -151,7 +151,6 @@ namespace
         }
         Doc& doc       = tab("door");
         doc.savedThere = theirs;
-        UNSCOPED_INFO("it can be merged");
         CHECK(ALScriptStudioMerging::canMerge(doc));
         unit->mergeSaved(doc);
         UNSCOPED_INFO("theirs's line put in, ours kept");
@@ -161,19 +160,14 @@ namespace
             REQUIRE(studio.titles.size() == 1);
             CHECK(studio.titles[0] == said("CompareSavedThere"));
         }
-        {
-            INFO("as a merge");
-            REQUIRE(doc.compareView);
-            CHECK(doc.compareView->merging());
-        }
-        UNSCOPED_INFO("one conflict");
+        REQUIRE(doc.compareView);
+        CHECK(doc.compareView->merging());
         CHECK(doc.compareView->conflictCount() == 1);
         {
             INFO("take and keep done with");
             REQUIRE_FALSE(doc.savedThere);
             CHECK(studio.notices == 1);
         }
-        UNSCOPED_INFO("said");
         CHECK(services().reports.back().text == services().counted("MergeConflicts", 1, named(doc)));
 
         // Settled from the comparison's bar: an edit of the tab.
@@ -183,13 +177,11 @@ namespace
         UNSCOPED_INFO("mine then theirs");
         CHECK(doc.editor->wholeText() ==
                       lines(9, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" }, { 7, "theirs 6" }, { 8, "line 7" } }));
-        UNSCOPED_INFO("none left");
         CHECK(doc.compareView->conflictCount() == 0);
 
         // Each a step to undo: the settling, then the merge.
         doc.editor->undo();
         doc.editor->undo();
-        UNSCOPED_INFO("back to ours");
         CHECK(doc.editor->wholeText() == ours);
     }
 
@@ -202,14 +194,9 @@ namespace
         Doc& doc       = tab("door");
         doc.savedThere = lines(8, { { 0, "theirs 0" } });
         unit->mergeSaved(doc);
-        UNSCOPED_INFO("merged");
         CHECK(doc.editor->wholeText() == lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
-        {
-            INFO("no conflicts");
-            REQUIRE(doc.compareView->merging());
-            CHECK(doc.compareView->conflictCount() == 0);
-        }
-        UNSCOPED_INFO("said");
+        REQUIRE(doc.compareView->merging());
+        CHECK(doc.compareView->conflictCount() == 0);
         CHECK(services().reports.back().text == said("MergeClean", named(doc)));
     }
 
@@ -236,13 +223,11 @@ namespace
             REQUIRE(doc.savedThere);
             CHECK(studio.notices == 0);
         }
-        UNSCOPED_INFO("said");
         CHECK(services().statuses.back() == said("MergeNoBase", named(doc)));
 
         Doc& locked       = tab("lamp");
         locked.modifiable = false;
         locked.savedThere = theirs;
-        UNSCOPED_INFO("cannot be merged");
         CHECK_FALSE(ALScriptStudioMerging::canMerge(locked));
         unit->mergeSaved(locked);
         {
@@ -251,7 +236,6 @@ namespace
             REQUIRE(locked.compareView);
             CHECK_FALSE(locked.compareView->merging());
         }
-        UNSCOPED_INFO("said");
         CHECK(services().statuses.back() == said("MergeReadOnly", named(locked)));
     }
 
@@ -266,12 +250,10 @@ namespace
         const LLUUID moved = LLUUID::generateNewID();
         doc.assetId        = was;
         unit->mergeWorld(doc);
-        UNSCOPED_INFO("asked");
         CHECK(studio.worldAsked == std::string("door"));
         UNSCOPED_INFO("nothing yet");
         CHECK(doc.editor->wholeText() == ours);
         studio.world(doc, theirs, moved);
-        UNSCOPED_INFO("merged");
         CHECK(doc.editor->wholeText() == lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
         {
             INFO("under the world's title, as a merge");
@@ -287,7 +269,7 @@ namespace
         unit.reset();
         studio.world(lamp, theirs, moved);
         {
-            INFO("nothing");
+            INFO("nothing once the merges are gone");
             CHECK(lamp.editor->wholeText() == ours);
             CHECK(lamp.assetId == was);
         }
@@ -319,7 +301,6 @@ namespace
 
         const S32 notices = studio.notices;
         doc.editor->undo();
-        UNSCOPED_INFO("back to ours");
         CHECK(doc.editor->wholeText() == ours);
         unit->textChanged(doc);
         {
@@ -328,7 +309,6 @@ namespace
             CHECK(*doc.savedThere == theirs);
             REQUIRE_FALSE(doc.merged);
         }
-        UNSCOPED_INFO("said");
         CHECK(services().reports.back().text == said("MergeTakenBack", named(doc)));
         UNSCOPED_INFO("take, keep, merge and compare offered again");
         CHECK(services().reports.back().actions == std::vector<std::string>{ "take_saved", "keep_saved", "merge_saved", "compare_saved" });
@@ -409,13 +389,10 @@ namespace
         doc.compareView->right()->goTo(ALTextPos(6, 0));
         UNSCOPED_INFO("where it is in one");
         CHECK(ALScriptStudioMerging::canSettle(doc));
-        UNSCOPED_INFO("settled with theirs");
         CHECK(ALScriptStudioMerging::settle(doc, ALTextMerge::Take::Theirs));
         UNSCOPED_INFO("theirs in the tab");
         CHECK(doc.editor->wholeText() == lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "theirs 6" } }));
-        UNSCOPED_INFO("none left");
         CHECK(doc.compareView->conflictCount() == 0);
-        UNSCOPED_INFO("nothing left to settle");
         CHECK_FALSE(ALScriptStudioMerging::canSettle(doc));
         notice = ALScriptStudioOrphans::noticeFor(&doc, services());
         UNSCOPED_INFO("nor to say");
@@ -443,12 +420,8 @@ namespace
                       lines(8, { { 3, "  three" }, { 5, "mine 5" }, { 7, "    line 7" } }));
         UNSCOPED_INFO("compared with the tab as merged");
         CHECK(doc.compareView->rightText() == doc.editor->wholeText());
-        {
-            INFO("a merge with no conflict");
-            REQUIRE(doc.compareView->merging());
-            CHECK(doc.compareView->conflictCount() == 0);
-        }
-        UNSCOPED_INFO("said");
+        REQUIRE(doc.compareView->merging());
+        CHECK(doc.compareView->conflictCount() == 0);
         CHECK(services().reports.back().text == said("MergeClean", named(doc)));
     }
 }

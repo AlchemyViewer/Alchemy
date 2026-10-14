@@ -55,22 +55,14 @@ namespace
     {
         const auto marks = ALDayCycleLandmarks::find(sine());
 
-        UNSCOPED_INFO("has sunrise");
         CHECK(marks.has_sunrise);
-        UNSCOPED_INFO("has noon");
         CHECK(marks.has_noon);
-        UNSCOPED_INFO("has sunset");
         CHECK(marks.has_sunset);
-        UNSCOPED_INFO("has midnight");
         CHECK(marks.has_midnight);
 
-        UNSCOPED_INFO("sunrise at 0");
         CHECK(apart(marks.sunrise, 0.f) < 0.02f);
-        UNSCOPED_INFO("noon at 0.25");
         CHECK(apart(marks.noon, 0.25f) < 0.02f);
-        UNSCOPED_INFO("sunset at 0.5");
         CHECK(apart(marks.sunset, 0.5f) < 0.02f);
-        UNSCOPED_INFO("midnight at 0.75");
         CHECK(apart(marks.midnight, 0.75f) < 0.02f);
     }
 
@@ -81,13 +73,9 @@ namespace
         const F32 phase = 0.3f;
         const auto marks = ALDayCycleLandmarks::find(sine(phase));
 
-        UNSCOPED_INFO("sunrise moved");
         CHECK(apart(marks.sunrise, phase) < 0.02f);
-        UNSCOPED_INFO("noon moved");
         CHECK(apart(marks.noon, phase + 0.25f) < 0.02f);
-        UNSCOPED_INFO("sunset moved");
         CHECK(apart(marks.sunset, std::fmod(phase + 0.5f, 1.f)) < 0.02f);
-        UNSCOPED_INFO("midnight moved");
         CHECK(apart(marks.midnight, std::fmod(phase + 0.75f, 1.f)) < 0.02f);
     }
 
@@ -99,7 +87,6 @@ namespace
         const auto marks = ALDayCycleLandmarks::find(sine(0.1f), 16);
         const F32 grid = 1.f / 16.f;
 
-        UNSCOPED_INFO("has sunrise");
         CHECK(marks.has_sunrise);
         UNSCOPED_INFO("beats the grid");
         CHECK(apart(marks.sunrise, 0.1f) < grid * 0.5f);
@@ -112,13 +99,9 @@ namespace
         const auto marks = ALDayCycleLandmarks::find(
             [](F32 p) { return 0.5f + 0.25f * std::sin(TWO_PI * p); });
 
-        UNSCOPED_INFO("has noon");
         CHECK(marks.has_noon);
-        UNSCOPED_INFO("no sunrise");
         CHECK_FALSE(marks.has_sunrise);
-        UNSCOPED_INFO("no sunset");
         CHECK_FALSE(marks.has_sunset);
-        UNSCOPED_INFO("no midnight");
         CHECK_FALSE(marks.has_midnight);
         UNSCOPED_INFO("noon at the peak");
         CHECK(apart(marks.noon, 0.25f) < 0.02f);
@@ -130,13 +113,9 @@ namespace
         const auto marks = ALDayCycleLandmarks::find(
             [](F32 p) { return -0.5f + 0.25f * std::sin(TWO_PI * p); });
 
-        UNSCOPED_INFO("has midnight");
         CHECK(marks.has_midnight);
-        UNSCOPED_INFO("no noon");
         CHECK_FALSE(marks.has_noon);
-        UNSCOPED_INFO("no sunrise");
         CHECK_FALSE(marks.has_sunrise);
-        UNSCOPED_INFO("no sunset");
         CHECK_FALSE(marks.has_sunset);
     }
 
@@ -146,7 +125,6 @@ namespace
     {
         const auto marks = ALDayCycleLandmarks::find([](F32) { return 0.5f; });
 
-        UNSCOPED_INFO("nothing to find");
         CHECK_FALSE(marks.any());
     }
 
@@ -158,36 +136,22 @@ namespace
         {
             const F32 phase = (F32)i / 20.f;
             const auto marks = ALDayCycleLandmarks::find(sine(phase));
+            CAPTURE(phase);
 
-            {
-                INFO("sunrise in range");
-                REQUIRE(marks.sunrise >= 0.f);
-                REQUIRE(marks.sunrise < 1.f);
-            }
-            {
-                INFO("noon in range");
-                REQUIRE(marks.noon >= 0.f);
-                REQUIRE(marks.noon < 1.f);
-            }
-            {
-                INFO("sunset in range");
-                REQUIRE(marks.sunset >= 0.f);
-                REQUIRE(marks.sunset < 1.f);
-            }
-            {
-                INFO("midnight in range");
-                REQUIRE(marks.midnight >= 0.f);
-                REQUIRE(marks.midnight < 1.f);
-            }
+            REQUIRE(marks.sunrise >= 0.f);
+            REQUIRE(marks.sunrise < 1.f);
+            REQUIRE(marks.noon >= 0.f);
+            REQUIRE(marks.noon < 1.f);
+            REQUIRE(marks.sunset >= 0.f);
+            REQUIRE(marks.sunset < 1.f);
+            REQUIRE(marks.midnight >= 0.f);
+            REQUIRE(marks.midnight < 1.f);
         }
     }
 
-    // Nothing to sample with, nothing to say.
     TEST_CASE_METHOD(daycycle_landmarks, "ALDayCycleLandmarks: no sampler or too few samples finds nothing", "[ALDayCycleLandmarks]")
     {
-        UNSCOPED_INFO("no sampler");
         CHECK_FALSE(ALDayCycleLandmarks::find(nullptr).any());
-        UNSCOPED_INFO("too few samples");
         CHECK_FALSE(ALDayCycleLandmarks::find(sine(), 1).any());
     }
 }

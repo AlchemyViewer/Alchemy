@@ -59,14 +59,12 @@ TEST_CASE("LLCPPFeatures: auto deduces an element and an iterator type", "[LLCPP
 
     // auto element
     auto& aval = numbers[1];
-    UNSCOPED_INFO("auto element");
     CHECK(aval==6);
 
     // auto iterator (non-const)
     auto it = numbers.rbegin();
     *it += 1;
     S32 val = *it;
-    UNSCOPED_INFO("auto iterator");
     CHECK(val==10);
 }
 
@@ -89,7 +87,6 @@ TEST_CASE("LLCPPFeatures: range for walks a container or a C array", "[LLCPPFeat
         auto& n = *it;
         n *= 2;
     }
-    UNSCOPED_INFO("iterator for vector");
     CHECK(numbers[2]==18);
 
     // Range for with container
@@ -102,7 +99,6 @@ TEST_CASE("LLCPPFeatures: range for walks a container or a C array", "[LLCPPFeat
     {
         n *= 2;
     }
-    UNSCOPED_INFO("range for vector");
     CHECK(numbersb[2]==18);
 
     // Range for over a C-style array.
@@ -115,7 +111,6 @@ TEST_CASE("LLCPPFeatures: range for walks a container or a C array", "[LLCPPFeat
     {
         sum += v;
     }
-    UNSCOPED_INFO("for C-array");
     CHECK(sum==31);
 }
 
@@ -152,7 +147,6 @@ public:
 TEST_CASE("LLCPPFeatures: an override specifier marks a virtual override", "[LLCPPFeatures]")
 {
     Bar b;
-    UNSCOPED_INFO("override");
     CHECK(b.is_happy());
 }
 
@@ -186,7 +180,6 @@ public:
 TEST_CASE("LLCPPFeatures: a class derives from one with a final override", "[LLCPPFeatures]")
 {
     Bicycle bi;
-    UNSCOPED_INFO("final");
     CHECK(bi.has_wheels());
 }
 
@@ -245,11 +238,8 @@ TEST_CASE("LLCPPFeatures: a defaulted copy constructor copies the members", "[LL
     DefaultCopyOK d; // OK
     DefaultCopyOK d2(d); // OK
     DefaultCopyOK d3 = d; // OK
-    UNSCOPED_INFO("default copy d");
     CHECK(d.val()==123);
-    UNSCOPED_INFO("default copy d2");
     CHECK(d.val()==d2.val());
-    UNSCOPED_INFO("default copy d3");
     CHECK(d.val()==d3.val());
 }
 
@@ -287,13 +277,10 @@ public:
 TEST_CASE("LLCPPFeatures: inline member initializers give defaults a constructor overrides", "[LLCPPFeatures]")
 {
     InitInline ii;
-    UNSCOPED_INFO("init member inline 1");
     CHECK(ii.mFoo==10);
 
     InitInlineWithConstructor iici;
-    UNSCOPED_INFO("init member inline 2");
     CHECK(iici.mFoo==10);
-    UNSCOPED_INFO("init member inline 3");
     CHECK(iici.mBar==25);
 }
 
@@ -321,12 +308,10 @@ constexpr S32 ce_factorial(S32 n)
 TEST_CASE("LLCPPFeatures: constexpr functions compute values", "[LLCPPFeatures]")
 {
     S32 val = compute2();
-    UNSCOPED_INFO("constexpr 1");
     CHECK(val==2);
 
     // Compile-time factorial. You used to need complex templates to do something this useless.
     S32 fac5 = ce_factorial(5);
-    UNSCOPED_INFO("constexpr 2");
     CHECK(fac5==120);
 }
 
@@ -361,7 +346,6 @@ using stringmap = std::map<std::string, T>;
 TEST_CASE("LLCPPFeatures: a template type alias names a map type", "[LLCPPFeatures]")
 {
     stringmap<S32> name_counts{ {"alice", 3}, {"bob", 2} };
-    UNSCOPED_INFO("type alias");
     CHECK(name_counts["bob"]==2);
 }
 

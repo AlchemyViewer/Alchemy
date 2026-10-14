@@ -64,7 +64,6 @@ namespace
     TEST_CASE("alfeedback: a sentry.io DSN sends to its project's envelope endpoint", "[alfeedback]")
     {
         const auto endpoint = ALFeedback::endpointFromDsn("https://0123abcd@o42.ingest.sentry.io/4501");
-        UNSCOPED_INFO("parsed");
         REQUIRE(endpoint.has_value());
         CHECK(endpoint->url == "https://o42.ingest.sentry.io/api/4501/envelope/");
         CHECK(endpoint->publicKey == "0123abcd");
@@ -73,7 +72,6 @@ namespace
     TEST_CASE("alfeedback: a self-hosted DSN keeps its port and path and drops an old secret", "[alfeedback]")
     {
         const auto endpoint = ALFeedback::endpointFromDsn("https://key:secret@sentry.example.com:9000/prefix/7/");
-        UNSCOPED_INFO("parsed");
         REQUIRE(endpoint.has_value());
         CHECK(endpoint->url == "https://sentry.example.com:9000/prefix/api/7/envelope/");
         CHECK(endpoint->publicKey == "key");
@@ -93,7 +91,6 @@ namespace
         REQUIRE_FALSE(ALFeedback::endpointFromDsn("https://key@host"));
         UNSCOPED_INFO("empty host");
         REQUIRE_FALSE(ALFeedback::endpointFromDsn("https://key@/1"));
-        UNSCOPED_INFO("empty");
         REQUIRE_FALSE(ALFeedback::endpointFromDsn(""));
     }
 
@@ -105,15 +102,11 @@ namespace
 
     TEST_CASE("alfeedback: settings named for keys or passwords or secrets or emails stay private", "[alfeedback]")
     {
-        UNSCOPED_INFO("translation key");
         CHECK(ALFeedback::privateSetting("DeepLTranslateAPIKey"));
         UNSCOPED_INFO("any case");
         CHECK(ALFeedback::privateSetting("someapikey"));
-        UNSCOPED_INFO("password");
         CHECK(ALFeedback::privateSetting("RememberPassword"));
-        UNSCOPED_INFO("token");
         CHECK(ALFeedback::privateSetting("ServiceToken"));
-        UNSCOPED_INFO("secret");
         CHECK(ALFeedback::privateSetting("ClientSecret"));
         UNSCOPED_INFO("an address");
         CHECK(ALFeedback::privateSetting("AlchemyFeedbackEmail"));
@@ -143,7 +136,6 @@ namespace
         CHECK_FALSE(ALFeedback::plausibleEmail("rye@.com"));
         UNSCOPED_INFO("space");
         CHECK_FALSE(ALFeedback::plausibleEmail("r ye@example.com"));
-        UNSCOPED_INFO("empty");
         CHECK_FALSE(ALFeedback::plausibleEmail(""));
     }
 
@@ -173,11 +165,8 @@ namespace
     TEST_CASE("alfeedback: an event id is 32 lower-case hex digits and new each time", "[alfeedback]")
     {
         const std::string id = ALFeedback::newEventId();
-        UNSCOPED_INFO("length");
         REQUIRE(id.size() == 32u);
-        UNSCOPED_INFO("hex");
         REQUIRE(id.find_first_not_of("0123456789abcdef") == std::string::npos);
-        UNSCOPED_INFO("new");
         CHECK(id != ALFeedback::newEventId());
     }
 
@@ -202,40 +191,24 @@ namespace
         context.tags = { { "run_id", "run" }, { "empty", "" } };
 
         const LLSD event = ALFeedback::feedbackEvent("feedc0de", "2026-10-09T12:00:00Z", message, context);
-        UNSCOPED_INFO("id");
         CHECK(event["event_id"].asString() == "feedc0de");
-        UNSCOPED_INFO("timestamp");
         CHECK(event["timestamp"].asString() == "2026-10-09T12:00:00Z");
-        UNSCOPED_INFO("level");
         CHECK(event["level"].asString() == "info");
-        UNSCOPED_INFO("release");
         CHECK(event["release"].asString() == "alchemy@26.4.0+64033");
-        UNSCOPED_INFO("environment");
         CHECK(event["environment"].asString() == "Alchemy Test");
-        UNSCOPED_INFO("dist");
         CHECK(event["dist"].asString() == "64033");
-        UNSCOPED_INFO("user id");
         CHECK(event["user"]["id"].asString() == context.userId);
-        UNSCOPED_INFO("user name");
         CHECK(event["user"]["username"].asString() == "rye.resident");
-        UNSCOPED_INFO("kind");
         CHECK(event["tags"]["feedback_kind"].asString() == "idea");
-        UNSCOPED_INFO("tag");
         CHECK(event["tags"]["run_id"].asString() == "run");
         UNSCOPED_INFO("an empty tag is left out");
         REQUIRE_FALSE(event["tags"].has("empty"));
         const LLSD& feedback = event["contexts"]["feedback"];
-        UNSCOPED_INFO("message");
         CHECK(feedback["message"].asString() == "More knobs");
-        UNSCOPED_INFO("email");
         CHECK(feedback["contact_email"].asString() == "rye@example.com");
-        UNSCOPED_INFO("name");
         CHECK(feedback["name"].asString() == "Rye");
-        UNSCOPED_INFO("associated");
         CHECK(feedback["associated_event_id"].asString() == message.associatedEventId);
-        UNSCOPED_INFO("os");
         CHECK(event["contexts"]["os"]["name"].asString() == context.osName);
-        UNSCOPED_INFO("gpu");
         CHECK(event["contexts"]["gpu"]["vendor_name"].asString() == "NVIDIA");
     }
 
@@ -244,20 +217,13 @@ namespace
         ALFeedback::Message message;
         message.text = "It broke";
         const LLSD event = ALFeedback::feedbackEvent("feedc0de", "2026-10-09T12:00:00Z", message, ALFeedback::Context());
-        UNSCOPED_INFO("no user");
         REQUIRE_FALSE(event.has("user"));
-        UNSCOPED_INFO("no release");
         REQUIRE_FALSE(event.has("release"));
-        UNSCOPED_INFO("no os");
         REQUIRE_FALSE(event["contexts"].has("os"));
-        UNSCOPED_INFO("no gpu");
         REQUIRE_FALSE(event["contexts"].has("gpu"));
         const LLSD& feedback = event["contexts"]["feedback"];
-        UNSCOPED_INFO("no email");
         REQUIRE_FALSE(feedback.has("contact_email"));
-        UNSCOPED_INFO("no name");
         REQUIRE_FALSE(feedback.has("name"));
-        UNSCOPED_INFO("no association");
         REQUIRE_FALSE(feedback.has("associated_event_id"));
         UNSCOPED_INFO("problem by default");
         CHECK(event["tags"]["feedback_kind"].asString() == "problem");
@@ -292,36 +258,26 @@ namespace
 
         size_t pos = 0;
         const LLSD header = json(take(bytes, pos));
-        UNSCOPED_INFO("header id");
         CHECK(header["event_id"].asString() == "feedc0de");
-        UNSCOPED_INFO("header dsn");
         CHECK(header["dsn"].asString() == "https://k@h/1");
         // A kept envelope goes again as it is, days later maybe: a time it
         // was sent would be read as the client's clock being wrong.
-        UNSCOPED_INFO("no time sent");
         REQUIRE_FALSE(header.has("sent_at"));
-        UNSCOPED_INFO("header sdk");
         CHECK(header["sdk"]["name"].asString() == "alchemy.feedback");
 
         const LLSD feedback_item = json(take(bytes, pos));
-        UNSCOPED_INFO("feedback type");
         CHECK(feedback_item["type"].asString() == "feedback");
         const LLSD payload = json(take(bytes, pos, feedback_item["length"].asInteger()));
         UNSCOPED_INFO("the message round-trips");
         CHECK(payload["contexts"]["feedback"]["message"].asString() == message.text);
 
         const LLSD screenshot_item = json(take(bytes, pos));
-        UNSCOPED_INFO("attachment type");
         CHECK(screenshot_item["type"].asString() == "attachment");
-        UNSCOPED_INFO("filename");
         CHECK(screenshot_item["filename"].asString() == "screenshot.png");
-        UNSCOPED_INFO("content type");
         CHECK(screenshot_item["content_type"].asString() == "image/png");
-        UNSCOPED_INFO("binary bytes");
         CHECK(std::string(take(bytes, pos, screenshot_item["length"].asInteger())) == binary);
 
         const LLSD log_item = json(take(bytes, pos));
-        UNSCOPED_INFO("log bytes");
         CHECK(std::string(take(bytes, pos, log_item["length"].asInteger())) == "line\n");
         UNSCOPED_INFO("nothing after");
         REQUIRE(pos == bytes.size());
@@ -335,7 +291,6 @@ namespace
             data += "2026-10-09T12:00:00Z INFO: a log line that repeats\n";
         }
         std::string zipped;
-        UNSCOPED_INFO("compressed");
         REQUIRE(ALFeedback::gzip(data, zipped));
         {
             INFO("gzip magic");
@@ -348,7 +303,6 @@ namespace
 
         std::string inflated(data.size(), '\0');
         z_stream stream = {};
-        UNSCOPED_INFO("inflate init");
         CHECK(inflateInit2(&stream, MAX_WBITS + 16) == Z_OK);
         stream.next_in = reinterpret_cast<Bytef*>(zipped.data());
         stream.avail_in = static_cast<uInt>(zipped.size());
@@ -364,42 +318,27 @@ namespace
     TEST_CASE("alfeedback: the server's answer reads as an outcome", "[alfeedback]")
     {
         using ALFeedback::Outcome;
-        UNSCOPED_INFO("200");
         CHECK(ALFeedback::classify(200) == Outcome::Sent);
-        UNSCOPED_INFO("429");
         CHECK(ALFeedback::classify(429) == Outcome::RateLimited);
-        UNSCOPED_INFO("413");
         CHECK(ALFeedback::classify(413) == Outcome::TooLarge);
-        UNSCOPED_INFO("400");
         CHECK(ALFeedback::classify(400) == Outcome::Rejected);
-        UNSCOPED_INFO("403");
         CHECK(ALFeedback::classify(403) == Outcome::Rejected);
-        UNSCOPED_INFO("408");
         CHECK(ALFeedback::classify(408) == Outcome::Unreachable);
-        UNSCOPED_INFO("503");
         CHECK(ALFeedback::classify(503) == Outcome::Unreachable);
         UNSCOPED_INFO("no answer");
         CHECK(ALFeedback::classify(0) == Outcome::Unreachable);
-        UNSCOPED_INFO("retry when limited");
         CHECK(ALFeedback::retryable(Outcome::RateLimited));
-        UNSCOPED_INFO("retry when unreachable");
         CHECK(ALFeedback::retryable(Outcome::Unreachable));
-        UNSCOPED_INFO("no retry when refused");
         CHECK_FALSE(ALFeedback::retryable(Outcome::Rejected));
-        UNSCOPED_INFO("no retry when too large");
         CHECK_FALSE(ALFeedback::retryable(Outcome::TooLarge));
-        UNSCOPED_INFO("no retry when sent");
         CHECK_FALSE(ALFeedback::retryable(Outcome::Sent));
     }
 
     TEST_CASE("alfeedback: a kept report's wait doubles from 15 minutes to 6 hours or more if asked", "[alfeedback]")
     {
         const S64 now = 1000000;
-        UNSCOPED_INFO("first");
         CHECK(ALFeedback::nextAttempt(now, 1, 0.f) == now + 15 * 60);
-        UNSCOPED_INFO("second");
         CHECK(ALFeedback::nextAttempt(now, 2, 0.f) == now + 30 * 60);
-        UNSCOPED_INFO("third");
         CHECK(ALFeedback::nextAttempt(now, 3, 0.f) == now + 60 * 60);
         UNSCOPED_INFO("capped");
         CHECK(ALFeedback::nextAttempt(now, 20, 0.f) == now + 6 * 60 * 60);
@@ -429,15 +368,10 @@ namespace
         queued.attempts = 3;
         queued.nextAt = 4102448400;
         const auto back = ALFeedback::queuedFromJson(ALFeedback::queuedToJson(queued));
-        UNSCOPED_INFO("parsed");
         REQUIRE(back.has_value());
-        UNSCOPED_INFO("id");
         CHECK(back->eventId == queued.eventId);
-        UNSCOPED_INFO("created");
         CHECK(back->created == queued.created);
-        UNSCOPED_INFO("attempts");
         CHECK(back->attempts == queued.attempts);
-        UNSCOPED_INFO("next");
         CHECK(back->nextAt == queued.nextAt);
         UNSCOPED_INFO("not a record");
         REQUIRE_FALSE(ALFeedback::queuedFromJson("{\"nothing\":1}"));
@@ -451,7 +385,6 @@ namespace
         UNSCOPED_INFO("loopback");
         REQUIRE(local.has_value());
         CHECK(local->url == "http://127.0.0.1:8765/api/1/envelope/");
-        UNSCOPED_INFO("localhost");
         REQUIRE(ALFeedback::endpointFromDsn("http://k@localhost/1").has_value());
         UNSCOPED_INFO("IPv6 loopback");
         REQUIRE(ALFeedback::endpointFromDsn("http://k@[::1]:9000/1").has_value());
@@ -492,7 +425,6 @@ namespace
 
     TEST_CASE("alfeedback: only an id can name a file", "[alfeedback]")
     {
-        UNSCOPED_INFO("an id");
         CHECK(ALFeedback::validEventId(ALFeedback::newEventId()));
         UNSCOPED_INFO("upper case");
         CHECK_FALSE(ALFeedback::validEventId("0123456789ABCDEF0123456789abcdef"));
@@ -531,11 +463,8 @@ namespace
 
     TEST_CASE("alfeedback: a wait the server asks for is a sane number of seconds", "[alfeedback]")
     {
-        UNSCOPED_INFO("none");
         CHECK(ALFeedback::serverWait(0.f) == 0);
-        UNSCOPED_INFO("negative");
         CHECK(ALFeedback::serverWait(-5.f) == 0);
-        UNSCOPED_INFO("not a number");
         CHECK(ALFeedback::serverWait(std::numeric_limits<F32>::quiet_NaN()) == 0);
         UNSCOPED_INFO("rounded up");
         CHECK(ALFeedback::serverWait(90.2f) == 91);
@@ -557,13 +486,9 @@ namespace
         queued.kind = ALFeedback::Kind::Idea;
         queued.message = "More knobs \xF0\x9F\x99\x82";
         const auto back = ALFeedback::queuedFromJson(ALFeedback::queuedToJson(queued));
-        UNSCOPED_INFO("parsed");
         REQUIRE(back.has_value());
-        UNSCOPED_INFO("not before");
         CHECK(back->notBefore == queued.notBefore);
-        UNSCOPED_INFO("kind");
         CHECK(back->kind == ALFeedback::Kind::Idea);
-        UNSCOPED_INFO("message");
         CHECK(back->message == queued.message);
         UNSCOPED_INFO("a path for an id");
         REQUIRE_FALSE(ALFeedback::queuedFromJson("{\"event_id\":\"../../x\",\"created\":1,\"attempts\":0}"));
@@ -571,11 +496,8 @@ namespace
             "{\"event_id\":\"0123abcd89abcdef0123456789abcdef\",\"created\":1e300,\"next_at\":-5,\"attempts\":-3}");
         UNSCOPED_INFO("times that are not times");
         REQUIRE(wild.has_value());
-        UNSCOPED_INFO("created");
         CHECK(wild->created == 0);
-        UNSCOPED_INFO("next");
         CHECK(wild->nextAt == 0);
-        UNSCOPED_INFO("attempts");
         CHECK(wild->attempts == 0);
     }
 
@@ -590,30 +512,19 @@ namespace
         draft.linkedAt = "2026-10-09T12:00:00Z";
         draft.linkedRunId = "run";
         const auto back = ALFeedback::draftFromJson(ALFeedback::draftToJson(draft));
-        UNSCOPED_INFO("parsed");
         REQUIRE(back.has_value());
-        UNSCOPED_INFO("kind");
         CHECK(back->kind == ALFeedback::Kind::Other);
-        UNSCOPED_INFO("message");
         CHECK(back->message == draft.message);
-        UNSCOPED_INFO("id");
         CHECK(back->eventId == draft.eventId);
-        UNSCOPED_INFO("associated");
         CHECK(back->associatedEventId == draft.associatedEventId);
-        UNSCOPED_INFO("linked");
         CHECK(back->linked == "freeze");
-        UNSCOPED_INFO("when");
         CHECK(back->linkedAt == draft.linkedAt);
-        UNSCOPED_INFO("run");
         CHECK(back->linkedRunId == "run");
 
         const auto odd = ALFeedback::draftFromJson(
             "{\"message\":\"hi there\",\"event_id\":\"../x\",\"linked\":\"party\",\"kind\":\"nonsense\"}");
-        UNSCOPED_INFO("parsed");
         REQUIRE(odd.has_value());
-        UNSCOPED_INFO("no id");
         REQUIRE(odd->eventId.empty());
-        UNSCOPED_INFO("no link");
         REQUIRE(odd->linked.empty());
         UNSCOPED_INFO("a problem");
         CHECK(odd->kind == ALFeedback::Kind::Problem);
@@ -623,9 +534,7 @@ namespace
 
     TEST_CASE("alfeedback: kinds and outcomes have names", "[alfeedback]")
     {
-        UNSCOPED_INFO("idea");
         CHECK(ALFeedback::kindFromName(ALFeedback::kindName(ALFeedback::Kind::Idea)) == ALFeedback::Kind::Idea);
-        UNSCOPED_INFO("other");
         CHECK(ALFeedback::kindFromName("other") == ALFeedback::Kind::Other);
         UNSCOPED_INFO("anything else");
         CHECK(ALFeedback::kindFromName("bug") == ALFeedback::Kind::Problem);

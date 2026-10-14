@@ -175,24 +175,13 @@ namespace
         Doc&              a          = tab("a", "default {}");
         unit.edit(a);
         const std::string file = unit.fileName(a);
-        UNSCOPED_INFO("the copy");
         CHECK(contents(file) == std::string("default {}"));
-        {
-            INFO("watched");
-            REQUIRE(a.watch);
-            CHECK(a.watch->path() == file);
-        }
-        {
-            INFO("the log beside it");
-            REQUIRE(a.external->log);
-            CHECK(a.external->log->path() == file + ".log");
-        }
-        {
-            INFO("the bridge told");
-            CHECK(studio.subscribed == Names{ "a" });
-            CHECK(a.external->subscribed);
-        }
-        UNSCOPED_INFO("the editor started on it");
+        REQUIRE(a.watch);
+        CHECK(a.watch->path() == file);
+        REQUIRE(a.external->log);
+        CHECK(a.external->log->path() == file + ".log");
+        CHECK(studio.subscribed == Names{ "a" });
+        CHECK(a.external->subscribed);
         CHECK(studio.started == Names{ file });
         UNSCOPED_INFO("what it holds, known");
         CHECK(a.external->written == std::string("default {}"));
@@ -213,8 +202,8 @@ namespace
         }
         {
             INFO("with no log, and nothing for the bridge");
-            REQUIRE_FALSE(d.external->log);
-            REQUIRE(studio.subscribed.size() == 2);
+            CHECK_FALSE(d.external->log);
+            CHECK(studio.subscribed.size() == 2);
         }
 
         Doc& n    = tab("n", "x");
@@ -222,8 +211,8 @@ namespace
         unit.edit(n);
         {
             INFO("a notecard not");
-            REQUIRE(studio.started.size() == 3);
-            REQUIRE_FALSE(n.watch);
+            CHECK(studio.started.size() == 3);
+            CHECK_FALSE(n.watch);
         }
     }
 
@@ -234,11 +223,8 @@ namespace
         unit.edit(a);
         write(unit.fileName(a), "two");
         unit.changed("a", unit.fileName(a));
-        {
-            INFO("taken");
-            CHECK(studio.taken == Names{ "two" });
-            CHECK(a.editor->text() == "two");
-        }
+        CHECK(studio.taken == Names{ "two" });
+        CHECK(a.editor->text() == "two");
         {
             INFO("saved from here, as the editor's");
             CHECK(studio.saved == Names{ "a" });
@@ -246,18 +232,17 @@ namespace
         }
         UNSCOPED_INFO("what the copy holds, known");
         CHECK(a.external->written == std::string("two"));
-        UNSCOPED_INFO("nothing asked");
         CHECK_FALSE(asked());
         a.editor->resetDirty();
         unit.changed("a", unit.fileName(a));
         {
             INFO("the same again, with the tab saved: nothing to take or save");
-            REQUIRE(studio.taken.size() == 1);
-            REQUIRE(studio.saved.size() == 1);
+            CHECK(studio.taken.size() == 1);
+            CHECK(studio.saved.size() == 1);
         }
         unit.changed("nobody", unit.fileName(a));
         UNSCOPED_INFO("a tab gone: nothing");
-        REQUIRE(studio.taken.size() == 1);
+        CHECK(studio.taken.size() == 1);
     }
 
     TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: a save outside over changes here is held until the author takes it", "[alscriptexternaleditor]")
@@ -269,27 +254,18 @@ namespace
         a.editor->insertText(" here");
         write(unit.fileName(a), "two");
         unit.changed("a", unit.fileName(a));
-        {
-            INFO("not taken");
-            REQUIRE(studio.taken.empty());
-            CHECK(a.editor->text() == "one here");
-        }
-        {
-            INFO("held");
-            REQUIRE(a.external->waiting);
-            CHECK(*a.external->waiting == "two");
-        }
-        {
-            INFO("and asked about");
-            CHECK(asked());
-            CHECK(services.reports.back().failure);
-            CHECK(services.reports.back().doc == "a");
-        }
+        CHECK(studio.taken.empty());
+        CHECK(a.editor->text() == "one here");
+        REQUIRE(a.external->waiting);
+        CHECK(*a.external->waiting == "two");
+        REQUIRE(asked());
+        CHECK(services.reports.back().failure);
+        CHECK(services.reports.back().doc == "a");
         unit.take(a, *a.external->waiting);
         {
             INFO("taken once said");
             CHECK(studio.taken == Names{ "two" });
-            REQUIRE_FALSE(a.external->waiting);
+            CHECK_FALSE(a.external->waiting);
             CHECK(studio.saved == Names{ "a" });
         }
     }
@@ -305,11 +281,8 @@ namespace
         CHECK(studio.taken == Names{ "a\nb" });
         write(unit.fileName(a), "a\r\nb\r\nc");
         unit.changed("a", unit.fileName(a));
-        {
-            INFO("the second taken too");
-            CHECK(studio.taken == Names{ "a\nb", "a\nb\nc" });
-            CHECK_FALSE(asked());
-        }
+        CHECK(studio.taken == Names{ "a\nb", "a\nb\nc" });
+        CHECK_FALSE(asked());
     }
 
     TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: an emptied copy is taken only if still empty a moment later", "[alscriptexternaleditor]")
@@ -320,7 +293,7 @@ namespace
         write(unit.fileName(a), "");
         unit.changed("a", unit.fileName(a));
         UNSCOPED_INFO("not taken at once");
-        REQUIRE(studio.taken.empty());
+        CHECK(studio.taken.empty());
         unit.changed("a", unit.fileName(a), true);
         UNSCOPED_INFO("still empty a moment later: taken");
         CHECK(studio.taken == Names{ "" });
@@ -330,7 +303,7 @@ namespace
         {
             INFO("the second step heard first: the look after takes nothing more");
             CHECK(studio.taken == Names{ "", "two" });
-            REQUIRE(studio.saved.size() == 2);
+            CHECK(studio.saved.size() == 2);
         }
     }
 
@@ -342,9 +315,8 @@ namespace
         a.editor->setCaret(a.editor->document().end());
         a.editor->insertText(" two");
         unit.sync(a);
-        UNSCOPED_INFO("written again");
         CHECK(contents(unit.fileName(a)) == std::string("one two"));
-        UNSCOPED_INFO("and known");
+        UNSCOPED_INFO("what it holds, known");
         CHECK(a.external->written == std::string("one two"));
         ALScriptCompileResult result;
         result.messages = { "(1, 2) : ERROR : Syntax error\x07" };
@@ -353,8 +325,8 @@ namespace
         {
             INFO("the log: when, then the words, what cannot be printed dropped");
             CHECK(log.find("// [when]") == 0);
-            REQUIRE(log.find("Syntax error\n") != std::string::npos);
-            REQUIRE(log.find('\x07') == std::string::npos);
+            CHECK(log.find("Syntax error\n") != std::string::npos);
+            CHECK(log.find('\x07') == std::string::npos);
         }
         Doc& d = tab("d", "x");
         d.file = "/somewhere/d.lsl";
@@ -362,8 +334,8 @@ namespace
         unit.sync(d);
         {
             INFO("a tab not held outside: nothing");
-            REQUIRE_FALSE(d.external->log);
-            REQUIRE_FALSE(d.watch);
+            CHECK_FALSE(d.external->log);
+            CHECK_FALSE(d.watch);
         }
     }
 
@@ -377,28 +349,19 @@ namespace
         unit.log(a, result);
         const std::string file = unit.fileName(a);
         const std::string log  = a.external->log->path();
-        {
-            INFO("both there");
-            CHECK(exists(file));
-            CHECK(exists(log));
-        }
+        CHECK(exists(file));
+        CHECK(exists(log));
         a.save.fromExternal(1);
         unit.stop(a);
-        {
-            INFO("the bridge told");
-            CHECK(studio.unsubscribed == Names{ "a" });
-            CHECK_FALSE(a.external->subscribed);
-        }
+        CHECK(studio.unsubscribed == Names{ "a" });
+        CHECK_FALSE(a.external->subscribed);
         {
             INFO("the watch gone, and the studio's copy with it");
-            REQUIRE_FALSE(a.watch);
+            CHECK_FALSE(a.watch);
             CHECK_FALSE(exists(file));
         }
-        {
-            INFO("the log gone");
-            CHECK_FALSE(exists(log));
-            REQUIRE_FALSE(a.external->log);
-        }
+        CHECK_FALSE(exists(log));
+        CHECK_FALSE(a.external->log);
         UNSCOPED_INFO("a save under way is no longer the editor's");
         CHECK_FALSE(a.save.external());
     }
@@ -412,22 +375,13 @@ namespace
         a.editor->insertText(" here");
         write(unit.fileName(a), "two");
         unit.changed("a", unit.fileName(a));
-        {
-            INFO("held");
-            REQUIRE(a.external->waiting);
-            CHECK(*a.external->waiting == "two");
-        }
+        REQUIRE(a.external->waiting);
+        CHECK(*a.external->waiting == "two");
         unit.keep(a);
-        {
-            INFO("let go, the tab's text standing");
-            REQUIRE_FALSE(a.external->waiting);
-            REQUIRE(studio.taken.empty());
-            CHECK(a.editor->text() == "one here");
-        }
-        {
-            INFO("said");
-            REQUIRE_FALSE(services.statuses.empty());
-            CHECK(services.statuses.back().find("ExternalKept") == 0);
-        }
+        CHECK_FALSE(a.external->waiting);
+        CHECK(studio.taken.empty());
+        CHECK(a.editor->text() == "one here");
+        REQUIRE_FALSE(services.statuses.empty());
+        CHECK(services.statuses.back().find("ExternalKept") == 0);
     }
 }

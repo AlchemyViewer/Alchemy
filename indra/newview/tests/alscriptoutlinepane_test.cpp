@@ -168,12 +168,10 @@ namespace
         {
             INFO("not in front: nothing");
             CHECK(outline->list()->getItemCount() == 0);
-            REQUIRE(told().shown.empty());
+            CHECK(told().shown.empty());
         }
         outline->show(doc);
-        UNSCOPED_INFO("the tree");
-        CHECK(rows() == std::string("count, ^default, .touch_start, .state_entry, alpha"));
-        UNSCOPED_INFO("told");
+        REQUIRE(rows() == std::string("count, ^default, .touch_start, .state_entry, alpha"));
         CHECK(joined(told().shown) == std::string("a"));
         const std::vector<LLScrollListItem*> items = outline->list()->getAllData();
         UNSCOPED_INFO("what it is");
@@ -182,16 +180,13 @@ namespace
         CHECK(items[0]->getColumn(1)->getToolTip() == std::string("variable\ninteger"));
         UNSCOPED_INFO("by its index");
         CHECK(items[4]->getValue().asInteger() == 4);
-        UNSCOPED_INFO("nothing said over it");
-        REQUIRE(comment().empty());
+        CHECK(comment().empty());
 
         doc.outline.clear();
         outline->show(doc);
-        UNSCOPED_INFO("nothing to outline");
         CHECK(comment() == std::string("Nothing in this script to outline yet."));
         doc.loaded = false;
         outline->show(doc);
-        UNSCOPED_INFO("not loaded yet");
         CHECK(comment() == std::string("Still loading."));
     }
 
@@ -228,7 +223,7 @@ namespace
         {
             INFO("the list kept");
             REQUIRE_FALSE(window.services().reveals.empty());
-            REQUIRE_FALSE(window.services().reveals.back());
+            CHECK_FALSE(window.services().reveals.back());
         }
         outline->fold(0, true);
         UNSCOPED_INFO("a leaf at the top: nowhere");
@@ -249,7 +244,6 @@ namespace
         CHECK(rows() == std::string("touch_start, state_entry"));
         filter->setText(std::string("zz"));
         outline->show(doc);
-        UNSCOPED_INFO("none");
         CHECK(comment() == std::string("No symbol names match what you typed."));
         filter->setText(std::string());
 
@@ -264,7 +258,6 @@ namespace
         sort->onCommit();
         UNSCOPED_INFO("by kind, then name");
         CHECK(rows() == std::string("count, alpha, ^default, .state_entry, .touch_start"));
-        UNSCOPED_INFO("the window told");
         CHECK(told().sorts == 1);
         filter->setText(std::string("t"));
         outline->show(doc);
@@ -303,7 +296,7 @@ namespace
         UNSCOPED_INFO("followed as it is shown");
         CHECK(chosen() == 2);
         UNSCOPED_INFO("going nowhere");
-        REQUIRE(told().chosen.empty());
+        CHECK(told().chosen.empty());
     }
 
     TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: the list is made again only when what it shows changes", "[alscriptoutlinepane]")
@@ -329,7 +322,6 @@ namespace
         CHECK(cell(outline->list()->getFirstData(), 1) != "marked");
         window.services().front = 0;
         outline->forget();
-        UNSCOPED_INFO("nothing listed");
         CHECK(outline->list()->getItemCount() == 0);
         outline->show(doc);
         UNSCOPED_INFO("the same rows back");
@@ -347,37 +339,31 @@ namespace
         {
             INFO("gone to");
             CHECK(joined(told().chosen) == "count");
-            REQUIRE(window.services().reveals.back() == false);
+            CHECK_FALSE(window.services().reveals.back());
         }
         {
-            INFO("return");
+            INFO("return: gone to, to type there");
             CHECK(list->handleKeyHere(KEY_RETURN, MASK_NONE));
             CHECK(told().chosen.back() == "count editor");
         }
         UNSCOPED_INFO("the keyboard taken");
-        REQUIRE(window.services().reveals.back());
+        CHECK(window.services().reveals.back());
         {
-            INFO("escape");
+            INFO("escape: back without going");
             CHECK(list->handleKeyHere(KEY_ESCAPE, MASK_NONE));
-            REQUIRE(told().chosen.size() == 2);
-            REQUIRE(window.services().reveals.size() == 3);
+            CHECK(told().chosen.size() == 2);
+            CHECK(window.services().reveals.size() == 3);
         }
         {
             INFO("with a key held: the list's");
             CHECK_FALSE(list->handleKeyHere(KEY_RETURN, MASK_CONTROL));
-            REQUIRE(told().chosen.size() == 2);
+            CHECK(told().chosen.size() == 2);
         }
         list->selectByValue(LLSD(1));
-        {
-            INFO("left");
-            CHECK(list->handleKeyHere(KEY_LEFT, MASK_NONE));
-            CHECK(doc.outlineFolded.contains("default"));
-        }
-        {
-            INFO("right");
-            CHECK(list->handleKeyHere(KEY_RIGHT, MASK_NONE));
-            CHECK_FALSE(doc.outlineFolded.contains("default"));
-        }
+        CHECK(list->handleKeyHere(KEY_LEFT, MASK_NONE));
+        CHECK(doc.outlineFolded.contains("default"));
+        CHECK(list->handleKeyHere(KEY_RIGHT, MASK_NONE));
+        CHECK_FALSE(doc.outlineFolded.contains("default"));
 
         // The mouse only reaches what is shown.
         window.floater->setVisible(true);
@@ -400,7 +386,6 @@ namespace
         list->localPointToOtherView(rect.mLeft + icon->getWidth() + list->getColumnPadding() + 2, row_y, &x, &y, outline);
         UNSCOPED_INFO("an arrow clicked");
         CHECK(outline->handleMouseDown(x, y, MASK_NONE));
-        UNSCOPED_INFO("folds");
         CHECK(doc.outlineFolded.contains("default"));
         list->localPointToOtherView(rect.mRight - 4, row_y, &x, &y, outline);
         outline->handleMouseDown(x, y, MASK_NONE);
@@ -423,9 +408,7 @@ namespace
         Doc&                 doc     = tab("a");
         window.floater->setVisible(false);
         outline->show(doc);
-        UNSCOPED_INFO("told");
         CHECK(joined(told().shown) == "a");
-        UNSCOPED_INFO("not listed");
         CHECK(outline->list()->getItemCount() == 0);
         outline->pump();
         UNSCOPED_INFO("nor while unseen");

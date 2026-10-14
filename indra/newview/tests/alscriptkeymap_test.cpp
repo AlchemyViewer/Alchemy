@@ -191,12 +191,12 @@ namespace
         {
             for (const ALKeyChord& chord : ALScriptKeymap::menuKeys(id))
             {
-                UNSCOPED_INFO("one command's key: " + id + " " + chord.describe());
+                UNSCOPED_INFO("one command's key: " << id << " " << chord.describe());
                 REQUIRE(seen.insert({ chord.key, chord.mask, chord.leadKey, chord.leadMask }).second);
                 for (const auto& [key, mask] : { std::pair{ chord.key, chord.mask }, std::pair{ chord.leadKey, chord.leadMask } })
                 {
                     const bool types = key >= 0x20 && key < 0x80;
-                    UNSCOPED_INFO("no Control-Alt: " + id);
+                    UNSCOPED_INFO("no Control-Alt: " << id);
                     REQUIRE((!types || (mask & (MASK_CONTROL | MASK_ALT)) != (MASK_CONTROL | MASK_ALT)));
                 }
             }
@@ -214,16 +214,16 @@ namespace
         std::set<std::string> ids;
         for (const ALScriptKeymap::MenuItem& item : items)
         {
-            UNSCOPED_INFO("the only item so named: " + item.id);
+            UNSCOPED_INFO("the only item so named: " << item.id);
             REQUIRE(ids.insert(item.id).second);
-            UNSCOPED_INFO("can take keys: " + item.id);
+            UNSCOPED_INFO("can take keys: " << item.id);
             REQUIRE((alEditorCommandFromName(item.id).has_value() || ALScriptKeymap::isMenuCommand(item.id)));
-            UNSCOPED_INFO("named by its menus: " + item.id);
+            UNSCOPED_INFO("named by its menus: " << item.id);
             REQUIRE(item.path.find(" > ") != std::string::npos);
         }
         for (const std::string& id : ALScriptKeymap::menuIds())
         {
-            UNSCOPED_INFO("the table's commands are the menus': " + id);
+            UNSCOPED_INFO("the table's commands are the menus': " << id);
             REQUIRE(ids.count(id) == 1);
         }
         const auto map = std::find_if(items.begin(), items.end(), [](const ALScriptKeymap::MenuItem& item) { return item.id == "map_left"; });
@@ -332,7 +332,8 @@ namespace
         UNSCOPED_INFO("back on the Mac's Control-minus");
         CHECK(has("back", ALKeyChord{ '-', MASK_MAC_CONTROL }));
 #else
-        { UNSCOPED_INFO("back on Alt-Left"); REQUIRE((has("back", ALKeyChord{ KEY_LEFT, MASK_ALT }) && has("forward", ALKeyChord{ KEY_RIGHT, MASK_ALT }))); }
+        UNSCOPED_INFO("back on Alt-Left and forward on Alt-Right");
+        CHECK((has("back", ALKeyChord{ KEY_LEFT, MASK_ALT }) && has("forward", ALKeyChord{ KEY_RIGHT, MASK_ALT })));
 #endif
     }
 
@@ -343,7 +344,6 @@ namespace
             CHECK(ALScriptKeyPresets::all().front().id == ALScriptKeyPresets::STANDARD);
             REQUIRE(ALScriptKeyPresets::all().front().bindings.empty());
         }
-        UNSCOPED_INFO("four");
         REQUIRE(ALScriptKeyPresets::all().size() == 4);
         for (const ALScriptKeyPresets::Preset& preset : ALScriptKeyPresets::all())
         {
@@ -351,16 +351,16 @@ namespace
             for (const ALScriptKeyPresets::Binding& binding : preset.bindings)
             {
                 const std::string what = preset.id + ": " + binding.id;
-                UNSCOPED_INFO("once: " + what);
+                UNSCOPED_INFO("once: " << what);
                 REQUIRE(named.insert(binding.id).second);
-                UNSCOPED_INFO("keys: " + what);
+                UNSCOPED_INFO("keys: " << what);
                 REQUIRE_FALSE(binding.keys.empty());
                 const bool editor = alEditorCommandFromName(binding.id).has_value();
-                UNSCOPED_INFO("a command: " + what);
+                UNSCOPED_INFO("a command: " << what);
                 REQUIRE((editor || ALScriptKeymap::isMenuCommand(binding.id)));
                 for (const ALKeyChord& chord : binding.keys)
                 {
-                    UNSCOPED_INFO("one key at a time for an editor's: " + what);
+                    UNSCOPED_INFO("one key at a time for an editor's: " << what);
                     REQUIRE((!editor || !chord.twoKeys()));
                 }
             }
@@ -382,13 +382,13 @@ namespace
                 {
                     for (const ALKeyChord& chord : binding.keys)
                     {
-                        UNSCOPED_INFO("the editor's key: " + what + " " + chord.describe());
+                        UNSCOPED_INFO("the editor's key: " << what << " " << chord.describe());
                         REQUIRE(map.lookup(chord.key, chord.mask) == *command);
                     }
                 }
                 else
                 {
-                    UNSCOPED_INFO("the menu's keys: " + what + " " + ALScriptKeymap::describe(ALScriptKeymap::menuKeys(binding.id)));
+                    UNSCOPED_INFO("the menu's keys: " << what << " " << ALScriptKeymap::describe(ALScriptKeymap::menuKeys(binding.id)));
                     REQUIRE(ALScriptKeymap::menuKeys(binding.id) == binding.keys);
                 }
             }
@@ -401,7 +401,7 @@ namespace
                     const std::string what = preset.id + ": " + id + " " + chord.describe();
                     const KEY         first_key  = chord.twoKeys() ? chord.leadKey : chord.key;
                     const MASK        first_mask = chord.twoKeys() ? chord.leadMask : chord.mask;
-                    UNSCOPED_INFO("not an editor's key: " + what);
+                    UNSCOPED_INFO("not an editor's key: " << what);
                     REQUIRE(map.lookup(first_key, first_mask) == ALEditorCommand::None);
                     for (const std::string& other : ALScriptKeymap::menuIds())
                     {
@@ -413,7 +413,7 @@ namespace
                         {
                             const bool clash = theirs == chord || (!chord.twoKeys() && theirs.ledBy(chord.key, chord.mask)) ||
                                                (chord.twoKeys() && !theirs.twoKeys() && theirs.key == chord.leadKey && theirs.mask == chord.leadMask);
-                            UNSCOPED_INFO("not " + other + "'s too: " + what);
+                            UNSCOPED_INFO("not " << other << "'s too: " << what);
                             REQUIRE_FALSE(clash);
                         }
                     }
@@ -469,11 +469,11 @@ namespace
         };
         for (const auto& [id, chord] : keys)
         {
-            UNSCOPED_INFO(std::string("a menu command: ") + id);
+            UNSCOPED_INFO("a menu command: " << id);
             REQUIRE(ALScriptKeymap::isMenuCommand(id));
-            UNSCOPED_INFO(std::string("its key: ") + id + " " + chord.describe());
+            UNSCOPED_INFO("its key: " << id << " " << chord.describe());
             REQUIRE(ALScriptKeymap::menuKey(id) == chord);
-            UNSCOPED_INFO(std::string("no editor's: ") + id);
+            UNSCOPED_INFO("no editor's: " << id);
             REQUIRE(ALScriptKeymap::current().lookup(chord.key, chord.mask) == C::None);
         }
         UNSCOPED_INFO("the step beside it");

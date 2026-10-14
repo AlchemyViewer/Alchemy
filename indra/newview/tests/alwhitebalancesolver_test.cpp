@@ -42,11 +42,8 @@ namespace
     TEST_CASE_METHOD(wb_data, "ALWhiteBalanceSolver: neutral in gives a gain of one", "[ALWhiteBalanceSolver]")
     {
         const LLVector3 g = ALWhiteBalanceSolver::gain(0.f, 0.f);
-        UNSCOPED_INFO("neutral red");
         CHECK_THAT(g.mV[VX], ll_test::WithinBits(1.f, 6));
-        UNSCOPED_INFO("neutral green");
         CHECK_THAT(g.mV[VY], ll_test::WithinBits(1.f, 6));
-        UNSCOPED_INFO("neutral blue");
         CHECK_THAT(g.mV[VZ], ll_test::WithinBits(1.f, 6));
     }
 
@@ -59,7 +56,7 @@ namespace
             for (S32 j = -2; j <= 2; ++j)
             {
                 const LLVector3 g = ALWhiteBalanceSolver::gain(i * 1000.f, j * 0.5f);
-                UNSCOPED_INFO("green stays pinned");
+                CAPTURE(i, j);
                 REQUIRE_THAT(g.mV[VY], ll_test::WithinBits(1.f, 6));
             }
         }
@@ -89,10 +86,12 @@ namespace
             {
                 const F32 cct = i * 1200.f;
                 const F32 duv = j * 0.25f;
+                CAPTURE(cct, duv);
 
                 // Out of gamut is out of scope: down there the blue gain is
                 // negative, so every candidate looks alike to the solver and
-                // no inverse exists to test. Test <9> covers that region.
+                // no inverse exists to test. The out-of-gamut case below
+                // covers that region.
                 if (!ALWhiteBalanceSolver::isUsable(cct, duv))
                 {
                     continue;
@@ -151,7 +150,6 @@ namespace
     TEST_CASE_METHOD(wb_data, "ALWhiteBalanceSolver: neutralisingGain pins green and scales red and blue to meet it", "[ALWhiteBalanceSolver]")
     {
         const LLVector3 g = ALWhiteBalanceSolver::neutralisingGain(LLColor3(0.4f, 0.5f, 0.8f));
-        UNSCOPED_INFO("green pinned");
         CHECK_THAT(g.mV[VY], ll_test::WithinBits(1.f, 6));
         UNSCOPED_INFO("red is lifted to meet green");
         CHECK_THAT(g.mV[VX], ll_test::WithinBits(1.25f, 5));
@@ -180,6 +178,7 @@ namespace
         for (S32 i = -3; i <= 3; ++i)
         {
             const F32 cct = i * 1500.f;
+            CAPTURE(cct);
 
             // A grey surface seen through the inverse of the correction: this
             // is what the scene buffer holds when the light is that colour.
@@ -207,9 +206,7 @@ namespace
     {
         const ALWhiteBalanceSolver::Result got =
             ALWhiteBalanceSolver::solveForColor(LLColor3(0.5f, 0.5f, 0.5f));
-        UNSCOPED_INFO("cct stays put");
         CHECK(std::fabs(got.mCCTOffset) < 1.f);
-        UNSCOPED_INFO("duv stays put");
         CHECK(std::fabs(got.mDuv) < 1e-3f);
         UNSCOPED_INFO("exactly reachable");
         CHECK(got.mResidual < 1e-4f);

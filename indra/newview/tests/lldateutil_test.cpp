@@ -111,61 +111,46 @@ namespace
 
     TEST_CASE_METHOD(dateutil, "LLDateUtil: an age of a year or more reads in years and whole months", "[LLDateUtil]")
     {
-        UNSCOPED_INFO("years + months");
         CHECK(LLDateUtil::ageFromDate("10/30/2007", mNow) ==
             "2 years 2 months old");
-        UNSCOPED_INFO("years");
         CHECK(LLDateUtil::ageFromDate("12/31/2007", mNow) ==
             "2 years old");
-        UNSCOPED_INFO("years");
         CHECK(LLDateUtil::ageFromDate("1/1/2008", mNow) ==
             "1 year 11 months old");
-        UNSCOPED_INFO("single year + one month");
         CHECK(LLDateUtil::ageFromDate("11/30/2008", mNow) ==
             "1 year 1 month old");
-        UNSCOPED_INFO("single year + a bit");
         CHECK(LLDateUtil::ageFromDate("12/12/2008", mNow) ==
             "1 year old");
-        UNSCOPED_INFO("single year");
         CHECK(LLDateUtil::ageFromDate("12/31/2008", mNow) ==
             "1 year old");
     }
 
     TEST_CASE_METHOD(dateutil, "LLDateUtil: an age of a month to a year reads in whole months", "[LLDateUtil]")
     {
-        UNSCOPED_INFO("months");
         CHECK(LLDateUtil::ageFromDate("10/30/2009", mNow) ==
             "2 months old");
-        UNSCOPED_INFO("months 2");
         CHECK(LLDateUtil::ageFromDate("10/31/2009", mNow) ==
             "2 months old");
-        UNSCOPED_INFO("single month");
         CHECK(LLDateUtil::ageFromDate("11/30/2009", mNow) ==
             "1 month old");
     }
 
     TEST_CASE_METHOD(dateutil, "LLDateUtil: an age under a month reads in whole weeks", "[LLDateUtil]")
     {
-        UNSCOPED_INFO("4 weeks");
         CHECK(LLDateUtil::ageFromDate("12/1/2009", mNow) ==
             "4 weeks old");
-        UNSCOPED_INFO("weeks");
         CHECK(LLDateUtil::ageFromDate("12/17/2009", mNow) ==
             "2 weeks old");
-        UNSCOPED_INFO("single week");
         CHECK(LLDateUtil::ageFromDate("12/24/2009", mNow) ==
             "1 week old");
     }
 
     TEST_CASE_METHOD(dateutil, "LLDateUtil: an age under a week reads in days or as joined today", "[LLDateUtil]")
     {
-        UNSCOPED_INFO("days");
         CHECK(LLDateUtil::ageFromDate("12/29/2009", mNow) ==
             "2 days old");
-        UNSCOPED_INFO("single day");
         CHECK(LLDateUtil::ageFromDate("12/30/2009", mNow) ==
             "1 day old");
-        UNSCOPED_INFO("today");
         CHECK(LLDateUtil::ageFromDate("12/31/2009", mNow) ==
             "Joined today");
     }
@@ -173,7 +158,6 @@ namespace
     TEST_CASE_METHOD(dateutil, "LLDateUtil: an age that spans the new year still reads in weeks", "[LLDateUtil]")
     {
         LLDate now(std::string("2010-01-04T12:00:00Z"));
-        UNSCOPED_INFO("days");
         CHECK(LLDateUtil::ageFromDate("12/13/2009", now) ==
             "3 weeks old");
     }

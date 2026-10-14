@@ -103,15 +103,13 @@ namespace
 
     // --- spline: ordering and point management -------------------------------
 
-    // A fresh model is the identity ramp.
     TEST_CASE_METHOD(curve_data, "ALCurveModel: a fresh model is the identity ramp", "[ALCurveModel]")
     {
-        UNSCOPED_INFO("two points by default");
         CHECK(mCurve.getPointCount() == 2);
         for (S32 i = 0; i <= 10; ++i)
         {
             const F32 x = i * 0.1f;
-            UNSCOPED_INFO("identity ramp");
+            CAPTURE(x);
             REQUIRE_THAT(mCurve.evaluate(x), ll_test::WithinBits(x, 5));
         }
     }
@@ -127,13 +125,12 @@ namespace
         CHECK(idx_hi == 1);
         UNSCOPED_INFO("low point went before the high one");
         CHECK(idx_lo == 1);
-        UNSCOPED_INFO("four points");
-        CHECK(mCurve.getPointCount() == 4);
+        REQUIRE(mCurve.getPointCount() == 4);
 
         const auto& p = mCurve.getPoints();
         for (size_t i = 1; i < p.size(); ++i)
         {
-            UNSCOPED_INFO("x is ascending");
+            CAPTURE(i);
             REQUIRE(p[i].mX > p[i - 1].mX);
         }
         UNSCOPED_INFO("second point is the low one");
@@ -149,14 +146,12 @@ namespace
         mCurve.setPoints(pts({ { 0.f, 0.f }, { 0.5f, 0.3f }, { 0.5f, 0.7f }, { 1.f, 1.f } }));
 
         const auto& p = mCurve.getPoints();
-        UNSCOPED_INFO("kept all four");
-        REQUIRE((S32)p.size() == 4);
+        CHECK((S32)p.size() == 4);
         for (size_t i = 1; i < p.size(); ++i)
         {
-            UNSCOPED_INFO("gap is at least MIN_POINT_GAP");
+            CAPTURE(i);
             REQUIRE(p[i].mX - p[i - 1].mX >= ALCurveModel::MIN_POINT_GAP - 1e-6f);
         }
-        UNSCOPED_INFO("evaluation is finite");
         CHECK(std::isfinite(mCurve.evaluate(0.5f)));
     }
 
@@ -203,7 +198,6 @@ namespace
         CHECK_FALSE(mCurve.removePoint(7));
         UNSCOPED_INFO("interior removed");
         CHECK(mCurve.removePoint(1));
-        UNSCOPED_INFO("two left");
         CHECK(mCurve.getPointCount() == 2);
         UNSCOPED_INFO("cannot go below two");
         CHECK_FALSE(mCurve.removePoint(0));
@@ -211,14 +205,13 @@ namespace
 
     // --- spline: shape -------------------------------------------------------
 
-    // The curve passes through every control point.
     TEST_CASE_METHOD(curve_data, "ALCurveModel: the curve passes through every control point", "[ALCurveModel]")
     {
         mCurve.setPoints(pts({ { 0.f, 0.05f }, { 0.25f, 0.5f }, { 0.7f, 0.6f }, { 1.f, 0.95f } }));
 
         for (const auto& p : mCurve.getPoints())
         {
-            UNSCOPED_INFO("interpolates its points");
+            CAPTURE(p.mX);
             REQUIRE_THAT(mCurve.evaluate(p.mX), ll_test::WithinBits(p.mY, 4));
         }
     }
@@ -234,12 +227,11 @@ namespace
         mCurve.sample(s, 257);
         for (size_t i = 1; i < s.size(); ++i)
         {
-            UNSCOPED_INFO("never decreases");
+            CAPTURE(i);
             REQUIRE(s[i] >= s[i - 1] - 1e-5f);
         }
     }
 
-    // A flat run stays exactly flat -- no ringing between equal-valued points.
     TEST_CASE_METHOD(curve_data, "ALCurveModel: a flat run stays exactly flat with no ringing between equal points", "[ALCurveModel]")
     {
         mCurve.setPoints(pts({ { 0.f, 0.f }, { 0.3f, 0.5f }, { 0.7f, 0.5f }, { 1.f, 1.f } }));
@@ -247,7 +239,7 @@ namespace
         for (S32 i = 0; i <= 8; ++i)
         {
             const F32 x = 0.3f + i * 0.05f;
-            UNSCOPED_INFO("flat between equal points");
+            CAPTURE(x);
             REQUIRE_THAT(mCurve.evaluate(x), ll_test::WithinBits(0.5f, 4));
         }
     }
@@ -275,40 +267,31 @@ namespace
         mCurve.sample(s, 129);
         for (F32 y : s)
         {
-            {
-                INFO("in range");
-                REQUIRE(y >= 0.f);
-                REQUIRE(y <= 1.f);
-            }
-            UNSCOPED_INFO("finite");
+            REQUIRE(y >= 0.f);
+            REQUIRE(y <= 1.f);
             REQUIRE(std::isfinite(y));
         }
     }
 
     // --- sampling ------------------------------------------------------------
 
-    // sample() spans 0..1 inclusive and honours its count.
     TEST_CASE_METHOD(curve_data, "ALCurveModel: sample() spans 0..1 inclusive and honours its count", "[ALCurveModel]")
     {
         mCurve.setPoints(pts({ { 0.f, 0.1f }, { 0.5f, 0.4f }, { 1.f, 0.9f } }));
 
         std::vector<F32> s;
         mCurve.sample(s, 65);
-        UNSCOPED_INFO("count honoured");
         REQUIRE((S32)s.size() == 65);
-        UNSCOPED_INFO("starts at evaluate(0)");
         CHECK_THAT(s.front(), ll_test::WithinBits(mCurve.evaluate(0.f), 6));
-        UNSCOPED_INFO("ends at evaluate(1)");
         CHECK_THAT(s.back(), ll_test::WithinBits(mCurve.evaluate(1.f), 6));
         UNSCOPED_INFO("the last sample is the value at exactly 1");
         CHECK_THAT(s.back(), ll_test::WithinBits(0.9f, 6));
 
         mCurve.sample(s, 1);
         UNSCOPED_INFO("a single sample is not a curve");
-        REQUIRE(s.empty());
+        CHECK(s.empty());
         mCurve.sample(s, 0);
-        UNSCOPED_INFO("zero samples");
-        REQUIRE(s.empty());
+        CHECK(s.empty());
     }
 
     // Unlocking the endpoints lets the first and last points move horizontally;
@@ -346,7 +329,7 @@ namespace
         for (S32 i = 1; i <= ALCurveModel::MAX_POINTS - 2; ++i)
         {
             const F32 x = (F32)i / (F32)(ALCurveModel::MAX_POINTS - 1);
-            UNSCOPED_INFO("added while under the cap");
+            CAPTURE(i);
             REQUIRE(mCurve.addPoint(x, x) >= 0);
         }
         UNSCOPED_INFO("at the cap");
@@ -367,7 +350,7 @@ namespace
         }
         mCurve.setPoints(many);
         UNSCOPED_INFO("twenty stored points survive");
-        CHECK(mCurve.getPointCount() == 20);
+        REQUIRE(mCurve.getPointCount() == 20);
         UNSCOPED_INFO("interior point kept");
         CHECK_THAT(mCurve.getPoints()[15].mX, ll_test::WithinBits(15.f / 19.f, 5));
         UNSCOPED_INFO("but no further adds");
@@ -406,11 +389,9 @@ namespace
                 F32 lo, md, hi;
                 shaderSplitWeights(l, mid, lo, md, hi);
                 const auto w = ALCurveModel::splitToneWeights(l, mid);
-                UNSCOPED_INFO("shadow matches the old shader");
+                CAPTURE(mid, l);
                 REQUIRE_THAT(w.mShadow, ll_test::WithinBits(lo, 5));
-                UNSCOPED_INFO("midtone matches the old shader");
                 REQUIRE_THAT(w.mMidtone, ll_test::WithinBits(md, 5));
-                UNSCOPED_INFO("highlight matches the old shader");
                 REQUIRE_THAT(w.mHighlight, ll_test::WithinBits(hi, 5));
             }
         }
@@ -430,23 +411,14 @@ namespace
             for (S32 i = 0; i <= 64; ++i)
             {
                 const auto w = ALCurveModel::splitToneWeights((F32)i / 64.f, mid);
-                UNSCOPED_INFO("weights sum to one");
+                CAPTURE(mid, i);
                 REQUIRE_THAT(w.mShadow + w.mMidtone + w.mHighlight, ll_test::WithinBits(1.f, 5));
-                {
-                    INFO("shadow in range");
-                    REQUIRE(w.mShadow    >= 0.f);
-                    REQUIRE(w.mShadow    <= 1.f);
-                }
-                {
-                    INFO("midtone in range");
-                    REQUIRE(w.mMidtone   >= 0.f);
-                    REQUIRE(w.mMidtone   <= 1.f);
-                }
-                {
-                    INFO("highlight in range");
-                    REQUIRE(w.mHighlight >= 0.f);
-                    REQUIRE(w.mHighlight <= 1.f);
-                }
+                REQUIRE(w.mShadow    >= 0.f);
+                REQUIRE(w.mShadow    <= 1.f);
+                REQUIRE(w.mMidtone   >= 0.f);
+                REQUIRE(w.mMidtone   <= 1.f);
+                REQUIRE(w.mHighlight >= 0.f);
+                REQUIRE(w.mHighlight <= 1.f);
             }
         }
 
@@ -472,9 +444,8 @@ namespace
         for (S32 i = 0; i <= 64; ++i)
         {
             const auto w = ALCurveModel::splitToneWeights((F32)i / 64.f, mid);
-            UNSCOPED_INFO("highlight never falls");
+            CAPTURE(i);
             REQUIRE(w.mHighlight >= prev_hi - 1e-5f);
-            UNSCOPED_INFO("shadow never rises");
             REQUIRE(w.mShadow <= prev_lo + 1e-5f);
             prev_hi = w.mHighlight;
             prev_lo = w.mShadow;
@@ -490,12 +461,9 @@ namespace
         {
             const F32 balance = (F32)i / 10.f;
             const F32 mid = ALCurveModel::splitToneMid(balance);
-            {
-                INFO("split point stays in range");
-                REQUIRE(mid >= 0.1f - 1e-5f);
-                REQUIRE(mid <= 0.9f + 1e-5f);
-            }
-            UNSCOPED_INFO("balance round-trips");
+            CAPTURE(balance);
+            REQUIRE(mid >= 0.1f - 1e-5f);
+            REQUIRE(mid <= 0.9f + 1e-5f);
             REQUIRE_THAT(ALCurveModel::splitToneBalance(mid), ll_test::WithinBits(balance, 5));
         }
 
@@ -525,11 +493,9 @@ namespace
                     F32 lo, md, hi;
                     shaderSplitWeightsRamped(l, mid, wsh.first, wsh.second, lo, md, hi);
                     const auto w = ALCurveModel::splitToneWeights(l, mid, wsh.first, wsh.second);
-                    UNSCOPED_INFO("shadow matches the shader");
+                    CAPTURE(mid, wsh.first, wsh.second, l);
                     REQUIRE_THAT(w.mShadow, ll_test::WithinBits(lo, 5));
-                    UNSCOPED_INFO("midtone matches the shader");
                     REQUIRE_THAT(w.mMidtone, ll_test::WithinBits(md, 5));
-                    UNSCOPED_INFO("highlight matches the shader");
                     REQUIRE_THAT(w.mHighlight, ll_test::WithinBits(hi, 5));
                 }
             }
@@ -545,31 +511,21 @@ namespace
         {
             for (const auto& wsh : widths)
             {
+                CAPTURE(mid, wsh.first, wsh.second);
                 F32 prev_hi = -1.f, prev_lo = 2.f;
                 for (S32 i = 0; i <= 64; ++i)
                 {
                     const F32 l = (F32)i / 64.f;
                     const auto w = ALCurveModel::splitToneWeights(l, mid, wsh.first, wsh.second);
-                    UNSCOPED_INFO("weights sum to one");
+                    CAPTURE(l);
                     REQUIRE_THAT(w.mShadow + w.mMidtone + w.mHighlight, ll_test::WithinBits(1.f, 5));
-                    {
-                        INFO("shadow in range");
-                        REQUIRE(w.mShadow    >= 0.f);
-                        REQUIRE(w.mShadow    <= 1.f);
-                    }
-                    {
-                        INFO("midtone in range");
-                        REQUIRE(w.mMidtone   >= 0.f);
-                        REQUIRE(w.mMidtone   <= 1.f);
-                    }
-                    {
-                        INFO("highlight in range");
-                        REQUIRE(w.mHighlight >= 0.f);
-                        REQUIRE(w.mHighlight <= 1.f);
-                    }
-                    UNSCOPED_INFO("highlight never falls");
+                    REQUIRE(w.mShadow    >= 0.f);
+                    REQUIRE(w.mShadow    <= 1.f);
+                    REQUIRE(w.mMidtone   >= 0.f);
+                    REQUIRE(w.mMidtone   <= 1.f);
+                    REQUIRE(w.mHighlight >= 0.f);
+                    REQUIRE(w.mHighlight <= 1.f);
                     REQUIRE(w.mHighlight >= prev_hi - 1e-5f);
-                    UNSCOPED_INFO("shadow never rises");
                     REQUIRE(w.mShadow <= prev_lo + 1e-5f);
                     prev_hi = w.mHighlight;
                     prev_lo = w.mShadow;
@@ -602,9 +558,7 @@ namespace
     TEST_CASE_METHOD(curve_data, "ALCurveModel: a zero width is a finite step at the split and still a partition", "[ALCurveModel]")
     {
         const auto ramp = ALCurveModel::splitToneRamp(0.5f, 0.f);
-        UNSCOPED_INFO("scale finite");
         CHECK(std::isfinite(ramp.mScale));
-        UNSCOPED_INFO("bias finite");
         CHECK(std::isfinite(ramp.mBias));
 
         const auto below = ALCurveModel::splitToneWeights(0.49f, 0.5f, 0.f, 0.f);
@@ -616,7 +570,7 @@ namespace
         for (S32 i = 0; i <= 64; ++i)
         {
             const auto w = ALCurveModel::splitToneWeights((F32)i / 64.f, 0.5f, 0.f, 0.f);
-            UNSCOPED_INFO("still sums to one");
+            CAPTURE(i);
             REQUIRE_THAT(w.mShadow + w.mMidtone + w.mHighlight, ll_test::WithinBits(1.f, 5));
         }
     }
@@ -635,14 +589,13 @@ namespace
                 for (S32 i = 0; i <= 20; ++i)
                 {
                     const F32 l = (F32)i / 20.f;
-                    UNSCOPED_INFO("folded form agrees");
+                    CAPTURE(edge0, width, l);
                     REQUIRE_THAT(l * ramp.mScale + ramp.mBias, ll_test::WithinBits((l - edge0) / width, 4));
                 }
             }
         }
     }
 
-    // The two-argument overload is the four-argument call at the default.
     TEST_CASE_METHOD(curve_data, "ALCurveModel: the two-argument overload is the four-argument call at the default", "[ALCurveModel]")
     {
         for (F32 mid : { 0.1f, 0.5f, 0.9f })
@@ -652,11 +605,9 @@ namespace
                 const F32 l = (F32)i / 32.f;
                 const auto a = ALCurveModel::splitToneWeights(l, mid);
                 const auto b = ALCurveModel::splitToneWeights(l, mid, 0.35f, 0.35f);
-                UNSCOPED_INFO("shadow bit for bit");
+                CAPTURE(mid, l);
                 REQUIRE(a.mShadow == b.mShadow);
-                UNSCOPED_INFO("midtone bit for bit");
                 REQUIRE(a.mMidtone == b.mMidtone);
-                UNSCOPED_INFO("highlight bit for bit");
                 REQUIRE(a.mHighlight == b.mHighlight);
             }
         }
@@ -664,18 +615,16 @@ namespace
 
     // --- ALToneCurveSet ------------------------------------------------------
 
-    // A fresh set is identity in every channel, and bakes to the identity ramp.
     TEST_CASE_METHOD(curve_data, "ALCurveModel: a fresh set is identity in every channel and bakes to the identity ramp", "[ALCurveModel]")
     {
         ALToneCurveSet set;
-        UNSCOPED_INFO("identity by default");
         CHECK(set.isIdentity());
         for (S32 c = 0; c < ALToneCurveSet::CH_COUNT; ++c)
         {
             for (S32 i = 0; i <= 20; ++i)
             {
                 const F32 x = (F32)i / 20.f;
-                UNSCOPED_INFO("evaluates to x");
+                CAPTURE(c, x);
                 REQUIRE_THAT(set.evaluate((ALToneCurveSet::EChannel)c, x), ll_test::WithinBits(x, 6));
             }
         }
@@ -686,16 +635,16 @@ namespace
         REQUIRE((S32)texels.size() == 512 * 4);
         for (S32 i = 0; i < 512; ++i)
         {
+            CAPTURE(i);
             const S32 expected = (S32)std::floor(65535.0 * i / 511.0 + 0.5);
             for (S32 c = 0; c < 3; ++c)
             {
                 // Within one code: the spline runs in F32, and a few of the
                 // ratios sit close enough to a rounding boundary for the last
                 // bit to decide which side.
-                UNSCOPED_INFO("identity ramp texel");
+                CAPTURE(c);
                 REQUIRE(std::abs((S32)texels[i * 4 + c] - expected) <= 1);
             }
-            UNSCOPED_INFO("alpha opaque");
             REQUIRE((S32)texels[i * 4 + 3] == (S32)ALToneCurveSet::ALPHA_OPAQUE);
         }
     }
@@ -706,38 +655,29 @@ namespace
     {
         const auto in = pts({ { 0.f, 0.05f }, { 0.25f, 0.2f }, { 0.75f, 0.8f }, { 1.f, 0.95f } });
         const LLSD sd = ALToneCurveSet::pointsToLLSD(in);
-        UNSCOPED_INFO("array");
         REQUIRE(sd.isArray());
-        UNSCOPED_INFO("one entry per point");
         REQUIRE((S32)sd.size() == 4);
         for (S32 i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO("entry is an array");
+            CAPTURE(i);
             REQUIRE(sd[i].isArray());
-            UNSCOPED_INFO("entry is a pair");
             REQUIRE((S32)sd[i].size() == 2);
-            UNSCOPED_INFO("x is a real");
             REQUIRE(sd[i][0].isReal());
-            UNSCOPED_INFO("y is a real");
             REQUIRE(sd[i][1].isReal());
         }
 
         std::vector<ALCurveModel::Point> out;
-        UNSCOPED_INFO("parsed");
-        REQUIRE(ALToneCurveSet::pointsFromLLSD(sd, out));
-        UNSCOPED_INFO("all points back");
+        CHECK(ALToneCurveSet::pointsFromLLSD(sd, out));
         REQUIRE((S32)out.size() == 4);
         for (S32 i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO("x survives");
+            CAPTURE(i);
             REQUIRE_THAT(out[i].mX, ll_test::WithinBits(in[i].mX, 6));
-            UNSCOPED_INFO("y survives");
             REQUIRE_THAT(out[i].mY, ll_test::WithinBits(in[i].mY, 6));
         }
 
         ALToneCurveSet set;
-        UNSCOPED_INFO("set from LLSD");
-        REQUIRE(set.setCurveFromLLSD(ALToneCurveSet::CH_GREEN, sd));
+        CHECK(set.setCurveFromLLSD(ALToneCurveSet::CH_GREEN, sd));
         UNSCOPED_INFO("no longer identity");
         CHECK_FALSE(set.isIdentity());
         const LLSD back = set.getCurveAsLLSD(ALToneCurveSet::CH_GREEN);
@@ -754,9 +694,9 @@ namespace
         std::vector<ALCurveModel::Point> out;
 
         UNSCOPED_INFO("undefined refused");
-        REQUIRE_FALSE(ALToneCurveSet::pointsFromLLSD(LLSD(), out));
+        CHECK_FALSE(ALToneCurveSet::pointsFromLLSD(LLSD(), out));
         UNSCOPED_INFO("identity on refusal");
-        REQUIRE((S32)out.size() == 2);
+        CHECK((S32)out.size() == 2);
         UNSCOPED_INFO("string refused");
         CHECK_FALSE(ALToneCurveSet::pointsFromLLSD(LLSD("[[0,0],[1,1]]"), out));
         UNSCOPED_INFO("map refused");
@@ -782,7 +722,7 @@ namespace
         UNSCOPED_INFO("survivors accepted");
         CHECK(ALToneCurveSet::pointsFromLLSD(mixed, out));
         UNSCOPED_INFO("exactly the three well-formed pairs");
-        REQUIRE((S32)out.size() == 3);
+        CHECK((S32)out.size() == 3);
 
         // One well-formed pair is not a curve.
         LLSD one = LLSD::emptyArray();
@@ -790,27 +730,20 @@ namespace
         UNSCOPED_INFO("a lone pair refused");
         CHECK_FALSE(ALToneCurveSet::pointsFromLLSD(one, out));
         UNSCOPED_INFO("identity again");
-        REQUIRE((S32)out.size() == 2);
+        CHECK((S32)out.size() == 2);
 
         // Out of range is clamped by the model, not rejected.
         LLSD wild = LLSD::emptyArray();
         wild.append(pair(LLSD::Real(-1.0), LLSD::Real(-1.0)));
         wild.append(pair(LLSD::Real(2.0), LLSD::Real(2.0)));
         ALToneCurveSet set;
-        UNSCOPED_INFO("parsed");
-        REQUIRE(set.setCurveFromLLSD(ALToneCurveSet::CH_RED, wild));
+        CHECK(set.setCurveFromLLSD(ALToneCurveSet::CH_RED, wild));
         for (const auto& p : set.curve(ALToneCurveSet::CH_RED).getPoints())
         {
-            {
-                INFO("x clamped");
-                REQUIRE(p.mX >= 0.f);
-                REQUIRE(p.mX <= 1.f);
-            }
-            {
-                INFO("y clamped");
-                REQUIRE(p.mY >= 0.f);
-                REQUIRE(p.mY <= 1.f);
-            }
+            REQUIRE(p.mX >= 0.f);
+            REQUIRE(p.mX <= 1.f);
+            REQUIRE(p.mY >= 0.f);
+            REQUIRE(p.mY <= 1.f);
         }
 
         // More points than the editor adds are kept as long as a file could
@@ -821,14 +754,10 @@ namespace
             const F64 x = i / 39.0;
             many.append(pair(LLSD::Real(x), LLSD::Real(x * x)));
         }
-        UNSCOPED_INFO("parsed");
         CHECK(set.setCurveFromLLSD(ALToneCurveSet::CH_BLUE, many));
         const auto& kept = set.curve(ALToneCurveSet::CH_BLUE).getPoints();
-        UNSCOPED_INFO("all forty kept");
         REQUIRE((S32)kept.size() == 40);
-        UNSCOPED_INFO("first at 0");
         CHECK_THAT(kept.front().mX, ll_test::WithinBits(0.f, 6));
-        UNSCOPED_INFO("last at 1");
         CHECK_THAT(kept.back().mX, ll_test::WithinBits(1.f, 6));
         UNSCOPED_INFO("shape honoured");
         CHECK_THAT(set.curve(ALToneCurveSet::CH_BLUE).evaluate(0.5f), ll_test::WithinBits(0.25f, 4));
@@ -845,7 +774,6 @@ namespace
         CHECK(set.curve(ALToneCurveSet::CH_BLUE).getPointCount() == 2);
     }
 
-    // Composite order: the channel curve first, then master on its output.
     TEST_CASE_METHOD(curve_data, "ALCurveModel: a channel's curve applies first and master on its output", "[ALCurveModel]")
     {
         ALToneCurveSet set;
@@ -869,7 +797,7 @@ namespace
         master_only.curve(ALToneCurveSet::CH_MASTER).setPoints(pts({ { 0.f, 0.1f }, { 1.f, 0.9f } }));
         for (S32 c = ALToneCurveSet::CH_RED; c <= ALToneCurveSet::CH_BLUE; ++c)
         {
-            UNSCOPED_INFO("every channel follows master");
+            CAPTURE(c);
             REQUIRE_THAT(master_only.evaluate((ALToneCurveSet::EChannel)c, 0.f), ll_test::WithinBits(0.1f, 5));
         }
     }
@@ -889,7 +817,6 @@ namespace
         CHECK_FALSE(ALToneCurveSet::isIdentityCurve(far_curve));
 
         ALToneCurveSet set;
-        UNSCOPED_INFO("all identity");
         CHECK(set.isIdentity());
         set.curve(ALToneCurveSet::CH_BLUE).setPoints(pts({ { 0.f, 0.f }, { 0.5f, 0.6f }, { 1.f, 1.f } }));
         UNSCOPED_INFO("one channel is enough");
@@ -908,7 +835,6 @@ namespace
         const S32 n = ALToneCurveSet::LUT_SIZE;
         std::vector<U16> texels;
         set.bake(texels, n);
-        UNSCOPED_INFO("size");
         REQUIRE((S32)texels.size() == n * 4);
 
         for (S32 c = 0; c < 3; ++c)
@@ -916,26 +842,27 @@ namespace
             const ALToneCurveSet::EChannel channel = (ALToneCurveSet::EChannel)(ALToneCurveSet::CH_RED + c);
             const F32 lo = set.evaluate(channel, 0.f) * 65535.f;
             const F32 hi = set.evaluate(channel, 1.f) * 65535.f;
+            CAPTURE(c);
             UNSCOPED_INFO("first texel is the curve at 0");
             REQUIRE(fabsf((F32)texels[c] - lo) <= 1.f);
             UNSCOPED_INFO("last texel is the curve at 1");
             REQUIRE(fabsf((F32)texels[(n - 1) * 4 + c] - hi) <= 1.f);
             for (S32 i = 1; i < n; ++i)
             {
-                UNSCOPED_INFO("monotone row");
+                CAPTURE(i);
                 REQUIRE(texels[i * 4 + c] >= texels[(i - 1) * 4 + c]);
             }
         }
         for (S32 i = 0; i < n; ++i)
         {
-            UNSCOPED_INFO("alpha opaque");
+            CAPTURE(i);
             REQUIRE((S32)texels[i * 4 + 3] == (S32)ALToneCurveSet::ALPHA_OPAQUE);
         }
 
         std::vector<U16> tiny;
         set.bake(tiny, 1);
         UNSCOPED_INFO("a size below 2 is raised to 2");
-        REQUIRE((S32)tiny.size() == 2 * 4);
+        CHECK((S32)tiny.size() == 2 * 4);
     }
 
     // What the shader will read back agrees with the analytic curve to well
@@ -974,6 +901,7 @@ namespace
             {
                 worst = std::max(worst, fabsf(shaderLutFetch(texels, n, c, x) - set.evaluate(channel, x)));
             }
+            CAPTURE(c);
             UNSCOPED_INFO("endpoint 0 exact to the U16");
             REQUIRE(fabsf(shaderLutFetch(texels, n, c, 0.f) - set.evaluate(channel, 0.f)) <= 1.f / 65535.f + 1e-6f);
             UNSCOPED_INFO("endpoint 1 exact to the U16");
@@ -993,24 +921,17 @@ namespace
             ALToneCurveSet::lutScaleBias(n, scale, bias);
             const F32 u0 = 0.f * scale + bias;
             const F32 u1 = 1.f * scale + bias;
-            UNSCOPED_INFO("x = 0 is texel 0's centre");
+            CAPTURE(n);
             REQUIRE_THAT(u0 * (F32)n - 0.5f, ll_test::WithinBits(0.f, 6));
-            UNSCOPED_INFO("x = 1 is the last texel's centre");
             REQUIRE_THAT(u1 * (F32)n - 0.5f, ll_test::WithinBits((F32)(n - 1), 6));
         }
     }
 
-    // The channel combo's values map onto the set, with anything unexpected
-    // landing on Master rather than on a channel.
     TEST_CASE_METHOD(curve_data, "ALCurveModel: combo values map onto channels and anything else onto master", "[ALCurveModel]")
     {
-        UNSCOPED_INFO("-1 is master");
         CHECK((S32)ALToneCurveSet::channelFromCombo(-1) == (S32)ALToneCurveSet::CH_MASTER);
-        UNSCOPED_INFO("0 is red");
         CHECK((S32)ALToneCurveSet::channelFromCombo(0) == (S32)ALToneCurveSet::CH_RED);
-        UNSCOPED_INFO("1 is green");
         CHECK((S32)ALToneCurveSet::channelFromCombo(1) == (S32)ALToneCurveSet::CH_GREEN);
-        UNSCOPED_INFO("2 is blue");
         CHECK((S32)ALToneCurveSet::channelFromCombo(2) == (S32)ALToneCurveSet::CH_BLUE);
         UNSCOPED_INFO("anything else is master");
         CHECK((S32)ALToneCurveSet::channelFromCombo(7) == (S32)ALToneCurveSet::CH_MASTER);
@@ -1030,8 +951,7 @@ namespace
     {
         UNSCOPED_INFO("added at the right edge");
         CHECK(mCurve.addPoint(1.f, 0.03f) >= 0);
-        UNSCOPED_INFO("three points");
-        CHECK(mCurve.getPointCount() == 3);
+        REQUIRE(mCurve.getPointCount() == 3);
         UNSCOPED_INFO("interior, one gap inside");
         CHECK_THAT(mCurve.getPoints()[1].mX, ll_test::WithinBits(1.f - ALCurveModel::MIN_POINT_GAP, 5));
         UNSCOPED_INFO("the end is still the end");
@@ -1059,11 +979,10 @@ namespace
     {
         mCurve.setPoints(pts({ { 0.f, 0.f }, { 1.f, 0.2f }, { 1.f, 0.4f }, { 1.f, 0.6f }, { 1.f, 1.f } }));
         const auto& p = mCurve.getPoints();
-        UNSCOPED_INFO("all kept");
         REQUIRE((S32)p.size() == 5);
         for (size_t i = 1; i < p.size(); ++i)
         {
-            UNSCOPED_INFO("separated");
+            CAPTURE(i);
             REQUIRE(p[i].mX - p[i - 1].mX >= ALCurveModel::MIN_POINT_GAP - 1e-6f);
         }
         UNSCOPED_INFO("the end is still at 1");
@@ -1075,28 +994,25 @@ namespace
         mCurve.sample(s, 1025);
         for (size_t i = 1; i < s.size(); ++i)
         {
-            UNSCOPED_INFO("finite");
+            CAPTURE(i);
             REQUIRE(std::isfinite(s[i]));
-            UNSCOPED_INFO("monotone");
             REQUIRE(s[i] >= s[i - 1] - 1e-5f);
         }
     }
 
-    // The setting names are one list: distinct, and channel-shaped.
     TEST_CASE_METHOD(curve_data, "ALCurveModel: the setting names are distinct and named for the curve", "[ALCurveModel]")
     {
         for (S32 c = 0; c < ALToneCurveSet::CH_COUNT; ++c)
         {
             const std::string name = ALToneCurveSet::settingName((ALToneCurveSet::EChannel)c);
-            UNSCOPED_INFO("named for the curve");
+            CAPTURE(c);
             REQUIRE(name.rfind("RenderColorGradeCurve", 0) == 0);
             for (S32 d = 0; d < c; ++d)
             {
-                UNSCOPED_INFO("distinct");
+                CAPTURE(d);
                 REQUIRE(name != ALToneCurveSet::settingName((ALToneCurveSet::EChannel)d));
             }
         }
-        UNSCOPED_INFO("master");
         CHECK(std::string(ALToneCurveSet::settingName(ALToneCurveSet::CH_MASTER)) ==
                       std::string("RenderColorGradeCurveMaster"));
     }

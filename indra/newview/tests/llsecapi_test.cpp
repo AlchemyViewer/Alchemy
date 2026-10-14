@@ -98,32 +98,25 @@ namespace
     // ---------------------------------------------------------------------------------------
     // Test functions
     // ---------------------------------------------------------------------------------------
-    // registration
     TEST_CASE_METHOD(secapiTest, "LLSecAPI: getSecHandler finds registered handlers by name and no others", "[LLSecAPI]")
     {
         // retrieve an unknown handler
 
-        UNSCOPED_INFO("'Unknown' handler should be NULL");
         REQUIRE(getSecHandler("unknown") == nullptr);
         LLPointer<LLSecAPIHandler> test1_handler =  new LLSecAPIBasicHandler();
         registerSecHandler("sectest1", test1_handler);
-        UNSCOPED_INFO("'Unknown' handler should be NULL");
         REQUIRE(getSecHandler("unknown") == nullptr);
         LLPointer<LLSecAPIHandler> retrieved_test1_handler = getSecHandler("sectest1");
-        UNSCOPED_INFO("Retrieved sectest1 handler should be the same");
         CHECK(retrieved_test1_handler == test1_handler);
 
         // insert a second handler
         LLPointer<LLSecAPIHandler> test2_handler =  new LLSecAPIBasicHandler();
         registerSecHandler("sectest2", test2_handler);
-        UNSCOPED_INFO("'Unknown' handler should be NULL");
         REQUIRE(getSecHandler("unknown") == nullptr);
         retrieved_test1_handler = getSecHandler("sectest1");
-        UNSCOPED_INFO("Retrieved sectest1 handler should be the same");
         CHECK(retrieved_test1_handler == test1_handler);
 
         LLPointer<LLSecAPIHandler> retrieved_test2_handler = getSecHandler("sectest2");
-        UNSCOPED_INFO("Retrieved sectest1 handler should be the same");
         CHECK(retrieved_test2_handler == test2_handler);
 
     }

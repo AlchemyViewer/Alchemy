@@ -21,7 +21,7 @@
 
 #include <cstdlib>
 
-namespace tut
+namespace
 {
     // Every expected value below was read off the tables as MSVC's CRT built them from
     // srand(42) / rand(), which is what every Windows viewer has textured terrain from. A
@@ -44,7 +44,7 @@ namespace tut
         ALNoiseRand rand(42);
         for (int i = 0; i < 65536; ++i)
         {
-            UNSCOPED_INFO("draw agrees with the CRT");
+            CAPTURE(i);
             REQUIRE(rand.next() == ::rand());
         }
 #else
@@ -62,7 +62,7 @@ namespace tut
         ALNoiseRand rand(42);
         for (int i = 0; i < 16; ++i)
         {
-            UNSCOPED_INFO("draw");
+            CAPTURE(i);
             REQUIRE(rand.next() == expected[i]);
         }
     }
@@ -76,7 +76,7 @@ namespace tut
         };
         for (int i = 0; i < 32; ++i)
         {
-            UNSCOPED_INFO("p head");
+            CAPTURE(i);
             REQUIRE(p[i] == head[i]);
         }
         long long sum = 0;
@@ -84,7 +84,6 @@ namespace tut
         {
             sum += (long long)p[i] * (i + 1);
         }
-        UNSCOPED_INFO("p weighted sum");
         CHECK(sum == 4318278LL);
         UNSCOPED_INFO("p wraps at 256");
         CHECK(p[257] == 117);
@@ -102,7 +101,7 @@ namespace tut
         };
         for (int i = 0; i < 8; ++i)
         {
-            UNSCOPED_INFO("g1 head");
+            CAPTURE(i);
             REQUIRE(g1[i] == g1_head[i]);
         }
 
@@ -114,9 +113,8 @@ namespace tut
         };
         for (int i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO("g2 head x");
+            CAPTURE(i);
             REQUIRE_THAT(g2[i][0], ll_test::WithinBits(g2_head[i][0], 20));
-            UNSCOPED_INFO("g2 head y");
             REQUIRE_THAT(g2[i][1], ll_test::WithinBits(g2_head[i][1], 20));
         }
 
@@ -128,11 +126,9 @@ namespace tut
         };
         for (int i = 0; i < 4; ++i)
         {
-            UNSCOPED_INFO("g3 head x");
+            CAPTURE(i);
             REQUIRE_THAT(g3[i][0], ll_test::WithinBits(g3_head[i][0], 20));
-            UNSCOPED_INFO("g3 head y");
             REQUIRE_THAT(g3[i][1], ll_test::WithinBits(g3_head[i][1], 20));
-            UNSCOPED_INFO("g3 head z");
             REQUIRE_THAT(g3[i][2], ll_test::WithinBits(g3_head[i][2], 20));
         }
     }

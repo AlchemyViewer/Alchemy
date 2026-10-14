@@ -61,7 +61,6 @@ namespace
     {
         std::vector<F32> out;
         ALTerrainSurfaceMaps::fill(out, GPE, 1, [](S32 gx, S32 gy, F32* t) { t[0] = (F32)(gx * 100 + gy); });
-        UNSCOPED_INFO("size");
         REQUIRE(out.size() == static_cast<size_t>(SIZE) * SIZE);
         UNSCOPED_INFO("first texel is the south-west apron corner");
         CHECK(out[texel(-APRON, -APRON)] == (F32)(-APRON * 100 - APRON));
@@ -83,7 +82,6 @@ namespace
     {
         std::vector<F32> out;
         ALTerrainSurfaceMaps::fill(out, GPE, 2, [](S32 gx, S32 gy, F32* t) { t[0] = (F32)gx; t[1] = (F32)gy; });
-        UNSCOPED_INFO("size");
         REQUIRE(out.size() == static_cast<size_t>(SIZE) * SIZE * 2);
         UNSCOPED_INFO("channel 0");
         CHECK(out[texel(3, 5, 2)] == 3.f);
@@ -97,7 +95,6 @@ namespace
         CHECK(out[texel(3, 5, 2) + 1] == 5.f);
     }
 
-    // Inside the region nothing moves.
     TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: resolve moves nothing inside the region", "[ALTerrainSurfaceMaps]")
     {
         bool has[8];
@@ -105,7 +102,6 @@ namespace
         S32 gx = 4, gy = GPE - 1;
         UNSCOPED_INFO("interior is this surface");
         CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == MIDDLE);
-        UNSCOPED_INFO("gx unchanged");
         CHECK(gx == 4);
         UNSCOPED_INFO("gy unchanged, the buffer row is ours");
         CHECK(gy == GPE - 1);
@@ -118,7 +114,6 @@ namespace
         bool has[8];
         allSet(true, has);
         S32 gx = -1, gy = 3;
-        UNSCOPED_INFO("west");
         CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == WEST);
         UNSCOPED_INFO("west gx");
         CHECK(gx == GPE - 2);
@@ -131,7 +126,6 @@ namespace
         CHECK(gx == GPE - 3);
 
         gx = GPE; gy = 3;
-        UNSCOPED_INFO("east");
         CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == EAST);
         UNSCOPED_INFO("east gx");
         CHECK(gx == 1);
@@ -142,25 +136,21 @@ namespace
         CHECK(gx == 2);
 
         gx = 3; gy = -1;
-        UNSCOPED_INFO("south");
         CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == SOUTH);
         UNSCOPED_INFO("south gy");
         CHECK(gy == GPE - 2);
 
         gx = 3; gy = GPE + 1;
-        UNSCOPED_INFO("north");
         CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == NORTH);
         UNSCOPED_INFO("north gy");
         CHECK(gy == 2);
     }
 
-    // Both axes out: the diagonal neighbour when it is there.
     TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: both axes out resolve to the diagonal neighbour when it is there", "[ALTerrainSurfaceMaps]")
     {
         bool has[8];
         allSet(true, has);
         S32 gx = -1, gy = -APRON;
-        UNSCOPED_INFO("south-west");
         CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == SOUTHWEST);
         UNSCOPED_INFO("south-west gx");
         CHECK(gx == GPE - 2);
@@ -168,7 +158,6 @@ namespace
         CHECK(gy == GPE - 3);
 
         gx = GPE + 1; gy = GPE;
-        UNSCOPED_INFO("north-east");
         CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == NORTHEAST);
         UNSCOPED_INFO("north-east gx");
         CHECK(gx == 2);
@@ -226,8 +215,8 @@ namespace
         {
             for (S32 gx = 0; gx < 6; ++gx)
             {
+                CAPTURE(gx, gy);
                 const F32 h = ALTerrainSurfaceMaps::smoothHeight((F32)gx, (F32)gy, field, nullptr, nullptr);
-                UNSCOPED_INFO("value at a sample is the sample");
                 REQUIRE(h == field(gx, gy));
             }
         }
@@ -243,6 +232,7 @@ namespace
         auto cliff = [](S32 gx, S32) { return gx <= 2 ? 30.f : 0.f; };
         for (F32 x = 0.f; x < 2.f; x += 0.125f)
         {
+            CAPTURE(x);
             F32 dzdx = 1.f, dzdy = 1.f;
             UNSCOPED_INFO("level up to the edge");
             REQUIRE_THAT(ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, &dzdx, &dzdy), ll_test::WithinBits(30.f, 12));
@@ -254,6 +244,7 @@ namespace
         F32 previous = 30.f;
         for (F32 x = 2.f; x <= 3.f; x += 0.0625f)
         {
+            CAPTURE(x);
             const F32 h = ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, nullptr, nullptr);
             {
                 INFO("inside the cell's range");
@@ -268,6 +259,7 @@ namespace
         CHECK_THAT(ALTerrainSurfaceMaps::smoothHeight(2.5f, 3.f, cliff, nullptr, nullptr), ll_test::WithinBits(15.f, 12));
         for (F32 x = 3.f; x < 5.f; x += 0.125f)
         {
+            CAPTURE(x);
             UNSCOPED_INFO("level past the foot");
             REQUIRE_THAT(ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, nullptr, nullptr), ll_test::WithinBits(0.f, 12));
         }
@@ -279,25 +271,23 @@ namespace
         {
             for (F32 x = 2.f; x <= 3.f; x += 0.25f)
             {
+                CAPTURE(x, y);
                 const F32 h = ALTerrainSurfaceMaps::smoothHeight(x, y, corner, nullptr, nullptr);
-                {
-                    INFO("plateau corner within its cell's range");
-                    REQUIRE(h >= 0.f);
-                    REQUIRE(h <= 30.f);
-                }
+                INFO("plateau corner within its cell's range");
+                REQUIRE(h >= 0.f);
+                REQUIRE(h <= 30.f);
             }
         }
     }
 
-    // A field symmetric in x and y gives a surface symmetric in x and y.
     TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: a field symmetric in x and y gives a surface symmetric in x and y", "[ALTerrainSurfaceMaps]")
     {
         auto field = [](S32 gx, S32 gy) { return (F32)(gx * gx + gy * gy) * 0.1f + (F32)((gx + gy) % 3); };
         for (F32 v = 0.f; v < 4.f; v += 0.37f)
         {
+            CAPTURE(v);
             const F32 a = ALTerrainSurfaceMaps::smoothHeight(1.2f, v, field, nullptr, nullptr);
             const F32 b = ALTerrainSurfaceMaps::smoothHeight(v, 1.2f, field, nullptr, nullptr);
-            UNSCOPED_INFO("h(x, y) == h(y, x)");
             REQUIRE_THAT(a, ll_test::WithinBits(b, 5));
         }
     }
@@ -311,15 +301,14 @@ namespace
         {
             for (F32 x = 0.6f; x < 4.f; x += 0.9f)
             {
+                CAPTURE(x, y);
                 F32 dzdx, dzdy;
                 ALTerrainSurfaceMaps::smoothHeight(x, y, field, &dzdx, &dzdy);
                 const F32 fdx = (ALTerrainSurfaceMaps::smoothHeight(x + eps, y, field, nullptr, nullptr)
                                - ALTerrainSurfaceMaps::smoothHeight(x - eps, y, field, nullptr, nullptr)) / (2.f * eps);
                 const F32 fdy = (ALTerrainSurfaceMaps::smoothHeight(x, y + eps, field, nullptr, nullptr)
                                - ALTerrainSurfaceMaps::smoothHeight(x, y - eps, field, nullptr, nullptr)) / (2.f * eps);
-                UNSCOPED_INFO("dz/dx");
                 REQUIRE_THAT(dzdx, ll_test::WithinBits(fdx, 8));
-                UNSCOPED_INFO("dz/dy");
                 REQUIRE_THAT(dzdy, ll_test::WithinBits(fdy, 8));
             }
         }

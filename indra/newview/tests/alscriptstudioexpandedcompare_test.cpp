@@ -163,10 +163,8 @@ namespace
         map.add(segment(4, 0, 8, 0, 3, 2, false));
         map.add(segment(6, 0, 4, 0, 5, 0));
         map.finish();
-        UNSCOPED_INFO("the ranges");
         CHECK(said(ALScriptStudioExpandedCompare::rangesOf(map)) == std::string("[0-0 1-1][1-2 2-2][3-3 3-4][5-5 6-6]"));
-        UNSCOPED_INFO("none for nothing");
-        REQUIRE(ALScriptStudioExpandedCompare::rangesOf(ALSourceMap()).empty());
+        CHECK(ALScriptStudioExpandedCompare::rangesOf(ALSourceMap()).empty());
     }
 
     TEST_CASE_METHOD(alscriptstudioexpandedcompare_data, "alscriptstudioexpandedcompare: the source is lined up beside what a save sends and typing maps back", "[alscriptstudioexpandedcompare]")
@@ -176,7 +174,6 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& door = tab("door");
-        UNSCOPED_INFO("it can be compared");
         CHECK(ALScriptStudioExpandedCompare::canCompare(door));
         unit->compare(door);
         {
@@ -210,7 +207,7 @@ namespace
         view.right()->goTo(ALTextPos(0, 3));
         view.right()->handleUnicodeChar('y', false);
         UNSCOPED_INFO("an include's line: nowhere");
-        REQUIRE(studio.typedAt.size() == 1);
+        CHECK(studio.typedAt.size() == 1);
     }
 
     TEST_CASE_METHOD(alscriptstudioexpandedcompare_data, "alscriptstudioexpandedcompare: a stale expansion is run again first and shown once current", "[alscriptstudioexpandedcompare]")
@@ -233,7 +230,6 @@ namespace
         CHECK(studio.compares == 0);
         door.uploaded.version = door.editor->document().version();
         unit->expanded(door);
-        UNSCOPED_INFO("shown");
         CHECK(studio.compares == 1);
         unit->expanded(door);
         UNSCOPED_INFO("once");
@@ -243,7 +239,6 @@ namespace
         Doc& gate = tab("gate");
         gate.editor->insertText("// ");
         unit->compare(gate);
-        UNSCOPED_INFO("waiting");
         CHECK(unit->waiting("gate"));
         services().docs.erase(std::remove_if(services().docs.begin(), services().docs.end(),
                                              [](const std::unique_ptr<ALScriptStudioDoc>& doc) { return doc->id == "gate"; }),
@@ -320,11 +315,11 @@ namespace
         UNSCOPED_INFO("the macro's call beside what it made");
         CHECK(beside(6, where("llOwnerSay")));
         UNSCOPED_INFO("the last brace beside the last brace");
-        REQUIRE(beside(8, static_cast<S32>(out.size()) - (out.back().empty() ? 2 : 1)));
+        CHECK(beside(8, static_cast<S32>(out.size()) - (out.back().empty() ? 2 : 1)));
         // What the map alone says: the call's line stands for what it made.
         const S32 call = view.model().rangeAt(ALDiffModel::Column::Left, 6);
         UNSCOPED_INFO("the call's line in a range");
-        CHECK(call >= 0);
+        REQUIRE(call >= 0);
         UNSCOPED_INFO("whose output is what it made");
         CHECK(view.model().ranges()[static_cast<size_t>(call)].rightFirst == where("llOwnerSay"));
         {
@@ -344,7 +339,6 @@ namespace
         door.editor->goTo(ALTextPos(0, 0));
         door.editor->insertText("// ");
         unit->compare(door);
-        UNSCOPED_INFO("a run asked");
         CHECK(studio.runs == 1);
         UNSCOPED_INFO("said while it waits");
         CHECK(services().statuses.back() == services().words("Preprocessing", { { "[NAME]", "door" } }));
@@ -369,7 +363,6 @@ namespace
         door.view = Doc::View::Source;
         door.editor->insertText("// ");
         unit->compare(door);
-        UNSCOPED_INFO("waiting");
         CHECK(unit->waiting("door"));
         studio.compareRanged(door, "other", door.editor->wholeText(), "other", "door", {});
         door.view = Doc::View::Compare;
@@ -388,7 +381,6 @@ namespace
         // Asked from a comparison, which is then closed: let go of.
         door.editor->insertText("// ");
         unit->compare(door);
-        UNSCOPED_INFO("waiting again");
         CHECK(unit->waiting("door"));
         door.view = Doc::View::Source;
         door.uploaded.version = door.editor->document().version();
@@ -407,10 +399,7 @@ namespace
         door.compareView->setRightText(door.editor->wholeText());
         door.uploaded.version = door.editor->document().version();
         unit->expanded(door);
-        {
-            INFO("shown");
-            CHECK(studio.compares == 3);
-            CHECK_FALSE(unit->waiting("door"));
-        }
+        CHECK(studio.compares == 3);
+        CHECK_FALSE(unit->waiting("door"));
     }
 }

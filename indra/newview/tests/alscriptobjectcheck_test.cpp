@@ -171,9 +171,7 @@ namespace
     {
         house();
         check.check(root, "House");
-        UNSCOPED_INFO("listed");
         CHECK(window.listedFor == std::vector<LLUUID>{ root });
-        UNSCOPED_INFO("running");
         CHECK(check.running());
         UNSCOPED_INFO("two at once");
         REQUIRE(window.asks.size() == size_t(2));
@@ -200,11 +198,8 @@ namespace
         UNSCOPED_INFO("B checked");
         REQUIRE(window.checked.size() == size_t(1));
         const Check::Script& b = window.checked[0];
-        {
-            INFO("by its name");
-            CHECK(b.name == "B");
-            CHECK(b.ref.item == id(11));
-        }
+        CHECK(b.name == "B");
+        CHECK(b.ref.item == id(11));
         UNSCOPED_INFO("the lints as chosen applied");
         REQUIRE(b.rows.size() == size_t(1));
         {
@@ -222,24 +217,17 @@ namespace
         REQUIRE(window.done.empty());
 
         window.asks[1].answered(answer({}));
-        UNSCOPED_INFO("done");
         REQUIRE(window.done.size() == size_t(1));
         const Check::Done& done = window.done[0];
-        {
-            INFO("of the house");
-            CHECK(done.root == root);
-            CHECK(done.name == "House");
-            CHECK(done.present);
-        }
-        UNSCOPED_INFO("checked");
+        CHECK(done.root == root);
+        CHECK(done.name == "House");
+        CHECK(done.present);
         CHECK(done.checked == 2);
         UNSCOPED_INFO("left to its tab");
         CHECK(done.open == 1);
         UNSCOPED_INFO("prims that did not answer");
         CHECK(done.unlisted == 1);
-        UNSCOPED_INFO("the one not read, by name");
         CHECK(done.unread == std::vector<std::string>{ "D" });
-        UNSCOPED_INFO("no longer running");
         CHECK_FALSE(check.running());
     }
 
@@ -249,7 +237,6 @@ namespace
         window.listing.scripts.push_back({ ALScriptRef(root, id(20)), "Main" });
         window.texts = { { id(20), "#include \"lib\"\ndefault {}\n" } };
         check.check(root, "Shed");
-        UNSCOPED_INFO("expanded");
         REQUIRE(window.expands.size() == size_t(1));
         {
             INFO("apart, as a tab's check");
@@ -281,13 +268,11 @@ namespace
         said.message  = "from the preprocessor";
         result.problems.push_back(said);
         window.expands[0].expanded(result);
-        UNSCOPED_INFO("asked");
         REQUIRE(window.asks.size() == size_t(1));
         UNSCOPED_INFO("about the expansion");
         CHECK(*window.asks[0].request.text == std::string("integer x;\ndefault {}\n"));
 
         window.asks[0].answered(answer({ problem(0, "in the library"), problem(1, "in the script") }));
-        UNSCOPED_INFO("checked");
         REQUIRE(window.checked.size() == size_t(1));
         const std::vector<ALScriptStudioDoc::Shown>& rows = window.checked[0].rows;
         UNSCOPED_INFO("the preprocessor's and the analyzers'");
@@ -308,7 +293,6 @@ namespace
             REQUIRE(rows[2].file.empty());
             CHECK(rows[2].line == 1);
         }
-        UNSCOPED_INFO("done");
         REQUIRE(window.done.size() == size_t(1));
     }
 

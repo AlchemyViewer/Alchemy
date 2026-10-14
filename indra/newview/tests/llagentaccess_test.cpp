@@ -44,31 +44,22 @@ namespace
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_PG);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 prefersPG");
         CHECK(aa.prefersPG());
-        UNSCOPED_INFO("1 prefersMature");
         CHECK_FALSE(aa.prefersMature());
-        UNSCOPED_INFO("1 prefersAdult");
         CHECK_FALSE(aa.prefersAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_MATURE);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("2 prefersPG");
         CHECK_FALSE(aa.prefersPG());
-        UNSCOPED_INFO("2 prefersMature");
         CHECK(aa.prefersMature());
-        UNSCOPED_INFO("2 prefersAdult");
         CHECK_FALSE(aa.prefersAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("3 prefersPG");
         CHECK_FALSE(aa.prefersPG());
-        UNSCOPED_INFO("3 prefersMature");
         CHECK(aa.prefersMature());
-        UNSCOPED_INFO("3 prefersAdult");
         CHECK(aa.prefersAdult());
 #endif // HACKED_GODLIKE_VIEWER
     }
@@ -81,56 +72,40 @@ namespace
 
         // make sure default is PG
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 isTeen");
         CHECK(aa.isTeen());
-        UNSCOPED_INFO("1 isMature");
         CHECK_FALSE(aa.isMature());
-        UNSCOPED_INFO("1 isAdult");
         CHECK_FALSE(aa.isAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         // check the conversion routine
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 conversion");
         CHECK(SIM_ACCESS_PG == aa.convertTextToMaturity('P'));
-        UNSCOPED_INFO("2 conversion");
         CHECK(SIM_ACCESS_MATURE == aa.convertTextToMaturity('M'));
-        UNSCOPED_INFO("3 conversion");
         CHECK(SIM_ACCESS_ADULT == aa.convertTextToMaturity('A'));
-        UNSCOPED_INFO("4 conversion");
         CHECK(SIM_ACCESS_MIN == aa.convertTextToMaturity('Q'));
 #endif // HACKED_GODLIKE_VIEWER
 
         // now try the other method of setting it - PG
         aa.setMaturity('P');
-        UNSCOPED_INFO("2 isTeen");
         CHECK(aa.isTeen());
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("2 isMature");
         CHECK_FALSE(aa.isMature());
-        UNSCOPED_INFO("2 isAdult");
         CHECK_FALSE(aa.isAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         // Mature
         aa.setMaturity('M');
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("3 isTeen");
         CHECK_FALSE(aa.isTeen());
-        UNSCOPED_INFO("3 isMature");
         CHECK(aa.isMature());
-        UNSCOPED_INFO("3 isAdult");
         CHECK_FALSE(aa.isAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         // Adult
         aa.setMaturity('A');
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("4 isTeen");
         CHECK_FALSE(aa.isTeen());
-        UNSCOPED_INFO("4 isMature");
         CHECK(aa.isMature());
-        UNSCOPED_INFO("4 isAdult");
         CHECK(aa.isAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
@@ -163,21 +138,19 @@ namespace
 #endif // HACKED_GODLIKE_VIEWER
         aa.setAdminOverride(true);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("admin true");
         CHECK(aa.getAdminOverride());
-        UNSCOPED_INFO("overrides 1");
+        UNSCOPED_INFO("the admin override alone");
         CHECK(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
         aa.setGodLevel(GOD_FULL);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("overrides 2");
+        UNSCOPED_INFO("the admin override and full god level");
         CHECK(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
         aa.setAdminOverride(false);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("admin false");
         CHECK_FALSE(aa.getAdminOverride());
-        UNSCOPED_INFO("overrides 3");
+        UNSCOPED_INFO("full god level alone");
         CHECK(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
     }
@@ -189,85 +162,85 @@ namespace
         LLAgentAccess aa(cgr);
 
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 pg to start");
-        CHECK(aa.wantsPGOnly());
-        UNSCOPED_INFO("2 pg to start");
-        CHECK_FALSE(aa.canAccessMature());
-        UNSCOPED_INFO("3 pg to start");
-        CHECK_FALSE(aa.canAccessAdult());
+        {
+            INFO("pg to start");
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setGodLevel(GOD_FULL);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 full god");
-        CHECK_FALSE(aa.wantsPGOnly());
-        UNSCOPED_INFO("2 full god");
-        CHECK(aa.canAccessMature());
-        UNSCOPED_INFO("3 full god");
-        CHECK(aa.canAccessAdult());
+        {
+            INFO("full god");
+            CHECK_FALSE(aa.wantsPGOnly());
+            CHECK(aa.canAccessMature());
+            CHECK(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setGodLevel(GOD_NOT);
         aa.setAdminOverride(true);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 admin mode");
-        CHECK_FALSE(aa.wantsPGOnly());
-        UNSCOPED_INFO("2 admin mode");
-        CHECK(aa.canAccessMature());
-        UNSCOPED_INFO("3 admin mode");
-        CHECK(aa.canAccessAdult());
+        {
+            INFO("admin mode");
+            CHECK_FALSE(aa.wantsPGOnly());
+            CHECK(aa.canAccessMature());
+            CHECK(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setAdminOverride(false);
         aa.setMaturity('M');
         // preferred is still pg by default
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 mature pref pg");
-        CHECK(aa.wantsPGOnly());
-        UNSCOPED_INFO("2 mature pref pg");
-        CHECK_FALSE(aa.canAccessMature());
-        UNSCOPED_INFO("3 mature pref pg");
-        CHECK_FALSE(aa.canAccessAdult());
+        {
+            INFO("mature pref pg");
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_MATURE);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 mature");
-        CHECK_FALSE(aa.wantsPGOnly());
-        UNSCOPED_INFO("2 mature");
-        CHECK(aa.canAccessMature());
-        UNSCOPED_INFO("3 mature");
-        CHECK_FALSE(aa.canAccessAdult());
+        {
+            INFO("mature");
+            CHECK_FALSE(aa.wantsPGOnly());
+            CHECK(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_PG);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 mature pref pg");
-        CHECK(aa.wantsPGOnly());
-        UNSCOPED_INFO("2 mature pref pg");
-        CHECK_FALSE(aa.canAccessMature());
-        UNSCOPED_INFO("3 mature pref pg");
-        CHECK_FALSE(aa.canAccessAdult());
+        {
+            INFO("mature pref pg");
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setMaturity('A');
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 adult pref pg");
-        CHECK(aa.wantsPGOnly());
-        UNSCOPED_INFO("2 adult pref pg");
-        CHECK_FALSE(aa.canAccessMature());
-        UNSCOPED_INFO("3 adult pref pg");
-        CHECK_FALSE(aa.canAccessAdult());
+        {
+            INFO("adult pref pg");
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 adult");
-        CHECK_FALSE(aa.wantsPGOnly());
-        UNSCOPED_INFO("2 adult");
-        CHECK(aa.canAccessMature());
-        UNSCOPED_INFO("3 adult");
-        CHECK(aa.canAccessAdult());
+        {
+            INFO("adult");
+            CHECK_FALSE(aa.wantsPGOnly());
+            CHECK(aa.canAccessMature());
+            CHECK(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         // make sure that even if pref is high, if access is low we block access
@@ -275,12 +248,12 @@ namespace
         cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
         aa.setMaturity('P');
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 pref adult, actual pg");
-        CHECK(aa.wantsPGOnly());
-        UNSCOPED_INFO("2 pref adult, actual pg");
-        CHECK_FALSE(aa.canAccessMature());
-        UNSCOPED_INFO("3 pref adult, actual pg");
-        CHECK_FALSE(aa.canAccessAdult());
+        {
+            INFO("pref adult, actual pg");
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
     }
@@ -294,13 +267,11 @@ namespace
         cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
         aa.setMaturity('M');
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 preferred maturity pegged to M when maturity is M");
         CHECK(cgr.getU32("PreferredMaturity") == SIM_ACCESS_MATURE);
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setMaturity('P');
 #ifndef HACKED_GODLIKE_VIEWER
-        UNSCOPED_INFO("1 preferred maturity pegged to P when maturity is P");
         CHECK(cgr.getU32("PreferredMaturity") == SIM_ACCESS_PG);
 #endif // HACKED_GODLIKE_VIEWER
     }
