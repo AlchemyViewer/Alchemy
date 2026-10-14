@@ -103,9 +103,6 @@ public:
             LLUUID      assetId;
             bool        lua      = false;
             std::string compileTarget;
-            // It went up in the preprocessor's envelope, so it is read as
-            // the preprocessor makes it whatever the setting.
-            bool        enveloped = false;
         };
         virtual void read(const ALScriptRef& ref, std::function<void(std::optional<Read>)> told) = 0;
         // Whether the preprocessor runs; a script expanded; an SLua

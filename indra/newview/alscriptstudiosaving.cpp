@@ -469,7 +469,14 @@ void ALScriptStudioSaving::save(Doc& doc)
     {
         return;
     }
+    // As written: no envelope round it once it is up, and no expansion of
+    // one to show.
     doc.uploaded.valid = false;
+    if (doc.envelope)
+    {
+        doc.envelope.reset();
+        mWindow.dropExpanded(doc);
+    }
     weighForSave(doc);
     upload(doc, doc.editor->wholeText());
 }

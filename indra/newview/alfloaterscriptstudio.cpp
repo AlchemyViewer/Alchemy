@@ -2693,8 +2693,9 @@ void ALFloaterScriptStudio::loadedScript(Doc& doc, const ALScriptLoaded& answer)
     }
     // Loaded again with nothing wrapped round it, and nothing to
     // expand it afresh: what the other editor holds was compiled from
-    // a text the script no longer is.
-    if (!preprocessed(doc))
+    // a text the script no longer is. Wrapped, what it came with is
+    // shown, though a save will send it as written.
+    if (!doc.envelope && !preprocessed(doc))
     {
         dropExpanded(doc);
     }
@@ -6108,7 +6109,6 @@ void ALFloaterScriptStudio::read(const ALScriptRef& ref, std::function<void(std:
         read.assetId       = loaded.assetId;
         read.lua           = loaded.language.lua;
         read.compileTarget = loaded.language.compileTarget;
-        read.enveloped     = ALScriptEnvelope::parse(loaded.text).has_value();
         told(std::move(read));
     });
 }

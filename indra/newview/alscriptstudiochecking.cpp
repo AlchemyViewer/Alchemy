@@ -152,7 +152,7 @@ ALPreprocessor::Wanted ALScriptStudioChecking::preprocessedWhy(const Doc& doc) c
         }
         return doc.directives;
     };
-    return ALPreprocessor::wanted(doc.envelope.has_value(), directives, ALScriptStudioViewer::get().preprocessing());
+    return ALPreprocessor::wanted(directives, ALScriptStudioViewer::get().preprocessing());
 }
 
 ALScriptPreprocessor::Request ALScriptStudioChecking::preprocessRequest(const Doc& doc, bool with_source) const

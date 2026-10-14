@@ -97,8 +97,10 @@ public:
         // A run over the text as it stands, fetching its includes, and
         // what it made once it has.
         virtual void runPreprocessor(const Doc& doc, std::function<void(const ALPreprocessor::Result&)> answer) = 0;
-        // What it made, in the tab's expanded view.
+        // What it made, in the tab's expanded view; and that view let go
+        // of, where nothing expands it any more.
         virtual void showExpanded(Doc& doc, const std::string& text) = 0;
+        virtual void dropExpanded(Doc& doc)                          = 0;
         // The map what runs is read back by known, where there was none:
         // what waited on it -- a run-time error, a line to go to -- placed.
         virtual void runningKnown(Doc& doc) = 0;

@@ -1896,7 +1896,7 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
         const std::optional<ALScriptEnvelope> held = ALScriptEnvelope::parse(fetch_item_asset(prim, item, LLAssetType::AT_LSL_TEXT));
         as_is = held && held->source == was->source && held->expanded != was->expanded;
     }
-    if (!as_is && ALPreprocessor::wanted(content, lua, was.has_value(), ALScriptPreprocessor::enabled()) != ALPreprocessor::Wanted::No)
+    if (!as_is && ALPreprocessor::wanted(content, lua, ALScriptPreprocessor::enabled()) != ALPreprocessor::Wanted::No)
     {
         auto prepared = std::make_shared<ALScriptPrepared>();
         await_async_result(

@@ -368,7 +368,7 @@ private:
     void                      showExpanded(Doc& doc, const std::string& text) override;
     // The other editor gone, where what it holds is of no text the
     // script is now, and the source shown in its place.
-    void                      dropExpanded(Doc& doc);
+    void                      dropExpanded(Doc& doc) override;
     void                      toggleExpanded();
     // A view of the tab put in front, and the pane, the bars and the
     // toolbar shown as it now is; the keyboard with it where asked, or
