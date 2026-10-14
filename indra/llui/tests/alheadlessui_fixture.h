@@ -44,10 +44,8 @@
 #include <cstdio>
 #include <vector>
 
-#if AL_TEST_CATCH2
 #include "alteststateguard.h"
 #include "altestteardown.h"
-#endif
 
 #ifndef LLUI_TEST_APP_DIR
 #  define LLUI_TEST_APP_DIR ""
@@ -100,7 +98,6 @@ namespace ll_test
         // the case that first asked is not blamed for it.
         static HeadlessUI& get(bool gl_textures = false)
         {
-#if AL_TEST_CATCH2
             static HeadlessUI* made = [gl_textures]
             {
                 HeadlessUI* ui = new HeadlessUI(gl_textures);
@@ -109,9 +106,6 @@ namespace ll_test
                 return ui;
             }();
             HeadlessUI& ui = *made;
-#else
-            static HeadlessUI ui(gl_textures);
-#endif
             if (gl_textures != ui.mGLTextures)
             {
                 LL_ERRS("HeadlessUI") << "HeadlessUI::get(gl_textures=" << gl_textures
@@ -212,9 +206,7 @@ namespace ll_test
         static const bool loaded = [&ui]
         {
             const bool read = ui.ok() && LLUIColorTable::instance().loadFromSettings();
-#if AL_TEST_CATCH2
             ll_test::StateGuard::accept("the colour table");
-#endif
             return read;
         }();
         return loaded;

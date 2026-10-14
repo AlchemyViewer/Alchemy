@@ -1,30 +1,5 @@
 # -*- cmake -*-
 
-add_library(lltut_runner_lib STATIC)
-
-target_sources(lltut_runner_lib PRIVATE lltut.cpp test.cpp)
-
-target_sources(
-  lltut_runner_lib
-  PUBLIC
-    FILE_SET HEADERS
-      FILES
-        catch_and_store_what_in.h
-        chained_callback.h
-        debug.h
-        llsdtraits.h
-        lltestapp.h
-        lltut.h
-        namedtempfile.h
-        print.h
-        setenv.h
-        sync.h
-)
-
-target_link_libraries(lltut_runner_lib PRIVATE al::flags PUBLIC llcommon ll::tut)
-
-set_target_properties(lltut_runner_lib PROPERTIES FOLDER "Tests")
-
 # The Catch2 harness: the main, what an LL_ERRS does, LOGFAIL's replay, the
 # state guard, the teardown, the matchers, the running case's name and the
 # failure type. An OBJECT library, which each test binary links directly: in
@@ -59,20 +34,19 @@ target_sources(
         altestname.h
         alteststateguard.h
         altestteardown.h
+        catch_and_store_what_in.h
+        debug.h
+        llsdtraits.h
+        lltestapp.h
+        namedtempfile.h
+        print.h
+        sync.h
 )
 
 # The matchers compare as llmath's is_approx_equal_fraction() does, a header
 # function, so the tests need llmath's headers but not its library.
 target_include_directories(al_test_support PUBLIC ${INDRA_SOURCE_DIR}/llmath)
 target_link_libraries(al_test_support PRIVATE al::flags PUBLIC llcommon ll::catch2)
-# Whatever links the harness is built for Catch2: a test binary and the
-# OBJECT libraries of checks it links alike. The helpers in test/ that TUT
-# tests still share fail a test the way its framework does by it, and so do
-# the fixtures the tests share with their checks -- the headless UI, the
-# shared GL context -- whose one-per-process object is a function's static:
-# an object built without it would have a body of its own, with a static of
-# its own, wherever the compiler inlined it, and a second UI or context.
-target_compile_definitions(al_test_support PUBLIC AL_TEST_CATCH2=1)
 
 set_target_properties(al_test_support PROPERTIES FOLDER "Tests")
 

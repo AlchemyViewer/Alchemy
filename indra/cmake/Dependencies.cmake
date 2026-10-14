@@ -96,12 +96,11 @@ al_import(ll::tinyexr      PACKAGE tinyexr         CONFIG TARGETS unofficial::ti
 al_import(ll::vorbis       PACKAGE Vorbis          CONFIG TARGETS Vorbis::vorbisfile Vorbis::vorbisenc Vorbis::vorbis)
 al_import(ll::xxhash       PACKAGE xxHash          CONFIG TARGETS xxHash::xxhash)
 
-# Header-only ports, and the two libraries kept in the tree.
+# Header-only ports, and the library kept in the tree.
 al_import(ll::glext        HEADER GL/glcorearb.h)
 al_import(ll::tinygltf     HEADER tiny_gltf.h)
 al_import(ll::vhacd        HEADER VHACD.h)
 al_import(ll::mikktspace   INCLUDE ${INDRA_SOURCE_DIR}/externals/mikktspace/)
-al_import(ll::tut          INCLUDE ${INDRA_SOURCE_DIR}/externals/tut/)
 
 # Per platform, and per option. The target is empty where the condition is
 # false, so the option gates sources at the consumer and nothing else.

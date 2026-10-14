@@ -2455,7 +2455,9 @@ if(AL_BUILD_TESTS)
   # a test links whole, since what reaches for them is a library the linker
   # may read after an archive of them; a test names them where it needs them.
   add_library(newview_test_fakes OBJECT tests/newview_test_fakes.cpp)
-  target_link_libraries(newview_test_fakes PRIVATE al::flags llcommon)
+  # The harness for its headers: the recovery writer's helper names the state
+  # guard and the teardown.
+  target_link_libraries(newview_test_fakes PRIVATE al::flags al_test_support llcommon)
   set_target_properties(newview_test_fakes PROPERTIES FOLDER "Tests/${test_project}")
   # The viewer's settings group, gSavedSettings, for a test whose code reads
   # it: a group made as the process starts, so linked by those tests alone.
