@@ -1401,7 +1401,7 @@ void LLViewerOctreeCull::traverse(const OctreeNode* n)
     if (mRes == 2 ||
         (mRes && group->hasState(LLViewerOctreeGroup::SKIP_FRUSTUM_CHECK)))
     {   //fully in, just add everything
-        traverseNearFirst(n, mEye);
+        mNearFirst ? traverseNearFirst(n, mEye) : OctreeTraveler::traverse(n);
     }
     else
     {
@@ -1409,7 +1409,7 @@ void LLViewerOctreeCull::traverse(const OctreeNode* n)
 
         if (mRes)
         { //at least partially in, run on down
-            traverseNearFirst(n, mEye);
+            mNearFirst ? traverseNearFirst(n, mEye) : OctreeTraveler::traverse(n);
         }
 
         mRes = 0;

@@ -370,7 +370,7 @@ class LLViewerOctreeCull : public OctreeTraveler
 {
 public:
     LLViewerOctreeCull(LLCamera* camera)
-        : mCamera(camera), mRes(0)
+        : mCamera(camera), mRes(0), mNearFirst(!camera->getOrigin().isExactlyZero())
     {
         mEye.load3(camera->getOrigin().mV);
     }
@@ -411,10 +411,13 @@ protected:
 
 protected:
     LLCamera *mCamera;
-    // The camera in the octree's own space, which traverse() visits children nearest to first: the groups it hands
-    // on then come roughly front to back, and the depth test rejects what nearer ones hide.
+    // The camera in the octree's own space, which traverse() visits children nearest to first while mNearFirst holds:
+    // the groups it hands on then come roughly front to back, and the depth test rejects what nearer ones hide. Off for
+    // a camera at the origin, which the sun's shadow cameras are placed at, and for culls whose results are not drawn
+    // in the order they are found; those keep the children's own order.
     LLVector4a mEye;
     S32 mRes;
+    bool mNearFirst;
 };
 
 //scan the octree, output the info of each node for debug use.

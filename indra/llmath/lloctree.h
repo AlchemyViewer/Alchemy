@@ -251,6 +251,8 @@ public:
     U32 getChildCount() const                       { return mChildCount; }
     oct_node* getChild(U32 index)                   { return mChild[index]; }
     const oct_node* getChild(U32 index) const       { return mChild[index]; }
+    /// The index of the child in `octant`, or NO_CHILD_NODES.
+    U8 getChildIndex(U8 octant) const               { return mChildMap[octant]; }
     child_list& getChildren()                       { return mChild; }
     const child_list& getChildren() const           { return mChild; }
 
@@ -849,33 +851,31 @@ void LLOctreeTraveler<T, T_PTR>::traverse(const LLOctreeNode<T, T_PTR>* node)
 
 // The children in order of their octant's offset from the eye's, the one the eye is in first. Octant o ^ k lies
 // across the splits k's bits name, and a ray from the eye crosses each split at most once, so a child can only hide
-// one whose offset holds every bit of its own and more: a larger offset, visited later.
+// one whose offset holds every bit of its own and more: a larger offset, visited later. The child map gives each
+// octant's child directly, so the order needs no sort.
 template <class T, typename T_PTR>
 void LLOctreeTraveler<T, T_PTR>::traverseNearFirst(const LLOctreeNode<T, T_PTR>* node, const LLVector4a& eye)
 {
     node->accept(this);
 
-    const U8 eye_octant = node->getOctant(eye);
-    const LLOctreeNode<T, T_PTR>* order[8];
-    U8 offsets[8];
-    U32 count = 0;
-    for (U32 i = 0; i < node->getChildCount(); i++)
+    const U32 count = node->getChildCount();
+    if (count < 2)
     {
-        const LLOctreeNode<T, T_PTR>* child = node->getChild(i);
-        const U8 offset = node->getOctant(child->getCenter()) ^ eye_octant;
-        U32 j = count++;
-        for (; j > 0 && offsets[j - 1] > offset; --j)
+        if (count == 1)
         {
-            order[j] = order[j - 1];
-            offsets[j] = offsets[j - 1];
+            traverse(node->getChild(0));
         }
-        order[j] = child;
-        offsets[j] = offset;
+        return;
     }
 
-    for (U32 i = 0; i < count; i++)
+    const U8 eye_octant = node->getOctant(eye);
+    for (U8 offset = 0; offset < 8; ++offset)
     {
-        traverse(order[i]);
+        const U8 index = node->getChildIndex(eye_octant ^ offset);
+        if (index != LLOctreeNode<T, T_PTR>::NO_CHILD_NODES)
+        {
+            traverse(node->getChild(index));
+        }
     }
 }
 

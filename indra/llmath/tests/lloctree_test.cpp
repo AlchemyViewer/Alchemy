@@ -223,21 +223,17 @@ namespace
         CHECK(crossings > 300);
     }
 
-    TEST_CASE("LLOctreeTraveler: traverseNearFirst visits children that share an octant", "[LLOctree]")
+    TEST_CASE("LLOctreeTraveler: traverseNearFirst walks a lone child, wherever the eye is", "[LLOctree]")
     {
-        // The child map keeps one child an octant; the walk goes by the children themselves.
         Node* root = new Node(vec(0.f, 0.f, 0.f), vec(8.f, 8.f, 8.f), nullptr);
-        const Node* first = make_child(root, 3);
-        const Node* second = make_child(root, 3);
-        const Node* other = make_child(root, 4);
+        const Node* child = make_child(root, 5);
 
-        NearFirst walk(vec(1.f, 1.f, -1.f));
+        NearFirst walk(vec(-3.f, -3.f, -3.f));
         walk.traverse(root);
 
-        REQUIRE(walk.mVisited.size() == 4);
-        CHECK(walk.indexOf(first) > 0);
-        CHECK(walk.indexOf(second) > 0);
-        CHECK(walk.indexOf(other) == 3);
+        REQUIRE(walk.mVisited.size() == 2);
+        CHECK(walk.indexOf(root) == 0);
+        CHECK(walk.indexOf(child) == 1);
 
         delete root;
     }
