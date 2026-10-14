@@ -393,7 +393,17 @@ namespace
         UNSCOPED_INFO("a host that starts like loopback");
         REQUIRE_FALSE(ALFeedback::endpointFromDsn("http://k@127.0.0.1.example.com/1"));
         UNSCOPED_INFO("loopback as a user name");
+        REQUIRE_FALSE(ALFeedback::endpointFromDsn("http://127.0.0.1@evil.example.com/1"));
+        UNSCOPED_INFO("loopback in the path");
         REQUIRE_FALSE(ALFeedback::endpointFromDsn("http://k@evil.example.com/127.0.0.1/1"));
+        // A second user part, after the key's, would make what follows it the
+        // host the address names, whatever the loopback check took for one.
+        UNSCOPED_INFO("loopback as the user name of another host");
+        REQUIRE_FALSE(ALFeedback::endpointFromDsn("http://k@127.0.0.1:8765@evil.example.com/1"));
+        UNSCOPED_INFO("IPv6 loopback as the user name of another host");
+        REQUIRE_FALSE(ALFeedback::endpointFromDsn("http://k@[::1]@evil.example.com/1"));
+        UNSCOPED_INFO("a second user part, encrypted or not");
+        REQUIRE_FALSE(ALFeedback::endpointFromDsn("https://k@o42.ingest.sentry.io@evil.example.com/4501"));
     }
 
     TEST_CASE("alfeedback: a report's logs hide capability addresses and the given words", "[alfeedback]")

@@ -134,6 +134,12 @@ std::optional<ALFeedback::Endpoint> ALFeedback::endpointFromDsn(std::string_view
     {
         return std::nullopt;
     }
+    // One user part, the key's. A second would make what follows it the host
+    // the address names, whatever the host below was taken to be.
+    if (host_and_path.find('@') != std::string_view::npos)
+    {
+        return std::nullopt;
+    }
     // What goes is the user's: in the clear only to this machine.
     if (scheme == "http")
     {
