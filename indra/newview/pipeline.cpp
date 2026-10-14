@@ -4766,10 +4766,15 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     LLGLEnable cull(GL_CULL_FACE);
 
     bool done_atmospherics = LLPipeline::sRenderingHUDs; //skip atmospherics on huds
-    bool done_water_haze = done_atmospherics;
+
+    // The water haze and the exclusion serve the water this view draws: from above, the haze fogs what lies under the
+    // surface and the exclusion cuts the surface, so neither runs where none is drawn -- the Water render type off, or
+    // the view missing the sea (LLDrawPoolWater::getNumPostDeferredPasses). From below, the haze fills the screen.
+    const bool water_drawn = mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterPool->getNumPostDeferredPasses() > 0;
+    bool done_water_haze = done_atmospherics || (!sUnderWaterRender && !water_drawn);
     // and the water exclusion mask: the water pool and water haze, which read it, do not run
     // on huds, and every pass that runs them builds the mask first
-    bool done_water_exclusion = LLPipeline::sRenderingHUDs;
+    bool done_water_exclusion = LLPipeline::sRenderingHUDs || !water_drawn;
 
     // do water exclusion just before water pass.
     U32 water_exclusion_pass = LLDrawPool::POOL_WATEREXCLUSION;

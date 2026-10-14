@@ -286,8 +286,9 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     };
 
     // Not where an exclusion prim removed the water (LLPipeline::doWaterExclusion), and marking where it is; from
-    // below, the surface stays where an exclusion prim covers it, undistorted. The flat field's cells beside the patches
-    // are its fringe where the patches are drawn.
+    // below, the surface stays where an exclusion prim covers it, undistorted, drawn again only if one was drawn. The
+    // flat field's cells beside the patches are its fringe where the patches are drawn.
+    const bool excluded = underwater && gPipeline.beginRenderMap(LLRenderPass::PASS_INVISIBLE) != gPipeline.endRenderMap(LLRenderPass::PASS_INVISIBLE);
     const auto draw = [&](LLGLSLShader* shader, bool patches)
     {
         {
@@ -295,7 +296,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
             shader->uniform1f(LLShaderMgr::WATER_EXCLUSION_DISTORT, 1.f);
             patches ? surface.drawPatches(*shader) : surface.draw(*shader, waves);
         }
-        if (underwater)
+        if (excluded)
         {
             ALWaterStencil::Excluded stencil;
             shader->uniform1f(LLShaderMgr::WATER_EXCLUSION_DISTORT, 0.f);
