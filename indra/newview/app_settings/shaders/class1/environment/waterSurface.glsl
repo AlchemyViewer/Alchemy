@@ -500,15 +500,15 @@ vec3 water_tiled_layer(sampler2D map_a, sampler2D map_b, vec2 uv, vec2 p, vec2 f
     return n;
 }
 
-// A layer read plainly, from the current map and, while a transition runs, the next.
+// A layer read plainly, from the current map and, while a transition runs, the next: implicit gradients, the same as
+// explicit ones taken of the same uv, at the sampler's full rate. The blend is uniform, so the read stays in uniform
+// control flow.
 vec3 water_plain_layer(sampler2D map_a, sampler2D map_b, vec2 uv)
 {
-    vec2 dx = dFdx(uv);
-    vec2 dy = dFdy(uv);
-    vec3 n = textureGrad(map_a, uv, dx, dy).xyz * 2.0 - 1.0;
+    vec3 n = texture(map_a, uv).xyz * 2.0 - 1.0;
     if (blend_factor > 0.0)
     {
-        n = mix(n, textureGrad(map_b, uv, dx, dy).xyz * 2.0 - 1.0, blend_factor);
+        n = mix(n, texture(map_b, uv).xyz * 2.0 - 1.0, blend_factor);
     }
     return n;
 }
