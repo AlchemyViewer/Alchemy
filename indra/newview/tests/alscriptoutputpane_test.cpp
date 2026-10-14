@@ -162,16 +162,25 @@ namespace
         {
             LLComboBox* combo = window.find<LLComboBox>("output_filter");
             CAPTURE(value);
+            REQUIRE(combo != nullptr);
             REQUIRE(combo->selectByValue(LLSD(value)));
             combo->onCommit();
         }
-        void find(const std::string& words)
+        // Words typed in the find box, as a commit of it would take them.
+        void require_find(const std::string& words)
         {
             LLFilterEditor* editor = window.find<LLFilterEditor>("output_find");
+            REQUIRE(editor != nullptr);
             editor->setText(words);
             editor->onCommit();
         }
-        const ALOutputView::Entry& last() const { return pane->view()->entries().back(); }
+        // What the pane said last.
+        const ALOutputView::Entry& require_last() const
+        {
+            const auto& entries = pane->view()->entries();
+            REQUIRE_FALSE(entries.empty());
+            return entries.back();
+        }
     };
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: the kind filter picks errors or owner words or debug or the studio's", "[ALScriptOutputPane]")
@@ -226,13 +235,13 @@ namespace
                       std::string("|lamp speaks|crate tells its owner|Saved door.lsl."));
 
         require_whose("");
-        find("DOOR");
+        require_find("DOOR");
         UNSCOPED_INFO("the words, in the text or whose it is");
         CHECK(shown() == std::string("|door speaks|Saved door.lsl."));
-        find("  lamp  ");
+        require_find("  lamp  ");
         UNSCOPED_INFO("trimmed");
         CHECK(shown() == std::string("|lamp speaks"));
-        find("");
+        require_find("");
         UNSCOPED_INFO("everything");
         CHECK(shownTexts().size() == size_t(4));
 
@@ -272,8 +281,10 @@ namespace
         CHECK(out.objects().front().first == roots[6]);
         UNSCOPED_INFO("the next went");
         CHECK(std::none_of(out.objects().begin(), out.objects().end(), [&](const auto& one) { return one.first == roots[7]; }));
+        const LLComboBox* filter = window.find<LLComboBox>("output_filter");
+        REQUIRE(filter != nullptr);
         UNSCOPED_INFO("and is still chosen");
-        CHECK(window.find<LLComboBox>("output_filter")->getValue().asString() == roots[6].asString());
+        CHECK(filter->getValue().asString() == roots[6].asString());
     }
 
     TEST_CASE_METHOD(alscriptoutputpane_data, "ALScriptOutputPane: an error or failure out of sight is unread until seen or cleared", "[ALScriptOutputPane]")
@@ -307,7 +318,9 @@ namespace
         out.said("Could not save.", true, nullptr, {});
         UNSCOPED_INFO("a failure out of sight is not");
         CHECK(out.unread());
-        window.find<LLButton>("output_clear")->onCommit();
+        LLButton* clear = window.find<LLButton>("output_clear");
+        REQUIRE(clear != nullptr);
+        clear->onCommit();
         UNSCOPED_INFO("cleared");
         CHECK_FALSE(out.unread());
         UNSCOPED_INFO("with what was said");
@@ -319,7 +332,7 @@ namespace
         ALScriptOutputPane& out = require_pane();
         ALScriptStudioDoc&  doc = services.addDoc("door-script", ALScriptRef(fresh(), fresh()), "door.lsl");
         out.said("Could not save door.lsl.", true, &doc, { "retry", "copy" });
-        const ALOutputView::Entry& entry = last();
+        const ALOutputView::Entry& entry = require_last();
         UNSCOPED_INFO("the name and two things to do");
         REQUIRE(entry.links.size() == size_t(3));
         UNSCOPED_INFO("the name, where the words say it");
@@ -348,7 +361,8 @@ namespace
 
         // Said of no tab: nothing to link.
         out.said("Nothing open.", false, nullptr, { "retry" });
-        CHECK(last().links.empty());
+        const ALOutputView::Entry& unlinked = require_last();
+        CHECK(unlinked.links.empty());
         // The tab closed since: nothing asked of the window.
         services.docs.clear();
         out.choose(chosen);
@@ -387,7 +401,7 @@ namespace
         CHECK(at.line == 4);
         UNSCOPED_INFO("in the script");
         CHECK(at.file.empty());
-        const ALOutputView::Entry& entry = last();
+        const ALOutputView::Entry& entry = require_last();
         UNSCOPED_INFO("a link to it");
         CHECK(entry.link);
         UNSCOPED_INFO("at that line");
@@ -428,7 +442,7 @@ namespace
         services.docs.clear();
         UNSCOPED_INFO("as said");
         CHECK(out.heard(error).line == 7);
-        chosen = last();
+        chosen = require_last();
         out.choose(chosen);
         {
             INFO("gone to as the region counts it");
@@ -586,7 +600,7 @@ namespace
         Event               error  = failed(object, item, "Counter", "bad\rvalue", -1);
         error.stack                = { "lua_script:8: bad\rvalue", "lua_script:3 function helper" };
         out.heard(error);
-        const ALOutputView::Entry& entry = last();
+        const ALOutputView::Entry& entry = require_last();
         UNSCOPED_INFO("its breaks as the log reads them");
         CHECK(entry.text == std::string("bad\nvalue\nlua_script:3 function helper"));
         UNSCOPED_INFO("a link for the frame");
@@ -601,7 +615,7 @@ namespace
         // the line it is shown on, and what to do after it.
         ALScriptStudioDoc& doc = services.addDoc("door-script", ALScriptRef(fresh(), fresh()), "door.lsl");
         out.said("Could not save\rdoor.lsl.", true, &doc, { "retry" });
-        const ALOutputView::Entry& studio_said = last();
+        const ALOutputView::Entry& studio_said = require_last();
         UNSCOPED_INFO("the name and what to do");
         REQUIRE(studio_said.links.size() == size_t(2));
         {

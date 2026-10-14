@@ -172,7 +172,9 @@ namespace
             UNSCOPED_INFO("the skin builds the tab as the pane");
             REQUIRE(pane != nullptr);
             // In sight, its tab the one chosen, as when it is worked in.
-            window.find<LLTabContainer>("bottom_tabs")->selectTabByName("search_tab");
+            LLTabContainer* bottom = window.find<LLTabContainer>("bottom_tabs");
+            REQUIRE(bottom != nullptr);
+            bottom->selectTabByName("search_tab");
             return *pane;
         }
 
@@ -240,11 +242,13 @@ namespace
         }
         {
             INFO("escape");
-            REQUIRE(out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            CHECK(out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            REQUIRE_FALSE(services.reveals.empty());
             CHECK(services.reveals.back());
         }
         UNSCOPED_INFO("copied");
         CHECK(out.list()->handleKeyHere('C', MASK_CONTROL));
+        REQUIRE(out.search().found()[0].lines.size() == size_t(2));
         UNSCOPED_INFO("the line as listed, trimmed");
         CHECK(out.search().found()[0].lines[1] == std::string("timer two"));
         CHECK(counted() == services.words("SearchCount", { { "[HITS]", services.counted("Matches", 2) },
@@ -304,6 +308,7 @@ namespace
         out.fetched(studio.fetches[1].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\nother\n"), false);
         UNSCOPED_INFO("the second's kept");
         REQUIRE(out.search().found().size() == size_t(1));
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
         UNSCOPED_INFO("for what it looked for");
         CHECK(out.search().found()[0].places[0].begin.line == 1);
     }
@@ -331,16 +336,24 @@ namespace
         door.editor->insertText("yy");
         out.typedIn(door);
         out.pump();
+        // A script searched again keeps its place in found(), whether it
+        // holds places now or none: found() sized once, its places after
+        // each pump.
+        REQUIRE(out.search().found().size() == size_t(1));
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
         UNSCOPED_INFO("not at once");
         CHECK(out.search().found()[0].places[0].begin.column == 1);
         std::this_thread::sleep_for(std::chrono::milliseconds(700));
         LLTabContainer* tabs = window.find<LLTabContainer>("bottom_tabs");
+        REQUIRE(tabs != nullptr);
         tabs->selectTabByName("problems_tab");
         out.pump();
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
         UNSCOPED_INFO("due, but out of sight: waiting");
         CHECK(out.search().found()[0].places[0].begin.column == 1);
         tabs->selectTabByName("search_tab");
         out.pump();
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
         UNSCOPED_INFO("then, seen, where it is now");
         CHECK(out.search().found()[0].places[0].begin.column == 3);
         out.replaceAll();
@@ -361,6 +374,7 @@ namespace
         studio.objects           = { { root, "Thing", { door.ref, away, card } } };
         studio.inHand            = root;
         find("timer", "object");
+        REQUIRE(studio.fetches.size() == size_t(2));
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\n"), false);
         out.fetched(studio.fetches[1].generation, "Thing", card, "card", std::make_shared<const std::string>("a timer\n"), true);
         UNSCOPED_INFO("three found");
@@ -401,6 +415,7 @@ namespace
         }
         UNSCOPED_INFO("and each is made");
         CHECK(studio.applied.size() == size_t(2));
+        REQUIRE_FALSE(services.reports.empty());
         CHECK(services.reports.back().text ==
                       services.words("SearchReplaced", { { "[PLACES]", services.counted("Places", 3) }, { "[SCRIPTS]", services.counted("ScriptsNotecards", 3) } }) +
                           "; " +
@@ -560,8 +575,16 @@ namespace
 
     TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: Sources keeps a script by its text and drops the oldest past the limit", "[ALScriptSearchPane]")
     {
+        // The viewer's one store: emptied before the case and after it,
+        // however it ends.
+        struct Emptied
+        {
+            ALScriptSearch::Sources& sources;
+            ~Emptied() { sources.clear(); }
+        };
         ALScriptSearch::Sources& sources = ALScriptSearch::Sources::instance();
         sources.clear();
+        const Emptied emptied{ sources };
         const ALScriptRef one(LLUUID::generateNewID(), LLUUID::generateNewID());
         const LLUUID      asset = LLUUID::generateNewID();
         sources.keep(one, LLUUID::null, { std::make_shared<const std::string>("timer"), "one.lsl", false });
@@ -610,7 +633,6 @@ namespace
             CHECK(sources.find(refs[0], assets[0]));
             CHECK(sources.find(refs[2], assets[2]));
         }
-        sources.clear();
     }
 
     TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: a fetched script is sought apart and an earlier search's is dropped", "[ALScriptSearchPane]")
@@ -664,6 +686,7 @@ namespace
         out.typedIn(door);
         std::this_thread::sleep_for(std::chrono::milliseconds(700));
         out.pump();
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
         UNSCOPED_INFO("typed in: searched again");
         CHECK(out.search().found()[0].places[0].begin.column == 1);
     }

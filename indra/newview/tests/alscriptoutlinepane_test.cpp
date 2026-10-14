@@ -174,10 +174,14 @@ namespace
         REQUIRE(rows() == std::string("count, ^default, .touch_start, .state_entry, alpha"));
         CHECK(joined(told().shown) == std::string("a"));
         const std::vector<LLScrollListItem*> items = outline->list()->getAllData();
+        const LLScrollListCell*              kind  = items[1]->getColumn(0);
+        const LLScrollListCell*              name  = items[0]->getColumn(1);
+        REQUIRE(kind != nullptr);
+        REQUIRE(name != nullptr);
         UNSCOPED_INFO("what it is");
-        CHECK(items[1]->getColumn(0)->getToolTip() == std::string("state"));
+        CHECK(kind->getToolTip() == std::string("state"));
         UNSCOPED_INFO("and its declaration");
-        CHECK(items[0]->getColumn(1)->getToolTip() == std::string("variable\ninteger"));
+        CHECK(name->getToolTip() == std::string("variable\ninteger"));
         UNSCOPED_INFO("by its index");
         CHECK(items[4]->getValue().asInteger() == 4);
         CHECK(comment().empty());
@@ -238,6 +242,7 @@ namespace
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         LLFilterEditor*      filter  = window.find<LLFilterEditor>("outline_filter");
+        REQUIRE(filter != nullptr);
         filter->setText(std::string("ST"));
         filter->onCommit();
         UNSCOPED_INFO("each with the letters");
@@ -254,6 +259,7 @@ namespace
         UNSCOPED_INFO("kept");
         CHECK(outline->sortOrder() == std::string("name"));
         LLComboBox* sort = window.find<LLComboBox>("outline_sort");
+        REQUIRE(sort != nullptr);
         sort->selectByValue(LLSD("kind"));
         sort->onCommit();
         UNSCOPED_INFO("by kind, then name");
@@ -305,7 +311,14 @@ namespace
         Doc&                 doc     = tab("a");
         outline->show(doc);
         // A mark left on the first row, which a list made again does not have.
-        outline->list()->getFirstData()->getColumn(1)->setValue(LLSD("marked"));
+        const auto require_marked = [&]() {
+            LLScrollListItem* first = outline->list()->getFirstData();
+            REQUIRE(first != nullptr);
+            LLScrollListCell* words = first->getColumn(1);
+            REQUIRE(words != nullptr);
+            words->setValue(LLSD("marked"));
+        };
+        require_marked();
         outline->show(doc);
         UNSCOPED_INFO("the same rows");
         CHECK(cell(outline->list()->getFirstData(), 1) == std::string("marked"));
@@ -313,7 +326,7 @@ namespace
         outline->show(doc);
         UNSCOPED_INFO("a detail changed: made again");
         CHECK(cell(outline->list()->getFirstData(), 1) != "marked");
-        outline->list()->getFirstData()->getColumn(1)->setValue(LLSD("marked"));
+        require_marked();
         Doc& other = tab("b");
         other.outline[0].detail = "float";
         window.services().front = 1;
@@ -339,12 +352,13 @@ namespace
         {
             INFO("gone to");
             CHECK(joined(told().chosen) == "count");
+            REQUIRE_FALSE(window.services().reveals.empty());
             CHECK_FALSE(window.services().reveals.back());
         }
         {
             INFO("return: gone to, to type there");
             CHECK(list->handleKeyHere(KEY_RETURN, MASK_NONE));
-            CHECK(told().chosen.back() == "count editor");
+            CHECK(joined(told().chosen) == "count, count editor");
         }
         UNSCOPED_INFO("the keyboard taken");
         CHECK(window.services().reveals.back());
@@ -369,6 +383,7 @@ namespace
         window.floater->setVisible(true);
         const LLRect              rect = list->getItemListRect();
         const LLScrollListColumn* icon = list->getColumn("icon");
+        REQUIRE(icon != nullptr);
         const auto                row  = [&](S32 at) {
             const LLScrollListItem* item = list->hitItem(rect.mLeft + 1, at);
             return item ? item->getValue().asInteger() : -1;
@@ -438,6 +453,7 @@ namespace
         Doc&                 doc     = tab("a");
         outline->show(doc);
         const std::vector<LLScrollListItem*> before = outline->list()->getAllData();
+        REQUIRE(before.size() == 5);
         doc.caret->crumbPath                        = { 4 };
         outline->followCaret(doc);
         UNSCOPED_INFO("alpha chosen");

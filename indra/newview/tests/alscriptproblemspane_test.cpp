@@ -30,6 +30,7 @@
 #include "../alscriptstudioweighing.h"
 
 #include "alpanefolds.h"
+#include "alscriptfixes.h"
 #include "alpanelist.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
@@ -231,12 +232,16 @@ namespace
         void tick(const char* box, bool on)
         {
             LLCheckBoxCtrl* check = window.find<LLCheckBoxCtrl>(box);
+            CAPTURE(box);
+            REQUIRE(check);
             check->set(on);
             check->onCommit();
         }
         void pick(const char* combo, const std::string& value)
         {
             LLComboBox* box = window.find<LLComboBox>(combo);
+            CAPTURE(combo);
+            REQUIRE(box);
             INFO("the combo offers " << value);
             REQUIRE(box->selectByValue(LLSD(value)));
             box->onCommit();
@@ -278,7 +283,10 @@ namespace
         {
             messages.push_back(row.message);
         }
-        REQUIRE(made.rows.size() == size_t(6));
+        {
+            CAPTURE(messages);
+            REQUIRE(made.rows.size() == size_t(6));
+        }
         UNSCOPED_INFO("the weight first, at no line");
         CHECK(made.rows[0].origin == services.words("OriginWeight"));
         UNSCOPED_INFO("the weight a warning, the studio's reckoning");
@@ -354,9 +362,10 @@ namespace
         CHECK(out.held() == 3);
         UNSCOPED_INFO("said on the tab");
         CHECK(studio.counts > 0);
+        LLCheckBoxCtrl* errors = window.find<LLCheckBoxCtrl>("problems_errors");
+        REQUIRE(errors);
         UNSCOPED_INFO("counted on the box");
-        CHECK(window.find<LLCheckBoxCtrl>("problems_errors")->getLabel() ==
-                      services.words("FilterErrorsCount", { { "[COUNT]", "1" } }));
+        CHECK(errors->getLabel() == services.words("FilterErrorsCount", { { "[COUNT]", "1" } }));
 
         tick("problems_errors", false);
         UNSCOPED_INFO("the filter kept");
@@ -369,14 +378,16 @@ namespace
         UNSCOPED_INFO("the lint's alone");
         CHECK(shown() == "|door warning|door note|#" + services.counted("ProblemsHidden", 1));
         pick("problems_origin", "");
-        window.find<LLFilterEditor>("problems_filter")->setText(std::string("NOTE"));
-        window.find<LLFilterEditor>("problems_filter")->onCommit();
+        LLFilterEditor* filter = window.find<LLFilterEditor>("problems_filter");
+        REQUIRE(filter);
+        filter->setText(std::string("NOTE"));
+        filter->onCommit();
         UNSCOPED_INFO("the words, in either case");
         CHECK(shown() == "|door note|#" + services.counted("ProblemsHidden", 2));
         UNSCOPED_INFO("rows to show: nothing said over them");
         CHECK_FALSE(out.list()->saysEmpty());
-        window.find<LLFilterEditor>("problems_filter")->setText(std::string());
-        window.find<LLFilterEditor>("problems_filter")->onCommit();
+        filter->setText(std::string());
+        filter->onCommit();
 
         pick("problems_scope", "all");
         UNSCOPED_INFO("every script's, each under its name");
@@ -427,6 +438,7 @@ namespace
         gather(d);
         out.fill(&d);
         out.selectFirstError(false);
+        REQUIRE_FALSE(studio.chosen.empty());
         UNSCOPED_INFO("the first error, the compiler's");
         CHECK(studio.chosen.back().line == 1);
         UNSCOPED_INFO("taken to the script");
@@ -452,10 +464,12 @@ namespace
             CHECK(studio.chosen.back().line == 0);
             REQUIRE(studio.toEditor.back());
         }
-        const size_t gone = studio.chosen.size();
+        const size_t gone     = studio.chosen.size();
+        const size_t revealed = services.reveals.size();
         {
             INFO("escape");
             CHECK(out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            REQUIRE(services.reveals.size() == revealed + 1);
             REQUIRE(services.reveals.back());
             REQUIRE(studio.chosen.size() == gone);
         }
@@ -534,6 +548,7 @@ namespace
         CHECK(studio.kinds[1] == std::string("door:"));
 
         out.act("copy_all");
+        REQUIRE_FALSE(services.statuses.empty());
         UNSCOPED_INFO("copied, and said");
         CHECK(services.statuses.back() == services.counted("ProblemsCopied", 3));
 
@@ -604,6 +619,8 @@ namespace
         }
         UNSCOPED_INFO("the lint named");
         CHECK(named);
+        UNSCOPED_INFO("by the name a NOLINT comment turns it off by");
+        CHECK(ALScriptFixes::suppressed(unused, "integer x; // NOLINT(DeclaredButNotUsed)", "", false));
         UNSCOPED_INFO("the error no number");
         CHECK_FALSE(numbered);
         LLComboBox* origins = window.find<LLComboBox>("problems_origin");
@@ -704,7 +721,7 @@ namespace
             at = rows[i]->getValue()["owner"].asString().rfind("checked:", 0) == 0 ? static_cast<S32>(i) : at;
         }
         UNSCOPED_INFO("a row of it");
-        CHECK(at >= 0);
+        REQUIRE(at >= 0);
         list()->selectNthItem(at);
         pane->choose(false);
         REQUIRE_FALSE(studio.chosen.empty());
@@ -792,6 +809,7 @@ namespace
         LLTabContainer* tabs       = window.find<LLTabContainer>("bottom_tabs");
         Doc&            door       = doc("door");
         door.check->analysis       = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning") };
+        REQUIRE(tabs);
         tabs->selectTabByName("references_tab");
         CHECK_FALSE(ALPaneFolds::inSight(&out));
         const S32 said = studio.counts;
@@ -1052,6 +1070,7 @@ namespace
         }
         choose("the compiler's, nowhere");
         out.choose(false);
+        REQUIRE_FALSE(studio.chosen.empty());
         UNSCOPED_INFO("chosen at none");
         CHECK(studio.chosen.back().line == -1);
         choose("the compiler's, at 3");

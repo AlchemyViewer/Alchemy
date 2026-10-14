@@ -62,7 +62,21 @@ namespace
             REQUIRE(pane != nullptr);
             return *pane;
         }
-        ALPaneList* list(const char* name) const { return floater ? floater->findChild<ALPaneList>(name, true) : nullptr; }
+        // One of the tab's lists, by its name in the skin.
+        ALPaneList* require_list(const char* name) const
+        {
+            ALPaneList* found = floater ? floater->findChild<ALPaneList>(name, true) : nullptr;
+            CAPTURE(name);
+            REQUIRE(found != nullptr);
+            return found;
+        }
+        // The head over the lists, which says whose weights they are.
+        LLTextBox* require_head() const
+        {
+            LLTextBox* head = floater ? floater->findChild<LLTextBox>("weights_head", true) : nullptr;
+            REQUIRE(head != nullptr);
+            return head;
+        }
 
         static std::string cell(const LLScrollListItem* item, S32 column)
         {
@@ -148,8 +162,8 @@ namespace
         REQUIRE(tab() != nullptr);
         ALScriptWeightsPane& pane = require_pane();
         pane.show(lsl());
-        ALPaneList* targets = list("weights_targets");
-        ALPaneList* parts   = list("weights_parts");
+        ALPaneList* targets = require_list("weights_targets");
+        ALPaneList* parts   = require_list("weights_parts");
         REQUIRE(targets->getItemCount() == 3);
         UNSCOPED_INFO("its own first");
         CHECK(cell(targets->getAllData()[0], 0) == std::string("LSL (LSO)"));
@@ -178,7 +192,7 @@ namespace
         CHECK(std::find(lines.begin(), lines.end(), "lib.lsl:1") != lines.end());
         UNSCOPED_INFO("the script's own at its line" + joined(lines));
         CHECK(std::find(lines.begin(), lines.end(), "8") != lines.end());
-        const std::string head = floater->findChild<LLTextBox>("weights_head", true)->getText();
+        const std::string head = require_head()->getText();
         {
             INFO("the head says whose and on what: " + head);
             CHECK(head.find("Door") != std::string::npos);
@@ -196,8 +210,8 @@ namespace
         }
         ALScriptWeightsPane& pane = require_pane();
         pane.show(lsl());
-        ALPaneList* targets = list("weights_targets");
-        ALPaneList* parts   = list("weights_parts");
+        ALPaneList* targets = require_list("weights_targets");
+        ALPaneList* parts   = require_list("weights_parts");
 
         parts->selectByValue(LLSD(2));
         std::optional<ALScriptWeightsPane::Place> place = pane.chosenPlace(parts);
@@ -246,8 +260,10 @@ namespace
         saved.parts.erase(saved.parts.begin() + 2);
         shown.saved = { saved };
         pane.show(shown);
-        ALPaneList* targets = list("weights_targets");
-        ALPaneList* parts   = list("weights_parts");
+        ALPaneList* targets = require_list("weights_targets");
+        ALPaneList* parts   = require_list("weights_parts");
+        REQUIRE(targets->getItemCount() == 3);
+        REQUIRE(parts->getItemCount() == 5);
         UNSCOPED_INFO("the target's whole");
         CHECK(cell(targets->getAllData()[0], 3) == std::string("+96"));
         UNSCOPED_INFO("nothing for a target not weighed then");
@@ -291,10 +307,13 @@ namespace
         ALScriptWeightsPane& pane = require_pane();
         pane.show(lsl());
         pane.showNothing("Nothing open to weigh.");
-        CHECK(list("weights_targets")->getItemCount() == 0);
-        CHECK(list("weights_parts")->getItemCount() == 0);
+        ALPaneList* targets = require_list("weights_targets");
+        ALPaneList* parts   = require_list("weights_parts");
+        LLTextBox*  head    = require_head();
+        CHECK(targets->getItemCount() == 0);
+        CHECK(parts->getItemCount() == 0);
         CHECK_FALSE(pane.chosenPlace(pane.partsList()));
-        CHECK(floater->findChild<LLTextBox>("weights_head", true)->getText() == std::string("Nothing open to weigh."));
+        CHECK(head->getText() == std::string("Nothing open to weigh."));
         UNSCOPED_INFO("and whose it is forgotten");
         CHECK(pane.shownId().empty());
     }
@@ -321,7 +340,7 @@ namespace
         shown.weights = { slua };
         shown.saved   = { slua };
         pane.show(shown);
-        std::vector<std::string> changes = column(list("weights_parts"), 4);
+        std::vector<std::string> changes = column(require_list("weights_parts"), 4);
         UNSCOPED_INFO("nothing changed");
         CHECK(joined(changes) == std::string("|||"));
         // The middle one heavier, and one added after them.
@@ -330,7 +349,7 @@ namespace
         now.parts.push_back(part(Kind::Function, "", 40, 12));
         shown.weights = { now };
         pane.show(shown);
-        changes = column(list("weights_parts"), 4);
+        changes = column(require_list("weights_parts"), 4);
         UNSCOPED_INFO("the middle one, and one new");
         CHECK(joined(changes) == std::string("||+50||new"));
     }
@@ -355,7 +374,7 @@ namespace
         shown.weights = { slua };
         shown.handlers[0] = "touch_start";
         pane.show(shown);
-        const std::string names = joined(column(list("weights_parts"), 0));
+        const std::string names = joined(column(require_list("weights_parts"), 0));
         UNSCOPED_INFO("the handler by its event: " + names);
         CHECK(names.find("touch_start") != std::string::npos);
         UNSCOPED_INFO("the other with none: " + names);
@@ -374,7 +393,7 @@ namespace
         }
         ALScriptWeightsPane&       pane  = require_pane();
         ALScriptWeightsPane::Shown shown = lsl();
-        LLTextBox*                 head  = floater->findChild<LLTextBox>("weights_head", true);
+        LLTextBox*                 head  = require_head();
         pane.show(shown);
         UNSCOPED_INFO("nothing of the region");
         CHECK(head->getText().find("region") == std::string::npos);
@@ -449,11 +468,11 @@ namespace
         shown.weights[2].total = 2048;
         std::swap(shown.weights[0], shown.weights[2]);
         pane.show(shown);
-        const std::string luau = floater->findChild<LLTextBox>("weights_head", true)->getText();
+        const std::string luau = require_head()->getText();
         UNSCOPED_INFO("said for LSL on Luau: " + luau);
         CHECK(luau.find("records no lines") != std::string::npos);
         pane.show(lsl());
-        const std::string lso = floater->findChild<LLTextBox>("weights_head", true)->getText();
+        const std::string lso = require_head()->getText();
         UNSCOPED_INFO("not for LSO: " + lso);
         CHECK(lso.find("records no lines") == std::string::npos);
     }
@@ -498,12 +517,9 @@ namespace
         shown.weights     = { slua };
         pane.show(shown);
 
-        ALPaneList* strings = list("weights_strings");
-        {
-            INFO("the list there");
-            REQUIRE(strings);
-            CHECK(strings->getParent()->getVisible());
-        }
+        ALPaneList* strings = require_list("weights_strings");
+        UNSCOPED_INFO("the list there");
+        CHECK(strings->getParent()->getVisible());
         UNSCOPED_INFO("a start, then each string");
         REQUIRE(strings->getItemCount() == 5);
         const std::vector<std::string> texts = column(strings, 0);
@@ -540,8 +556,9 @@ namespace
             REQUIRE(place);
             CHECK(place->line == 2);
         }
+        ALPaneList* parts = require_list("weights_parts");
         UNSCOPED_INFO("not the parts' choice");
-        CHECK_FALSE(pane.chosenPlace(list("weights_parts")));
+        CHECK_FALSE(pane.chosenPlace(parts));
 
         // Kept chosen through a refill, by what it is.
         strings->selectByValue(LLSD(1));
@@ -585,8 +602,10 @@ namespace
             kept = start;
             of   = texts;
         });
+        LLButton* keep = floater->findChild<LLButton>("weights_keep_start", true);
+        REQUIRE(keep);
         strings->selectByValue(LLSD(0));
-        floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
+        keep->onCommit();
         {
             INFO("asked with the start and its strings");
             CHECK(kept == "You have touched me, ");
@@ -595,13 +614,13 @@ namespace
         }
         kept.clear();
         strings->selectByValue(LLSD(1));
-        floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
+        keep->onCommit();
         UNSCOPED_INFO("not for a string");
         CHECK(kept.empty());
         // Nor in a script that cannot be written to.
         pane.setKeepStart([&](const std::string& start, const std::vector<std::string>&) { kept = start; }, []() { return false; });
         strings->selectByValue(LLSD(0));
-        floater->findChild<LLButton>("weights_keep_start", true)->onCommit();
+        keep->onCommit();
         UNSCOPED_INFO("not where the script cannot be written to");
         CHECK(kept.empty());
 

@@ -394,8 +394,12 @@ namespace
             CHECK(drags == 1);
         }
         CHECK(t.choose(objectRow(house), false));
-        UNSCOPED_INFO("an object may not");
-        CHECK_FALSE(t.folderView()->getCurSelectedItem()->isMovable());
+        item = t.folderView()->getCurSelectedItem();
+        {
+            INFO("an object may not");
+            REQUIRE(item);
+            CHECK_FALSE(item->isMovable());
+        }
         gFocusMgr.setKeyboardFocus(nullptr);
     }
 }
