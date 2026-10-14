@@ -41,6 +41,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <list>
 #include <optional>
 
 namespace
@@ -158,6 +159,10 @@ namespace
             {
                 SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
+            // The jump bar the skin gives the bar, which every check after
+            // reads what the bar shows from.
+            INFO("the skin gives the bar its jump bar");
+            REQUIRE(jump() != nullptr);
             return found;
         }
         ALJumpBar*        jump() { return window.find<ALJumpBar>("breadcrumb"); }
@@ -229,11 +234,11 @@ namespace
             }
             return joined(out);
         }
+        // The part that begins so, or none.
         const Part* part(const std::string& begins)
         {
-            static std::vector<Part> held;
-            held = parts();
-            for (const Part& one : held)
+            const std::vector<Part>& now = held.emplace_back(parts());
+            for (const Part& one : now)
             {
                 if (one.text.rfind(begins, 0) == 0)
                 {
@@ -242,6 +247,10 @@ namespace
             }
             return nullptr;
         }
+        // The parts each part() looked through, kept for the case: a part one
+        // call found is still there after the next, so a check that compares
+        // two reads both, whichever is found first.
+        std::list<std::vector<Part>> held;
     };
 
     TEST_CASE_METHOD(alscriptcrumbsbar_data, "alscriptcrumbsbar: the caret's path offers each step's siblings and follows changes", "[alscriptcrumbsbar]")
@@ -253,7 +262,8 @@ namespace
         const std::string top = "Script a [default, f, g, h, other]";
         CHECK(path() == top + ", default [default, f, g, h, other], state_entry [state_entry, touch_start]");
         UNSCOPED_INFO("kept");
-        REQUIRE(doc.caret->crumbPath.size() == size_t(2));
+        CHECK(doc.caret->crumbPath.size() == size_t(2));
+        REQUIRE(jump()->path().size() == size_t(3));
         UNSCOPED_INFO("the script's step");
         CHECK(jump()->path()[0].value == std::string("top"));
         UNSCOPED_INFO("said");
@@ -279,6 +289,7 @@ namespace
         CHECK(path().find("state_entry [") != std::string::npos);
         doc.editor->setCaret(ALTextPos(13, 5));
         place(crumbs, doc);
+        REQUIRE_FALSE(jump()->path().empty());
         UNSCOPED_INFO("where two meet: the later");
         CHECK(jump()->path().back().label == std::string("h"));
         doc.editor->setCaret(ALTextPos(17, 0));
@@ -288,11 +299,13 @@ namespace
 
         doc.name = "Renamed";
         place(crumbs, doc);
+        REQUIRE_FALSE(jump()->path().empty());
         UNSCOPED_INFO("a new name: again");
         CHECK(jump()->path()[0].label == std::string("Renamed"));
         Doc& other = tab("b");
         other.name = "Other";
         place(crumbs, other);
+        REQUIRE_FALSE(jump()->path().empty());
         UNSCOPED_INFO("not in front: nothing");
         CHECK(jump()->path()[0].label == std::string("Renamed"));
         crumbs->forget();
@@ -302,6 +315,7 @@ namespace
             CHECK(jump()->trailer().empty());
         }
         place(crumbs, doc);
+        REQUIRE_FALSE(jump()->path().empty());
         UNSCOPED_INFO("and shown again whatever");
         CHECK(jump()->path()[0].label == std::string("Renamed"));
     }
@@ -317,8 +331,10 @@ namespace
         CHECK(trailer() == std::string("Ln 3, Col 7, Tab Size: 4"));
         {
             INFO("pressed for a line");
-            CHECK(part("Ln")->value == "line");
-            CHECK(part("Ln")->toolTip == "line tip");
+            const Part* line = part("Ln");
+            REQUIRE(line != nullptr);
+            CHECK(line->value == "line");
+            CHECK(line->toolTip == "line tip");
         }
 
         doc.modifiable  = false;
@@ -344,20 +360,32 @@ namespace
             CHECK(raw[11].between);
             CHECK_FALSE(raw[12].between);
         }
+        const Part* indentation = part("Tab");
+        const Part* selection   = part("2 lines");
+        const Part* errors      = part("2 errors");
+        const Part* warnings    = part("1 warning");
+        const Part* readOnly    = part("Read");
+        const Part* position    = part("Ln");
+        REQUIRE(indentation != nullptr);
+        REQUIRE(selection != nullptr);
+        REQUIRE(errors != nullptr);
+        REQUIRE(readOnly != nullptr);
+        REQUIRE(position != nullptr);
         {
             INFO("where narrow: the indentation first, then the selection, the counts and read only last, the place never");
-            CHECK(part("Tab")->drop > part("2 lines")->drop);
-            CHECK(part("2 lines")->drop > part("2 errors")->drop);
-            CHECK(part("2 errors")->drop > 0);
-            CHECK(part("Read")->drop > 0);
-            CHECK(part("Ln")->drop == 0);
+            CHECK(indentation->drop > selection->drop);
+            CHECK(selection->drop > errors->drop);
+            CHECK(errors->drop > 0);
+            CHECK(readOnly->drop > 0);
+            CHECK(position->drop == 0);
         }
         UNSCOPED_INFO("read only, said");
-        CHECK(part("Read")->toolTip == std::string("You can view this script but not change it"));
+        CHECK(readOnly->toolTip == std::string("You can view this script but not change it"));
         {
             INFO("the problems pressable");
-            CHECK(part("2 errors")->value == "problems");
-            CHECK(part("1 warning")->toolTip == "problems tip");
+            CHECK(errors->value == "problems");
+            REQUIRE(warnings != nullptr);
+            CHECK(warnings->toolTip == "problems tip");
         }
         doc.editor->setSelection(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 2)));
         crumbs->showTrailer(doc);
@@ -370,9 +398,10 @@ namespace
         CHECK(part("4 characters selected") != nullptr);
         doc.editor->setCaret(ALTextPos(0, 2));
         crumbs->showTrailer(doc);
+        const Part* column = part("Ln");
+        REQUIRE(column != nullptr);
         UNSCOPED_INFO("the column as seen, past the tab");
-        CHECK(part("Ln")->text ==
-                      "Ln 1, Col " + std::to_string(doc.editor->getTabWidth() + 1));
+        CHECK(column->text == "Ln 1, Col " + std::to_string(doc.editor->getTabWidth() + 1));
         doc.loaded = false;
         crumbs->showTrailer(doc);
         {
@@ -407,14 +436,18 @@ namespace
         doc.weighing->sent  = true;
         doc.weighing->weight->total = 60000;
         crumbs->showTrailer(doc);
+        weighed = part("LSL (Mono)");
+        REQUIRE(weighed != nullptr);
         UNSCOPED_INFO("as sent");
-        CHECK(part("LSL (Mono)")->toolTip.find("as it is saved") != std::string::npos);
+        CHECK(weighed->toolTip.find("as it is saved") != std::string::npos);
         UNSCOPED_INFO("near: the warning's");
-        CHECK(part("LSL (Mono)")->color == warn);
+        CHECK(weighed->color == warn);
         doc.weighing->weight->total = 70000;
         crumbs->showTrailer(doc);
+        weighed = part("LSL (Mono)");
+        REQUIRE(weighed != nullptr);
         UNSCOPED_INFO("past: the error's");
-        CHECK(part("LSL (Mono)")->color == error);
+        CHECK(weighed->color == error);
         doc.weighing->weight->estimate = true;
         crumbs->showTrailer(doc);
         UNSCOPED_INFO("an estimate");
@@ -437,10 +470,12 @@ namespace
         }
         doc.weighing->assetBytes = LIMIT * 9 / 10 + 1;
         crumbs->showTrailer(doc);
+        REQUIRE_FALSE(parts().empty());
         UNSCOPED_INFO("near: the warning's");
         CHECK(parts().back().color == warn);
         doc.weighing->assetBytes = LIMIT + 1;
         crumbs->showTrailer(doc);
+        REQUIRE_FALSE(parts().empty());
         UNSCOPED_INFO("over: the error's");
         CHECK(parts().back().color == error);
         UNSCOPED_INFO("and by how much");
@@ -448,6 +483,7 @@ namespace
         doc.notecard             = true;
         doc.weighing->assetBytes = static_cast<size_t>(LLNotecard::MAX_SIZE) / 2 + 1;
         crumbs->showTrailer(doc);
+        REQUIRE_FALSE(parts().empty());
         UNSCOPED_INFO("a notecard's by its own limit");
         CHECK(parts().back().toolTip.find("Notecard text") != std::string::npos);
         doc.notecard             = false;
@@ -456,7 +492,8 @@ namespace
         crumbs->setTips({ "line tip", "problems tip", "source tip", "expanded tip" });
         doc.expandedEditor = editor("expanded_a", "integer x;\n");
         crumbs->showTrailer(doc);
-        const Part  shown = parts().back();
+        REQUIRE_FALSE(parts().empty());
+        const Part shown = parts().back();
         {
             INFO("the source in front");
             CHECK(shown.text == "Source");
@@ -466,6 +503,7 @@ namespace
         doc.view = Doc::View::Expanded;
         doc.expandedEditor->setCaret(ALTextPos(0, 3));
         crumbs->showTrailer(doc);
+        REQUIRE_FALSE(parts().empty());
         {
             INFO("the expansion");
             CHECK(parts().back().text == "Preprocessed");
@@ -493,18 +531,24 @@ namespace
         doc.uploaded.codeAfter  = 10240;
         told().target           = ALScriptWeight::Target::Mono;
         crumbs->showTrailer(doc);
+        const Part* weighed = part("LSL (Mono)");
+        REQUIRE(weighed != nullptr);
         UNSCOPED_INFO("before and after");
-        CHECK(part("LSL (Mono)")->text == std::string("LSL (Mono) ~20.0 \xE2\x86\x92 ~10.0 of 64 KB used"));
+        CHECK(weighed->text == std::string("LSL (Mono) ~20.0 \xE2\x86\x92 ~10.0 of 64 KB used"));
         UNSCOPED_INFO("once");
         CHECK(parts().size() == size_t(4));
         doc.uploaded.codeAfter = 60000;
         crumbs->showTrailer(doc);
+        weighed = part("LSL (Mono)");
+        REQUIRE(weighed != nullptr);
         UNSCOPED_INFO("near: the warning's");
-        CHECK(part("LSL (Mono)")->color == doc.editor->markColor(ALCodeEditor::Mark::Warning));
+        CHECK(weighed->color == doc.editor->markColor(ALCodeEditor::Mark::Warning));
         doc.uploaded.codeAfter = 70000;
         crumbs->showTrailer(doc);
+        weighed = part("LSL (Mono)");
+        REQUIRE(weighed != nullptr);
         UNSCOPED_INFO("past: the error's");
-        CHECK(part("LSL (Mono)")->color == doc.editor->markColor(ALCodeEditor::Mark::Error));
+        CHECK(weighed->color == doc.editor->markColor(ALCodeEditor::Mark::Error));
         told().target = ALScriptWeight::Target::LSO;
         crumbs->showTrailer(doc);
         {
@@ -671,7 +715,9 @@ namespace
         {
             INFO("other tips: said again");
             CHECK(said > 2);
-            CHECK(part("3 errors")->toolTip == "problems");
+            const Part* problems = part("3 errors");
+            REQUIRE(problems != nullptr);
+            CHECK(problems->toolTip == "problems");
         }
         said = 0;
         Doc& other = tab("b");

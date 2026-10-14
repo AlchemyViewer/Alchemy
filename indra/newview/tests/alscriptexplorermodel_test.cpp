@@ -209,6 +209,18 @@ namespace
             const auto found = std::find_if(all.begin(), all.end(), [&name](const Model::Row& row) { return row.name == name; });
             return found != all.end() ? &*found : nullptr;
         }
+
+        // What the first row of that name stands for, as a click on it
+        // would choose it.
+        Model::Choice require_choice(const std::vector<Model::Row>& all, const std::string& name) const
+        {
+            CAPTURE(name);
+            const Model::Row* row = rowNamed(all, name);
+            REQUIRE(row != nullptr);
+            const std::optional<Model::Choice> choice = Model::Choice::of(row->value);
+            REQUIRE(choice.has_value());
+            return *choice;
+        }
     };
 
     TEST_CASE_METHOD(alscriptexplorermodel_data, "alscriptexplorermodel: pins come first then the selection then the open scripts' objects", "[alscriptexplorermodel]")
@@ -226,7 +238,7 @@ namespace
         selected = { chair, lamp };
         open     = { id(21) };
         list();
-        CHECK(names() == std::string("Lamp* Gone(away)* (unnamed)(away)* Chair Table"));
+        REQUIRE(names() == std::string("Lamp* Gone(away)* (unnamed)(away)* Chair Table"));
         {
             INFO("an object by a prim of it, listed by its root");
             CHECK(model.objects().back().root == table);
@@ -254,10 +266,14 @@ namespace
         const LLUUID chair = object(10, "Chair");
         selected           = { chair };
         list();
+        const std::vector<Model::Row> unknown = model.rows(std::string());
+        REQUIRE_FALSE(unknown.empty());
         UNSCOPED_INFO("what a prim holds not known yet, a folder of it may still be opened");
-        CHECK_FALSE(model.rows(std::string()).front().known);
+        CHECK_FALSE(unknown.front().known);
         holds(chair, { "sit.lsl", "readme" });
-        CHECK(model.rows(std::string()).front().known);
+        const std::vector<Model::Row> known = model.rows(std::string());
+        REQUIRE_FALSE(known.empty());
+        CHECK(known.front().known);
         CHECK(rows() == std::string("O:Chair I:sit.lsl I:readme"));
         list();
         UNSCOPED_INFO("kept through a listing");
@@ -436,8 +452,8 @@ namespace
         holds(id(10), { "a.lsl", "b.lsl", "notes" });
         holds(id(11), { "c.lsl" });
         holds(id(12), {});
-        const std::vector<Model::Row> all = model.rows(std::string());
-        Model::Choice whole = *Model::Choice::of(all.front().value);
+        const std::vector<Model::Row> all   = model.rows(std::string());
+        const Model::Choice           whole = require_choice(all, "House");
         {
             INFO("an object row");
             CHECK_FALSE(whole.isItem());
@@ -449,9 +465,9 @@ namespace
         UNSCOPED_INFO("each script once");
         CHECK(model.scriptsReached({ whole }) == 3);
 
-        Model::Choice prim = *Model::Choice::of(rowNamed(all, "House.1")->value);
-        Model::Choice c    = *Model::Choice::of(rowNamed(all, "c.lsl")->value);
-        Model::Choice a    = *Model::Choice::of(rowNamed(all, "a.lsl")->value);
+        const Model::Choice prim = require_choice(all, "House.1");
+        const Model::Choice c    = require_choice(all, "c.lsl");
+        const Model::Choice a    = require_choice(all, "a.lsl");
         {
             INFO("a prim row");
             CHECK(prim.primRow);
@@ -471,8 +487,9 @@ namespace
         }
         UNSCOPED_INFO("counted once");
         CHECK(model.scriptsReached({ prim, c, a }) == 2);
+        const Model::Choice notes = require_choice(all, "notes");
         UNSCOPED_INFO("a notecard chosen reaches no script");
-        CHECK(model.scriptsReached({ *Model::Choice::of(rowNamed(all, "notes")->value) }) == 0);
+        CHECK(model.scriptsReached({ notes }) == 0);
     }
 
     TEST_CASE_METHOD(alscriptexplorermodel_data, "alscriptexplorermodel: a rename shows at once and a root's new name reaches its object's pin", "[alscriptexplorermodel]")
@@ -482,6 +499,8 @@ namespace
         model.togglePinned(house, "House");
         list();
         model.renamed(id(11), "Door");
+        REQUIRE(model.objects().size() == size_t(1));
+        REQUIRE(model.objects().front().prims.size() == size_t(2));
         CHECK(model.objects().front().prims[1].name == std::string("Door"));
         {
             INFO("a prim is not its object");
@@ -493,6 +512,7 @@ namespace
             INFO("the root is");
             CHECK(model.objects().front().name == "Home");
             CHECK(model.takePinsChanged());
+            REQUIRE(model.pins().size() == size_t(1));
             CHECK(model.pins().front().name == "Home");
         }
         UNSCOPED_INFO("told once");
@@ -543,14 +563,14 @@ namespace
 
         // Pinned from the rows: every object among them, as the first is not.
         const std::vector<Model::Row> all = model.rows(std::string());
-        model.pin({ *Model::Choice::of(all[0].value), *Model::Choice::of(rowNamed(all, "b.lsl")->value), *Model::Choice::of(rowNamed(all, "Chair")->value) });
+        model.pin({ require_choice(all, "House"), require_choice(all, "b.lsl"), require_choice(all, "Chair") });
         {
             INFO("both pinned, each once");
             CHECK(model.pins().size() == 2);
             CHECK(model.isPinned(house));
             CHECK(model.isPinned(chair));
         }
-        model.pin({ *Model::Choice::of(rowNamed(all, "Chair")->value) });
+        model.pin({ require_choice(all, "Chair") });
         {
             INFO("let go");
             CHECK(model.pins().size() == 1);
@@ -571,7 +591,7 @@ namespace
         CHECK(ask(false, false).empty());
         model.askRegion(id(11));
         UNSCOPED_INFO("the one dropped into, though its object says current");
-        CHECK(ask(false, false) == std::vector<LLUUID>({ id(11) }));
+        REQUIRE(ask(false, false) == std::vector<LLUUID>({ id(11) }));
         {
             INFO("and of the region");
             CHECK(model.asksRegion(id(11)));
@@ -717,7 +737,10 @@ namespace
         {
             INFO("a step is no new place");
             CHECK_FALSE(model.takePinsChanged());
-            CHECK(model.pinOf(house)->position->mdV[VX] == 256010.0);
+            const Model::Pin* stepped = model.pinOf(house);
+            REQUIRE(stepped);
+            REQUIRE(stepped->position);
+            CHECK(stepped->position->mdV[VX] == 256010.0);
         }
         world[house].position = LLVector3d(256000.0 + 100.0, 256000.0 + 20.0, 30.0);
         world[house].region   = "Morris";
@@ -725,7 +748,9 @@ namespace
         {
             INFO("far, and elsewhere: kept, and said");
             CHECK(model.takePinsChanged());
-            CHECK(model.pinOf(house)->region == "Morris");
+            const Model::Pin* moved = model.pinOf(house);
+            REQUIRE(moved);
+            CHECK(moved->region == "Morris");
         }
 
         // Across sessions, and away.

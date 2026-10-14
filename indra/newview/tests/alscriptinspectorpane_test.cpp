@@ -268,7 +268,9 @@ namespace
         inspector->inspected(doc, result, ALTextPos(0, 8));
         UNSCOPED_INFO("in the include");
         CHECK(shown() == std::string("integer count\nDeclared in inc.lsl on line 5."));
-        const ALTextView::Substitution& to = inspector->view()->substitutions().back();
+        const std::vector<ALTextView::Substitution>& to_include = inspector->view()->substitutions();
+        REQUIRE_FALSE(to_include.empty());
+        const ALTextView::Substitution& to = to_include.back();
         {
             INFO("linked there");
             CHECK(to.value["path"].asString() == "disk:/inc.lsl");
@@ -327,7 +329,9 @@ namespace
         inspector->inspected(doc, result, ALTextPos(0, 8));
         UNSCOPED_INFO("in the module");
         CHECK(shown() == std::string("function M.twice(n: number): number\nDeclared in util.luau on line 4."));
-        const ALTextView::Substitution& to = inspector->view()->substitutions().back();
+        const std::vector<ALTextView::Substitution>& to_module = inspector->view()->substitutions();
+        REQUIRE_FALSE(to_module.empty());
+        const ALTextView::Substitution& to = to_module.back();
         {
             INFO("linked there");
             CHECK(to.value["path"].asString() == "disk:/lib/util.luau");

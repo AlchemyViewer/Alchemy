@@ -30,6 +30,7 @@
 #include "alscriptstudio_fixture.h"
 #include "lltabcontainer.h"
 #include "llbutton.h"
+#include "llclipboard.h"
 #include "llfocusmgr.h"
 #include "llscrolllistcell.h"
 #include "llscrolllistitem.h"
@@ -156,6 +157,7 @@ namespace
         CHECK(window.pane().counts == 1);
         CHECK(lines() == joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
         const std::vector<LLScrollListItem*> rows = refs->list()->getAllData();
+        REQUIRE(rows.size() == size_t(3));
         CHECK(cell(rows[0], 2) == std::string("declaration"));
         UNSCOPED_INFO("in the script it is declared in only");
         CHECK(cell(rows[2], 2) == std::string());
@@ -166,12 +168,14 @@ namespace
         Found twice = found();
         twice.places.push_back(place("", 0, 20, "integer count; count"));
         refs->show(twice);
+        REQUIRE(refs->list()->getItemCount() == 4);
         UNSCOPED_INFO("on the declaration's line, not it");
         CHECK(cell(refs->list()->getAllData()[3], 2).empty());
 
         Found in_b = found();
         in_b.home  = B;
         refs->show(in_b);
+        REQUIRE(refs->list()->getItemCount() == 3);
         UNSCOPED_INFO("declared in B: A's first line not it");
         CHECK(cell(refs->list()->getAllData()[0], 2).empty());
         refs->forget();
@@ -217,6 +221,7 @@ namespace
         refs->pump();
         UNSCOPED_INFO("B's by its path");
         CHECK(lines() == joined(Names{ "A 2:9", "A 3:5", "B 1:11" }));
+        REQUIRE(refs->found().places.size() == size_t(3));
         UNSCOPED_INFO("its line's words");
         CHECK(refs->found().places[2].text == std::string("foo() { count; }"));
 
@@ -231,6 +236,7 @@ namespace
         refs->pump();
         UNSCOPED_INFO("a place on the line edited");
         CHECK(lines() == joined(Names{ "A 3:6", "B 1:11" }));
+        REQUIRE_FALSE(refs->found().places.empty());
         UNSCOPED_INFO("its words again");
         CHECK(refs->found().places[0].text == std::string("yy = count;"));
         const S32 counts = window.pane().counts;
@@ -257,7 +263,7 @@ namespace
         refs->list()->onCommit();
         refs->choose(true);
         UNSCOPED_INFO("gone to");
-        CHECK(joined(window.pane().chosen) == joined(Names{ "a|" + B + "|0", "a|" + B + "|0 editor" }));
+        REQUIRE(joined(window.pane().chosen) == joined(Names{ "a|" + B + "|0", "a|" + B + "|0 editor" }));
         refs->rekey("elsewhere", "z");
         UNSCOPED_INFO("another's id");
         CHECK(refs->found().from == std::string("a"));
@@ -273,10 +279,18 @@ namespace
         CHECK(window.pane().chosen.back() == "a2||0 editor");
         const size_t gone = window.pane().chosen.size();
         CHECK(refs->list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+        REQUIRE_FALSE(window.services().reveals.empty());
         CHECK(window.services().reveals.back());
         CHECK(window.pane().chosen.size() == gone);
-        UNSCOPED_INFO("copied");
         CHECK(refs->list()->handleKeyHere('C', MASK_CONTROL));
+        std::string copied;
+        LLClipboard::instance().pasteFromClipboard(copied);
+        {
+            INFO("the row chosen copied, and no other: " + copied);
+            CHECK(copied.find("integer count;") != std::string::npos);
+            CHECK(copied.find("x = count;") == std::string::npos);
+            CHECK(copied.find("foo() { count; }") == std::string::npos);
+        }
     }
 
     TEST_CASE_METHOD(alscriptreferencespane_data, "alscriptreferencespane: rows sort by a column and then by script and place", "[alscriptreferencespane]")
@@ -363,6 +377,7 @@ namespace
         // Left out by Space on the row chosen: its box clear, its line as it is.
         refs->list()->selectNthItem(1);
         refs->list()->handleUnicodeCharHere(' ');
+        REQUIRE(refs->list()->getItemCount() == 3);
         UNSCOPED_INFO("left out");
         CHECK_FALSE(refs->list()->getAllData()[1]->getColumn(2)->getValue().asBoolean());
         UNSCOPED_INFO("its line as it is");
@@ -423,6 +438,7 @@ namespace
         CHECK_FALSE(changes->getVisible());
         {
             INFO("each row as found");
+            REQUIRE(refs->list()->getItemCount() == 3);
             CHECK(cell(refs->list()->getAllData()[0], 3) == "integer count;");
             CHECK(refs->list()->getAllData()[0]->getColumn(2)->getValue().asString() != "1");
         }
@@ -442,6 +458,7 @@ namespace
         refs->pump();
         UNSCOPED_INFO("slid, not listed again unseen");
         CHECK(lines() == joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
+        REQUIRE_FALSE(refs->found().places.empty());
         UNSCOPED_INFO("the places themselves slid");
         CHECK(refs->found().places[0].span.line == 1);
         tabs->selectTabByName("references_tab");
@@ -459,8 +476,10 @@ namespace
         boost::signals2::scoped_connection in_a(
             a.editor->document().onChanged([refs, &a](const ALTextDocument::Edit& edit) { refs->slide(a, "object:1:a", edit); }));
         LLScrollListItem* in_b     = refs->list()->rowWithKey("3");
-        LLScrollListCell* b_line   = in_b ? in_b->getColumn(1) : nullptr;
+        REQUIRE(in_b);
+        LLScrollListCell* b_line   = in_b->getColumn(1);
         LLScrollListItem* second   = refs->list()->rowWithKey("2");
+        CHECK(second);
         refs->list()->selectByValue(LLSD(2));
         a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "// one\n" } });
         refs->pump();
@@ -486,7 +505,7 @@ namespace
         }
         refs->show(many);
         UNSCOPED_INFO("a thousand and one row saying the rest");
-        CHECK(refs->list()->getItemCount() == 1001);
+        REQUIRE(refs->list()->getItemCount() == 1001);
         CHECK(cell(refs->list()->getAllData().back(), 3) == window.services().counted("ReferencesUnlisted", 3));
         UNSCOPED_INFO("all of them counted over the list");
         CHECK(head().find("1003") != std::string::npos);
