@@ -2,7 +2,7 @@
  * @file   StringVec.h
  * @author Nat Goodspeed
  * @date   2012-02-24
- * @brief  Extend TUT ensure_equals() to handle std::vector<std::string>
+ * @brief  Print a std::vector<std::string>, as a failed check shows one
  *
  * $LicenseInfo:firstyear=2012&license=viewerlgpl$
  * Copyright (c) 2012, Linden Research, Inc.

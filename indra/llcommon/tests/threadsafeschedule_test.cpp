@@ -25,7 +25,7 @@ using namespace std::literals::string_literals; // s suffix
 using Queue = LL::ThreadSafeSchedule<std::string>;
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
 namespace
 {

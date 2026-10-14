@@ -40,7 +40,6 @@
 #include "../llviewercontrol.h"
 #include "../llvocache.h"
 
-// Tut header
 #include <catch2/catch_test_macros.hpp>
 
 // -------------------------------------------------------------------------------------------
@@ -87,7 +86,7 @@ LLVOCache::~LLVOCache() {}
 // -------------------------------------------------------------------------------------------
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// Tests
 // -------------------------------------------------------------------------------------------
 
 namespace
@@ -142,8 +141,6 @@ namespace
     // Test functions
     // Notes:
     // * Test as many as you possibly can without requiring a full blown simulation of everything
-    // * The tests are executed in sequence so the test instance state may change between calls
-    // * Remember that you cannot test private methods with tut
     // ---------------------------------------------------------------------------------------
 
     // ---------------------------------------------------------------------------------------

@@ -60,9 +60,9 @@ Tests are off by default. To enable: add `-DAL_BUILD_TESTS=ON` to the configure 
 ctest --test-dir build-<OS>-<preset> --output-on-failure -LE manual
 ```
 
-`-LE manual` leaves out the benchmarks and the pending one-process runs of Catch2 binaries (label `combined_pending`), as the build's own test target does.
+`-LE manual` leaves out the benchmarks and the pending one-process runs of Catch2 binaries (label `combined_pending`), as the build's own test target does. `-L <library>` runs one library's tests, and `-R '^<binary>/<file stem>$'` one file's.
 
-Unit tests live alongside the library they test in `indra/<library>/tests/` directories. They are moving from TUT (Template Unit Test) to Catch2 a library at a time. TUT test targets are defined by the `LL_ADD_PROJECT_UNIT_TESTS` macro in `indra/cmake/LLAddBuildTest.cmake`; a converted library builds its files into one Catch2 binary with `al_add_test_binary` (`indra/cmake/ALAddTestBinary.cmake`), on the harness in `indra/test/`. Integration tests are in `indra/integration_tests/`.
+Tests are Catch2 v3 and live alongside the library they test in `indra/<library>/tests/` directories. A library's test files build into one binary with `al_add_test_binary` (`indra/cmake/ALAddTestBinary.cmake`), on the harness in `indra/test/`, each file still a CTest entry of its own. Run one file by hand as `<binary> "[#<file stem>]~[.]"`, and add `--order rand` to shuffle. Benchmarks are files of the same binaries (`BENCH_SOURCES`), run by `ctest -L benchmark -V`. How to write a test, and the rules a test binary needs, are in `doc/TESTING.md`. Integration tests are in `indra/integration_tests/`.
 
 ## Architecture
 

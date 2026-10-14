@@ -45,9 +45,8 @@
 // header doesn't otherwise expose its prototype.
 bool init_from_xml(LLFontRegistry* registry, LLPointer<LLXMLNode> node);
 
-namespace tut
+namespace ll_test
 {
-    using namespace ll_test;
 
     // A fixture that owns a local LLFontRegistry with
     // create_gl_textures=true over the GL context llheadlessgl_fixture.h

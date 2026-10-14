@@ -187,7 +187,7 @@ namespace
     };
 }
 
-namespace tut
+namespace ll_test
 {
     struct alincludesearch_data
     {

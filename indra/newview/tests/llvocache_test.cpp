@@ -78,7 +78,7 @@ const LLHost& LLViewerRegion::getHost() const { static const LLHost host; return
 LLViewerRegion* LLWorld::getRegionFromHandle(const U64&) { return nullptr; }
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// Tests
 // -------------------------------------------------------------------------------------------
 namespace
 {

@@ -33,7 +33,7 @@ using namespace std::literals::chrono_literals; // ms suffix
 using namespace std::literals::string_literals; // s suffix
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
 namespace
 {

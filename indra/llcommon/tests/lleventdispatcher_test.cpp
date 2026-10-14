@@ -321,9 +321,9 @@ void freenb(NPARAMSb)
 } // anonymous namespace
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
     static void require_contains(const std::string& outer, const std::string& inner)
     {
@@ -670,7 +670,7 @@ namespace tut
 
         std::string call_exc(const std::string& func, const LLSD& args, const std::string& exc_frag)
         {
-            return tut::call_exc(
+            return ::call_exc(
                 [this, func, args]()
                 {
                     if (func.empty())
@@ -687,7 +687,7 @@ namespace tut
 
         void call_logerr(const std::string& func, const LLSD& args, const std::string& frag)
         {
-            tut::call_logerr([this, func, args](){ work(func, args); }, frag);
+            ::call_logerr([this, func, args](){ work(func, args); }, frag);
         }
 
         LLSD getMetadata(const std::string& name)
@@ -1363,7 +1363,7 @@ namespace tut
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: a listener error without a reply pump throws", "[lleventdispatcher]")
     {
         DispatchResult service;
-        tut::call_exc(
+        ::call_exc(
             [&service]()
             { service.post(llsd::map("op", "nosuchfunc", "reqid", 17)); },
             "nosuchfunc");
@@ -1480,7 +1480,7 @@ namespace tut
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: batched map exception", "[lleventdispatcher]")
     {
         DispatchResult service;
-        auto error = tut::call_exc(
+        auto error = ::call_exc(
             [&service]()
             {
                 service.post(llsd::map(
@@ -1560,7 +1560,7 @@ namespace tut
     TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: batched array exception", "[lleventdispatcher]")
     {
         DispatchResult service;
-        auto error = tut::call_exc(
+        auto error = ::call_exc(
             [&service]()
             {
                 service.post(llsd::map(
@@ -1581,4 +1581,4 @@ namespace tut
             "[1]");
         require_contains(error, "unsupported");
     }
-} // namespace tut
+} // anonymous namespace

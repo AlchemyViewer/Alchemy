@@ -22,9 +22,7 @@
 
 namespace
 {
-    // File scope rather than a fixture member: TUT's test bodies reach the
-    // fixture through a dependent base, so a name inherited from it is not
-    // visible inside a lambda written in one.
+    // At file scope, where every case and every lambda in one sees it.
     constexpr F32 TWO_PI = 6.28318530718f;
 }
 
