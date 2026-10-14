@@ -66,8 +66,8 @@ namespace
 
 namespace
 {
-    // Shared GL context + LLFontGL bring-up. One per binary. TUT
-    // creates a fresh fixture per test method; per-fixture HeadlessGL
+    // Shared GL context + LLFontGL bring-up. One per binary. Catch2
+    // creates a fresh fixture per test case; per-fixture HeadlessGL
     // creation poisons LLFontGL's process-static fontp cache, since
     // each test's GL context destroys the LLImageGL textures the
     // fontps reference (LLFontManager::cleanupClass + LLImageGL::

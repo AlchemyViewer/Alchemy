@@ -23,12 +23,12 @@
 #include <string>
 #include <vector>
 
-// for ensure_equals(std::vector<std::string>): must come BEFORE lltut.h
+// to print a std::vector<std::string> in a failed check
 #include "StringVec.h"
 #include <catch2/catch_test_macros.hpp>
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
 namespace
 {

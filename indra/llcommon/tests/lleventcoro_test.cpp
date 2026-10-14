@@ -127,7 +127,7 @@ private:
 } // anonymous namespace
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
 namespace
 {
@@ -313,9 +313,9 @@ namespace
                 // should immediately retrieve 'first' without waiting
                 LL_DEBUGS() << "listener coro waiting for first" << LL_ENDL;
                 data.append(llcoro::suspendUntilEventOnWithTimeout(pump, 0.1f, LLSD()));
-                // Don't use ensure() from within the coro -- ensure() failure
-                // throws tut::fail, which won't propagate out to the main
-                // test driver, which will result in an odd failure.
+                // Don't check from within the coro -- a failed REQUIRE
+                // throws, which won't propagate out to the case, which will
+                // result in an odd failure.
                 // Wait for 'second' because it's not already pending.
                 LL_DEBUGS() << "listener coro waiting for second" << LL_ENDL;
                 data.append(llcoro::suspendUntilEventOnWithTimeout(pump, 0.1f, LLSD()));

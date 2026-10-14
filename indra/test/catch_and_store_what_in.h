@@ -93,7 +93,7 @@ catch (const std::runtime_error& ex)                                    \
     else                                                                \
     {                                                                   \
         /* We don't even recognize this exception. Let it propagate */  \
-        /* out to TUT to fail the test.                             */  \
+        /* out to Catch2 to fail the test.                          */  \
         throw;                                                          \
     }                                                                   \
 }                                                                       \
