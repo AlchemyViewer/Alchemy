@@ -1118,6 +1118,9 @@ private:
     struct ToolbarFacts
     {
         std::string         id;
+        // The script in the world the strip acts on (worldRefOf), which a
+        // file's tab changes as its links do.
+        ALScriptRef         world;
         bool                loaded     = false;
         bool                modifiable = false;
         bool                notecard   = false;

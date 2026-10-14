@@ -3858,6 +3858,7 @@ ALFloaterScriptStudio::ToolbarFacts ALFloaterScriptStudio::toolbarFactsOf() cons
     facts.notecard         = doc->notecard;
     facts.file             = !doc->file.empty();
     const ALScriptRef world = worldRefOf(*doc);
+    facts.world            = world;
     facts.inventory        = world.inInventory();
     facts.sending          = doc->save.sending();
     facts.canUndo          = doc->undoText()->canUndo();
@@ -3904,10 +3905,20 @@ void ALFloaterScriptStudio::refreshToolbar()
     // own tab asked as it loaded: whether it runs, and its experience.
     if (standing && doc->worldAsked != world)
     {
-        doc->worldAsked = world;
-        doc->running    = -1;
+        // What was known of the one it stood in for before is not this
+        // one's.
+        doc->worldAsked      = world;
+        doc->running         = -1;
+        doc->runningAsked.reset();
+        doc->experience      = LLUUID::null;
+        doc->experienceKnown = false;
         ALScriptWorkspace::instance().askRunning(world);
         askExperienceOf(*doc);
+    }
+    else if (doc && !standing && !doc->file.empty())
+    {
+        // Standing in for none now: asked afresh should it stand in again.
+        doc->worldAsked = ALScriptRef();
     }
     mCompileTarget->setVisible(script);
     mCompileTarget->setEnabled(have && script && doc->modifiable);
@@ -9836,15 +9847,31 @@ void ALFloaterScriptStudio::askExperienceOf(Doc& doc)
 {
     const LLHandle<LLFloater> handle = getHandle();
     const std::string         id     = doc.id;
+    const ALScriptRef         world  = worldRefOf(doc);
     doc.experienceAsking             = true;
-    ALScriptWorkspace::instance().askExperience(worldRefOf(doc), [handle, id](const std::optional<LLUUID>& experience) {
+    ALScriptWorkspace::instance().askExperience(world, [handle, id, world](const std::optional<LLUUID>& experience) {
         ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         const size_t           index  = studio ? studio->indexOf(id) : NONE;
         if (index == NONE)
         {
             return;
         }
-        Doc& doc             = *studio->mDocs[index];
+        Doc& doc = *studio->mDocs[index];
+        // An answer about a script the tab no longer stands in for -- a
+        // file's links changed while it was asked -- is not the tab's: let
+        // go of, and the tab left asking where it asks another now.
+        if (studio->worldRefOf(doc) != world)
+        {
+            if (doc.worldAsked == world || doc.worldAsked.isNull())
+            {
+                doc.experienceAsking = false;
+            }
+            if (&doc == studio->active())
+            {
+                studio->refreshToolbar();
+            }
+            return;
+        }
         doc.experienceAsking = false;
         // One picked meanwhile stands, as a picked target does.
         if (experience && !doc.experienceChosen)
