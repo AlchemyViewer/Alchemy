@@ -206,6 +206,14 @@ const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(b
             {
                 case ALSyntaxKind::Function:
                 {
+                    // A library's table, listed by its name alone with
+                    // nothing it takes or gives: no call.
+                    if (!attrs.has("arguments") && !attrs.has("return") && word.text.find('.') == std::string::npos)
+                    {
+                        word.table  = true;
+                        word.detail = word.text;
+                        break;
+                    }
                     // Lua says "()" for a function that returns nothing,
                     // which is nothing worth reading before the name.
                     std::string returns = attrs.get("return").asString();
@@ -538,6 +546,11 @@ ALCodeEditor::Completion ALScriptStudioWords::completionFor(const Vocab& word, b
     c.kind          = word.kind;
     c.deprecated    = word.deprecated;
     c.documentation = word.documentation;
+    if (word.table)
+    {
+        c.kind  = ALSyntaxKind::Namespace;
+        c.table = true;
+    }
     if (word.kind == ALSyntaxKind::Event)
     {
         // A handler to fill in: LSL's with its typed parameters as the
@@ -778,9 +791,17 @@ void ALScriptStudioWords::complete(bool lua, ALCodeEditor& editor, const ALTextP
     // else, so a handler is offered only there; asked once, and only
     // if one matches.
     std::optional<bool> in_state;
-    for (const Vocab& each : vocabulary(lua))
+    const std::vector<Vocab>& words = vocabulary(lua);
+    for (size_t i = 0; i < words.size(); ++i)
     {
+        const Vocab& each = words[i];
         if (!begins(each.text))
+        {
+            continue;
+        }
+        // A library's table that is a type too -- string, buffer -- is
+        // offered once, as the type, as it is: the dot is the scripter's.
+        if (each.table && ((i > 0 && words[i - 1].text == each.text) || (i + 1 < words.size() && words[i + 1].text == each.text)))
         {
             continue;
         }

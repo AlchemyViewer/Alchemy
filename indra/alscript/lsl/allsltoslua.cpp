@@ -914,6 +914,13 @@ namespace
         // Whether listItem writes a call as an index into its list: its
         // items already what is asked for.
         bool listItemFits(LSLFunctionExpression* e);
+        // llList2Key where keys are held as text: its item read as text, as
+        // LSL gave it -- a string's, a key's -- where SLua's List2Key
+        // answers NULL_KEY for text that is no UUID.
+        bool textKeyItem(LSLFunctionExpression* e) const
+        {
+            return !mOptions.uuidKeys && std::string_view(e->getIdentifier()->getName()) == "llList2Key";
+        }
 
         // --- keys that hold text -----------------------------------------------------
 
@@ -921,7 +928,8 @@ namespace
         // that is no UUID. The event parameters SLua passes as text --
         // link_message's id -- and the key variables given text that is no
         // UUID, or such a parameter, or another such, which SLua holds as
-        // strings.
+        // strings; and a key that may hold any text -- given a string --
+        // given on to one of those.
         void findTextKeys();
         // An expression's type as SLua has it: LSL's, but a key for the
         // constants SLua types a uuid, and a string for those above.
@@ -3684,8 +3692,8 @@ namespace
         {
             return { nameOf(id) + "(" + args(e->getArguments(), params) + ")", PRIMARY, boolean(symbol) };
         }
-        const std::string lsl  = id->getName();
-        const std::string bare = lsl.rfind("ll", 0) == 0 ? lsl.substr(2) : lsl;
+        std::string lsl  = id->getName();
+        std::string bare = lsl.rfind("ll", 0) == 0 ? lsl.substr(2) : lsl;
         // A list's length is its length.
         if (lsl == "llGetListLength")
         {
@@ -3713,6 +3721,20 @@ namespace
             {
                 return *written;
             }
+        }
+        // llList2Key's item as text, where keys are held as text: as
+        // List2String reads it, which differs only for an item neither a
+        // string nor a key.
+        if (textKeyItem(e))
+        {
+            if ((itemTypes(argumentAt(e, 0)) & ~(ItemString | ItemKey)) != 0)
+            {
+                noteOnce(e, "SluaList2KeyText",
+                         "Keys are held as text, so llList2Key's item is read as List2String reads it, as LSL gave it, where SLua's "
+                         "List2Key answers NULL_KEY for text that is no UUID; a number's or a vector's text is given, where LSL gave \"\".");
+            }
+            lsl  = "llList2String";
+            bare = "List2String";
         }
         const ALLSLTraits::Trait* trait   = ALLSLTraits::of(lsl.c_str());
         const U8                  slua    = trait ? trait->slua : 0;
@@ -7339,14 +7361,16 @@ namespace
             { "llList2Vector", { ItemVector, 0 } },
             { "llList2Rot", { ItemRotation, 0 } },
         };
+        static const std::pair<U8, U8> TEXT_KEY = { ItemString, ItemString | ItemKey };
         const auto fits = FITS.find(std::string_view(e->getIdentifier()->getName()));
         LSLExpression* list = argumentAt(e, 0);
         if (!mOptions.idioms || fits == FITS.end() || !wholeVariable(list))
         {
             return false;
         }
-        const U8 types = itemTypes(list);
-        return (types & ~fits->second.first) == 0 || (types & ~fits->second.second) == 0;
+        const std::pair<U8, U8>& fit   = textKeyItem(e) ? TEXT_KEY : fits->second;
+        const U8                 types = itemTypes(list);
+        return (types & ~fit.first) == 0 || (types & ~fit.second) == 0;
     }
 
     std::optional<Expr> Writer::listItem(LSLFunctionExpression* e, const std::string& lsl)
@@ -7367,17 +7391,19 @@ namespace
             { "llList2Vector", { ItemVector, 0, "ZERO_VECTOR" } },
             { "llList2Rot", { ItemRotation, 0, "ZERO_ROTATION" } },
         };
-        const auto kind = KINDS.find(lsl);
-        if (kind == KINDS.end())
+        static const Kind TEXT_KEY = { ItemString, ItemString | ItemKey, "\"\"" };
+        const auto        named    = KINDS.find(lsl);
+        if (named == KINDS.end())
         {
             return std::nullopt;
         }
+        const Kind& kind = textKeyItem(e) ? TEXT_KEY : named->second;
         LSLExpression* list  = argumentAt(e, 0);
         LSLExpression* index = argumentAt(e, 1);
         LSLSymbol*     var   = wholeVariable(list);
         const U8       types = var ? itemTypes(list) : ItemAny;
-        const bool     as_is = (types & ~kind->second.as_is) == 0;
-        if (!var || (!as_is && (types & ~kind->second.as_text) != 0))
+        const bool     as_is = (types & ~kind.as_is) == 0;
+        if (!var || (!as_is && (types & ~kind.as_text) != 0))
         {
             return std::nullopt;
         }
@@ -7404,7 +7430,7 @@ namespace
         // And where its loop walks the list's items, the item by name.
         const auto        walked  = found ? mEach.find(counter) : mEach.end();
         const std::string item    = walked != mEach.end() ? walked->second : name + "[" + at + "]";
-        const Expr        read    = found ? Expr{ item } : Expr{ item + " or " + kind->second.empty, OR };
+        const Expr        read    = found ? Expr{ item } : Expr{ item + " or " + kind.empty, OR };
         return as_is ? read : Expr{ "tostring(" + read.text + ")" };
     }
 
@@ -7417,11 +7443,12 @@ namespace
             return LST_KEY;
         }
         LSLExpression* inner = unbracketed(e);
-        // Where the script's keys are held as text: a cast to a key, and a
-        // call of its own that gives one.
+        // Where the script's keys are held as text: a cast to a key, a call
+        // of its own that gives one, and llList2Key's item (textKeyItem).
         if (!mOptions.uuidKeys && inner && e->getIType() == LST_KEY &&
             (inner->getNodeSubType() == NODE_TYPECAST_EXPRESSION ||
-             (inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(inner))))
+             (inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+              (readOf(inner) || textKeyItem(static_cast<LSLFunctionExpression*>(inner))))))
         {
             return LST_STRING;
         }
@@ -7529,6 +7556,33 @@ namespace
             }
             return false;
         };
+        // A key variable, as given whole.
+        const auto keyVar = [](LSLExpression* e) -> LSLSymbol* {
+            e = unbracketed(e);
+            if (!e || e->getIType() != LST_KEY || e->getNodeSubType() != NODE_LVALUE_EXPRESSION ||
+                !isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
+            {
+                return nullptr;
+            }
+            LSLSymbol* var = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
+            return var && var->getSubType() != SYM_BUILTIN ? var : nullptr;
+        };
+        // The keys that may hold any text: given a string that is no UUID
+        // written out -- a variable's, a call's -- or given such a key.
+        // Given on to a key held as text, uuid() would have made "" NULL_KEY
+        // on the way, so such a key holds text too.
+        boost::unordered_flat_set<LSLSymbol*> loose;
+        const auto loosely = [&](LSLExpression* e) {
+            e = unbracketed(e);
+            if (e && e->getIType() == LST_STRING)
+            {
+                return !uuidConstant(e) && !(e->getNodeSubType() == NODE_CONSTANT_EXPRESSION &&
+                                             e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT &&
+                                             ALLSLTraits::isUuid(static_cast<LSLStringConstant*>(e->getChild(0))->getValue()));
+            }
+            LSLSymbol* var = keyVar(e);
+            return var && loose.contains(var);
+        };
         for (bool changed = true; changed;)
         {
             changed = false;
@@ -7537,6 +7591,16 @@ namespace
                 if (!mTextKeys.contains(var) && text(e))
                 {
                     mTextKeys.insert(var);
+                    changed = true;
+                }
+                if (!loose.contains(var) && loosely(e))
+                {
+                    loose.insert(var);
+                    changed = true;
+                }
+                if (LSLSymbol* from = keyVar(e); from && mTextKeys.contains(var) && loose.contains(from) && !mTextKeys.contains(from))
+                {
+                    mTextKeys.insert(from);
                     changed = true;
                 }
             }

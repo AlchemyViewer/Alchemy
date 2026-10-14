@@ -92,6 +92,8 @@ namespace
             run = std::move(answer);
         }
         void showExpanded(Doc&, const std::string&) override {}
+        void dropExpanded(Doc& doc) override { droppedExpanded.push_back(doc.id); }
+        std::vector<std::string> droppedExpanded;
         void runningKnown(Doc& doc) override { known.push_back(doc.id); }
         bool send(const Doc& doc, const std::string& text, const ALScriptSaveOptions& with, std::string& error) override
         {
@@ -513,6 +515,65 @@ namespace
             CHECK_FALSE(refused.save.underway());
             CHECK(studio.stops == 2);
         }
+    }
+
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a wrapped script nothing preprocesses goes up as written, its envelope let go of", "[alscriptstudiosaving]")
+    {
+        ALScriptStudioSaving& saving = make();
+        studio.preprocessor          = false;
+        Doc& doc                     = tab("a", "default {}");
+        doc.envelope                 = ALScriptEnvelope();
+        type(doc, "x");
+        saving.save(doc);
+        {
+            INFO("Tapple's: sent as written, nothing run");
+            CHECK(studio.runs.empty());
+            REQUIRE(studio.sent.size() == size_t(1));
+            CHECK(studio.sent.back().text == "default {}x");
+        }
+        {
+            INFO("the envelope let go of, and its expansion's view");
+            CHECK_FALSE(doc.envelope);
+            CHECK(studio.droppedExpanded == Names{ "a" });
+        }
+    }
+
+    TEST_CASE_METHOD(alscriptstudiosaving_data, "alscriptstudiosaving: a save without preprocessing goes as written once and its asset is kept as it went", "[alscriptstudiosaving]")
+    {
+        ALScriptStudioSaving& saving = make();
+        studio.preprocessor          = true;
+        Doc& doc                     = tab("a", "default {}");
+        doc.envelope                 = ALScriptEnvelope();
+        doc.savePlain                = true;
+        type(doc, "x");
+        saving.save(doc);
+        {
+            INFO("as written, though the preprocessor would run");
+            CHECK(studio.runs.empty());
+            REQUIRE(studio.sent.size() == size_t(1));
+            CHECK(studio.sent.back().text == "default {}x");
+            CHECK_FALSE(doc.envelope);
+            CHECK_FALSE(doc.savePlain);
+        }
+        UNSCOPED_INFO("not the asset until it is up");
+        CHECK_FALSE(doc.asset);
+        saving.compiled(answer(doc));
+        {
+            INFO("the asset, as it went");
+            REQUIRE(doc.asset);
+            CHECK(*doc.asset == "default {}x");
+        }
+        type(doc, "y");
+        saving.save(doc);
+        UNSCOPED_INFO("once: the next save preprocesses");
+        CHECK(studio.runs == Names{ "a" });
+
+        // Stopped before it went, it is let go of.
+        Doc& other      = tab("b", "default {}");
+        other.savePlain = true;
+        saving.stopped(other);
+        UNSCOPED_INFO("a stopped save's ask let go of");
+        CHECK_FALSE(other.savePlain);
     }
 
     // Preprocessed first, its errors said, what it made in the envelope with

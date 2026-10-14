@@ -610,6 +610,7 @@ namespace ALScriptKeymap
             after_k("inspector", '4'),
             after_k("expanded", 'P'),
             { "compare_saved", KEY_NONE, MASK_NONE },
+            { "compare_asset", KEY_NONE, MASK_NONE },
             { "compare_with", KEY_NONE, MASK_NONE },
             // As Visual Studio Code's Show Next Change peeks, beside its
             // Alt-F5 step.
@@ -655,6 +656,7 @@ namespace ALScriptKeymap
             { "zoom_reset", '0', MASK_CONTROL },
             // Build
             { "preprocess", KEY_NONE, MASK_NONE },
+            { "save_plain", KEY_NONE, MASK_NONE },
             { "running", KEY_NONE, MASK_NONE },
             { "reset_script", KEY_NONE, MASK_NONE },
             { "choose_target", KEY_NONE, MASK_NONE },

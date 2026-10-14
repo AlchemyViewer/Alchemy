@@ -513,7 +513,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
         }
         else
         {
-            if (ALPreprocessor::wanted(text, script_is_lua, ALScriptEnvelope::looksWrapped(text), ALScriptPreprocessor::enabled()) !=
+            if (ALPreprocessor::wanted(text, script_is_lua, ALScriptPreprocessor::enabled()) !=
                 ALPreprocessor::Wanted::No)
             {
                 auto prepared = std::make_shared<ALScriptPrepared>();

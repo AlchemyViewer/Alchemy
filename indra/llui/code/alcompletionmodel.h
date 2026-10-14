@@ -77,6 +77,10 @@ struct ALCompletion
     // slash and the list again.
     std::string  path;
     bool         folder = false;
+    // A library's table, whose members follow it -- SLua's lljson, math:
+    // taken, it is followed by a dot, or past one there already, and the
+    // list again, of what it holds.
+    bool         table = false;
     // The mark before it on the list, where the provider has one; else
     // the icon of its kind, or a badge where the icons are not to be had.
     LLUIImagePtr icon;

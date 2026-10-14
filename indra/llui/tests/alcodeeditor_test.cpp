@@ -1406,6 +1406,100 @@ namespace
         CHECK(e.text() == std::string("("));
     }
 
+    TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: in SLua's backticks a brace pairs and a backtick closes the string", "[alcodeeditor]")
+    {
+        ALCodeEditor& e = make("", "slua");
+        e.setAutoClose(true);
+        type("local s = `");
+        CHECK(e.text() == std::string("local s = ``"));
+        type("{");
+        UNSCOPED_INFO("Tapple's: the brace that opens code in the string, closed");
+        CHECK(e.text() == std::string("local s = `{}`"));
+        type("id}");
+        UNSCOPED_INFO("its closer typed over");
+        CHECK(e.text() == std::string("local s = `{id}`"));
+        type("`");
+        UNSCOPED_INFO("and the backtick's");
+        CHECK(e.text() == std::string("local s = `{id}`"));
+        CHECK(e.caret() == ALTextPos(0, 16));
+
+        // Tapple's: a backtick after an interpolation closes the string.
+        e.setText("local cacheLine: string = ll.LinksetDataRead(`CACHE_PREFIX{id}");
+        e.setCaret(e.document().end());
+        type("`");
+        UNSCOPED_INFO("one backtick, closing");
+        CHECK(e.text() == std::string("local cacheLine: string = ll.LinksetDataRead(`CACHE_PREFIX{id}`"));
+
+        // In the interpolation, code: a bracket pairs.
+        e.setText("local s = `{");
+        e.setCaret(e.document().end());
+        type("(");
+        UNSCOPED_INFO("a bracket in the interpolation, closed");
+        CHECK(e.text() == std::string("local s = `{()"));
+
+        // In a plain string, or in the backticks' text, other brackets are
+        // text.
+        e.setText("local s = \"a");
+        e.setCaret(e.document().end());
+        type("{");
+        UNSCOPED_INFO("a brace in a plain string, text");
+        CHECK(e.text() == std::string("local s = \"a{"));
+        e.setText("local s = `a");
+        e.setCaret(e.document().end());
+        type("(");
+        UNSCOPED_INFO("a bracket in the backticks' text, text");
+        CHECK(e.text() == std::string("local s = `a("));
+
+        // A comment to the line's end is still prose at its end.
+        e.setText("-- a note");
+        e.setCaret(e.document().end());
+        type("(");
+        UNSCOPED_INFO("not in a comment");
+        CHECK(e.text() == std::string("-- a note("));
+    }
+
+    TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: a library's table completes with a dot and the list again", "[alcodeeditor]")
+    {
+        ALCodeEditor& e = make("", "slua");
+        e.setCompletionProvider([](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            ALCodeEditor::Completion table;
+            table.text   = "lljson";
+            table.detail = "lljson";
+            table.kind   = ALSyntaxKind::Namespace;
+            table.table  = true;
+            ALCodeEditor::Completion member;
+            member.text   = "lljson.encode";
+            member.detail = "lljson.encode(value)";
+            member.kind   = ALSyntaxKind::Function;
+            for (const ALCodeEditor::Completion& c : { table, member })
+            {
+                if (ALCodeEditor::matchTier(c.text, prefix) >= 0)
+                {
+                    out.push_back(c);
+                }
+            }
+        });
+        type("llj");
+        REQUIRE(e.completionOpen());
+        key(KEY_TAB);
+        UNSCOPED_INFO("Tapple's: a dot, not brackets");
+        CHECK(e.text() == std::string("lljson."));
+        CHECK(e.caret() == ALTextPos(0, 7));
+        UNSCOPED_INFO("and the list of what it holds");
+        CHECK(e.completionOpen());
+
+        // A dot there already is gone past.
+        e.setText(".encode(x)");
+        e.setCaret(ALTextPos(0, 0));
+        type("llj");
+        REQUIRE(e.completionOpen());
+        key(KEY_TAB);
+        UNSCOPED_INFO("no second dot");
+        CHECK(e.text() == std::string("lljson.encode(x)"));
+        UNSCOPED_INFO("the caret past the dot");
+        CHECK(e.caret() == ALTextPos(0, 7));
+    }
+
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: completion opens as configured and Return takes it or starts a line", "[alcodeeditor]")
     {
         ALCodeEditor& e = make("integer counter;\n");

@@ -42,6 +42,7 @@
 #include "v3math.h"
 #include "v4math.h"
 
+#include "alscriptdiskmasters.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
@@ -1896,7 +1897,9 @@ void LLViewerRegion::killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>&
             return;
         }
 
-        if (v_obj->isSelected()
+        // An object holding a script linked to a file on disk is kept as
+        // a selected one is: a save of the file sends to it out of sight.
+        if (v_obj->isSelected() || ALScriptDiskMasters::holdsLinked(v_obj->getID())
             || (v_obj->flagAnimSource() && isAgentAvatarValid() && gAgentAvatarp->hasMotionFromSource(v_obj->getID())))
         {
             // do not remove objects user is interacting with
@@ -1912,7 +1915,7 @@ void LLViewerRegion::killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>&
             {
                 if( !child->mDrawable->getEntry()
                     || !child->mDrawable->getEntry()->hasVOCacheEntry()
-                    || child->isSelected()
+                    || child->isSelected() || ALScriptDiskMasters::holdsLinked(child->getID())
                     || (child->flagAnimSource() && isAgentAvatarValid() && gAgentAvatarp->hasMotionFromSource(child->getID())))
                 {
                     //do not remove parent if any of its children non-cacheable, animating or selected

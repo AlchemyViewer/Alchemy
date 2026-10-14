@@ -4576,4 +4576,114 @@ namespace
             CHECK(has(uuids, "local cast = uuid(s)"));
         }
     }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key that may hold any text given on to a key held as text holds text", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "key driver = \"\";\n"
+                                "key gOwner = \"\";\n"
+                                "onDriverChange(key newDriver) {\n"
+                                "    driver = newDriver;\n"
+                                "    if (driver == \"\") {\n"
+                                "        llOwnerSay(\"no driver\");\n"
+                                "    } else {\n"
+                                "        llOwnerSay(\"driver\");\n"
+                                "    }\n"
+                                "}\n"
+                                "onStateChange(string value) {\n"
+                                "    onDriverChange(value);\n"
+                                "}\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        onStateChange(\"\");\n"
+                                "        string m = llGetObjectDesc();\n"
+                                "        key a = m;\n"
+                                "        key b = a;\n"
+                                "        driver = b;\n"
+                                "        key id = llGetSubString(m, 0, 35);\n"
+                                "        llGiveInventory(id, \"x\");\n"
+                                "        key owner = llGetOwner();\n"
+                                "        gOwner = owner;\n"
+                                "        llOwnerSay((string)owner);\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLToSLua::Options o;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("Tapple's: the parameter text, given the text as it is");
+            CHECK(has(r, "local driver: string = \"\"\n"));
+            CHECK(has(r, "local function onDriverChange(newDriver: string)"));
+            CHECK(has(r, "    driver = newDriver\n"));
+            CHECK(has(r, "if driver == \"\" then"));
+            CHECK(has(r, "    onDriverChange(value)\n"));
+            CHECK_FALSE(has(r, "uuid(value)"));
+        }
+        {
+            INFO("through another key");
+            CHECK(has(r, "local a: string = m\n"));
+            CHECK(has(r, "local b: string = a\n"));
+            CHECK(has(r, "driver = b\n"));
+        }
+        UNSCOPED_INFO("text not given on to text, a uuid");
+        CHECK(has(r, "local id: uuid = uuid(ll.GetSubString(m, 1, 36))"));
+        UNSCOPED_INFO("a key that holds a UUID given on to text, made text there");
+        CHECK(has(r, "local owner: uuid = ll.GetOwner()"));
+        CHECK(has(r, "gOwner = tostring(owner)"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: with uuidKeys off llList2Key's item is read as text as List2String reads it", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "list gMixed;\n"
+                                "default { state_entry() {\n"
+                                "    list l = [\"hello world\"];\n"
+                                "    string msg = llList2Key(l, 0);\n"
+                                "    llOwnerSay(msg);\n"
+                                "    key k = llList2Key(l, 0);\n"
+                                "    if (k) llOwnerSay((string)k);\n"
+                                "    gMixed = llParseString2List(llGetObjectDesc(), [\",\"], []) + [1];\n"
+                                "    llOwnerSay(llList2Key(gMixed, 0));\n"
+                                "} }\n";
+        ALLSLToSLua::Options o;
+        o.uuidKeys                  = false;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("Tapple's: the item's text, as LSL gave it");
+            CHECK(has(r, "local msg: string = l[1] or \"\"\n"));
+            CHECK(has(r, "local k: string = l[1] or \"\"\n"));
+            CHECK(has(r, "if (touuid(k) or NULL_KEY).istruthy then print(k) end"));
+            CHECK_FALSE(has(r, "List2Key("));
+        }
+        {
+            INFO("items that may be neither, read as List2String reads them, and said");
+            CHECK(has(r, "print(llcompat.List2String(gMixed, 0))"));
+            CHECK(noted(r, "SluaList2KeyText"));
+        }
+        require_checks_clean(r);
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        CAPTURE(close.text);
+        REQUIRE(close.converted);
+        {
+            INFO("closeToLSL: List2String's call, as Tapple wrote it");
+            CHECK(has(close, "local msg = llcompat.List2String(l, 0)\n"));
+            CHECK(has(close, "local k = llcompat.List2String(l, 0)\n"));
+            CHECK_FALSE(has(close, "List2Key("));
+        }
+        require_checks_clean(close);
+
+        const ALLSLToSLua::Result uuids = require_converted(lsl);
+        CAPTURE(uuids.text);
+        {
+            INFO("uuids by default: List2Key's uuid");
+            CHECK(has(uuids, "local msg = tostring(llcompat.List2Key(l, 0))"));
+            CHECK(has(uuids, "local k = llcompat.List2Key(l, 0)"));
+            CHECK_FALSE(noted(uuids, "SluaList2KeyText"));
+        }
+    }
 }

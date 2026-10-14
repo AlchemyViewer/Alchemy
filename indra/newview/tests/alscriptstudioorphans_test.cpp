@@ -542,6 +542,26 @@ namespace
         }
         UNSCOPED_INFO("nothing more to say");
         CHECK(Orphans::noticeFor(&a, words).text.empty());
+
+        // Tapple's: its X lets go of it as Keep Source does.
+        a.compiledDiffers = std::string("y");
+        unit.noticeAction("close");
+        {
+            INFO("closed: let go of, not said again");
+            CHECK_FALSE(a.compiledDiffers);
+            CHECK(Orphans::noticeFor(&a, words).text.empty());
+        }
+        // Closed while something else is said, it is said next.
+        a.compiledDiffers         = std::string("z");
+        a.orphan->kind            = Orphan::Away;
+        a.orphan->noticeDismissed = false;
+        REQUIRE(Orphans::noticeFor(&a, words).text == said("NoticeAway"));
+        unit.noticeAction("close");
+        {
+            INFO("another notice closed: the compiled half's said next");
+            CHECK(a.compiledDiffers.has_value());
+            CHECK(Orphans::noticeFor(&a, words).text == said("NoticeCompiledDiffers"));
+        }
     }
 
     TEST_CASE_METHOD(alscriptstudioorphans_data, "alscriptstudioorphans: a kept text compares with the tab and restores with the source in front", "[alscriptstudioorphans]")

@@ -871,7 +871,7 @@ void ALTextView::scrollToCaret()
     scrollToShow(mCaret);
 }
 
-void ALTextView::scrollToShow(const ALTextPos& pos)
+void ALTextView::scrollToShow(const ALTextPos& pos, S32 context)
 {
     const S32 row_h = mLayout.rowHeight();
     if (row_h <= 0)
@@ -884,6 +884,8 @@ void ALTextView::scrollToShow(const ALTextPos& pos)
     const S32 height = mLayout.rowHeightOf(pos.line, row);
     const LLRect text = textRect();
     const S32 page = llmax(height, text.getHeight());
+    // The rows either side, no more than leave it room on the page.
+    const S32 margin = llmin(llmax(0, context) * row_h, llmax(0, page - height) / 2);
     // Across first: where it is across says what covers it above.
     if (mWordWrap)
     {
@@ -901,9 +903,9 @@ void ALTextView::scrollToShow(const ALTextPos& pos)
             mScrollX = x + CARET_MARGIN - width;
         }
     }
-    if (top + height > mScrollY + page)
+    if (top + height + margin > mScrollY + page)
     {
-        mScrollY = top + height - page;
+        mScrollY = top + height + margin - page;
     }
     // Up, below what is drawn over the top where it is -- the find bar,
     // the lines pinned there -- which is asked again at each place tried,
@@ -915,15 +917,16 @@ void ALTextView::scrollToShow(const ALTextPos& pos)
     for (S32 tries = 0; tries < 4 && mScrollY > 0; ++tries)
     {
         const S32 covered = llmin(llmax(0, coveredAbove(local_x)), llmax(0, page - height));
-        if (top >= mScrollY + covered)
+        const S32 above   = llmin(margin, llmax(0, page - height - covered - margin));
+        if (top - above >= mScrollY + covered)
         {
             break;
         }
-        mScrollY = llmax(0, top - covered - llmin(gap, llmax(0, page - height - covered)));
+        mScrollY = llmax(0, top - above - covered - llmin(gap, llmax(0, page - height - covered - above)));
     }
-    if (top < mScrollY)
+    if (top - margin < mScrollY)
     {
-        mScrollY = top - llmin(gap, llmax(0, page - height));
+        mScrollY = top - margin - llmin(gap, llmax(0, page - height - margin));
     }
     mScrollY     = llmax(0, mScrollY);
     mScrollAsked = true;
@@ -4724,6 +4727,7 @@ bool ALTextView::findNext(bool forward)
     // from the keys.
     singleSelection();
     setSelection(match);
+    scrollToShow(mCaret, FOUND_CONTEXT);
     mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped(), wrapped);
     return true;
 }

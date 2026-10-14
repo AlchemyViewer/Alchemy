@@ -1047,6 +1047,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptStudioPanesWiden</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's window widens by the Explorer's or the Inspector's width as it opens, as far as the screen goes, and narrows by as much as it folds; off, the pane takes its room from the editor.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALScriptStudioState</key>
         <map>
             <key>Comment</key>

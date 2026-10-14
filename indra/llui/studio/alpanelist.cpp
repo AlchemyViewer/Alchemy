@@ -247,7 +247,11 @@ void ALPaneList::setRows(std::vector<Row> rows)
     {
         getItemList() = std::move(order);
         setNeedsSort();
-        dirtyColumns();
+        // Laid out for the rows it holds now, as adding one lays it out and
+        // taking one out does not: the scroll bar's length and the place
+        // scrolled to within it, so that fewer rows end where the last one
+        // does rather than scrolled past it onto nothing.
+        updateLayout();
     }
 
     // What was chosen chosen again, and the row at the top back there.

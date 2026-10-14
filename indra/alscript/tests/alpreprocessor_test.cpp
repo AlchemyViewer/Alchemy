@@ -2128,21 +2128,17 @@ namespace
             };
         };
         {
-            INFO("enveloped first, its text not read");
-            CHECK(P::wanted(true, directives(true), true) == P::Wanted::Enveloped);
-            CHECK_FALSE(asked);
-        }
-        {
-            INFO("then its directives, the setting on or off");
-            CHECK(P::wanted(false, directives(true), true) == P::Wanted::Directives);
-            CHECK(P::wanted(false, directives(true), false) == P::Wanted::Directives);
+            INFO("its directives first, the setting on or off");
+            CHECK(P::wanted(directives(true), true) == P::Wanted::Directives);
+            CHECK(P::wanted(directives(true), false) == P::Wanted::Directives);
+            CHECK(asked);
         }
         UNSCOPED_INFO("then the setting");
-        CHECK(P::wanted(false, directives(false), true) == P::Wanted::Setting);
-        UNSCOPED_INFO("else not");
-        CHECK(P::wanted(false, directives(false), false) == P::Wanted::No);
+        CHECK(P::wanted(directives(false), true) == P::Wanted::Setting);
+        UNSCOPED_INFO("else not, wrapped before or not: Tapple's");
+        CHECK(P::wanted(directives(false), false) == P::Wanted::No);
         UNSCOPED_INFO("by text");
-        CHECK(P::wanted("#define X 1\n", false, false, false) == P::Wanted::Directives);
+        CHECK(P::wanted("#define X 1\n", false, false) == P::Wanted::Directives);
     }
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a require only the old search found is said with a fix each way", "[alpreprocessor]")

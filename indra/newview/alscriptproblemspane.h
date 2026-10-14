@@ -281,6 +281,9 @@ private:
     LLComboBox*             mScope    = nullptr;
     LLComboBox*             mOrigin   = nullptr;
     LLFilterEditor*         mFilter   = nullptr;
+    // The sources' words, the most pressing first: as the Source column
+    // sorts them and the filter lists them.
+    std::vector<std::string> mOrigins;
     store_t                 mStore;
     std::vector<Checked>    mChecked;
     // The object whose scripts the list holds, where it holds one's.

@@ -428,6 +428,37 @@ namespace
         }
     }
 
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: sorted by source, the most pressing first, as the filter lists them", "[ALScriptProblemsPane]")
+    {
+        ALScriptProblemsPane& out = make();
+        using S                   = ALScriptProblem::Source;
+        using V                   = ALScriptProblem::Severity;
+        Doc& door                 = doc("door");
+        door.check->analysis      = { problem(S::Lint, V::Warning, 1, "a lint"), problem(S::Types, V::Error, 2, "a type"),
+                                      problem(S::Parser, V::Error, 3, "a parse") };
+        gather(door);
+        out.fill(&door);
+        out.list()->sortByColumnIndex(2, true);
+        UNSCOPED_INFO("Tapple's: the parser's, then the types', then the lint's");
+        CHECK(shown() == std::string("|a parse|a type|a lint"));
+        out.list()->sortByColumnIndex(2, false);
+        UNSCOPED_INFO("the other way, the other way round");
+        CHECK(shown() == std::string("|a lint|a type|a parse"));
+        LLComboBox* origins = window.find<LLComboBox>("problems_origin");
+        REQUIRE(origins);
+        std::vector<std::string> listed;
+        for (const LLScrollListItem* item : origins->getAllData())
+        {
+            listed.push_back(item->getValue().asString());
+        }
+        UNSCOPED_INFO("the filter in the same order, after any");
+        CHECK(listed == std::vector<std::string>{ "", services.words("OriginCompiler"), services.words("OriginParser"),
+                                                  services.words("OriginPreprocessor"), services.words("OriginRuntime"),
+                                                  services.words("OriginMigration"), services.words("OriginTypes"), services.words("OriginLint"),
+                                                  services.words("OriginOptimizer"), services.words("OriginWeight"),
+                                                  services.words("OriginDefinitions") });
+    }
+
     TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: selectFirstError and a chosen row go to the problem's place", "[ALScriptProblemsPane]")
     {
         ALScriptProblemsPane& out = make();

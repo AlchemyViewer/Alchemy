@@ -387,4 +387,37 @@ namespace
         CHECK_FALSE(refs.renamable);
         service.setDocument("");
     }
+
+    TEST_CASE_METHOD(alluaunavigation_data, "alluaunavigation: a forward-declared local function is defined where its function is", "[alluaunavigation]")
+    {
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
+        const std::string text = "local count, f, g\n"                  // 0
+                                 "local function h() return f() end\n" // 1
+                                 "function f() return 1 end\n"         // 2
+                                 "g = function() return 2 end\n"       // 3
+                                 "count = 0\n"                         // 4
+                                 "print(h(), g(), count)\n";           // 5
+        open("forward", false);
+        ALScriptReferences refs = service.references(text, 1, 26); // `f` in `return f()`
+        REQUIRE(refs.found);
+        CHECK(refs.name == "f");
+        UNSCOPED_INFO("Tapple's: at `function f`, not `local f`");
+        CHECK(where(refs.definition) == std::string("2:9"));
+        CHECK(refs.hasDefinition);
+        CHECK(refs.kind == ALScriptSymbolKind::Function);
+        UNSCOPED_INFO("every place, the declaration among them");
+        CHECK(placesOf(refs) == std::string("0:13 1:26 2:9"));
+
+        refs = service.references(text, 5, 11); // `g` in `g()`
+        UNSCOPED_INFO("given a function by an assignment: there");
+        CHECK(where(refs.definition) == std::string("3:0"));
+        CHECK(refs.kind == ALScriptSymbolKind::Function);
+
+        refs = service.references(text, 5, 16); // `count`
+        UNSCOPED_INFO("given a number: where it is declared");
+        CHECK(where(refs.definition) == std::string("0:6"));
+        CHECK(refs.kind == ALScriptSymbolKind::Variable);
+        service.setDocument("");
+    }
 }
