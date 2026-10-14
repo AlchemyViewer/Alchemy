@@ -54,7 +54,6 @@ target_sources(
     llevents.cpp
     lleventtimer.cpp
     llexception.cpp
-    llfasttimer.cpp
     llfile.cpp
     llfindlocale.cpp
     llfixedbuffer.cpp
@@ -174,7 +173,6 @@ target_sources(
         llevents.h
         lleventemitter.h
         llexception.h
-        llfasttimer.h
         llfile.h
         llfindlocale.h
         llfixedbuffer.h
@@ -270,11 +268,6 @@ if(DARWIN)
   target_sources(llcommon PRIVATE llsys_objc.mm PUBLIC FILE_SET HEADERS FILES llsys_objc.h)
 
   set_source_files_properties(llsys_objc.mm PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
-endif()
-
-if(AL_USE_TRACY)
-  # Skip precompiled headers on these files due to special compilation needs
-  set_source_files_properties(llfasttimer.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 endif()
 
 target_link_libraries(
