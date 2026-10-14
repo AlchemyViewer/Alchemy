@@ -79,6 +79,7 @@ namespace
         }
         CHECK_FALSE(undo.canUndo());
         caret = undo.redo();
+        REQUIRE(caret.has_value());
         UNSCOPED_INFO("redone");
         CHECK(doc.text() == std::string("abc"));
         {
@@ -148,7 +149,7 @@ namespace
         undo.markSaved();
         UNSCOPED_INFO("saved is pristine");
         CHECK(undo.isPristine());
-        ALTextPos at = type(ALTextPos(0, 1), "y");
+        type(ALTextPos(0, 1), "y");
         UNSCOPED_INFO("changed");
         CHECK_FALSE(undo.isPristine());
         undo.undo();
@@ -199,44 +200,51 @@ namespace
         CHECK_FALSE(undo.canUndo());
     }
 
+    // Steps of 300 KB, three of which the steps back hold: a fourth lets the
+    // oldest go, and the saved mark, counted from the bottom, moves down
+    // with it -- until the step that led to the saved text is let go too,
+    // and stepping back can never reach it, and the journal must not say it
+    // has.
     TEST_CASE_METHOD(altextundo_data, "altextundo: the saved mark follows forgotten steps and is lost once out of reach", "[altextundo]")
     {
-        // Five steps, saved, then more than the stack keeps: the steps
-        // that led to the saved text are gone, so stepping back can never
-        // reach it, and the journal must not say it has.
-        ALTextPos at = ALTextPos(0, 0);
-        for (S32 i = 0; i < 5; ++i)
-        {
-            at = type(at, "a", 2.0);
-        }
+        const std::string part(300 * 1024, 'a');
+        ALTextPos         at(0, 0);
+        at = type(at, part.c_str(), 2.0);
+        at = type(at, part.c_str(), 2.0);
         undo.markSaved();
         UNSCOPED_INFO("saved");
         CHECK(undo.isPristine());
-        for (S32 i = 0; i < 100; ++i)
-        {
-            at = type(at, "b", 2.0);
-        }
+        at = type(at, part.c_str(), 2.0);
+        at = type(at, part.c_str(), 2.0);
         UNSCOPED_INFO("changed since");
         CHECK_FALSE(undo.isPristine());
-        for (S32 i = 0; i < 95; ++i)
-        {
-            undo.undo();
-        }
-        UNSCOPED_INFO("five steps in force again, but not the saved five");
-        CHECK_FALSE(undo.isPristine());
-        // Saved again with a full stack: another step drops one, and the
-        // mark with it keeps counting from the bottom.
-        for (S32 i = 0; i < 95; ++i)
-        {
-            undo.redo();
-        }
-        undo.markSaved();
-        at = type(at, "c", 2.0);
-        UNSCOPED_INFO("changed");
+        undo.undo();
+        UNSCOPED_INFO("two steps in force again, but not the saved two");
         CHECK_FALSE(undo.isPristine());
         undo.undo();
         UNSCOPED_INFO("back to the saved text, the mark having moved down");
         CHECK(undo.isPristine());
+        undo.undo();
+        UNSCOPED_INFO("and one step back past it, the oldest having gone");
+        CHECK_FALSE(undo.canUndo());
+
+        // Forward again, and on until the step that led to the saved text is
+        // let go too.
+        for (S32 i = 0; i < 3; ++i)
+        {
+            undo.redo();
+        }
+        at = type(at, part.c_str(), 2.0);
+        UNSCOPED_INFO("the saved text at the bottom of the stack, still reached");
+        CHECK(undo.savedText().has_value());
+        type(at, part.c_str(), 2.0);
+        UNSCOPED_INFO("the step that led to it gone, and the saved text with it");
+        CHECK_FALSE(undo.savedText().has_value());
+        while (undo.undo())
+        {
+        }
+        UNSCOPED_INFO("stepping back as far as it goes never finds it");
+        CHECK_FALSE(undo.isPristine());
     }
 
     // A save point is taken when a text is sent to be saved, and marks that
@@ -383,7 +391,10 @@ namespace
         CHECK(other.text() == std::string("alpha gamma"));
 
         // A saved text among the steps forward is found forward.
+        undo.markSaved();
         undo.undo();
+        UNSCOPED_INFO("saved a step forward");
+        CHECK(undo.savedText() == std::optional<std::string>("alpha beta"));
         undo.markSaved();
         undo.redo();
         UNSCOPED_INFO("saved a step back");
@@ -696,8 +707,10 @@ namespace
         put(1.0);
         big.markSaved();
         put(3.0);
-        UNSCOPED_INFO("two of 400 KB kept");
+        big.undo();
+        UNSCOPED_INFO("two of 400 KB kept: one still back past the newest");
         CHECK(big.canUndo());
+        big.redo();
         put(5.0);
         UNSCOPED_INFO("three written");
         CHECK(big_doc.text().size() == part.size() * 3);
