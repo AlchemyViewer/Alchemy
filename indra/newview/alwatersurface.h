@@ -182,16 +182,17 @@ private:
     struct Baked;
 
     /// Follows the water pool's two wave normal maps, current and next, for what the water's shaders take from their
-    /// pixels: each map's mean slope, and with `heights` the heights its waves are displaced by (ALWaterHeightBake),
-    /// both worked on the General queue, the heights uploaded here when wanted. A map's pixels are asked for when
-    /// something is still to come from them, and read in place; the texture lets them go in its own time. What they
-    /// gave is kept for the last few maps seen.
-    void            trackMaps(LLViewerTexture* current, LLViewerTexture* next, bool heights);
+    /// pixels: with `means` each map's mean slope, which only the tiled reads take, and with `heights` the heights its
+    /// waves are displaced by (ALWaterHeightBake), both worked on the General queue, the heights uploaded here when
+    /// wanted. A map's full-resolution pixels are asked for only when something wanted is still to come from them, read
+    /// in place, and let go once a bake holds them. What they gave is kept for the last few maps seen.
+    void            trackMaps(LLViewerTexture* current, LLViewerTexture* next, bool means, bool heights);
     MapStats&       mapStats(const LLUUID& id);
     MapStats*       findMapStats(const LLUUID& id);
     const MapStats* findMapStats(const LLUUID& id) const;
     void            bakeMap(MapStats& stats, LLPointer<LLImageRaw> raw, bool heights);
-    void            land(const LLUUID& id, Baked& baked);
+    /// What a bake gave, or with null, that it failed: the map then gives no heights and the neutral mean.
+    void            land(const LLUUID& id, const Baked* baked);
     void            uploadHeights(MapStats& stats);
 
     ALWaterField::Layout mLayout;
