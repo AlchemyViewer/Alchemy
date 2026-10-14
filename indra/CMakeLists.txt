@@ -490,7 +490,6 @@ endforeach()
 
 # Add our test macros
 if(AL_BUILD_TESTS)
-  include(LLAddBuildTest)
   include(ALAddTestBinary)
 endif()
 

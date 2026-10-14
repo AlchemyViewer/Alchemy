@@ -25,11 +25,9 @@
 #ifndef AL_NEWVIEW_TEST_FAKES_H
 #define AL_NEWVIEW_TEST_FAKES_H
 
-#if AL_TEST_CATCH2
 #include "alrecoverystore.h"
 #include "alteststateguard.h"
 #include "altestteardown.h"
-#endif
 
 namespace LL
 {
@@ -46,7 +44,6 @@ namespace newview_test
     // its being made chooses nothing for the tests after.
     LL::WorkQueue& mainLoop();
 
-#if AL_TEST_CATCH2
     // The thread Script Studio's recovery stores write on, ALRecoveryWriter's,
     // the process's, which the viewer stops in its cleanup: made by the first
     // fixture that makes a store, before it does, as the store would have
@@ -64,7 +61,6 @@ namespace newview_test
         }();
         (void)made;
     }
-#endif
 }
 
 #endif // AL_NEWVIEW_TEST_FAKES_H

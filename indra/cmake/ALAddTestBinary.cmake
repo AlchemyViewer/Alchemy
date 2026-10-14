@@ -9,6 +9,17 @@ if(NOT AL_BUILD_TESTS)
   return()
 endif()
 
+# The directories a test's shared libraries are staged in, put on the loader's
+# search path for the test's run. macOS takes the same directory as an rpath
+# instead, since the loader there ignores the environment.
+if(WINDOWS)
+  set(AL_TEST_ENVIRONMENT "PATH=path_list_prepend:${SHARED_LIB_STAGING_DIR}")
+elseif(LINUX)
+  set(AL_TEST_ENVIRONMENT "LD_LIBRARY_PATH=path_list_prepend:${SHARED_LIB_STAGING_DIR}")
+else()
+  set(AL_TEST_ENVIRONMENT "")
+endif()
+
 # al_add_test_binary(<name> PROJECT <project> SOURCES <test file>... [UNIT <file>...]
 #                    [LIBRARIES <target>...] [SUPPORT <object library>...]
 #                    [INCLUDES <dir>...] [DEFINES <define>...] [ENVIRONMENT <VAR=value>...]

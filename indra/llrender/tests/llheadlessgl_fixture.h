@@ -7,8 +7,8 @@
  * shown, with the same GL the viewer runs on -- WGL on Windows, EGL on
  * Linux -- and where Linux has no display, SDL's offscreen driver.
  *
- * Standing the context up is the expensive part — TUT spins a fresh
- * fixture per test method, so a test that can share one takes the
+ * Standing the context up is the expensive part — Catch2 makes a fresh
+ * fixture per test case, so a test that can share one takes the
  * static-local instance behind sharedHeadlessGL() and keeps its own
  * state (font registry, atlas pages) in the fixture. A test that
  * needs a context of its own makes a HeadlessGL per test instead.
@@ -56,10 +56,8 @@
 #include "llfile.h"
 #include "lluuid.h"
 
-#if AL_TEST_CATCH2
 #include "alteststateguard.h"
 #include "altestteardown.h"
-#endif
 
 #include <algorithm>
 #include <cstring>
@@ -105,7 +103,7 @@ namespace ll_test
         ALFontShaping::clearCache();
     }
 
-    // RAII scope — calls resetFontState() in dtor. Embed in a TUT fixture
+    // RAII scope — calls resetFontState() in dtor. Embed in a fixture
     // struct to guarantee the shape cache is empty after every test,
     // regardless of how the test exited.
     struct FontStateScope
@@ -335,9 +333,7 @@ namespace ll_test
             LLPointer<LLImageRaw> raw = new LLImageRaw(1, 1, 4);
             std::memset(raw->getData(), 0xFF, 4);
             white = new LLImageGL(raw, false);
-#if AL_TEST_CATCH2
             ll_test::Teardown::add([] { white = nullptr; });
-#endif
         }
         ALTextureSlot::sWhiteTexture = white->getTexName();
         // Bound once, so that the slot holds a texture: an unbind puts the
@@ -558,7 +554,6 @@ namespace ll_test
     // from then on, so the case that first asked is not blamed for it.
     inline HeadlessGL& sharedHeadlessGL()
     {
-#if AL_TEST_CATCH2
         static HeadlessGL* gl = []
         {
             HeadlessGL* made = new HeadlessGL(/*needs_vbos=*/true,
@@ -570,13 +565,6 @@ namespace ll_test
             return made;
         }();
         return *gl;
-#else
-        static HeadlessGL gl(/*needs_vbos=*/true,
-                             /*needs_imagegl=*/true,
-                             /*needs_llrender=*/true,
-                             /*needs_render=*/true);
-        return gl;
-#endif
     }
 
     // A test's hold on the shared context. It takes sharedHeadlessGL() as it
