@@ -6205,14 +6205,34 @@ static F32 light_fade_brightness(F32 fade)
     return llclamp(fade >= 0.f ? fade / LIGHT_FADE_TIME : 1.f + fade / LIGHT_FADE_TIME, 0.f, 1.f);
 }
 
+// The stored depths a view-space span of lit points can hold, from ALDepthBounds::viewSpan's: under forward-Z the 24-bit
+// depth stores the step nearest a point's depth, as much as half a step past the span's ends, which far off is more than
+// any margin in view space (a step is about 15 cm at 500 m), so the span is let out by two steps, kept off the
+// clear. A float depth's rounding lies far inside the view-space margin.
+static void widen_for_storage(F64& zmin, F64& zmax)
+{
+    if (!LLRender::sReverseZ)
+    {
+        constexpr F64 STEP = 1.0 / 16777215.0;
+        F64 drawn_min, drawn_max;
+        ALDepthBounds::drawn(drawn_min, drawn_max);
+        zmin = llmax(zmin - 2.0 * STEP, drawn_min);
+        zmax = llmin(zmax + 2.0 * STEP, drawn_max);
+    }
+}
+
 // Holds a light's draw to the stored depths its light reaches: its sphere, `size` around its view-space centre (the
-// light shaders' cutoff), widened a little for what reconstruction loses. To everything drawn where the projection
-// cannot say.
+// light shaders' cutoff), widened a little for what reconstruction loses and for the depth's storage. To everything
+// drawn where the projection cannot say.
 static void bound_to_light(ALDepthBounds& bounds, const LLMatrix4a& proj, F32 view_z, F32 size)
 {
     const F32 reach = size * 1.01f + 0.01f;
     F64 zmin, zmax;
-    if (!ALDepthBounds::viewSpan(proj, view_z + reach, view_z - reach, zmin, zmax))
+    if (ALDepthBounds::viewSpan(proj, view_z + reach, view_z - reach, zmin, zmax))
+    {
+        widen_for_storage(zmin, zmax);
+    }
+    else
     {
         ALDepthBounds::drawn(zmin, zmax);
     }
@@ -11566,7 +11586,11 @@ void LLPipeline::renderDeferredLighting()
                         if (bounds)
                         {   // far_z is the farthest of the lights' spheres, as the shader's cut is
                             F64 zmin, zmax;
-                            if (!ALDepthBounds::viewSpan(proj, 0.f, far_z * 1.01f - 0.01f, zmin, zmax))
+                            if (ALDepthBounds::viewSpan(proj, 0.f, far_z * 1.01f - 0.01f, zmin, zmax))
+                            {
+                                widen_for_storage(zmin, zmax);
+                            }
+                            else
                             {
                                 ALDepthBounds::drawn(zmin, zmax);
                             }
