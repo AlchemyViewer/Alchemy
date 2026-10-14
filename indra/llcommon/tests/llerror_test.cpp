@@ -102,7 +102,7 @@ namespace
         fatalWasCalled = true;                  \
     }
 
-namespace tut
+namespace
 {
     namespace
     {
@@ -273,7 +273,7 @@ namespace
     }
 };
 
-namespace tut
+namespace
 {
     TEST_CASE_METHOD(ErrorTestData, "error: the default level filters messages", "[error]")
         // messages are filtered based on default level
@@ -490,12 +490,12 @@ namespace
     void require_log_name(LLError::RecorderPtr recorder, LogFromFunction f,
         const std::string& class_name = "")
     {
-        std::dynamic_pointer_cast<tut::TestRecorder>(recorder)->clearMessages();
+        std::dynamic_pointer_cast<TestRecorder>(recorder)->clearMessages();
         std::string name = f(false);
         f(true);
 
-        std::string messageWithoutName = std::dynamic_pointer_cast<tut::TestRecorder>(recorder)->message(0);
-        std::string messageWithName = std::dynamic_pointer_cast<tut::TestRecorder>(recorder)->message(1);
+        std::string messageWithoutName = std::dynamic_pointer_cast<TestRecorder>(recorder)->message(0);
+        std::string messageWithName = std::dynamic_pointer_cast<TestRecorder>(recorder)->message(1);
 
         require_has(name + " logged without name",
             messageWithoutName, name);
@@ -526,7 +526,7 @@ namespace
     }
 };
 
-namespace tut
+namespace
 {
     TEST_CASE_METHOD(ErrorTestData, "error: multiline output leaves backslashes and line breaks unescaped", "[error]")
         // backslash, return, and newline are not escaped with backslashes
@@ -547,7 +547,7 @@ namespace tut
     }
 }
 
-namespace tut
+namespace
 {
     //  class/function information in output
     TEST_CASE_METHOD(ErrorTestData, "error: messages name the function and class they came from", "[error]")
@@ -596,7 +596,7 @@ namespace
 
 }
 
-namespace tut
+namespace
 {
     // handle nested logging
     TEST_CASE_METHOD(ErrorTestData, "error: logging while building a message logs both", "[error]")
@@ -638,7 +638,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     // time in output (for recorders that need it)
     TEST_CASE_METHOD(ErrorTestData, "error: a recorder gets the time only when it asks for it", "[error]")
@@ -725,7 +725,7 @@ public:
     static void doAll() { doDebug(); doInfo(); doWarn(); doError(); }
 };
 
-namespace tut
+namespace
 {
     // filtering by class
     TEST_CASE_METHOD(ErrorTestData, "error: a class level overrides the default level", "[error]")
@@ -857,7 +857,7 @@ namespace tut
     }
 }
 
-namespace tut
+namespace
 {
     TEST_CASE_METHOD(ErrorTestData, "error: single-line output escapes backslashes and line breaks", "[error]")
         // backslash, return, and newline are escaped with backslashes
@@ -886,7 +886,7 @@ namespace
     }
 };
 
-namespace tut
+namespace
 {
     TEST_CASE_METHOD(ErrorTestData, "error: a space in a tag is an error", "[error]")
         // space character is not allowed in a tag

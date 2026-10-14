@@ -91,9 +91,9 @@ static void waitfor(LLLeap* instance, int timeout=60)
 }
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct llleap_data
     {
@@ -651,4 +651,4 @@ namespace tut
     {
         test_or_split(PYTHON, reader_module, ll_test::currentTestName(), BUFFERED_LENGTH);
     }
-} // namespace tut
+} // anonymous namespace

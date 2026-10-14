@@ -35,7 +35,7 @@
 
 using std::fpclassify;
 
-namespace tut
+namespace
 {
     namespace
     {
