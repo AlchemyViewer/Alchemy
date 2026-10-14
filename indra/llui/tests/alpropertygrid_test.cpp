@@ -106,7 +106,11 @@ namespace
                 const LLRect& r = labels[i];
                 CAPTURE(i, r, within);
                 REQUIRE(within.contains(r));
-                if (i > 0)
+                if (i == 0)
+                {
+                    REQUIRE(r.mTop == within.mTop);
+                }
+                else
                 {
                     REQUIRE(labels[i - 1].mTop - r.mTop == ROW);
                 }
@@ -114,7 +118,7 @@ namespace
         }
     };
 
-    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: freshly filled rows stack one row apart inside their section", "[alpropertygrid]")
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: freshly filled rows stack one row apart from the top of their section", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
@@ -135,7 +139,7 @@ namespace
 
     // And they are still stacked from its top after the grid is resized, which
     // is the whole reason a resize no longer rebuilds them.
-    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: rows stay stacked inside their section after a resize", "[alpropertygrid]")
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: rows stay stacked from the top of their section after a resize", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
@@ -406,11 +410,14 @@ namespace
     }
 
     // A number is stepped by its arrows, by the wheel over it and by a scrub
-    // along it, and all three take the same step. A field carrying no
-    // decimals rounds whatever the step leaves it at, so a step of less than
-    // one lands back on the number it started from: the arrows write what is
-    // already there and only the keyboard can change anything.
-    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a whole number steps by at least one and a real by less", "[alpropertygrid]")
+    // along it, and all three take the one step its spinner is given, which
+    // is what this checks. The gestures are LLSpinCtrl's own, and its arrows
+    // and wheel read the keyboard's modifiers, which a headless test has no
+    // keyboard for. A field carrying no decimals rounds whatever the step
+    // leaves it at, so a step of less than one would land back on the number
+    // it started from: the arrows would write what is already there and only
+    // the keyboard could change anything.
+    TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: a whole number is given a step of at least one and a real less", "[alpropertygrid]")
     {
         if (!ui.ok())
         {
@@ -582,6 +589,8 @@ namespace
         two->setFields(both);
         UNSCOPED_INFO("a heading over the first");
         CHECK(two->getChild<LLAccordionCtrlTab>("first", true)->getHeaderHeight() > 0);
+        UNSCOPED_INFO("and one over the second");
+        CHECK(two->getChild<LLAccordionCtrlTab>("second", true)->getHeaderHeight() > 0);
 
         one->die();
         two->die();
@@ -788,6 +797,7 @@ namespace
         CHECK(editor->getToolTip() == label->getToolTip());
         UNSCOPED_INFO("and it is the same editor, not a new one in its place");
         CHECK(row->getChild<LLView>("width", true) == editor);
+        REQUIRE(grid->fields().size() == 1u);
         UNSCOPED_INFO("which the grid remembers");
         CHECK(grid->fields().front().authored);
 
@@ -883,10 +893,11 @@ namespace
         grid->setFields(fields);
 
         LLPanel* row = grid->getChild<LLPanel>("size_rows", true)->getChild<LLPanel>("width_row", true);
-        LLView* back = row->getChild<LLView>("width_remove", true);
+        LLButton* back = row->findChild<LLButton>("width_remove", true);
+        REQUIRE(back != nullptr);
         UNSCOPED_INFO("the way back is there for the half that is written");
         CHECK(back->getVisible());
-        back->as<LLButton>()->onCommit();
+        back->onCommit();
         UNSCOPED_INFO("and takes out that half alone");
         REQUIRE(removed.size() == 1u);
         UNSCOPED_INFO("which is the second");
@@ -900,7 +911,7 @@ namespace
         UNSCOPED_INFO("until the first is written");
         CHECK(back->getVisible());
         removed.clear();
-        back->as<LLButton>()->onCommit();
+        back->onCommit();
         UNSCOPED_INFO("and then it takes out the first");
         REQUIRE(removed.size() == 1u);
         CHECK(removed.front() == std::string("width"));
@@ -1044,6 +1055,7 @@ namespace
         }
         CHECK(label->getText() == std::string("After"));
         CHECK(width->getValue().asInteger() == 20);
+        REQUIRE(grid->fields().size() == 2u);
         UNSCOPED_INFO("and the grid knows it");
         CHECK(grid->fields()[1].value == std::string("20"));
 
@@ -1075,6 +1087,7 @@ namespace
         fields.back().authored = false;
         fields.push_back(field("border", 0));
         grid->setFields(fields);
+        REQUIRE(grid->fields().size() == 3u);
         CHECK(grid->fields()[0].name == std::string("radius"));
         CHECK(grid->fields()[1].name == std::string("corners"));
         UNSCOPED_INFO("the written one stays where it was");

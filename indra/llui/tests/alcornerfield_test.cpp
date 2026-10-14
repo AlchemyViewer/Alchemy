@@ -147,8 +147,8 @@ namespace
         }
         {
             INFO("beside the picture, which is at the left");
-            CHECK(tl.mLeft > 0);
             CHECK(tl.mLeft >= 72);
+            CHECK(bl.mLeft >= 72);
         }
         UNSCOPED_INFO("the link beside them");
         CHECK(f->getChild<LLCheckBoxCtrl>("link")->getRect().mLeft > tr.mRight);

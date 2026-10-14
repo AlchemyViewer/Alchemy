@@ -165,6 +165,7 @@ namespace
         {
             INFO("which shadows the default's");
             REQUIRE(base->shadowed >= 0);
+            REQUIRE(base->shadowed < static_cast<S32>(sheet.declarations().size()));
             CHECK(sheet.fileOf(sheet.declarations()[base->shadowed]) == "default.xml");
         }
     }
