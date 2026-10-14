@@ -767,6 +767,12 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
         // Nothing picked waits on a save any more.
         mTabs.fillTabs();
         mWeighing.keepSaved(doc);
+        // The compiled half that did not match the source is replaced.
+        if (doc.compiledDiffers)
+        {
+            doc.compiledDiffers.reset();
+            mTabs.refreshNotice();
+        }
     }
     if (result.newAssetId.notNull())
     {
