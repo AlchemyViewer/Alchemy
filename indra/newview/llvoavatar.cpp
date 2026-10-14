@@ -1275,6 +1275,17 @@ void LLVOAvatar::destroyGL()
     deleteCachedImages();
 
     resetImpostors();
+
+    // The profile timers' queries go while the context is current. An avatar can be marked dead, or destroyed, after
+    // the GL has shut down; its timer then has nothing left to delete. A pending time is dropped, and the next profile
+    // makes a new query.
+    for (LLCharacter* character : LLCharacter::sInstances)
+    {
+        if (LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(character))
+        {
+            avatar->mGPUTimer.release();
+        }
+    }
 }
 
 //static
