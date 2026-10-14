@@ -110,6 +110,17 @@ namespace
             made->setText(text);
             return *made;
         }
+        // A word the definitions give, for a case to read: one missing ends
+        // the case here rather than reading through nothing. Asked before an
+        // UNSCOPED_INFO, not between it and its check, which this REQUIRE
+        // passing would take the message from.
+        static const Vocab& known(bool lua, const std::string& name)
+        {
+            const Vocab* found = Words::word(lua, name);
+            CAPTURE(name);
+            REQUIRE(found);
+            return *found;
+        }
         static std::vector<std::string> texts(const std::vector<ALCodeEditor::Completion>& completions)
         {
             std::vector<std::string> out;
@@ -135,24 +146,30 @@ namespace
         }
         {
             INFO("and what returns");
-            CHECK(Words::word(false, "llOld")->detail == "integer llOld()");
-            CHECK(Words::word(false, "llOld")->deprecated);
+            const Vocab& old = known(false, "llOld");
+            CHECK(old.detail == "integer llOld()");
+            CHECK(old.deprecated);
         }
+        const Vocab& touch = known(false, "touch_start");
         UNSCOPED_INFO("an event's");
-        CHECK(Words::word(false, "touch_start")->detail == std::string("touch_start(integer num_detected)"));
+        CHECK(touch.detail == std::string("touch_start(integer num_detected)"));
+        const Vocab& pi = known(false, "PI");
         UNSCOPED_INFO("a constant's type and value");
-        CHECK(Words::word(false, "PI")->detail == std::string("float PI = 3.14159265"));
+        CHECK(pi.detail == std::string("float PI = 3.14159265"));
+        const Vocab& integer = known(false, "integer");
         UNSCOPED_INFO("a type's tooltip's first line");
-        CHECK(Words::word(false, "integer")->detail == std::string("A whole number."));
-        CHECK(Words::word(false, "jump")->kind == ALSyntaxKind::Control);
+        CHECK(integer.detail == std::string("A whole number."));
+        const Vocab& jump = known(false, "jump");
+        CHECK(jump.kind == ALSyntaxKind::Control);
         {
             INFO("not a word");
             CHECK_FALSE(Words::word(false, "x"));
             CHECK_FALSE(Words::word(false, ""));
             CHECK_FALSE(Words::word(false, "nothing"));
         }
+        const Vocab& slua_say = known(true, "ll.Say");
         UNSCOPED_INFO("SLua's () returns nothing worth saying");
-        CHECK(Words::word(true, "ll.Say")->detail == std::string("ll.Say(number channel)"));
+        CHECK(slua_say.detail == std::string("ll.Say(number channel)"));
     }
 
     TEST_CASE_METHOD(alscriptstudiowords_data, "alscriptstudiowords: the vocabulary is kept until forgotten and then built again", "[alscriptstudiowords]")
@@ -224,22 +241,24 @@ namespace
 
     TEST_CASE_METHOD(alscriptstudiowords_data, "alscriptstudiowords: completions fill in handlers where they go and offer snippets", "[alscriptstudiowords]")
     {
-        const ALCodeEditor::Completion lsl = Words::completionFor(*Words::word(false, "touch_start"), false);
+        const ALCodeEditor::Completion lsl = Words::completionFor(known(false, "touch_start"), false);
         UNSCOPED_INFO("LSL's handler");
         CHECK(lsl.snippet == std::string("touch_start(integer num_detected)\n{\n    $0\n}"));
-        const ALCodeEditor::Completion slua = Words::completionFor(*Words::word(true, "touch_start"), true);
+        const Vocab&                   slua_touch = known(true, "touch_start");
+        const ALCodeEditor::Completion slua       = Words::completionFor(slua_touch, true);
         UNSCOPED_INFO("SLua's, a function of LLEvents'");
         CHECK(slua.snippet == std::string("function LLEvents.touch_start(detected)\n    $0\nend"));
         UNSCOPED_INFO("typed where asked, as the definitions type it");
-        CHECK(Words::completionFor(*Words::word(true, "touch_start"), true, true).snippet ==
+        CHECK(Words::completionFor(slua_touch, true, true).snippet ==
               std::string("function LLEvents.touch_start(detected: {DetectedEvent})\n    $0\nend"));
+        const Vocab& listen = known(true, "listen");
         UNSCOPED_INFO("each parameter typed");
-        CHECK(Words::completionFor(*Words::word(true, "listen"), true, true).snippet ==
+        CHECK(Words::completionFor(listen, true, true).snippet ==
               std::string("function LLEvents.listen(channel: number, name: string, id: uuid, msg: string)\n    $0\nend"));
         UNSCOPED_INFO("each untyped");
-        CHECK(Words::completionFor(*Words::word(true, "listen"), true).snippet ==
+        CHECK(Words::completionFor(listen, true).snippet ==
               std::string("function LLEvents.listen(channel, name, id, msg)\n    $0\nend"));
-        const ALCodeEditor::Completion say = Words::completionFor(*Words::word(false, "llSay"), false);
+        const ALCodeEditor::Completion say = Words::completionFor(known(false, "llSay"), false);
         {
             INFO("a function as itself");
             CHECK(say.snippet.empty());
@@ -332,8 +351,9 @@ namespace
         CHECK(Words::helpUrl(true, "LLEvents") == std::string("https://wiki.secondlife.com/wiki/Lua_Alpha"));
         UNSCOPED_INFO("nothing: the portal");
         CHECK(Words::helpUrl(false, "") == std::string("https://wiki.example/LSL_Portal"));
+        const Vocab& pi = known(false, "PI");
         UNSCOPED_INFO("the reference's words");
-        CHECK(Words::referenceText(*Words::word(false, "PI"), false) ==
+        CHECK(Words::referenceText(pi, false) ==
               std::string("float PI = 3.14159265\n\nThe ratio.\nhttps://wiki.example/PI"));
     }
 
@@ -517,20 +537,27 @@ namespace
         viewer.slots.definitionsYaml = [] { return std::string("functions:\n  llSay:\n    categories:\n      - avatar_communication\n"); };
         lsl["constants"]["PRIM_POSITION"] = LLSD().with("type", "integer").with("value", "6");
         Words::forget();
+        const Vocab& say = known(false, "llSay");
         UNSCOPED_INFO("LSL, in words");
-        CHECK(Words::word(false, "llSay")->group == std::string("Avatar communication"));
+        CHECK(say.group == std::string("Avatar communication"));
+        const Vocab& old = known(false, "llOld");
         UNSCOPED_INFO("none where none is said");
-        CHECK(Words::word(false, "llOld")->group.empty());
+        CHECK(old.group.empty());
+        const Vocab& touch = known(false, "touch_start");
         UNSCOPED_INFO("an event none");
-        CHECK(Words::word(false, "touch_start")->group.empty());
+        CHECK(touch.group.empty());
+        const Vocab& position = known(false, "PRIM_POSITION");
         UNSCOPED_INFO("a constant by family");
-        CHECK(Words::word(false, "PRIM_POSITION")->group == std::string("PRIM_..."));
+        CHECK(position.group == std::string("PRIM_..."));
+        const Vocab& pi = known(false, "PI");
         UNSCOPED_INFO("one without a family none");
-        CHECK(Words::word(false, "PI")->group.empty());
+        CHECK(pi.group.empty());
+        const Vocab& slua_say = known(true, "ll.Say");
         UNSCOPED_INFO("SLua's ll function as its twin");
-        CHECK(Words::word(true, "ll.Say")->group == std::string("Avatar communication"));
+        CHECK(slua_say.group == std::string("Avatar communication"));
+        const Vocab& math_pi = known(true, "math.pi");
         UNSCOPED_INFO("another SLua function by library");
-        CHECK(Words::word(true, "math.pi")->group == std::string("math"));
+        CHECK(math_pi.group == std::string("math"));
     }
 
     TEST_CASE_METHOD(alscriptstudiowords_data, "alscriptstudiowords: the units ask the attached viewer and default what it leaves unsaid", "[alscriptstudiowords]")
@@ -620,21 +647,25 @@ namespace
         slua["events"]["varied"] = LLSD().with("arguments", LLSD().with(0, argument("first", "number")).with(1, argument("...", "any")));
         slua["events"]["bare"]   = LLSD().with("arguments", LLSD().with(0, argument("...any", "")));
         Words::forget();
-        const auto handler = [](const char* name, bool typed) { return Words::completionFor(*Words::word(true, name), true, typed).snippet; };
+        const auto   handler = [](const Vocab& word, bool typed) { return Words::completionFor(word, true, typed).snippet; };
+        const Vocab& mapped  = known(true, "mapped");
         UNSCOPED_INFO("a generic's comma");
-        CHECK(handler("mapped", true) == std::string("function LLEvents.mapped(pairs: Map<K, V>, n: number)\n    $0\nend"));
+        CHECK(handler(mapped, true) == std::string("function LLEvents.mapped(pairs: Map<K, V>, n: number)\n    $0\nend"));
         UNSCOPED_INFO("and untyped");
-        CHECK(handler("mapped", false) == std::string("function LLEvents.mapped(pairs, n)\n    $0\nend"));
+        CHECK(handler(mapped, false) == std::string("function LLEvents.mapped(pairs, n)\n    $0\nend"));
+        const Vocab& called = known(true, "called");
         UNSCOPED_INFO("a function type's arrow, a table type's colon");
-        CHECK(handler("called", true) ==
+        CHECK(handler(called, true) ==
               std::string("function LLEvents.called(back: (number) -> (), data: {[string]: any})\n    $0\nend"));
+        const Vocab& varied = known(true, "varied");
         UNSCOPED_INFO("a variadic typed");
-        CHECK(handler("varied", true) == std::string("function LLEvents.varied(first: number, ...: any)\n    $0\nend"));
+        CHECK(handler(varied, true) == std::string("function LLEvents.varied(first: number, ...: any)\n    $0\nend"));
         UNSCOPED_INFO("and not");
-        CHECK(handler("varied", false) == std::string("function LLEvents.varied(first, ...)\n    $0\nend"));
+        CHECK(handler(varied, false) == std::string("function LLEvents.varied(first, ...)\n    $0\nend"));
+        const Vocab& bare = known(true, "bare");
         UNSCOPED_INFO("one written ...any");
-        CHECK(handler("bare", true) == std::string("function LLEvents.bare(...: any)\n    $0\nend"));
+        CHECK(handler(bare, true) == std::string("function LLEvents.bare(...: any)\n    $0\nend"));
         UNSCOPED_INFO("and untyped");
-        CHECK(handler("bare", false) == std::string("function LLEvents.bare(...)\n    $0\nend"));
+        CHECK(handler(bare, false) == std::string("function LLEvents.bare(...)\n    $0\nend"));
     }
 }

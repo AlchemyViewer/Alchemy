@@ -59,6 +59,7 @@ namespace
             ALScriptAnalysis::Result result;
             result.kind    = one.request.kind;
             result.id      = one.request.id;
+            REQUIRE(one.request.text);
             result.outline = ALLuauService::shape(*one.request.text);
             one.answered(result);
         }
@@ -134,6 +135,7 @@ namespace
             CHECK(left.kind == ALScriptAnalysis::Kind::Shape);
             CHECK(left.lua);
             CHECK(left.front);
+            REQUIRE(left.text);
             CHECK(*left.text == LEFT);
             CHECK(left.id != studio.asked[1].request.id);
         }

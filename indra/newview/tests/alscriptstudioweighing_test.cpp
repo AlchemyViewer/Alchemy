@@ -241,6 +241,7 @@ namespace
         {
             INFO("asked of what was sent, for its own target");
             REQUIRE(studio.requests.size() == 1);
+            REQUIRE(studio.requests[0].text);
             CHECK(*studio.requests[0].text == "sent text");
             CHECK(studio.requests[0].targets == std::vector<Target>{ Target::Mono });
         }
@@ -265,6 +266,9 @@ namespace
         }
         a.uploaded.disabled = true;
         unit.weighSent(a);
+        // Each question's answer is kept beside it: answers[1] below is there too.
+        REQUIRE(studio.requests.size() == 2);
+        REQUIRE(studio.requests[1].text);
         UNSCOPED_INFO("the preprocessor off: the text as written");
         CHECK(*studio.requests[1].text == "default {}");
         a.editor->setCaret(a.editor->document().end());
@@ -431,6 +435,7 @@ namespace
         result.version       = versionOf(a);
         result.variantTotals = { 100, 90, 100 };
         studio.answers[0](result);
+        REQUIRE(e.fixes().size() == 3);
         UNSCOPED_INFO("the lighter one said");
         CHECK(e.fixes()[0].note.find("FixLighterEstimate") == 0);
         {

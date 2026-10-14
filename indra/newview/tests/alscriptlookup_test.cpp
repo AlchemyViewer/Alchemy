@@ -487,8 +487,11 @@ namespace
         REQUIRE(studio.loads.size() == size_t(1));
         UNSCOPED_INFO("the open one passed over");
         CHECK(studio.expands.empty());
-        UNSCOPED_INFO("waiting said");
-        CHECK(has(services.statuses.back(), "LookingAcross [COUNT]=1 [NAME]=count"));
+        {
+            INFO("waiting said");
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(has(services.statuses.back(), "LookingAcross [COUNT]=1 [NAME]=count"));
+        }
         UNSCOPED_INFO("nothing shown yet");
         CHECK(studio.shows == 0);
 
@@ -559,6 +562,7 @@ namespace
         }
 
         studio.expands[0].expanded(expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "inc.lsl", inc, "integer count;\n"));
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer({ span(0, 8, 5) }));
         {
             INFO("still one to come");
@@ -585,7 +589,11 @@ namespace
 
         studio.lines.clear();
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("count"), true, inc, span(0, 8, 5), {}, doc.editor->document().version());
+        // This lookup's own questions answered, not the last one's.
+        CHECK(studio.expands.size() == size_t(2));
+        CHECK(studio.loads.size() == size_t(2));
         studio.expands.back().expanded(expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "inc.lsl", inc, "integer count;\n"));
+        CHECK(studio.asks.size() == size_t(2));
         studio.asks.back().answered(answer({ span(0, 8, 5) }));
         studio.loads.back().loaded(LLUUID::null, "default { }\n");
         UNSCOPED_INFO("shown again");
@@ -606,6 +614,7 @@ namespace
         lookUp(ALEditorCommand::FindReferences, false);
         UNSCOPED_INFO("the second shown");
         CHECK(studio.shows == 1);
+        REQUIRE(studio.loads.size() == size_t(1));
         studio.loads[0].loaded(LLUUID::null, B_TEXT);
         {
             INFO("the first's answer dropped");
@@ -614,7 +623,9 @@ namespace
         }
 
         lookUp(ALEditorCommand::FindReferences);
+        CHECK(studio.loads.size() == size_t(2));
         studio.loads.back().loaded(LLUUID::null, B_TEXT);
+        REQUIRE(studio.expands.size() == size_t(1));
         studio.expands.back().expanded(expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT));
         UNSCOPED_INFO("no declaration in it: nothing asked");
         CHECK(studio.asks.empty());
@@ -624,12 +635,15 @@ namespace
         const U32 generation = doc.lookup->generation;
         lookUp(ALEditorCommand::FindReferences);
         CHECK(doc.lookup->generation != generation);
+        CHECK(studio.loads.size() == size_t(3));
         studio.loads.back().loaded(LLUUID::null, B_TEXT);
+        CHECK(studio.expands.size() == size_t(2));
         // A lookup of another tab's, still waiting on its read, as this
         // one waits on its expansion: both current, and both gone with it.
         Doc& other = tab("x", c, A_TEXT, "X");
         unit->start(other, ALEditorCommand::FindReferences, refsOf("count"), true, std::string(), span(0, 8, 5), {},
                     other.editor->document().version());
+        CHECK(studio.loads.size() == size_t(4));
         const size_t expands = studio.expands.size();
         unit.reset();
         studio.expands.back().expanded(
@@ -650,6 +664,7 @@ namespace
         lookUp(ALEditorCommand::Rename, false, false);
         {
             INFO("not renamable");
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(has(services.statuses.back(), "NotRenamable"));
             CHECK(studio.askedName.empty());
         }
@@ -702,6 +717,7 @@ namespace
         CHECK(has(studio.hint("sum"), "RenameToAcross [COUNT]=9 [FILES]=6"));
 
         studio.chosen("9lives");
+        REQUIRE_FALSE(services.statuses.empty());
         CHECK(has(services.statuses.back(), "RenameBadName"));
         CHECK(doc.editor->text() == A_TEXT);
         studio.chosen("state");
@@ -743,8 +759,12 @@ namespace
         }
         UNSCOPED_INFO("a file opened");
         CHECK(studio.filesOpened == Names{ "/e.lsl" });
-        UNSCOPED_INFO("and changed");
-        CHECK(services.findDoc("disk:/e.lsl")->editor->text() == std::string("integer total = 4;\n"));
+        const Doc* file = services.findDoc("disk:/e.lsl");
+        {
+            INFO("and changed");
+            REQUIRE(file);
+            CHECK(file->editor->text() == std::string("integer total = 4;\n"));
+        }
         UNSCOPED_INFO("said once");
         REQUIRE(services.reports.size() == size_t(1));
         const al_studio_test::FakeServices::Said& said = services.reports[0];
@@ -767,6 +787,7 @@ namespace
         Doc& doc = lookUp(ALEditorCommand::Rename, false);
         doc.editor->insertText(" ");
         studio.chosen("total");
+        REQUIRE_FALSE(services.statuses.empty());
         CHECK(has(services.statuses.back(), "RenameStale [NAME]=total"));
         CHECK(services.reports.empty());
 
@@ -943,6 +964,7 @@ namespace
         studio.previewed("9lives");
         {
             INFO("no name: nothing shown");
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(has(services.statuses.back(), "RenameBadName"));
             CHECK_FALSE(studio.apply);
         }
@@ -959,7 +981,9 @@ namespace
             CHECK_FALSE(has(studio.previewSaid, "RenamePreviewHint"));
         }
         studio.apply({ 1 });
-        Doc& doc = *services.findDoc("a");
+        Doc* found = services.findDoc("a");
+        REQUIRE(found);
+        Doc& doc = *found;
         UNSCOPED_INFO("made at the one kept");
         CHECK(doc.editor->text() == std::string("integer count;\ndefault { state_entry() { sum = 1; } }\n"));
 
@@ -1017,6 +1041,7 @@ namespace
         CHECK(studio.shows == 0);
         studio.loads[1].loaded(LLUUID::null, std::string("default { }\n"));
         CHECK(studio.shows == 1);
+        REQUIRE_FALSE(services.statuses.empty());
         const std::string said = services.statuses.back();
         {
             INFO("found, then what was passed over: " + said);
@@ -1101,6 +1126,7 @@ namespace
         UNSCOPED_INFO("beside it as it is");
         CHECK(studio.compared.back() ==
                       "a: " + std::string(A_TEXT) + " | integer count;\ndefault { state_entry() { sum = 1; } }\n (CompareNow | RenameAfter [NAME]=sum [SCRIPT]=A)");
+        REQUIRE_FALSE(studio.activated.empty());
         UNSCOPED_INFO("in its tab, brought forward");
         CHECK(studio.activated.back() == "a");
         UNSCOPED_INFO("nothing changed");
@@ -1118,6 +1144,7 @@ namespace
         {
             INFO("not open: said, not shown");
             CHECK(studio.compared.size() == before);
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(has(services.statuses.back(), "RenameChangesNotHere [NAME]=sum [SCRIPT]=D"));
             CHECK(services.statusFailures.back());
         }
@@ -1251,6 +1278,7 @@ namespace
         }
         studio.expands[0].expanded(expansion("lib.luau", LIB, LIB_TEXT));
         studio.expands[1].expanded(expansion("b.luau", B, B_LUA, "lib.luau", LIB, LIB_TEXT));
+        REQUIRE(studio.asks.size() == size_t(2));
         studio.asks[0].answered(answer({ span(1, 11, 5) }));
         studio.asks[1].answered(answer({ span(1, 11, 5), span(4, 10, 5) }));
         UNSCOPED_INFO("the other's place, by its path");

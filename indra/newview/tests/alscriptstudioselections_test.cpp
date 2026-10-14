@@ -160,13 +160,15 @@ namespace
         CHECK(unit->held()->title == titled("SelectionLines", "door", 3, 4));
         LLStringUtil::format_map_t args;
         args["[TITLE]"] = unit->held()->title;
+        REQUIRE_FALSE(services().statuses.empty());
         CHECK(services().statuses.back() == said("SelectionHeld", args));
 
         door.editor->goTo(ALTextRange(ALTextPos(5, 0), ALTextPos(5, 4)));
         unit->hold(door);
         {
             INFO("one line, in place of the other");
-            REQUIRE(unit->held()->text == "line");
+            REQUIRE(unit->held().has_value());
+            CHECK(unit->held()->text == "line");
             CHECK(unit->held()->title == titled("SelectionLine", "door", 6));
         }
     }
@@ -214,6 +216,7 @@ namespace
         unit->hold(door);
         door.editor->goTo(ALTextRange(ALTextPos(5, 0), ALTextPos(7, 0)));
         unit->compare(door);
+        REQUIRE(door.compareView);
         ALDiffView& view = *door.compareView;
         UNSCOPED_INFO("its changes may be taken back");
         CHECK(view.canTakeBack());
@@ -290,6 +293,8 @@ namespace
             CHECK(unit->canCompare(door));
         }
         unit->compare(door);
+        // Compared, and so in its place: the window makes the view as it compares.
+        REQUIRE_FALSE(studio.did.empty());
         UNSCOPED_INFO("its text");
         CHECK(studio.did.back() ==
                       "line 0\nline 1\n | line 0\nexpanded 1\n (" + titled("SelectionLines", "door", 1, 2) + " | " + titled("SelectionLines", "door", 1, 2) + ")");
@@ -313,12 +318,14 @@ namespace
         unit->hold(door);
         door.editor->goTo(ALTextRange(ALTextPos(1, 12), ALTextPos(2, 9)));
         unit->compare(door);
+        REQUIRE(door.compareView);
         ALDiffView& view = *door.compareView;
         UNSCOPED_INFO("the stretch");
         CHECK(view.rightText() == std::string("beta;\ninteger c"));
         view.right()->setFocus(true);
         view.right()->goTo(ALTextPos(0, 2));
         view.right()->handleUnicodeChar('x', false);
+        REQUIRE_FALSE(studio.typedAt.empty());
         UNSCOPED_INFO("on its first line, from where it starts");
         CHECK(studio.typedAt.back() == ALTextPos(1, 14));
         UNSCOPED_INFO("typed there");

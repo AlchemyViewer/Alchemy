@@ -384,6 +384,7 @@ namespace
             CHECK(asked.kind == Kind::Check);
             CHECK(asked.id == "a");
             CHECK(asked.version == version(doc));
+            REQUIRE(asked.text);
             CHECK(*asked.text == doc.editor->text());
         }
         UNSCOPED_INFO("with the window's settings");
@@ -438,6 +439,7 @@ namespace
         checking.ask(doc, Kind::Hover, ALTextPos(0, 1), ALTextPos(0, 1));
         {
             INFO("a newer text its own");
+            REQUIRE(studio.asks.back().request.text);
             REQUIRE(studio.asks.back().request.text != studio.asks[0].request.text);
             CHECK(*studio.asks.back().request.text == doc.editor->text());
         }
@@ -454,6 +456,7 @@ namespace
         entry.name     = "count";
         result.outline = { entry };
         doc.editor->insertText("x");
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(result);
         {
             INFO("of another text: dropped");
@@ -530,6 +533,8 @@ namespace
         REQUIRE(studio.asks.size() == size_t(1));
         {
             INFO("of the expansion, at its place");
+            REQUIRE(studio.asks[0].request.text);
+            REQUIRE(doc.expanded.text);
             CHECK(*studio.asks[0].request.text == *doc.expanded.text);
             CHECK(studio.asks[0].request.line == 4);
         }
@@ -544,6 +549,7 @@ namespace
         result.line    = 4;
         result.column  = 20;
         studio.asks[0].answered(result);
+        REQUIRE_FALSE(studio.told.empty());
         UNSCOPED_INFO("at the source's place");
         CHECK(studio.told.back() == std::string("inspect a 3:20"));
         result.line = 0;
@@ -555,6 +561,7 @@ namespace
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         doc.check->expansions += 1;
         doc.expanded.generation += 1;
+        REQUIRE(studio.asks.size() == size_t(3));
         studio.asks[2].answered(answer(doc));
         {
             INFO("an answer of an expansion since replaced: the check asked again");
@@ -633,6 +640,7 @@ namespace
         Doc&                    doc      = tab("a");
         preprocessing                    = true;
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        REQUIRE(expansions.size() == size_t(1));
         expansions[0].second(expansion(SCRIPT));
         ALScriptProblem own = problem(4, "own");
         own.fixes           = { fix("Put right", 4, 0, 3, "abc") };
@@ -653,6 +661,7 @@ namespace
         mine.span.endLine      = 1;
         theirs.name            = "helper";
         result.outline         = { mine, theirs };
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(result);
         const ALScriptProblems& got = doc.check->analysis;
         UNSCOPED_INFO("the include's unused dropped");
@@ -664,6 +673,7 @@ namespace
             CHECK(got[0].line == 3);
             REQUIRE(got[0].file.empty());
             REQUIRE(got[0].fixes.size() == 1);
+            REQUIRE_FALSE(got[0].fixes[0].edits.empty());
             CHECK(got[0].fixes[0].edits[0].line == 3);
         }
         {
@@ -701,6 +711,8 @@ namespace
             CHECK(doc.check->fragment->second);
         }
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        REQUIRE(studio.asks.size() == size_t(1));
+        REQUIRE(studio.asks[0].request.text);
         UNSCOPED_INFO("a state put after it");
         CHECK(*studio.asks[0].request.text == doc.editor->text() + "\ndefault{state_entry(){}}\n");
         ALScriptProblem unused = problem(0, "helper unused", ALScriptProblem::Severity::Warning);
@@ -752,14 +764,17 @@ namespace
         ALScriptAnalysis::Result result = answer(doc, { undeclared, other });
         result.problems[0].line = 4;
         result.problems[1].line = 4;
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(result);
+        REQUIRE(doc.check->analysis.size() == size_t(2));
         const ALScriptProblem& given = doc.check->analysis[0];
         UNSCOPED_INFO("offered");
         REQUIRE(given.fixes.size() == size_t(1));
         {
             INFO("the include put in, preferred");
             CHECK(given.fixes[0].preferred);
-            REQUIRE(given.fixes[0].edits[0].text.find("#include \"lib.lsl\"") != std::string::npos);
+            REQUIRE_FALSE(given.fixes[0].edits.empty());
+            CHECK(given.fixes[0].edits[0].text.find("#include \"lib.lsl\"") != std::string::npos);
         }
         UNSCOPED_INFO("nothing gives the other");
         REQUIRE(doc.check->analysis[1].fixes.empty());
@@ -776,6 +791,7 @@ namespace
         studio.asks.back().answered(answer(doc, { undeclared }));
         {
             INFO("not preprocessed: nothing to include with");
+            REQUIRE(doc.check->analysis.size() == size_t(1));
             REQUIRE(doc.check->analysis[0].fixes.empty());
             REQUIRE(nearby.size() == 1);
         }
@@ -786,6 +802,7 @@ namespace
         studio.asks.back().answered(given_all);
         {
             INFO("all given: nothing fetched");
+            REQUIRE(doc.check->analysis.size() == size_t(1));
             REQUIRE_FALSE(doc.check->analysis[0].fixes.empty());
             REQUIRE(nearby.size() == 1);
         }
@@ -818,6 +835,7 @@ namespace
         ALScriptProblem theirs           = parse;
         theirs.file                      = "disk:/lib.lsl";
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer(doc, { quiet, said, parse, theirs }));
         UNSCOPED_INFO("the one a comment quiets dropped");
         REQUIRE(doc.check->analysis.size() == size_t(3));
@@ -840,6 +858,7 @@ namespace
         plain.map.finish();
         expansions.back().second(plain);
         studio.asks.back().answered(answer(doc, { parse }));
+        REQUIRE(doc.check->analysis.size() == size_t(1));
         UNSCOPED_INFO("its transform on: not");
         CHECK(doc.check->analysis[0].message == std::string("syntax error"));
 
@@ -866,6 +885,7 @@ namespace
         Doc& marked   = tab("m", "integer f() inline { return 1; }\n");
         checking.ask(marked, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
+        REQUIRE(marked.check->analysis.size() == size_t(1));
         UNSCOPED_INFO("inline explained: " << marked.check->analysis[0].message);
         CHECK(marked.check->analysis[0].message.find("syntax error PreprocHintInline [WORD]=inline") == 0);
         preprocessing         = true;
@@ -877,6 +897,7 @@ namespace
         stripped.map.finish();
         expansions.back().second(stripped);
         studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
+        REQUIRE(marked.check->analysis.size() == size_t(1));
         UNSCOPED_INFO("preprocessing, the extensions off: not");
         CHECK(marked.check->analysis[0].message == std::string("syntax error"));
 
@@ -885,6 +906,7 @@ namespace
         Doc& constant = tab("c", "f(const integer n) { }\n");
         checking.ask(constant, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(constant, { problem(0, "syntax error") }));
+        REQUIRE(constant.check->analysis.size() == size_t(1));
         UNSCOPED_INFO("const explained: " << constant.check->analysis[0].message);
         CHECK(constant.check->analysis[0].message.find("syntax error PreprocHintConst [WORD]=const") == 0);
 
@@ -942,6 +964,7 @@ namespace
         CHECK(doc.editor->undoJournal().undoLabel() == std::string("fix"));
         {
             INFO("said, checked again");
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(services.statuses.back() == "Rename it");
             CHECK(doc.check->analysisDue == 1.0);
         }
@@ -976,11 +999,13 @@ namespace
         {
             INFO("not checked: checked first");
             REQUIRE(doc.check->fixAllAfterCheck.has_value());
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(services.statuses.back() == "FixChecking [NAME]=a");
         }
         checking.pump(1.0);
         ALScriptProblem one = problem(0, "one");
         one.fixes           = { fix("First", 0, 0, 7, "float") };
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer(doc, { one }));
         {
             INFO("then made");
@@ -1031,6 +1056,7 @@ namespace
         ALScriptProblem         one      = problem(0, "one");
         one.fixes                        = { fix("First", 0, 0, 7, "float") };
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer(doc, { one, problem(2, "two") }));
         {
             INFO("asked for, made with the next frame");
@@ -1044,6 +1070,7 @@ namespace
             REQUIRE(studio.waiting.empty());
             REQUIRE(fixes.size() == 1);
             CHECK(fixes[0].title == "First");
+            REQUIRE_FALSE(fixes[0].edits.empty());
             CHECK(fixes[0].edits[0].second == "float");
         }
         const Doc::Shown* shown = checking.shownOf(fixes[0].value);
@@ -1104,6 +1131,7 @@ namespace
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         checking.ask(doc, Kind::Actions, ALTextPos(0, 8), ALTextPos(0, 13));
+        REQUIRE(studio.asks.size() == size_t(1));
         UNSCOPED_INFO("a stretch");
         CHECK(studio.asks[0].request.endColumn == 13);
         {
@@ -1141,6 +1169,7 @@ namespace
         refs.line    = 0;
         refs.column  = 8;
         studio.asks.back().answered(refs);
+        REQUIRE_FALSE(studio.told.empty());
         UNSCOPED_INFO("handed on");
         CHECK(studio.told.back() == std::string("references a 0:8"));
         doc.language.compileTarget = "none";
@@ -1233,6 +1262,7 @@ namespace
         Doc&                    doc      = tab("a");
         checking.schedule(doc, true);
         checking.pump(1.0);
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer(doc, { problem(0, "wrong"), problem(1, "unused", ALScriptProblem::Severity::Warning) }));
         UNSCOPED_INFO("both taken");
         REQUIRE(doc.check->analysis.size() == size_t(2));
@@ -1317,6 +1347,7 @@ namespace
         UNSCOPED_INFO("asked");
         REQUIRE(studio.asks.size() == size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
+        REQUIRE(asked.text);
         UNSCOPED_INFO("of the script apart");
         CHECK(*asked.text == doc.editor->text());
         {
@@ -1362,7 +1393,11 @@ namespace
         // `count` declared const: in the expansion, a line down.
         ALPreprocessor::Result expanded = expansion(SCRIPT);
         expanded.consts                 = { { "count", 1, 8, false } };
+        REQUIRE(expansions.size() == size_t(1));
         expansions[0].second(expanded);
+        // The check, asked once the expansion came: what each inspect
+        // below is asked after.
+        REQUIRE(studio.asks.size() == size_t(1));
         const auto inspect = [&](S32 line, S32 column, const std::string& label) {
             checking.ask(doc, Kind::Inspect, ALTextPos(0, 8), ALTextPos(0, 8));
             ALScriptAnalysis::Result result = answer(doc);
@@ -1432,8 +1467,10 @@ namespace
         checking.ask(doc, Kind::Inspect, ALTextPos(0, 10), ALTextPos(0, 10));
         UNSCOPED_INFO("the inspector, of the same word: not asked");
         REQUIRE(studio.asks.size() == size_t(1));
+        REQUIRE_FALSE(studio.told.empty());
         UNSCOPED_INFO("but told");
         CHECK(studio.told.back() == std::string("inspect a 0:10"));
+        REQUIRE_FALSE(studio.labels.empty());
         UNSCOPED_INFO("what the tip was");
         CHECK(studio.labels.back() == std::string("integer count"));
         checking.ask(doc, Kind::Inspect, ALTextPos(1, 0), ALTextPos(1, 0));
@@ -1511,12 +1548,14 @@ namespace
         ALScriptProblem two = problem(3, "two");
         two.fixes           = { fix("Second", 3, 4, 15, "touch_start") };
         const std::string before = doc.editor->wholeText();
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks.back().answered(answer(doc, { one, two }));
         UNSCOPED_INFO("asked, with a preview");
         REQUIRE((bool)studio.preview);
         studio.preview();
         UNSCOPED_INFO("nothing made yet");
         CHECK(doc.editor->wholeText() == before);
+        REQUIRE_FALSE(studio.told.empty());
         const std::string& compared = studio.told.back();
         {
             INFO("the text now beside it after: " << compared);
@@ -1526,6 +1565,7 @@ namespace
         }
         {
             INFO("Apply offered");
+            REQUIRE_FALSE(services.reports.empty());
             CHECK(services.reports.back().actions == Names{ "apply_fixes" });
             CHECK(services.reports.back().doc == "a");
         }
@@ -1557,6 +1597,7 @@ namespace
         }
         {
             INFO("said");
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(services.statuses.back() == "FixAllChangedSince");
             CHECK(services.statusFailures.back());
         }
@@ -1578,6 +1619,7 @@ namespace
         compat.source          = ALScriptProblem::Source::Lint;
         compat.code            = "SlCompatCall";
         compat.fixes           = { fix("Write it ll.GetSubString(s, 1, 3)", 2, 6, 36, "ll.GetSubString(s, 1, 3)") };
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks.back().answered(answer(doc, { compat }));
         const ALScriptProblems& said = doc.check->analysis;
         UNSCOPED_INFO("two notes, then the lint");
@@ -1640,6 +1682,7 @@ namespace
         const ALScriptProblem zero   = lint(0, "SlZeroIndex", fix("First", 0, 0, 7, "float", false));
         const ALScriptProblem paren  = lint(3, "SlParenCondition", fix("Second", 3, 4, 15, "touch_start", true));
         const ALScriptProblem shadow = lint(1, "LocalShadow", fix("Third", 1, 0, 1, "x", true));
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks.back().answered(answer(doc, { zero, paren, shadow }));
         Doc::FixPick pick;
         pick.migration = true;
@@ -1647,12 +1690,14 @@ namespace
         checking.askFixAll(doc, pick);
         UNSCOPED_INFO("not asked: seen");
         REQUIRE_FALSE(studio.preview);
+        REQUIRE_FALSE(studio.told.empty());
         const std::string& compared = studio.told.back();
         {
             INFO("the two from LSL, not the other: " << compared);
             REQUIRE(compared.find("FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos);
             REQUIRE(compared.find("float count;") != std::string::npos);
         }
+        REQUIRE_FALSE(services.reports.empty());
         UNSCOPED_INFO("Apply offered");
         CHECK(services.reports.back().actions == Names{ "apply_fixes" });
         {
@@ -1685,6 +1730,7 @@ namespace
         truth.source          = ALScriptProblem::Source::Lint;
         truth.code            = "SlNumberTruth";
         truth.fixes           = { fix("Compare it: #t ~= 0", 1, 3, 5, "#t ~= 0", false) };
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks.back().answered(answer(doc, { truth }));
         Doc::FixPick pick;
         pick.migration = true;
@@ -1692,8 +1738,10 @@ namespace
         {
             INFO("previewed, not asked");
             REQUIRE_FALSE(studio.preview);
+            REQUIRE_FALSE(studio.told.empty());
             CHECK(studio.told.back().rfind("compare a: ", 0) == 0);
         }
+        REQUIRE_FALSE(services.reports.empty());
         UNSCOPED_INFO("Apply offered");
         CHECK(services.reports.back().actions == Names{ "apply_fixes" });
         UNSCOPED_INFO("made by Apply");
@@ -1703,6 +1751,7 @@ namespace
         {
             INFO("Apply again: nothing waiting, and said");
             CHECK_FALSE(checking.applyPreviewed(doc));
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(services.statuses.back() == "FixAllNotPreviewed");
             CHECK(services.statusFailures.back());
         }
@@ -1755,6 +1804,7 @@ namespace
         CHECK(named == std::vector<std::string>{ "inc=/lib" });
         {
             INFO("said");
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(services.statuses.back().find("AliasTaken [NAME]=inc") == 0);
             CHECK(services.statusFailures.back());
         }
@@ -1799,6 +1849,7 @@ namespace
         highlighter.tokens(last);
         UNSCOPED_INFO("the text not lexed to its end for it: " << highlighter.lastLexed() << " of " << last + 1 << " left");
         CHECK(highlighter.lastLexed() > last / 2);
+        REQUIRE(doc.check->fragment);
         UNSCOPED_INFO("nor kept for the text as it stands");
         CHECK(doc.check->fragment->first != version(doc));
         {
@@ -1814,6 +1865,7 @@ namespace
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         UNSCOPED_INFO("asked once");
         REQUIRE(studio.asks.size() == size_t(1));
+        REQUIRE(studio.asks[0].request.text);
         UNSCOPED_INFO("of the script as it stands");
         CHECK(*studio.asks[0].request.text == doc.editor->text());
         UNSCOPED_INFO("and a script now");

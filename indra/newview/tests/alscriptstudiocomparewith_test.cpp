@@ -228,6 +228,7 @@ namespace
         Doc& doc = tab("door", "as saved\n");
         require_changed(doc, "as changed\n");
         unit->show(doc);
+        REQUIRE_FALSE(studio.candidates.empty());
         CHECK(studio.values().front() == std::string("saved"));
         CHECK(studio.candidates[0].label == said("CompareSaved"));
         studio.choose("saved");
@@ -238,6 +239,7 @@ namespace
         studio.choose("saved");
         UNSCOPED_INFO("not compared");
         CHECK(studio.did.size() == 1U);
+        REQUIRE_FALSE(services().statuses.empty());
         CHECK(services().statuses.back() == said("CompareNothingSaved"));
         UNSCOPED_INFO("as a failure");
         CHECK(services().statusFailures.back());
@@ -264,6 +266,7 @@ namespace
         studio.choose("saved_there");
         UNSCOPED_INFO("nothing more");
         CHECK(studio.did.size() == 1U);
+        REQUIRE_FALSE(services().statuses.empty());
         CHECK(services().statuses.back() == said("CompareSavedThereGone"));
         UNSCOPED_INFO("as a failure");
         CHECK(services().statusFailures.back());
@@ -294,6 +297,7 @@ namespace
         unsaved["[TITLE]"] = "lamp";
         // Titled as a copy of it as it was, which stays as it is.
         const auto snapshot = [this](const std::string& name) { return this->said("CompareTabSnapshot", { { "[NAME]", name } }); };
+        REQUIRE_FALSE(studio.did.empty());
         UNSCOPED_INFO("unsaved, as it is now");
         CHECK(studio.did.back() ==
               "compare door: lamp later\n | door\n (" + snapshot(said("CompareUnsaved", unsaved)) + " | )");
@@ -308,6 +312,7 @@ namespace
         studio.choose("tab:sign");
         UNSCOPED_INFO("nothing more");
         CHECK(studio.did.size() == 2U);
+        REQUIRE_FALSE(services().statuses.empty());
         CHECK(services().statuses.back() == said("CompareTabClosed", { { "[NAME]", "sign" } }));
         UNSCOPED_INFO("as a failure");
         CHECK(services().statusFailures.back());
@@ -345,6 +350,7 @@ namespace
         studio.choose("clipboard");
         UNSCOPED_INFO("not once emptied");
         CHECK(studio.did.size() == 1U);
+        REQUIRE_FALSE(services().statuses.empty());
         CHECK(services().statuses.back() == said("CompareWithClipboardEmpty"));
     }
 
@@ -378,6 +384,7 @@ namespace
         CHECK(studio.did.size() == 1U);
         LLStringUtil::format_map_t args;
         args["[FILE]"] = missing;
+        REQUIRE_FALSE(services().statuses.empty());
         CHECK(services().statuses.back() == said("LoadFromFileFailed", args));
         UNSCOPED_INFO("as a failure");
         CHECK(services().statusFailures.back());

@@ -73,6 +73,11 @@ namespace
         UNSCOPED_INFO("LSL: the function, the state, its event");
         REQUIRE(lsl_shape.outline.size() == size_t(3));
         {
+            INFO("the function first");
+            CHECK(lsl_shape.outline[0].kind == ALScriptSymbolKind::Function);
+            CHECK(lsl_shape.outline[0].name == "go");
+        }
+        {
             INFO("the event in its state");
             CHECK(lsl_shape.outline[1].kind == ALScriptSymbolKind::State);
             CHECK(lsl_shape.outline[2].name == "state_entry");

@@ -168,12 +168,15 @@ namespace
             REQUIRE_FALSE(doc.savedThere);
             CHECK(studio.notices == 1);
         }
+        REQUIRE_FALSE(services().reports.empty());
         CHECK(services().reports.back().text == services().counted("MergeConflicts", 1, named(doc)));
 
         // Settled from the comparison's bar: an edit of the tab.
         doc.compareView->right()->setFocus(true);
         doc.compareView->right()->goTo(ALTextPos(6, 0));
-        ALViewType::as<ALFlatButton>(doc.compareView->bar()->getChild<LLView>("keep_both"))->press();
+        ALFlatButton* keep_both = ALViewType::as<ALFlatButton>(doc.compareView->bar()->findChild<LLView>("keep_both"));
+        REQUIRE(keep_both);
+        keep_both->press();
         UNSCOPED_INFO("mine then theirs");
         CHECK(doc.editor->wholeText() ==
                       lines(9, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" }, { 7, "theirs 6" }, { 8, "line 7" } }));
@@ -195,8 +198,10 @@ namespace
         doc.savedThere = lines(8, { { 0, "theirs 0" } });
         unit->mergeSaved(doc);
         CHECK(doc.editor->wholeText() == lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
+        REQUIRE(doc.compareView);
         REQUIRE(doc.compareView->merging());
         CHECK(doc.compareView->conflictCount() == 0);
+        REQUIRE_FALSE(services().reports.empty());
         CHECK(services().reports.back().text == said("MergeClean", named(doc)));
     }
 
@@ -223,6 +228,7 @@ namespace
             REQUIRE(doc.savedThere);
             CHECK(studio.notices == 0);
         }
+        REQUIRE_FALSE(services().statuses.empty());
         CHECK(services().statuses.back() == said("MergeNoBase", named(doc)));
 
         Doc& locked       = tab("lamp");
@@ -257,7 +263,9 @@ namespace
         CHECK(doc.editor->wholeText() == lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 6, "mine 6" } }));
         {
             INFO("under the world's title, as a merge");
+            REQUIRE(studio.titles.size() == 1);
             CHECK(studio.titles.back() == said("CompareWorld"));
+            REQUIRE(doc.compareView);
             CHECK(doc.compareView->conflictCount() == 1);
         }
         UNSCOPED_INFO("made from what the world holds");
@@ -289,6 +297,7 @@ namespace
             REQUIRE_FALSE(doc.savedThere);
             REQUIRE(doc.merged);
         }
+        REQUIRE_FALSE(services().reports.empty());
         UNSCOPED_INFO("the conflicts said with the comparison to show");
         CHECK(services().reports.back().actions == std::vector<std::string>{ "show_compare" });
         // Typed in, or any change not a step back: nothing.
@@ -357,6 +366,7 @@ namespace
             CHECK(doc.assetId == was);
             REQUIRE_FALSE(doc.merged);
         }
+        REQUIRE_FALSE(services().reports.empty());
         UNSCOPED_INFO("reload, merge and compare offered again");
         CHECK(services().reports.back().actions == std::vector<std::string>{ "reload_world", "merge_world", "compare_world" });
     }
@@ -371,6 +381,7 @@ namespace
         doc.savedThere = theirs;
         unit->mergeSaved(doc);
         // As the window keeps what was said, and shows the comparison.
+        REQUIRE_FALSE(services().reports.empty());
         doc.offer = Doc::Offer{ services().reports.back().text, services().reports.back().actions };
         UNSCOPED_INFO("not while the comparison is not in front");
         CHECK_FALSE(ALScriptStudioMerging::canSettle(doc));
@@ -382,6 +393,7 @@ namespace
             REQUIRE(notice.buttons[1].first.empty());
         }
 
+        REQUIRE(doc.compareView);
         doc.compareView->right()->setFocus(true);
         doc.compareView->right()->goTo(ALTextPos(2, 0));
         UNSCOPED_INFO("not where the caret is in no conflict");
@@ -422,6 +434,7 @@ namespace
         CHECK(doc.compareView->rightText() == doc.editor->wholeText());
         REQUIRE(doc.compareView->merging());
         CHECK(doc.compareView->conflictCount() == 0);
+        REQUIRE_FALSE(services().reports.empty());
         CHECK(services().reports.back().text == said("MergeClean", named(doc)));
     }
 }
