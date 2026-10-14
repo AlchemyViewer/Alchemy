@@ -94,29 +94,6 @@ protected:
     const size_t        mAccumulatorIndex;
 };
 
-
-template<>
-class StatType<TimeBlockAccumulator::CallCountFacet>
-:   public StatType<TimeBlockAccumulator>
-{
-public:
-
-    StatType(const char* name, const char* description = "")
-    :   StatType<TimeBlockAccumulator>(name, description)
-    {}
-};
-
-template<>
-class StatType<TimeBlockAccumulator::SelfTimeFacet>
-    :   public StatType<TimeBlockAccumulator>
-{
-public:
-
-    StatType(const char* name, const char* description = "")
-        :   StatType<TimeBlockAccumulator>(name, description)
-    {}
-};
-
 template <typename T = F64>
 class EventStatHandle
 :   public StatType<EventAccumulator>

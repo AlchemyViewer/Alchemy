@@ -660,7 +660,7 @@ void LLViewerMedia::onIdle(void *dummy_arg)
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMedia::updateMedia(void *dummy_arg)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
 
     llassert(!gCubeSnapshot);
     static LLCachedControl<bool> use_read_thread(gSavedSettings, "PluginUseReadThread", true);
@@ -687,7 +687,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     impl_list::iterator end = sViewerMediaImplList.end();
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media update interest"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE_INTEREST);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media update interest");
         for(; iter != end;)
         {
             LLViewerMediaImpl* pimpl = *iter++;
@@ -699,12 +699,12 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     // Let the spare media source actually launch
     if(mSpareBrowserMediaSource)
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media spare idle"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_SPARE_IDLE);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media spare idle");
         mSpareBrowserMediaSource->idle();
     }
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_SORT);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort");
         // Sort the static instance list using our interest criteria
         sViewerMediaImplList.sort(priorityComparitor);
     }
@@ -735,7 +735,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     // If max_normal + max_low is less than max_instances, things will tend to get unloaded instead of being set to slideshow.
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media misc"); //LL_RECORD_BLOCK_TIME(FTM_MEDIA_MISC);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media misc");
         for(; iter != end; iter++)
         {
             LLViewerMediaImpl* pimpl = *iter;
@@ -922,7 +922,7 @@ void LLViewerMedia::updateMedia(void *dummy_arg)
     }
     else
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort2"); // LL_RECORD_BLOCK_TIME(FTM_MEDIA_SORT2);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media sort2");
         // Use a distance-based sort for proximity values.
         std::stable_sort(proximity_order.begin(), proximity_order.end(), proximity_comparitor);
     }
@@ -2992,7 +2992,7 @@ bool LLViewerMediaImpl::canNavigateBack()
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMediaImpl::update()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_DO_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
 
     // Shared CEF daemon crash recovery: once the backoff has elapsed, clear the
     // failure latch so the normal load path below recreates the source (which
@@ -4044,7 +4044,7 @@ bool LLViewerMediaImpl::isUpdated()
 
 void LLViewerMediaImpl::calculateInterest()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_CALCULATE_INTEREST);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     LLViewerMediaTexture* texture = LLViewerTextureManager::findMediaTexture( mTextureId );
 
     llassert(!gCubeSnapshot);

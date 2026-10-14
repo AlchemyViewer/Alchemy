@@ -29,7 +29,6 @@
 #include "llviewerobjectlist.h"
 
 #include "message.h"
-#include "llfasttimer.h"
 #include "llrender.h"
 #include "llwindow.h"       // decBusyCount()
 

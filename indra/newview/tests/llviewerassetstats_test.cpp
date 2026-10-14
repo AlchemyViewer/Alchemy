@@ -237,32 +237,28 @@ get_region(const LLSD & sd, U64 region_handle1)
 namespace
 {
         // The fixture's ThreadRecorder makes itself this thread's recorder,
-        // with its own timer stack and current accumulators, and leaves all
-        // of them null when it goes; the fixture makes it the master recorder
-        // too. This takes the runner's as they were before the test's
-        // recorder, and puts them back after it.
+        // with its own current accumulators, and leaves all of them null
+        // when it goes; the fixture makes it the master recorder too. This
+        // takes the runner's as they were before the test's recorder, and
+        // puts them back after it.
         struct RecorderRestore
         {
             template <typename T>
             using Current = LLThreadLocalSingletonPointer<T>;
 
-            LLTrace::ThreadRecorder*        mMaster{ LLTrace::get_master_thread_recorder() };
-            LLTrace::ThreadRecorder*        mRecorder{ LLTrace::get_thread_recorder() };
-            LLTrace::BlockTimerStackRecord* mTimerStack{ Current<LLTrace::BlockTimerStackRecord>::getInstance() };
-            LLTrace::CountAccumulator*      mCounts{ Current<LLTrace::CountAccumulator>::getInstance() };
-            LLTrace::SampleAccumulator*     mSamples{ Current<LLTrace::SampleAccumulator>::getInstance() };
-            LLTrace::EventAccumulator*      mEvents{ Current<LLTrace::EventAccumulator>::getInstance() };
-            LLTrace::TimeBlockAccumulator*  mTimers{ Current<LLTrace::TimeBlockAccumulator>::getInstance() };
+            LLTrace::ThreadRecorder*    mMaster{ LLTrace::get_master_thread_recorder() };
+            LLTrace::ThreadRecorder*    mRecorder{ LLTrace::get_thread_recorder() };
+            LLTrace::CountAccumulator*  mCounts{ Current<LLTrace::CountAccumulator>::getInstance() };
+            LLTrace::SampleAccumulator* mSamples{ Current<LLTrace::SampleAccumulator>::getInstance() };
+            LLTrace::EventAccumulator*  mEvents{ Current<LLTrace::EventAccumulator>::getInstance() };
 
             ~RecorderRestore()
             {
                 LLTrace::set_master_thread_recorder(mMaster);
                 LLTrace::set_thread_recorder(mRecorder);
-                Current<LLTrace::BlockTimerStackRecord>::setInstance(mTimerStack);
                 Current<LLTrace::CountAccumulator>::setInstance(mCounts);
                 Current<LLTrace::SampleAccumulator>::setInstance(mSamples);
                 Current<LLTrace::EventAccumulator>::setInstance(mEvents);
-                Current<LLTrace::TimeBlockAccumulator>::setInstance(mTimers);
             }
         };
 

@@ -46,7 +46,6 @@
 #include "lldrawpoolwater.h"
 #include "lldynamictexture.h"
 #include "llenvironment.h"
-#include "llfasttimer.h"
 #include "llfeaturemanager.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
@@ -927,7 +926,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         {
             LLAppViewer::instance()->pingMainloopTimeout("Display:Sky");
-            LL_PROFILE_ZONE_NAMED_CATEGORY_ENVIRONMENT("update sky"); //LL_RECORD_BLOCK_TIME(FTM_UPDATE_SKY);
+            LL_PROFILE_ZONE_NAMED_CATEGORY_ENVIRONMENT("update sky");
             gSky.updateSky();
         }
 
@@ -1551,7 +1550,7 @@ bool setup_hud_matrices(const LLRect& screen_region)
 void render_ui(F32 zoom_factor, int subfield)
 {
     LLPerfStats::RecordSceneTime T ( LLPerfStats::StatType_t::RENDER_UI ); // render time capture - Primary UI stat can have HUD time overlap (TODO)
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI; //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     LL_PROFILE_GPU_ZONE("ui");
     LLGLState::checkStates();
 
@@ -1605,7 +1604,7 @@ void render_ui(F32 zoom_factor, int subfield)
         {
             if (!gDisconnected)
             {
-                LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 3D"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_3D);
+                LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 3D");
                 LLGLState::checkStates();
                 render_ui_3d();
                 LLGLState::checkStates();
@@ -1623,7 +1622,7 @@ void render_ui(F32 zoom_factor, int subfield)
 
         if (render_ui)
         {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 2D"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_2D);
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 2D");
             LLHUDObject::renderAll();
             render_ui_2d();
         }

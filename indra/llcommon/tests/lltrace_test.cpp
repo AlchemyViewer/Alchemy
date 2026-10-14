@@ -65,26 +65,22 @@ namespace
     using namespace LLTrace;
 
     // A ThreadRecorder makes itself this thread's recorder, with its own
-    // timer stack and current accumulators, and leaves all of them null
-    // when it goes. This takes the main thread's as they were before the
-    // test's recorder, and puts them back after it.
+    // current accumulators, and leaves all of them null when it goes. This
+    // takes the main thread's as they were before the test's recorder, and
+    // puts them back after it.
     struct ThreadRecorderRestore
     {
-        ThreadRecorder*        mRecorder{ get_thread_recorder() };
-        BlockTimerStackRecord* mTimerStack{ LLThreadLocalSingletonPointer<BlockTimerStackRecord>::getInstance() };
-        CountAccumulator*      mCounts{ LLThreadLocalSingletonPointer<CountAccumulator>::getInstance() };
-        SampleAccumulator*     mSamples{ LLThreadLocalSingletonPointer<SampleAccumulator>::getInstance() };
-        EventAccumulator*      mEvents{ LLThreadLocalSingletonPointer<EventAccumulator>::getInstance() };
-        TimeBlockAccumulator*  mTimers{ LLThreadLocalSingletonPointer<TimeBlockAccumulator>::getInstance() };
+        ThreadRecorder*    mRecorder{ get_thread_recorder() };
+        CountAccumulator*  mCounts{ LLThreadLocalSingletonPointer<CountAccumulator>::getInstance() };
+        SampleAccumulator* mSamples{ LLThreadLocalSingletonPointer<SampleAccumulator>::getInstance() };
+        EventAccumulator*  mEvents{ LLThreadLocalSingletonPointer<EventAccumulator>::getInstance() };
 
         ~ThreadRecorderRestore()
         {
             set_thread_recorder(mRecorder);
-            LLThreadLocalSingletonPointer<BlockTimerStackRecord>::setInstance(mTimerStack);
             LLThreadLocalSingletonPointer<CountAccumulator>::setInstance(mCounts);
             LLThreadLocalSingletonPointer<SampleAccumulator>::setInstance(mSamples);
             LLThreadLocalSingletonPointer<EventAccumulator>::setInstance(mEvents);
-            LLThreadLocalSingletonPointer<TimeBlockAccumulator>::setInstance(mTimers);
         }
     };
 
