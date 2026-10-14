@@ -84,8 +84,8 @@ void main()
     vec3  irradiance = vec3(0);
     vec3  radiance  = vec3(0);
 
-    // No sky reaches here: the triangle is drawn on the far plane, and the depth test rejects every pixel the
-    // world left at the cleared depth (hazeV.glsl).
+    // No sky reaches here: the pass shades only what the world drew (ALDrawnOnly), the depth bounds holding it off
+    // the cleared depth, or without them a depth test of the triangle on the far plane (hazeV.glsl).
 
    float alpha = 0.0;
 
