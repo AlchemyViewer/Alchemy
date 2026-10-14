@@ -2295,18 +2295,6 @@
   <string>Selecionar probes de reflexão.</string>
   <key>SelectionHighlightAlpha</key>
   <string>Opacidade do destaque de seleção (0,0 = totalmente transparente, 1,0 = totalmente opaco).</string>
-  <key>SelectionHighlightAlphaTest</key>
-  <string>Valor de alpha abaixo do qual os pixels são exibidos na linha de destaque de seleção (0,0 = mostrar todos os pixels, 1,0 = não mostrar nenhum pixel).</string>
-  <key>SelectionHighlightThickness</key>
-  <string>Espessura da linha de destaque de seleção (fração da distância de visão).</string>
-  <key>SelectionHighlightUAnim</key>
-  <string>Taxa na qual a textura anima na direção U na linha de destaque de seleção (fração de textura por segundo).</string>
-  <key>SelectionHighlightUScale</key>
-  <string>Escala da exibição da textura na linha de destaque de seleção (fração do tamanho da textura).</string>
-  <key>SelectionHighlightVAnim</key>
-  <string>Taxa na qual a textura anima na direção V na linha de destaque de seleção (fração de textura por segundo).</string>
-  <key>SelectionHighlightVScale</key>
-  <string>Escala da exibição da textura na linha de destaque de seleção (fração do tamanho da textura).</string>
   <key>ServerChoice</key>
   <string>[NÃO MODIFICAR] Controla a qual grade você se conecta.</string>
   <key>SessionSettingsFile</key>
