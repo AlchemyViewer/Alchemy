@@ -321,7 +321,9 @@ function(al_add_test_binary name)
     # Every case no file's tag names: a filter of nothing but exclusions
     # leaves the hidden cases out, as the files' entries do, and one that
     # matches nothing exits 2. The ISA gate is not asked: nothing runs, and a
-    # listing already needs the binary to start on any host.
+    # listing already needs the binary to start on any host. Disabled where
+    # the files' entries are: a run starts its checks whatever it matches,
+    # and a GL binary's make the context the host has none of.
     set(strays)
     foreach(stem IN LISTS stems)
       string(APPEND strays "~[#${stem}]")
@@ -335,7 +337,11 @@ function(al_add_test_binary name)
     )
     set_tests_properties(
       ${target}/stray_cases
-      PROPERTIES ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}" LABELS "${labels}" TIMEOUT 60
+      PROPERTIES
+        ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+        LABELS "${labels}"
+        DISABLED ${disabled}
+        TIMEOUT 60
     )
 
     list(LENGTH stems file_count)
