@@ -9283,6 +9283,82 @@ class LLToolsShowHiddenSelection : public view_listener_t
     }
 };
 
+// Outline Whole Faces: checked where whole faces are outlined, which Highlight Transparent makes them; enabled where
+// the setting decides it, which RLVa's Highlight Transparent restriction and Highlight Transparent itself take away.
+class LLToolsCheckOutlineWholeFaces : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return LLDrawPoolAlpha::sShowDebugAlpha ||
+               (gSavedSettings.getBOOL("AlchemySelectionOutlineGeometry") && RlvActions::canHighlightTransparent());
+    }
+};
+
+class LLToolsEnableOutlineWholeFaces : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return !LLDrawPoolAlpha::sShowDebugAlpha && RlvActions::canHighlightTransparent();
+    }
+};
+
+// The Selection Outline menu's widths: the contour's, with the narrower one beside the wireframe that goes with it.
+class LLToolsSelectionOutlineWidth : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        const F32 width = (F32)userdata.asReal();
+        const F32 beside_wireframe = width <= 3.f ? 2.f : (width <= 5.f ? 4.f : 6.f);
+        gSavedSettings.setF32("AlchemySelectionOutlineWidth", width);
+        gSavedSettings.setF32("AlchemySelectionOutlineWireframeWidth", beside_wireframe);
+        return true;
+    }
+};
+
+class LLToolsCheckSelectionOutlineWidth : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return ll_round(gSavedSettings.getF32("AlchemySelectionOutlineWidth")) == userdata.asInteger();
+    }
+};
+
+// The Selection Outline menu's contrast (ALSelectionOutline::EContrast).
+class LLToolsSelectionOutlineContrast : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        gSavedSettings.setS32("AlchemySelectionOutlineContrast", userdata.asInteger());
+        return true;
+    }
+};
+
+class LLToolsCheckSelectionOutlineContrast : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return gSavedSettings.getS32("AlchemySelectionOutlineContrast") == userdata.asInteger();
+    }
+};
+
+// The Selection Outline menu's wireframe widths.
+class LLToolsSelectionWireframeWidth : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        gSavedSettings.setF32("AlchemySelectionWireframeWidth", (F32)userdata.asReal());
+        return true;
+    }
+};
+
+class LLToolsCheckSelectionWireframeWidth : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return ll_round(gSavedSettings.getF32("AlchemySelectionWireframeWidth")) == userdata.asInteger();
+    }
+};
+
 class LLToolsShowSelectionLightRadius : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -10614,6 +10690,14 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToolsSelectBySurrounding(), "Tools.SelectBySurrounding");
     view_listener_t::addMenu(new LLToolsSelectionLODMode(), "Tools.SelectionLODMode");
     view_listener_t::addMenu(new LLToolsShowHiddenSelection(), "Tools.ShowHiddenSelection");
+    view_listener_t::addMenu(new LLToolsCheckOutlineWholeFaces(), "Tools.CheckOutlineWholeFaces");
+    view_listener_t::addMenu(new LLToolsEnableOutlineWholeFaces(), "Tools.EnableOutlineWholeFaces");
+    view_listener_t::addMenu(new LLToolsSelectionOutlineWidth(), "Tools.SelectionOutlineWidth");
+    view_listener_t::addMenu(new LLToolsCheckSelectionOutlineWidth(), "Tools.CheckSelectionOutlineWidth");
+    view_listener_t::addMenu(new LLToolsSelectionOutlineContrast(), "Tools.SelectionOutlineContrast");
+    view_listener_t::addMenu(new LLToolsCheckSelectionOutlineContrast(), "Tools.CheckSelectionOutlineContrast");
+    view_listener_t::addMenu(new LLToolsSelectionWireframeWidth(), "Tools.SelectionWireframeWidth");
+    view_listener_t::addMenu(new LLToolsCheckSelectionWireframeWidth(), "Tools.CheckSelectionWireframeWidth");
     view_listener_t::addMenu(new LLToolsShowSelectionLightRadius(), "Tools.ShowSelectionLightRadius");
     view_listener_t::addMenu(new LLToolsEditLinkedParts(), "Tools.EditLinkedParts");
     view_listener_t::addMenu(new LLToolsSnapObjectXY(), "Tools.SnapObjectXY");

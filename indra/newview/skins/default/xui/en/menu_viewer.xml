@@ -1848,14 +1848,124 @@ function="World.EnvPreset"
                      parameter="AlchemySelectionWireframe" />
                 </menu_item_check>
                 <menu_item_check
-                 label="Outline Alpha Geometry"
-                 name="Outline Alpha Geometry">
+                 label="Outline Whole Faces (Ignore Alpha)"
+                 name="Outline Whole Faces">
                     <menu_item_check.on_check
-                     control="AlchemySelectionOutlineGeometry" />
+                     function="Tools.CheckOutlineWholeFaces" />
                     <menu_item_check.on_click
                      function="ToggleControl"
                      parameter="AlchemySelectionOutlineGeometry" />
+                    <menu_item_check.on_enable
+                     function="Tools.EnableOutlineWholeFaces" />
                 </menu_item_check>
+                <menu
+                 create_jump_keys="true"
+                 label="Selection Outline"
+                 name="Selection Outline"
+                 tear_off="true">
+                    <menu_item_check
+                     label="Thin"
+                     name="Outline Thin">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineWidth"
+                         parameter="2" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineWidth"
+                         parameter="2" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Normal"
+                     name="Outline Normal">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineWidth"
+                         parameter="3" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineWidth"
+                         parameter="3" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Thick"
+                     name="Outline Thick">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineWidth"
+                         parameter="5" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineWidth"
+                         parameter="5" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Extra Thick"
+                     name="Outline Extra Thick">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineWidth"
+                         parameter="8" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineWidth"
+                         parameter="8" />
+                    </menu_item_check>
+                    <menu_item_separator/>
+                    <menu_item_check
+                     label="Contrast: None"
+                     name="Outline Contrast Off">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineContrast"
+                         parameter="0" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineContrast"
+                         parameter="0" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Contrast: Shift Lightness"
+                     name="Outline Contrast Shift">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineContrast"
+                         parameter="1" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineContrast"
+                         parameter="1" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Contrast: Rim"
+                     name="Outline Contrast Rim">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionOutlineContrast"
+                         parameter="2" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionOutlineContrast"
+                         parameter="2" />
+                    </menu_item_check>
+                    <menu_item_separator/>
+                    <menu_item_check
+                     label="Wireframe Lines: 1 px"
+                     name="Wireframe Width 1">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionWireframeWidth"
+                         parameter="1" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionWireframeWidth"
+                         parameter="1" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Wireframe Lines: 2 px"
+                     name="Wireframe Width 2">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionWireframeWidth"
+                         parameter="2" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionWireframeWidth"
+                         parameter="2" />
+                    </menu_item_check>
+                    <menu_item_check
+                     label="Wireframe Lines: 3 px"
+                     name="Wireframe Width 3">
+                        <menu_item_check.on_check
+                         function="Tools.CheckSelectionWireframeWidth"
+                         parameter="3" />
+                        <menu_item_check.on_click
+                         function="Tools.SelectionWireframeWidth"
+                         parameter="3" />
+                    </menu_item_check>
+                </menu>
                 <menu_item_check
                  label="Show Light Radius for Selection"
                  name="Show Light Radius for Selection">
