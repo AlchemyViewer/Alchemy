@@ -93,6 +93,13 @@ function(al_expect_from_test_support name)
       LABELS test
       TIMEOUT 60
   )
+  # A sanitizer's report fails it, as it fails a test binary's entries.
+  if(AL_TEST_FAIL_REGULAR_EXPRESSION)
+    set_tests_properties(
+      test_support_tests/${name}
+      PROPERTIES FAIL_REGULAR_EXPRESSION "${AL_TEST_FAIL_REGULAR_EXPRESSION}"
+    )
+  endif()
 endfunction()
 
 al_expect_from_test_support(

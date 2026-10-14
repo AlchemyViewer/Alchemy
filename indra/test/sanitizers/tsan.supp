@@ -1,0 +1,11 @@
+# ThreadSanitizer suppressions for the tests of a sanitized build
+# (ALAddTestBinary.cmake gives the runs this file). One per line:
+#
+#   race:<function or source file>
+#   called_from_lib:<library>
+#   deadlock:<function>
+#
+# A suppression is for code that is not ours and that the tsan triplet cannot
+# build instrumented, such as the system's GL driver under the gl tests, and
+# says above it what it hides, why it cannot be fixed here, and where it was
+# reported upstream. A race in our own code is fixed, not listed.
