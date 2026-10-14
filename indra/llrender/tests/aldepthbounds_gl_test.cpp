@@ -41,9 +41,9 @@
 #include <string>
 #include <vector>
 
-// Each case lays a row of pixels down with a depth apiece, by scissored clears, so every depth is exactly what the
-// case asked for, then draws one triangle over the row and reads back which pixels it reached. The stored depths are
-// worked out here from the projection's own formula, not by the code under test.
+// Each case lays a row of pixels down with a depth apiece, written into the depth texture as stored, so every depth is
+// exactly what the case asked for, then draws one triangle over the row and reads back which pixels it reached. The
+// stored depths are worked out here from the projection's own formula, not by the code under test.
 namespace
 {
     constexpr F32 NEAR_PLANE = 0.1f;
@@ -190,19 +190,38 @@ namespace
             LLGLDepthTest::rebase();
         }
 
-        // Pixel i holds depths[i].
+        // Pixel i holds depths[i], uploaded as the texture stores it. Not by scissored clears: a driver that cannot
+        // clear a rectangle draws a quad at the clear depth instead (Mesa's llvmpipe), whose transform to window depth,
+        // worked in float through ndc, rounds a reverse-Z depth of 1e-9 to the clear's 0.
         void lay(const std::vector<F64>& depths)
         {
             REQUIRE((S32)depths.size() == mWidth);
-            glEnable(GL_SCISSOR_TEST);
-            for (S32 i = 0; i < mWidth; ++i)
+            glBindTexture(GL_TEXTURE_2D, mDepth);
+            if (mReverse)
             {
-                glScissor(i, 0, 1, 1);
-                glClearDepth(depths[i]);
-                glClear(GL_DEPTH_BUFFER_BIT);
+                struct Texel
+                {
+                    F32 mDepth;
+                    U32 mStencil;
+                };
+                std::vector<Texel> texels((size_t)mWidth);
+                for (S32 i = 0; i < mWidth; ++i)
+                {
+                    texels[i] = { (F32)depths[i], 0 };
+                }
+                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mWidth, 1, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, texels.data());
             }
-            glDisable(GL_SCISSOR_TEST);
-            glClearDepth(mReverse ? 0.0 : 1.0);
+            else
+            {
+                // Depth in the top 24 bits, stencil in the low 8.
+                std::vector<U32> texels((size_t)mWidth);
+                for (S32 i = 0; i < mWidth; ++i)
+                {
+                    texels[i] = (U32)(depths[i] * 16777215.0 + 0.5) << 8;
+                }
+                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mWidth, 1, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, texels.data());
+            }
+            glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         // The far-plane triangle over the row, under whatever depth state the caller holds; which pixels it reached.
@@ -248,14 +267,14 @@ namespace
     };
 
     // ALDrawnOnly reaches what the depth test on the far plane reached before it, under reverse-Z: every pixel the
-    // world drew, out as far as reconstruction reaches, and none the sky holds. Nothing the viewer draws lies past
-    // that; a surface 100,000 km out stores 1e-9, which Mesa's llvmpipe has the bounds turn away.
+    // world drew, out as far as reconstruction reaches and past it, and none the sky holds.
     TEST_CASE_METHOD(aldepthbounds_data, "aldepthbounds_gl: under reverse-Z the drawn pixels are the depth test's, and no sky", "[aldepthbounds_gl]")
     {
         requireBounds();
-        setUp(true, 7);
+        setUp(true, 8);
         const std::vector<F64> depths = {
             0.0,                                                    // sky
+            stored_depth(true, 1.0e8),                              // 100,000 km out, 1e-9
             stored_depth(true, MAX_RECONSTRUCT_DISTANCE),           // as far as reconstruction reaches
             stored_depth(true, 256000.0),                           // the water's rim
             stored_depth(true, 8192.0),                             // terrain's reach
