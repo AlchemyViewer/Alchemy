@@ -32,6 +32,8 @@
 
 #include <pugixml.hpp>
 
+#include <iterator>
+
 namespace
 {
     struct alxuitranslate_data
@@ -581,11 +583,7 @@ namespace
         // merge reads and anything else would be an override nobody asked for.
         const pugi::xml_node inner = overlay.resolve({ "inner" });
         REQUIRE(inner);
-        S32 attributes = 0;
-        for (pugi::xml_attribute one : inner.attributes())
-        {
-            ++attributes;
-        }
+        const S32 attributes = (S32)std::distance(inner.attributes_begin(), inner.attributes_end());
         UNSCOPED_INFO("carrying only its name");
         CHECK(attributes == 1);
 
@@ -637,8 +635,11 @@ namespace
         CHECK((int)one->state == (int)ALXUITranslate::State::NotApplied);
         UNSCOPED_INFO("neither of them");
         CHECK((int)two->state == (int)ALXUITranslate::State::NotApplied);
-        UNSCOPED_INFO("and both say the base has the name elsewhere");
-        CHECK((int)one->miss == (int)ALXUITranslate::Miss::Moved);
+        {
+            INFO("and both say the base has the name elsewhere");
+            CHECK((int)one->miss == (int)ALXUITranslate::Miss::Moved);
+            CHECK((int)two->miss == (int)ALXUITranslate::Miss::Moved);
+        }
         {
             INFO("so neither applies");
             CHECK_FALSE(one->applies());
