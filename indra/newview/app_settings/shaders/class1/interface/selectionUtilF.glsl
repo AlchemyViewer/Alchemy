@@ -65,6 +65,17 @@ bool isVisible(vec4 texel)
     return texel.b > 0.75;
 }
 
+// The depth the id target is cleared to, behind every surface: where the id pass keeps a surface the scene does not
+// show (selectionIdF.glsl), so that a shown one always takes its texel.
+float clearedDepth()
+{
+#ifdef REVERSE_Z
+    return 0.0;
+#else
+    return 1.0;
+#endif
+}
+
 // Distance in front of the eye of a stored depth, through the projection loaded for the pass. The cleared depth of
 // an infinite projection unprojects to w = 0, floored as deferredUtil.glsl floors it.
 float eyeDistance(float depth)

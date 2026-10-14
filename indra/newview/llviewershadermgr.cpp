@@ -170,6 +170,7 @@ LLGLSLShader        gSelectionTileProgram;
 LLGLSLShader        gSelectionOutlineProgram;
 LLGLSLShader        gSelectionGlowReachProgram;
 LLGLSLShader        gSelectionGlowRowProgram;
+LLGLSLShader        gSelectionBackdropMaskProgram;
 
 LLGLSLShader        gDeferredHighlightProgram;
 
@@ -3905,6 +3906,11 @@ bool LLViewerShaderMgr::loadShadersInterface()
         load_selection(gSelectionGlowRowProgram, "Selection Glow Row Shader",
                        { { "interface/copyV.glsl", GL_VERTEX_SHADER },
                          { "interface/selectionGlowRowF.glsl", GL_FRAGMENT_SHADER },
+                         { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
+                       0);
+        load_selection(gSelectionBackdropMaskProgram, "Selection Backdrop Mask Shader",
+                       { { "interface/copyV.glsl", GL_VERTEX_SHADER },
+                         { "interface/selectionBackdropMaskF.glsl", GL_FRAGMENT_SHADER },
                          { "interface/selectionUtilF.glsl", GL_FRAGMENT_SHADER } },
                        0);
     }

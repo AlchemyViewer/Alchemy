@@ -86,12 +86,21 @@ namespace
         return ALSelectionOutline::contourSetting(wireframe, width, wireframe_width);
     }
 
+    // The wireframe's width setting (AlchemySelectionWireframeWidth).
+    F32 wire_setting()
+    {
+        static LLCachedControl<F32> wire_width(gSavedSettings, "AlchemySelectionWireframeWidth",
+                                               ALSelectionOutline::DEFAULT_WIRE_WIDTH);
+        return wire_width;
+    }
+
     // What every view takes from the settings beyond its matrices and widths.
     void set_view_settings(ALSelectionOutline::View& view)
     {
-        static LLCachedControl<bool> contrast(gSavedSettings, "AlchemySelectionOutlineContrast", true);
+        static LLCachedControl<S32> contrast(gSavedSettings, "AlchemySelectionOutlineContrast",
+                                             ALSelectionOutline::CONTRAST_RIM);
         set_whole_faces(view);
-        view.mContrast = contrast;
+        view.mContrast = ALSelectionOutline::contrastMode(contrast);
     }
 }
 
@@ -99,7 +108,7 @@ ALSelectionOutline::View ALSelectionOutline::worldView()
 {
     View view = makeView(LLViewerCamera::getCurrent().getModelview(), gGL.getProjectionMatrix(), contour_setting(),
                          LLUI::getScaleFactor().mV[VX], false, LLPipeline::RenderHighlightThickness,
-                         LLPipeline::RenderHighlightBrightness);
+                         LLPipeline::RenderHighlightBrightness, wire_setting());
     set_view_settings(view);
     return view;
 }
@@ -113,7 +122,7 @@ bool ALSelectionOutline::hudView(View& view)
         return false;
     }
     view = makeView(modelview, projection, contour_setting(), LLUI::getScaleFactor().mV[VX], true,
-                    LLPipeline::RenderHighlightThickness, LLPipeline::RenderHighlightBrightness);
+                    LLPipeline::RenderHighlightThickness, LLPipeline::RenderHighlightBrightness, wire_setting());
     set_view_settings(view);
     return true;
 }
@@ -187,6 +196,7 @@ void ALSelectionOutline::release()
         mPalette = 0;
     }
     mPaletteRows = 0;
+    mUploadedTexels.clear();
 }
 
 void ALSelectionOutline::releaseStale(U32 frame, F64 now)
@@ -227,6 +237,7 @@ void ALSelectionOutline::releaseStale(U32 frame, F64 now)
         LLImageGL::deleteTextures(1, &mPalette);
         mPalette = 0;
         mPaletteRows = 0;
+        mUploadedTexels.clear();
     }
 }
 
@@ -267,10 +278,37 @@ void ALSelectionOutline::render(const View& view)
         return;
     }
 
+    LLMatrix4a mvp;
+    mvp.setMul(view.mModelview, view.mProjection);
+
+    // Ids in priority order: id i + 1 is mEntries[mOrder[i]].
+    const U32 count = (U32)mEntries.size();
+    mPriorities.resize(count);
+    for (U32 i = 0; i < count; ++i)
+    {
+        mPriorities[i] = mEntries[i].mPriority;
+    }
+    priorityOrder(mPriorities, mOrder);
+
+    // What this frame draws on screen, and where. The HUD's wireframe tests the id pass's depth, so it needs its
+    // faces there; the world's needs nothing of it.
+    collectFaces(view, width, height, mvp);
+    const bool ids = passes.mIds && !mRects.empty();
+    const bool edges = passes.mEdges && ids;
+    const bool contour = edges && wants.mContour;
+    const bool wireframe = passes.mWireframe && !mLineRects.empty() && (!view.mHUD || ids);
+    const bool backdrop = readsBackdrop(view, contour, wireframe) && gSelectionBackdropMaskProgram.isComplete();
+    if (!ids && !wireframe)
+    {
+        releaseStale(use.mFrame, use.mTime);
+        clearEntries();
+        return;
+    }
+
     // The targets the passes that run read are made at the window's size; the others are given up once they are
     // stale.
     bool allocated = true;
-    if (passes.mIds)
+    if (ids)
     {
         if (!mIdMap.isComplete() || mIdMap.getWidth() != (U32)width || mIdMap.getHeight() != (U32)height)
         {
@@ -279,18 +317,19 @@ void ALSelectionOutline::render(const View& view)
         }
         mIdUse = use;
     }
-    if (passes.mEdges)
+    if (edges)
     {
         if (!mJumpMap.isComplete() || !mTileMap.isComplete() || mJumpMap.getWidth() != (U32)width ||
             mJumpMap.getHeight() != (U32)height)
         {
             allocated = allocated && mJumpMap.allocate(width, height, GL_R8) &&
-                        mTileMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_RGBA16);
+                        mTileMap.allocate(tileCount((U32)width), tileCount((U32)height), GL_RGBA16) &&
+                        mTileMap.addColorAttachment(GL_R32F);
         }
         mEdgeUse = use;
     }
     // The glow is drawn where its passes' programs loaded; without them what glows is drawn with nothing.
-    const bool glow = passes.mEdges && wants.mGlow && gSelectionGlowReachProgram.isComplete() &&
+    const bool glow = edges && wants.mGlow && gSelectionGlowReachProgram.isComplete() &&
                       gSelectionGlowRowProgram.isComplete();
     if (glow)
     {
@@ -302,12 +341,11 @@ void ALSelectionOutline::render(const View& view)
         }
         mGlowUse = use;
     }
-    // The window behind the lines, at 1 / BACKDROP_SCALE of its size, where they are kept apart from it.
-    const bool backdrop = view.mContrast && (passes.mEdges || passes.mWireframe);
     if (backdrop)
     {
-        const U32 backdrop_width = (U32)((width + BACKDROP_SCALE - 1) / BACKDROP_SCALE);
-        const U32 backdrop_height = (U32)((height + BACKDROP_SCALE - 1) / BACKDROP_SCALE);
+        // Whole squares of BACKDROP_SCALE pixels: an odd window's last column and row take the texels beside them.
+        const U32 backdrop_width = (U32)llmax(width / BACKDROP_SCALE, 1);
+        const U32 backdrop_height = (U32)llmax(height / BACKDROP_SCALE, 1);
         if (!mBackdropMap.isComplete() || mBackdropMap.getWidth() != backdrop_width ||
             mBackdropMap.getHeight() != backdrop_height)
         {
@@ -327,18 +365,6 @@ void ALSelectionOutline::render(const View& view)
 
     LL_PROFILE_GPU_ZONE("selection outline");
 
-    LLMatrix4a mvp;
-    mvp.setMul(view.mModelview, view.mProjection);
-
-    // Ids in priority order: id i + 1 is mEntries[mOrder[i]].
-    const U32 count = (U32)mEntries.size();
-    mPriorities.resize(count);
-    for (U32 i = 0; i < count; ++i)
-    {
-        mPriorities[i] = mEntries[i].mPriority;
-    }
-    priorityOrder(mPriorities, mOrder);
-
     const U32 rows = paletteRows(count);
     mPaletteTexels.assign((size_t)PALETTE_WIDTH * rows * 4, 0);
     for (U32 i = 0; i < count; ++i)
@@ -350,74 +376,93 @@ void ALSelectionOutline::render(const View& view)
     LLGLSLShader* previous = LLGLSLShader::sCurBoundShaderPtr;
     gGL.flush();
 
-    mScissorValid = false;
-    mLastAvatar = nullptr;
-    mLastMeshId = 0;
-    mSkipLastSkin = false;
-
-    if (passes.mIds)
+    if (ids)
     {
-        drawIds(view, width, height, mvp);
+        drawIds(view, width, height);
     }
 
-    // What the id pass drew says whether the outline and the glow have anything to touch, and the HUD's wireframe,
-    // whose faces it drew too; the world's wireframe, drawn without it, draws whatever its faces put on screen.
-    const bool edges = passes.mEdges && mScissorValid;
-    const bool wireframe = passes.mWireframe && (!view.mHUD || mScissorValid);
-    if (edges || wireframe)
+    // The same colours as the frame before upload nothing.
+    if (!mPalette || mUploadedTexels != mPaletteTexels)
     {
         uploadPalette(mPalette, mPaletteRows, mPaletteTexels, rows);
+        mUploadedTexels = mPaletteTexels;
+    }
 
-        // What the lines are drawn over, copied before either draws, around every texel the id pass drew and what
-        // their lines reach; the world's wireframe alone, drawn without it, may be anywhere in the window.
-        LLRenderTarget* backdrop_map = nullptr;
-        if (backdrop)
+    // What the lines are drawn over, copied before either draws, around where they are drawn; under the contour's
+    // the texels showing a selected surface are marked, which it does not read.
+    LLRenderTarget* backdrop_map = nullptr;
+    if (backdrop)
+    {
+        std::vector<LLRect> copied;
+        copied.reserve(mLineRects.size());
+        for (const LLRect& rect : mLineRects)
         {
-            const LLRect rect = backdropRect(mScissor, mScissorValid, width, height);
-            if (rect.notEmpty())
+            const LLRect from = backdropRect(rect, width, height);
+            if (from.notEmpty())
             {
-                mBackdropMap.copyFromBound(vp_x + rect.mLeft, vp_y + rect.mBottom, vp_x + rect.mRight, vp_y + rect.mTop,
-                                           rect.mLeft / BACKDROP_SCALE, rect.mBottom / BACKDROP_SCALE,
-                                           rect.mRight / BACKDROP_SCALE, rect.mTop / BACKDROP_SCALE, GL_LINEAR);
-                backdrop_map = &mBackdropMap;
+                copied.push_back(from);
             }
         }
-
-        // The wireframe first, the outline over it.
-        if (wireframe)
+        mergeRects(copied);
+        for (const LLRect& from : copied)
         {
-            drawWireframes(view, width, height, backdrop_map);
+            mBackdropMap.copyFromBound(vp_x + from.mLeft, vp_y + from.mBottom, vp_x + from.mRight, vp_y + from.mTop,
+                                       from.mLeft / BACKDROP_SCALE, from.mBottom / BACKDROP_SCALE,
+                                       from.mRight / BACKDROP_SCALE, from.mTop / BACKDROP_SCALE, GL_LINEAR);
         }
-
-        if (edges)
+        if (!copied.empty())
         {
-            // The scissor holds every texel drawn and the reach of its line or glow around them; the edge pass reads
-            // no further, and what it reads past the jump and tile passes' work they clear to nothing, as it is.
-            gSelectionJumpProgram.bind();
-            drawJumps(gSelectionJumpProgram, mIdMap, mJumpMap, mScissor, view, *gPipeline.mScreenTriangleVB);
-            gSelectionTileProgram.bind();
-            drawTiles(gSelectionTileProgram, mIdMap, mJumpMap, mTileMap, mScissor, *gPipeline.mScreenTriangleVB);
-            if (glow)
+            if (contour)
             {
-                gSelectionGlowReachProgram.bind();
-                drawGlowReach(gSelectionGlowReachProgram, mTileMap, mGlowReachMap, mScissor, view,
-                              *gPipeline.mScreenTriangleVB);
-                gSelectionGlowRowProgram.bind();
-                drawGlowRows(gSelectionGlowRowProgram, mIdMap, mGlowReachMap, mGlowRowMap, mScissor, view,
-                             *gPipeline.mScreenTriangleVB);
+                gSelectionBackdropMaskProgram.bind();
+                drawBackdropMask(gSelectionBackdropMaskProgram, mIdMap, mBackdropMap, copied,
+                                 *gPipeline.mScreenTriangleVB);
             }
-
-            LLGLSColorMask mask(true, false);
-            LLGLDepthTest depth(GL_FALSE);
-            LLGLEnable blend(GL_BLEND);
-            gGL.setSceneBlendType(LLRender::BT_ALPHA);
-            LLGLSScissor scissor(vp_x + mScissor.mLeft, vp_y + mScissor.mBottom, mScissor.getWidth(),
-                                 mScissor.getHeight());
-
-            gSelectionOutlineProgram.bind();
-            drawEdges(gSelectionOutlineProgram, mIdMap, mJumpMap, mTileMap, glow ? &mGlowReachMap : nullptr,
-                      glow ? &mGlowRowMap : nullptr, backdrop_map, mPalette, view, *gPipeline.mScreenTriangleVB);
+            backdrop_map = &mBackdropMap;
         }
+    }
+
+    // The wireframe first, the outline over it.
+    if (wireframe)
+    {
+        drawWireframes(view, width, height, backdrop_map);
+    }
+
+    if (edges)
+    {
+        // The rects hold every texel drawn and the reach of its line or glow around them; the edge pass reads no
+        // further, and what it reads past the jump and tile passes' work they clear to nothing, as it is. A frame
+        // with no contour reads no jump, but the tile pass reads them all.
+        gSelectionJumpProgram.bind();
+        if (contour)
+        {
+            drawJumps(gSelectionJumpProgram, mIdMap, mJumpMap, mRects, view, *gPipeline.mScreenTriangleVB);
+        }
+        else
+        {
+            clearJumps(mJumpMap);
+        }
+        gSelectionTileProgram.bind();
+        drawTiles(gSelectionTileProgram, mIdMap, mJumpMap, mTileMap, mRects, view, *gPipeline.mScreenTriangleVB);
+        if (glow)
+        {
+            gSelectionGlowReachProgram.bind();
+            drawGlowReach(gSelectionGlowReachProgram, mTileMap, mGlowReachMap, mRects, view,
+                          *gPipeline.mScreenTriangleVB);
+            gSelectionGlowRowProgram.bind();
+            drawGlowRows(gSelectionGlowRowProgram, mIdMap, mGlowReachMap, mGlowRowMap, mRects, view,
+                         *gPipeline.mScreenTriangleVB);
+        }
+
+        LLGLSColorMask mask(true, false);
+        LLGLDepthTest depth(GL_FALSE);
+        LLGLEnable blend(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+
+        gSelectionOutlineProgram.bind();
+        drawEdges(gSelectionOutlineProgram, mIdMap, mJumpMap, mTileMap, glow ? &mGlowReachMap : nullptr,
+                  glow ? &mGlowRowMap : nullptr, contour ? backdrop_map : nullptr, mPalette, view,
+                  *gPipeline.mScreenTriangleVB, &mRects, vp_x, vp_y);
     }
 
     if (previous)
@@ -432,9 +477,246 @@ void ALSelectionOutline::render(const View& view)
     clearEntries();
 }
 
-void ALSelectionOutline::drawIds(const View& view, S32 width, S32 height, const LLMatrix4a& mvp)
+void ALSelectionOutline::collectFaces(const View& view, S32 width, S32 height, const LLMatrix4a& mvp)
 {
-    const U32 count = (U32)mEntries.size();
+    mFaces.clear();
+    mRects.clear();
+    mLineRects.clear();
+
+    const S32 contour_reach = contourReach(view);
+    const S32 glow_reach = lineReach(view.mGlowRadius);
+    const S32 wire_reach = lineReach(view.mWireWidth);
+    const LLRect target(0, height, width, 0);
+
+    for (U32 i = 0; i < (U32)mEntries.size(); ++i)
+    {
+        const Entry& entry = mEntries[mOrder[i]];
+        const bool in_ids = inIdPass(entry.mParts, entry.mPriority, view.mHUD);
+        const bool wire = (entry.mParts & PART_WIREFRAME) != 0;
+        if (!in_ids && !wire)
+        {
+            continue;
+        }
+
+        LLViewerObject* object = entry.mObject;
+        LLDrawable* drawable = object->mDrawable;
+        if (!drawable || drawable->isDead() || !drawable->getVOVolume())
+        {
+            continue;
+        }
+
+        // The frame each face's vertex buffer is in, as LLVolumeGeometryManager::registerFace places it. Rigged
+        // faces are skinned into agent space and take none.
+        const LLMatrix4a* model = nullptr;
+        bool agent_extents = false;
+        if (drawable->isState(LLDrawable::ANIMATED_CHILD))
+        {
+            model = &drawable->getWorldMatrix();
+        }
+        else if (drawable->isActive())
+        {
+            model = &drawable->getRenderMatrix();
+        }
+        else if (drawable->getRegion())
+        {
+            model = &drawable->getRegion()->mRenderMatrix;
+            // A static face's box already has the region's origin in it (LLFace::genVolumeBBoxes).
+            agent_extents = true;
+        }
+
+        FaceBox box;
+        const size_t first = mFaces.size();
+        // The TE mask holds 32 faces, more than a volume has.
+        const S32 faces = llmin(llmin((S32)object->getNumTEs(), drawable->getNumFaces()), 32);
+        for (S32 te = 0; te < faces; ++te)
+        {
+            if (!(entry.mTEMask & (1u << te)))
+            {
+                continue;
+            }
+
+            LLFace* face = drawable->getFace(te);
+            if (!face)
+            {
+                continue;
+            }
+            // The HUD's matrices have no place for a rigged face, posed about its avatar in the world.
+            const bool rigged = face->isState(LLFace::RIGGED);
+            if ((rigged && view.mHUD) || (!rigged && !model))
+            {
+                continue;
+            }
+            LLVertexBuffer* buffer = face->getVertexBuffer();
+            if (!buffer || face->getGeomCount() == 0 || face->getIndicesCount() == 0)
+            {
+                continue;
+            }
+
+            LLVector4a extents[2];
+            if (rigged)
+            {
+                if (!face->mAvatar || !face->mSkinInfo)
+                {
+                    continue;
+                }
+                // Joint boxes, refreshed while the face is in view (LLFace::calcPixelArea); empty until they are.
+                extents[0] = face->mRiggedExtents[0];
+                extents[1] = face->mRiggedExtents[1];
+                LLVector4a size;
+                size.setSub(extents[1], extents[0]);
+                if (!(size[0] > 0.f && size[1] > 0.f && size[2] > 0.f))
+                {
+                    box.mBounded = false;
+                }
+            }
+            else if (agent_extents)
+            {
+                extents[0] = face->mExtents[0];
+                extents[1] = face->mExtents[1];
+            }
+            else
+            {
+                matMulBoundBox(*model, face->mExtents, extents);
+            }
+            box.mLo.setMin(box.mLo, extents[0]);
+            box.mHi.setMax(box.mHi, extents[1]);
+
+            mFaces.push_back({ face, rigged ? nullptr : model, i, entry.mPriority, rigged });
+        }
+        if (mFaces.size() == first)
+        {
+            continue;
+        }
+
+        // What reaches past the faces: the glow, the contour, or the wireframe's lines alone.
+        const S32 reach = entry.mPriority == PRIORITY_HOVER ? glow_reach
+                          : (entry.mParts & PART_CONTOUR)   ? llmax(contour_reach, wire_reach)
+                                                            : wire_reach;
+        LLRect rect = target;
+        if (box.mBounded)
+        {
+            const LLVector4a extents[2] = { box.mLo, box.mHi };
+            if (!scissorRect(mvp, extents, width, height, reach, rect))
+            {
+                // Nothing of it can reach the window.
+                mFaces.resize(first);
+                continue;
+            }
+        }
+        if (in_ids)
+        {
+            mRects.push_back(rect);
+        }
+        if (entry.mPriority != PRIORITY_HOVER)
+        {
+            mLineRects.push_back(rect);
+        }
+    }
+
+    mergeRects(mRects);
+    mergeRects(mLineRects);
+
+    // The rigged apart, as they take another program; the lowest priority first, so that where surfaces the scene
+    // does not show lie at the same depth, the highest priority's is drawn last and keeps the texel, and its lines
+    // are laid over the others'; then by what the draws share.
+    std::sort(mFaces.begin(), mFaces.end(), [](const FaceDraw& a, const FaceDraw& b)
+    {
+        if (a.mRigged != b.mRigged)
+        {
+            return !a.mRigged;
+        }
+        if (a.mPriority != b.mPriority)
+        {
+            return a.mPriority > b.mPriority;
+        }
+        if (a.mRigged)
+        {
+            if (a.mFace->mAvatar != b.mFace->mAvatar)
+            {
+                return std::less<const LLVOAvatar*>()(a.mFace->mAvatar, b.mFace->mAvatar);
+            }
+            if (a.mFace->mSkinInfo != b.mFace->mSkinInfo)
+            {
+                return std::less<const LLMeshSkinInfo*>()(a.mFace->mSkinInfo, b.mFace->mSkinInfo);
+            }
+        }
+        else if (a.mModel != b.mModel)
+        {
+            return std::less<const LLMatrix4a*>()(a.mModel, b.mModel);
+        }
+        const LLVertexBuffer* a_buffer = a.mFace->getVertexBuffer();
+        const LLVertexBuffer* b_buffer = b.mFace->getVertexBuffer();
+        if (a_buffer != b_buffer)
+        {
+            return std::less<const LLVertexBuffer*>()(a_buffer, b_buffer);
+        }
+        if (a.mIndex != b.mIndex)
+        {
+            return a.mIndex < b.mIndex;
+        }
+        return a.mFace->getGeomIndex() < b.mFace->getGeomIndex();
+    });
+}
+
+template <typename Drawn, typename Begin>
+void ALSelectionOutline::drawFaceList(LLGLSLShader& program, bool rigged, const View& view, Drawn&& drawn, Begin&& begin)
+{
+    // Joint palettes and the base colour transform are given to the bound program, which this one is not yet.
+    mLastAvatar = nullptr;
+    mLastMeshId = 0;
+    mSkipLastSkin = false;
+    TransformCache transform;
+
+    const LLMatrix4a* loaded = nullptr;
+    bool any_loaded = false;
+    U32 index = U32_MAX;
+    for (const FaceDraw& draw : mFaces)
+    {
+        if (draw.mRigged != rigged || !drawn(draw))
+        {
+            continue;
+        }
+
+        LLFace* face = draw.mFace;
+        LLVertexBuffer* buffer = face->getVertexBuffer();
+        if (rigged &&
+            !LLRenderPass::uploadMatrixPalette(face->mAvatar, face->mSkinInfo, mLastAvatar, mLastMeshId, mSkipLastSkin))
+        {
+            continue;
+        }
+        if (!any_loaded || draw.mModel != loaded)
+        {
+            gGL.loadMatrix(view.mModelview);
+            if (draw.mModel)
+            {
+                gGL.multMatrix(draw.mModel->getF32ptr());
+            }
+            loaded = draw.mModel;
+            any_loaded = true;
+        }
+        if (draw.mIndex != index)
+        {
+            begin(draw);
+            index = draw.mIndex;
+        }
+
+        const FaceBinding binding = bindFace(program, face, wholeFaces(view, draw.mPriority), transform);
+        drawFace(*buffer, face->getGeomIndex(), face->getGeomIndex() + face->getGeomCount() - 1, face->getIndicesCount(),
+                 face->getIndicesStart(), binding.mDoubleSided);
+
+        if (binding.mAnimated)
+        {
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
+            gGL.loadIdentity();
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+        }
+    }
+}
+
+void ALSelectionOutline::drawIds(const View& view, S32 width, S32 height)
+{
+    const bool any_rigged =
+        std::any_of(mFaces.begin(), mFaces.end(), [](const FaceDraw& draw) { return draw.mRigged; });
     mIdMap.bindTarget();
     {
         // Depth writes on before the clear, which they mask.
@@ -454,24 +736,31 @@ void ALSelectionOutline::drawIds(const View& view, S32 width, S32 height, const 
         gGL.pushMatrix();
 
         // Static faces through the program, rigged ones through its rigged variant: the depth test, not the
-        // order, decides which surface each pixel keeps.
+        // order, decides which surface each pixel keeps, but where two surfaces the scene does not show lie at the
+        // cleared depth, the later.
         for (bool rigged : { false, true })
         {
-            if (rigged && view.mHUD)
+            if (rigged && !any_rigged)
             {
                 break;
             }
             LLGLSLShader& program = rigged ? *gSelectionIdProgram.mRiggedVariant : gSelectionIdProgram;
             gSelectionIdProgram.bind(rigged);
             bindIdPass(program, view.mHUD ? nullptr : &gPipeline.mRT->deferredScreen, width, height);
-            for (U32 i = 0; i < count; ++i)
-            {
-                const Entry& entry = mEntries[mOrder[i]];
-                if (inIdPass(entry.mParts, entry.mPriority, view.mHUD))
-                {
-                    drawObject(program, entry, i + 1, rigged, view, mvp);
-                }
-            }
+            drawFaceList(program, rigged, view,
+                         [this, &view](const FaceDraw& draw)
+                         {
+                             const Entry& entry = mEntries[mOrder[draw.mIndex]];
+                             return inIdPass(entry.mParts, entry.mPriority, view.mHUD);
+                         },
+                         [this, &program](const FaceDraw& draw)
+                         {
+                             // An object drawn for the HUD wireframe's depth alone is not outlined: it hides what
+                             // lies behind it and draws no line of its own.
+                             const Entry& entry = mEntries[mOrder[draw.mIndex]];
+                             setId(program, draw.mIndex + 1, entry.mPriority, entry.mShowHidden,
+                                   outlined(entry.mParts, entry.mPriority));
+                         });
             program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
             program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
         }
@@ -484,162 +773,6 @@ void ALSelectionOutline::drawIds(const View& view, S32 width, S32 height, const 
         gGL.popMatrix();
     }
     mIdMap.flush();
-}
-
-template <typename Begin>
-bool ALSelectionOutline::drawFaces(LLGLSLShader& program, const Entry& entry, bool rigged, const View& view, FaceBox& box,
-                                   Begin&& begin)
-{
-    LLViewerObject* object = entry.mObject;
-    LLDrawable* drawable = object->mDrawable;
-    if (!drawable || drawable->isDead() || !drawable->getVOVolume())
-    {
-        return false;
-    }
-
-    // The frame each face's vertex buffer is in, as LLVolumeGeometryManager::registerFace places it. Rigged faces
-    // are skinned into agent space and take none.
-    const LLMatrix4a* model = nullptr;
-    bool agent_extents = false;
-    if (!rigged)
-    {
-        if (drawable->isState(LLDrawable::ANIMATED_CHILD))
-        {
-            model = &drawable->getWorldMatrix();
-        }
-        else if (drawable->isActive())
-        {
-            model = &drawable->getRenderMatrix();
-        }
-        else if (drawable->getRegion())
-        {
-            model = &drawable->getRegion()->mRenderMatrix;
-            // A static face's box already has the region's origin in it (LLFace::genVolumeBBoxes).
-            agent_extents = true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    bool drawn = false;
-
-    // The TE mask holds 32 faces, more than a volume has.
-    const S32 faces = llmin(llmin((S32)object->getNumTEs(), drawable->getNumFaces()), 32);
-    for (S32 te = 0; te < faces; ++te)
-    {
-        if (!(entry.mTEMask & (1u << te)))
-        {
-            continue;
-        }
-
-        LLFace* face = drawable->getFace(te);
-        if (!face || face->isState(LLFace::RIGGED) != rigged)
-        {
-            continue;
-        }
-
-        LLVertexBuffer* buffer = face->getVertexBuffer();
-        if (!buffer || face->getGeomCount() == 0 || face->getIndicesCount() == 0)
-        {
-            continue;
-        }
-
-        LLVector4a extents[2];
-        if (rigged)
-        {
-            if (!face->mAvatar || !face->mSkinInfo ||
-                !LLRenderPass::uploadMatrixPalette(face->mAvatar, face->mSkinInfo, mLastAvatar, mLastMeshId, mSkipLastSkin))
-            {
-                continue;
-            }
-            // Joint boxes, refreshed while the face is in view (LLFace::calcPixelArea); empty until they are.
-            extents[0] = face->mRiggedExtents[0];
-            extents[1] = face->mRiggedExtents[1];
-            LLVector4a size;
-            size.setSub(extents[1], extents[0]);
-            if (!(size[0] > 0.f && size[1] > 0.f && size[2] > 0.f))
-            {
-                box.mBounded = false;
-            }
-        }
-        else if (agent_extents)
-        {
-            extents[0] = face->mExtents[0];
-            extents[1] = face->mExtents[1];
-        }
-        else
-        {
-            matMulBoundBox(*model, face->mExtents, extents);
-        }
-        box.mLo.setMin(box.mLo, extents[0]);
-        box.mHi.setMax(box.mHi, extents[1]);
-
-        if (!drawn)
-        {
-            gGL.loadMatrix(view.mModelview);
-            if (model)
-            {
-                gGL.multMatrix(model->getF32ptr());
-            }
-            begin();
-            drawn = true;
-        }
-
-        const FaceBinding binding = bindFace(program, face, wholeFaces(view, entry.mPriority));
-        drawFace(*buffer, face->getGeomIndex(), face->getGeomIndex() + face->getGeomCount() - 1, face->getIndicesCount(),
-                 face->getIndicesStart(), binding.mDoubleSided);
-
-        if (binding.mAnimated)
-        {
-            gGL.matrixMode(LLRender::MM_TEXTURE0);
-            gGL.loadIdentity();
-            gGL.matrixMode(LLRender::MM_MODELVIEW);
-        }
-    }
-    return drawn;
-}
-
-void ALSelectionOutline::drawObject(LLGLSLShader& program, const Entry& entry, U32 id, bool rigged, const View& view,
-                                    const LLMatrix4a& mvp)
-{
-    // An object drawn for the HUD wireframe's depth alone is not outlined: it hides what lies behind it and draws no
-    // line of its own.
-    const bool drawn = outlined(entry.mParts, entry.mPriority);
-    FaceBox box;
-    if (!drawFaces(program, entry, rigged, view, box,
-                   [&] { setId(program, id, entry.mPriority, entry.mShowHidden, drawn); }))
-    {
-        return;
-    }
-
-    const S32 width = (S32)mIdMap.getWidth();
-    const S32 height = (S32)mIdMap.getHeight();
-    LLRect rect;
-    if (!box.mBounded)
-    {
-        rect.set(0, height, width, 0);
-    }
-    else
-    {
-        const LLVector4a extents[2] = { box.mLo, box.mHi };
-        const S32 reach = lineReach(entry.mPriority == PRIORITY_HOVER ? view.mGlowRadius : view.mWidth);
-        if (!scissorRect(mvp, extents, width, height, reach, rect))
-        {
-            return;
-        }
-    }
-
-    if (mScissorValid)
-    {
-        mScissor.unionWith(rect);
-    }
-    else
-    {
-        mScissor = rect;
-        mScissorValid = true;
-    }
 }
 
 void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height, LLRenderTarget* backdrop)
@@ -659,6 +792,8 @@ void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height,
     {
         any_hidden = any_hidden || inWirePass(entry.mParts, entry.mShowHidden, WIRE_HIDDEN);
     }
+    const bool any_rigged =
+        std::any_of(mFaces.begin(), mFaces.end(), [](const FaceDraw& draw) { return draw.mRigged; });
 
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
@@ -684,28 +819,25 @@ void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height,
         WireState state(pass, offset_factor);
         for (bool rigged : { false, true })
         {
-            if (rigged && view.mHUD)
+            if (rigged && !any_rigged)
             {
                 break;
             }
             LLGLSLShader& program = rigged ? *gSelectionWireframeProgram.mRiggedVariant : gSelectionWireframeProgram;
             gSelectionWireframeProgram.bind(rigged);
-            bindWirePass(program, pass, view.mWireWidth, width, height, mPalette, &mIdMap, backdrop);
-            // Joint palettes are uploaded to the bound program, which this one is not yet.
-            mLastAvatar = nullptr;
-            mLastMeshId = 0;
-            mSkipLastSkin = false;
-            for (U32 i = 0; i < (U32)mEntries.size(); ++i)
-            {
-                // What glows, or is outlined alone, has no wireframe.
-                const Entry& entry = mEntries[mOrder[i]];
-                if (!inWirePass(entry.mParts, entry.mShowHidden, pass))
-                {
-                    continue;
-                }
-                FaceBox box;
-                drawFaces(program, entry, rigged, view, box, [&] { setId(program, i + 1, entry.mPriority, entry.mShowHidden); });
-            }
+            bindWirePass(program, pass, view.mWireWidth, width, height, mPalette, &mIdMap, view.mContrast, backdrop);
+            // What glows, or is outlined alone, has no wireframe.
+            drawFaceList(program, rigged, view,
+                         [this, pass](const FaceDraw& draw)
+                         {
+                             const Entry& entry = mEntries[mOrder[draw.mIndex]];
+                             return inWirePass(entry.mParts, entry.mShowHidden, pass);
+                         },
+                         [this, &program](const FaceDraw& draw)
+                         {
+                             const Entry& entry = mEntries[mOrder[draw.mIndex]];
+                             setId(program, draw.mIndex + 1, entry.mPriority, entry.mShowHidden);
+                         });
             program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
             program.unbindTexture(LLShaderMgr::SELECTION_PALETTE);
             program.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
@@ -721,13 +853,14 @@ void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height,
     gGL.popMatrix();
 }
 
-ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& program, LLFace* face, bool whole)
+ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& program, LLFace* face, bool whole,
+                                                             TransformCache& bound)
 {
-    // Only the texture's alpha is read, never the face's colour: a prim made invisible by its transparency is
-    // still outlined where its texture is there.
     const LLTextureEntry* te = face->getTextureEntry();
     LLViewerTexture* texture = face->getTexture();
     F32 cutoff = NO_ALPHA_TEST;
+    LLUUID texture_id;
+    U8 max_alpha = 255;
     LLGLTFMaterial::TextureTransform::Pack transform;
     std::copy(std::begin(IDENTITY_TRANSFORM), std::end(IDENTITY_TRANSFORM), std::begin(transform));
     FaceBinding binding;
@@ -746,8 +879,9 @@ ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& progr
         }
         if (texture && texture_has_alpha(texture))
         {
-            cutoff = faceAlphaCutoff(texture->getID(), texture_max_alpha(texture),
-                                     gltfAlphaCutoff(gltf->mAlphaMode, gltf->mAlphaCutoff), whole);
+            cutoff = gltfAlphaCutoff(gltf->mAlphaMode, gltf->mAlphaCutoff);
+            texture_id = texture->getID();
+            max_alpha = texture_max_alpha(texture);
         }
         gltf->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(transform);
     }
@@ -755,15 +889,17 @@ ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& progr
     {
         // The diffuse map as the face names it, whatever stands in for it while it loads.
         const LLMaterial* material = te->getMaterialParams().get();
-        cutoff = faceAlphaCutoff(te->getID(), texture_max_alpha(texture),
-                                 legacyAlphaCutoff(material != nullptr, material ? material->getDiffuseAlphaMode() : 0,
-                                                   material ? material->getAlphaMaskCutoff() : 0,
-                                                   texture_has_alpha(texture)),
-                                 whole);
+        cutoff = legacyAlphaCutoff(material != nullptr, material ? material->getDiffuseAlphaMode() : 0,
+                                   material ? material->getAlphaMaskCutoff() : 0, texture_has_alpha(texture));
+        texture_id = te->getID();
+        max_alpha = texture_max_alpha(texture);
     }
 
-    setAlphaTest(program, cutoff, transform);
-    if (cutoff <= 0.f)
+    // Cut by its texture's alpha alone, never its colour's; but a face the scene draws nothing of, as a prim made
+    // invisible by its colour's alpha, is kept whole as surface the scene does not show.
+    const AlphaTest test = faceAlphaTest(texture_id, max_alpha, cutoff, whole, LLVOVolume::isInvisibleFace(te));
+    setAlphaTest(program, test, transform, &bound);
+    if (test.mCutoff <= 0.f || test.mCutoff > 1.f || !texture)
     {
         return binding;
     }

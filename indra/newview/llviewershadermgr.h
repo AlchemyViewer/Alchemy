@@ -173,6 +173,7 @@ extern LLGLSLShader         gSelectionTileProgram;
 extern LLGLSLShader         gSelectionOutlineProgram;
 extern LLGLSLShader         gSelectionGlowReachProgram;
 extern LLGLSLShader         gSelectionGlowRowProgram;
+extern LLGLSLShader         gSelectionBackdropMaskProgram;
 
 extern LLGLSLShader         gDeferredHighlightProgram;
 

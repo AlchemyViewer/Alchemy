@@ -2496,13 +2496,13 @@
         <key>AlchemySelectionOutlineContrast</key>
         <map>
             <key>Comment</key>
-            <string>Move the lightness of selection outlines and wireframes away from what lies behind them, keeping their hue, so they stay visible on any colour. Off draws the colours as they are. Applies live.</string>
+            <string>How selection outlines stay visible over what lies behind them. 0: drawn in their colours as they are. 1: their lightness, the wireframe's too, moved away from that of what lies around them where the two are too alike, their hue kept. 2: their colours as they are, the outline cased by a thin rim, dark around a light line and light around a dark one. Applies live.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Boolean</string>
+            <string>S32</string>
             <key>Value</key>
-            <integer>1</integer>
+            <integer>2</integer>
         </map>
         <key>AlchemySelectionOutlineGeometry</key>
         <map>
@@ -2525,6 +2525,17 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>AlchemySelectionWireframeWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the selection wireframe's lines at a UI scale of 1; it grows with the UI scale. Range 1 to 8. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
         </map>
         <key>AlchemyRenderUBOUpdateMode</key>
         <map>

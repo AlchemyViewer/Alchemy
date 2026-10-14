@@ -24,15 +24,24 @@
  */
 
 // The window as it stood before the wireframe and the outline were drawn over it, at half its resolution
-// (ALSelectionOutline::BACKDROP_SCALE), bilinearly filtered: display colour.
+// (ALSelectionOutline::BACKDROP_SCALE), read a texel at a time: display colour, and in .a 1 where none of the texel's
+// pixels shows a selected surface (selectionBackdropMaskF.glsl).
 uniform sampler2D selectionBackdrop;
 
-// 1 where lines are kept apart from the backdrop's lightness (AlchemySelectionOutlineContrast), 0 where they are drawn
-// as the palette has them.
+// How the lines are kept apart from what lies behind them (ALSelectionOutline::EContrast): 0 drawn as the palette has
+// them, 1 shifted, 2 cased by a rim.
 uniform int selection_contrast;
 
-// How far apart in OKLab lightness a line and the backdrop around it are kept (ALSelectionOutline::MIN_CONTRAST).
+#define CONTRAST_SHIFT 1
+
+// The window pixels to a texel of the backdrop along each axis (ALSelectionOutline::BACKDROP_SCALE).
+#define BACKDROP_SCALE 2
+
+// How far apart in OKLab a shifted line and the backdrop around it are kept (ALSelectionOutline::MIN_CONTRAST).
 const float MIN_CONTRAST = 0.3;
+
+// The relative luminance over which a line takes a dark rim, and under which a light one: about OKLab's middle.
+const float RIM_TURN = 0.18;
 
 // srgbF.glsl
 vec3 srgb_to_linear(vec3 cs);
@@ -61,32 +70,47 @@ vec3 oklabToLinear(vec3 lab)
                 0.2309699292, -0.3413193965, 1.7076147010) * lms;
 }
 
-// The backdrop's OKLab lightness about the centre `pixel` of a pixel of a window `size` pixels across: of the mean
-// colour of the 8 x 8 pixels around it, four bilinear taps of the half-resolution copy, so a textured surface gives a
-// steady lightness rather than each of its texels'. -1 without selection_contrast.
-float backdropLightness(vec2 pixel, vec2 size)
+// The OKLab colour of what lies behind a line at the centre `pixel` of a window pixel, under CONTRAST_SHIFT: the mean of
+// the backdrop's texels over the 8 x 8 pixels about it, so a textured surface gives a steady colour. With `masked`,
+// the contour's, only of the texels that show no selected surface, as an object is no backdrop of its own outline;
+// without, the wireframe's, drawn on its object, of all of them. .w is 0 where there is none to read, or the lines are
+// not shifted, and 1 where there is.
+vec4 backdropColour(vec2 pixel, bool masked)
 {
-    if (selection_contrast == 0)
+    if (selection_contrast != CONTRAST_SHIFT)
     {
-        return -1.0;
+        return vec4(0.0);
     }
+    ivec2 last = textureSize(selectionBackdrop, 0) - ivec2(1);
+    ivec2 centre = ivec2(floor(pixel / float(BACKDROP_SCALE)));
     vec3 sum = vec3(0.0);
-    for (int i = 0; i < 4; ++i)
+    float weight = 0.0;
+    for (int dy = -2; dy < 2; ++dy)
     {
-        vec2 offset = vec2(((i & 1) == 0) ? -2.0 : 2.0, ((i & 2) == 0) ? -2.0 : 2.0);
-        sum += srgb_to_linear(texture(selectionBackdrop, (pixel + offset) / size).rgb);
+        for (int dx = -2; dx < 2; ++dx)
+        {
+            vec4 texel = texelFetch(selectionBackdrop, clamp(centre + ivec2(dx, dy), ivec2(0), last), 0);
+            float w = masked ? texel.a : 1.0;
+            sum += srgb_to_linear(texel.rgb) * w;
+            weight += w;
+        }
     }
-    return linearToOklab(sum * 0.25).x;
+    return (weight > 0.0) ? vec4(linearToOklab(sum / weight), 1.0) : vec4(0.0);
 }
 
-// The lightness a line of lightness `line` takes over a backdrop of lightness `back` (ALSelectionOutline::
-// contrastLightness): its own where the two are MIN_CONTRAST apart; else MIN_CONTRAST lighter than the backdrop below
-// the turn and MIN_CONTRAST darker above it. The turn is the line's own lightness, held to where both sides have room,
-// so a light line stays light over all but light backdrops and a dark one dark over all but dark ones.
+// The lightness a line of lightness `line` takes over a backdrop of lightness `back` where their colours are less
+// than MIN_CONTRAST apart (ALSelectionOutline::contrastLightness): its own where the lightnesses are MIN_CONTRAST
+// apart already; else, below the turn, MIN_CONTRAST lighter than the backdrop; above it, MIN_CONTRAST darker and darker
+// again by as much as the line is darker than white, so lines of different lightness keep their order and distance.
+// The turn is the line's own lightness held to where both sides have room.
 float contrastLightness(float line, float back)
 {
     float turn = clamp(line, MIN_CONTRAST, 1.0 - MIN_CONTRAST);
-    return (back < turn) ? max(line, back + MIN_CONTRAST) : min(line, back - MIN_CONTRAST);
+    if (back < turn)
+    {
+        return max(line, back + MIN_CONTRAST);
+    }
+    return (line <= back - MIN_CONTRAST) ? line : max(back - MIN_CONTRAST - (1.0 - line), 0.0);
 }
 
 // `colour`, display-encoded, at OKLab lightness `lightness`: its hue kept, and its chroma as near its own as the display
@@ -118,15 +142,27 @@ vec3 withLightness(vec3 colour, float lightness)
     return linear_to_srgb(clamp(oklabToLinear(vec3(lightness, ab * kept)), vec3(0.0), vec3(1.0)));
 }
 
-// `colour`, display-encoded, as a line shows it over a backdrop of lightness `back` (backdropLightness): unchanged
-// where `back` is negative or the two are far enough apart, else at contrastLightness.
-vec3 contrastColour(vec3 colour, float back)
+// `colour`, display-encoded, as a line shows it over `back`, what backdropColour read behind it: as it is where there
+// was nothing to read, or the two colours, hue and all, are MIN_CONTRAST apart; else at contrastLightness.
+vec3 contrastColour(vec3 colour, vec4 back)
 {
-    if (back < 0.0)
+    if (back.w <= 0.0)
     {
         return colour;
     }
-    float line = linearToOklab(srgb_to_linear(colour)).x;
-    float lightness = contrastLightness(line, back);
-    return (lightness == line) ? colour : withLightness(colour, lightness);
+    vec3 lab = linearToOklab(srgb_to_linear(colour));
+    if (distance(lab, back.xyz) >= MIN_CONTRAST)
+    {
+        return colour;
+    }
+    float lightness = contrastLightness(lab.x, back.x);
+    return (lightness == lab.x) ? colour : withLightness(colour, lightness);
+}
+
+// The rim cased around a contour of `line`, display-encoded, under CONTRAST_RIM: dark around a light line and light
+// around a dark one, so that over any backdrop the line or its rim stands out.
+vec3 rimColour(vec3 line)
+{
+    float luminance = dot(srgb_to_linear(line), vec3(0.2126, 0.7152, 0.0722));
+    return (luminance > RIM_TURN) ? vec3(0.0) : vec3(1.0);
 }

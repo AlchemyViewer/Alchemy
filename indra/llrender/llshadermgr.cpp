@@ -2213,6 +2213,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("selectionGlowRowMap");
     mReservedUniforms.push_back("selectionBackdrop");
     mReservedUniforms.push_back("selection_contrast");
+    mReservedUniforms.push_back("selection_keep_cut");
+    mReservedUniforms.push_back("selectionTileDepthMap");
+    mReservedUniforms.push_back("outline_rim_width");
 
     mReservedUniforms.push_back("waterGlintRoughness");
 
