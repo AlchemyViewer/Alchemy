@@ -1878,7 +1878,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterFogDensity");
     mReservedUniforms.push_back("waterFogKS");
     mReservedUniforms.push_back("refScale");
-    mReservedUniforms.push_back("waterHeight");
     mReservedUniforms.push_back("waterPlane");
     mReservedUniforms.push_back("waterSign");
     mReservedUniforms.push_back("normScale");

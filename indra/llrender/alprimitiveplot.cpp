@@ -28,47 +28,59 @@
 
 #include "llgl.h"
 #include "llglheaders.h"
-
-#include <algorithm>
-#include <iterator>
+#include "llglslshader.h"
+#include "llrender.h"
 
 void ALPrimitivePlot::plot()
 {
 #if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
-    int64_t total = 0;
-    for (U32 query : mIssued)
+    // The slot after the last is the oldest, and becomes this frame's.
+    mFrame = (mFrame + 1) % FRAMES;
+    Frame& frame = mFrames[mFrame];
+    if (frame.mCounted)
     {
-        GLuint available = 0;
-        glGetQueryObjectuiv(query, GL_QUERY_RESULT_AVAILABLE, &available);
-        if (!available)
+        int64_t total = 0;
+        bool    ready = true;
+        for (U32 i = 0; i < frame.mSpans && ready; ++i)
         {
-            mIssued.clear();
-            return;
+            GLuint available = 0;
+            glGetQueryObjectuiv(frame.mQueries[i], GL_QUERY_RESULT_AVAILABLE, &available);
+            if (available)
+            {
+                GLuint count = 0;
+                glGetQueryObjectuiv(frame.mQueries[i], GL_QUERY_RESULT, &count);
+                total += count;
+            }
+            ready = available != 0;
         }
-        GLuint count = 0;
-        glGetQueryObjectuiv(query, GL_QUERY_RESULT, &count);
-        total += count;
+        if (ready)
+        {
+            LL_PROFILE_PLOT(mName, total);
+        }
     }
-    mIssued.clear();
-    LL_PROFILE_PLOT(mName, total);
+    frame.mSpans   = 0;
+    frame.mCounted = TracyIsConnected && gGLManager.canQueryPrimitives(mTessellated);
 #endif
 }
 
 void ALPrimitivePlot::begin()
 {
 #if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
-    if (!gGLManager.canQueryPrimitives(mTessellated) || mIssued.size() == RING)
+    Frame& frame = mFrames[mFrame];
+    if (LLGLSLShader::sProfileEnabled)
+    {
+        frame.mCounted = false;
+    }
+    if (!frame.mCounted || frame.mSpans == SPANS)
     {
         return;
     }
-    if (mQueries[0] == 0)
+    if (frame.mQueries[0] == 0)
     {
-        glGenQueries(RING, mQueries);
+        glGenQueries(SPANS, frame.mQueries);
     }
-    const U32 query = mQueries[mNext];
-    mNext = (mNext + 1) % RING;
-    glBeginQuery(GL_PRIMITIVES_GENERATED, query);
-    mIssued.push_back(query);
+    gGL.flush();
+    glBeginQuery(GL_PRIMITIVES_GENERATED, frame.mQueries[frame.mSpans++]);
     mActive = true;
 #endif
 }
@@ -77,6 +89,7 @@ void ALPrimitivePlot::end()
 {
     if (mActive)
     {
+        gGL.flush();
         glEndQuery(GL_PRIMITIVES_GENERATED);
         mActive = false;
     }
@@ -85,11 +98,13 @@ void ALPrimitivePlot::end()
 void ALPrimitivePlot::release()
 {
     end();
-    if (mQueries[0] != 0)
+    for (Frame& frame : mFrames)
     {
-        glDeleteQueries(RING, mQueries);
-        std::fill(std::begin(mQueries), std::end(mQueries), 0);
+        if (frame.mQueries[0] != 0)
+        {
+            glDeleteQueries(SPANS, frame.mQueries);
+        }
+        frame = Frame();
     }
-    mIssued.clear();
-    mNext = 0;
+    mFrame = 0;
 }

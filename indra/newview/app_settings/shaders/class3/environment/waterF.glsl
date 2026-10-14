@@ -29,6 +29,10 @@
 
 out vec4 frag_color;
 
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
+
 #ifdef HAS_SUN_SHADOW
 float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
 #endif
@@ -74,12 +78,11 @@ uniform float fresnelOffset;
 uniform vec2 waterFar;
 uniform vec4 waterRim;
 
-in vec3 refCoord;
+// The pack's screen, which the water is drawn into and whose copy screenTex and depthMap hold, stretched to theirs.
+uniform vec2 screen_res;
+
 in vec3 view;
 in vec3 vary_position;
-in vec3 vary_normal;
-in vec3 vary_tangent;
-in vec3 vary_light_dir;
 
 vec3 srgb_to_linear(vec3 col);
 vec3 linear_to_srgb(vec3 col);
@@ -129,9 +132,11 @@ void main()
 {
     mirrorClip(vary_position);
 
-    vec3 vN = vary_normal;
-    vec3 vT = vary_tangent;
+    // The plane's frame and the light in eye space, the same at every point: agent z and x through the view.
+    vec3 vN = normal_matrix[2];
+    vec3 vT = normal_matrix[0];
     vec3 vB = cross(vN, vT);
+    vec3 vary_light_dir = normal_matrix * lightDir;
 
     vec3 pos = vary_position.xyz;
     float linear_depth = 1 / -pos.z;
@@ -145,7 +150,7 @@ void main()
     vec3 wave3;
     water_wave_normals(bumpMap, bumpMap2, view.xy, wave1, wave2, wave3);
 
-    vec2 distort = (refCoord.xy/refCoord.z) * 0.5 + 0.5;
+    vec2 distort = gl_FragCoord.xy / screen_res;
 
     vec3 wavef = (wave1 + wave2 * 0.4 + wave3 * 0.6) * 0.5;
 
@@ -253,7 +258,6 @@ void main()
 
     vec3 colorEmissive = vec3(0);
     float ao = 1.0;
-    vec3 light_dir = transform_normal(vN, vT, vB, lightDir);
 
     float NdotV = clamp(abs(dot(norm, v)), 0.001, 1.0);
 
@@ -263,7 +267,7 @@ void main()
     // long tail lit every face within a few tens of degrees, and on the steepened slopes drew each crest across the path
     // as a streak. Water is a dielectric with no diffuse surface of its own: the glint is the light's own colour at the
     // Fresnel reflectance of the angle between the view and the light, 2% looking down at it and most of it at grazing.
-    vec3 l = normalize(light_dir);
+    vec3 l = transform_normal(vN, vT, vB, lightDir);
     float glint_alpha = waterGlintRoughness * waterGlintRoughness;
     float glint_exp = max(2.0 / (glint_alpha * glint_alpha) - 2.0, 1.0);
     float lobe = pow(clamp(dot(reflect(-v, sun_norm), l), 0.0, 1.0), glint_exp);

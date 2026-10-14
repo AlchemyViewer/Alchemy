@@ -36,9 +36,11 @@ void ALSamplesQuery::begin()
     if (mQuery == 0)
     {
         glGenQueries(1, &mQuery);
+        // A query object keeps the target it was first begun with.
+        mTarget = gGLManager.mGLVersion >= 4.29f ? GL_ANY_SAMPLES_PASSED_CONSERVATIVE : GL_ANY_SAMPLES_PASSED;
     }
     gGL.flush();
-    glBeginQuery(GL_ANY_SAMPLES_PASSED, mQuery);
+    glBeginQuery(mTarget, mQuery);
     mActive = true;
 }
 
@@ -47,7 +49,7 @@ void ALSamplesQuery::end()
     if (mActive)
     {
         gGL.flush();
-        glEndQuery(GL_ANY_SAMPLES_PASSED);
+        glEndQuery(mTarget);
         mActive = false;
     }
 }

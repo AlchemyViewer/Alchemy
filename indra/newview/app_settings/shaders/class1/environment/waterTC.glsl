@@ -52,24 +52,29 @@ bool depth_pyramid_box_visible(vec3 lo, vec3 hi, mat4 to_clip);
 // The horizontal distance from the camera the waves were laid out around to the nearest point of the edge ab.
 float edgeReach(vec3 a, vec3 b)
 {
-    vec2 ab = b.xy - a.xy;
-    float t = clamp(dot(waterWaveEye.xy - a.xy, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
-    return distance(a.xy + t * ab, waterWaveEye.xy);
+    precise vec2 ab = b.xy - a.xy;
+    precise float t = clamp(dot(waterWaveEye.xy - a.xy, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+    precise float reach = distance(a.xy + t * ab, waterWaveEye.xy);
+    return reach;
 }
 
 // An edge's level: its length times the density over its distance, but whole (1) where all of it lies past the reach,
 // where the waves have faded out and nothing would bend it. So the patches along the edge of the rectangle the waves
 // are drawn over meet the flat cells beside them corner to corner (water_vertex's fringe). Worked from the edge's two
-// ends alone, which the patch across it passes in the same order, so both split it alike.
+// ends alone, which the patch across it passes in the same order, so both split it alike: precise, since the two
+// patches work it at different call sites, which the compiler may otherwise contract or reorder apart by an ulp, and
+// an ulp of level moves every vertex along the edge.
 float edgeLevel(vec3 a, vec3 b)
 {
-    if (edgeReach(a, b) >= waterWaveReach.x)
+    precise float reach = edgeReach(a, b);
+    if (reach >= waterWaveReach.x)
     {
         return 1.0;
     }
-    float len = distance(a, b);
-    float d = distance(0.5 * (a + b), eyeVec);
-    return clamp(len * waterTessDensity / max(d, 1.0), 1.0, WATER_MAX_LEVEL);
+    precise float len = distance(a, b);
+    precise float d = distance(0.5 * (a + b), eyeVec);
+    precise float level = clamp(len * waterTessDensity / max(d, 1.0), 1.0, WATER_MAX_LEVEL);
+    return level;
 }
 
 // Whether any of the box [lo, hi] lies inside every plane: the corner furthest inside each is tested.

@@ -48,7 +48,9 @@ uniform vec3 eyeVec;
 // and bound at UB_ENVIRONMENT. Members are read by bare name.
 //[ENGINE_BLOCK Environment]
 
-in vec3 refCoord;
+// The pack's screen, which the water is drawn into and whose copy screenTex holds, stretched to its size.
+uniform vec2 screen_res;
+
 in vec3 view;
 in vec3 vary_position;
 
@@ -59,7 +61,7 @@ void water_wave_normals(sampler2D map_a, sampler2D map_b, vec2 r, out vec3 big, 
 void main()
 {
     mirrorClip(vary_position);
-    vec2 screen_tc = (refCoord.xy/refCoord.z) * 0.5 + 0.5;
+    vec2 screen_tc = gl_FragCoord.xy / screen_res;
 
     vec4 color;
 

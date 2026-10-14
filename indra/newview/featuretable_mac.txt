@@ -85,6 +85,7 @@ RenderDisableVintageMode           1   1
 RenderDownScaleMethod       1   0
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  1   256
+AlchemyRenderWaterWaves    1   1
 RenderReflectionProbeIrradianceResolution 1 16
 AlchemyRenderUBOUpdateMode 1 2
 
@@ -129,6 +130,7 @@ RenderTonemapMix			1   0.7
 RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   512
 RenderReflectionProbeCount  1   1
+AlchemyRenderWaterWaves    1   0
 
 //
 // Medium Low Graphics Settings
@@ -171,6 +173,7 @@ RenderTonemapMix			1   0.7
 RenderDisableVintageMode           1   0
 RenderMaxTextureResolution         1   1024
 RenderReflectionProbeCount  1   32
+AlchemyRenderWaterWaves    1   0
 
 //
 // Medium Graphics Settings (standard)

@@ -94,13 +94,12 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
     {
         // copy framebuffer contents so far to a texture to be used for
         // reflections and refractions
-        LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
-
         LLRenderTarget& src = gPipeline.mRT->screen;
         LLRenderTarget& dst = gPipeline.mWaterDis;
 
         dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
-                    GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+                    GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        gPipeline.copySceneDepth(dst);
     }
 }
 
@@ -114,19 +113,23 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     LLSettingsSky::ptr_t   psky   = environment.getCurrentSky();
     LLVector3              light_dir       = environment.getLightDirection();
     bool                   sun_up          = environment.getIsSunUp();
-    bool                   has_normal_mips = gSavedSettings.getBOOL("RenderWaterMipNormal");
+    static LLCachedControl<bool> has_normal_mips(gSavedSettings, "RenderWaterMipNormal", true);
     bool                   underwater      = LLViewerCamera::getInstance()->cameraUnderWater();
     LLColor4               fog_color       = LLColor4(pwater->getWaterFogColor(), 0.f);
     LLColor3               fog_color_linear = linearColor3(fog_color);
 
-    // The alpha is the glow channel. The surface adds its sun glint's glow to it, as WindLight's water did, over the
-    // glow of whatever lies beneath, which it would otherwise wipe; seen from below it leaves the alpha alone. Only
-    // the class 3 shader writes a glow: class 1's is a placeholder that writes 1. Captures take no glow.
+    // The alpha is the glow channel. The surface keeps the larger of its sun glint's glow and the glow of whatever lies
+    // beneath, which it would otherwise wipe, as WindLight's water added its own; the larger, not the sum, so where the
+    // surface overdraws itself, a crest over the trough behind it or over the flat field, the glow is a surface's
+    // once. Seen from below it leaves the alpha alone. Only the class 3 shader writes a glow: class 1's is a placeholder
+    // that writes 1. Captures take no glow.
     const bool glint_glow = !underwater && mShaderLevel > 2 && !gCubeSnapshot;
     LLGLState blend(GL_BLEND, glint_glow ? GL_TRUE : GL_FALSE);
     if (glint_glow)
     {
         gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_ZERO, LLRender::BF_ONE, LLRender::BF_ONE);
+        gGL.flush();
+        glBlendEquationSeparate(GL_FUNC_ADD, GL_MAX);
     }
     gGL.setColorMask(true, glint_glow);
 
@@ -186,10 +189,10 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     const bool have_rim = surface.rim(eye, rim_lo, rim_hi);
     const ALFarPlane::WaterFar water_far = ALFarPlane::waterFar(LLViewerCamera::getInstance()->getProjectionFar(), have_rim, rim_lo, rim_hi);
 
-    // The waves are drawn in the main view and in mirrors, which draw what it does; probe captures, at their size,
-    // could not resolve them and draw the field flat. Not where this view misses every patch.
-    const bool waves = surface.wavesDrawn() && (!gCubeSnapshot || LLRender::sMirrorPass)
-                       && surface.patchesInView(*LLViewerCamera::getInstance());
+    // The waves are drawn in the main view alone. Probe captures, at their size, could not resolve them, and a mirror
+    // is a cube of faces about its probe (LLHeroProbeManager), a whole sphere of patches each update with no cull
+    // against the scene's depth: both draw the field flat. Not where this view misses every patch.
+    const bool waves = surface.wavesDrawn() && !gCubeSnapshot && surface.patchesInView(*LLViewerCamera::getInstance());
 
     // Probe and hero captures render the water too; only the main view's primitives are counted, and only its waves'
     // patches are culled against the scene's depth, through a depth pyramid built from the depth the water pass copied
@@ -234,9 +237,6 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
         shader->bindTexture(LLShaderMgr::WATER_SCREENTEX, &gPipeline.mWaterDis);
 
-        F32 water_height = environment.getWaterHeight();
-        F32 camera_height = eye.mV[VZ];
-        shader->uniform1f(LLShaderMgr::WATER_WATERHEIGHT, camera_height - water_height);
         shader->uniform3fv(LLShaderMgr::WATER_EYEVEC, 1, eye.mV);
 
         shader->uniform2fv(LLShaderMgr::WATER_BIG_PHASE, 1, phases.mBig.mV);
@@ -286,8 +286,9 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     };
 
     // Not where an exclusion prim removed the water (LLPipeline::doWaterExclusion), and marking where it is; from
-    // below, the surface stays where an exclusion prim covers it, undistorted. The flat field's cells beside the patches
-    // are its fringe where the patches are drawn.
+    // below, the surface stays where an exclusion prim covers it, undistorted, drawn again only if one was drawn. The
+    // flat field's cells beside the patches are its fringe where the patches are drawn.
+    const bool excluded = underwater && gPipeline.beginRenderMap(LLRenderPass::PASS_INVISIBLE) != gPipeline.endRenderMap(LLRenderPass::PASS_INVISIBLE);
     const auto draw = [&](LLGLSLShader* shader, bool patches)
     {
         {
@@ -295,7 +296,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
             shader->uniform1f(LLShaderMgr::WATER_EXCLUSION_DISTORT, 1.f);
             patches ? surface.drawPatches(*shader) : surface.draw(*shader, waves);
         }
-        if (underwater)
+        if (excluded)
         {
             ALWaterStencil::Excluded stencil;
             shader->uniform1f(LLShaderMgr::WATER_EXCLUSION_DISTORT, 0.f);
@@ -305,23 +306,9 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     LLGLDisable cullface(GL_CULL_FACE);
 
+    // The patches near the camera first, front to back, so the depth test turns away the flat field behind their crests.
     // The flat field's primitives and the patches' apart: a primitives query may not span a tessellated draw on every
     // driver (ALPrimitivePlot).
-    if (main_view)
-    {
-        gPipeline.mWaterPrimitives.begin();
-    }
-
-    LLGLSLShader* flat = underwater ? gUnderWaterProgram.selectVariant() : gWaterProgram.selectVariant();
-    setup(flat, false);
-    draw(flat, false);
-    gPipeline.unbindDeferredShader(*flat);
-
-    if (main_view)
-    {
-        gPipeline.mWaterPrimitives.end();
-    }
-
     if (waves)
     {
         LL_PROFILE_GPU_ZONE("water waves");
@@ -339,8 +326,25 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         }
     }
 
+    if (main_view)
+    {
+        gPipeline.mWaterPrimitives.begin();
+    }
+
+    LLGLSLShader* flat = underwater ? gUnderWaterProgram.selectVariant() : gWaterProgram.selectVariant();
+    setup(flat, false);
+    draw(flat, false);
+    gPipeline.unbindDeferredShader(*flat);
+
+    if (main_view)
+    {
+        gPipeline.mWaterPrimitives.end();
+    }
+
     if (glint_glow)
     {
+        gGL.flush();
+        glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
     gGL.setColorMask(true, false);

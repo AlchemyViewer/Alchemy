@@ -1063,9 +1063,9 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         }
 
         //water reflection texture (always needed as scratch space whether or not transparent water is enabled)
-        // mWaterDis and mSceneMap receive depth blits from every pack's mRT->screen, so their depth
-        // format must match it, stencil included -- flip together via mainDepthFormat().
-        mWaterDis.allocate(resX, resY, screenFormat, true, true, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
+        // mWaterDis and mSceneMap take every pack's scene depth, which copySceneDepth draws in rather than blits: they
+        // keep the depth's format, flipped with it via mainDepthFormat(), and none of its stencil.
+        mWaterDis.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
 
         // The format the sky's colour lands in (addDeferredAttachments), so the sky behind clamps and quantizes as the sky
         // does: the emissive attachment's float with HDR, and 8 bits otherwise, the emissive attachment's or the albedo's,
@@ -1076,7 +1076,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
         if(RenderScreenSpaceReflections)
         {
-            mSceneMap.allocate(resX, resY, screenFormat, true, true, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
+            mSceneMap.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
         }
         else
         {
@@ -1317,6 +1317,7 @@ void LLPipeline::releaseGLBuffers()
     mWaterSurface.release();
     mDepthPyramid.release();
     mSkyBehindQuery.release();
+    mSkyBehindQueryFrame = 0;
 
     if (mNoiseMap)
     {
@@ -4772,10 +4773,15 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     LLGLEnable cull(GL_CULL_FACE);
 
     bool done_atmospherics = LLPipeline::sRenderingHUDs; //skip atmospherics on huds
-    bool done_water_haze = done_atmospherics;
+
+    // The water haze and the exclusion serve the water this view draws: from above, the haze fogs what lies under the
+    // surface and the exclusion cuts the surface, so neither runs where none is drawn -- the Water render type off, or
+    // the view missing the sea (LLDrawPoolWater::getNumPostDeferredPasses). From below, the haze fills the screen.
+    const bool water_drawn = mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterPool->getNumPostDeferredPasses() > 0;
+    bool done_water_haze = done_atmospherics || (!sUnderWaterRender && !water_drawn);
     // and the water exclusion mask: the water pool and water haze, which read it, do not run
     // on huds, and every pass that runs them builds the mask first
-    bool done_water_exclusion = LLPipeline::sRenderingHUDs;
+    bool done_water_exclusion = LLPipeline::sRenderingHUDs || !water_drawn;
 
     // do water exclusion just before water pass.
     U32 water_exclusion_pass = LLDrawPool::POOL_WATEREXCLUSION;
@@ -8885,10 +8891,39 @@ void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget*
     if (RenderScreenSpaceReflections && !gCubeSnapshot)
     {
         LL_PROFILE_GPU_ZONE("ssr copy");
-        LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
         dst->copyContents(*src, 0, 0, src->getWidth(), src->getHeight(), 0, 0, dst->getWidth(), dst->getHeight(),
-                         GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        copySceneDepth(*dst);
     }
+}
+
+void LLPipeline::copySceneDepth(LLRenderTarget& dst)
+{
+    LL_PROFILE_GPU_ZONE("depth copy");
+    LLRenderTarget& src = mRT->deferredScreen;
+    if (!gCopyDepthProgram.isComplete())
+    {
+        // Unstretched, where the two differ in size, but the depth all the same.
+        dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
+                         GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        return;
+    }
+
+    dst.bindTarget();
+    {
+        LLGLSColorMask no_color(false, false);
+        LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
+        LLGLDisable no_blend(GL_BLEND);
+        LLGLDisable no_cull(GL_CULL_FACE);
+
+        gCopyDepthProgram.bind();
+        gCopyDepthProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &src, ALSamplers::PointClamp);
+        mScreenTriangleVB->setBuffer();
+        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+        gCopyDepthProgram.unbindTexture(LLShaderMgr::DEFERRED_DEPTH);
+        gCopyDepthProgram.unbind();
+    }
+    dst.flush();
 }
 
 void LLPipeline::generateGlow(LLRenderTarget* src)
@@ -11664,14 +11699,8 @@ void LLPipeline::doAtmospherics()
     {
         {
             // copy depth buffer for use in haze shader (use water displacement map as temp storage)
-            LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
-
-            LLRenderTarget& src = gPipeline.mRT->screen;
-            LLRenderTarget& dst = gPipeline.mWaterDis;
-
-            src.flush();
-            dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
-                             GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            mRT->screen.flush();
+            copySceneDepth(mWaterDis);
             mRT->screen.bindTarget();
         }
 
@@ -11715,7 +11744,8 @@ void LLPipeline::doAtmospherics()
 
         // Far water converges on the sky drawn behind it when this view's is there: the main view's alone, once the
         // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit). The water
-        // marked its own pixels in the stencil, so the two draws shade each pixel once.
+        // marked its own pixels in the stencil, so the two draws shade each pixel once. The water's draw runs only if
+        // the sky pool's query saw water: its field covers every pixel the water marked, and inland none is.
         const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind.isComplete() && mSkyBehindFrame == gFrameCount;
         if (sky_behind)
         {
@@ -11725,6 +11755,11 @@ void LLPipeline::doAtmospherics()
             }
             {
                 ALWaterStencil::OnWater stencil;
+                std::optional<ALSamplesQuery::Conditional> if_water;
+                if (mSkyBehindQueryFrame == gFrameCount)
+                {
+                    if_water.emplace(mSkyBehindQuery);
+                }
                 apply_haze(*gHazeOnWaterProgram.selectVariant(), true);
             }
         }
@@ -11749,14 +11784,8 @@ void LLPipeline::doWaterHaze()
     {
         // copy depth buffer for use in haze shader (use water displacement map as temp storage)
         {
-            LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
-
-            LLRenderTarget& src = gPipeline.mRT->screen;
-            LLRenderTarget& dst = gPipeline.mWaterDis;
-
-            src.flush();
-            dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
-                    GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            mRT->screen.flush();
+            copySceneDepth(mWaterDis);
             mRT->screen.bindTarget();
         }
 

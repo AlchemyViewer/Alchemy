@@ -1184,8 +1184,6 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
             bounds[0].add(*shift);
         }
 
-        F32 OCCLUSION_FUDGE_Z = SG_OCCLUSION_FUDGE; //<-- #Solution #2
-
         if (earlyFail(camera, bounds))
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - early fail");
@@ -1238,7 +1236,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
                         shader->uniform3fv(LLShaderMgr::BOX_CENTER, 1, bounds[0].getF32ptr());
                         shader->uniform3f(LLShaderMgr::BOX_SIZE, bounds[1][0]+SG_OCCLUSION_FUDGE,
                                                                  bounds[1][1]+SG_OCCLUSION_FUDGE,
-                                                                 bounds[1][2]+OCCLUSION_FUDGE_Z);
+                                                                 bounds[1][2]+SG_OCCLUSION_FUDGE);
 
                         {
                             LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - draw");
