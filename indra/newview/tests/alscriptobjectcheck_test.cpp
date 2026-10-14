@@ -184,6 +184,7 @@ namespace
         {
             INFO("a check of what was read");
             REQUIRE(window.asks[0].request.kind == ALScriptAnalysis::Kind::Check);
+            REQUIRE(window.asks[0].request.text);
             CHECK(*window.asks[0].request.text == "default {}\n");
         }
         {
@@ -269,6 +270,7 @@ namespace
         result.problems.push_back(said);
         window.expands[0].expanded(result);
         REQUIRE(window.asks.size() == size_t(1));
+        REQUIRE(window.asks[0].request.text);
         UNSCOPED_INFO("about the expansion");
         CHECK(*window.asks[0].request.text == std::string("integer x;\ndefault {}\n"));
 
@@ -300,6 +302,7 @@ namespace
     {
         house();
         check.check(root, "House");
+        REQUIRE_FALSE(window.asks.empty());
         std::function<void(const ALScriptAnalysis::Result&)> stale = std::move(window.asks[0].answered);
         window.asks.clear();
         window.checked.clear();

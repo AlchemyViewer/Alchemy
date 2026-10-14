@@ -193,6 +193,7 @@ namespace
         REQUIRE(studio.candidates.size() == 3U);
         CHECK(studio.picked == said("HistoryTitle", args));
         const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        REQUIRE(listed.size() == 3U);
         CHECK(studio.candidates[0].label == ALRecoveryEntry::sayWhen(listed[0].when));
         const std::string& newest = studio.candidates[0].detail;
         {
@@ -209,8 +210,9 @@ namespace
         }
         {
             INFO("the first kept says nothing of one before");
-            REQUIRE(studio.candidates[2].detail.find(said("HistorySameLength")) == std::string::npos);
-            REQUIRE(studio.candidates[2].detail.find("longer") == std::string::npos);
+            CHECK(studio.candidates[2].detail.find(said("HistorySameLength")) == std::string::npos);
+            CHECK(studio.candidates[2].detail.find("longer") == std::string::npos);
+            CHECK(studio.candidates[2].detail.find("shorter") == std::string::npos);
         }
     }
 
@@ -223,6 +225,7 @@ namespace
         Doc& doc = tab("door", "the text now");
         require_saved(doc, "the text then", 100.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 1U);
         studio.choose(studio.candidates[0].value);
         UNSCOPED_INFO("compared");
         REQUIRE(studio.did.size() == 1U);
@@ -243,6 +246,7 @@ namespace
         Doc& loading = tab("lamp", "", false);
         require_saved(loading, "a lamp's text", 50.0);
         unit.show(loading);
+        REQUIRE(studio.candidates.size() == 1U);
         studio.choose(studio.candidates[0].value);
         UNSCOPED_INFO("not compared yet");
         REQUIRE(studio.did.size() == 1U);
@@ -321,8 +325,10 @@ namespace
         require_saved(doc, "second\nsame", 200.0);
         require_saved(doc, "third\nsame", 100.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 3U);
         // Listed newest first: the middle one.
         studio.choose(studio.candidates[1].value);
+        REQUIRE(doc.compareView);
         ALDiffView& view = *doc.compareView;
         UNSCOPED_INFO("the slider");
         CHECK(view.bar()->getChild<LLView>("versions")->getVisible());
@@ -340,9 +346,11 @@ namespace
             CHECK(doc.historyShown->text == "third\nsame");
         }
         const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        REQUIRE(listed.size() == 3U);
         LLStringUtil::format_map_t     when;
         when["[NAME]"] = "door";
         when["[WHEN]"] = ALRecoveryEntry::sayWhen(listed[0].when);
+        REQUIRE(doc.compareTitles);
         UNSCOPED_INFO("titled by it");
         CHECK(doc.compareTitles->theirs == said("HistorySavedAt", when));
         {
@@ -375,6 +383,7 @@ namespace
         require_saved(loading, "one", 200.0);
         require_saved(loading, "two", 100.0);
         unit.show(loading);
+        REQUIRE(studio.candidates.size() == 2U);
         studio.choose(studio.candidates[0].value);
         {
             INFO("waiting, with something to do once shown");
@@ -397,6 +406,7 @@ namespace
         Doc& alone = tab("gate", "now");
         require_saved(alone, "only", 100.0);
         unit.show(alone);
+        REQUIRE(studio.candidates.size() == 1U);
         studio.choose(studio.candidates[0].value);
         {
             INFO("one save: no slider");
@@ -416,24 +426,29 @@ namespace
         require_saved(doc, "older", 200.0);
         require_saved(doc, "newer", 100.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 2U);
         studio.choose(studio.candidates[0].value);
+        REQUIRE(doc.compareView);
         ALDiffView& view = *doc.compareView;
         UNSCOPED_INFO("at the newest");
         CHECK(view.bar()->versionShown() == 1);
         // The older one gone from disk since it was listed.
         const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        REQUIRE(listed.size() == 2U);
         std::error_code                gone;
         std::filesystem::remove(fsyspath(listed[1].path), gone);
         ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
         LLStringUtil::format_map_t args;
         args["[NAME]"] = "door";
         args["[WHEN]"] = ALRecoveryEntry::sayWhen(listed[1].when);
+        REQUIRE_FALSE(services().statuses.empty());
         CHECK(services().statuses.back() == said("HistoryUnreadable", args));
         UNSCOPED_INFO("the slider put back");
         CHECK(view.bar()->versionShown() == 1);
         {
             INFO("the left as it was");
             CHECK(view.leftText() == "newer");
+            REQUIRE(doc.historyShown);
             CHECK(doc.historyShown->text == "newer");
         }
     }
@@ -450,7 +465,9 @@ namespace
         require_saved(doc, "second", 200.0);
         require_saved(doc, "third", 100.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 3U);
         studio.choose(studio.candidates[1].value);
+        REQUIRE(doc.compareView);
         ALDiffView&  view  = *doc.compareView;
         const auto   press = [&view](const char* name) { ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>(name))->press(); };
         press("older");
@@ -458,6 +475,7 @@ namespace
         CHECK(view.leftText() == std::string("first"));
         press("newer");
         const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        REQUIRE(listed.size() == 3U);
         std::error_code                gone;
         std::filesystem::remove(fsyspath(listed[2].path), gone);
         press("older");
@@ -465,6 +483,7 @@ namespace
             INFO("the oldest again, as it was read");
             CHECK(view.leftText() == "first");
             CHECK(view.bar()->versionShown() == 0);
+            REQUIRE(doc.historyShown);
             CHECK(doc.historyShown->text == "first");
         }
     }
@@ -480,7 +499,9 @@ namespace
         require_saved(doc, "first", 300.0);
         require_saved(doc, "second", 200.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 2U);
         studio.choose(studio.candidates[0].value);
+        REQUIRE(doc.compareView);
         ALDiffView& view = *doc.compareView;
         {
             INFO("the slider");

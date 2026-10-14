@@ -185,6 +185,7 @@ namespace
         CHECK(studio.titles == "door | " + services().words("ComparePreprocessed"));
         UNSCOPED_INFO("lined up by line");
         CHECK(said(studio.given) == std::string("[0-0 1-1][1-1 2-2]"));
+        REQUIRE(door.compareView);
         ALDiffView& view = *door.compareView;
         UNSCOPED_INFO("the source's first line beside the expansion's second");
         CHECK(view.left()->layout().lineTop(0) == view.right()->layout().lineTop(1));
@@ -293,6 +294,7 @@ namespace
         door.uploaded.text    = std::make_shared<const std::string>(result.text);
         door.uploaded.map     = result.map;
         unit->compare(door);
+        REQUIRE(door.compareView);
         ALDiffView&                     view  = *door.compareView;
         const std::vector<std::string>  out   = ALTextDiff::split(result.text);
         const auto                      where = [&out](std::string_view what) {
@@ -340,6 +342,7 @@ namespace
         door.editor->insertText("// ");
         unit->compare(door);
         CHECK(studio.runs == 1);
+        REQUIRE_FALSE(services().statuses.empty());
         UNSCOPED_INFO("said while it waits");
         CHECK(services().statuses.back() == services().words("Preprocessing", { { "[NAME]", "door" } }));
         // The window was busy: the run that answers is the one before.

@@ -120,6 +120,7 @@ TEST_CASE_METHOD(alscripttypes_data, "alscripttypes: inSource maps diagnostics b
     const std::vector<ALScriptDiagnostic> wrapped = result.inSource(1);
     {
         INFO("a line down in an envelope, no column");
+        REQUIRE(wrapped.size() == size_t(4));
         CHECK(wrapped[0].hasLine);
         CHECK(wrapped[0].line == 4);
         CHECK_FALSE(wrapped[0].hasColumn);

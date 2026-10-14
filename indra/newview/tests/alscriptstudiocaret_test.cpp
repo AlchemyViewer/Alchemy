@@ -231,6 +231,7 @@ namespace
             INFO("none: said, no jump");
             REQUIRE(studio.said.size() == 1);
             CHECK(navigation->unit.places(false) == 1);
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(services.statuses.back().find("NoDefinition [NAME]=count") == 0);
         }
         ask(doc, ALEditorCommand::GoToDefinition);
@@ -263,6 +264,7 @@ namespace
         {
             INFO("finding it: not");
             REQUIRE(studio.said.size() == 1);
+            REQUIRE_FALSE(services.statuses.empty());
             CHECK(services.statuses.back().find("NothingKnown") == 0);
         }
         caret.ask(doc, ALEditorCommand::GoToDefinition, ALTextRange(ALTextPos(1, 37), ALTextPos(1, 42)));
@@ -352,10 +354,12 @@ namespace
         ask(doc, ALEditorCommand::GoToDefinition);
         result.references.definition = span(7, 0, 5);
         const size_t said            = studio.said.size();
+        const size_t told            = services.statuses.size();
         caret.answered(doc, result, ALTextPos(0, 8));
         {
             INFO("declared where no source is: none");
             REQUIRE(studio.said.size() == said);
+            REQUIRE(services.statuses.size() == told + 1);
             CHECK(services.statuses.back().find("NoDefinition") == 0);
         }
     }
@@ -600,6 +604,7 @@ namespace
         {
             INFO("a module the expansion has not: none");
             REQUIRE(studio.said.size() == 1);
+            REQUIRE(services.statuses.size() == size_t(1));
             CHECK(services.statuses.back().find("NoDefinition") == 0);
         }
 
@@ -610,6 +615,8 @@ namespace
         {
             INFO("an expansion of another text: none");
             REQUIRE(studio.said.size() == 1);
+            // Said again, not the module's none still standing.
+            REQUIRE(services.statuses.size() == size_t(2));
             CHECK(services.statuses.back().find("NoDefinition") == 0);
         }
     }
