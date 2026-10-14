@@ -42,7 +42,6 @@
 #include "llerror.h"
 #include "llfocusmgr.h"
 #include "llviewercontrol.h"
-#include "llfasttimer.h"
 #include "llfontgl.h"
 #include "llfonttextcache.h"
 #include "llnamevalue.h"

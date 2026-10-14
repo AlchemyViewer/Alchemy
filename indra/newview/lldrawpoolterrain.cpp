@@ -29,7 +29,6 @@
 #include "lldrawpoolterrain.h"
 
 #include "alterrainsurfacemaps.h"
-#include "llfasttimer.h"
 
 #include "llviewercontrol.h"
 #include "lldrawable.h"

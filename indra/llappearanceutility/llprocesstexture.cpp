@@ -27,7 +27,6 @@
 // linden includes
 #include "linden_common.h"
 
-#include "llfasttimer.h"
 #include "llgl.h"
 #include "llimagej2c.h"
 #include "llsd.h"

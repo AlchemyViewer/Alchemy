@@ -48,7 +48,6 @@
 #include <boost/circular_buffer.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/range.hpp>
-#include "llfasttimer.h"
 
 using namespace llsd;
 

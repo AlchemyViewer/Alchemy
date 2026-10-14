@@ -68,7 +68,6 @@
 #include "bufferarray.h"
 #include "bufferstream.h"
 #include "workqueue.h"
-#include "llfasttimer.h"
 #include "llcorehttputil.h"
 #include "lltrans.h"
 #include "llstatusbar.h"
@@ -304,9 +303,6 @@
 //                   locally-generated 500 status.
 //   0x08            As with 0x04 but for the upload operation.
 //
-//   For major changes, see the LL_MESH_FASTTIMER_ENABLE below and
-//   instructions for looking for frame stalls using fast timers.
-//
 // *TODO:  Work list for followup actions:
 //   * Review anything marked as unsafe above, verify if there are real issues.
 //   * See if we can put ::run() into a hard sleep.  May not actually perform better
@@ -327,19 +323,6 @@
 // --------------------------------------------------------------------------
 //                    Development/Debug/QA Tools
 //
-// Enable here or in build environment to get fasttimer data on mesh fetches.
-//
-// Typically, this is used to perform A/B testing using the
-// fasttimer console (shift-ctrl-9).  This is done by looking
-// for stalls due to lock contention between the main thread
-// and the repository and HTTP code.  In a release viewer,
-// these appear as ping-time or worse spikes in frame time.
-// With this instrumentation enabled, a stall will appear
-// under the 'Mesh Fetch' timer which will be either top-level
-// or under 'Render' time.
-
-static LLFastTimer::DeclareTimer FTM_MESH_FETCH("Mesh Fetch");
-
 // Random failure testing for development/QA.
 //
 // Set the MESH_*_FAILED macros to either 'false' or to

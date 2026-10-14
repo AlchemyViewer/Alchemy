@@ -46,7 +46,6 @@
 #include "lldrawpoolwater.h"
 #include "lldynamictexture.h"
 #include "llenvironment.h"
-#include "llfasttimer.h"
 #include "llfeaturemanager.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"

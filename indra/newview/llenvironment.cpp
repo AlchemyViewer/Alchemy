@@ -36,7 +36,6 @@
 #include "llwlhandlers.h"
 #include "lltrans.h"
 #include "lltrace.h"
-#include "llfasttimer.h"
 #include "alfarplane.h"
 #include "llviewercamera.h"
 #include "pipeline.h"

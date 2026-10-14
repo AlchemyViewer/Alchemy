@@ -31,7 +31,6 @@
 
 #include "llstring.h"
 #include "llerror.h"
-#include "llfasttimer.h"
 #include "llsd.h"
 #include <vector>
 
