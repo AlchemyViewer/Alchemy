@@ -1033,7 +1033,7 @@ public:
     // The farthest depth under each texel of the main view's depth, built where a GPU cull asks for it.
     ALDepthPyramid              mDepthPyramid;
 
-    // Profiling tracks, plotted at the start of each main frame for the frame before: the primitives the main view's
+    // Profiling tracks, plotted at the start of each main frame for a frame a few before: the primitives the main view's
     // terrain and water passes draw, the water's flat field and its waves' patches apart, and the draws of water
     // geometry in every view and pass.
     ALPrimitivePlot             mTerrainPrimitives{ "terrain primitives", true };
