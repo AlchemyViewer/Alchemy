@@ -3240,13 +3240,15 @@ void LLPipeline::markOccluder(LLSpatialGroup* group)
             sCull->pushOcclusionGroup(group);
             group->setOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION);
 
-            // An empty parent's bounds are its children's, so one query can cull them all. Never the root, which the
-            // cull never culls (LLOctreeCull::earlyFail): its children would take its OCCLUDED, and only an
+            // An empty parent's bounds are its children's, so one query can cull them all; with one child they are that
+            // child's (LLViewerOctreeGroup::rebound), and the query would be the child's again. Never the root, which
+            // the cull never culls (LLOctreeCull::earlyFail): its children would take its OCCLUDED, and only an
             // earlyFail re-queries an occluded group, so nothing would bring the partition back.
             if (parent &&
                 parent->getParent() &&
                 !parent->isOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION) &&
                 parent->getElementCount() == 0 &&
+                parent->getOctreeNode()->getChildCount() > 1 &&
                 parent->needsUpdate())
             {
                 sCull->pushOcclusionGroup(parent);
