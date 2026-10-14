@@ -28,6 +28,7 @@
 
 #include "lldrawable.h"
 #include "lldrawpool.h"
+#include "lldrawpoolalpha.h"
 #include "llface.h"
 #include "llfetchedgltfmaterial.h"
 #include "llframetimer.h"
@@ -43,6 +44,7 @@
 #include "llviewertexture.h"
 #include "llvovolume.h"
 #include "pipeline.h"
+#include "rlvactions.h"
 
 #include <iterator>
 
@@ -55,14 +57,33 @@ namespace
         const S8 components = texture->getComponents();
         return (components == 4 && texture->getType() != LLViewerTexture::MEDIA_TEXTURE) || components == 2;
     }
+
+    // The highest alpha of what a face samples, 255 where it is not known (LLImageGL::getMaxAlpha).
+    U8 texture_max_alpha(const LLViewerTexture* texture)
+    {
+        const LLImageGL* image = texture->getGLTexture();
+        return image ? image->getMaxAlpha() : 255;
+    }
+
+    // Which faces a view draws whole (View::mWholeFaces, View::mWholeGlow): Highlight Transparent, which RLVa already
+    // gates, draws them so in the scene, and AlchemySelectionOutlineGeometry asks for them where RLVa would allow it.
+    void set_whole_faces(ALSelectionOutline::View& view)
+    {
+        static LLCachedControl<bool> outline_geometry(gSavedSettings, "AlchemySelectionOutlineGeometry", true);
+        const bool debug_alpha = LLDrawPoolAlpha::sShowDebugAlpha;
+        view.mWholeFaces = debug_alpha || (outline_geometry && RlvActions::canHighlightTransparent());
+        view.mWholeGlow = debug_alpha;
+    }
 }
 
 ALSelectionOutline::View ALSelectionOutline::worldView()
 {
     static LLCachedControl<F32> contour_width(gSavedSettings, "AlchemySelectionOutlineWidth", DEFAULT_CONTOUR_WIDTH);
-    return makeView(LLViewerCamera::getCurrent().getModelview(), gGL.getProjectionMatrix(), contour_width,
-                    LLUI::getScaleFactor().mV[VX], false, LLPipeline::RenderHighlightThickness,
-                    LLPipeline::RenderHighlightBrightness);
+    View view = makeView(LLViewerCamera::getCurrent().getModelview(), gGL.getProjectionMatrix(), contour_width,
+                         LLUI::getScaleFactor().mV[VX], false, LLPipeline::RenderHighlightThickness,
+                         LLPipeline::RenderHighlightBrightness);
+    set_whole_faces(view);
+    return view;
 }
 
 bool ALSelectionOutline::hudView(View& view)
@@ -76,6 +97,7 @@ bool ALSelectionOutline::hudView(View& view)
     }
     view = makeView(modelview, projection, contour_width, LLUI::getScaleFactor().mV[VX], true,
                     LLPipeline::RenderHighlightThickness, LLPipeline::RenderHighlightBrightness);
+    set_whole_faces(view);
     return true;
 }
 
@@ -512,7 +534,7 @@ bool ALSelectionOutline::drawFaces(LLGLSLShader& program, const Entry& entry, bo
             drawn = true;
         }
 
-        const FaceBinding binding = bindFace(program, face);
+        const FaceBinding binding = bindFace(program, face, wholeFaces(view, entry.mPriority));
         drawFace(*buffer, face->getGeomIndex(), face->getGeomIndex() + face->getGeomCount() - 1, face->getIndicesCount(),
                  face->getIndicesStart(), binding.mDoubleSided);
 
@@ -645,7 +667,7 @@ void ALSelectionOutline::drawWireframes(const View& view, S32 width, S32 height)
     gGL.popMatrix();
 }
 
-ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& program, LLFace* face)
+ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& program, LLFace* face, bool whole)
 {
     // Only the texture's alpha is read, never the face's colour: a prim made invisible by its transparency is
     // still outlined where its texture is there.
@@ -670,7 +692,8 @@ ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& progr
         }
         if (texture && texture_has_alpha(texture))
         {
-            cutoff = faceAlphaCutoff(texture->getID(), gltfAlphaCutoff(gltf->mAlphaMode, gltf->mAlphaCutoff));
+            cutoff = faceAlphaCutoff(texture->getID(), texture_max_alpha(texture),
+                                     gltfAlphaCutoff(gltf->mAlphaMode, gltf->mAlphaCutoff), whole);
         }
         gltf->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(transform);
     }
@@ -678,10 +701,11 @@ ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& progr
     {
         // The diffuse map as the face names it, whatever stands in for it while it loads.
         const LLMaterial* material = te->getMaterialParams().get();
-        cutoff = faceAlphaCutoff(te->getID(),
+        cutoff = faceAlphaCutoff(te->getID(), texture_max_alpha(texture),
                                  legacyAlphaCutoff(material != nullptr, material ? material->getDiffuseAlphaMode() : 0,
                                                    material ? material->getAlphaMaskCutoff() : 0,
-                                                   texture_has_alpha(texture)));
+                                                   texture_has_alpha(texture)),
+                                 whole);
     }
 
     setAlphaTest(program, cutoff, transform);

@@ -2482,6 +2482,17 @@
             <key>Value</key>
             <real>2.0</real>
         </map>
+        <key>AlchemySelectionOutlineGeometry</key>
+        <map>
+            <key>Comment</key>
+            <string>Outline and wireframe the whole faces of selected objects, whatever their textures' alpha cuts away, so an alpha card shows its card rather than its leaf. Not while RLVa prevents Highlight Transparent; always while Highlight Transparent is on. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemySelectionWireframe</key>
         <map>
             <key>Comment</key>

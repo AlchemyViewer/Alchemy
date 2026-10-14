@@ -1848,6 +1848,15 @@ function="World.EnvPreset"
                      parameter="AlchemySelectionWireframe" />
                 </menu_item_check>
                 <menu_item_check
+                 label="Outline Alpha Geometry"
+                 name="Outline Alpha Geometry">
+                    <menu_item_check.on_check
+                     control="AlchemySelectionOutlineGeometry" />
+                    <menu_item_check.on_click
+                     function="ToggleControl"
+                     parameter="AlchemySelectionOutlineGeometry" />
+                </menu_item_check>
+                <menu_item_check
                  label="Show Light Radius for Selection"
                  name="Show Light Radius for Selection">
                     <menu_item_check.on_check

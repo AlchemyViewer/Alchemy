@@ -203,7 +203,7 @@ namespace
             mScene.release();
             mFar.release();
             mFrame.release();
-            for (U32* texture : { &mPalette, &mRamp, &mClear, &mGlass })
+            for (U32* texture : { &mPalette, &mRamp, &mClear, &mGlass, &mSpeck })
             {
                 if (*texture)
                 {
@@ -515,6 +515,25 @@ namespace
                 mGlass = uniformTexture(77);
             }
             return mGlass;
+        }
+
+        // A 4 x 4 texture clear but for its last texel, opaque: a leaf on its card, drawn on a quad's last corner.
+        U32 speckTexture()
+        {
+            if (!mSpeck)
+            {
+                std::vector<U8> texels(4 * 4 * 4, 255);
+                for (size_t i = 3; i < texels.size(); i += 4)
+                {
+                    texels[i] = (i == texels.size() - 1) ? 255 : 0;
+                }
+                LLImageGL::generateTextures(1, &mSpeck);
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mSpeck);
+                LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGBA8, 4, 4,
+                                             GL_RGBA, GL_UNSIGNED_BYTE, texels.data());
+                gGL.getTextureSlot(0)->unbind();
+            }
+            return mSpeck;
         }
 
         struct Draw
@@ -905,6 +924,7 @@ namespace
         U32 mRamp = 0;
         U32 mClear = 0;
         U32 mGlass = 0;
+        U32 mSpeck = 0;
         std::vector<U8> mPaletteTexels;
         LLPointer<LLVertexBuffer> mTriangle;
         std::vector<LLPointer<LLVertexBuffer>> mBuffers;
@@ -3125,38 +3145,66 @@ namespace
         }
     }
 
-    // A face wearing the library's transparent texture is drawn whole, legacy or GLTF, whatever its alpha mode, so
-    // the invisible prims builders hide roots and touch areas with are outlined; any other texture keeps its alpha cut.
-    TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: a face wearing the library's transparent texture is drawn whole", "[ALSelectionOutline]")
+    // A face is drawn whole where its texture's cut would leave nothing of it: the library's transparent texture,
+    // legacy or GLTF, whatever its alpha mode, so the invisible prims builders hide roots and touch areas with are
+    // outlined, and any other texture with no texel at or above its cutoff. A texture with something to keep keeps its
+    // cut.
+    TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: a face whose texture's cut would leave nothing is drawn whole", "[ALSelectionOutline]")
     {
         const LLUUID other("c0ffee00-0000-4000-8000-0000000000aa");
         const F32 blend = Outline::legacyAlphaCutoff(false, 0, 0, true);
         const F32 mask = Outline::gltfAlphaCutoff(LLGLTFMaterial::ALPHA_MODE_MASK, 0.5f);
         UNSCOPED_INFO("the transparent texture is drawn whole");
-        CHECK(Outline::faceAlphaCutoff(IMG_TRANSPARENT, blend) == Outline::NO_ALPHA_TEST);
+        CHECK(Outline::faceAlphaCutoff(IMG_TRANSPARENT, 255, blend, false) == Outline::NO_ALPHA_TEST);
         UNSCOPED_INFO("as a GLTF base colour too");
-        CHECK(Outline::faceAlphaCutoff(IMG_TRANSPARENT, mask) == Outline::NO_ALPHA_TEST);
-        UNSCOPED_INFO("any other keeps its cut");
-        CHECK(Outline::faceAlphaCutoff(other, blend) == blend);
-        UNSCOPED_INFO("a GLTF one too");
-        CHECK(Outline::faceAlphaCutoff(other, mask) == mask);
+        CHECK(Outline::faceAlphaCutoff(IMG_TRANSPARENT, 255, mask, false) == Outline::NO_ALPHA_TEST);
+        UNSCOPED_INFO("another clear texture too");
+        CHECK(Outline::faceAlphaCutoff(other, 0, blend, false) == Outline::NO_ALPHA_TEST);
+        UNSCOPED_INFO("one with nothing at the blend cutoff");
+        CHECK(Outline::faceAlphaCutoff(other, 25, blend, false) == Outline::NO_ALPHA_TEST);
+        UNSCOPED_INFO("one with a texel at it keeps its cut");
+        CHECK(Outline::faceAlphaCutoff(other, 26, blend, false) == blend);
+        UNSCOPED_INFO("one with nothing at a mask's cutoff");
+        CHECK(Outline::faceAlphaCutoff(other, 127, mask, false) == Outline::NO_ALPHA_TEST);
+        UNSCOPED_INFO("one with a texel at a mask's keeps its cut");
+        CHECK(Outline::faceAlphaCutoff(other, 128, mask, false) == mask);
+        UNSCOPED_INFO("a face with no alpha test is given none");
+        CHECK(Outline::faceAlphaCutoff(other, 0, Outline::NO_ALPHA_TEST, false) == Outline::NO_ALPHA_TEST);
 
+        struct Face
+        {
+            const char* mWhich;
+            LLUUID mTexture;
+            U8 mMaxAlpha;
+            bool mSpeck;
+            bool mWhole;
+        };
+        const Face faces[] = {
+            { "the transparent texture", IMG_TRANSPARENT, 0, false, true },
+            { "another clear texture", other, 0, false, true },
+            { "a leaf on its card", other, 255, true, false },
+        };
         for (bool reverse : conventions())
         {
             CAPTURE(reverse);
             setUp(reverse);
             palette({ { ID_A, RED } }, true);
-            for (const LLUUID& texture : { IMG_TRANSPARENT, other })
+            for (const Face& face : faces)
             {
-                const bool whole = texture == IMG_TRANSPARENT;
-                INFO((whole ? "the transparent texture" : "another clear texture"));
-                idPass({ { quadA(), ID_A, Outline::PRIORITY_ROOT, Outline::faceAlphaCutoff(texture, blend), clearTexture() } });
+                INFO(face.mWhich);
+                idPass({ { quadA(), ID_A, Outline::PRIORITY_ROOT, Outline::faceAlphaCutoff(face.mTexture, face.mMaxAlpha, blend, false),
+                           face.mSpeck ? speckTexture() : clearTexture() } });
                 const std::vector<U8> ids = read(mIdMap);
-                UNSCOPED_INFO((whole ? "drawn whole" : "cut away"));
-                REQUIRE(idAt(ids, 20, 32) == (whole ? ID_A : 0U));
+                UNSCOPED_INFO((face.mWhole ? "drawn whole" : "cut away"));
+                REQUIRE(idAt(ids, 20, 32) == (face.mWhole ? ID_A : 0U));
                 const std::vector<U8> px = edgePass();
-                UNSCOPED_INFO((whole ? "outlined" : "not outlined"));
-                REQUIRE((whole ? red(at(px, 8, 32)) : black(at(px, 8, 32))));
+                UNSCOPED_INFO((face.mWhole ? "outlined" : "not outlined there"));
+                REQUIRE((face.mWhole ? red(at(px, 8, 32)) : black(at(px, 8, 32))));
+                if (face.mSpeck)
+                {
+                    UNSCOPED_INFO("the leaf kept");
+                    REQUIRE(idAt(ids, 29, 40) == ID_A);
+                }
             }
         }
     }
@@ -3305,6 +3353,52 @@ namespace
                 UNSCOPED_INFO("partly hidden, as the full search draws it");
                 REQUIRE(rows == full);
             }
+        }
+    }
+
+    // While the view asks for whole faces (AlchemySelectionOutlineGeometry, Highlight Transparent), a texture cuts
+    // nothing: a leaf's card is outlined and wireframed whole. What glows keeps its cut unless the scene itself draws
+    // faces whole.
+    TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: whole faces outline and wireframe an alpha card whole", "[ALSelectionOutline]")
+    {
+        const LLUUID other("c0ffee00-0000-4000-8000-0000000000aa");
+        const F32 blend = Outline::legacyAlphaCutoff(false, 0, 0, true);
+        UNSCOPED_INFO("a whole face takes no cut");
+        CHECK(Outline::faceAlphaCutoff(other, 255, blend, true) == Outline::NO_ALPHA_TEST);
+
+        Outline::View view;
+        view.mWholeFaces = true;
+        UNSCOPED_INFO("selections drawn whole");
+        CHECK(Outline::wholeFaces(view, Outline::PRIORITY_ROOT));
+        CHECK(Outline::wholeFaces(view, Outline::PRIORITY_CHILD));
+        CHECK(Outline::wholeFaces(view, Outline::PRIORITY_INSPECT));
+        UNSCOPED_INFO("the glow keeps its cut");
+        CHECK_FALSE(Outline::wholeFaces(view, Outline::PRIORITY_HOVER));
+        view.mWholeFaces = false;
+        view.mWholeGlow = true;
+        UNSCOPED_INFO("the glow drawn whole where the scene draws faces whole");
+        CHECK(Outline::wholeFaces(view, Outline::PRIORITY_HOVER));
+        UNSCOPED_INFO("which alone leaves selections their cut");
+        CHECK_FALSE(Outline::wholeFaces(view, Outline::PRIORITY_ROOT));
+
+        const F32 cut = Outline::faceAlphaCutoff(other, 255, blend, false);
+        const F32 whole = Outline::faceAlphaCutoff(other, 255, blend, true);
+        for (bool reverse : conventions())
+        {
+            CAPTURE(reverse);
+            setUp(reverse);
+            palette({ { ID_A, RED } }, true);
+            idPass({ { quadA(), ID_A, Outline::PRIORITY_ROOT, whole, speckTexture() } });
+            UNSCOPED_INFO("the card drawn whole");
+            REQUIRE(idAt(read(mIdMap), 20, 32) == ID_A);
+            UNSCOPED_INFO("and outlined");
+            REQUIRE(red(at(edgePass(), 8, 32)));
+
+            windowDepth(nullptr);
+            const size_t whole_lines = lit(worldWireframe({ { quadA(), ID_A, Outline::PRIORITY_ROOT, whole, speckTexture() } }));
+            const size_t cut_lines = lit(worldWireframe({ { quadA(), ID_A, Outline::PRIORITY_ROOT, cut, speckTexture() } }));
+            UNSCOPED_INFO("its wireframe draws the card's edges");
+            REQUIRE(whole_lines > cut_lines);
         }
     }
 }

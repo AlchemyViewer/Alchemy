@@ -65,9 +65,11 @@ class LLVOAvatar;
 /// where they are left out), and in .a its priority. Faces are culled as the scene culls them, back faces unless a
 /// GLTF material is double-sided, so a face the scene does not draw takes no pixel. Where a face's alpha mode cuts
 /// it out by its texture's alpha, the fragments are discarded, so the outline follows what is drawn rather than
-/// the cards it is drawn on; the face's colour, whose alpha makes a prim invisible, is not read, and a face wearing
-/// the library's transparent texture is drawn whole (faceAlphaCutoff). Integer formats are not used because
-/// LLGLSLShader gives integer samplers no unit.
+/// the cards it is drawn on. The face's colour, whose alpha makes a prim invisible, is not read: a face at 100%
+/// transparency has geometry while its object is selected (LLVOVolume::isInvisibleFace), and is outlined whole where
+/// its texture lets it be. A face wearing the library's transparent texture, or a texture with nothing its cut would
+/// keep, is drawn whole, and so is every face while the view asks for whole faces (View::mWholeFaces,
+/// faceAlphaCutoff). Integer formats are not used because LLGLSLShader gives integer samplers no unit.
 ///
 /// Ids are given in priority order, the highest first (EPriority). The jump pass (interface/selectionJumpF.glsl)
 /// marks, in a one-byte target of its own, the texels of the id target on the near side of a jump: a step in an
@@ -180,6 +182,12 @@ public:
         /// (RenderHighlightBrightness), which glowOpacity scales it by.
         S32 mGlowRadius = 1;
         F32 mGlowBrightness = 0.f;
+        /// Whether the outline and the wireframe draw every face whole, whatever its texture's alpha would cut away:
+        /// AlchemySelectionOutlineGeometry where RLVa allows Highlight Transparent, or Highlight Transparent itself.
+        bool mWholeFaces = false;
+        /// Whether the glow, which follows the surface the pointer is over, draws every face whole: only under
+        /// Highlight Transparent, where the scene itself draws them so.
+        bool mWholeGlow = false;
     };
 
     /// What the objects of a frame ask for between them.
@@ -394,13 +402,26 @@ public:
     /// computes it.
     static F32 glowOpacity(F32 dist, S32 radius, F32 brightness);
 
-    /// The texture alpha below which a face whose texture is `texture_id` is not outlined, from `cutoff`, what its
-    /// alpha mode gives (legacyAlphaCutoff, gltfAlphaCutoff): for the library's transparent texture
-    /// (IMG_TRANSPARENT) NO_ALPHA_TEST, so the face is drawn whole. Builders put it on roots, collision and touch
-    /// prims to hide them while they can still be picked and edited, and its alpha would cut every fragment.
-    static F32 faceAlphaCutoff(const LLUUID& texture_id, F32 cutoff)
+    /// The texture alpha below which a face whose texture is `texture_id`, its highest alpha `max_alpha`
+    /// (LLImageGL::getMaxAlpha), is not outlined, from `cutoff`, what its alpha mode gives (legacyAlphaCutoff,
+    /// gltfAlphaCutoff). NO_ALPHA_TEST, so the face is drawn whole, where `whole` (wholeFaces); for the library's
+    /// transparent texture (IMG_TRANSPARENT), which builders put on roots, collision and touch prims to hide them
+    /// while they can still be picked and edited; and for any texture with nothing at or above the cutoff. Those
+    /// would cut every fragment, and leave the face no outline at all.
+    static F32 faceAlphaCutoff(const LLUUID& texture_id, U8 max_alpha, F32 cutoff, bool whole)
     {
-        return texture_id == IMG_TRANSPARENT ? NO_ALPHA_TEST : cutoff;
+        if (whole || texture_id == IMG_TRANSPARENT || (F32)max_alpha / 255.f < cutoff)
+        {
+            return NO_ALPHA_TEST;
+        }
+        return cutoff;
+    }
+
+    /// Whether an object at `priority` is drawn with its faces whole in `view` (faceAlphaCutoff): what glows as
+    /// View::mWholeGlow says, and what is outlined as View::mWholeFaces says.
+    static bool wholeFaces(const View& view, EPriority priority)
+    {
+        return priority == PRIORITY_HOVER ? view.mWholeGlow : view.mWholeFaces;
     }
 
     /// Tiles across `pixels` texels of the id target.
@@ -575,8 +596,8 @@ private:
     };
 
     // Binds `face`'s texture and alpha test to the bound program and loads its texture animation, if it is drawn
-    // with one.
-    static FaceBinding bindFace(LLGLSLShader& program, LLFace* face);
+    // with one. With `whole` the face is drawn whole (faceAlphaCutoff).
+    static FaceBinding bindFace(LLGLSLShader& program, LLFace* face, bool whole);
 
     void clearEntries();
 
