@@ -101,7 +101,7 @@ namespace
         CHECK(std::abs(note0 - note2) < 1.f);
         UNSCOPED_INFO("past the widest text");
         CHECK(note2 > v.layout().xOf(2, 10));
-        UNSCOPED_INFO("two styles a line: the note's face on every line, and the ink where one is given");
+        UNSCOPED_INFO("a style a line, the note's face: no choice here has an ink of its own");
         CHECK(v.styles().size() == size_t(3));
         v.moveChoice(1, true);
         UNSCOPED_INFO("down one");
@@ -206,6 +206,7 @@ namespace
         CHECK(v.document().line(1) == std::string("odd one\t(string)"));
         UNSCOPED_INFO("the choice below is on its own line");
         CHECK(v.document().line(2) == std::string("last\t "));
+        REQUIRE(v.choices().size() == size_t(3));
         UNSCOPED_INFO("the words handed back as given");
         CHECK(v.choices()[0].note == std::string("for each\nitem in a list"));
         S32 x, y;

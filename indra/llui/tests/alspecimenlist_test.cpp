@@ -142,19 +142,28 @@ namespace
         }
         ALSpecimenList* list = make();
         list->setSpecimens(three());
+        // Filtering shows and hides; it builds nothing, so these stay.
+        const LLView* check_box = list->findChild<LLView>("row_check_box", true);
+        const LLView* panel = list->findChild<LLView>("row_panel", true);
+        const LLView* containers = list->findChild<LLView>("heading_Containers", true);
+        const LLView* controls = list->findChild<LLView>("heading_Controls", true);
+        REQUIRE(check_box != nullptr);
+        REQUIRE(panel != nullptr);
+        REQUIRE(containers != nullptr);
+        REQUIRE(controls != nullptr);
 
         list->filter("CHECK");
         CHECK(list->shown() == 1u);
-        CHECK(list->findChild<LLView>("row_check_box", true)->getVisible());
-        CHECK_FALSE(list->findChild<LLView>("row_panel", true)->getVisible());
-        CHECK_FALSE(list->findChild<LLView>("heading_Containers", true)->getVisible());
-        CHECK(list->findChild<LLView>("heading_Controls", true)->getVisible());
+        CHECK(check_box->getVisible());
+        CHECK_FALSE(panel->getVisible());
+        CHECK_FALSE(containers->getVisible());
+        CHECK(controls->getVisible());
 
         // A heading is a word to filter by as well: everything under it.
         list->filter("containers");
         UNSCOPED_INFO("the group matched");
         CHECK(list->shown() == 1u);
-        CHECK(list->findChild<LLView>("row_panel", true)->getVisible());
+        CHECK(panel->getVisible());
 
         list->filter(std::string());
         CHECK(list->shown() == 3u);
@@ -172,10 +181,15 @@ namespace
         ALSpecimenList* list = make();
         list->setSpecimens(three());
 
+        const LLView* scroller = list->findChild<LLView>("scroller", true);
+        const LLView* empty = list->findChild<LLView>("empty", true);
+        REQUIRE(scroller != nullptr);
+        REQUIRE(empty != nullptr);
+
         list->filter("qqzzxw");
         CHECK(list->shown() == 0u);
-        CHECK_FALSE(list->findChild<LLView>("scroller", true)->getVisible());
-        CHECK(list->findChild<LLView>("empty", true)->getVisible());
+        CHECK_FALSE(scroller->getVisible());
+        CHECK(empty->getVisible());
         delete list;
     }
 
@@ -191,13 +205,15 @@ namespace
         ALSpecimenList* list = make();
         list->setSpecimens(three());
         LLView* row = list->findChild<LLView>("row_check_box", true);
+        REQUIRE(row != nullptr);
         const LLRect r = row->getLocalRect();
         const S32 x = r.getCenterX();
         const S32 y = r.getCenterY();
 
-        // Without a starter, moving the press carries nothing.
+        // Without a starter, moving the press carries nothing: there is no
+        // starter to call, and calling the empty one would throw.
         row->handleMouseDown(x, y, MASK_NONE);
-        row->handleHover(x + 20, y, MASK_NONE);
+        CHECK_NOTHROW(row->handleHover(x + 20, y, MASK_NONE));
         row->handleMouseUp(x + 20, y, MASK_NONE);
 
         std::vector<std::string> carried;
@@ -286,8 +302,10 @@ namespace
         CHECK(list->shown() == size_t(1));
         list->filter("zzz");
         CHECK(list->shown() == size_t(0));
+        const LLView* empty = list->findChild<LLView>("empty", true);
+        REQUIRE(empty != nullptr);
         UNSCOPED_INFO("the pane says so");
-        CHECK(list->findChild<LLView>("empty", true)->getVisible());
+        CHECK(empty->getVisible());
         delete list;
     }
 
@@ -404,6 +422,7 @@ namespace
         // The cells sit across under their heading: B is the second, at
         // the tiles' own height less the heading and half a cell.
         LLView* tiles = list->findChild<LLView>("tiles", true);
+        REQUIRE(tiles != nullptr);
         const S32 x = 150;
         const S32 y = tiles->getRect().getHeight() - 20 - 30;
         list->cellPressed(0, MASK_NONE);
@@ -455,6 +474,7 @@ namespace
         UNSCOPED_INFO("both sides are");
         CHECK(list->cells());
         LLView* tiles = list->findChild<LLView>("tiles", true);
+        REQUIRE(tiles != nullptr);
         {
             INFO("the picture stayed with the row");
             CHECK(tiles->findChild<LLView>("picture", true) == nullptr);
@@ -489,10 +509,15 @@ namespace
             CHECK(sample->getText() == "Aa Bb 0123");
         }
         CHECK(sample->getFont() == LLFontGL::getFontSansSerif());
+        const LLView*    mono        = list->findChild<LLView>("row_Monospace", true);
+        const LLTextBox* mono_sample = mono ? mono->findChild<LLTextBox>("sample") : nullptr;
+        REQUIRE(mono_sample != nullptr);
         UNSCOPED_INFO("the other row in its own");
-        CHECK(list->findChild<LLView>("row_Monospace", true)->findChild<LLTextBox>("sample")->getFont() == LLFontGL::getFontMonospace());
+        CHECK(mono_sample->getFont() == LLFontGL::getFontMonospace());
+        const LLTextBox* label = sans->findChild<LLTextBox>("label");
+        REQUIRE(label != nullptr);
         UNSCOPED_INFO("past the label");
-        CHECK(sample->getRect().mLeft > sans->findChild<LLTextBox>("label")->getRect().mRight - 1);
+        CHECK(sample->getRect().mLeft > label->getRect().mRight - 1);
 
         list->filter("monospace");
         UNSCOPED_INFO("found by its name, not only its label");

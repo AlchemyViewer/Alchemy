@@ -112,6 +112,7 @@ namespace
         {
             ALMenuSlot slot;
             LLContextMenu* menu = make(slot);
+            REQUIRE(menu);
             menu->setVisible(true);
             slot.close();
             {
@@ -121,6 +122,7 @@ namespace
                 CHECK(slot.get() == nullptr);
             }
             open = make(slot);
+            REQUIRE(open);
             open->setVisible(true);
         }
         {

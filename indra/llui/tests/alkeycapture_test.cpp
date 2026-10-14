@@ -155,6 +155,7 @@ namespace
     TEST_CASE_METHOD(alkeycapture_data, "alkeycapture: a one-key capture keeps the last key and Escape gives nothing", "[alkeycapture]")
     {
         ALKeyCapture* capture = show(false);
+        REQUIRE(capture != nullptr);
         {
             INFO("Return with nothing pressed gives nothing");
             CHECK(ALKeyChords::takeKey(KEY_RETURN, MASK_NONE));
@@ -167,6 +168,7 @@ namespace
         CHECK(capture->pressed() == (ALKeyChord{ 'S', MASK_NONE }));
         ALKeyChords::takeChar('s');
         ALPopover* up = capture->popover();
+        REQUIRE(up != nullptr);
         CHECK(ALKeyChords::takeKey(KEY_ESCAPE, MASK_NONE));
         CHECK(chosen.empty());
         {

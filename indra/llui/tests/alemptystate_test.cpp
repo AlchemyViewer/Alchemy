@@ -127,14 +127,13 @@ namespace
         CHECK(part(state, "sentence")->getVisible());
 
         // And it is in the middle of the room, not under where a headline
-        // would have been.
+        // would have been: as much room above it as below, but for the odd
+        // pixel of halving.
         const LLRect sentence = part(state, "sentence")->getRect();
-        const S32 middle = state->getRect().getHeight() / 2;
-        {
-            INFO("centred on its own " << where(sentence));
-            CHECK(sentence.mTop >= middle);
-            CHECK(sentence.mBottom <= middle);
-        }
+        const S32 above = state->getRect().getHeight() - sentence.mTop;
+        const S32 below = sentence.mBottom;
+        CAPTURE(above, below);
+        CHECK(llabs(above - below) <= 1);
         state->die();
     }
 

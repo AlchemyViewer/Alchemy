@@ -83,7 +83,8 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLPanel* over = anchor();
-        ALPopover* popover = ALPopover::show(over, content(160, 90));
+        LLPanel* body = content(160, 90);
+        ALPopover* popover = ALPopover::show(over, body);
         REQUIRE(popover != nullptr);
         CHECK(popover->getVisible());
 
@@ -100,7 +101,7 @@ namespace
         CHECK(where.mTop == screen.mBottom);
 
         UNSCOPED_INFO("the content is in it");
-        REQUIRE(popover->getChild<LLPanel>("content", true) != nullptr);
+        CHECK(popover->findChild<LLPanel>("content", true) == body);
         popover->closeFloater();
         over->die();
     }
@@ -136,6 +137,7 @@ namespace
         {
             LLPanel* over = anchor();
             ALPopover* popover = ALPopover::show(over, content());
+            REQUIRE(popover != nullptr);
             std::vector<bool> said;
             popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
             popover->settle();
@@ -149,6 +151,7 @@ namespace
         {
             LLPanel* over = anchor();
             ALPopover* popover = ALPopover::show(over, content());
+            REQUIRE(popover != nullptr);
             std::vector<bool> said;
             popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
             CHECK(popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
@@ -163,6 +166,7 @@ namespace
         {
             LLPanel* over = anchor();
             ALPopover* popover = ALPopover::show(over, content());
+            REQUIRE(popover != nullptr);
             std::vector<bool> said;
             popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
             popover->onFocusLost();
@@ -181,8 +185,12 @@ namespace
         {
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
+        LLPanel*                orphan = content();
+        const LLHandle<LLPanel> given  = orphan->getHandle();
         UNSCOPED_INFO("no anchor, no popover");
-        CHECK(ALPopover::show(nullptr, content()) == nullptr);
+        CHECK(ALPopover::show(nullptr, orphan) == nullptr);
+        UNSCOPED_INFO("and the content given deleted, not leaked");
+        CHECK(given.isDead());
         LLPanel* over = anchor();
         UNSCOPED_INFO("and no content, none either");
         CHECK(ALPopover::show(over, nullptr) == nullptr);
@@ -238,6 +246,7 @@ namespace
         home->addChild(over);
 
         ALPopover* popover = ALPopover::show(over, content());
+        REQUIRE(popover != nullptr);
         UNSCOPED_INFO("it knows where home is");
         CHECK(popover->home() == home);
         UNSCOPED_INFO("and asks before the viewer's own menu does");
@@ -259,6 +268,7 @@ namespace
         // menu's keys.
         LLPanel* loose = anchor();
         ALPopover* alone = ALPopover::show(loose, content());
+        REQUIRE(alone != nullptr);
         UNSCOPED_INFO("no home");
         CHECK(alone->home() == nullptr);
         UNSCOPED_INFO("no claim");
@@ -337,6 +347,7 @@ namespace
         LLPanel*   over   = anchor();
         window->addChild(over);
         ALPopover*        popover = ALPopover::show(over, content());
+        REQUIRE(popover != nullptr);
         std::vector<bool> said;
         popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
         UNSCOPED_INFO("its window's dependent");
@@ -353,6 +364,7 @@ namespace
         LLPanel*   under = anchor();
         again->addChild(under);
         ALPopover* first = ALPopover::show(under, content());
+        REQUIRE(first != nullptr);
         first->escape();
         CHECK(first->isDead());
         again->closeFloater();
@@ -542,6 +554,7 @@ namespace
         ALPopoverSlot    slot;
         std::vector<int> said;
         ALPopover*       popover = ALPopover::show(over, content());
+        REQUIRE(popover != nullptr);
         slot.hold(popover, [&said](bool) { said.push_back(1); });
         slot.hold(popover, [&said](bool) { said.push_back(2); });
         {
@@ -557,6 +570,7 @@ namespace
         const auto dead = [](const LLHandle<ALPopover>& handle) { return !handle.get() || handle.get()->isDead(); };
         said.clear();
         ALPopover*                dropped = ALPopover::show(over, content());
+        REQUIRE(dropped != nullptr);
         const LLHandle<ALPopover> handle  = dropped->getDerivedHandle<ALPopover>();
         slot.hold(dropped, [&said](bool) { said.push_back(3); });
         slot.drop();
@@ -575,6 +589,7 @@ namespace
         {
             ALPopoverSlot gone;
             ALPopover*    held = ALPopover::show(over, content());
+            REQUIRE(held != nullptr);
             scoped             = held->getDerivedHandle<ALPopover>();
             gone.hold(held, [&said](bool) { said.push_back(4); });
         }

@@ -289,8 +289,11 @@ namespace
             CHECK(v.shows(v.entries().back()));
             CHECK_FALSE(v.shows(v.entries().front()));
         }
-        UNSCOPED_INFO("the links laid again where the entry moved");
-        CHECK(v.substitutions()[1].range == ALTextRange(ALTextPos(2, 2), ALTextPos(2, 16)));
+        {
+            INFO("the links laid again where the entry moved");
+            REQUIRE(v.substitutions().size() == size_t(3));
+            CHECK(v.substitutions()[1].range == ALTextRange(ALTextPos(2, 2), ALTextPos(2, 16)));
+        }
     }
 
     TEST_CASE_METHOD(aloutputview_data, "aloutputview: each lane keeps its own fill so one lane does not push out another", "[aloutputview]")

@@ -134,7 +134,7 @@ namespace
     };
 
     // Each class answers for itself and every base that is a kind, and for
-    // nothing else. A type with no kind is still answered, the slow way.
+    // nothing else; a class a test declares answers as the library's do.
     TEST_CASE_METHOD(alviewtype_data, "alviewtype: as<> finds a view's own class and each base kind but no other", "[alviewtype]")
     {
         if (!ui.ok())
@@ -207,7 +207,7 @@ namespace
         CHECK(inner->getParentByType<LLFloater>() == f);
         UNSCOPED_INFO("the nearest floater view above it, through the floater");
         CHECK(inner->getParentByType<LLFloaterView>() == fv.get());
-        UNSCOPED_INFO("no ancestor is a type with no kind");
+        UNSCOPED_INFO("its ancestors are controls, but none a TestCtrl");
         CHECK(inner->getParentByType<TestCtrl>() == nullptr);
 
         fv.reset();
@@ -361,6 +361,10 @@ namespace
     // Bound by on_check, a binding the item's own params do not name.
     TEST_CASE_METHOD(alviewtype_data, "alviewtype: a check item bound by on_check stays bound and shows the setting", "[alviewtype]")
     {
+        if (!ui.ok())
+        {
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         LLControlGroup* config = LLUI::getInstance()->mSettingGroups["config"];
         if (!config->controlExists("ViewTypeCheck"))
         {
