@@ -435,7 +435,7 @@ ctest --test-dir <build-dir> --output-on-failure -LE manual
 
 `-LE manual` leaves out what the build's own test target leaves out: the benchmarks, and each Catch2 binary's run of all its files in one process while that run is still labelled `combined_pending` (`ctest -L combined_pending` runs those).
 
-Unit tests live alongside the library they cover in `indra/<library>/tests/`. They are moving from the TUT (Template Unit Test) framework to Catch2 a library at a time: a converted library builds its test files into one binary (`al_add_test_binary`, `indra/cmake/ALAddTestBinary.cmake`), each file still a CTest entry of its own, on the harness in `indra/test/`. Integration tests are in `indra/integration_tests/`.
+Unit tests are Catch2 v3, and live alongside the library they cover in `indra/<library>/tests/`. A library builds its test files into one binary (`al_add_test_binary`, `indra/cmake/ALAddTestBinary.cmake`), each file still a CTest entry of its own, on the harness in `indra/test/`. [TESTING.md](TESTING.md) says how to run them, how to write one, and what a test binary asks of its files. Integration tests are in `indra/integration_tests/`.
 
 ## Editing XUI
 
