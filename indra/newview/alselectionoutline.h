@@ -258,9 +258,11 @@ public:
     static constexpr U32 PALETTE_WIDTH = 256;
     /// What a hidden part keeps of its outline's opacity.
     static constexpr F32 HIDDEN_ALPHA = 0.4f;
-    /// The contour's width in pixels at a UI scale of 1: AlchemySelectionOutlineWidth's default, and the range it
-    /// is held to.
-    static constexpr F32 DEFAULT_CONTOUR_WIDTH = 2.f;
+    /// The contour's width in pixels at a UI scale of 1: AlchemySelectionOutlineWidth's default, while the wireframe
+    /// is off; AlchemySelectionOutlineWireframeWidth's, while it is on and its lines already mark the object; and the
+    /// range both are held to.
+    static constexpr F32 DEFAULT_CONTOUR_WIDTH = 3.f;
+    static constexpr F32 DEFAULT_WIREFRAME_CONTOUR_WIDTH = 2.f;
     static constexpr F32 MIN_CONTOUR_WIDTH = 1.f;
     static constexpr F32 MAX_CONTOUR_WIDTH = 16.f;
     /// The width of the edges between objects in pixels at a UI scale of 1. It does not follow the contour's: the
@@ -389,6 +391,10 @@ public:
     /// The contour's width in pixels for the setting `width` at `ui_scale`, the setting held to MIN_CONTOUR_WIDTH
     /// to MAX_CONTOUR_WIDTH, and to the least where it is not a number.
     static S32 contourWidth(F32 width, F32 ui_scale);
+
+    /// The contour width setting a view takes: AlchemySelectionOutlineWireframeWidth's `wireframe_width` while the
+    /// wireframe is drawn (AlchemySelectionWireframe), AlchemySelectionOutlineWidth's `width` while it is not.
+    static F32 contourSetting(bool wireframe, F32 width, F32 wireframe_width) { return wireframe ? wireframe_width : width; }
 
     /// How far in pixels the glow reaches past its object's silhouette for RenderHighlightThickness `thickness` at
     /// `ui_scale`: thickness x GLOW_PIXELS at a UI scale of 1, held to MAX_GLOW_RADIUS, and its default where the

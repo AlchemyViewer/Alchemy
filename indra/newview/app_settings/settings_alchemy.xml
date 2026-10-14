@@ -2474,7 +2474,18 @@
         <key>AlchemySelectionOutlineWidth</key>
         <map>
             <key>Comment</key>
-            <string>Width in pixels of the outline around selected objects, in the world and on the HUD, at a UI scale of 1; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <string>Width in pixels of the outline around selected objects, in the world and on the HUD, at a UI scale of 1, while the selection wireframe is off; it grows with the UI scale. Range 1 to 16. Applies live.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>3.0</real>
+        </map>
+        <key>AlchemySelectionOutlineWireframeWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Width in pixels of the outline around selected objects while the selection wireframe is on, at a UI scale of 1; it grows with the UI scale. Range 1 to 16. Applies live.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

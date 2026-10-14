@@ -1266,16 +1266,23 @@ namespace
         CHECK((U32)texels[hidden + 3] == 0U);
     }
 
-    // The widths: the contour AlchemySelectionOutlineWidth wide, held to 1 to 16, and the edges between objects a
-    // pixel, at a UI scale of 1; both scaled with it and rounded, never under a pixel; the world and the HUD alike.
+    // The widths: the contour AlchemySelectionOutlineWidth wide, or AlchemySelectionOutlineWireframeWidth while the
+    // wireframe is drawn, held to 1 to 16, and the edges between objects a pixel, at a UI scale of 1; both scaled with
+    // it and rounded, never under a pixel; the world and the HUD alike.
     TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: line widths scale with the UI and the contour's is held to 1 to 16", "[ALSelectionOutline]")
     {
         UNSCOPED_INFO("the setting's default");
-        CHECK(Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.f) == 2);
+        CHECK(Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.f) == 3);
         UNSCOPED_INFO("the default at 1.5");
-        CHECK(Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.5f) == 3);
+        CHECK(Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 1.5f) == 5);
         UNSCOPED_INFO("the default at 2");
-        CHECK(Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 2.f) == 4);
+        CHECK(Outline::contourWidth(Outline::DEFAULT_CONTOUR_WIDTH, 2.f) == 6);
+        UNSCOPED_INFO("the wireframe's default");
+        CHECK(Outline::contourWidth(Outline::DEFAULT_WIREFRAME_CONTOUR_WIDTH, 1.f) == 2);
+        UNSCOPED_INFO("the setting without the wireframe");
+        CHECK(Outline::contourSetting(false, 3.f, 2.f) == 3.f);
+        UNSCOPED_INFO("and with it");
+        CHECK(Outline::contourSetting(true, 3.f, 2.f) == 2.f);
         UNSCOPED_INFO("a setting between pixels rounds");
         CHECK(Outline::contourWidth(2.5f, 1.f) == 3);
         UNSCOPED_INFO("a setting under 1 held to 1");

@@ -74,12 +74,22 @@ namespace
         view.mWholeFaces = debug_alpha || (outline_geometry && RlvActions::canHighlightTransparent());
         view.mWholeGlow = debug_alpha;
     }
+
+    // The contour width setting in force (ALSelectionOutline::contourSetting).
+    F32 contour_setting()
+    {
+        static LLCachedControl<bool> wireframe(gSavedSettings, "AlchemySelectionWireframe", false);
+        static LLCachedControl<F32> width(gSavedSettings, "AlchemySelectionOutlineWidth",
+                                          ALSelectionOutline::DEFAULT_CONTOUR_WIDTH);
+        static LLCachedControl<F32> wireframe_width(gSavedSettings, "AlchemySelectionOutlineWireframeWidth",
+                                                    ALSelectionOutline::DEFAULT_WIREFRAME_CONTOUR_WIDTH);
+        return ALSelectionOutline::contourSetting(wireframe, width, wireframe_width);
+    }
 }
 
 ALSelectionOutline::View ALSelectionOutline::worldView()
 {
-    static LLCachedControl<F32> contour_width(gSavedSettings, "AlchemySelectionOutlineWidth", DEFAULT_CONTOUR_WIDTH);
-    View view = makeView(LLViewerCamera::getCurrent().getModelview(), gGL.getProjectionMatrix(), contour_width,
+    View view = makeView(LLViewerCamera::getCurrent().getModelview(), gGL.getProjectionMatrix(), contour_setting(),
                          LLUI::getScaleFactor().mV[VX], false, LLPipeline::RenderHighlightThickness,
                          LLPipeline::RenderHighlightBrightness);
     set_whole_faces(view);
@@ -88,14 +98,13 @@ ALSelectionOutline::View ALSelectionOutline::worldView()
 
 bool ALSelectionOutline::hudView(View& view)
 {
-    static LLCachedControl<F32> contour_width(gSavedSettings, "AlchemySelectionOutlineWidth", DEFAULT_CONTOUR_WIDTH);
     LLMatrix4a projection;
     LLMatrix4a modelview;
     if (!get_hud_matrices(projection, modelview))
     {
         return false;
     }
-    view = makeView(modelview, projection, contour_width, LLUI::getScaleFactor().mV[VX], true,
+    view = makeView(modelview, projection, contour_setting(), LLUI::getScaleFactor().mV[VX], true,
                     LLPipeline::RenderHighlightThickness, LLPipeline::RenderHighlightBrightness);
     set_whole_faces(view);
     return true;
