@@ -72,6 +72,8 @@ namespace
                 REQUIRE(run.right == r);
                 if (run.kind == Kind::Same)
                 {
+                    UNSCOPED_INFO("a Same run inside both texts");
+                    REQUIRE((l + run.count <= static_cast<S32>(left.size()) && r + run.count <= static_cast<S32>(right.size())));
                     for (S32 i = 0; i < run.count; ++i)
                     {
                         UNSCOPED_INFO("a Same run's lines alike");
@@ -739,6 +741,7 @@ namespace
         {
             INFO("the operator whole");
             REQUIRE_FALSE(left.empty());
+            REQUIRE_FALSE(right.empty());
             CHECK(left[0] == std::make_pair(6, 8));
             CHECK(right[0] == std::make_pair(6, 8));
         }
@@ -753,6 +756,7 @@ namespace
         {
             INFO("without them, by bytes: = and ! alone");
             REQUIRE_FALSE(left.empty());
+            REQUIRE_FALSE(right.empty());
             CHECK(left[0] == std::make_pair(6, 7));
             CHECK(right[0] == std::make_pair(6, 7));
         }
@@ -835,8 +839,9 @@ namespace
             }
             return -1;
         };
-        const std::vector<Run> patience = ALTextDiff::lines(was, now, by(A::Patience));
-        const std::vector<Run> minimal  = ALTextDiff::lines(was, now, by(A::Minimal));
+        const std::vector<Run> patience  = ALTextDiff::lines(was, now, by(A::Patience));
+        const std::vector<Run> minimal   = ALTextDiff::lines(was, now, by(A::Minimal));
+        const std::vector<Run> histogram = ALTextDiff::lines(was, now, by(A::Histogram));
         require_walks(was, now, patience);
         require_walks(was, now, minimal);
         {
@@ -850,8 +855,8 @@ namespace
             CHECK(require_walks(was, now, minimal) <= require_walks(was, now, patience));
         }
         {
-            INFO("all three alike here: minimal no more");
-            CHECK(require_walks(was, now, minimal) <= require_walks(was, now, patience));
+            INFO("minimal: fewer or as few as histogram");
+            CHECK(require_walks(was, now, minimal) <= require_walks(was, now, histogram));
         }
 
         // Where they differ. A line moved from the top to the bottom past
@@ -1204,6 +1209,14 @@ namespace
             }
             return true;
         };
+        // Each line of each text has its marks and says whether it was read
+        // as tokens: what the checks below index.
+        const auto require_each_line = [](const Result& r, size_t left, size_t right) {
+            REQUIRE(r.leftMarks.size() == left);
+            REQUIRE(r.leftByTokens.size() == left);
+            REQUIRE(r.rightMarks.size() == right);
+            REQUIRE(r.rightByTokens.size() == right);
+        };
         const std::vector<std::string> call  = { "default", "{", "    llSay(0, \"a\" + b);", "}" };
         const std::vector<std::string> flown = { "default", "{", "    llSay(", "        0,", "        \"a\" + b", "    );", "}" };
         const Result reflowed = ALStructuralDiff::compare(call, flown, ALTextDiff::Options());
@@ -1214,6 +1227,7 @@ namespace
             CHECK(unmarked(reflowed));
             CHECK_FALSE(reflowed.tooLarge);
         }
+        require_each_line(reflowed, call.size(), flown.size());
         {
             INFO("its lines read as tokens, those the same not");
             REQUIRE(reflowed.leftByTokens[2]);
@@ -1241,6 +1255,7 @@ namespace
         const std::vector<std::string> changed = { "default", "{", "    llSay(", "        1,", "        \"a\" + b", "    );", "}" };
         const Result real = ALStructuralDiff::compare(call, changed, ALTextDiff::Options());
         require_walks(call, changed, real.runs);
+        require_each_line(real, call.size(), changed.size());
         {
             INFO("the change inside the reformatting marked, and nothing else");
             CHECK(real.leftMarks[2] == ALTextDiff::spans_t{ { 10, 11 } });
@@ -1253,6 +1268,7 @@ namespace
         const std::vector<std::string> one = { "f(a)(b)" };
         const std::vector<std::string> two = { "f(a(b))" };
         const Result nested = ALStructuralDiff::compare(one, two, ALTextDiff::Options());
+        require_each_line(nested, one.size(), two.size());
         {
             INFO("a bracket whose other went elsewhere marked");
             REQUIRE_FALSE(nested.leftMarks[0].empty());
@@ -1260,6 +1276,7 @@ namespace
         }
         // f's ( kept by the tokens alone, though its ) is not: let go of.
         const Result closed = ALStructuralDiff::compare({ "f(a); g(b);" }, { "f(a; g(b));" }, ALTextDiff::Options());
+        require_each_line(closed, 1, 1);
         {
             INFO("an opening bracket whose closing one was not kept, marked");
             REQUIRE_FALSE(closed.leftMarks[0].empty());
@@ -1278,6 +1295,7 @@ namespace
         const std::vector<std::string> mine   = numbered(ALStructuralDiff::MOST_TOKENS / 2 + 1, "mine ");
         const std::vector<std::string> theirs = numbered(ALStructuralDiff::MOST_TOKENS / 2 + 1, "theirs ");
         const Result                   big    = ALStructuralDiff::compare(mine, theirs, ALTextDiff::Options());
+        require_each_line(big, mine.size(), theirs.size());
         {
             INFO("too large: by lines, said so");
             CHECK(big.tooLarge);
@@ -1306,7 +1324,7 @@ namespace
             kinds.push_back(hunk.kind);
         }
         UNSCOPED_INFO("each kind, in order");
-        CHECK(kinds == std::vector<K>{ K::Same, K::Ours, K::Same, K::Theirs, K::Same, K::Both, K::Same, K::Conflict });
+        REQUIRE(kinds == std::vector<K>{ K::Same, K::Ours, K::Same, K::Theirs, K::Same, K::Both, K::Same, K::Conflict });
         {
             INFO("a hunk's lines in each");
             CHECK(hunks[7] == H{ K::Conflict, 7, 1, 7, 1, 7, 1 });
@@ -1361,10 +1379,14 @@ namespace
         std::vector<std::string> in_two = base;
         in_one.insert(in_one.begin() + 4, "mine");
         in_two.insert(in_two.begin() + 4, "theirs");
+        const ALTextMerge::hunks_t put_in = ALTextMerge::merge(base, in_one, in_two);
+        REQUIRE(put_in.size() >= 2u);
         UNSCOPED_INFO("put in at one place");
-        CHECK(ALTextMerge::merge(base, in_one, in_two)[1].kind == K::Conflict);
+        CHECK(put_in[1].kind == K::Conflict);
+        const ALTextMerge::hunks_t put_in_alike = ALTextMerge::merge(base, in_one, in_one);
+        REQUIRE(put_in_alike.size() >= 2u);
         UNSCOPED_INFO("put in alike at one place");
-        CHECK(ALTextMerge::merge(base, in_one, in_one)[1].kind == K::Both);
+        CHECK(put_in_alike[1].kind == K::Both);
 
         // A block moved down by ours, a line in it changed by theirs where
         // it was: a conflict, left so.
@@ -1498,6 +1520,8 @@ namespace
                 }
                 if (run.kind == Kind::Same)
                 {
+                    UNSCOPED_INFO("a Same run inside both texts");
+                    REQUIRE((left + run.count <= static_cast<S32>(a.size()) && right + run.count <= static_cast<S32>(b.size())));
                     for (S32 i = 0; i < run.count; ++i)
                     {
                         UNSCOPED_INFO("kept the same");

@@ -86,7 +86,15 @@ namespace
             return *view;
         }
 
-        static void press(ALDiffView& d, const char* name) { ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>(name))->press(); }
+        // The bar's button of that name. getChild makes a stand-in for a
+        // name the bar lacks, which is no button.
+        static ALFlatButton& require_button(ALDiffView& d, const char* name)
+        {
+            ALFlatButton* button = ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>(name));
+            REQUIRE(button != nullptr);
+            return *button;
+        }
+        static void press(ALDiffView& d, const char* name) { require_button(d, name).press(); }
         static bool enabled(ALDiffView& d, const char* name) { return d.bar()->getChild<LLView>(name)->getEnabled(); }
 
         // The lines "line 0" on, so many, with some of them said otherwise.
@@ -540,7 +548,7 @@ namespace
 
         S32 said = -1;
         d.setOnInline([&said](bool inlined) { said = inlined ? 1 : 0; });
-        ALFlatButton* inlined = ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("inline"));
+        ALFlatButton* inlined = &require_button(d, "inline");
         UNSCOPED_INFO("side by side: not lit");
         CHECK_FALSE(inlined->getToggleState());
         inlined->press();
@@ -570,7 +578,7 @@ namespace
         {
             INFO("swapped, and lit");
             CHECK(d.isSwapped());
-            CHECK(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("swap"))->getToggleState());
+            CHECK(require_button(d, "swap").getToggleState());
         }
         UNSCOPED_INFO("the right's text on the left");
         CHECK(d.left()->text() == std::string("a\nb = 2\nc\nd"));
@@ -852,7 +860,7 @@ namespace
         }
         {
             INFO("the gap");
-            CHECK(gapsOf(d.right())[16] == 1);
+            CHECK(d.right()->layout().gapRows(16) == 1);
             CHECK(d.right()->layout().lineTop(16) == d.right()->layout().rowHeight());
         }
 
@@ -885,7 +893,7 @@ namespace
             INFO("folded, inline");
             CHECK(hidden(d.inlined(), 1));
             CHECK_FALSE(hidden(d.inlined(), 16));
-            CHECK(gapsOf(d.inlined())[16] == 1);
+            CHECK(d.inlined()->layout().gapRows(16) == 1);
         }
         d.inlined()->goTo(ALTextPos(16, 0));
         d.setInline(false);
@@ -1145,7 +1153,7 @@ namespace
         {
             INFO("on, and the bar's button lit");
             CHECK(d.ignores("whitespace"));
-            CHECK(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
+            CHECK(require_button(d, "ignore").getToggleState());
         }
         UNSCOPED_INFO("one line changed: the word, not its indent");
         CHECK(d.changeCount() == 1);
@@ -1291,27 +1299,30 @@ namespace
         LLContextMenu* menu = holder->findChild<LLContextMenu>("menu_diff_ignore");
         UNSCOPED_INFO("shown");
         REQUIRE(menu != nullptr);
-        if (menu)
+        menu->arrangeAndClear();
+        LLMenuItemGL* comments = menu->findChild<LLMenuItemGL>("comments");
+        LLMenuItemGL* letter_case = menu->findChild<LLMenuItemGL>("case");
+        LLMenuItemGL* trailing = menu->findChild<LLMenuItemGL>("trailing");
+        REQUIRE(comments != nullptr);
+        REQUIRE(letter_case != nullptr);
+        REQUIRE(trailing != nullptr);
+        UNSCOPED_INFO("comments offered, with LSL's grammar");
+        CHECK(comments->getVisible());
+        UNSCOPED_INFO("case not, for code");
+        CHECK_FALSE(letter_case->getVisible());
+        trailing->onCommit();
         {
-            menu->arrangeAndClear();
-            UNSCOPED_INFO("comments offered, with LSL's grammar");
-            CHECK(menu->findChild<LLMenuItemGL>("comments")->getVisible());
-            UNSCOPED_INFO("case not, for code");
-            CHECK_FALSE(menu->findChild<LLMenuItemGL>("case")->getVisible());
-            LLMenuItemGL* trailing = menu->findChild<LLMenuItemGL>("trailing");
-            trailing->onCommit();
-            {
-                INFO("an item turns its own on");
-                CHECK(d.ignores("trailing"));
-                CHECK_FALSE(d.ignores("whitespace"));
-            }
+            INFO("an item turns its own on");
+            CHECK(d.ignores("trailing"));
+            CHECK_FALSE(d.ignores("whitespace"));
         }
         d.setIgnore("comments", true);
         d.setIgnore("blank_lines", true);
         UNSCOPED_INFO("a comment reworded, a blank line gone and blanks at an end: no change");
         CHECK(d.changeCount() == 0);
+        const ALFlatButton& ignore = require_button(d, "ignore");
         UNSCOPED_INFO("lit");
-        CHECK(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
+        CHECK(ignore.getToggleState());
         menus.reset();
         LLMortician::updateClass();
         delete holder;
@@ -1750,7 +1761,7 @@ namespace
             INFO("comments let go of: no change, the bar lit");
             CHECK(d.ignores("comments"));
             CHECK(d.changeCount() == 0);
-            CHECK(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
+            CHECK(require_button(d, "ignore").getToggleState());
         }
         d.setGrammar(nullptr);
         {
@@ -1758,7 +1769,7 @@ namespace
             CHECK_FALSE(d.ignores("comments"));
             CHECK_FALSE(d.offersIgnore("comments"));
             CHECK(d.changeCount() == 1);
-            CHECK_FALSE(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
+            CHECK_FALSE(require_button(d, "ignore").getToggleState());
         }
     }
 
@@ -2120,7 +2131,7 @@ namespace
             INFO("opened, and the button so");
             CHECK_FALSE(d.foldsSame());
             CHECK(d.foldedCount() == 0);
-            CHECK_FALSE(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("fold"))->getToggleState());
+            CHECK_FALSE(require_button(d, "fold").getToggleState());
         }
         d.right()->handleKey('F', MASK_ALT, false);
         {
@@ -2296,7 +2307,7 @@ namespace
         d.setMergeBase(base);
         d.setVersions(3, 1, [](S32) {});
         LLView* count = d.bar()->getChild<LLView>("count");
-        const auto glyph = [&d](const char* name) { return ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>(name))->glyph(); };
+        const ALFlatButton& take_theirs = require_button(d, "take_theirs");
         const auto nothing_past_left = [&d]() {
             for (LLView* child : *d.bar()->getChildList())
             {
@@ -2311,7 +2322,7 @@ namespace
         {
             INFO("wide: all of it");
             CHECK(count->getVisible());
-            CHECK(glyph("take_theirs") == "Theirs");
+            CHECK(take_theirs.glyph() == "Theirs");
             CHECK(d.bar()->getChild<LLView>("versions")->getVisible());
         }
         S32 lost_count = 0;
@@ -2324,7 +2335,7 @@ namespace
             UNSCOPED_INFO("nothing past the left edge");
             REQUIRE(nothing_past_left());
             lost_count  = !count->getVisible() && !lost_count ? width : lost_count;
-            lost_words  = glyph("take_theirs") == "T" && !lost_words ? width : lost_words;
+            lost_words  = take_theirs.glyph() == "T" && !lost_words ? width : lost_words;
             lost_slider = !d.bar()->getChild<LLView>("versions")->getVisible() && !lost_slider ? width : lost_slider;
         }
         {
@@ -2337,7 +2348,7 @@ namespace
         {
             INFO("and all back");
             CHECK(count->getVisible());
-            CHECK(glyph("take_theirs") == "Theirs");
+            CHECK(take_theirs.glyph() == "Theirs");
             CHECK(d.bar()->getChild<LLView>("versions")->getVisible());
             CHECK(d.bar()->getChild<LLView>("take_theirs")->getVisible());
             CHECK(d.bar()->getChild<LLView>("done")->getVisible());
