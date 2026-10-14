@@ -85,8 +85,7 @@ namespace
             many.push_back(word("w" + std::to_string(i)));
         }
         ALCompletionModel::rank(many, "w");
-        UNSCOPED_INFO("capped");
-        REQUIRE(many.size() == ALCompletionModel::CAP);
+        CHECK(many.size() == ALCompletionModel::CAP);
     }
 
     TEST_CASE_METHOD(alcompletionmodel_data, "ALCompletionModel: documentWords adds the document's other words after the answer", "[ALCompletionModel]")
@@ -126,11 +125,11 @@ namespace
         UNSCOPED_INFO("the same identifier");
         CHECK_FALSE(fresh);
         UNSCOPED_INFO("merged, not doubled, and what does not match left out");
-        CHECK(joined(model.list()) == std::string("salt|say"));
+        REQUIRE(joined(model.list()) == std::string("salt|say"));
         const ALCompletion& say = model.list()[1];
         {
             INFO("its detail and words filled in");
-            REQUIRE(say.detail == "say(msg)");
+            CHECK(say.detail == "say(msg)");
             REQUIRE(say.documentation);
             CHECK(*say.documentation == "Says it.");
         }
@@ -142,7 +141,7 @@ namespace
         {
             INFO("a new identifier lets the answer go");
             CHECK(model.narrow(ALTextPos(0, 1), ALTextPos(0, 2), "a", std::string(), {}, text));
-            REQUIRE(model.list().empty());
+            CHECK(model.list().empty());
         }
     }
 
@@ -159,7 +158,6 @@ namespace
         UNSCOPED_INFO("hidden");
         CHECK_FALSE(model.relisted("say"));
         model.narrow(ALTextPos(0, 0), ALTextPos(0, 1), "s", std::string(), {}, text);
-        UNSCOPED_INFO("asked");
         CHECK(model.asked() == ALTextPos(0, 0));
         model.close();
         UNSCOPED_INFO("closed");
@@ -200,7 +198,6 @@ namespace
             many.push_back(word(name, ALSyntaxKind::Variable));
         }
         ALCompletionModel::rank(many, "w");
-        UNSCOPED_INFO("the cap");
         REQUIRE(many.size() == ALCompletionModel::CAP);
         {
             INFO("the best of them, in order");
@@ -257,7 +254,7 @@ namespace
         CHECK(joined(model.list()) == std::string("number"));
         model.narrow(ALTextPos(1, 6), ALTextPos(1, 7), "n", std::string(), {}, text);
         UNSCOPED_INFO("another identifier has them again");
-        REQUIRE(joined(model.list()).find("number_of") != std::string::npos);
+        CHECK(joined(model.list()).find("number_of") != std::string::npos);
     }
 
     TEST_CASE_METHOD(alcompletionmodel_data, "ALCompletionModel: in a string the match reads escapes but the range covers them", "[ALCompletionModel]")
@@ -274,6 +271,7 @@ namespace
         CHECK(model.range() == ALTextRange(start, ALTextPos(0, 19)));
     }
 
+    // Offered, it would be what Return takes, which doubles its tail.
     TEST_CASE_METHOD(alcompletionmodel_data, "ALCompletionModel: the identifier the caret is inside is not offered for itself", "[ALCompletionModel]")
     {
         const ALTextDocument text("x = foobar;\nfoobaz = 1\n");

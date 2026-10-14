@@ -49,33 +49,22 @@ namespace
     TEST_CASE_METHOD(altextdocument_data, "altextdocument: an empty document is one empty line", "[altextdocument]")
     {
         ALTextDocument doc;
-        UNSCOPED_INFO("one line");
         CHECK(doc.lineCount() == 1);
-        UNSCOPED_INFO("empty");
-        REQUIRE(doc.empty());
-        UNSCOPED_INFO("no text");
+        CHECK(doc.empty());
         CHECK(doc.text() == std::string());
-        UNSCOPED_INFO("no bytes");
         CHECK(doc.byteCount() == size_t(0));
-        UNSCOPED_INFO("end is start");
-        REQUIRE(doc.end() == doc.start());
+        CHECK(doc.end() == doc.start());
     }
 
     TEST_CASE_METHOD(altextdocument_data, "altextdocument: line endings arrive as anything and leave as LF", "[altextdocument]")
     {
         ALTextDocument doc("one\r\ntwo\rthree\nfour");
-        UNSCOPED_INFO("four lines");
         CHECK(doc.lineCount() == 4);
-        UNSCOPED_INFO("second");
         CHECK(doc.line(1) == std::string("two"));
-        UNSCOPED_INFO("third");
         CHECK(doc.line(2) == std::string("three"));
-        UNSCOPED_INFO("joined with LF");
         CHECK(doc.text() == std::string("one\ntwo\nthree\nfour"));
-        UNSCOPED_INFO("bytes");
-        REQUIRE(doc.byteCount() == doc.text().size());
-        UNSCOPED_INFO("end");
-        REQUIRE(doc.end() == ALTextPos(3, 4));
+        CHECK(doc.byteCount() == doc.text().size());
+        CHECK(doc.end() == ALTextPos(3, 4));
         UNSCOPED_INFO("a line past the end is empty");
         CHECK(doc.line(9) == std::string());
     }
@@ -86,19 +75,14 @@ namespace
         listen(doc);
         const U32 before = doc.version();
         ALTextDocument::Edit edit = doc.insert(ALTextPos(0, 5), ",");
-        UNSCOPED_INFO("text");
         CHECK(doc.text() == std::string("hello, world"));
         UNSCOPED_INFO("range is where it went");
         CHECK(edit.range == ALTextRange(ALTextPos(0, 5), ALTextPos(0, 5)));
-        UNSCOPED_INFO("nothing removed");
         CHECK(edit.removed == std::string());
-        UNSCOPED_INFO("inserted");
         CHECK(edit.inserted == std::string(","));
         UNSCOPED_INFO("ends after the comma");
         CHECK(edit.endAfter() == ALTextPos(0, 6));
-        UNSCOPED_INFO("version moved");
         CHECK(doc.version() > before);
-        UNSCOPED_INFO("heard once");
         REQUIRE(heard.size() == size_t(1));
         UNSCOPED_INFO("heard the same");
         CHECK(heard.front().inserted == std::string(","));
@@ -108,13 +92,10 @@ namespace
     {
         ALTextDocument doc("abcd");
         ALTextDocument::Edit split = doc.insert(ALTextPos(0, 2), "1\n22\n");
-        UNSCOPED_INFO("three lines");
         CHECK(doc.lineCount() == 3);
-        UNSCOPED_INFO("text");
         CHECK(doc.text() == std::string("ab1\n22\ncd"));
         UNSCOPED_INFO("ends at the start of the last line");
         CHECK(split.endAfter() == ALTextPos(2, 0));
-        UNSCOPED_INFO("range after");
         CHECK(split.rangeAfter() == ALTextRange(ALTextPos(0, 2), ALTextPos(2, 0)));
 
         ALTextDocument::Edit joined = doc.remove(ALTextRange(ALTextPos(0, 3), ALTextPos(2, 1)));
@@ -135,13 +116,10 @@ namespace
     {
         ALTextDocument doc("one\ntwo\nthree\nfour");
         ALTextDocument::Edit edit = doc.replace(ALTextRange(ALTextPos(2, 3), ALTextPos(0, 2)), "X\nY");
-        UNSCOPED_INFO("text");
         CHECK(doc.text() == std::string("onX\nYee\nfour"));
         UNSCOPED_INFO("range normalised");
         CHECK(edit.range == ALTextRange(ALTextPos(0, 2), ALTextPos(2, 3)));
-        UNSCOPED_INFO("removed");
         CHECK(edit.removed == std::string("e\ntwo\nthr"));
-        UNSCOPED_INFO("text of a range");
         CHECK(doc.text(ALTextRange(ALTextPos(0, 1), ALTextPos(1, 2))) == std::string("nX\nYe"));
     }
 
@@ -151,12 +129,10 @@ namespace
         listen(doc);
         const U32 before = doc.version();
         ALTextDocument::Edit edit = doc.remove(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)));
-        UNSCOPED_INFO("nothing");
         CHECK(edit.nothing());
-        UNSCOPED_INFO("version still");
         CHECK(doc.version() == before);
         UNSCOPED_INFO("nobody told");
-        REQUIRE(heard.empty());
+        CHECK(heard.empty());
         UNSCOPED_INFO("clamped past the end");
         CHECK(doc.insert(ALTextPos(7, 7), "").nothing());
     }
@@ -164,24 +140,20 @@ namespace
     TEST_CASE_METHOD(altextdocument_data, "altextdocument: offsets and positions agree and the whole text kept follows edits", "[altextdocument]")
     {
         ALTextDocument doc("ab\n\ncde");
-        UNSCOPED_INFO("start");
         CHECK(doc.offsetOf(ALTextPos(0, 0)) == size_t(0));
         UNSCOPED_INFO("past the first break");
         CHECK(doc.offsetOf(ALTextPos(1, 0)) == size_t(3));
         UNSCOPED_INFO("into the last");
         CHECK(doc.offsetOf(ALTextPos(2, 2)) == size_t(6));
-        UNSCOPED_INFO("back");
         CHECK(doc.posAt(6) == ALTextPos(2, 2));
         UNSCOPED_INFO("the empty line");
         CHECK(doc.posAt(3) == ALTextPos(1, 0));
         UNSCOPED_INFO("a break's own offset is the line end before it");
         CHECK(doc.posAt(2) == ALTextPos(0, 2));
         UNSCOPED_INFO("past everything is the end");
-        REQUIRE(doc.posAt(99) == doc.end());
+        CHECK(doc.posAt(99) == doc.end());
         // The whole text is kept between edits and follows them.
-        UNSCOPED_INFO("the whole");
         CHECK(doc.wholeText() == std::string("ab\n\ncde"));
-        UNSCOPED_INFO("the line starts");
         CHECK(doc.lineStarts() == std::vector<size_t>({ 0, 3, 4 }));
         doc.insert(ALTextPos(0, 2), "X\nY");
         UNSCOPED_INFO("the whole after an edit");
@@ -273,7 +245,6 @@ namespace
         CHECK(doc.posAtDisplayColumn(0, 2, 4) == ALTextPos(0, 0));
         UNSCOPED_INFO("past the end is the end");
         CHECK(doc.posAtDisplayColumn(0, 40, 4) == ALTextPos(0, 7));
-        UNSCOPED_INFO("column six");
         CHECK(doc.posAtDisplayColumn(0, 6, 4) == ALTextPos(0, 3));
         // ASCII alone, read a byte a column.
         ALTextDocument ascii("\tab\tc");
@@ -295,18 +266,15 @@ namespace
         listen(doc);
         const U32            before = doc.version();
         ALTextDocument::Edit same   = doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)), "two");
-        UNSCOPED_INFO("nothing");
         CHECK(same.nothing());
-        UNSCOPED_INFO("the version still");
         CHECK(doc.version() == before);
-        UNSCOPED_INFO("nobody told");
-        REQUIRE(heard.empty());
+        CHECK(heard.empty());
         UNSCOPED_INFO("the text as it was");
         CHECK(doc.text() == std::string("one two"));
         {
             INFO("and a different text is an edit");
             CHECK_FALSE(doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)), "Two").nothing());
-            REQUIRE(heard.size() == 1);
+            CHECK(heard.size() == 1);
         }
     }
 
@@ -315,9 +283,7 @@ namespace
         ALTextDocument doc;
         doc.append("one\ntwo");
         doc.append("\nthree");
-        UNSCOPED_INFO("three lines");
         CHECK(doc.lineCount() == 3);
-        UNSCOPED_INFO("in the order it came");
         CHECK(doc.text() == std::string("one\ntwo\nthree"));
     }
 
@@ -327,9 +293,9 @@ namespace
         ALTextDocument    doc("one two three\nfour five");
         // Inside it, longer: the end moves on by what grew.
         ALTextDocument::Edit grew = doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)), "TWO!!");
-        UNSCOPED_INFO("grown");
-        CHECK(grew.stretched(scope) == ALTextRange(ALTextPos(0, 4), ALTextPos(1, 3)));
         UNSCOPED_INFO("its end on the next line as it was");
+        CHECK(grew.stretched(scope) == ALTextRange(ALTextPos(0, 4), ALTextPos(1, 3)));
+        UNSCOPED_INFO("grown");
         CHECK(grew.stretched(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 13))) == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 15)));
         // Before it: both ends move along.
         doc.setText("one two three");
@@ -391,7 +357,6 @@ namespace
         doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(1, 1)), "x\r\nyz\r\n");
         doc.insert(ALTextPos(0, 0), "q");
         doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)), std::string_view());
-        UNSCOPED_INFO("three heard");
         REQUIRE(heard.size() == size_t(3));
         for (const ALTextDocument::Edit& edit : heard)
         {
@@ -400,14 +365,11 @@ namespace
             ALTextDocument::Edit by_hand{ edit.range, edit.removed, edit.inserted };
             UNSCOPED_INFO("by hand, not");
             REQUIRE_FALSE(by_hand.endKept);
-            UNSCOPED_INFO("the same end");
             REQUIRE(edit.endAfter() == by_hand.endAfter());
-            UNSCOPED_INFO("the same breaks");
             REQUIRE(edit.breaksInserted() == by_hand.breaksInserted());
         }
         UNSCOPED_INFO("across the line endings put in, as LF");
         CHECK(heard[0].endAfter() == ALTextPos(2, 0));
-        UNSCOPED_INFO("two breaks");
         CHECK(heard[0].breaksInserted() == 2);
         UNSCOPED_INFO("one character on");
         CHECK(heard[1].endAfter() == ALTextPos(0, 1));
@@ -423,10 +385,9 @@ namespace
         typedef ALTextPos   P;
         const ALTextDocument::Edit edit =
             doc.replaceMany({ { R(P(0, 4), P(0, 7)), "2" }, { R(P(1, 0), P(1, 5)), "3\nTHREE" }, { R(P(2, 5), P(2, 8)), "6" }, { R(P(2, 0), P(2, 4)), "5" } });
-        UNSCOPED_INFO("the text");
         CHECK(doc.text() == std::string("one 2\n3\nTHREE four\n5 6\nseven"));
         UNSCOPED_INFO("one notification");
-        REQUIRE(heard.size() == 1);
+        CHECK(heard.size() == 1);
         UNSCOPED_INFO("from the first to the last");
         CHECK(edit.range == R(P(0, 4), P(2, 8)));
         const std::vector<ALTextDocument::Edit::Part>& parts = edit.parts;
@@ -498,7 +459,7 @@ namespace
         {
             INFO("one stretch is a plain edit");
             REQUIRE(heard.size() == 1);
-            REQUIRE(heard[0].parts.empty());
+            CHECK(heard[0].parts.empty());
         }
     }
 
@@ -523,7 +484,6 @@ namespace
         CHECK(alBlanksWidth("\t  x", 4) == 6);
         UNSCOPED_INFO("nothing blank");
         CHECK(alBlanksWidth("x  ", 4, &bytes) == 0);
-        UNSCOPED_INFO("no bytes");
         CHECK(bytes == size_t(0));
         UNSCOPED_INFO("all blank");
         CHECK(alBlanksWidth(" \t", 2, &bytes) == 2);
@@ -602,7 +562,7 @@ namespace
             std::vector<size_t> stops = utf8str_grapheme_starts(line, line.size());
             for (size_t c : stops)
             {
-                UNSCOPED_INFO("forward in \"" + line + "\" at " + std::to_string(c));
+                CAPTURE(line, c);
                 REQUIRE(d.nextCluster(ALTextPos(l, static_cast<S32>(c))).column ==
                               static_cast<S32>(utf8str_step_grapheme_forward(line, c)));
             }
@@ -611,22 +571,22 @@ namespace
             {
                 if (c > 0)
                 {
-                    UNSCOPED_INFO("back in \"" + line + "\" at " + std::to_string(c));
+                    CAPTURE(line, c);
                     REQUIRE(d.prevCluster(ALTextPos(l, static_cast<S32>(c))).column ==
                                   static_cast<S32>(utf8str_step_grapheme_backward(line, c)));
                 }
             }
             for (size_t c = 0; c <= line.size(); ++c)
             {
-                UNSCOPED_INFO("clamped in \"" + line + "\" at " + std::to_string(c));
+                CAPTURE(line, c);
                 REQUIRE(d.clamp(ALTextPos(l, static_cast<S32>(c))).column ==
                               static_cast<S32>(utf8str_grapheme_align_backward(line, c)));
             }
         }
         UNSCOPED_INFO("off a line's end to the next");
-        REQUIRE(d.nextCluster(ALTextPos(0, static_cast<S32>(lines[0].size()))) == ALTextPos(1, 0));
+        CHECK(d.nextCluster(ALTextPos(0, static_cast<S32>(lines[0].size()))) == ALTextPos(1, 0));
         UNSCOPED_INFO("back off its start to the one before");
-        REQUIRE(d.prevCluster(ALTextPos(1, 0)) == ALTextPos(0, static_cast<S32>(lines[0].size())));
+        CHECK(d.prevCluster(ALTextPos(1, 0)) == ALTextPos(0, static_cast<S32>(lines[0].size())));
     }
 
     TEST_CASE_METHOD(altextdocument_data, "altextdocument: an edit moves a place pushed or not and finds the stretch it stood in", "[altextdocument]")
@@ -640,12 +600,11 @@ namespace
         UNSCOPED_INFO("after it moved either way");
         CHECK(typed.placed(ALTextPos(0, 3), false) == ALTextPos(0, 5));
         UNSCOPED_INFO("nothing stood in what was put in");
-        REQUIRE_FALSE(typed.replacedAround(ALTextPos(0, 2)));
+        CHECK_FALSE(typed.replacedAround(ALTextPos(0, 2)));
 
         // "abXYcdef": "XY" and "ef" replaced at once.
         const ALTextDocument::Edit batch =
             doc.replaceMany({ { ALTextRange(ALTextPos(0, 2), ALTextPos(0, 4)), "-" }, { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 8)), "" } });
-        UNSCOPED_INFO("made");
         CHECK(doc.text() == std::string("ab-cd"));
         UNSCOPED_INFO("in the first");
         CHECK(batch.replacedAround(ALTextPos(0, 3)) == ALTextRange(ALTextPos(0, 2), ALTextPos(0, 4)));
@@ -653,14 +612,15 @@ namespace
         CHECK(batch.replacedAround(ALTextPos(0, 6)) == ALTextRange(ALTextPos(0, 6), ALTextPos(0, 8)));
         {
             INFO("not between them");
-            REQUIRE_FALSE(batch.replacedAround(ALTextPos(0, 4)));
-            REQUIRE_FALSE(batch.replacedAround(ALTextPos(0, 5)));
+            CHECK_FALSE(batch.replacedAround(ALTextPos(0, 4)));
+            CHECK_FALSE(batch.replacedAround(ALTextPos(0, 5)));
         }
         UNSCOPED_INFO("nor at an end");
-        REQUIRE_FALSE(batch.replacedAround(ALTextPos(0, 8)));
+        CHECK_FALSE(batch.replacedAround(ALTextPos(0, 8)));
         UNSCOPED_INFO("between them, moved by the first");
         CHECK(batch.placed(ALTextPos(0, 5)) == ALTextPos(0, 4));
     }
+
     TEST_CASE_METHOD(altextdocument_data, "altextdocument: CRLF and a lone CR split lines as reading a character at a time does", "[altextdocument]")
     {
         // Each character read in turn: what the lines are.
@@ -714,7 +674,7 @@ namespace
             {
                 got.push_back(doc.line(l));
             }
-            UNSCOPED_INFO("the lines of a text of " + std::to_string(text.size()) + " bytes");
+            CAPTURE(text.size());
             REQUIRE(got == want);
             ALTextDocument replaced("something else\nfirst");
             replaced.setText(text);
@@ -726,8 +686,8 @@ namespace
     TEST_CASE_METHOD(altextdocument_data, "altextdocument: the bytes of the text and of a stretch agree after every kind of edit", "[altextdocument]")
     {
         ALTextDocument doc("one\r\ntwo\rthree");
-        const auto agrees = [&doc](const std::string& what) {
-            UNSCOPED_INFO(what + ": the whole");
+        const auto require_bytes_agree = [&doc](const std::string& what) {
+            INFO(what);
             REQUIRE(doc.byteCount() == doc.text().size());
             const S32         last     = doc.lineCount() - 1;
             const ALTextRange ranges[] = { ALTextRange(doc.start(), doc.end()), ALTextRange(ALTextPos(0, 1), ALTextPos(0, 2)),
@@ -735,21 +695,20 @@ namespace
                                            ALTextRange(ALTextPos(-3, 9), ALTextPos(99, 99)) };
             for (const ALTextRange& range : ranges)
             {
-                UNSCOPED_INFO(what + ": a stretch");
                 REQUIRE(doc.byteCount(range) == doc.text(range).size());
             }
         };
-        agrees("as read");
+        require_bytes_agree("as read");
         doc.insert(ALTextPos(1, 1), "X\r\nY");
-        agrees("a break put in");
+        require_bytes_agree("a break put in");
         doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(2, 1)), "z");
-        agrees("lines taken out");
+        require_bytes_agree("lines taken out");
         doc.replaceMany({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)), "ab\ncd" }, { ALTextRange(doc.end(), doc.end()), "\r\n\n" } });
-        agrees("a batch");
+        require_bytes_agree("a batch");
         doc.remove(ALTextRange(doc.start(), doc.end()));
-        agrees("everything gone");
+        require_bytes_agree("everything gone");
         doc.setText("again\nand again");
-        agrees("a text put in whole");
+        require_bytes_agree("a text put in whole");
     }
 
     TEST_CASE_METHOD(altextdocument_data, "altextdocument: code word steps never stop inside a keycap or a blank a mark is on", "[altextdocument]")

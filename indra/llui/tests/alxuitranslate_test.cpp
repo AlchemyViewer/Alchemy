@@ -110,24 +110,21 @@ namespace
         ALXUITranslate units;
         units.scan(root, pugi::xml_node());
 
-        UNSCOPED_INFO("the title is a unit");
-        REQUIRE(find(units, "", "title"));
-        UNSCOPED_INFO("a label is a unit");
-        REQUIRE(find(units, "ok", "label"));
-        UNSCOPED_INFO("a tool tip is a unit");
-        REQUIRE(find(units, "ok", "tool_tip"));
+        CHECK(find(units, "", "title"));
+        CHECK(find(units, "ok", "label"));
+        CHECK(find(units, "ok", "tool_tip"));
         UNSCOPED_INFO("body text is a unit");
-        REQUIRE(find(units, "greeting", ""));
+        CHECK(find(units, "greeting", ""));
         UNSCOPED_INFO("a value with no text or label of its own is a unit");
-        REQUIRE(find(units, "inner/deep", "value"));
+        CHECK(find(units, "inner/deep", "value"));
         UNSCOPED_INFO("a number is not: " + describe(units));
-        REQUIRE_FALSE(find(units, "count", "value"));
+        CHECK_FALSE(find(units, "count", "value"));
         UNSCOPED_INFO("a resolution is not");
-        REQUIRE_FALSE(find(units, "size", "value"));
+        CHECK_FALSE(find(units, "size", "value"));
         UNSCOPED_INFO("what the file forbids is not");
-        REQUIRE_FALSE(find(units, "code", "value"));
+        CHECK_FALSE(find(units, "code", "value"));
         UNSCOPED_INFO("and with no language, every one of them is missing");
-        REQUIRE(units.count(ALXUITranslate::State::Missing) == (S32)units.units().size());
+        CHECK(units.count(ALXUITranslate::State::Missing) == (S32)units.units().size());
     }
 
     // The four states a language's value can be in.
@@ -149,13 +146,10 @@ namespace
         units.scan(root, overlay);
 
         const ALXUITranslate::Unit* title = find(units, "", "title");
-        UNSCOPED_INFO("the title is there");
         REQUIRE(title);
-        UNSCOPED_INFO("and applies");
         CHECK((int)title->state == (int)ALXUITranslate::State::Translated);
 
         const ALXUITranslate::Unit* tip = find(units, "ok", "tool_tip");
-        UNSCOPED_INFO("the tool tip is there");
         REQUIRE(tip);
         UNSCOPED_INFO("and lost its placeholder");
         CHECK((int)tip->state == (int)ALXUITranslate::State::Placeholders);
@@ -165,7 +159,6 @@ namespace
         // value arrives -- and the unit says both that it arrives and that
         // the base has moved on from where it was written.
         const ALXUITranslate::Unit* deep = find(units, "inner/deep", "value");
-        UNSCOPED_INFO("the nested one is there");
         REQUIRE(deep);
         UNSCOPED_INFO("written at a path the base moved on from, and applied all the same: " + describe(units));
         CHECK((int)deep->state == (int)ALXUITranslate::State::Rescued);
@@ -179,7 +172,6 @@ namespace
         const ALXUITranslate::Unit* code = find(units, "code", "value");
         UNSCOPED_INFO("what the file forbids, translated anyway, is shown");
         REQUIRE(code);
-        UNSCOPED_INFO("as forbidden");
         CHECK((int)code->state == (int)ALXUITranslate::State::Forbidden);
 
         const ALXUITranslate::Unit* gone = find(units, "gone", "value");
@@ -199,18 +191,17 @@ namespace
         pugi::xml_node root = base.load(english());
 
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer("<panel name=\"root\">\n</panel>\n"));
 
         ALXUITranslate units;
         units.scan(root, overlay.root());
         const ALXUITranslate::Unit* deep = find(units, "inner/deep", "value");
-        UNSCOPED_INFO("the unit is there");
         REQUIRE(deep);
 
         std::string error;
+        const bool wrote = ALXUITranslate::write(overlay, root, *deep, "Anidado", error);
         UNSCOPED_INFO("writes: " + error);
-        CHECK(ALXUITranslate::write(overlay, root, *deep, "Anidado", error));
+        CHECK(wrote);
         UNSCOPED_INFO("the chain, and nothing else on it");
         CHECK(overlay.text() ==
             "<panel name=\"root\">\n"
@@ -228,7 +219,6 @@ namespace
         pugi::xml_node root = base.load(english());
 
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer(
             "<panel name=\"root\">\n"
             "    <!-- a comment that stays -->\n"
@@ -239,7 +229,6 @@ namespace
         ALXUITranslate units;
         units.scan(root, overlay.root());
         const ALXUITranslate::Unit* deep = find(units, "inner/deep", "value");
-        UNSCOPED_INFO("the unit is there");
         REQUIRE(deep);
         UNSCOPED_INFO("and the language has it in the wrong place, where the merge rescues it");
         CHECK((int)deep->state == (int)ALXUITranslate::State::Rescued);
@@ -247,8 +236,9 @@ namespace
         CHECK((int)deep->miss == (int)ALXUITranslate::Miss::Moved);
 
         std::string error;
+        const bool wrote = ALXUITranslate::write(overlay, root, *deep, "Anidado", error);
         UNSCOPED_INFO("writes: " + error);
-        CHECK(ALXUITranslate::write(overlay, root, *deep, "Anidado", error));
+        CHECK(wrote);
         UNSCOPED_INFO("moved under the ancestor it needed");
         CHECK(overlay.text() ==
             "<panel name=\"root\">\n"
@@ -267,7 +257,6 @@ namespace
         pugi::xml_node root = base.load(english());
 
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer("<panel name=\"root\">\n</panel>\n"));
         const std::string before = overlay.text();
 
@@ -280,9 +269,9 @@ namespace
         unit.field = "label";
 
         UNSCOPED_INFO("an empty translation is refused");
-        REQUIRE_FALSE(ALXUITranslate::write(overlay, root, unit, "", error));
+        CHECK_FALSE(ALXUITranslate::write(overlay, root, unit, "", error));
         UNSCOPED_INFO("and says why");
-        REQUIRE_FALSE(error.empty());
+        CHECK_FALSE(error.empty());
 
         unit.field = "left";
         UNSCOPED_INFO("a layout attribute is refused");
@@ -320,7 +309,6 @@ namespace
         // The language has both, and has put one of them at the wrong
         // depth: the box is there, the item is outside it.
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer(
             "<panel name=\"root\">\n"
             "    <combo_box name=\"first\">\n"
@@ -365,7 +353,6 @@ namespace
             "<panel name=\"root\">\n"
             "    <text name=\"here\" value=\"Uno\"/>\n"
             "</panel>\n";
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer(before));
 
         std::string error;
@@ -392,7 +379,6 @@ namespace
 
         // Flat, and wrapped in a shell of its own that says nothing.
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer(
             "<panel name=\"root\">\n"
             "    <panel name=\"stale\">\n"
@@ -402,8 +388,9 @@ namespace
             "</panel>\n"));
 
         std::string error;
+        const S32 moved = ALXUITranslate::repair(overlay, root, error);
         UNSCOPED_INFO("both move: " + error);
-        CHECK(ALXUITranslate::repair(overlay, root, error) == 2);
+        CHECK(moved == 2);
 
         const std::string& text = overlay.text();
         const size_t middle = text.find("<panel name=\"middle\">");
@@ -412,14 +399,14 @@ namespace
         UNSCOPED_INFO("under the ancestor above it");
         CHECK(text.find("<panel name=\"outer\">") < middle);
         UNSCOPED_INFO("the shell they came out of is gone");
-        REQUIRE(text.find("stale") == std::string::npos);
+        CHECK(text.find("stale") == std::string::npos);
         {
             INFO("and both values are inside it");
-            REQUIRE(text.find("Uno", middle) != std::string::npos);
-            REQUIRE(text.find("Dos", middle) != std::string::npos);
+            CHECK(text.find("Uno", middle) != std::string::npos);
+            CHECK(text.find("Dos", middle) != std::string::npos);
         }
         UNSCOPED_INFO("each on its own line, indented for where it landed");
-        REQUIRE(text.find("\n            <text") != std::string::npos);
+        CHECK(text.find("\n            <text") != std::string::npos);
     }
 
     // What a file has to say, and what it has outlived.
@@ -469,7 +456,6 @@ namespace
             "</panel>\n");
 
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer(
             "<panel name=\"root\">\n"
             "    <text name=\"twice\" value=\"Uno\"/>\n"
@@ -497,7 +483,6 @@ namespace
             "    </panel>\n"
             "    <text name=\"twice\" value=\"Dos\"/>\n"
             "</panel>\n";
-        UNSCOPED_INFO("loads");
         REQUIRE(second.loadBuffer(before));
         UNSCOPED_INFO("nothing is moved");
         CHECK(ALXUITranslate::repair(second, root, error) == 0);
@@ -518,15 +503,15 @@ namespace
             "</panel>\n");
 
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer(
             "<panel name=\"root\">\n"
             "    <text name=\"Give to #RLV\" value=\"Dar\"/>\n"
             "</panel>\n"));
 
         std::string error;
+        const S32 moved = ALXUITranslate::repair(overlay, root, error);
         UNSCOPED_INFO("the hash in the name is part of it: " + error);
-        CHECK(ALXUITranslate::repair(overlay, root, error) == 1);
+        CHECK(moved == 1);
         UNSCOPED_INFO("so it moves like any other name");
         CHECK(overlay.text() ==
             "<panel name=\"root\">\n"
@@ -564,7 +549,6 @@ namespace
         units.scan(root, mine);
 
         const ALXUITranslate::Unit* unit = find(units, "greeting", "");
-        UNSCOPED_INFO("body text is a unit");
         REQUIRE(unit != nullptr);
         UNSCOPED_INFO("the English is what a widget would be given");
         CHECK(unit->english == std::string("Show direction to:"));
@@ -584,21 +568,18 @@ namespace
 
         // An overlay with nothing but the root: everything below is written.
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer("<panel name=\"root\"/>\n"));
 
         std::string error;
-        UNSCOPED_INFO("the chain is written");
         REQUIRE(ALXUITranslate::ensureChain(overlay, root, { "inner", "deep" }, error));
         UNSCOPED_INFO("with nothing to say about it: " + error);
-        REQUIRE(error.empty());
+        CHECK(error.empty());
         UNSCOPED_INFO("and the element is now there");
-        REQUIRE(overlay.resolve({ "inner", "deep" }));
+        CHECK(overlay.resolve({ "inner", "deep" }));
 
         // Each ancestor carries nothing but its name, because that is all the
         // merge reads and anything else would be an override nobody asked for.
         const pugi::xml_node inner = overlay.resolve({ "inner" });
-        UNSCOPED_INFO("the ancestor is there");
         REQUIRE(inner);
         S32 attributes = 0;
         for (pugi::xml_attribute one : inner.attributes())
@@ -612,13 +593,13 @@ namespace
         UNSCOPED_INFO("the override is written");
         CHECK(overlay.setAttribute({ "inner", "deep" }, "width", "40"));
         UNSCOPED_INFO("and the file says so");
-        REQUIRE(overlay.text().find("width=\"40\"") != std::string::npos);
+        CHECK(overlay.text().find("width=\"40\"") != std::string::npos);
 
         // An element the base does not have is not one to make a way down to.
         UNSCOPED_INFO("no base element, no chain");
         CHECK_FALSE(ALXUITranslate::ensureChain(overlay, root, { "inner", "nowhere" }, error));
         UNSCOPED_INFO("and it says why");
-        REQUIRE_FALSE(error.empty());
+        CHECK_FALSE(error.empty());
     }
 
     // The merge rescues a moved element only where exactly one of its
@@ -689,7 +670,6 @@ namespace
         // since the rescue lasts only until the base grows another of the
         // name.
         ALXUIEdit fix;
-        UNSCOPED_INFO("loads");
         REQUIRE(fix.loadBuffer(
             "<panel name=\"root\">\n"
             "    <text name=\"deep\" value=\"Anidado\"/>\n"
@@ -709,8 +689,9 @@ namespace
             CHECK(one->state == ALXUITranslate::State::Rescued);
         }
         std::string error;
+        const S32 moved = ALXUITranslate::repair(fix, one_below, error);
         UNSCOPED_INFO("the repair moves it: " + error);
-        CHECK(ALXUITranslate::repair(fix, one_below, error) == 1);
+        CHECK(moved == 1);
         units.scan(one_below, fix.root());
         one = find(units, "inner/deep", "value");
         {
@@ -735,7 +716,6 @@ namespace
             "    </combo_box>\n"
             "</panel>\n");
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer(
             "<panel name=\"root\">\n"
             "    <combo_box name=\"c\">\n"
@@ -752,16 +732,14 @@ namespace
             REQUIRE(one);
             REQUIRE(two);
         }
-        UNSCOPED_INFO("the first is missing");
         CHECK((int)one->state == (int)ALXUITranslate::State::Missing);
-        UNSCOPED_INFO("the second is translated");
         CHECK((int)two->state == (int)ALXUITranslate::State::Translated);
-        UNSCOPED_INFO("with the language's word");
         CHECK(two->translation == std::string("Zwei"));
 
         std::string error;
+        const bool wrote = ALXUITranslate::write(overlay, root, *one, "Eins", error);
         UNSCOPED_INFO("writes the first: " + error);
-        CHECK(ALXUITranslate::write(overlay, root, *one, "Eins", error));
+        CHECK(wrote);
         UNSCOPED_INFO("as an item named by its value");
         CHECK(overlay.text() ==
             "<panel name=\"root\">\n"
@@ -787,7 +765,6 @@ namespace
         Doc base;
         pugi::xml_node root = base.load(english());
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer(
             "<panel name=\"root\">\n"
             "    <panel name=\"inner\">\n"
@@ -804,8 +781,9 @@ namespace
         UNSCOPED_INFO("applying to nothing");
         CHECK((int)tip->miss == (int)ALXUITranslate::Miss::AttributeAbsent);
         std::string error;
+        const bool tip_out = ALXUITranslate::remove(overlay, *tip, error);
         UNSCOPED_INFO("taken out: " + error);
-        REQUIRE(ALXUITranslate::remove(overlay, *tip, error));
+        CHECK(tip_out);
         UNSCOPED_INFO("the attribute alone");
         CHECK(overlay.text() ==
             "<panel name=\"root\">\n"
@@ -819,8 +797,9 @@ namespace
         const ALXUITranslate::Unit* gone = find(units, "inner/gone", "");
         UNSCOPED_INFO("the element the base lacks is a unit: " + describe(units));
         REQUIRE(gone);
+        const bool gone_out = ALXUITranslate::remove(overlay, *gone, error);
         UNSCOPED_INFO("taken out: " + error);
-        CHECK(ALXUITranslate::remove(overlay, *gone, error));
+        CHECK(gone_out);
         UNSCOPED_INFO("the whole element, since its text was all it said");
         CHECK(overlay.text() ==
             "<panel name=\"root\">\n"
@@ -831,10 +810,10 @@ namespace
 
         units.scan(root, overlay.root());
         const ALXUITranslate::Unit* deep = find(units, "inner/deep", "value");
-        UNSCOPED_INFO("the translated value is a unit");
         REQUIRE(deep);
+        const bool deep_out = ALXUITranslate::remove(overlay, *deep, error);
         UNSCOPED_INFO("taken out as well: " + error);
-        CHECK(ALXUITranslate::remove(overlay, *deep, error));
+        CHECK(deep_out);
         UNSCOPED_INFO("and the shell above it goes with it");
         CHECK(overlay.text() ==
             "<panel name=\"root\">\n"
@@ -858,7 +837,6 @@ namespace
             "    <button name=\"twice\" label=\"B\"/>\n"
             "</panel>\n");
         ALXUIEdit overlay;
-        UNSCOPED_INFO("loads");
         REQUIRE(overlay.loadBuffer(
             "<panel name=\"root\" title=\"Lugares\">\n"
             "    <text name=\"deep\" value=\"Anidado\" tool_tip=\"Nada\"/>\n"

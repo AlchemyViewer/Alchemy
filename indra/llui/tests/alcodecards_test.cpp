@@ -49,10 +49,8 @@ namespace
         const std::string says = "local x: number\nA number.\n" + ALCodeCards::deprecatedNote() + "\ndeclared at line 3";
         const ALCodeCards::Composition card = ALCodeCards::compose(problems, fixes, says, links);
 
-        UNSCOPED_INFO("the text");
-        CHECK(card.text ==
-                      "unknown global 'x'\ntwo\nlines\nFix: Declare 'x'\n\nlocal x: number\nA number.\n" + ALCodeCards::deprecatedNote() +
-                          "\ndeclared at line 3");
+        CHECK(card.text == "unknown global 'x'\ntwo\nlines\nFix: Declare 'x'\n\nlocal x: number\nA number.\n" + ALCodeCards::deprecatedNote() +
+                               "\ndeclared at line 3");
         UNSCOPED_INFO("each problem's lines, the second two");
         CHECK(card.problemLines == std::vector<std::pair<S32, size_t>>{ { 0, 0 }, { 1, 1 }, { 2, 1 } });
         {
@@ -75,7 +73,7 @@ namespace
         {
             INFO("the head is the first line");
             CHECK(word.headLine == 0);
-            REQUIRE(word.problemLines.empty());
+            CHECK(word.problemLines.empty());
             CHECK(word.text == "ll.Say(channel: number, text: string)");
         }
         const ALCodeCards::Composition wrong = ALCodeCards::compose({ { "expected ')'", LLColor4::red } }, {}, std::string(), {});
@@ -118,10 +116,8 @@ namespace
     {
         ALCodeCards       cards;
         const ALTextRange word(ALTextPos(2, 4), ALTextPos(2, 9));
-        UNSCOPED_INFO("not asked");
         CHECK_FALSE(cards.askedAbout(word, 7));
         cards.asking(word, 7);
-        UNSCOPED_INFO("asked");
         CHECK(cards.askedAbout(word, 7));
         UNSCOPED_INFO("not for another version of the text");
         CHECK_FALSE(cards.askedAbout(word, 8));
@@ -132,20 +128,17 @@ namespace
         {
             INFO("an empty one taken, as nothing known of the word");
             CHECK(cards.heard(ALTextPos(2, 4), 7, std::string(), {}));
-            REQUIRE(cards.answer().empty());
+            CHECK(cards.answer().empty());
         }
         UNSCOPED_INFO("the word's, taken");
         CHECK(cards.heard(ALTextPos(2, 4), 7, "local n: number", { { "declared here", "", LLSD(1) } }));
-        {
-            INFO("kept");
-            CHECK(cards.answer() == "local n: number");
-            REQUIRE(cards.links().size() == 1);
-        }
+        CHECK(cards.answer() == "local n: number");
+        CHECK(cards.links().size() == 1);
         cards.asking(ALTextRange(ALTextPos(4, 0), ALTextPos(4, 2)), 7);
         {
             INFO("let go of for the next word");
-            REQUIRE(cards.answer().empty());
-            REQUIRE(cards.links().empty());
+            CHECK(cards.answer().empty());
+            CHECK(cards.links().empty());
         }
     }
 
@@ -162,11 +155,8 @@ namespace
         UNSCOPED_INFO("nor on another line");
         CHECK_FALSE(cards.signatureFor(ALTextPos(4, 12)));
         cards.hideSignature();
-        {
-            INFO("gone");
-            REQUIRE_FALSE(cards.signature());
-            CHECK_FALSE(cards.signatureFor(ALTextPos(3, 12)));
-        }
+        CHECK_FALSE(cards.signature());
+        CHECK_FALSE(cards.signatureFor(ALTextPos(3, 12)));
 
         const LLRect view(0, 300, 400, 0);
         UNSCOPED_INFO("above the row");

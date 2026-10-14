@@ -85,7 +85,6 @@ namespace
         const std::vector<std::string> saved = { "a", "b", "c", "d", "e" };
         const std::vector<std::string> now   = { "a", "B", "c", "x", "d" };
         const std::vector<Change>      found = ALChangePeek::changesOf(saved, now);
-        UNSCOPED_INFO("three");
         REQUIRE(found.size() == 3U);
         UNSCOPED_INFO("changed");
         CHECK(found[0] == Change{ 1, 1, 1, 1 });
@@ -102,13 +101,12 @@ namespace
         UNSCOPED_INFO("a line the same");
         CHECK(ALChangePeek::changeAt(found, 2) == -1);
         UNSCOPED_INFO("none where nothing changed");
-        REQUIRE(ALChangePeek::changesOf(saved, saved).empty());
+        CHECK(ALChangePeek::changesOf(saved, saved).empty());
     }
 
     TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: a peek shows the saved lines in a gap under the change and steps on", "[alchangepeek]")
     {
         ALCodeEditor& e = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
-        UNSCOPED_INFO("a change");
         CHECK(e.peekChange(1));
         ALChangePeek& peek = *e.changePeek();
         {
@@ -117,11 +115,8 @@ namespace
             CHECK(peek.changeShown() == 0);
             CHECK(peek.changeCount() == 3);
         }
-        {
-            INFO("said");
-            REQUIRE(peek.said().find("1 of 3") != std::string::npos);
-            REQUIRE(peek.said().find("Changed") != std::string::npos);
-        }
+        CHECK(peek.said().find("1 of 3") != std::string::npos);
+        CHECK(peek.said().find("Changed") != std::string::npos);
         UNSCOPED_INFO("the line as saved");
         CHECK(peek.savedText()->wholeText() == std::string("b"));
         UNSCOPED_INFO("numbered as it was");
@@ -153,12 +148,12 @@ namespace
         press(peek, "next");
         {
             INFO("the line put in");
-            REQUIRE(peek.changeShown() == 1);
-            REQUIRE(peek.gapLine() == 4);
+            CHECK(peek.changeShown() == 1);
+            CHECK(peek.gapLine() == 4);
             CHECK_FALSE(peek.savedText()->getVisible());
         }
         UNSCOPED_INFO("said as put in");
-        REQUIRE(peek.said().find("Added") != std::string::npos);
+        CHECK(peek.said().find("Added") != std::string::npos);
         UNSCOPED_INFO("the gap gone from where it was");
         CHECK(e.lineAnnotation(2).gap == 0);
         UNSCOPED_INFO("the caret on its line");
@@ -166,8 +161,8 @@ namespace
         press(peek, "next");
         {
             INFO("taken out at the end, under the last line");
-            REQUIRE(peek.changeShown() == 2);
-            REQUIRE(peek.gapLine() == 5);
+            CHECK(peek.changeShown() == 2);
+            CHECK(peek.gapLine() == 5);
             CHECK(peek.savedText()->wholeText() == "e");
         }
         {
@@ -257,12 +252,12 @@ namespace
         {
             INFO("open at its change");
             REQUIRE(e.changePeek());
-            REQUIRE(e.changePeek()->isOpen());
+            CHECK(e.changePeek()->isOpen());
             CHECK(e.changePeek()->changeShown() == 0);
         }
         {
             INFO("Escape closes it");
-            REQUIRE(e.changePeek()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            CHECK(e.changePeek()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
             CHECK_FALSE(e.changePeek()->isOpen());
         }
         const S32 same = text.mTop - (e.layout().lineTop(0) - e.scrollY()) - e.layout().lineHeight(0) / 2;
@@ -293,7 +288,7 @@ namespace
         CHECK(std::none_of(now.begin(), now.end(), [](const ALTextRange& r) { return r.begin.line != 0; }));
         peek.close();
         UNSCOPED_INFO("let go of");
-        REQUIRE(e.highlights(ALCodeEditor::Highlight::Change).empty());
+        CHECK(e.highlights(ALCodeEditor::Highlight::Change).empty());
 
         // A line put in alone has nothing to mark against.
         editor->die();
@@ -302,8 +297,8 @@ namespace
         f.peekChange(1);
         {
             INFO("nothing marked");
-            REQUIRE(f.highlights(ALCodeEditor::Highlight::Change).empty());
-            REQUIRE(f.changePeek()->savedText()->decorations().empty());
+            CHECK(f.highlights(ALCodeEditor::Highlight::Change).empty());
+            CHECK(f.changePeek()->savedText()->decorations().empty());
         }
     }
 
@@ -347,14 +342,14 @@ namespace
         typed("]c");
         {
             INFO("the peek gone along");
-            REQUIRE(e.caret().line == 4);
-            REQUIRE(e.changePeek()->isOpen());
+            CHECK(e.caret().line == 4);
+            CHECK(e.changePeek()->isOpen());
             CHECK(e.changePeek()->changeShown() == 1);
         }
         {
             INFO("as the editor steps without vim");
-            REQUIRE(e.stepChange(false));
-            REQUIRE(e.caret().line == 1);
+            CHECK(e.stepChange(false));
+            CHECK(e.caret().line == 1);
             CHECK(e.changePeek()->changeShown() == 0);
         }
         {
@@ -420,7 +415,6 @@ namespace
             now += (n ? "\n" : "") + std::string(n >= 40 && n <= 47 ? "changed " : "line ") + std::to_string(n);
         }
         ALCodeEditor& e = make(saved, now);
-        UNSCOPED_INFO("a change");
         CHECK(e.peekChange(40));
         ALChangePeek& peek = *e.changePeek();
         const LLRect  text = e.textRect();
@@ -467,7 +461,7 @@ namespace
         {
             INFO("known: three");
             REQUIRE(first);
-            REQUIRE(first->changes.size() == 3);
+            CHECK(first->changes.size() == 3);
             CHECK(first->version == e.document().version());
         }
         UNSCOPED_INFO("asked again, the same");
@@ -482,8 +476,8 @@ namespace
         CHECK(e.peekChange(1));
         {
             INFO("and on to the next");
-            REQUIRE(e.stepChange(true));
-            REQUIRE(e.caret().line == 3);
+            CHECK(e.stepChange(true));
+            CHECK(e.caret().line == 3);
             CHECK(e.changePeek()->changeShown() == 1);
         }
         UNSCOPED_INFO("nothing worked out again");
@@ -495,21 +489,21 @@ namespace
         {
             INFO("an edit: again, of the text as it is");
             REQUIRE(edited);
-            REQUIRE(edited != first);
-            REQUIRE(edited->version == e.document().version());
+            CHECK(edited != first);
+            CHECK(edited->version == e.document().version());
             CHECK(edited->now.front() == "ya");
         }
         {
             INFO("undone: again, three");
-            REQUIRE(e.perform(ALEditorCommand::Undo));
-            REQUIRE(e.changesSinceSaved() != edited);
-            REQUIRE(e.changesSinceSaved()->changes.size() == 3);
+            CHECK(e.perform(ALEditorCommand::Undo));
+            CHECK(e.changesSinceSaved() != edited);
+            CHECK(e.changesSinceSaved()->changes.size() == 3);
         }
         e.resetDirty();
         {
             INFO("saved: none");
             REQUIRE(e.changesSinceSaved());
-            REQUIRE(e.changesSinceSaved()->changes.empty());
+            CHECK(e.changesSinceSaved()->changes.empty());
         }
         // Changed by its document, which no journal is told of: again.
         e.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "z");
@@ -645,7 +639,7 @@ namespace
         e.handleMouseDown(e.leftEdge() + 1, y, MASK_NONE);
         e.handleMouseUp(e.leftEdge() + 1, y, MASK_NONE);
         UNSCOPED_INFO("no peek");
-        REQUIRE((!e.changePeek() || !e.changePeek()->isOpen()));
+        CHECK((!e.changePeek() || !e.changePeek()->isOpen()));
     }
 
     TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: a line put back as saved loses its bar once changes are worked out", "[alchangepeek]")

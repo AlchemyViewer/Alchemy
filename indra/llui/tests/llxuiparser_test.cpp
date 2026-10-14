@@ -133,7 +133,6 @@ namespace
     TEST_CASE("llxuiparser: attributes of every scalar kind reach the block", "[llxuiparser]")
     {
         XuiRoot block;
-        UNSCOPED_INFO("the document parsed");
         CHECK(parse("scalars",
                      "<root flag=\"true\""
                      " text=\"hello\""
@@ -144,27 +143,16 @@ namespace
                      " id=\"a2e76fcd-9360-4f6d-a924-000000000001\"/>",
                      block));
 
-        UNSCOPED_INFO("flag provided");
         CHECK(block.flag.isProvided());
-        UNSCOPED_INFO("flag");
-        CHECK(block.flag() == true);
-        UNSCOPED_INFO("text");
+        CHECK(block.flag());
         CHECK(block.text() == std::string("hello"));
-        UNSCOPED_INFO("small");
         CHECK((S32)block.small_number() == 200);
-        UNSCOPED_INFO("count");
         CHECK(block.count() == -17);
-        UNSCOPED_INFO("ratio");
         CHECK(block.ratio() == 0.5f);
-        UNSCOPED_INFO("tint red");
         CHECK(block.tint().mV[VRED] == 1.f);
-        UNSCOPED_INFO("tint green");
         CHECK(block.tint().mV[VGREEN] == 0.5f);
-        UNSCOPED_INFO("tint blue");
         CHECK(block.tint().mV[VBLUE] == 0.f);
-        UNSCOPED_INFO("tint alpha");
         CHECK(block.tint().mV[VALPHA] == 1.f);
-        UNSCOPED_INFO("id");
         CHECK(block.id().asString() ==
                       std::string("a2e76fcd-9360-4f6d-a924-000000000001"));
     }
@@ -178,9 +166,7 @@ namespace
         XuiRoot block;
         parse("junk", "<root count=\"12abc\" ratio=\"0.5px\"/>", block, true);
 
-        UNSCOPED_INFO("a number with a tail is refused");
         CHECK_FALSE(block.count.isProvided());
-        UNSCOPED_INFO("a real with a tail is refused");
         CHECK_FALSE(block.ratio.isProvided());
     }
 
@@ -191,9 +177,7 @@ namespace
         XuiRoot block;
         parse("narrow", "<root small=\"300\"/>", block, true);
 
-        UNSCOPED_INFO("out of range is refused");
         CHECK_FALSE(block.small_number.isProvided());
-        UNSCOPED_INFO("and the default stands");
         CHECK((S32)block.small_number() == 0);
     }
 
@@ -204,34 +188,24 @@ namespace
         XuiRoot block;
         parse("plus", "<root count=\"+5\" ratio=\"+0.25\"/>", block);
 
-        UNSCOPED_INFO("signed integer accepted");
         CHECK(block.count.isProvided());
-        UNSCOPED_INFO("count");
         CHECK(block.count() == 5);
-        UNSCOPED_INFO("signed real accepted");
         CHECK(block.ratio.isProvided());
-        UNSCOPED_INFO("ratio");
         CHECK(block.ratio() == 0.25f);
     }
 
     TEST_CASE("llxuiparser: a dotted attribute name descends into nested blocks", "[llxuiparser]")
     {
         XuiRoot block;
-        UNSCOPED_INFO("the document parsed");
         CHECK(parse("dotted",
                      "<root middle.depth=\"2\" middle.leaf.depth=\"3\""
                      " middle.leaf.label=\"deep\"/>",
                      block));
 
-        UNSCOPED_INFO("one dot lands");
         CHECK(block.middle.depth.isProvided());
-        UNSCOPED_INFO("one dot");
         CHECK(block.middle.depth() == 2);
-        UNSCOPED_INFO("two dots land");
         CHECK(block.middle.leaf.depth.isProvided());
-        UNSCOPED_INFO("two dots");
         CHECK(block.middle.leaf.depth() == 3);
-        UNSCOPED_INFO("and again");
         CHECK(block.middle.leaf.label() == std::string("deep"));
     }
 
@@ -240,14 +214,11 @@ namespace
         // The other spelling of the same thing: an element named for the
         // parent's scope plus the path, carrying the rest as attributes.
         XuiRoot block;
-        UNSCOPED_INFO("the document parsed");
         CHECK(parse("compound",
                      "<root><root.middle leaf.depth=\"7\" depth=\"6\"/></root>",
                      block));
 
-        UNSCOPED_INFO("attribute on the compound element");
         CHECK(block.middle.depth() == 6);
-        UNSCOPED_INFO("dotted attribute under it");
         CHECK(block.middle.leaf.depth() == 7);
     }
 
@@ -261,7 +232,6 @@ namespace
               "<root><other.middle depth=\"4\"/></root>",
               block, true);
 
-        UNSCOPED_INFO("nothing was taken from it");
         CHECK_FALSE(block.middle.depth.isProvided());
     }
 
@@ -272,7 +242,6 @@ namespace
         const ll_test::TempDir dir("al_xuiparser");
         XuiRoot block;
         LLSimpleXUIParser parser;
-        UNSCOPED_INFO("reading a file that is not there fails");
         CHECK_FALSE(parser.readXUI((dir.path() / "al_xuiparser_no_such_file.xml").string(), block, true));
     }
 }

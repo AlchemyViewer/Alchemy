@@ -149,14 +149,14 @@ namespace
             return n;
         }
 
-        static void checkAgainstMap(const ALXUITreeItem* item, const ALXUISourceMap& map, S32& from_xml)
+        static void require_agrees_with_map(const ALXUITreeItem* item, const ALXUISourceMap& map, S32& from_xml)
         {
-            UNSCOPED_INFO(std::string("from-XML flag agrees with the map for ") + item->getName());
+            UNSCOPED_INFO("from-XML flag agrees with the map for " << item->getName());
             REQUIRE(item->isFromXML() == map.isFromXML(item->getView()));
             from_xml += item->isFromXML();
             for (auto it = item->getChildrenBegin(); it != item->getChildrenEnd(); ++it)
             {
-                checkAgainstMap(static_cast<const ALXUITreeItem*>(it->get()), map, from_xml);
+                require_agrees_with_map(static_cast<const ALXUITreeItem*>(it->get()), map, from_xml);
             }
         }
     };
@@ -175,7 +175,6 @@ namespace
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
-        UNSCOPED_INFO("built");
         REQUIRE(floater != nullptr);
 
         ALXUISourceMap map;
@@ -183,15 +182,13 @@ namespace
 
         ALXUITreeModel model;
         ALXUITreeItem* root_item = model.build(floater, map);
-        UNSCOPED_INFO("a root item");
         REQUIRE(root_item != nullptr);
-        UNSCOPED_INFO("one item per view");
         CHECK(countItems(root_item) == countViews(floater));
         UNSCOPED_INFO("and the model counts the same");
-        REQUIRE((S32)model.count() == countViews(floater));
+        CHECK((S32)model.count() == countViews(floater));
 
         S32 from_xml = 0;
-        checkAgainstMap(root_item, map, from_xml);
+        require_agrees_with_map(root_item, map, from_xml);
         UNSCOPED_INFO("four rows from the file");
         CHECK(from_xml == 4);
 
@@ -199,17 +196,14 @@ namespace
         UNSCOPED_INFO("the second inner by path");
         REQUIRE(second != nullptr);
         UNSCOPED_INFO("is the view the selection resolves to");
-        REQUIRE(second->getView() == ALXUISelection::resolve(floater, ALXUISelection::fromString("outer/inner#1")));
+        CHECK(second->getView() == ALXUISelection::resolve(floater, ALXUISelection::fromString("outer/inner#1")));
         UNSCOPED_INFO("and is found by its view");
-        REQUIRE(model.itemFor(second->getView()) == second);
-        UNSCOPED_INFO("with its tag");
+        CHECK(model.itemFor(second->getView()) == second);
         CHECK(second->getTag() == std::string("panel"));
         UNSCOPED_INFO("in order after the first");
         CHECK(second->getOrder() == 1);
-        UNSCOPED_INFO("the root's tag");
         CHECK(root_item->getTag() == std::string("floater"));
 
-        UNSCOPED_INFO("the floater has a drag handle");
         REQUIRE(dragHandle(floater) != nullptr);
         const ALXUITreeItem* drag = model.itemFor(dragHandle(floater));
         UNSCOPED_INFO("a code-built child has a row");
@@ -217,7 +211,7 @@ namespace
         UNSCOPED_INFO("marked as such");
         CHECK_FALSE(drag->isFromXML());
         UNSCOPED_INFO("with the tag its type is registered under");
-        REQUIRE_FALSE(drag->getTag().empty());
+        CHECK_FALSE(drag->getTag().empty());
 
         delete floater;
         fv.reset();
@@ -237,7 +231,6 @@ namespace
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
-        UNSCOPED_INFO("built");
         REQUIRE(floater != nullptr);
         ALXUISourceMap map;
         map.build(floater, root);
@@ -247,12 +240,9 @@ namespace
         ALXUITreeItem* outer = model.itemFor(ALXUISelection::fromString("outer"));
         ALXUITreeItem* hidden = model.itemFor(ALXUISelection::fromString("outer/inner#1"));
         ALXUITreeItem* drag = model.itemFor(dragHandle(floater));
-        {
-            INFO("rows");
-            REQUIRE(outer);
-            REQUIRE(hidden);
-            REQUIRE(drag);
-        }
+        REQUIRE(outer);
+        REQUIRE(hidden);
+        REQUIRE(drag);
 
         ALXUITreeFilter& filter = model.getFilter();
         {
@@ -321,9 +311,9 @@ namespace
         UNSCOPED_INFO("is a new row");
         CHECK(outer2 != old_outer.get());
         UNSCOPED_INFO("names the new view");
-        REQUIRE(outer2->getView() == ALXUISelection::resolve(floater2, ALXUISelection::fromString("outer")));
+        CHECK(outer2->getView() == ALXUISelection::resolve(floater2, ALXUISelection::fromString("outer")));
         UNSCOPED_INFO("with the same count");
-        REQUIRE((S32)model.count() == countViews(floater2));
+        CHECK((S32)model.count() == countViews(floater2));
         UNSCOPED_INFO("every row's view is in the new tree");
         CHECK(allUnder(model.rootItem(), floater2));
         old_outer = nullptr;
@@ -348,7 +338,6 @@ namespace
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
-        UNSCOPED_INFO("built");
         REQUIRE(floater != nullptr);
 
         ALXUISourceMap map;
@@ -356,7 +345,6 @@ namespace
 
         ALXUITreeModel model;
         ALXUITreeItem* root_item = model.build(floater, map);
-        UNSCOPED_INFO("a root item");
         REQUIRE(root_item != nullptr);
 
         const auto before = root_item->getChildrenCount();
@@ -367,7 +355,6 @@ namespace
         // And what it refuses is only that: an item that is not this one is
         // taken as before.
         ALXUITreeItem* outer = model.itemFor(ALXUISelection::fromString("outer"));
-        UNSCOPED_INFO("a row to adopt");
         REQUIRE(outer != nullptr);
         root_item->addChild(outer);
         UNSCOPED_INFO("another item still is");
@@ -402,13 +389,11 @@ namespace
             "</floater>\n";
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root, WITH_COMBO);
-        UNSCOPED_INFO("built");
         REQUIRE(floater != nullptr);
         ALXUISourceMap map;
         map.build(floater, root);
         ALXUITreeModel model;
         ALXUITreeItem* root_item = model.build(floater, map);
-        UNSCOPED_INFO("a root item");
         REQUIRE(root_item != nullptr);
 
         // A tree of rows over the items, the way the studio builds one.
@@ -464,12 +449,10 @@ namespace
 
         LLFolderViewItem* outer = rows["outer"];
         LLFolderViewItem* inner = rows["outer/inner"];
-        UNSCOPED_INFO("a row for the container");
         REQUIRE(outer != nullptr);
-        UNSCOPED_INFO("and one for the leaf");
         REQUIRE(inner != nullptr);
         UNSCOPED_INFO("the container's row is a folder");
-        REQUIRE(outer->as<LLFolderViewFolder>() != nullptr);
+        CHECK(outer->as<LLFolderViewFolder>() != nullptr);
 
         // Nothing moves until the tree has something to move rows with.
         UNSCOPED_INFO("a row does not move on its own");
@@ -532,37 +515,57 @@ namespace
             asked.clear();
             const S32 top = row->getRect().getHeight();
             row->handleDragAndDrop(20, top - from_top, MASK_NONE, drop, DAD_WIDGET, &cargo, &accept, tip);
-            UNSCOPED_INFO("the row asked the document once");
+            INFO("the row asked the document once");
             REQUIRE(asked.size() == 1);
             return asked.front();
         };
         const S32 line = inner->getItemHeight();
 
-        UNSCOPED_INFO("the leaf's top half is before it");
-        CHECK(over(inner, 1).zone == ALXUITreeModel::DropZone::Before);
-        UNSCOPED_INFO("and its bottom half is after it");
-        CHECK(over(inner, line - 1).zone == ALXUITreeModel::DropZone::After);
-        UNSCOPED_INFO("a leaf has no middle");
-        CHECK(over(inner, line / 2).zone != ALXUITreeModel::DropZone::Into);
-        UNSCOPED_INFO("and names itself");
-        CHECK(over(inner, 1).path == std::string("outer/inner"));
+        {
+            INFO("the leaf's top half is before it");
+            CHECK(over(inner, 1).zone == ALXUITreeModel::DropZone::Before);
+        }
+        {
+            INFO("and its bottom half is after it");
+            CHECK(over(inner, line - 1).zone == ALXUITreeModel::DropZone::After);
+        }
+        {
+            INFO("a leaf has no middle");
+            CHECK(over(inner, line / 2).zone != ALXUITreeModel::DropZone::Into);
+        }
+        {
+            INFO("and names itself");
+            CHECK(over(inner, 1).path == std::string("outer/inner"));
+        }
         UNSCOPED_INFO("which the drag is told it may");
         CHECK(accept == ACCEPT_YES_SINGLE);
 
-        UNSCOPED_INFO("the container's top third is before it");
-        CHECK(over(outer, 1).zone == ALXUITreeModel::DropZone::Before);
-        UNSCOPED_INFO("its middle is into it");
-        CHECK(over(outer, line / 2).zone == ALXUITreeModel::DropZone::Into);
-        UNSCOPED_INFO("and its bottom third is after it");
-        CHECK(over(outer, line - 1).zone == ALXUITreeModel::DropZone::After);
-        UNSCOPED_INFO("by its own path");
-        CHECK(over(outer, 1).path == std::string("outer"));
+        {
+            INFO("the container's top third is before it");
+            CHECK(over(outer, 1).zone == ALXUITreeModel::DropZone::Before);
+        }
+        {
+            INFO("its middle is into it");
+            CHECK(over(outer, line / 2).zone == ALXUITreeModel::DropZone::Into);
+        }
+        {
+            INFO("and its bottom third is after it");
+            CHECK(over(outer, line - 1).zone == ALXUITreeModel::DropZone::After);
+        }
+        {
+            INFO("by its own path");
+            CHECK(over(outer, 1).path == std::string("outer"));
+        }
 
         // The drop itself is the same question with the answer meant.
-        UNSCOPED_INFO("a drop says it is one");
-        CHECK(over(inner, 1, /*drop=*/true).drop);
-        UNSCOPED_INFO("and a hover says it is not");
-        CHECK_FALSE(over(inner, 1).drop);
+        {
+            INFO("a drop says it is one");
+            CHECK(over(inner, 1, /*drop=*/true).drop);
+        }
+        {
+            INFO("and a hover says it is not");
+            CHECK_FALSE(over(inner, 1).drop);
+        }
 
         // Refused, the drag is told so.
         take = false;
@@ -594,12 +597,9 @@ namespace
         ALXUITreeItem* top   = model.rootItem();
         ALXUITreeItem* outer = model.itemFor(ALXUISelection::fromString("outer"));
         ALXUITreeItem* inner = model.itemFor(ALXUISelection::fromString("outer/Inner"));
-        {
-            INFO("rows");
-            REQUIRE(top);
-            REQUIRE(outer);
-            REQUIRE(inner);
-        }
+        REQUIRE(top);
+        REQUIRE(outer);
+        REQUIRE(inner);
 
         ALXUITreeFilter& filter = model.getFilter();
         filter.setWords("INNER");
@@ -611,7 +611,7 @@ namespace
         CHECK(inner->passedFilter(now));
         {
             INFO("lit where they are");
-            REQUIRE(inner->getFilterStringOffset() == 0);
+            CHECK(inner->getFilterStringOffset() == 0);
             CHECK(inner->getFilterStringSize() == 5);
         }
         ALXUITreeItem* drag = model.itemFor(dragHandle(floater));
@@ -622,7 +622,7 @@ namespace
         }
         {
             INFO("one holding a row that does, does");
-            REQUIRE(outer->passedFilter(now));
+            CHECK(outer->passedFilter(now));
             CHECK(outer->descendantsPassedFilter(now));
         }
         UNSCOPED_INFO("unlit, the words not being in it");

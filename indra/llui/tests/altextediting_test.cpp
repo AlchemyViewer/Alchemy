@@ -104,9 +104,9 @@ namespace
         UNSCOPED_INFO("a selection ending at a line's start takes one line, past the one below");
         CHECK(combined(text, moveLines(doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)) }, 1), 1, placed) == std::string("two\none\nthree"));
         UNSCOPED_INFO("not past the top");
-        REQUIRE(moveLines(doc, { at(0, 2) }, -1).empty());
+        CHECK(moveLines(doc, { at(0, 2) }, -1).empty());
         UNSCOPED_INFO("nor the bottom");
-        REQUIRE(moveLines(doc, { at(2, 2) }, 1).empty());
+        CHECK(moveLines(doc, { at(2, 2) }, 1).empty());
 
         UNSCOPED_INFO("gone");
         CHECK(combined(text, deleteLines(doc, { at(1, 3) }), 1, placed) == std::string("one\nthree"));
@@ -147,7 +147,7 @@ namespace
 
         const ALTextDocument blank("   \n");
         UNSCOPED_INFO("nothing where no line says anything");
-        REQUIRE(toggleComment(blank, { at(0, 1) }, "//").empty());
+        CHECK(toggleComment(blank, { at(0, 1) }, "//").empty());
     }
 
     TEST_CASE_METHOD(altextediting_data, "altextediting: lines joined as vim's J joins them or with their blanks kept as gJ does", "[altextediting]")
@@ -155,7 +155,6 @@ namespace
         const std::string text = "call(a,\n    b\n    )\n\nend";
         const ALTextDocument doc(text);
         const std::optional<Change> j = joinLines(doc, 0, 2, false);
-        UNSCOPED_INFO("joined");
         REQUIRE(j.has_value());
         UNSCOPED_INFO("one space, none before the )");
         CHECK(applied(text, *j) == std::string("call(a, b)\n\nend"));
@@ -167,8 +166,8 @@ namespace
         CHECK(applied(text, *joinLines(doc, 0, 1, true)) == std::string("call(a,    b\n    )\n\nend"));
         {
             INFO("one line is nothing to join");
-            REQUIRE_FALSE(joinLines(doc, 4, 4, false));
-            REQUIRE_FALSE(joinLines(doc, 4, 9, false));
+            CHECK_FALSE(joinLines(doc, 4, 4, false));
+            CHECK_FALSE(joinLines(doc, 4, 9, false));
         }
     }
 
@@ -181,7 +180,7 @@ namespace
         {
             INFO("down");
             REQUIRE(down.has_value());
-            REQUIRE(down->replacements.size() == 1);
+            CHECK(down->replacements.size() == 1);
         }
         UNSCOPED_INFO("under d");
         CHECK(applied(text, *down) == std::string("c\nd\na\nb\ne"));
@@ -203,11 +202,11 @@ namespace
         CHECK(applied(text, *moveLinesTo(doc, 0, 0, 4)) == std::string("b\nc\nd\ne\na"));
 
         UNSCOPED_INFO("into themselves, nothing");
-        REQUIRE_FALSE(moveLinesTo(doc, 1, 3, 2));
+        CHECK_FALSE(moveLinesTo(doc, 1, 3, 2));
         UNSCOPED_INFO("under their own last, nothing");
-        REQUIRE_FALSE(moveLinesTo(doc, 1, 3, 3));
+        CHECK_FALSE(moveLinesTo(doc, 1, 3, 3));
         UNSCOPED_INFO("under the line above them already, nothing");
-        REQUIRE_FALSE(moveLinesTo(doc, 1, 3, 0));
+        CHECK_FALSE(moveLinesTo(doc, 1, 3, 0));
 
         const Change copy = copyLinesTo(doc, 3, 4, 0);
         UNSCOPED_INFO("copied under a");
@@ -293,9 +292,9 @@ namespace
         UNSCOPED_INFO("each with its line");
         CHECK(placed == std::string("0:0-0:0 1:0-1:0 3:0-3:0 "));
         UNSCOPED_INFO("nothing where one is at the top already");
-        REQUIRE(moveLines(doc, { at(0, 0), at(3, 0) }, -1).empty());
+        CHECK(moveLines(doc, { at(0, 0), at(3, 0) }, -1).empty());
         UNSCOPED_INFO("nor at the bottom");
-        REQUIRE(moveLines(doc, { at(3, 0), at(5, 1) }, 1).empty());
+        CHECK(moveLines(doc, { at(3, 0), at(5, 1) }, 1).empty());
     }
 
     TEST_CASE_METHOD(altextediting_data, "altextediting: lines deleted or joined at several selections go once for each run", "[altextediting]")
@@ -334,7 +333,7 @@ namespace
         UNSCOPED_INFO("a caret inside the token where it began");
         CHECK(placed == std::string("0:1-0:1 2:0-2:0 "));
         UNSCOPED_INFO("nothing where no line says anything");
-        REQUIRE(toggleComment(ALTextDocument("\n  \n"), { at(0, 0), at(1, 1) }, "//").empty());
+        CHECK(toggleComment(ALTextDocument("\n  \n"), { at(0, 0), at(1, 1) }, "//").empty());
     }
 
     TEST_CASE_METHOD(altextediting_data, "altextediting: a J join adds no space after a trailing blank or onto an empty line", "[altextediting]")

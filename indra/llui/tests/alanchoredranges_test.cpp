@@ -58,7 +58,6 @@ namespace
     {
         ALAnchoredRanges<Mark> marks;
         marks.assign({ { on(3, 0, 2), "c" }, { on(1, 4, 5), "b" }, { on(1, 4, 9), "b2" }, { on(0, 0, 1), "a" } });
-        UNSCOPED_INFO("in order");
         CHECK(names(marks) == std::string("a,b,b2,c"));
         marks.insert({ on(1, 4, 6), "b3" });
         UNSCOPED_INFO("after its equals");
@@ -73,8 +72,7 @@ namespace
         const ALTextDocument::Edit edit = doc.replace(on(1, 4, 7), "2\nTWO");
         const size_t               gone = marks.apply(edit);
         UNSCOPED_INFO("the one it cut through");
-        CHECK(gone == size_t(1));
-        UNSCOPED_INFO("gone");
+        REQUIRE(gone == size_t(1));
         CHECK(names(marks) == std::string("zero,one,three,four"));
         UNSCOPED_INFO("before it: where it was");
         CHECK(marks[1].range == on(1, 0, 3));

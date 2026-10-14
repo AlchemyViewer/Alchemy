@@ -104,13 +104,13 @@ namespace
         };
         l.setFocus(true);
         UNSCOPED_INFO("no fold: left is the list's");
-        REQUIRE((!l.handleKeyHere(KEY_LEFT, MASK_NONE) || asked.empty()));
+        CHECK((!l.handleKeyHere(KEY_LEFT, MASK_NONE) || asked.empty()));
         l.setFold([&](const LLSD& value, std::optional<bool> folded) { asked.push_back(said(value, folded)); },
                   [](const LLScrollListItem*, S32 x) { return x < 20; });
         l.deselectAllItems();
         l.handleKeyHere(KEY_LEFT, MASK_NONE);
         UNSCOPED_INFO("nothing chosen: nothing asked");
-        REQUIRE(asked.empty());
+        CHECK(asked.empty());
         l.selectFirstItem();
         {
             INFO("left shuts");
@@ -141,7 +141,7 @@ namespace
         l.handleMouseUp(first.mLeft + 40, first.getCenterY(), MASK_NONE);
         {
             INFO("a press past it chooses the row");
-            REQUIRE(asked.size() == 3);
+            CHECK(asked.size() == 3);
             CHECK(l.getFirstSelectedIndex() == 0);
         }
         l.setFocus(false);
@@ -206,7 +206,7 @@ namespace
         {
             INFO("of what was chosen, nothing else chosen on the way");
             CHECK(l.getFirstSelectedIndex() == 0);
-            REQUIRE(l.getAllSelected().size() == 1);
+            CHECK(l.getAllSelected().size() == 1);
         }
         l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
 
@@ -252,7 +252,6 @@ namespace
         });
         click(0, MASK_NONE);
         click(2, MASK_CONTROL);
-        UNSCOPED_INFO("two chosen");
         CHECK(l.getNumSelected() == 2);
         const LLRect second = l.getCellRect(1, 0);
         const LLRect third  = l.getCellRect(2, 0);
@@ -269,7 +268,6 @@ namespace
         CHECK(asked == 0);
 
         click(0, MASK_CONTROL);
-        UNSCOPED_INFO("both again");
         CHECK(l.getNumSelected() == 2);
         l.handleMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
         l.handleHover(second.getCenterX(), second.getCenterY(), MASK_NONE);
@@ -305,7 +303,7 @@ namespace
         EAcceptance  accept = ACCEPT_NO;
         std::string  tip;
         UNSCOPED_INFO("over a row, taken");
-        REQUIRE(l.handleDragAndDrop(second.getCenterX(), second.getCenterY(), MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip));
+        CHECK(l.handleDragAndDrop(second.getCenterX(), second.getCenterY(), MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip));
         {
             INFO("with its value");
             CHECK(defined);
@@ -353,8 +351,8 @@ namespace
         UNSCOPED_INFO("a copy is the rows'");
         CHECK(LLEditMenuHandler::gEditMenuHandler->canCopy());
         pane.setFocus(false);
-        UNSCOPED_INFO("let go of with it");
-        REQUIRE(LLEditMenuHandler::gEditMenuHandler == nullptr);
+        UNSCOPED_INFO("let go of with the keyboard");
+        CHECK(LLEditMenuHandler::gEditMenuHandler == nullptr);
     }
 
     TEST_CASE_METHOD(alpanelist_data, "alpanelist: return and a double-click go to the row chosen and escape goes back", "[alpanelist]")
@@ -385,10 +383,11 @@ namespace
         }
         const LLRect row = l.getCellRect(1, 0);
         l.handleDoubleClick(row.getCenterX(), row.getCenterY(), MASK_NONE);
-        UNSCOPED_INFO("a double-click goes");
         CHECK(went == 2);
     }
 
+    // A column nothing is in and a row nobody can choose are left out, and a
+    // long cell steps out of line.
     TEST_CASE_METHOD(alpanelist_data, "alpanelist: the rows as text are lined up under their headings", "[alpanelist]")
     {
         ALPaneList& l = make();
@@ -434,7 +433,7 @@ namespace
         UNSCOPED_INFO("the caption over them");
         CHECK(l.asText(l.getAllData()).rfind("Found here\n\nText", 0) == 0);
         UNSCOPED_INFO("no rows, no text");
-        REQUIRE(l.asText({}).empty());
+        CHECK(l.asText({}).empty());
     }
 
     TEST_CASE_METHOD(alpanelist_data, "alpanelist: a copyable list copies the rows chosen or a cell or every row", "[alpanelist]")
@@ -461,7 +460,6 @@ namespace
         CHECK(l.getFirstSelectedIndex() == 0);
 
         l.setCopyable(true);
-        UNSCOPED_INFO("control-C taken");
         CHECK(l.handleKeyHere('C', MASK_CONTROL));
         UNSCOPED_INFO("the row chosen, as a table");
         CHECK(copied() == std::string("Text\none\n"));
@@ -473,20 +471,17 @@ namespace
             CHECK(l.getFirstSelectedIndex() == 2);
             CHECK(l.getNumSelected() == 1);
         }
-        UNSCOPED_INFO("the cell under it can be copied");
         CHECK(l.copyActionEnabled("copy_cell"));
         l.copyAction("copy_cell");
         UNSCOPED_INFO("the cell, as it is");
         CHECK(copied() == std::string("three"));
         l.copyAction("select_all");
-        UNSCOPED_INFO("all chosen");
         CHECK(l.getNumSelected() == 3);
         const LLRect first = l.getCellRect(0, 0);
         l.handleRightMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
         UNSCOPED_INFO("a right-click inside the choice keeps it");
         CHECK(l.getNumSelected() == 3);
         l.copyAction("copy");
-        UNSCOPED_INFO("the rows chosen");
         CHECK(copied() == std::string("Text\none\ntwo\nthree\n"));
         l.deselectAllItems();
         {
@@ -496,7 +491,6 @@ namespace
         }
         clipboard.copyToClipboard(std::string("before"), 0, 6);
         l.copyAction("copy_all");
-        UNSCOPED_INFO("every row");
         CHECK(copied() == std::string("Text\none\ntwo\nthree\n"));
         const LLRect rows = l.getItemListRect();
         l.handleRightMouseDown(rows.getCenterX(), rows.mBottom + 2, MASK_NONE);
@@ -546,12 +540,10 @@ namespace
         {
             INFO("none chosen: left");
             CHECK_FALSE(l.handleKeyHere(KEY_F10, MASK_SHIFT));
-            REQUIRE(clicked.empty());
+            CHECK(clicked.empty());
         }
         l.selectNthItem(1);
-        UNSCOPED_INFO("Shift-F10");
         CHECK(l.handleKeyHere(KEY_F10, MASK_SHIFT));
-        UNSCOPED_INFO("the Menu key");
         CHECK(l.handleKeyHere(KEY_CONTEXT_MENU, MASK_NONE));
         UNSCOPED_INFO("each on the row chosen");
         CHECK(clicked == std::vector<std::string>({ "two", "two" }));
@@ -559,6 +551,8 @@ namespace
         CHECK(l.getFirstSelectedIndex() == 1);
     }
 
+    // Choosing again on a double-click's release would take the keyboard
+    // back from where the double-click sent it.
     TEST_CASE_METHOD(alpanelist_data, "alpanelist: a double-click's release chooses nothing but a later click's does", "[alpanelist]")
     {
         ALPaneList& l = make();
@@ -586,6 +580,9 @@ namespace
         CHECK(chosen == 2);
     }
 
+    // Rows by key: the same rows made again only where a cell changed, what
+    // is chosen kept; gone ones taken out, new ones made, all in the order
+    // given.
     TEST_CASE_METHOD(alpanelist_data, "alpanelist: rows set by key remake only changed cells and keep what is chosen", "[alpanelist]")
     {
         ALPaneList& l   = make();
@@ -600,7 +597,6 @@ namespace
             return one;
         };
         l.setRows({ row("a", "alpha"), row("b", "beta"), row("c", "gamma") });
-        UNSCOPED_INFO("listed");
         CHECK(order() == std::string("alpha beta gamma"));
         LLScrollListItem* b      = l.rowWithKey("b");
         LLScrollListCell* b_cell = b->getColumn(0);
@@ -640,14 +636,14 @@ namespace
         }
         {
             INFO("gone: nothing by it");
-            REQUIRE_FALSE(l.rowWithKey("c"));
-            REQUIRE(l.keyOf(nullptr).empty());
+            CHECK_FALSE(l.rowWithKey("c"));
+            CHECK(l.keyOf(nullptr).empty());
         }
         l.setRows({});
         {
             INFO("none");
             CHECK(l.getItemCount() == 0);
-            REQUIRE_FALSE(l.rowWithKey("d"));
+            CHECK_FALSE(l.rowWithKey("d"));
         }
         add("loose", 0);
         l.setRows({ row("e", "epsilon") });

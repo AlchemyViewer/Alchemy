@@ -59,25 +59,23 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
-        const auto reads = [](const std::string& attribute)
+        const auto require_read = [](const std::string& attribute)
         {
+            CAPTURE(attribute);
             const std::string source =
                 "<accordion_tab name=\"tab\" title=\"Tab\" " + attribute + "=\"false\"/>\n";
             LLXMLNodePtr node;
-            UNSCOPED_INFO("parses");
             REQUIRE(LLXMLNode::parseBuffer(source.data(), source.size(), node));
 
             LLAccordionCtrlTab::Params params;
             LLXUIParser parser;
             parser.readXUI(node, params, "accordion_test.xml");
-            UNSCOPED_INFO(attribute + " was read");
             REQUIRE(params.display_children.isProvided());
-            UNSCOPED_INFO(attribute + " says what it says");
             REQUIRE_FALSE(params.display_children());
         };
 
-        reads("expanded");
-        reads("display_children");
+        require_read("expanded");
+        require_read("display_children");
     }
 
     // And left out, a tab is open: a section that says nothing about itself
@@ -272,7 +270,6 @@ namespace
         const std::string source =
             "<accordion_tab name=\"tab\" title=\"Tab\" header_tool_tip=\"What it does\"/>\n";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parses");
         REQUIRE(LLXMLNode::parseBuffer(source.data(), source.size(), node));
         LLAccordionCtrlTab::Params read;
         LLXUIParser parser;
@@ -292,41 +289,51 @@ namespace
             tp.rect = LLRect(0, 100, 300, 0);
             return LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
         };
-        const auto header = [](LLAccordionCtrlTab* tab)
+        const auto require_header = [](LLAccordionCtrlTab* tab)
         {
             LLView* found = tab->findChild<LLView>("dd_header", false);
-            UNSCOPED_INFO("the tab has its header");
+            INFO("the tab has its header");
             REQUIRE(found != nullptr);
             return found;
         };
 
         LLAccordionCtrlTab* tab = build("Tab", "What it does");
         tab->reshape(300, 100);
-        UNSCOPED_INFO("the header says it");
-        CHECK(header(tab)->getToolTip() == std::string("What it does"));
+        {
+            INFO("the header says it");
+            CHECK(require_header(tab)->getToolTip() == std::string("What it does"));
+        }
         UNSCOPED_INFO("and the tab does not");
-        REQUIRE(tab->getToolTip().empty());
+        CHECK(tab->getToolTip().empty());
 
         const std::string title = "A title far too long for the header it is in";
         tab->setTitle(title);
         tab->reshape(60, 100);
-        UNSCOPED_INFO("cut short, the title comes first");
-        CHECK(header(tab)->getToolTip() ==
-                      title + "\nWhat it does");
+        {
+            INFO("cut short, the title comes first");
+            CHECK(require_header(tab)->getToolTip() ==
+                          title + "\nWhat it does");
+        }
         tab->setTitle("Tab");
         tab->reshape(300, 100);
-        UNSCOPED_INFO("and goes once it fits");
-        CHECK(header(tab)->getToolTip() == std::string("What it does"));
+        {
+            INFO("and goes once it fits");
+            CHECK(require_header(tab)->getToolTip() == std::string("What it does"));
+        }
         tab->die();
 
         LLAccordionCtrlTab* plain = build("Tab", "");
         plain->reshape(300, 100);
-        UNSCOPED_INFO("without one, a title that fits says nothing");
-        REQUIRE(header(plain)->getToolTip().empty());
+        {
+            INFO("without one, a title that fits says nothing");
+            CHECK(require_header(plain)->getToolTip().empty());
+        }
         plain->setTitle(title);
         plain->reshape(60, 100);
-        UNSCOPED_INFO("and one cut short says itself");
-        CHECK(header(plain)->getToolTip() == title);
+        {
+            INFO("and one cut short says itself");
+            CHECK(require_header(plain)->getToolTip() == title);
+        }
         plain->die();
     }
 

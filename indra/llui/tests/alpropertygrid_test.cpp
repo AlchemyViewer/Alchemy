@@ -77,8 +77,8 @@ namespace
 
         // Each row of a section, in the coordinates of the panel that stacks
         // them -- and, on the way, that a row's own parts are inside it.
-        static std::vector<LLRect> rowsOf(ALPropertyGrid* grid, const std::string& group,
-                                          const std::vector<std::string>& names)
+        static std::vector<LLRect> require_rows_of(ALPropertyGrid* grid, const std::string& group,
+                                                   const std::vector<std::string>& names)
         {
             LLPanel* rows = grid->getChild<LLPanel>(group + "_rows", true);
             std::vector<LLRect> out;
@@ -86,44 +86,34 @@ namespace
             {
                 LLPanel* row = rows->getChild<LLPanel>(name + "_row", true);
                 const LLRect label = row->getChild<LLTextBox>(name + "_label", true)->getRect();
-                UNSCOPED_INFO(name + ": its label " + where(label) + " is inside the row "
-                           + where(row->getLocalRect()));
+                CAPTURE(name, label, row->getLocalRect());
                 REQUIRE(row->getLocalRect().contains(label));
                 out.push_back(row->getRect());
             }
             return out;
         }
 
-        static std::string where(const LLRect& r)
-        {
-            return std::to_string(r.mLeft) + "," + std::to_string(r.mBottom)
-                 + " to " + std::to_string(r.mRight) + "," + std::to_string(r.mTop);
-        }
-
         // Rows run from the top of their panel, one row-height apart, and none
         // of them is outside it. Everything the grid draws depends on this and
         // nothing else re-establishes it.
-        static void ensureStacked(const std::string& what, LLPanel* rows,
-                                  const std::vector<LLRect>& labels)
+        static void require_stacked(const std::string& what, LLPanel* rows,
+                                    const std::vector<LLRect>& labels)
         {
+            INFO(what);
             const LLRect within = rows->getLocalRect();
             for (size_t i = 0; i < labels.size(); ++i)
             {
                 const LLRect& r = labels[i];
-                UNSCOPED_INFO(what + ": row " + std::to_string(i) + " at " + where(r)
-                           + " is inside " + where(within));
+                CAPTURE(i, r, within);
                 REQUIRE(within.contains(r));
                 if (i > 0)
                 {
-                    UNSCOPED_INFO(what + ": row " + std::to_string(i) + " is one row below row "
-                                      + std::to_string(i - 1));
                     REQUIRE(labels[i - 1].mTop - r.mTop == ROW);
                 }
             }
         }
     };
 
-    // Freshly filled, the rows of a section are stacked from its top.
     TEST_CASE_METHOD(alpropertygrid_data, "alpropertygrid: freshly filled rows stack one row apart inside their section", "[alpropertygrid]")
     {
         if (!ui.ok())
@@ -136,10 +126,10 @@ namespace
         grid->setFields({ field("name", 0), field("value", 0),
                           field("left", 1), field("top", 1), field("width", 1) });
 
-        ensureStacked("identity", grid->getChild<LLPanel>("identity_rows", true),
-                      rowsOf(grid, "identity", { "name", "value" }));
-        ensureStacked("position", grid->getChild<LLPanel>("position_rows", true),
-                      rowsOf(grid, "position", { "left", "top", "width" }));
+        require_stacked("identity", grid->getChild<LLPanel>("identity_rows", true),
+                        require_rows_of(grid, "identity", { "name", "value" }));
+        require_stacked("position", grid->getChild<LLPanel>("position_rows", true),
+                        require_rows_of(grid, "position", { "left", "top", "width" }));
         grid->die();
     }
 
@@ -160,12 +150,12 @@ namespace
         for (auto size : { std::make_pair(300, 500), std::make_pair(700, 500),
                            std::make_pair(400, 200), std::make_pair(400, 900) })
         {
+            CAPTURE(size.first, size.second);
             grid->reshape(size.first, size.second);
-            const std::string what = std::to_string(size.first) + "x" + std::to_string(size.second);
-            ensureStacked(what + " identity", grid->getChild<LLPanel>("identity_rows", true),
-                          rowsOf(grid, "identity", { "name", "value" }));
-            ensureStacked(what + " position", grid->getChild<LLPanel>("position_rows", true),
-                          rowsOf(grid, "position", { "left", "top", "width" }));
+            require_stacked("identity", grid->getChild<LLPanel>("identity_rows", true),
+                            require_rows_of(grid, "identity", { "name", "value" }));
+            require_stacked("position", grid->getChild<LLPanel>("position_rows", true),
+                            require_rows_of(grid, "position", { "left", "top", "width" }));
         }
         grid->die();
     }
@@ -184,10 +174,8 @@ namespace
         grid->setFields({ field("name", 0), field("value", 0),
                           field("left", 1), field("top", 1), field("width", 1) });
 
-        UNSCOPED_INFO("two rows");
         CHECK(grid->getChild<LLPanel>("identity_rows", true)->getRect().getHeight() ==
                       2 * ROW);
-        UNSCOPED_INFO("three rows");
         CHECK(grid->getChild<LLPanel>("position_rows", true)->getRect().getHeight() ==
                       3 * ROW);
         grid->die();
@@ -211,8 +199,7 @@ namespace
         {
             LLAccordionCtrlTab* tab = grid->getChild<LLAccordionCtrlTab>(group, true);
             LLPanel* rows = grid->getChild<LLPanel>(group + "_rows", true);
-            UNSCOPED_INFO(group + ": the panel " + where(rows->getRect()) + " is inside its tab "
-                       + where(tab->getLocalRect()));
+            CAPTURE(group, rows->getRect(), tab->getLocalRect());
             REQUIRE(tab->getLocalRect().contains(rows->getRect()));
         }
         grid->die();
@@ -243,27 +230,23 @@ namespace
         UNSCOPED_INFO("the pair is one row");
         REQUIRE(rows->findChild<LLPanel>("left_row", true) != nullptr);
         UNSCOPED_INFO("and the other half has none of its own");
-        REQUIRE(rows->findChild<LLPanel>("top_row", true) == nullptr);
+        CHECK(rows->findChild<LLPanel>("top_row", true) == nullptr);
         UNSCOPED_INFO("the unpaired field still has one");
-        REQUIRE(rows->findChild<LLPanel>("name_row", true) != nullptr);
+        CHECK(rows->findChild<LLPanel>("name_row", true) != nullptr);
 
         // Both editors are on the one row, and inside it.
         LLPanel* row = rows->getChild<LLPanel>("left_row", true);
         LLView* first = row->findChild<LLView>("left", true);
         LLView* second = row->findChild<LLView>("top", true);
-        UNSCOPED_INFO("the first editor is on the row");
         REQUIRE(first != nullptr);
-        UNSCOPED_INFO("and so is the second");
         REQUIRE(second != nullptr);
-        UNSCOPED_INFO("the first is inside it " + where(first->getRect()));
+        UNSCOPED_INFO("the first editor " << first->getRect() << " is inside the row");
         CHECK(row->getLocalRect().contains(first->getRect()));
-        UNSCOPED_INFO("the second is inside it " + where(second->getRect()));
+        UNSCOPED_INFO("the second editor " << second->getRect() << " is inside the row");
         CHECK(row->getLocalRect().contains(second->getRect()));
-        UNSCOPED_INFO("and the second is to the right of the first");
         CHECK(second->getRect().mLeft >= first->getRect().mRight);
 
         // Two rows, not three: the section is as tall as what it shows.
-        UNSCOPED_INFO("the section holds two rows");
         CHECK(rows->getRect().getHeight() == 2 * ROW);
         grid->die();
     }
@@ -296,9 +279,7 @@ namespace
         const LLRect second = rows->getChild<LLPanel>("left_row", true)->getRect();
         const LLRect last = rows->getChild<LLPanel>("name_row", true)->getRect();
 
-        UNSCOPED_INFO("an ordinary row is one row");
         CHECK(second.getHeight() == ROW);
-        UNSCOPED_INFO("a picture takes more than one " + where(picture));
         CHECK(picture.getHeight() > ROW);
         UNSCOPED_INFO("the picture starts at the top of the section");
         CHECK(picture.mTop == rows->getRect().getHeight());
@@ -306,7 +287,6 @@ namespace
         CHECK(second.mTop == picture.mBottom);
         UNSCOPED_INFO("and the one after that where the second ended");
         CHECK(last.mTop == second.mBottom);
-        UNSCOPED_INFO("the section is as tall as the three of them");
         CHECK(rows->getRect().getHeight() == picture.getHeight() + second.getHeight() + last.getHeight());
 
         // The label still sits in the ordinary row at the top of the tall
@@ -314,12 +294,11 @@ namespace
         LLPanel* row = rows->getChild<LLPanel>("follows_row", true);
         const LLRect label = row->getChild<LLTextBox>("follows_label", true)->getRect();
         {
-            INFO("the label is in the top row of it " + where(label));
+            INFO("the label " << label << " is in the top row of it");
             CHECK(label.mBottom >= picture.getHeight() - ROW);
             CHECK(label.mTop <= picture.getHeight());
         }
-        UNSCOPED_INFO("the picture is on the row " + where(row->getLocalRect()));
-        REQUIRE(row->findChild<LLView>("follows", true) != nullptr);
+        CHECK(row->findChild<LLView>("follows", true) != nullptr);
         grid->die();
     }
 
@@ -347,13 +326,13 @@ namespace
         UNSCOPED_INFO("the row somebody disagrees about is marked");
         REQUIRE(mark != nullptr);
         UNSCOPED_INFO("and the one nobody does is not");
-        REQUIRE(rows->findChild<LLUICtrl>("name_gutter", true) == nullptr);
+        CHECK(rows->findChild<LLUICtrl>("name_gutter", true) == nullptr);
         {
             INFO("the mark says both places");
-            REQUIRE(mark->getToolTip().find("gemini") != std::string::npos);
-            REQUIRE(mark->getToolTip().find("ja") != std::string::npos);
+            CHECK(mark->getToolTip().find("gemini") != std::string::npos);
+            CHECK(mark->getToolTip().find("ja") != std::string::npos);
         }
-        UNSCOPED_INFO("it is in the margin beside the label " + where(mark->getRect()));
+        UNSCOPED_INFO("it is in the margin beside the label: " << mark->getRect());
         CHECK(mark->getRect().mRight <= rows->getChild<LLPanel>("label_row", true)
                    ->getChild<LLTextBox>("label_label", true)->getRect().mLeft);
 
@@ -400,27 +379,27 @@ namespace
         LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
         LLPanel* row = rows->getChild<LLPanel>("width_row", true);
         const std::string tip = row->getChild<LLTextBox>("width_label", true)->getToolTip();
-        UNSCOPED_INFO("it names the field: " + tip);
-        REQUIRE(tip.find("width is a S32") != std::string::npos);
-        UNSCOPED_INFO("and says where what is in force came from: " + tip);
-        REQUIRE(tip.find("written in base") != std::string::npos);
-        UNSCOPED_INFO("a row somebody wrote does not say nobody did: " + tip);
-        REQUIRE(tip.find("nobody wrote this") == std::string::npos);
+        UNSCOPED_INFO("it names the field: " << tip);
+        CHECK(tip.find("width is a S32") != std::string::npos);
+        UNSCOPED_INFO("and says where what is in force came from: " << tip);
+        CHECK(tip.find("written in base") != std::string::npos);
+        UNSCOPED_INFO("a row somebody wrote does not say nobody did: " << tip);
+        CHECK(tip.find("nobody wrote this") == std::string::npos);
 
         // The editor answers the same question as the label.
         UNSCOPED_INFO("the editor says what the label says");
         CHECK(row->getChild<LLView>("width", true)->getToolTip() == tip);
         UNSCOPED_INFO("and the way back says what it takes out");
-        REQUIRE(row->getChild<LLView>("width_remove", true)->getToolTip()
+        CHECK(row->getChild<LLView>("width_remove", true)->getToolTip()
                    .find("take width out again") != std::string::npos);
 
         // The row nobody wrote says so, and has no way back to offer.
         LLPanel* unwritten = rows->getChild<LLPanel>("height_row", true);
         const std::string quiet = unwritten->getChild<LLTextBox>("height_label", true)->getToolTip();
-        UNSCOPED_INFO("an unwritten row says nobody wrote it: " + quiet);
-        REQUIRE(quiet.find("nobody wrote this") != std::string::npos);
-        UNSCOPED_INFO("and it names no layer: " + quiet);
-        REQUIRE(quiet.find("written in") == std::string::npos);
+        UNSCOPED_INFO("an unwritten row says nobody wrote it: " << quiet);
+        CHECK(quiet.find("nobody wrote this") != std::string::npos);
+        UNSCOPED_INFO("and it names no layer: " << quiet);
+        CHECK(quiet.find("written in") == std::string::npos);
         UNSCOPED_INFO("nor is there anything to take out");
         CHECK_FALSE(unwritten->getChild<LLView>("height_remove", true)->getVisible());
         grid->die();
@@ -453,17 +432,12 @@ namespace
         LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
         LLSpinCtrl* whole = rows->getChild<LLPanel>("width_row", true)
                                 ->getChild<LLSpinCtrl>("width", true);
-        UNSCOPED_INFO("a whole number steps by a whole number: "
-                   + std::to_string(whole->getIncrement()));
         CHECK(whole->getIncrement() >= 1.f);
 
         LLSpinCtrl* real = rows->getChild<LLPanel>("alpha_row", true)
                                ->getChild<LLSpinCtrl>("alpha", true);
-        {
-            INFO("and one with decimals steps by less: " + std::to_string(real->getIncrement()));
-            REQUIRE(real->getIncrement() > 0.f);
-            CHECK(real->getIncrement() < 1.f);
-        }
+        CHECK(real->getIncrement() > 0.f);
+        CHECK(real->getIncrement() < 1.f);
         grid->die();
     }
 
@@ -498,12 +472,10 @@ namespace
         for (S32 i = 0; i < 4; ++i)
         {
             const std::string name = std::string("rect.") + parts[i];
+            CAPTURE(name);
             LLSpinCtrl* box = row->getChild<LLSpinCtrl>(name, true);
-            UNSCOPED_INFO("a box for " + name);
             REQUIRE(box != nullptr);
-            UNSCOPED_INFO("holding its own number");
             REQUIRE((F32)box->getValue().asReal() == wanted[i]);
-            UNSCOPED_INFO("and captioned with what it is");
             REQUIRE(row->findChild<LLView>(name + "_caption", true) != nullptr);
         }
 
@@ -534,8 +506,6 @@ namespace
         const S32 tall = row->getRect().getHeight();
         const S32 ordinary = other->getChild<LLPanel>("identity_rows", true)
                                   ->getChild<LLPanel>("width_row", true)->getRect().getHeight();
-        UNSCOPED_INFO("a captioned row is taller: " + std::to_string(tall) + " vs "
-                   + std::to_string(ordinary));
         CHECK(tall > ordinary);
         other->die();
         grid->die();
@@ -572,7 +542,6 @@ namespace
         short_one.back().components = { "X", "Y", "Z" };
         short_one.back().value = "1 2";
         grid->setFields(short_one);
-        UNSCOPED_INFO("the part nobody gave is nought");
         CHECK((F32)grid->getChild<LLPanel>("identity_rows", true)
                                ->getChild<LLPanel>("short_row", true)
                                ->getChild<LLSpinCtrl>("short.Z", true)->getValue().asReal() == 0.f);
@@ -598,9 +567,7 @@ namespace
         one->setFields(fields);
 
         LLAccordionCtrlTab* tab = one->getChild<LLAccordionCtrlTab>("only", true);
-        UNSCOPED_INFO("the section is there");
         REQUIRE(tab != nullptr);
-        UNSCOPED_INFO("and says nothing over it");
         CHECK(tab->getHeaderHeight() == 0);
         UNSCOPED_INFO("so it is as tall as its one row");
         CHECK(one->getChild<LLPanel>("only_rows", true)->getRect().getHeight() == ROW);
@@ -613,7 +580,7 @@ namespace
         both.push_back(field("name", 0));
         both.push_back(field("width", 1));
         two->setFields(both);
-        UNSCOPED_INFO("a heading over each");
+        UNSCOPED_INFO("a heading over the first");
         CHECK(two->getChild<LLAccordionCtrlTab>("first", true)->getHeaderHeight() > 0);
 
         one->die();
@@ -644,10 +611,8 @@ namespace
 
         LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
                            ->getChild<LLPanel>("tint_row", true);
-        UNSCOPED_INFO("a colour gets the colour editor");
-        REQUIRE(row->findChild<ALColorField>("tint", true) != nullptr);
-        UNSCOPED_INFO("and not a box per part");
-        REQUIRE(row->findChild<LLSpinCtrl>("tint.R", true) == nullptr);
+        CHECK(row->findChild<ALColorField>("tint", true) != nullptr);
+        CHECK(row->findChild<LLSpinCtrl>("tint.R", true) == nullptr);
         UNSCOPED_INFO("nor the line that would have captioned them");
         CHECK(row->getRect().getHeight() == ROW);
         grid->die();
@@ -683,20 +648,13 @@ namespace
         grid->setFields({ field });
 
         LLPanel* row = grid->findChild<LLPanel>("RenderVignetteColor_row", true);
-        UNSCOPED_INFO("the row is there");
         REQUIRE(row != nullptr);
-        UNSCOPED_INFO("and shown");
         CHECK(row->getVisible());
         LLView* editor = row->findChild<ALColorField>("RenderVignetteColor", true);
-        UNSCOPED_INFO("with the colour editor on it");
         REQUIRE(editor != nullptr);
-        UNSCOPED_INFO("shown");
         CHECK(editor->getVisible());
-        {
-            INFO("and somewhere to be seen: " + std::to_string(editor->getRect().getWidth()));
-            REQUIRE(editor->getRect().getWidth() > 0);
-            CHECK(editor->getRect().getHeight() > 0);
-        }
+        CHECK(editor->getRect().getWidth() > 0);
+        CHECK(editor->getRect().getHeight() > 0);
 
         // The part that was actually wrong. A section nothing is written in
         // arrives folded, which is right for a page of eighty fields and is
@@ -730,11 +688,8 @@ namespace
         fields.back().authored = false;
         grid->setFields(fields);
 
-        UNSCOPED_INFO("the written section is open");
         CHECK(grid->getChild<LLAccordionCtrlTab>("written", true)->getDisplayChildren());
-        UNSCOPED_INFO("and the quiet one arrives folded");
         CHECK_FALSE(grid->getChild<LLAccordionCtrlTab>("quiet", true)->getDisplayChildren());
-        UNSCOPED_INFO("under a heading that can open it");
         CHECK(grid->getChild<LLAccordionCtrlTab>("quiet", true)->getHeaderHeight() > 0);
         grid->die();
     }
@@ -766,15 +721,12 @@ namespace
         LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
                            ->getChild<LLPanel>("EmojiSkinTonePreference_row", true);
         LLTextBox* label = row->getChild<LLTextBox>("EmojiSkinTonePreference_label", true);
-        UNSCOPED_INFO("the row says what the caller said");
         CHECK(label->getText() == std::string("S32"));
 
         LLButton* back = row->getChild<LLButton>("EmojiSkinTonePreference_remove", true);
-        UNSCOPED_INFO("and so does the way back");
         CHECK(back->getLabelUnselected() == std::string("Reset"));
         UNSCOPED_INFO("which is wider than a letter");
         CHECK(back->getRect().getWidth() > 16);
-        UNSCOPED_INFO("and still inside the row");
         CHECK(row->getLocalRect().contains(back->getRect()));
 
         // Left empty, the row says the name, which is what a row usually calls
@@ -782,7 +734,6 @@ namespace
         std::vector<ALPropertyGrid::Field> plain;
         plain.push_back(field("width", 0));
         grid->setFields(plain);
-        UNSCOPED_INFO("the name by default");
         CHECK(grid->getChild<LLPanel>("identity_rows", true)
                           ->getChild<LLPanel>("width_row", true)
                           ->getChild<LLTextBox>("width_label", true)->getText() ==
@@ -829,10 +780,10 @@ namespace
         CHECK(back->getVisible());
         UNSCOPED_INFO("in the other ink");
         CHECK(label->getColor().get() != quiet);
-        UNSCOPED_INFO("saying where from: " + label->getToolTip());
-        REQUIRE(label->getToolTip().find("written in base") != std::string::npos);
-        UNSCOPED_INFO("and no longer that nobody did: " + label->getToolTip());
-        REQUIRE(label->getToolTip().find("nobody wrote this") == std::string::npos);
+        UNSCOPED_INFO("saying where from: " << label->getToolTip());
+        CHECK(label->getToolTip().find("written in base") != std::string::npos);
+        UNSCOPED_INFO("and no longer that nobody did: " << label->getToolTip());
+        CHECK(label->getToolTip().find("nobody wrote this") == std::string::npos);
         UNSCOPED_INFO("the editor says the same");
         CHECK(editor->getToolTip() == label->getToolTip());
         UNSCOPED_INFO("and it is the same editor, not a new one in its place");
@@ -846,17 +797,17 @@ namespace
         CHECK_FALSE(back->getVisible());
         UNSCOPED_INFO("in the quiet ink");
         CHECK(label->getColor().get() == quiet);
-        UNSCOPED_INFO("saying so: " + label->getToolTip());
-        REQUIRE(label->getToolTip().find("nobody wrote this") != std::string::npos);
+        UNSCOPED_INFO("saying so: " << label->getToolTip());
+        CHECK(label->getToolTip().find("nobody wrote this") != std::string::npos);
 
         // A grid showing only what is written has a row fewer or more, and
         // that is a rebuild's decision.
         grid->setAuthoredOnly(true);
         UNSCOPED_INFO("nothing written, nothing shown");
-        REQUIRE(grid->findChild<LLPanel>("width_row", true) == nullptr);
+        CHECK(grid->findChild<LLPanel>("width_row", true) == nullptr);
         grid->setAuthored("width", true, "base");
         UNSCOPED_INFO("written, and the row is back");
-        REQUIRE(grid->findChild<LLPanel>("width_row", true) != nullptr);
+        CHECK(grid->findChild<LLPanel>("width_row", true) != nullptr);
         grid->die();
     }
 
@@ -889,23 +840,23 @@ namespace
         LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
         const std::string spelt = rows->getChild<LLPanel>("dynamicwidth_row", true)
                                       ->getChild<LLTextBox>("dynamicwidth_label", true)->getToolTip();
-        UNSCOPED_INFO("a deprecated name says so: " + spelt);
-        REQUIRE(spelt.find("nothing new should use it") != std::string::npos);
-        UNSCOPED_INFO("and says what to write: " + spelt);
-        REQUIRE(spelt.find("write dynamic_width") != std::string::npos);
+        UNSCOPED_INFO("a deprecated name says so: " << spelt);
+        CHECK(spelt.find("nothing new should use it") != std::string::npos);
+        UNSCOPED_INFO("and says what to write: " << spelt);
+        CHECK(spelt.find("write dynamic_width") != std::string::npos);
 
         const std::string bare = rows->getChild<LLPanel>("hover_row", true)
                                      ->getChild<LLTextBox>("hover_label", true)->getToolTip();
         {
-            INFO("one with nothing to write instead says only that: " + bare);
-            REQUIRE(bare.find("nothing new should use it") != std::string::npos);
-            REQUIRE(bare.find("write") == std::string::npos);
+            INFO("one with nothing to write instead says only that: " << bare);
+            CHECK(bare.find("nothing new should use it") != std::string::npos);
+            CHECK(bare.find("write") == std::string::npos);
         }
 
         const std::string fine = rows->getChild<LLPanel>("width_row", true)
                                      ->getChild<LLTextBox>("width_label", true)->getToolTip();
-        UNSCOPED_INFO("and a name in good standing says nothing of the kind: " + fine);
-        REQUIRE(fine.find("should") == std::string::npos);
+        UNSCOPED_INFO("and a name in good standing says nothing of the kind: " << fine);
+        CHECK(fine.find("should") == std::string::npos);
         grid->die();
     }
 
@@ -952,7 +903,6 @@ namespace
         back->as<LLButton>()->onCommit();
         UNSCOPED_INFO("and then it takes out the first");
         REQUIRE(removed.size() == 1u);
-        UNSCOPED_INFO("alone");
         CHECK(removed.front() == std::string("width"));
         grid->die();
     }
@@ -982,11 +932,8 @@ namespace
         LLLineEditor* line = grid->getChild<LLLineEditor>("text", true);
         line->setText(std::string("Monospace"));
         line->onCommit();
-        UNSCOPED_INFO("one write: " + std::to_string(written.size()));
         REQUIRE(written.size() == 1u);
-        UNSCOPED_INFO("of the name");
         CHECK(written.front().first == std::string("font"));
-        UNSCOPED_INFO("as typed");
         CHECK(written.front().second == std::string("Monospace"));
         grid->die();
     }
@@ -1011,9 +958,9 @@ namespace
         LLPanel* position = grid->getChild<LLPanel>("position_rows", true);
         LLPanel* identity = grid->getChild<LLPanel>("identity_rows", true);
         UNSCOPED_INFO("a field past the last heading is under the last");
-        REQUIRE(position->findChild<LLPanel>("stray_row", true) != nullptr);
+        CHECK(position->findChild<LLPanel>("stray_row", true) != nullptr);
         UNSCOPED_INFO("and one before the first is under the first");
-        REQUIRE(identity->findChild<LLPanel>("below_row", true) != nullptr);
+        CHECK(identity->findChild<LLPanel>("below_row", true) != nullptr);
         grid->die();
     }
 
@@ -1057,7 +1004,6 @@ namespace
         // And once the commit is over, the grid is what it was asked to be.
         gIdleCallbacks.callFunctions();
         LLLineEditor* now = grid->findChild<LLLineEditor>("label", true);
-        UNSCOPED_INFO("filled again");
         REQUIRE(now != nullptr);
         UNSCOPED_INFO("with what was committed");
         CHECK(now->getText() == std::string("After"));
@@ -1090,16 +1036,13 @@ namespace
         fields[0].value = "After";
         fields[1].value = "20";
         fields[1].authored = false;
-        UNSCOPED_INFO("the same rows are taken");
         CHECK(grid->updateFields(fields));
         {
             INFO("the editors are the ones that were there");
-            REQUIRE(grid->findChild<LLLineEditor>("label", true) == label);
+            CHECK(grid->findChild<LLLineEditor>("label", true) == label);
             CHECK(grid->findChild<LLSpinCtrl>("width", true) == width);
         }
-        UNSCOPED_INFO("saying the new text");
         CHECK(label->getText() == std::string("After"));
-        UNSCOPED_INFO("and the new number");
         CHECK(width->getValue().asInteger() == 20);
         UNSCOPED_INFO("and the grid knows it");
         CHECK(grid->fields()[1].value == std::string("20"));
@@ -1132,9 +1075,7 @@ namespace
         fields.back().authored = false;
         fields.push_back(field("border", 0));
         grid->setFields(fields);
-        UNSCOPED_INFO("first as given");
         CHECK(grid->fields()[0].name == std::string("radius"));
-        UNSCOPED_INFO("second as given");
         CHECK(grid->fields()[1].name == std::string("corners"));
         UNSCOPED_INFO("the written one stays where it was");
         CHECK(grid->fields()[2].name == std::string("border"));
@@ -1169,7 +1110,7 @@ namespace
         UNSCOPED_INFO("a new description keeps the row");
         CHECK(grid->updateFields(fields));
         UNSCOPED_INFO("and the tip says it");
-        REQUIRE(label->getToolTip().find("Where it sits.") != std::string::npos);
+        CHECK(label->getToolTip().find("Where it sits.") != std::string::npos);
 
         // Scrubbing T: the update lands in the other three and not in T.
         gFocusMgr.setMouseCapture(top);

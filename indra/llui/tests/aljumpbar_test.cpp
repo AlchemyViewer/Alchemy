@@ -78,8 +78,6 @@ namespace
         }
     };
 
-    // One crumb per step, in order, and a step with somewhere else to be is
-    // the one with the arrow on it.
     TEST_CASE_METHOD(aljumpbar_data, "aljumpbar: one crumb per step in order with an arrow where a step has siblings", "[aljumpbar]")
     {
         if (!ui.ok())
@@ -89,15 +87,13 @@ namespace
         ALJumpBar* bar = make();
         bar->setPath(path());
 
-        UNSCOPED_INFO("one each");
         CHECK(crumbsIn(bar) == 4);
         UNSCOPED_INFO("a step with nowhere else to be is a plain button");
-        REQUIRE(bar->getChild<LLView>("crumb_0")->as<LLFlyoutButton>() == nullptr);
+        CHECK(bar->getChild<LLView>("crumb_0")->as<LLFlyoutButton>() == nullptr);
         UNSCOPED_INFO("and one with siblings offers them");
         REQUIRE(bar->getChild<LLView>("crumb_2")->as<LLFlyoutButton>() != nullptr);
 
         // Left to right, in the order the path reads.
-        UNSCOPED_INFO("in order");
         CHECK(bar->getChild<LLView>("crumb_0")->getRect().mRight
                         <= bar->getChild<LLView>("crumb_1")->getRect().mLeft);
         delete bar;
@@ -121,20 +117,16 @@ namespace
         });
 
         bar->getChild<LLButton>("crumb_1")->onCommit();
-        UNSCOPED_INFO("said once");
         REQUIRE(chosen.size() == 1u);
-        UNSCOPED_INFO("which crumb");
         CHECK(chosen.back().first == 1u);
-        UNSCOPED_INFO("and its own value");
+        UNSCOPED_INFO("the crumb's own value");
         CHECK(chosen.back().second == std::string("body"));
 
         // Sideways: the sibling picked is what is answered, not the crumb.
         LLFlyoutButton* sideways = bar->getChild<LLView>("crumb_3")->as<LLFlyoutButton>();
-        UNSCOPED_INFO("the last step offers its siblings");
         REQUIRE(sideways != nullptr);
         sideways->setSelectedByValue(LLSD("help_btn"), true);
         sideways->onCommit();
-        UNSCOPED_INFO("said again");
         REQUIRE(chosen.size() == 2u);
         UNSCOPED_INFO("on the same crumb");
         CHECK(chosen.back().first == 3u);
@@ -158,31 +150,28 @@ namespace
         CHECK(crumbsIn(bar) == 4);
 
         bar->reshape(150, 22);
-        UNSCOPED_INFO("fewer than four are shown");
         CHECK(crumbsIn(bar) < 4);
         UNSCOPED_INFO("the last step is still one of them");
         REQUIRE(bar->findChild<LLView>("crumb_3", true) != nullptr);
         UNSCOPED_INFO("and the first is not");
-        REQUIRE(bar->findChild<LLView>("crumb_0", true) == nullptr);
+        CHECK(bar->findChild<LLView>("crumb_0", true) == nullptr);
 
         // Everything shown is inside the room there is.
         for (LLView* child : *bar->getChildList())
         {
             if (child->getName().rfind("crumb_", 0) == 0)
             {
-                UNSCOPED_INFO("inside the bar: " + child->getName());
+                INFO("inside the bar: " << child->getName());
                 REQUIRE(child->getRect().mRight <= 150);
             }
         }
 
         bar->reshape(600, 22);
-        UNSCOPED_INFO("and back again when there is room");
+        UNSCOPED_INFO("all four back when there is room");
         CHECK(crumbsIn(bar) == 4);
         delete bar;
     }
 
-    // What is said past the end of the path is not a step, so it is not
-    // something to press.
     TEST_CASE_METHOD(aljumpbar_data, "aljumpbar: the trailer past the end of the path is not something to press", "[aljumpbar]")
     {
         if (!ui.ok())
@@ -192,16 +181,14 @@ namespace
         ALJumpBar* bar = make();
         bar->setPath(path());
         UNSCOPED_INFO("nothing said by default");
-        REQUIRE(bar->findChild<LLView>("trailer", true) == nullptr);
+        CHECK(bar->findChild<LLView>("trailer", true) == nullptr);
 
         bar->setTrailer("default/en");
         const LLView* trailer = bar->findChild<LLView>("trailer", true);
-        UNSCOPED_INFO("said");
         REQUIRE(trailer != nullptr);
         UNSCOPED_INFO("past the end of the path");
         CHECK(trailer->getRect().mLeft >= bar->getChild<LLView>("crumb_3")->getRect().mRight);
-        UNSCOPED_INFO("and it is not a button");
-        REQUIRE(trailer->as<LLButton>() == nullptr);
+        CHECK(trailer->as<LLButton>() == nullptr);
         delete bar;
     }
 
@@ -232,9 +219,7 @@ namespace
         const S32 y = body->getRect().getHeight() / 2;
         body->handleMouseDown(x, y, MASK_NONE);
         body->handleMouseUp(x, y, MASK_NONE);
-        UNSCOPED_INFO("the crumb was chosen");
         REQUIRE(went.size() == 1u);
-        UNSCOPED_INFO("and said where");
         CHECK(went.front() == std::string("body"));
         UNSCOPED_INFO("the path is still the old one while the press is over");
         CHECK(crumbsIn(bar) == 4);
@@ -268,12 +253,9 @@ namespace
         LLTextBox* line     = bar->findChild<LLTextBox>("trailer_0", true);
         LLTextBox* gap      = bar->findChild<LLTextBox>("trailer_1", true);
         LLTextBox* problems = bar->findChild<LLTextBox>("trailer_2", true);
-        {
-            INFO("each piece");
-            REQUIRE(line);
-            REQUIRE(gap);
-            REQUIRE(problems);
-        }
+        REQUIRE(line);
+        REQUIRE(gap);
+        REQUIRE(problems);
         UNSCOPED_INFO("in the order said");
         CHECK(line->getRect().mRight <= problems->getRect().mLeft);
         UNSCOPED_INFO("past the end of the path");
@@ -286,20 +268,17 @@ namespace
             piece->handleMouseUp(x, y, MASK_NONE);
         };
         press(problems);
-        UNSCOPED_INFO("said once");
         REQUIRE(chosen.size() == 1u);
-        UNSCOPED_INFO("with the piece's value");
         CHECK(chosen.back() == std::string("problems"));
         press(gap);
         UNSCOPED_INFO("a piece with no value says nothing");
-        REQUIRE(chosen.size() == 1u);
+        CHECK(chosen.size() == 1u);
         press(line);
-        UNSCOPED_INFO("and the other says its own");
         CHECK(chosen.back() == std::string("line"));
 
         const LLView* before = bar->findChild<LLView>("trailer", true);
         bar->setTrailer(parts);
-        UNSCOPED_INFO("the same pieces again are the same pieces");
+        UNSCOPED_INFO("the same pieces again build nothing again");
         CHECK(bar->findChild<LLView>("trailer", true) == before);
 
         // Other words in the same pieces -- the caret moving -- change the
@@ -308,24 +287,19 @@ namespace
         std::vector<ALJumpBar::TrailerPart> moved = parts;
         moved[0].text = "Ln 120, Col 14";
         bar->setTrailer(moved);
-        UNSCOPED_INFO("the same trailer");
         CHECK(bar->findChild<LLView>("trailer", true) == before);
-        UNSCOPED_INFO("the same path");
         CHECK(bar->findChild<LLView>("crumb_0", true) == crumb);
         LLTextBox* again = bar->findChild<LLTextBox>("trailer_0", true);
-        UNSCOPED_INFO("the same piece");
-        CHECK(again == line);
-        UNSCOPED_INFO("with the new words");
+        REQUIRE(again == line);
         CHECK(again->getText() == std::string("Ln 120, Col 14"));
         UNSCOPED_INFO("still in order");
         CHECK(again->getRect().mRight <= bar->findChild<LLTextBox>("trailer_2", true)->getRect().mLeft);
-        UNSCOPED_INFO("and against the far edge");
+        UNSCOPED_INFO("against the far edge");
         CHECK(bar->findChild<LLTextBox>("trailer_2", true)->getRect().mRight <= bar->getChild<LLView>("trailer")->getRect().getWidth());
 
         // Another piece, and the trailer is built again.
         moved.push_back({ "1 warning", "problems", "The problems" });
         bar->setTrailer(moved);
-        UNSCOPED_INFO("a fourth piece");
         REQUIRE(bar->findChild<LLTextBox>("trailer_3", true) != nullptr);
         delete bar;
     }
@@ -342,7 +316,6 @@ namespace
         ALJumpBar* bar = make();
         bar->setPath(path());
         LLView* crumb = bar->findChild<LLView>("crumb_3", false);
-        UNSCOPED_INFO("a crumb");
         REQUIRE(crumb != nullptr);
         const LLHandle<LLView> held = crumb->getHandle();
 
@@ -358,7 +331,6 @@ namespace
         bar->setPath(other);
         UNSCOPED_INFO("another path, built again");
         CHECK(held.isDead());
-        UNSCOPED_INFO("with as many crumbs");
         CHECK(crumbsIn(bar) == 4);
         delete bar;
     }
@@ -375,7 +347,6 @@ namespace
         std::vector<ALJumpBar::TrailerPart> parts = { { "Ln 3, Col 1", "line", "Go to a line" }, { "200 KB of 256 KB", std::string(), "The size" } };
         bar->setTrailer(parts);
         LLTextBox* size = bar->findChild<LLTextBox>("trailer_1", true);
-        UNSCOPED_INFO("a piece");
         REQUIRE(size != nullptr);
         const LLColor4 quiet = size->getColor().get();
 
@@ -450,7 +421,8 @@ namespace
         bar->reshape(two * 4, 22);
         for (size_t i = 0; i < parts.size(); ++i)
         {
-            UNSCOPED_INFO("widened, all said");
+            INFO("widened, all said");
+            CAPTURE(i);
             REQUIRE(said(i));
         }
 

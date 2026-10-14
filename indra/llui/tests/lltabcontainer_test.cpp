@@ -106,9 +106,7 @@ namespace
         tabs->addTabPanel(described);
 
         LLButton* button = tabButton(tabs, "described");
-        UNSCOPED_INFO("the page has a button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("the button says what the page said");
         CHECK(button->getToolTip() ==
                       std::string("What this mode is for"));
         tabs->die();
@@ -128,10 +126,8 @@ namespace
         tabs->addTabPanel(page("plain", std::string()));
 
         LLButton* button = tabButton(tabs, "plain");
-        UNSCOPED_INFO("the page has a button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("a page that said nothing leaves its button silent");
-        REQUIRE(button->getToolTip().empty());
+        CHECK(button->getToolTip().empty());
         tabs->die();
     }
 
@@ -149,13 +145,10 @@ namespace
         tabs->addTabPanel(counted);
 
         LLButton* button = tabButton(tabs, "counted");
-        UNSCOPED_INFO("the page has a button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("a tab starts with nothing to say");
         CHECK_FALSE(button->hasBadge());
 
         tabs->setTabBadge(counted, "12");
-        UNSCOPED_INFO("a count puts a badge on the tab");
         CHECK(button->hasBadge());
 
         tabs->setTabBadge(counted, std::string());
@@ -179,9 +172,7 @@ namespace
 
         tabs->setTabBadge(quiet, std::string());
         LLButton* button = tabButton(tabs, "quiet");
-        UNSCOPED_INFO("the page has a button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("nothing to say builds nothing");
         CHECK_FALSE(button->hasBadge());
         tabs->die();
     }
@@ -199,9 +190,7 @@ namespace
         tabs->addTabPanel(page("sideways", "Down the side"));
 
         LLButton* button = tabButton(tabs, "sideways", true);
-        UNSCOPED_INFO("the page has a button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("the button says what the page said");
         CHECK(button->getToolTip() ==
                       std::string("Down the side"));
         tabs->die();
@@ -226,22 +215,19 @@ namespace
         tabs->addTabPanel(third);
 
         tabs->selectTabPanel(third);
-        UNSCOPED_INFO("reading the third");
-        REQUIRE(tabs->getCurrentPanel() == third);
+        CHECK(tabs->getCurrentPanel() == third);
 
         tabs->setTabVisibility(second, false);
-        UNSCOPED_INFO("hiding another leaves it there");
-        REQUIRE(tabs->getCurrentPanel() == third);
+        CHECK(tabs->getCurrentPanel() == third);
 
         // The one being read is the one that went: somewhere else, then.
         tabs->setTabVisibility(third, false);
         UNSCOPED_INFO("hiding this one moves to the first left");
-        REQUIRE(tabs->getCurrentPanel() == first);
-        UNSCOPED_INFO("and the container is still worth showing");
+        CHECK(tabs->getCurrentPanel() == first);
         CHECK(tabs->getVisible());
 
         tabs->setTabVisibility(first, false);
-        UNSCOPED_INFO("a container with nothing to show does not");
+        UNSCOPED_INFO("nothing left to show");
         CHECK_FALSE(tabs->getVisible());
         tabs->die();
     }
@@ -259,18 +245,13 @@ namespace
         LLTabContainer* tabs = build();
         LLButton* next = tabs->findChild<LLButton>("Right Arrow", true);
         LLButton* jump = tabs->findChild<LLButton>("Jump Right Arrow", true);
-        {
-            INFO("the strip has its arrows");
-            REQUIRE(next);
-            REQUIRE(jump);
-        }
+        REQUIRE(next);
+        REQUIRE(jump);
         const S32 next_right = next->getRect().mRight;
         const S32 jump_right = jump->getRect().mRight;
 
         tabs->setRightTabBtnOffset(10);
-        UNSCOPED_INFO("the arrow moved in");
         CHECK(next->getRect().mRight == next_right - 10);
-        UNSCOPED_INFO("and the jump beside it");
         CHECK(jump->getRect().mRight == jump_right - 10);
 
         tabs->setRightTabBtnOffset(10);
@@ -278,9 +259,7 @@ namespace
         CHECK(next->getRect().mRight == next_right - 10);
 
         tabs->setRightTabBtnOffset(0);
-        UNSCOPED_INFO("no offset puts it back");
         CHECK(next->getRect().mRight == next_right);
-        UNSCOPED_INFO("both of them");
         CHECK(jump->getRect().mRight == jump_right);
         tabs->die();
     }
@@ -301,23 +280,17 @@ namespace
         tabs->addTabPanel(page("b", std::string()));
         tabs->addTabPanel(page("c", std::string()));
         tabs->lockTabs();
-        UNSCOPED_INFO("three locked");
         CHECK(tabs->getNumLockedTabs() == 3);
-        UNSCOPED_INFO("three widths");
         CHECK(tabs->getTotalTabWidth() > 0);
 
         tabs->deleteAllTabs();
-        UNSCOPED_INFO("none locked");
         CHECK(tabs->getNumLockedTabs() == 0);
-        UNSCOPED_INFO("no width");
         CHECK(tabs->getTotalTabWidth() == 0);
-        UNSCOPED_INFO("nothing read");
         CHECK(tabs->getCurrentPanelIndex() == -1);
 
         LLPanel* front = page("front", std::string());
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(front).insert_at(LLTabContainer::START));
-        UNSCOPED_INFO("a tab at the front of an empty strip");
-        REQUIRE(tabs->getPanelByIndex(0) == front);
+        CHECK(tabs->getPanelByIndex(0) == front);
         tabs->die();
     }
 
@@ -343,12 +316,11 @@ namespace
         S32 commits = 0;
         tabs->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         tabs->selectNextTab();
-        UNSCOPED_INFO("still on the first");
-        REQUIRE(tabs->getCurrentPanel() == first);
-        UNSCOPED_INFO("and not told about it again");
+        CHECK(tabs->getCurrentPanel() == first);
+        UNSCOPED_INFO("next: not told again about the tab it is on");
         CHECK(commits == 0);
         tabs->selectPrevTab();
-        UNSCOPED_INFO("either way");
+        UNSCOPED_INFO("previous: nor that way");
         CHECK(commits == 0);
 
         tabs->deleteAllTabs();
@@ -356,11 +328,9 @@ namespace
         tabs->addTabPanel(page("fourth", std::string()));
         tabs->enableTabButton(0, false);
         tabs->enableTabButton(1, false);
-        UNSCOPED_INFO("nothing selected");
         CHECK(tabs->getCurrentPanelIndex() == -1);
         tabs->selectNextTab();
         tabs->selectPrevTab();
-        UNSCOPED_INFO("and nothing selectable leaves it so");
         CHECK(tabs->getCurrentPanelIndex() == -1);
         tabs->die();
     }
@@ -384,11 +354,9 @@ namespace
         const std::string title("A title to measure");
         tabs->setPanelTitle(0, title);
         LLButton* button = tabButton(tabs, "titled");
-        UNSCOPED_INFO("the page has a button");
         REQUIRE(button != nullptr);
         const S32 in_own_font = llclamp(LLFontGL::getFontSansSerifBig()->getWidth(title),
                                         tabs->getMinTabWidth(), tabs->getMaxTabWidth());
-        UNSCOPED_INFO("sized to the title in the strip's font");
         CHECK(button->getRect().getWidth() == in_own_font);
         tabs->die();
     }
@@ -412,11 +380,8 @@ namespace
         tabs->setValidateBeforeCommit([](const LLSD&) { return false; });
 
         tabs->onTabBtn(LLSD(), second);
-        UNSCOPED_INFO("refused, so still on the first");
-        REQUIRE(tabs->getCurrentPanel() == first);
-        UNSCOPED_INFO("the keyboard did not go into the refused panel");
+        CHECK(tabs->getCurrentPanel() == first);
         CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(second));
-        UNSCOPED_INFO("which is not showing");
         CHECK_FALSE(second->getVisible());
         gFocusMgr.setKeyboardFocus(nullptr);
         tabs->die();
@@ -444,9 +409,8 @@ namespace
         tabs->selectTabPanel(first);
         tabs->setTabVisibility(second, false);
         LLButton* hidden = tabButton(tabs, "second");
-        UNSCOPED_INFO("the hidden page has a button");
         REQUIRE(hidden != nullptr);
-        UNSCOPED_INFO("which is not shown");
+        UNSCOPED_INFO("before the drag");
         CHECK_FALSE(hidden->getVisible());
 
         // Before the strip is drawn its buttons all sit at the left, so a
@@ -461,10 +425,8 @@ namespace
         LLFrameTimer::updateFrameTime();
         tabs->handleDragAndDrop(x, y, 0, false, DAD_NONE, nullptr, &accept, tip);
 
-        UNSCOPED_INFO("the hidden tab's button stays hidden");
         CHECK_FALSE(hidden->getVisible());
-        UNSCOPED_INFO("and the drag did not open it");
-        REQUIRE(tabs->getCurrentPanel() == first);
+        CHECK(tabs->getCurrentPanel() == first);
         gFocusMgr.setKeyboardFocus(nullptr);
         tabs->die();
     }
@@ -483,10 +445,8 @@ namespace
         p.name = "tabs";
         p.rect = LLRect(0, 0, 400, 0);
         LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(p);
-        UNSCOPED_INFO("a strip with no height has its arrows");
-        REQUIRE(tabs->findChild<LLButton>("Left Arrow", true) != nullptr);
-        UNSCOPED_INFO("all of them");
-        REQUIRE(tabs->findChild<LLButton>("Jump Right Arrow", true) != nullptr);
+        CHECK(tabs->findChild<LLButton>("Left Arrow", true) != nullptr);
+        CHECK(tabs->findChild<LLButton>("Jump Right Arrow", true) != nullptr);
         tabs->die();
     }
 
@@ -505,9 +465,7 @@ namespace
         p.tab_position = LLTabContainer::LEFT;
         LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(p);
         LLButton* down = tabs->findChild<LLButton>("Down Arrow", true);
-        UNSCOPED_INFO("the strip has its lower arrow");
         REQUIRE(down != nullptr);
-        UNSCOPED_INFO("at the strip's own bottom");
         CHECK(down->getRect().mBottom == 0);
         tabs->die();
     }
@@ -526,13 +484,9 @@ namespace
         {
             tabs->addTabPanel(page("page" + std::to_string(i), std::string()));
         }
-        UNSCOPED_INFO("the last tab is selected");
         CHECK(tabs->selectTab(19));
-        UNSCOPED_INFO("and is the one being read");
         CHECK(tabs->getCurrentPanelIndex() == 19);
-        UNSCOPED_INFO("the first again");
         CHECK(tabs->selectTab(0));
-        UNSCOPED_INFO("and read");
         CHECK(tabs->getCurrentPanelIndex() == 0);
         tabs->die();
     }
@@ -549,10 +503,8 @@ namespace
         LLTabContainer* tabs = build();
         tabs->addTabPanel(page("first", std::string()));
         tabs->addTabPanel(page("second", std::string()));
-        UNSCOPED_INFO("nothing selected");
         CHECK(tabs->getCurrentPanelIndex() == -1);
         tabs->onNextBtn(LLSD());
-        UNSCOPED_INFO("next from nothing is the first");
         CHECK(tabs->getCurrentPanelIndex() == 0);
         tabs->die();
     }
@@ -579,14 +531,11 @@ namespace
         tabs->selectTabPanel(a);
         LLPanel* between = page("between", std::string());
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(between).insert_at(LLTabContainer::RIGHT_OF_CURRENT));
-        UNSCOPED_INFO("put in the middle");
         CHECK(tabs->getIndexForPanel(between) == 1);
 
         LLButton* button = tabButton(tabs, "between");
-        UNSCOPED_INFO("the page has a button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("with the middle tab's flash image");
-        REQUIRE(button->getImageFlash().get() == flash.get());
+        CHECK(button->getImageFlash().get() == flash.get());
         tabs->die();
     }
 
@@ -608,10 +557,8 @@ namespace
 
         LLPanel* added = page("added", std::string());
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(added).select_tab(true).insert_at(LLTabContainer::RIGHT_OF_CURRENT));
-        UNSCOPED_INFO("put after the first");
         CHECK(tabs->getIndexForPanel(added) == 1);
-        UNSCOPED_INFO("and the one selected");
-        REQUIRE(tabs->getCurrentPanel() == added);
+        CHECK(tabs->getCurrentPanel() == added);
         tabs->die();
     }
 
@@ -639,24 +586,18 @@ namespace
         tabs->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         tabs->removeTabPanel(a);
         a->die();
-        UNSCOPED_INFO("still reading the third");
-        REQUIRE(tabs->getCurrentPanel() == c);
-        UNSCOPED_INFO("at its new place");
+        CHECK(tabs->getCurrentPanel() == c);
         CHECK(tabs->getCurrentPanelIndex() == 1);
-        UNSCOPED_INFO("with nothing to announce");
+        UNSCOPED_INFO("the selection did not change, so nothing to announce");
         CHECK(commits == 0);
-        {
-            INFO("and it is the one showing");
-            CHECK(c->getVisible());
-            CHECK_FALSE(d->getVisible());
-        }
+        CHECK(c->getVisible());
+        CHECK_FALSE(d->getVisible());
 
         // The one being read is the one that goes: what took its place.
         tabs->removeTabPanel(c);
         c->die();
-        UNSCOPED_INFO("reading what took its place");
-        REQUIRE(tabs->getCurrentPanel() == d);
-        UNSCOPED_INFO("announced");
+        CHECK(tabs->getCurrentPanel() == d);
+        UNSCOPED_INFO("the selection changed, so announced");
         CHECK(commits == 1);
         tabs->die();
     }
@@ -673,7 +614,6 @@ namespace
         tabs->addTabPanel(page("first", std::string()));
         tabs->addTabPanel(page("second", std::string()));
         tabs->setValue(1);
-        UNSCOPED_INFO("the value set is the value read");
         CHECK(tabs->getValue().asInteger() == 1);
         tabs->die();
     }
@@ -704,22 +644,17 @@ namespace
         tabs->setTabImage(pictured, icon);
 
         LLButton* button = tabButton(tabs, "pictured");
-        UNSCOPED_INFO("the page has a button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("the picture is the button's");
-        REQUIRE(icon->getParent() == button);
+        CHECK(icon->getParent() == button);
         const LLRect& in_button = icon->getRect();
         const LLRect box = button->getLocalRect();
-        {
-            INFO("and sits inside it");
-            CHECK(in_button.mLeft >= box.mLeft);
-            CHECK(in_button.mRight <= box.mRight);
-            CHECK(in_button.mBottom >= box.mBottom);
-            CHECK(in_button.mTop <= box.mTop);
-        }
+        CHECK(in_button.mLeft >= box.mLeft);
+        CHECK(in_button.mRight <= box.mRight);
+        CHECK(in_button.mBottom >= box.mBottom);
+        CHECK(in_button.mTop <= box.mTop);
         UNSCOPED_INFO("padded off the top");
         CHECK(in_button.mTop == box.mTop - 2);
-        UNSCOPED_INFO("and the left");
+        UNSCOPED_INFO("padded off the left");
         CHECK(in_button.mLeft == 2);
         UNSCOPED_INFO("as tall as the room leaves it");
         CHECK(in_button.getHeight() == box.getHeight() - 4);
@@ -749,7 +684,6 @@ namespace
         tabs->addTabPanel(page("g", std::string()));
         LLPanel* last = page("h", std::string());
         tabs->addTabPanel(last);
-        UNSCOPED_INFO("the wide tab is as wide as a tab may be");
         CHECK(tabButton(tabs, "f")->getRect().getWidth() == tabs->getMaxTabWidth());
 
         tabs->setTabVisibility(wide, false);
@@ -779,14 +713,10 @@ namespace
         tabs->selectTabPanel(first);
         tabButton(tabs, "first")->setFocus(true);
 
-        UNSCOPED_INFO("control-right is not the strip's");
         CHECK_FALSE(tabs->handleKeyHere(KEY_RIGHT, MASK_CONTROL));
-        UNSCOPED_INFO("and moved nothing");
-        REQUIRE(tabs->getCurrentPanel() == first);
-        UNSCOPED_INFO("right on its own is");
+        CHECK(tabs->getCurrentPanel() == first);
         CHECK(tabs->handleKeyHere(KEY_RIGHT, MASK_NONE));
-        UNSCOPED_INFO("and moved to the next");
-        REQUIRE(tabs->getCurrentPanel() == second);
+        CHECK(tabs->getCurrentPanel() == second);
         gFocusMgr.setKeyboardFocus(nullptr);
         tabs->die();
     }
@@ -806,7 +736,6 @@ namespace
         tabs->addTabPanel(plain);
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(indented).indent(10));
         const S32 pad = tabButton(tabs, "plain")->getLeftHPad();
-        UNSCOPED_INFO("the indent is added to the label's padding");
         CHECK(tabButton(tabs, "indented")->getLeftHPad() == pad + 10);
         tabs->die();
     }
@@ -859,6 +788,7 @@ namespace
 
         for (bool offset : { false, true })
         {
+            CAPTURE(offset);
             LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
             p.name = "tabs";
             p.rect = LLRect(0, 300, 400, 0);
@@ -868,14 +798,9 @@ namespace
             tabs->addTabPanel(only);
             LLButton* jump_left = tabs->findChild<LLButton>("Jump Left Arrow", true);
             LLButton* jump_right = tabs->findChild<LLButton>("Jump Right Arrow", true);
-            {
-                INFO("the strip has its jump arrows");
-                REQUIRE(jump_left);
-                REQUIRE(jump_right);
-            }
-            UNSCOPED_INFO("the strip starts where the page does");
+            REQUIRE(jump_left);
+            REQUIRE(jump_right);
             REQUIRE(jump_left->getRect().mLeft == only->getRect().mLeft);
-            UNSCOPED_INFO("and ends where it does");
             REQUIRE(jump_right->getRect().mRight == only->getRect().mRight);
             tabs->die();
         }
@@ -909,11 +834,10 @@ namespace
         for (const char* name : { "a", "b", "c", "d" })
         {
             const S32 width = tabButton(tabs, name)->getRect().getWidth();
-            UNSCOPED_INFO("each tab is wider than it wants");
+            CAPTURE(name);
             REQUIRE(width > 60);
             total += width;
         }
-        UNSCOPED_INFO("and together they are the strip");
         CHECK(total == room);
         UNSCOPED_INFO("the odd pixels go to the first");
         CHECK(tabButton(tabs, "a")->getRect().getWidth() ==
@@ -926,7 +850,6 @@ namespace
         {
             total += tabButton(tabs, name)->getRect().getWidth();
         }
-        UNSCOPED_INFO("three share it");
         CHECK(total == room);
         UNSCOPED_INFO("the hidden one is its own width");
         CHECK(tabButton(tabs, "a")->getRect().getWidth() == 60);
@@ -939,7 +862,6 @@ namespace
         }
         UNSCOPED_INFO("seven of sixty do not fit, so each is sixty");
         CHECK(tabButton(tabs, "a")->getRect().getWidth() == 60);
-        UNSCOPED_INFO("and the strip scrolls");
         CHECK(tabs->getMaxScrollPos() > 0);
         tabs->die();
     }
@@ -979,7 +901,6 @@ namespace
 
         UNSCOPED_INFO("the button is not a tab");
         CHECK(tabs->getTabCount() == 4);
-        UNSCOPED_INFO("it is the container's own child");
         CHECK(button->getParent() == tabs);
 
         // The 398 between the pages' sides, less the 80 kept.
@@ -988,9 +909,7 @@ namespace
         {
             total += tabButton(tabs, name)->getRect().getWidth();
         }
-        UNSCOPED_INFO("the tabs fill what is left");
         CHECK(total == 398 - KEPT);
-        UNSCOPED_INFO("and stop short of the button");
         CHECK(1 + total <= button->getRect().mLeft);
 
         // Pressed and released on it: its own click, and the strip does not
@@ -998,16 +917,13 @@ namespace
         const S32 x = button->getRect().getCenterX();
         const S32 y = button->getRect().getCenterY();
         tabs->handleMouseDown(x, y, MASK_NONE);
-        UNSCOPED_INFO("the button holds the mouse");
         CHECK(gFocusMgr.getMouseCapture() == button);
         button->handleMouseUp(x - button->getRect().mLeft, y - button->getRect().mBottom, MASK_NONE);
-        UNSCOPED_INFO("and is clicked");
         CHECK(clicks == 1);
 
         // Over the tabs, the strip takes the mouse, and would take it from a
         // button put there.
         tabs->handleMouseDown(10, y, MASK_NONE);
-        UNSCOPED_INFO("the strip holds the mouse over the tabs");
         CHECK(gFocusMgr.getMouseCapture() == tabs);
         gFocusMgr.setMouseCapture(nullptr);
         tabs->die();

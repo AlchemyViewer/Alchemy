@@ -84,6 +84,7 @@ namespace
     {
         for (const LLRect& rect : { LLRect(0, 10, 20, 0), LLRect(30, 40, 50, 20) })
         {
+            CAPTURE(rect.mLeft, rect.mBottom);
             const std::vector<S32> pixels = drawn([&] { ALSurface::draw(rect, LLColor4::black, LLColor4::white, 1.f); });
             // Its frame and its ground, where both are sure to be.
             const S32 frame  = at(pixels, rect.mLeft + 3, rect.mTop - 1);
@@ -102,8 +103,8 @@ namespace
                     const S32  wanted = edge ? frame : inside ? ground : 0;
                     if (at(pixels, x, y) != wanted)
                     {
-                        FAIL("at " + std::to_string(x) + "," + std::to_string(y) + " of the surface at " + std::to_string(rect.mLeft) + "," +
-                             std::to_string(rect.mBottom) + ": " + std::to_string(at(pixels, x, y)) + " for " + std::to_string(wanted));
+                        CAPTURE(x, y, wanted);
+                        FAIL("the pixel is " << at(pixels, x, y));
                     }
                 }
             }
@@ -136,11 +137,8 @@ namespace
         const S32 ground = at(pixels, first.mLeft + 3, middle);
         UNSCOPED_INFO("the frame and the ground tell apart");
         CHECK(frame != ground);
-        UNSCOPED_INFO("framed at its left edge");
         CHECK(at(pixels, first.mLeft, middle) == frame);
-        UNSCOPED_INFO("and at its right");
         CHECK(at(pixels, first.mRight - 1, middle) == frame);
-        UNSCOPED_INFO("its ground just inside");
         CHECK(at(pixels, first.mLeft + 1, middle) == ground);
         strip->die();
     }
@@ -154,6 +152,7 @@ namespace
         }
         for (const bool attached : { true, false })
         {
+            CAPTURE(attached);
             ALTabStrip::Params p(LLUICtrlFactory::getDefaultParams<ALTabStrip>());
             p.name                 = "tabs";
             p.rect                 = LLRect(0, 24, W, 0);
@@ -172,11 +171,8 @@ namespace
             const S32              ground = at(pixels, shown.mLeft + 3, shown.getCenterY());
             UNSCOPED_INFO("the frame and the shown tab's ground tell apart");
             REQUIRE(frame != ground);
-            UNSCOPED_INFO((attached ? "the shown tab open at its bottom" : "unattached, the shown tab closed at its bottom"));
             REQUIRE(at(pixels, shown.mLeft + 3, shown.mBottom) == (attached ? ground : frame));
-            UNSCOPED_INFO("its sides still framed");
             REQUIRE(at(pixels, shown.mLeft, shown.getCenterY()) == frame);
-            UNSCOPED_INFO("a tab behind closed at its bottom");
             REQUIRE(at(pixels, behind.mLeft + 3, behind.mBottom) == frame);
             strip->die();
         }

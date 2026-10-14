@@ -58,9 +58,7 @@ namespace
         {
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        UNSCOPED_INFO("a Url in the text");
         CHECK(found("hello http://www.example.com/x there") == std::string("http://www.example.com/x"));
-        UNSCOPED_INFO("the first of two");
         CHECK(found("see https://secondlife.com/a or http://example.net/b") == std::string("https://secondlife.com/a"));
         UNSCOPED_INFO("a bare Secondlife host");
         CHECK(found("see https://secondlife.com and go") == std::string("https://secondlife.com"));
@@ -68,13 +66,9 @@ namespace
         CHECK(found("at http://secondlife.com:8080 now") == std::string("http://secondlife.com:8080"));
         UNSCOPED_INFO("a full stop after one is not its");
         CHECK(found("visit http://example.com/index.php.") == std::string("http://example.com/index.php"));
-        UNSCOPED_INFO("an address");
         CHECK(found("mail someone@example.org now") == std::string("someone@example.org"));
-        UNSCOPED_INFO("an app Url in any case");
         CHECK(found("go SECONDLIFE:///app/chat/42/hello there") == std::string("SECONDLIFE:///app/chat/42/hello"));
-        UNSCOPED_INFO("nothing where there is none");
         CHECK(found("the :// alone, and www. alone") == std::string(""));
-        UNSCOPED_INFO("nor in plain words");
         CHECK(found("nothing to see here") == std::string(""));
         UNSCOPED_INFO("nor where an at or a .com is only a word's");
         CHECK(found("meet me @ the club, the .com boom is over") == std::string(""));
@@ -88,9 +82,7 @@ namespace
         }
         // A check before the patterns once took only a lowercase tag, where
         // the entry's pattern takes one in any case.
-        UNSCOPED_INFO("a nolink tag in capitals");
         CHECK(found("say <NOLINK>hello</NOLINK> ok") == std::string("<NOLINK>hello</NOLINK>"));
-        UNSCOPED_INFO("and in lowercase");
         CHECK(found("say <nolink>hello</nolink> ok") == std::string("<nolink>hello</nolink>"));
     }
 }

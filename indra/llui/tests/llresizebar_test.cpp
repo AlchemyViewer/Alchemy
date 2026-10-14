@@ -80,7 +80,6 @@ namespace
         }
 
         std::unique_ptr<LLResizeBar> bar(orphanBar());
-        UNSCOPED_INFO("double-clicking a bar with nothing to resize is handled");
         CHECK(bar->handleDoubleClick(1, 1, 0));
     }
 
@@ -99,9 +98,7 @@ namespace
         bool heard = false;
         bar->setResizeListener([&heard](void*) { heard = true; });
 
-        UNSCOPED_INFO("the hover is handled");
         CHECK(bar->handleHover(1, 1, 0));
-        UNSCOPED_INFO("but it is not a resize");
         CHECK_FALSE(heard);
     }
 
@@ -113,14 +110,10 @@ namespace
         LLResizeBar::Params p;   // builds the block descriptor
 
         LLInitParam::BlockDescriptor& descriptor = LLResizeBar::Params::getBlockDescriptor();
-        UNSCOPED_INFO("min_size is named");
-        REQUIRE(descriptor.findNamedParam("min_size") != nullptr);
-        UNSCOPED_INFO("max_size is named");
-        REQUIRE(descriptor.findNamedParam("max_size") != nullptr);
-        UNSCOPED_INFO("side is named");
-        REQUIRE(descriptor.findNamedParam("side") != nullptr);
-        UNSCOPED_INFO("resizing_view is named");
-        REQUIRE(descriptor.findNamedParam("resizing_view") != nullptr);
+        CHECK(descriptor.findNamedParam("min_size") != nullptr);
+        CHECK(descriptor.findNamedParam("max_size") != nullptr);
+        CHECK(descriptor.findNamedParam("side") != nullptr);
+        CHECK(descriptor.findNamedParam("resizing_view") != nullptr);
     }
 
     // A drag that leaves the window goes on resizing from the edge it left by,
@@ -181,16 +174,14 @@ namespace
         std::unique_ptr<PlainCtrl> c(new PlainCtrl(p));
 
         c->setFocus(true);
-        UNSCOPED_INFO("an enabled control takes focus");
+        UNSCOPED_INFO("enabled");
         CHECK(c->hasFocus());
 
         c->setEnabled(false);
         c->setFocus(false);
-        UNSCOPED_INFO("and a disabled one gives it up");
         CHECK_FALSE(c->hasFocus());
 
         c->setFocus(true);
-        UNSCOPED_INFO("but does not take it back");
         CHECK_FALSE(c->hasFocus());
 
         gFocusMgr.setKeyboardFocus(nullptr);
@@ -217,17 +208,14 @@ namespace
 
         LLXMLNodePtr node;
         const std::string xml = "<panel name=\"missing\" filename=\"no_such_file_at_all.xml\"/>";
-        UNSCOPED_INFO("parsed");
         REQUIRE(LLXMLNode::parseBuffer(const_cast<char*>(xml.data()), xml.size(), node));
 
         LLPanel::Params pp(LLUICtrlFactory::getDefaultParams<LLPanel>());
         std::unique_ptr<LLPanel> panel(LLUICtrlFactory::create<LLPanel>(pp));
         panel->setXMLFilename("no_such_file_at_all.xml");
-        UNSCOPED_INFO("a panel whose file will not load did not build");
         CHECK_FALSE(panel->initPanelXML(node, nullptr, LLUICtrlFactory::getDefaultParams<LLPanel>()));
 
         const std::string after = LLUICtrlFactory::instance().getCurFileName();
-        UNSCOPED_INFO("and left the file name where it found it");
         CHECK(after == before);
     }
 }

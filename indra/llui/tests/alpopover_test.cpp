@@ -84,17 +84,16 @@ namespace
         }
         LLPanel* over = anchor();
         ALPopover* popover = ALPopover::show(over, content(160, 90));
-        UNSCOPED_INFO("opens");
         REQUIRE(popover != nullptr);
-        UNSCOPED_INFO("and is shown");
         CHECK(popover->getVisible());
 
         const LLRect screen = over->calcScreenRect();
         const LLRect where = popover->getRect();
-        UNSCOPED_INFO("the size the content asked for");
-        CHECK(where.getWidth() == 160);
-        UNSCOPED_INFO("in both directions");
-        CHECK(where.getHeight() == 90);
+        {
+            INFO("the size the content asked for");
+            CHECK(where.getWidth() == 160);
+            CHECK(where.getHeight() == 90);
+        }
         UNSCOPED_INFO("left edges line up");
         CHECK(where.mLeft == screen.mLeft);
         UNSCOPED_INFO("and it hangs from the bottom of the control");
@@ -116,7 +115,6 @@ namespace
         }
         LLPanel* over = anchor(200, 10);
         ALPopover* popover = ALPopover::show(over, content(160, 90));
-        UNSCOPED_INFO("opens");
         REQUIRE(popover != nullptr);
         UNSCOPED_INFO("and is on the screen");
         CHECK(popover->getRect().mBottom >= 0);
@@ -141,10 +139,9 @@ namespace
             std::vector<bool> said;
             popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
             popover->settle();
-            UNSCOPED_INFO("said once");
             REQUIRE(said.size() == 1u);
             UNSCOPED_INFO("and said it was not escaped");
-            REQUIRE_FALSE(said.front());
+            CHECK_FALSE(said.front());
             over->die();
         }
 
@@ -154,12 +151,10 @@ namespace
             ALPopover* popover = ALPopover::show(over, content());
             std::vector<bool> said;
             popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
-            UNSCOPED_INFO("escape is taken");
             CHECK(popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
-            UNSCOPED_INFO("said once");
             REQUIRE(said.size() == 1u);
             UNSCOPED_INFO("and said it was escaped");
-            REQUIRE(said.front());
+            CHECK(said.front());
             over->die();
         }
 
@@ -171,10 +166,9 @@ namespace
             std::vector<bool> said;
             popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
             popover->onFocusLost();
-            UNSCOPED_INFO("said once");
             REQUIRE(said.size() == 1u);
             UNSCOPED_INFO("and said it was not escaped");
-            REQUIRE_FALSE(said.front());
+            CHECK_FALSE(said.front());
             over->die();
         }
     }
@@ -188,15 +182,13 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         UNSCOPED_INFO("no anchor, no popover");
-        REQUIRE(ALPopover::show(nullptr, content()) == nullptr);
+        CHECK(ALPopover::show(nullptr, content()) == nullptr);
         LLPanel* over = anchor();
         UNSCOPED_INFO("and no content, none either");
-        REQUIRE(ALPopover::show(over, nullptr) == nullptr);
+        CHECK(ALPopover::show(over, nullptr) == nullptr);
         over->die();
     }
 
-    // A control at the right edge of the screen opens its popover on the
-    // screen, not off the side of it.
     TEST_CASE_METHOD(alpopover_data, "alpopover: a control at the screen's right edge opens its popover on the screen", "[alpopover]")
     {
         if (!ui.ok())
@@ -206,10 +198,8 @@ namespace
         const S32 screen_width = gFloaterView->getRect().getWidth();
         LLPanel* over = anchor(screen_width - 40, 300);
         ALPopover* popover = ALPopover::show(over, content(160, 90));
-        UNSCOPED_INFO("opens");
         REQUIRE(popover != nullptr);
-        UNSCOPED_INFO("and is on the screen: right edge " + std::to_string(popover->getRect().mRight)
-                   + " of " + std::to_string(screen_width));
+        UNSCOPED_INFO("on the screen, not off its right edge");
         CHECK(popover->getRect().mRight <= screen_width);
         UNSCOPED_INFO("and no narrower for it");
         CHECK(popover->getRect().getWidth() == 160);
@@ -249,28 +239,28 @@ namespace
 
         ALPopover* popover = ALPopover::show(over, content());
         UNSCOPED_INFO("it knows where home is");
-        REQUIRE(popover->home() == home);
+        CHECK(popover->home() == home);
         UNSCOPED_INFO("and asks before the viewer's own menu does");
         CHECK(popover->hasAccelerators());
         UNSCOPED_INFO("a key home takes is taken");
         CHECK(popover->handleKeyHere('F', MASK_CONTROL));
         UNSCOPED_INFO("and home heard it");
-        REQUIRE(home->heard.size() == 1u);
+        CHECK(home->heard.size() == 1u);
         UNSCOPED_INFO("a key home declines is declined");
         CHECK_FALSE(popover->handleKeyHere('Q', MASK_CONTROL));
         UNSCOPED_INFO("having been asked");
-        REQUIRE(home->heard.size() == 2u);
+        CHECK(home->heard.size() == 2u);
         UNSCOPED_INFO("escape is still the popover's own");
         CHECK(popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
         UNSCOPED_INFO("and never reaches home");
-        REQUIRE(home->heard.size() == 2u);
+        CHECK(home->heard.size() == 2u);
 
         // Hung off nothing in a window, it has no home and no claim on the
         // menu's keys.
         LLPanel* loose = anchor();
         ALPopover* alone = ALPopover::show(loose, content());
         UNSCOPED_INFO("no home");
-        REQUIRE(alone->home() == nullptr);
+        CHECK(alone->home() == nullptr);
         UNSCOPED_INFO("no claim");
         CHECK_FALSE(alone->hasAccelerators());
         UNSCOPED_INFO("and a key it does not take is declined");
@@ -354,10 +344,9 @@ namespace
         window->closeFloater();
         UNSCOPED_INFO("gone with its window");
         CHECK(popover->isDead());
-        UNSCOPED_INFO("said so once");
         REQUIRE(said.size() == 1u);
         UNSCOPED_INFO("and not as escaped: nobody pressed escape");
-        REQUIRE_FALSE(said.front());
+        CHECK_FALSE(said.front());
 
         // Gone first: the window closing after it finds nothing of it.
         LLFloater* again = home();
@@ -365,7 +354,6 @@ namespace
         again->addChild(under);
         ALPopover* first = ALPopover::show(under, content());
         first->escape();
-        UNSCOPED_INFO("gone");
         CHECK(first->isDead());
         again->closeFloater();
         UNSCOPED_INFO("and the window closed after it");
@@ -384,11 +372,8 @@ namespace
         LLPanel*     over   = anchor();
         const LLRect screen(300, 260, 380, 240);
         ALPopover*   popover = ALPopover::showAt(screen, over, content(160, 90));
-        {
-            INFO("opens");
-            REQUIRE(popover != nullptr);
-            CHECK(popover->getVisible());
-        }
+        REQUIRE(popover != nullptr);
+        CHECK(popover->getVisible());
         const LLRect where = popover->getRect();
         UNSCOPED_INFO("its left with the rect's");
         CHECK(where.mLeft == screen.mLeft);
@@ -398,7 +383,7 @@ namespace
         CHECK(where.mLeft != over->calcScreenRect().mLeft);
         popover->closeFloater();
         UNSCOPED_INFO("no anchor, no popover");
-        REQUIRE(ALPopover::showAt(screen, nullptr, content()) == nullptr);
+        CHECK(ALPopover::showAt(screen, nullptr, content()) == nullptr);
         over->die();
     }
 
@@ -421,11 +406,9 @@ namespace
         UNSCOPED_INFO("the field has the keyboard");
         CHECK(gFocusMgr.getKeyboardFocus() == field);
         ALPopover* popover = ALPopover::showOver(over, content(), "Go to line");
-        UNSCOPED_INFO("shown");
         REQUIRE(popover != nullptr);
-        UNSCOPED_INFO("silent");
         CHECK(popover->getSoundFlags() == LLView::SILENT);
-        UNSCOPED_INFO("it has the keyboard");
+        UNSCOPED_INFO("the popover has the keyboard");
         CHECK(gFocusMgr.getKeyboardFocus() != field);
         popover->escape();
         UNSCOPED_INFO("the keyboard back in the field");
@@ -465,13 +448,13 @@ namespace
         (void)first;
         for (const bool escaping : { true, false })
         {
+            CAPTURE(escaping);
             typed->setFocus(true);
             UNSCOPED_INFO("the second field has the keyboard");
             REQUIRE(gFocusMgr.getKeyboardFocus() == typed);
             ALPopover* popover = ALPopover::showOver(window, content(), "Go to line");
-            UNSCOPED_INFO("shown");
             REQUIRE(popover != nullptr);
-            UNSCOPED_INFO("it has the keyboard");
+            UNSCOPED_INFO("the popover has the keyboard");
             REQUIRE(gFocusMgr.getKeyboardFocus() != typed);
             if (escaping)
             {
@@ -481,7 +464,7 @@ namespace
             {
                 popover->settle();
             }
-            UNSCOPED_INFO((escaping ? "escaped: the keyboard back where it was" : "settled: the keyboard back where it was"));
+            UNSCOPED_INFO("the keyboard back where it was");
             REQUIRE(gFocusMgr.getKeyboardFocus() == typed);
         }
         gFocusMgr.setKeyboardFocus(nullptr);
@@ -500,30 +483,24 @@ namespace
         const auto                        tell = [&said](int which) {
             return [&said, which](bool escaped) { said.emplace_back(which, escaped); };
         };
-        {
-            INFO("empty");
-            CHECK_FALSE(slot.isOpen());
-            REQUIRE(slot.get() == nullptr);
-        }
+        CHECK_FALSE(slot.isOpen());
+        CHECK(slot.get() == nullptr);
 
         ALPopover* first = ALPopover::show(over, content());
         slot.hold(first, tell(1));
-        {
-            INFO("holds it");
-            CHECK(slot.isOpen());
-            CHECK(slot.get() == first);
-        }
+        CHECK(slot.isOpen());
+        CHECK(slot.get() == first);
         slot.close(false);
         UNSCOPED_INFO("settled, and told so");
         CHECK(said == std::vector<std::pair<int, bool>>{ { 1, false } });
         {
             INFO("empty again");
             CHECK_FALSE(slot.isOpen());
-            REQUIRE(slot.get() == nullptr);
+            CHECK(slot.get() == nullptr);
         }
         slot.close();
         UNSCOPED_INFO("nothing to close, nobody told");
-        REQUIRE(said.size() == 1u);
+        CHECK(said.size() == 1u);
 
         slot.hold(ALPopover::show(over, content()), tell(2));
         slot.close();
@@ -569,9 +546,9 @@ namespace
         slot.hold(popover, [&said](bool) { said.push_back(2); });
         {
             INFO("still up, held");
-            REQUIRE(slot.get() == popover);
+            CHECK(slot.get() == popover);
             CHECK(popover->getVisible());
-            REQUIRE(said.empty());
+            CHECK(said.empty());
         }
         slot.close();
         UNSCOPED_INFO("the new listener told, the old not");
@@ -592,7 +569,7 @@ namespace
             late->closeFloater();
         }
         UNSCOPED_INFO("nobody told, even as it closes after");
-        REQUIRE(said.empty());
+        CHECK(said.empty());
 
         LLHandle<ALPopover> scoped;
         {
@@ -604,7 +581,7 @@ namespace
         UNSCOPED_INFO("a slot that goes: it dies");
         CHECK(dead(scoped));
         UNSCOPED_INFO("nobody told");
-        REQUIRE(said.empty());
+        CHECK(said.empty());
         over->die();
     }
 
@@ -656,7 +633,7 @@ namespace
         {
             INFO("told, and gone");
             CHECK(told);
-            REQUIRE(owner == nullptr);
+            CHECK(owner == nullptr);
         }
         over->die();
     }

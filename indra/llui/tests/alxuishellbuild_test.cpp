@@ -93,12 +93,10 @@ namespace
 
         gProbeClassBuilt = 0;
         std::unique_ptr<LLPanel> panel(build());
-        UNSCOPED_INFO("built");
         REQUIRE(panel != nullptr);
         UNSCOPED_INFO("the registered class was constructed");
         CHECK(gProbeClassBuilt == 1);
-        UNSCOPED_INFO("the inner panel exists");
-        REQUIRE(panel->findChild<LLPanel>("inner") != nullptr);
+        CHECK(panel->findChild<LLPanel>("inner") != nullptr);
     }
 
     // With it, the same file builds a plain panel in the class's place, and
@@ -116,12 +114,11 @@ namespace
             UNSCOPED_INFO("the switch is active while its holder lives");
             CHECK(ALXUIShellBuild::active());
             std::unique_ptr<LLPanel> panel(build());
-            UNSCOPED_INFO("built");
             REQUIRE(panel != nullptr);
             UNSCOPED_INFO("the registered class was not constructed");
             CHECK(gProbeClassBuilt == 0);
             UNSCOPED_INFO("the inner panel exists as a plain panel");
-            REQUIRE(panel->findChild<LLPanel>("inner") != nullptr);
+            CHECK(panel->findChild<LLPanel>("inner") != nullptr);
         }
         UNSCOPED_INFO("the switch is gone with its holder");
         CHECK_FALSE(ALXUIShellBuild::active());

@@ -67,7 +67,6 @@ namespace
         }
     };
 
-    // The rect a caller asks for is the rect it gets.
     TEST_CASE_METHOD(llcombobox_data, "llcombobox: the rect a caller asks for is the rect it gets", "[llcombobox]")
     {
         if (!ui.ok())
@@ -77,7 +76,6 @@ namespace
 
         const LLRect asked(200, 21, 590, 1);
         LLComboBox* combo = build(asked);
-        UNSCOPED_INFO("as asked");
         CHECK(where(combo->getRect()) == where(asked));
         combo->die();
     }
@@ -105,9 +103,8 @@ namespace
                 {
                     continue;
                 }
-                UNSCOPED_INFO(std::string(text_entry ? "typing: " : "no typing: ")
-                           + child->getName() + " at " + where(child->getRect())
-                           + " is inside " + where(within));
+                UNSCOPED_INFO((text_entry ? "typing: " : "no typing: ") << child->getName() << " at "
+                              << where(child->getRect()) << " is inside " << where(within));
                 REQUIRE(within.contains(child->getRect()));
             }
             combo->die();
@@ -133,11 +130,9 @@ namespace
                 editor = found;
             }
         }
-        UNSCOPED_INFO("it has a field to type in");
         REQUIRE(editor != nullptr);
         UNSCOPED_INFO("wide enough to hold a value: " + where(editor->getRect()));
         CHECK(editor->getRect().getWidth() > 200);
-        UNSCOPED_INFO("and as tall as the combo");
         CHECK(editor->getRect().getHeight() ==
                       combo->getRect().getHeight());
         combo->die();
@@ -156,7 +151,6 @@ namespace
         combo->reshape(500, 20);
 
         const LLRect within = combo->getLocalRect();
-        UNSCOPED_INFO("it took the width");
         CHECK(within.getWidth() == 500);
         for (LLView* child : *combo->getChildList())
         {
@@ -164,8 +158,8 @@ namespace
             {
                 continue;
             }
-            UNSCOPED_INFO(std::string("after widening, ") + child->getName() + " at "
-                       + where(child->getRect()) + " is inside " + where(within));
+            UNSCOPED_INFO("after widening, " << child->getName() << " at " << where(child->getRect())
+                          << " is inside " << where(within));
             REQUIRE(within.contains(child->getRect()));
         }
         combo->die();
@@ -195,7 +189,6 @@ namespace
         // Set after the value, because setting a value the list has is a
         // choice and would take the mark off again.
         combo->setUnset(true);
-        UNSCOPED_INFO("the combo says nobody chose it");
         CHECK(combo->isUnset());
         UNSCOPED_INFO("so what is shown is not sure of itself");
         CHECK(text->getTentative());

@@ -70,7 +70,6 @@ namespace
 
     TEST_CASE_METHOD(alunifieddiff_data, "alunifieddiff: the same text writes nothing; a change has three lines of context", "[alunifieddiff]")
     {
-        UNSCOPED_INFO("the same");
         CHECK(diff(numbered(9), numbered(9)) == std::string());
         UNSCOPED_INFO("one changed");
         CHECK(diff(numbered(9), numbered(9, { { 5, "five" } })) ==
@@ -101,7 +100,7 @@ namespace
         UNSCOPED_INFO("seven: two");
         CHECK(hunks(diff(numbered(20), numbered(20, { { 2, "x" }, { 10, "y" } }))) == 2);
         UNSCOPED_INFO("the second stretch's lines, to the end");
-        REQUIRE(diff(numbered(20), numbered(20, { { 2, "x" }, { 18, "y" } })).find("\n@@ -15,6 +15,6 @@\n") != std::string::npos);
+        CHECK(diff(numbered(20), numbered(20, { { 2, "x" }, { 18, "y" } })).find("\n@@ -15,6 +15,6 @@\n") != std::string::npos);
     }
 
     TEST_CASE_METHOD(alunifieddiff_data, "alunifieddiff: a missing final newline is marked and differs from the line with one", "[alunifieddiff]")
@@ -122,13 +121,13 @@ namespace
         ALTextDiff::Options blanks;
         blanks.like.ignoreWhitespace = true;
         UNSCOPED_INFO("re-indented: a change as they are");
-        REQUIRE_FALSE(diff("a\n  b\n", "a\nb\n").empty());
+        CHECK_FALSE(diff("a\n  b\n", "a\nb\n").empty());
         UNSCOPED_INFO("nothing, blanks let go of");
         CHECK(diff("a\n  b\n", "a\nb\n", blanks) == std::string());
         ALTextDiff::Options lines;
         lines.like.ignoreBlankLines = true;
         UNSCOPED_INFO("a blank line: a change as they are");
-        REQUIRE_FALSE(diff("a\nb\n", "a\n\nb\n").empty());
+        CHECK_FALSE(diff("a\nb\n", "a\n\nb\n").empty());
         UNSCOPED_INFO("nothing, blank lines let go of");
         CHECK(diff("a\nb\n", "a\n\nb\n", lines) == std::string());
         UNSCOPED_INFO("but within another's stretch, said");

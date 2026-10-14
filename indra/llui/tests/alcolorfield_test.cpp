@@ -116,30 +116,23 @@ namespace
         REQUIRE(tabs != nullptr);
         UNSCOPED_INFO("and that tab is the one showing");
         CHECK(tabs->getCurrentPanelIndex() == 0);
-        UNSCOPED_INFO("so the grid can be seen");
         CHECK(grid->isInVisibleChain());
 
         // Where the scroll container will draw it: a grid parked outside its
         // window is a grid that draws nothing.
         const LLRect rect = grid->getRect();
-        UNSCOPED_INFO("wide enough to hold a swatch: " + std::to_string(rect.getWidth()));
+        UNSCOPED_INFO("wide enough to hold a swatch");
         CHECK(rect.getWidth() >= 28);
-        UNSCOPED_INFO("tall enough to hold a row: " + std::to_string(rect.getHeight()));
+        UNSCOPED_INFO("tall enough to hold a row");
         CHECK(rect.getHeight() >= 28);
         LLScrollContainer* scroll = grid->getParent()->as<LLScrollContainer>();
-        UNSCOPED_INFO("it is in a scroll container");
         REQUIRE(scroll != nullptr);
         const LLRect window = scroll->getContentWindowRect();
+        CHECK(window.getWidth() > 0);
+        CHECK(window.getHeight() > 0);
         {
-            INFO("which has a window to show it through: "
-                   + std::to_string(window.getWidth()) + "x" + std::to_string(window.getHeight()));
-            CHECK(window.getWidth() > 0);
-            CHECK(window.getHeight() > 0);
-        }
-        {
-            INFO("and the top of the grid is in that window: grid top "
-                   + std::to_string(rect.mTop) + ", window " + std::to_string(window.mBottom)
-                   + ".." + std::to_string(window.mTop));
+            INFO("the top of the grid is in the scroll container's window");
+            CAPTURE(rect.mTop, window.mBottom, window.mTop);
             CHECK(rect.mTop > window.mBottom);
             CHECK(rect.mTop <= window.mTop + 1);
         }
@@ -175,13 +168,10 @@ namespace
 
         field->handleMouseDown(4, 10, MASK_NONE);
         ALPopover* popover = popover_open();
-        UNSCOPED_INFO("the popover opened");
         REQUIRE(popover != nullptr);
-        UNSCOPED_INFO("as a popover that resizes");
         CHECK(popover->isResizable());
-        UNSCOPED_INFO("escape is taken");
         CHECK(popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
-        UNSCOPED_INFO("and nothing was written");
+        UNSCOPED_INFO("escaped: nothing was written");
         CHECK(commits == 0);
         UNSCOPED_INFO("the value is what it was");
         CHECK(field->getValue().asString() == std::string("White"));
@@ -190,9 +180,8 @@ namespace
         popover = popover_open();
         UNSCOPED_INFO("opened again");
         REQUIRE(popover != nullptr);
-        UNSCOPED_INFO("return is taken");
         CHECK(popover->handleKeyHere(KEY_RETURN, MASK_NONE));
-        UNSCOPED_INFO("and what it held was written once");
+        UNSCOPED_INFO("returned: what it held was written once");
         CHECK(commits == 1);
         UNSCOPED_INFO("which was the value it opened on");
         CHECK(field->getValue().asString() == std::string("White"));
@@ -220,7 +209,6 @@ namespace
         field->setValue("0.5, 0.25, 0, 0.75");
         UNSCOPED_INFO("four numbers come to a colour");
         CHECK(field->resolved(color));
-        UNSCOPED_INFO("the four");
         CHECK(color == LLColor4(0.5f, 0.25f, 0.f, 0.75f));
 
         field->setValue("1 0 0");
@@ -256,14 +244,11 @@ namespace
         LLLineEditor* line = field->getChild<LLLineEditor>("text");
         line->setText(std::string("Black"));
         line->onCommit();
-        UNSCOPED_INFO("one commit");
         REQUIRE(said.size() == 1u);
-        UNSCOPED_INFO("of what was typed");
         CHECK(said.front() == std::string("Black"));
         LLColor4 color;
         UNSCOPED_INFO("which now comes to a colour");
         REQUIRE(field->resolved(color));
-        UNSCOPED_INFO("the black one");
         CHECK(color == LLColor4::black);
         field->die();
     }
@@ -288,7 +273,6 @@ namespace
         CHECK(picker->color() == LLColor4::white);
 
         LLView* grid = swatchesUnder(gFloaterView);
-        UNSCOPED_INFO("and the grid");
         REQUIRE(grid != nullptr);
         // The first swatch, which is the first name in the table.
         grid->handleMouseDown(5 + 14, grid->getRect().getHeight() - 5 - 14, MASK_NONE);
@@ -296,7 +280,7 @@ namespace
         UNSCOPED_INFO("the grid is in the popover");
         REQUIRE(popover != nullptr);
         const std::string chosen = popover->getTitle();
-        UNSCOPED_INFO("a name was chosen");
+        UNSCOPED_INFO("the title names the colour chosen");
         CHECK(LLUIColorTable::instance().colorExists(chosen));
         UNSCOPED_INFO("and the picker followed it");
         CHECK(picker->color() == LLUIColorTable::instance().getColor(chosen).get());
@@ -339,7 +323,6 @@ namespace
         CHECK(picker->color() == LLColor4(0.f, 0.5f, 1.f, 1.f));
 
         LLView* grid = swatchesUnder(gFloaterView);
-        UNSCOPED_INFO("and the grid");
         REQUIRE(grid != nullptr);
         // The first swatch is the caller's own name.
         grid->handleMouseDown(5 + 14, grid->getRect().getHeight() - 5 - 14, MASK_NONE);

@@ -47,8 +47,9 @@ namespace
             for (const char* name : { "lsl", "slua" })
             {
                 std::string error;
-                UNSCOPED_INFO(std::string(name) + " loads: " + error);
-                REQUIRE(library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/" + name + ".xml", error));
+                const bool  loaded = library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/" + name + ".xml", error);
+                INFO(name << " loads: " << error);
+                REQUIRE(loaded);
             }
             spaces.softTabs = true;
             spaces.tabWidth = 4;
@@ -151,11 +152,8 @@ namespace
     {
         const ALSyntaxGrammar* lsl  = grammar("lsl");
         const ALSyntaxGrammar* slua = grammar("slua");
-        {
-            INFO("grammars");
-            REQUIRE(lsl);
-            REQUIRE(slua);
-        }
+        REQUIRE(lsl);
+        REQUIRE(slua);
 
         const std::string    plain = "    x = 1;";
         const ALTextDocument plain_doc(plain);
@@ -163,7 +161,7 @@ namespace
         UNSCOPED_INFO("the indentation kept");
         CHECK(kept.text == std::string("\n    "));
         UNSCOPED_INFO("the caret after it");
-        REQUIRE_FALSE(kept.caret);
+        CHECK_FALSE(kept.caret);
 
         const std::string    opens = "\tdefault {";
         const ALTextDocument opens_doc(opens);
@@ -227,10 +225,10 @@ namespace
         CHECK(back.next.line < 0);
 
         UNSCOPED_INFO("not with something after it on the line");
-        REQUIRE_FALSE(outdentAsTyped(ALTextDocument("if x then\n    end y"), ALTextPos(1, 7), ALTextPos(1, 7), 'd', slua, none(), AutoOutdent(), spaces)
+        CHECK_FALSE(outdentAsTyped(ALTextDocument("if x then\n    end y"), ALTextPos(1, 7), ALTextPos(1, 7), 'd', slua, none(), AutoOutdent(), spaces)
                     .replacement);
         UNSCOPED_INFO("nor with a selection");
-        REQUIRE_FALSE(outdentAsTyped(doc, ALTextPos(2, 4), after_end, 'd', slua, none(), AutoOutdent(), spaces).replacement);
+        CHECK_FALSE(outdentAsTyped(doc, ALTextPos(2, 4), after_end, 'd', slua, none(), AutoOutdent(), spaces).replacement);
 
         // A bracket the caller matches goes level with its opener, however
         // the lines between are indented.
@@ -249,9 +247,9 @@ namespace
         const std::string    outer = "if x then\n  y()\nend";
         const ALTextDocument outer_doc(outer);
         UNSCOPED_INFO("a line already out stays");
-        REQUIRE_FALSE(reindent(outer_doc, 1, "    ", spaces));
+        CHECK_FALSE(reindent(outer_doc, 1, "    ", spaces));
         UNSCOPED_INFO("one in comes out");
-        REQUIRE(reindent(outer_doc, 1, "", spaces).has_value());
+        CHECK(reindent(outer_doc, 1, "", spaces).has_value());
     }
 
     TEST_CASE_METHOD(altextindent_data, "altextindent: closingBeforeReturn brings a closing word out but not with a selection", "[altextindent]")
@@ -265,9 +263,9 @@ namespace
         UNSCOPED_INFO("level with the loop");
         CHECK(applied(text, *closing) == std::string("while x do\n    y()\nend"));
         UNSCOPED_INFO("not with a selection");
-        REQUIRE_FALSE(closingBeforeReturn(doc, ALTextPos(2, 4), ALTextPos(2, 7), slua, none(), spaces));
+        CHECK_FALSE(closingBeforeReturn(doc, ALTextPos(2, 4), ALTextPos(2, 7), slua, none(), spaces));
         UNSCOPED_INFO("not a word that is a name");
-        REQUIRE_FALSE(closingBeforeReturn(ALTextDocument("x\n    ending"), ALTextPos(1, 10), ALTextPos(1, 10), slua,
+        CHECK_FALSE(closingBeforeReturn(ALTextDocument("x\n    ending"), ALTextPos(1, 10), ALTextPos(1, 10), slua,
                                                                  none(), spaces));
     }
 
@@ -282,7 +280,7 @@ namespace
         CHECK(applied(code, *convertIndentation(indented, 0, 3, false, 4)) ==
                       std::string("\tif x\n\ty\n\t  z\nw"));
         UNSCOPED_INFO("nothing to change is nothing");
-        REQUIRE_FALSE(convertIndentation(ALTextDocument("    a\nb"), 0, 1, true, 4));
+        CHECK_FALSE(convertIndentation(ALTextDocument("    a\nb"), 0, 1, true, 4));
         UNSCOPED_INFO("measured as the tabs were: a tab of two, two spaces at four");
         CHECK(applied("\ta", *convertIndentation(ALTextDocument("\ta"), 0, 0, false, 4, 2)) == std::string("  a"));
     }
@@ -295,7 +293,6 @@ namespace
         };
         UNSCOPED_INFO("four spaces a level");
         CHECK(read("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}") == std::string("spaces 4"));
-        UNSCOPED_INFO("two");
         CHECK(read("if x then\n  y()\n  if z then\n    w()\n  end\nend") == std::string("spaces 2"));
         UNSCOPED_INFO("tabs, a tab as wide as the default");
         CHECK(read("a\n\tb\n\t\tc\n\td") == std::string("tabs 4"));
@@ -379,11 +376,11 @@ namespace
 
         const ALTextDocument doc("{\n    x;\n}");
         UNSCOPED_INFO("one line: nothing");
-        REQUIRE_FALSE(planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;", lsl, spaces));
+        CHECK_FALSE(planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;", lsl, spaces));
         UNSCOPED_INFO("after text on its line: nothing");
-        REQUIRE_FALSE(planPaste(doc, ALTextRange(ALTextPos(1, 6), ALTextPos(1, 6)), "a;\nb;", lsl, spaces));
+        CHECK_FALSE(planPaste(doc, ALTextRange(ALTextPos(1, 6), ALTextPos(1, 6)), "a;\nb;", lsl, spaces));
         UNSCOPED_INFO("no grammar that indents: nothing");
-        REQUIRE_FALSE(planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;\nb;", nullptr, spaces));
+        CHECK_FALSE(planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;\nb;", nullptr, spaces));
         UNSCOPED_INFO("already where it goes: nothing to do");
         CHECK(pasted("{\n    x;\n}", ALTextPos(1, 4), "a;\n    b;\n", spaces) ==
                       std::string("{\n    a;\n    b;\n    x;\n}"));
@@ -428,7 +425,7 @@ namespace
         }
         const ALTextDocument opened("if (x) {\n    {");
         UNSCOPED_INFO("under a block's opener, where it is");
-        REQUIRE_FALSE(outdentAsTyped(opened, ALTextPos(1, 5), ALTextPos(1, 5), '{', lsl, none(), AutoOutdent(), spaces).replacement);
+        CHECK_FALSE(outdentAsTyped(opened, ALTextPos(1, 5), ALTextPos(1, 5), '{', lsl, none(), AutoOutdent(), spaces).replacement);
     }
 
     TEST_CASE_METHOD(altextindent_data, "altextindent: a new line closes an open SLua block and continues an LSL block comment", "[altextindent]")
@@ -483,7 +480,7 @@ namespace
         }
         const ALTextDocument written("     * a /");
         UNSCOPED_INFO("after something written, as typed");
-        REQUIRE_FALSE(outdentAsTyped(written, ALTextPos(0, 10), ALTextPos(0, 10), '/', lsl, none(), AutoOutdent(), spaces).replacement);
+        CHECK_FALSE(outdentAsTyped(written, ALTextPos(0, 10), ALTextPos(0, 10), '/', lsl, none(), AutoOutdent(), spaces).replacement);
     }
 
     TEST_CASE_METHOD(altextindent_data, "altextindent: shiftLines goes levels in or out as vim's > and < and leaves empty lines", "[altextindent]")

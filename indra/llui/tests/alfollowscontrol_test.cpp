@@ -70,7 +70,6 @@ namespace
         }
     };
 
-    // A view that follows one edge keeps its distance from it and its size.
     TEST_CASE_METHOD(alfollowscontrol_data, "alfollowscontrol: a view following the near edges keeps its distance and its size", "[alfollowscontrol]")
     {
         const LLRect child(10, 60, 40, 20);
@@ -85,7 +84,6 @@ namespace
         CHECK(held.getHeight() == 40);
     }
 
-    // Following the opposite edge moves it by the whole growth.
     TEST_CASE_METHOD(alfollowscontrol_data, "alfollowscontrol: following the far edges moves a view by the whole growth", "[alfollowscontrol]")
     {
         const LLRect child(10, 60, 40, 20);
@@ -130,8 +128,6 @@ namespace
         CHECK(held.getWidth() == 30);
     }
 
-    // The value is read and written the way a file writes it, and the two
-    // words that stand for every edge and for none are kept.
     TEST_CASE_METHOD(alfollowscontrol_data, "alfollowscontrol: the value reads and writes as a file does and keeps all and none", "[alfollowscontrol]")
     {
         ALFollowsControl* control = build();
@@ -155,7 +151,6 @@ namespace
         delete control;
     }
 
-    // A click on a strut is that edge, and only that edge.
     TEST_CASE_METHOD(alfollowscontrol_data, "alfollowscontrol: a click on a strut turns that edge alone on and off", "[alfollowscontrol]")
     {
         ALFollowsControl* control = build();
@@ -188,7 +183,7 @@ namespace
             control->setValue("none");
             const LLCoordGL at = onStrut(edge);
             control->handleMouseDown(at.mX, at.mY, MASK_NONE);
-            UNSCOPED_INFO(std::string("strut ") + expected[edge]);
+            CAPTURE(edge);
             REQUIRE(control->getValue().asString() ==
                           std::string(expected[edge]));
             delete control;
@@ -249,25 +244,25 @@ namespace
         {
             const LLCoordGL at = onStrut(edge);
             const std::string tip = control->tipAt(at.mX, at.mY);
-            UNSCOPED_INFO(std::string("the strut says which edge it is: ") + tip);
+            UNSCOPED_INFO("the strut says which edge it is: " << tip);
             REQUIRE(tip.find(named[edge]) != std::string::npos);
-            UNSCOPED_INFO(std::string("and what holding it does: ") + tip);
+            UNSCOPED_INFO("and what holding it does: " << tip);
             REQUIRE(tip.find(said[edge]) != std::string::npos);
         }
 
         const std::string across = control->tipAt(SIDE / 2 - 12, SIDE / 2);
         {
-            INFO("the spring says it is both edges: " + across);
-            REQUIRE(across.find("left") != std::string::npos);
-            REQUIRE(across.find("right") != std::string::npos);
+            INFO("the spring says it is both edges: " << across);
+            CHECK(across.find("left") != std::string::npos);
+            CHECK(across.find("right") != std::string::npos);
         }
-        UNSCOPED_INFO("and what that means: " + across);
-        REQUIRE(across.find("the width gives") != std::string::npos);
+        UNSCOPED_INFO("and what that means: " << across);
+        CHECK(across.find("the width gives") != std::string::npos);
 
         // Off the picture there is nothing to say about a part, and the
         // control's own tool tip is what answers.
         UNSCOPED_INFO("outside the picture it says nothing of its own");
-        REQUIRE(control->tipAt(SIDE * 2 + 20, SIDE / 2).empty());
+        CHECK(control->tipAt(SIDE * 2 + 20, SIDE / 2).empty());
         delete control;
     }
 
@@ -284,17 +279,12 @@ namespace
 
     TEST_CASE_METHOD(alfollowscontrol_data, "alfollowscontrol: followsText writes as a file does and followsFlags reads any order", "[alfollowscontrol]")
     {
-        UNSCOPED_INFO("two edges");
         CHECK(ALFollowsControl::followsText(FOLLOWS_LEFT | FOLLOWS_TOP) == std::string("left|top"));
-        UNSCOPED_INFO("every edge is all");
         CHECK(ALFollowsControl::followsText(FOLLOWS_ALL) == std::string("all"));
-        UNSCOPED_INFO("no edge is none");
         CHECK(ALFollowsControl::followsText(FOLLOWS_NONE) == std::string("none"));
-        UNSCOPED_INFO("read back");
         CHECK(ALFollowsControl::followsFlags("left|top") == (U32)(FOLLOWS_LEFT | FOLLOWS_TOP));
         UNSCOPED_INFO("in any order");
         CHECK(ALFollowsControl::followsFlags("top|left") == (U32)(FOLLOWS_LEFT | FOLLOWS_TOP));
-        UNSCOPED_INFO("all is every edge");
         CHECK(ALFollowsControl::followsFlags("all") == (U32)FOLLOWS_ALL);
         // The four flags are not four bits in a row, so the sets of them
         // are made from the flags rather than counted.
@@ -306,7 +296,7 @@ namespace
             {
                 follows |= (set & (1u << i)) ? edges[i] : 0u;
             }
-            UNSCOPED_INFO("every set of edges round trips: " + ALFollowsControl::followsText(follows));
+            UNSCOPED_INFO("round trip of " << ALFollowsControl::followsText(follows));
             REQUIRE(ALFollowsControl::followsFlags(ALFollowsControl::followsText(follows)) == follows);
         }
     }

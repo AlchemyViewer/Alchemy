@@ -195,63 +195,44 @@ namespace
             " increment=\"0.05\" decimal_digits=\"3\" text_width=\"56\" show_text=\"true\""
             " can_edit_text=\"false\" show_reset=\"false\" control_name=\"RenderBloomKnee\"/>\n";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parses");
         REQUIRE(LLXMLNode::parseBuffer(source.data(), source.size(), node));
 
         ALSettingRow::Params p;
         LLXUIParser parser;
         parser.readXUI(node, p, "setting_row_test.xml");
-        UNSCOPED_INFO("label");
         CHECK(p.label() == std::string("Knee"));
-        UNSCOPED_INFO("label_width");
         CHECK(p.label_width() == 120);
-        UNSCOPED_INFO("min_val");
         CHECK(closeTo(p.min_value(), -1.0));
-        UNSCOPED_INFO("max_val");
         CHECK(closeTo(p.max_value(), 2.0));
-        UNSCOPED_INFO("increment");
         CHECK(closeTo(p.increment(), 0.05));
-        UNSCOPED_INFO("decimal_digits");
         CHECK(p.decimal_digits() == 3);
-        UNSCOPED_INFO("text_width said");
         CHECK(p.text_width.isProvided());
-        UNSCOPED_INFO("text_width");
         CHECK(p.text_width() == 56);
-        UNSCOPED_INFO("can_edit_text");
         CHECK_FALSE(p.can_edit_text());
-        UNSCOPED_INFO("show_reset");
         CHECK_FALSE(p.show_reset());
-        UNSCOPED_INFO("control_name");
         CHECK(p.control_name() == std::string("RenderBloomKnee"));
 
         // And what a file leaves out is what every Lightbox row writes today.
         ALSettingRow::Params defaults;
         UNSCOPED_INFO("label_width defaults to the rows' 140");
         CHECK(defaults.label_width() == 140);
-        UNSCOPED_INFO("can_edit_text defaults on");
         CHECK(defaults.can_edit_text());
-        UNSCOPED_INFO("show_reset defaults on");
         CHECK(defaults.show_reset());
-        UNSCOPED_INFO("text_width is not said unless said");
         CHECK_FALSE(defaults.text_width.isProvided());
         {
             INFO("a scalar unless said otherwise");
-            REQUIRE(defaults.components().empty());
+            CHECK(defaults.components().empty());
             CHECK(defaults.part() == -1);
         }
 
         // A vector's letters and a part's index, by the names a row writes.
         const std::string vector_source = "<setting_row name=\"v\" components=\"R G B\" part=\"1\" letter_width=\"18\"/>\n";
         LLXMLNodePtr      vector_node;
-        UNSCOPED_INFO("a vector parses");
         REQUIRE(LLXMLNode::parseBuffer(vector_source.data(), vector_source.size(), vector_node));
         ALSettingRow::Params vector_p;
         parser.readXUI(vector_node, vector_p, "setting_row_test.xml");
-        UNSCOPED_INFO("components");
         CHECK(vector_p.components() == std::string("R G B"));
-        UNSCOPED_INFO("part");
         CHECK(vector_p.part() == 1);
-        UNSCOPED_INFO("letter_width");
         CHECK(vector_p.letter_width() == 18);
         UNSCOPED_INFO("a letter's width unless said");
         CHECK(defaults.letter_width() == 10);
@@ -268,13 +249,10 @@ namespace
 
         LLControlVariable* control = setting("SettingRowTestBinding", 0.5f);
         ALSettingRow* r = row("SettingRowTestBinding");
-        UNSCOPED_INFO("the row reads the setting");
         CHECK(closeTo(r->getValue().asReal(), 0.5));
 
         control->set(LLSD(0.75));
-        UNSCOPED_INFO("and follows it");
         CHECK(closeTo(r->getValue().asReal(), 0.75));
-        UNSCOPED_INFO("the slider shows it");
         CHECK(closeTo(r->getSlider()->getValueF32(), 0.75));
 
         S32 writes = 0;
@@ -285,11 +263,8 @@ namespace
 
         r->getSlider()->setValue(0.25f);
         r->getSlider()->onCommit();
-        UNSCOPED_INFO("the slider's value reaches the setting");
         CHECK(closeTo(control->getValue().asReal(), 0.25));
-        UNSCOPED_INFO("written once");
         CHECK(writes == 1);
-        UNSCOPED_INFO("and the row says so once");
         CHECK(commits == 1);
         r->die();
     }
@@ -305,9 +280,7 @@ namespace
 
         setting("SettingRowTestBinding", 0.5f);
         ALSettingRow* r = row("SettingRowTestBinding");
-        UNSCOPED_INFO("the row is bound");
-        REQUIRE(r->getControlVariable() != nullptr);
-        UNSCOPED_INFO("and nothing in it is");
+        CHECK(r->getControlVariable() != nullptr);
         CHECK(boundUnder(r) == 0);
         r->die();
     }
@@ -330,19 +303,15 @@ namespace
         control->set(LLSD(0.8));
         UNSCOPED_INFO("shown once changed");
         CHECK(r->getResetButton()->getVisible());
-        UNSCOPED_INFO("and the row says so");
         CHECK(r->isModified());
 
         S32 commits = 0;
         r->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         r->getResetButton()->onCommit();
-        UNSCOPED_INFO("the default is back");
         CHECK(closeTo(control->getValue().asReal(), 0.5));
-        UNSCOPED_INFO("the slider shows it");
         CHECK(closeTo(r->getSlider()->getValueF32(), 0.5));
-        UNSCOPED_INFO("the button has gone");
         CHECK_FALSE(r->getResetButton()->getVisible());
-        UNSCOPED_INFO("and the row did not commit");
+        UNSCOPED_INFO("the row did not commit");
         CHECK(commits == 0);
         r->die();
     }
@@ -365,7 +334,6 @@ namespace
         CHECK_FALSE(control->isDefault());
         UNSCOPED_INFO("but not modified as shown");
         CHECK_FALSE(r->isModified());
-        UNSCOPED_INFO("so no button");
         CHECK_FALSE(r->getResetButton()->getVisible());
 
         control->set(LLSD(0.69));
@@ -387,15 +355,11 @@ namespace
         ALSettingRow* r = row(std::string());
         const S32 width = r->getRect().getWidth();
         const S32 slot = ALSettingRow::RESET_SIZE + ALSettingRow::RESET_GAP;
-        UNSCOPED_INFO("the button at the right edge");
         CHECK(r->getResetButton()->getRect().mRight == width);
-        UNSCOPED_INFO("the slider ends before its slot");
         CHECK(r->getSlider()->getRect().mRight == width - slot);
 
         r->reshape(width + 50, r->getRect().getHeight());
-        UNSCOPED_INFO("still at the right edge, wider");
         CHECK(r->getResetButton()->getRect().mRight == width + 50);
-        UNSCOPED_INFO("and the slider still before it");
         CHECK(r->getSlider()->getRect().mRight == width + 50 - slot);
         r->die();
     }
@@ -412,16 +376,11 @@ namespace
         setting("SettingRowTestBinding", 0.5f);
         ALSettingRow* r = row("SettingRowTestBinding");
         r->setEnabled(false);
-        UNSCOPED_INFO("the slider greys");
         CHECK_FALSE(r->getSlider()->getEnabled());
-        UNSCOPED_INFO("and the button");
         CHECK_FALSE(r->getResetButton()->getEnabled());
         r->setEnabled(true);
-        {
-            INFO("and both come back");
-            REQUIRE(r->getSlider()->getEnabled());
-            CHECK(r->getResetButton()->getEnabled());
-        }
+        CHECK(r->getSlider()->getEnabled());
+        CHECK(r->getResetButton()->getEnabled());
         r->die();
 
         LLControlVariable* gate = config().getControl("SettingRowTestGate").get();
@@ -438,7 +397,7 @@ namespace
         gate->set(LLSD(false));
         {
             INFO("greyed when it closes");
-            REQUIRE_FALSE(gated->getSlider()->getEnabled());
+            CHECK_FALSE(gated->getSlider()->getEnabled());
             CHECK_FALSE(gated->getResetButton()->getEnabled());
         }
         gate->set(LLSD(true));
@@ -457,20 +416,15 @@ namespace
 
         ALSettingRow* r = row(std::string());
         r->setValue(LLSD(0.4));
-        UNSCOPED_INFO("takes a value");
         CHECK(closeTo(r->getValue().asReal(), 0.4));
 
         S32 commits = 0;
         r->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         r->getSlider()->setValue(0.6f);
         r->getSlider()->onCommit();
-        UNSCOPED_INFO("says when it changed");
         CHECK(commits == 1);
-        UNSCOPED_INFO("and gives the new value");
         CHECK(closeTo(r->getValue().asReal(), 0.6));
-        UNSCOPED_INFO("never a reset");
         CHECK_FALSE(r->getResetButton()->getVisible());
-        UNSCOPED_INFO("nor a claim to be modified");
         CHECK_FALSE(r->isModified());
         r->die();
     }
@@ -504,13 +458,9 @@ namespace
         LLSliderCtrl* plain_small = slider_like(0.05f);
         LLLineEditor* row_box = valueBoxOf(small->getSlider());
         LLLineEditor* plain_box = valueBoxOf(plain_small);
-        {
-            INFO("both have a value box");
-            REQUIRE(row_box);
-            REQUIRE(plain_box);
-        }
-        UNSCOPED_INFO("under 1, the row's is wider than a slider's " + std::to_string(row_box->getRect().getWidth())
-                   + " > " + std::to_string(plain_box->getRect().getWidth()));
+        REQUIRE(row_box);
+        REQUIRE(plain_box);
+        UNSCOPED_INFO("under 1, the row's is wider than a slider's");
         CHECK(row_box->getRect().getWidth() > plain_box->getRect().getWidth());
 
         ALSettingRow* large = row(std::string(), 0.f, 10.f, 3);
@@ -525,7 +475,6 @@ namespace
         plain_large->die();
     }
 
-    // Found by its name and lit up by it, the way a slider is.
     TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: a row is found and highlighted by its label as a slider is", "[alsettingrow]")
     {
         if (!ui.ok())
@@ -534,14 +483,10 @@ namespace
         }
 
         ALSettingRow* r = row(std::string());
-        UNSCOPED_INFO("searched for by its label");
-        REQUIRE(r->getSearchText().find("Strength") != std::string::npos);
-        UNSCOPED_INFO("which it can say");
+        CHECK(r->getSearchText().find("Strength") != std::string::npos);
         CHECK(r->getLabel() == std::string("Strength"));
         LLTextBox* box = r->getLabelBox();
-        UNSCOPED_INFO("and point at");
         REQUIRE(box != nullptr);
-        UNSCOPED_INFO("the text box that shows it");
         CHECK(box->getText() == std::string("Strength"));
         // The column every row's label takes when the file does not say: a
         // default the slider did not get would have it measure the word.
@@ -549,10 +494,8 @@ namespace
         CHECK(box->getRect().getWidth() == 140);
 
         r->setHighlighted(true);
-        UNSCOPED_INFO("lit, the slider's label is lit");
         CHECK(r->getSlider()->getHighlighted());
         r->setHighlighted(false);
-        UNSCOPED_INFO("and out again");
         CHECK_FALSE(r->getSlider()->getHighlighted());
         r->die();
     }
@@ -571,13 +514,10 @@ namespace
         gFloaterView->addChild(r);
         control->set(LLSD(0.9));
         r->getResetButton()->setFocus(true);
-        UNSCOPED_INFO("the button has the keyboard");
         CHECK(r->getResetButton()->hasFocus());
 
         control->resetToDefault(true);
-        UNSCOPED_INFO("gone");
         CHECK_FALSE(r->getResetButton()->getVisible());
-        UNSCOPED_INFO("and the keyboard with it");
         CHECK_FALSE(r->getResetButton()->hasFocus());
         r->die();
     }
@@ -604,9 +544,7 @@ namespace
             asked_by = from;
         });
         r->getResetButton()->onCommit();
-        UNSCOPED_INFO("the owner is asked once");
         CHECK(asked == 1);
-        UNSCOPED_INFO("with the row");
         CHECK(asked_by == r);
         UNSCOPED_INFO("and the row did not reset it itself");
         CHECK(closeTo(control->getValue().asReal(), 0.9));
@@ -616,7 +554,6 @@ namespace
         r->getResetButton()->onCommit();
         UNSCOPED_INFO("reset by the owner");
         CHECK(closeTo(control->getValue().asReal(), 0.5));
-        UNSCOPED_INFO("and the button gone");
         CHECK_FALSE(r->getResetButton()->getVisible());
         r->die();
     }
@@ -646,14 +583,11 @@ namespace
             "  <setting_row.mouse_up_callback function=\"SettingRowTest.Up\"/>\n"
             "</setting_row>\n";
         LLXMLNodePtr node;
-        UNSCOPED_INFO("parses");
         REQUIRE(LLXMLNode::parseBuffer(source.data(), source.size(), node));
         ALSettingRow::Params p(LLUICtrlFactory::getDefaultParams<ALSettingRow>());
         LLXUIParser parser;
         parser.readXUI(node, p, "setting_row_test.xml");
-        UNSCOPED_INFO("press said");
         CHECK(p.mouse_down_callback.isProvided());
-        UNSCOPED_INFO("release said");
         CHECK(p.mouse_up_callback.isProvided());
         p.rect = LLRect(0, 18, 360, 0);
 
@@ -667,7 +601,6 @@ namespace
                 bar = candidate;
             }
         }
-        UNSCOPED_INFO("the row's slider has a bar");
         REQUIRE(bar != nullptr);
 
         // On the track and off the thumb, which sits at the middle for 0.5:
@@ -676,19 +609,14 @@ namespace
         const S32 x = 1;
         const S32 y = bar->getRect().getHeight() / 2;
         bar->handleMouseDown(x, y, MASK_NONE);
-        UNSCOPED_INFO("the press is told once");
         CHECK(pressed == 1);
-        UNSCOPED_INFO("and no release yet");
         CHECK(released == 0);
         bar->handleMouseUp(x, y, MASK_NONE);
-        UNSCOPED_INFO("the release is told once");
         CHECK(released == 1);
-        UNSCOPED_INFO("and no second press");
         CHECK(pressed == 1);
 
         // A row that names neither is a row like every other.
         ALSettingRow* plain = row("SettingRowTestHeld");
-        UNSCOPED_INFO("no press asked for");
         CHECK_FALSE(params("SettingRowTestHeld").mouse_down_callback.isProvided());
         plain->die();
         r->die();
@@ -707,33 +635,25 @@ namespace
         p.label_width                = 110;
         p.components                 = "R G";
         ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
-        UNSCOPED_INFO("no slider");
-        REQUIRE(r->getSlider() == nullptr);
-        {
-            INFO("its caption, which names it");
-            REQUIRE(r->getLabelBox());
-            CHECK(r->getLabelBox()->getText() == "Lum weights");
-        }
+        CHECK(r->getSlider() == nullptr);
+        REQUIRE(r->getLabelBox());
+        CHECK(r->getLabelBox()->getText() == "Lum weights");
         LLSpinCtrl* red   = r->findChild<LLSpinCtrl>("weights.R");
         LLSpinCtrl* green = r->findChild<LLSpinCtrl>("weights.G");
         {
             INFO("a box per letter");
             REQUIRE(red);
             REQUIRE(green);
-            REQUIRE_FALSE(r->findChild<LLSpinCtrl>("weights.B"));
+            CHECK_FALSE(r->findChild<LLSpinCtrl>("weights.B"));
         }
         {
             INFO("after the caption, as wide as a number");
-            REQUIRE(red->getRect().mLeft == 110);
+            CHECK(red->getRect().mLeft == 110);
             CHECK(red->getRect().getWidth() == 68);
         }
-        UNSCOPED_INFO("side by side");
         CHECK(green->getRect().mLeft == red->getRect().mRight + 4);
-        {
-            INFO("the setting in them");
-            CHECK(closeTo(red->getValue().asReal(), 1.0));
-            CHECK(closeTo(green->getValue().asReal(), 0.5));
-        }
+        CHECK(closeTo(red->getValue().asReal(), 1.0));
+        CHECK(closeTo(green->getValue().asReal(), 0.5));
         bool lettered = false;
         for (LLView* child : *red->getChildList())
         {
@@ -746,7 +666,7 @@ namespace
             CHECK(red->getScrub());
         }
         UNSCOPED_INFO("with no caption under it");
-        REQUIRE_FALSE(r->findChild<LLTextBox>("weights.R_caption"));
+        CHECK_FALSE(r->findChild<LLTextBox>("weights.R_caption"));
         r->setFocus(true);
         UNSCOPED_INFO("the keyboard to the first box");
         CHECK((red->hasFocus() || gFocusMgr.childHasKeyboardFocus(red)));
@@ -767,9 +687,7 @@ namespace
         green->onCommit();
         UNSCOPED_INFO("its part written, the rest as they stood");
         CHECK(sameParts(control->getValue(), 1.0, 0.25, 0.7));
-        UNSCOPED_INFO("written once");
         CHECK(writes == 1);
-        UNSCOPED_INFO("committed once");
         CHECK(commits == 1);
 
         control->set(LLSD().with(0, 0.5).with(1, 0.25).with(2, 0.3));
@@ -781,11 +699,8 @@ namespace
         CHECK(sameParts(control->getValue(), 0.5, 0.5, 0.3));
 
         r->setEnabled(false);
-        {
-            INFO("disabled with the row");
-            CHECK_FALSE(red->getEnabled());
-            CHECK_FALSE(green->getEnabled());
-        }
+        CHECK_FALSE(red->getEnabled());
+        CHECK_FALSE(green->getEnabled());
         r->die();
     }
 
@@ -817,17 +732,17 @@ namespace
         control->set(LLSD().with(0, 0.0).with(1, 0.0).with(2, 0.4));
         {
             INFO("a part it does not show is not its difference");
-            REQUIRE_FALSE(r->isModified());
+            CHECK_FALSE(r->isModified());
             CHECK_FALSE(r->getResetButton()->getVisible());
         }
         control->set(LLSD().with(0, 0.0).with(1, 0.3).with(2, 0.4));
         {
             INFO("shown once a part it shows differs");
-            REQUIRE(r->isModified());
+            CHECK(r->isModified());
             CHECK(r->getResetButton()->getVisible());
         }
         UNSCOPED_INFO("saying the default's parts");
-        REQUIRE(r->getResetButton()->getToolTip().find("0.00, 0.00") != std::string::npos);
+        CHECK(r->getResetButton()->getToolTip().find("0.00, 0.00") != std::string::npos);
         r->getResetButton()->onCommit();
         UNSCOPED_INFO("the whole setting back");
         CHECK(sameParts(control->getValue(), 0.0, 0.0, 0.0));
@@ -847,7 +762,6 @@ namespace
         ALSettingRow::Params p       = params("SettingRowTestEffect", 0.f, 2.f);
         p.part                       = 1;
         ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
-        UNSCOPED_INFO("a slider");
         REQUIRE(r->getSlider() != nullptr);
         UNSCOPED_INFO("over its part");
         CHECK(closeTo(r->getSlider()->getValueF32(), 1.0));
@@ -857,11 +771,11 @@ namespace
         CHECK(sameParts(control->getValue(), 0.8, 0.5, 0.0));
         {
             INFO("its part differs");
-            REQUIRE(r->isModified());
+            CHECK(r->isModified());
             CHECK(r->getResetButton()->getVisible());
         }
         UNSCOPED_INFO("saying its default");
-        REQUIRE(r->getResetButton()->getToolTip().find("1.00") != std::string::npos);
+        CHECK(r->getResetButton()->getToolTip().find("1.00") != std::string::npos);
 
         control->set(LLSD().with(0, 0.2).with(1, 1.0).with(2, 0.0));
         UNSCOPED_INFO("another part differing is not its difference");

@@ -141,9 +141,7 @@ namespace
         canvas->setLeastSurface(ROOM_W, ROOM_H);
         place(canvas, 200, 100);
 
-        UNSCOPED_INFO("as wide as the room");
         CHECK(canvas->getRect().getWidth() == ROOM_W);
-        UNSCOPED_INFO("and as tall");
         CHECK(canvas->getRect().getHeight() == ROOM_H);
         canvas->die();
     }
@@ -200,9 +198,7 @@ namespace
         S32 x = 100;
         S32 y = 50;
         canvas->toContent(x, y);
-        UNSCOPED_INFO("across");
         CHECK(x == 50);
-        UNSCOPED_INFO("down");
         CHECK(y == 25);
         canvas->die();
     }
@@ -342,7 +338,6 @@ namespace
         const S32 half = (ROOM_W - ALCanvasRow::GUTTER) / 2;
         UNSCOPED_INFO("each fills its share of the room");
         CHECK(first->getRect().getWidth() == half);
-        UNSCOPED_INFO("both of them");
         CHECK(second->getRect().getWidth() == half);
         UNSCOPED_INFO("and the row is the two of them and the gutter");
         CHECK(row->getRect().getWidth() == half * 2 + ALCanvasRow::GUTTER);
@@ -478,13 +473,13 @@ namespace
             const S32 want_down = canvas->surfaceHeight() - root->getRect().mTop;
             canvas->rememberRoot();
 
-            const std::string which = "move " + std::to_string(again) + ": ";
-            UNSCOPED_INFO(which + "it stayed where it was put, across");
+            CAPTURE(again);
+            UNSCOPED_INFO("it stayed where it was put, across");
             REQUIRE(root->getRect().mLeft == want_left);
-            UNSCOPED_INFO(which + "and down from the top");
+            UNSCOPED_INFO("and down from the top");
             REQUIRE(canvas->surfaceHeight() - root->getRect().mTop == want_down);
             {
-                INFO(which + "and the surface reaches under it " + where(root->getRect()));
+                INFO("and the surface reaches under it " + where(root->getRect()));
                 REQUIRE(root->getRect().mBottom >= 0);
                 REQUIRE(root->getRect().mRight <= canvas->surfaceWidth());
             }
@@ -536,11 +531,12 @@ namespace
             }
             else if (pass > 1)
             {
-                UNSCOPED_INFO("pass " + std::to_string(pass) + ": the row is where it was, across");
+                CAPTURE(pass);
+                UNSCOPED_INFO("the row is where it was, across");
                 REQUIRE(row->getRect().getWidth() == settled.getWidth());
-                UNSCOPED_INFO("pass " + std::to_string(pass) + ": and down");
+                UNSCOPED_INFO("and down");
                 REQUIRE(row->getRect().getHeight() == settled.getHeight());
-                UNSCOPED_INFO("pass " + std::to_string(pass) + ": and so is what is on it");
+                UNSCOPED_INFO("and so is what is on it");
                 REQUIRE(canvas->getRect().mLeft == 0);
             }
         }
@@ -604,7 +600,7 @@ namespace
         canvas->rememberRoot();
         {
             INFO("the surface reaches just under it " + where(root->getRect()));
-            REQUIRE(root->getRect().mBottom > 0);
+            CHECK(root->getRect().mBottom > 0);
             CHECK(root->getRect().mBottom <= SNAP_FROM);
         }
 
@@ -612,11 +608,11 @@ namespace
         const S32 was = canvas->surfaceHeight();
         for (S32 frame = 0; frame < 8; ++frame)
         {
+            CAPTURE(frame);
             LLRect snapped;
             LLView* to = root->findSnapRect(snapped, LLCoordGL(0, -1),
                                             LLView::SNAP_PARENT_AND_SIBLINGS, SNAP_FROM);
-            UNSCOPED_INFO("frame " + std::to_string(frame)
-                   + ": nothing on a surface has an edge of it to line up with");
+            UNSCOPED_INFO("nothing on a surface has an edge of it to line up with");
             REQUIRE(to == nullptr);
             root->setShape(snapped, true);
             canvas->refresh();
@@ -663,7 +659,7 @@ namespace
 
         for (S32 turn = 0; turn < 6; ++turn)
         {
-            const std::string which = "turn " + std::to_string(turn) + ": ";
+            CAPTURE(turn);
 
             // The band folding away and coming back.
             area->reshape(ROOM_W, (turn % 2) ? ROOM_H : ROOM_H / 2);
@@ -674,10 +670,10 @@ namespace
             canvas->refresh();
             row->settle();
 
-            UNSCOPED_INFO(which + "the surface is inside the row, " + where(canvas->getRect())
+            UNSCOPED_INFO("the surface is inside the row, " + where(canvas->getRect())
                    + " in " + where(row->getLocalRect()));
             REQUIRE(row->getLocalRect().contains(canvas->getRect()));
-            UNSCOPED_INFO(which + "and the window is on the surface, " + where(root->getRect())
+            UNSCOPED_INFO("and the window is on the surface, " + where(root->getRect())
                    + " on " + where(canvas->getLocalRect()));
             REQUIRE(canvas->getLocalRect().contains(root->getRect()));
         }
@@ -852,11 +848,9 @@ namespace
         canvas->rememberRoot();
         UNSCOPED_INFO("once something has been put on it, it has");
         CHECK(canvas->keptPlace(left, down));
-        UNSCOPED_INFO("across");
         CHECK(left == root->getRect().mLeft);
         UNSCOPED_INFO("and down from the top");
-        CHECK(down ==
-                      canvas->surfaceHeight() - root->getRect().mTop);
+        CHECK(down == canvas->surfaceHeight() - root->getRect().mTop);
 
         // The rebuild: everything on it goes, and what is built next asks.
         const S32 was_left = left;
@@ -866,9 +860,7 @@ namespace
         down = -1;
         UNSCOPED_INFO("and still has it once the surface is cleared");
         CHECK(canvas->keptPlace(left, down));
-        UNSCOPED_INFO("the same place, across");
         CHECK(left == was_left);
-        UNSCOPED_INFO("and down");
         CHECK(down == was_down);
         canvas->die();
     }
@@ -1000,9 +992,7 @@ namespace
         canvas->refresh();
 
         const LLRect room = area->getContentWindowRect();
-        UNSCOPED_INFO("as wide as the room");
         CHECK(canvas->getRect().getWidth() == room.getWidth());
-        UNSCOPED_INFO("and as tall");
         CHECK(canvas->getRect().getHeight() == room.getHeight());
 
         canvas->setZoom(4.f);
@@ -1018,13 +1008,11 @@ namespace
     {
         ALCanvasView* canvas = surface();
 
-        UNSCOPED_INFO("nothing on it yet");
-        REQUIRE(canvas->empty());
+        CHECK(canvas->empty());
         UNSCOPED_INFO("life size reads as a hundred");
         CHECK(canvas->legend() == std::string("100%"));
         place(canvas, 200, 100);
-        UNSCOPED_INFO("something on it now");
-        REQUIRE_FALSE(canvas->empty());
+        CHECK_FALSE(canvas->empty());
         canvas->setZoom(2.f);
         UNSCOPED_INFO("twice life size");
         CHECK(canvas->legend() == std::string("200%"));
@@ -1052,8 +1040,9 @@ namespace
             canvas->setZoom(zoom);
             for (S32 room = 640; room < 652; ++room)
             {
+                CAPTURE(zoom, room);
                 canvas->setLeastSurface(room, room - 96);
-                UNSCOPED_INFO("no wider than the room at " + std::to_string(zoom) + " with " + std::to_string(room));
+                UNSCOPED_INFO("no wider than the room");
                 REQUIRE(canvas->getRect().getWidth() <= room);
                 UNSCOPED_INFO("nor taller");
                 REQUIRE(canvas->getRect().getHeight() <= room - 96);
@@ -1099,7 +1088,6 @@ namespace
         inWindow(300, 500, before_x, before_y);
 
         canvas->zoomAbout(2.f, 300, 500);
-        UNSCOPED_INFO("zoomed");
         CHECK(canvas->zoom() == 2.f);
         UNSCOPED_INFO("scrolled across to keep the point");
         CHECK(area->getDocPosHorizontal() == 300);
@@ -1110,9 +1098,7 @@ namespace
         S32 after_x = 0;
         S32 after_y = 0;
         inWindow(600, 1000, after_x, after_y);
-        UNSCOPED_INFO("same place across");
         CHECK(after_x == before_x);
-        UNSCOPED_INFO("same place down");
         CHECK(after_y == before_y);
         area->die();
     }
@@ -1137,10 +1123,8 @@ namespace
         canvas->refresh();
         area->getContentWindowRect();
 
-        UNSCOPED_INFO("not panning yet");
         CHECK_FALSE(canvas->panning());
         canvas->beginPan(100, 100);
-        UNSCOPED_INFO("panning");
         CHECK(canvas->panning());
         // Dragged left and down: what is seen moves that way, so the
         // container scrolls right and up.
@@ -1155,7 +1139,6 @@ namespace
         UNSCOPED_INFO("scrolled down by the drag");
         CHECK(area->getDocPosVertical() == 30);
         canvas->endPan();
-        UNSCOPED_INFO("let go");
         CHECK_FALSE(canvas->panning());
 
         canvas->panBy(-20, 10);
@@ -1244,14 +1227,14 @@ namespace
         canvas->panTo(160, 70);
         {
             INFO("the origin follows the hand");
-            REQUIRE(canvas->contentOriginX() == 60.f);
+            CHECK(canvas->contentOriginX() == 60.f);
             CHECK(canvas->contentOriginY() == -30.f);
         }
         canvas->endPan();
         canvas->panBy(-10, 5);
         {
             INFO("and moves by an amount");
-            REQUIRE(canvas->contentOriginX() == 50.f);
+            CHECK(canvas->contentOriginX() == 50.f);
             CHECK(canvas->contentOriginY() == -25.f);
         }
 
@@ -1261,7 +1244,6 @@ namespace
         };
         const std::pair<S32, S32> under = contentAt(300, 200);
         canvas->zoomAbout(2.f, 300, 200);
-        UNSCOPED_INFO("zoomed");
         CHECK(canvas->zoom() == 2.f);
         UNSCOPED_INFO("what was under the pointer is under it still");
         CHECK(contentAt(300, 200) == under);
@@ -1288,7 +1270,7 @@ namespace
             Target* node = target(canvas, LLRect(40, 80, 100, 20));
             canvas->setZoom(2.f);
             UNSCOPED_INFO("taken");
-            REQUIRE(canvas->handleDragAndDrop(100, 60, MASK_NONE, true, DAD_NOTECARD, nullptr, &accept, tip));
+            CHECK(canvas->handleDragAndDrop(100, 60, MASK_NONE, true, DAD_NOTECARD, nullptr, &accept, tip));
             {
                 INFO("on a zoomed surface, in its own coordinates");
                 REQUIRE(node->drops.size() == 1);
@@ -1334,13 +1316,9 @@ namespace
         const F32    ox     = canvas->contentOriginX();
         const F32    oy     = canvas->contentOriginY();
         const LLRect screen = canvas->screenRectOf(node);
-        UNSCOPED_INFO("its left, where it is drawn");
         CHECK(screen.mLeft == sx + ll_round(ox - 40.f));
-        UNSCOPED_INFO("its right");
         CHECK(screen.mRight == sx + ll_round(ox + 40.f));
-        UNSCOPED_INFO("its top");
         CHECK(screen.mTop == sy + ll_round(oy + 60.f));
-        UNSCOPED_INFO("its bottom");
         CHECK(screen.mBottom == sy + ll_round(oy + 20.f));
         UNSCOPED_INFO("not where its own rect says");
         CHECK(node->calcScreenRect() != screen);
@@ -1362,7 +1340,7 @@ namespace
         canvas->setContentOrigin(40.f, 40.f);
         {
             INFO("not a viewport's to move");
-            REQUIRE(canvas->contentOriginX() == 0.f);
+            CHECK(canvas->contentOriginX() == 0.f);
             CHECK(canvas->contentOriginY() == 0.f);
         }
         canvas->setViewport(true);
@@ -1370,7 +1348,7 @@ namespace
         canvas->setViewport(false);
         {
             INFO("a corner again");
-            REQUIRE(canvas->contentOriginX() == 0.f);
+            CHECK(canvas->contentOriginX() == 0.f);
             CHECK(canvas->contentOriginY() == 0.f);
         }
         S32 x = 30, y = 30;

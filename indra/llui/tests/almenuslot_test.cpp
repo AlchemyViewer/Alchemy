@@ -88,13 +88,9 @@ namespace
     {
         ALMenuSlot     slot;
         LLContextMenu* first = make(slot);
-        {
-            INFO("made");
-            REQUIRE(first);
-            REQUIRE(slot.get() == first);
-            CHECK(first->getParent() == holder);
-        }
-        UNSCOPED_INFO("alive");
+        REQUIRE(first);
+        CHECK(slot.get() == first);
+        CHECK(first->getParent() == holder);
         CHECK_FALSE(first->isDead());
         LLContextMenu* second = make(slot);
         {
@@ -120,16 +116,16 @@ namespace
             slot.close();
             {
                 INFO("closed: hidden and gone");
-                REQUIRE_FALSE(menu->getVisible());
+                CHECK_FALSE(menu->getVisible());
                 CHECK(menu->isDead());
-                REQUIRE(slot.get() == nullptr);
+                CHECK(slot.get() == nullptr);
             }
             open = make(slot);
             open->setVisible(true);
         }
         {
             INFO("the slot gone, its menu is too");
-            REQUIRE_FALSE(open->getVisible());
+            CHECK_FALSE(open->getVisible());
             CHECK(open->isDead());
         }
     }
@@ -142,11 +138,8 @@ namespace
         }
         LLMenuGL::sMenuContainer = nullptr;
         ALMenuSlot slot;
-        {
-            INFO("nothing");
-            REQUIRE(slot.make("menu_pane_list.xml") == nullptr);
-            REQUIRE(slot.get() == nullptr);
-        }
+        CHECK(slot.make("menu_pane_list.xml") == nullptr);
+        CHECK(slot.get() == nullptr);
         LLMenuGL::sMenuContainer = holder;
     }
 }

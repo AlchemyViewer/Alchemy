@@ -87,7 +87,6 @@ namespace
     {
         ALChoiceList& v = make();
         v.setChoices({ choice("llSay", "(integer, string)"), choice("llShout", ""), choice("llOwnerSay", "(string)") }, 1);
-        UNSCOPED_INFO("three lines");
         CHECK(v.document().lineCount() == 3);
         UNSCOPED_INFO("a note after a tab; none is a space in the note's face");
         CHECK(v.document().line(1) == std::string("llShout\t "));
@@ -103,7 +102,7 @@ namespace
         UNSCOPED_INFO("past the widest text");
         CHECK(note2 > v.layout().xOf(2, 10));
         UNSCOPED_INFO("two styles a line: the note's face on every line, and the ink where one is given");
-        REQUIRE(v.styles().size() == size_t(3));
+        CHECK(v.styles().size() == size_t(3));
         v.moveChoice(1, true);
         UNSCOPED_INFO("down one");
         CHECK(v.chosen() == 2);
@@ -166,7 +165,6 @@ namespace
         CHECK(picked == -1);
         UNSCOPED_INFO("the double click is taken");
         CHECK(v.handleDoubleClick(x, y, MASK_NONE));
-        UNSCOPED_INFO("picked");
         CHECK(picked == 1);
         v.choose(15);
         {
@@ -179,6 +177,7 @@ namespace
         UNSCOPED_INFO("and back");
         CHECK(v.scrollY() == 0);
     }
+
     TEST_CASE_METHOD(alchoicelist_data, "alchoicelist: a mark on any choice gives every line a column for it", "[alchoicelist]")
     {
         ALChoiceList& v = make();
@@ -194,6 +193,7 @@ namespace
         UNSCOPED_INFO("no marks, no column");
         CHECK(v.layout().xOf(0, 0) < 1.f);
     }
+
     TEST_CASE_METHOD(alchoicelist_data, "alchoicelist: a choice is one line and its note one column whatever they hold", "[alchoicelist]")
     {
         ALChoiceList& v = make();

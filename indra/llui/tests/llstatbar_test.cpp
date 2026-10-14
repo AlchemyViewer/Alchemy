@@ -63,9 +63,7 @@ namespace
     // result being positive before it walks any ticks at all.
     TEST_CASE_METHOD(llstatbar_data, "llstatbar: calcTickValue over a range with no width gives no spacing", "[llstatbar]")
     {
-        UNSCOPED_INFO("empty range has no tick spacing");
         CHECK(LLStatBar::calcTickValue(0.f, 0.f) == 0.f);
-        UNSCOPED_INFO("empty range away from zero has no tick spacing");
         CHECK(LLStatBar::calcTickValue(7.f, 7.f) == 0.f);
     }
 
@@ -92,9 +90,7 @@ namespace
 
         // range 3 over divisor 6 puts the first tick at -0.5 + 0.5.
         const F32 tick = LLStatBar::calcTickValue(-0.5f, 2.5f);
-        UNSCOPED_INFO("a tick landing on zero still yields a finite spacing");
         CHECK(finite(tick));
-        UNSCOPED_INFO("a tick landing on zero still yields a positive spacing");
         CHECK(tick > 0.f);
 
         // Same shape, divisor of 4: range 2 puts the first tick at -0.5 + 0.5.
@@ -119,18 +115,14 @@ namespace
     {
         // Both bounds tiny enough that their sum rounds to zero.
         const F32 tick = LLStatBar::calcTickValue(-1e-30f, 1e-30f);
-        UNSCOPED_INFO("tick spacing over a denormal range is finite");
         CHECK(finite(tick));
-        UNSCOPED_INFO("tick spacing over a denormal range is not negative");
         CHECK(tick >= 0.f);
     }
 
     TEST_CASE_METHOD(llstatbar_data, "llstatbar: calcTickValue over a huge range is finite and positive", "[llstatbar]")
     {
         const F32 tick = LLStatBar::calcTickValue(0.f, 1e30f);
-        UNSCOPED_INFO("tick spacing over a huge range is finite");
         CHECK(finite(tick));
-        UNSCOPED_INFO("tick spacing over a huge range is positive");
         CHECK(tick > 0.f);
     }
 
@@ -140,21 +132,15 @@ namespace
     TEST_CASE_METHOD(llstatbar_data, "llstatbar: the scaled range contains zero whichever side the data sits on", "[llstatbar]")
     {
         const Scaled positive = scale(20.f, 80.f);
-        UNSCOPED_INFO("a positive range keeps zero as its floor");
         CHECK(positive.mMin <= 0.f);
-        UNSCOPED_INFO("a positive range reaches its data");
         CHECK(positive.mMax >= 80.f);
 
         const Scaled negative = scale(-80.f, -20.f);
-        UNSCOPED_INFO("a negative range keeps zero as its ceiling");
         CHECK(negative.mMax >= 0.f);
-        UNSCOPED_INFO("a negative range reaches its data");
         CHECK(negative.mMin <= -80.f);
 
         const Scaled spanning = scale(-30.f, 45.f);
-        UNSCOPED_INFO("a spanning range reaches its floor");
         CHECK(spanning.mMin <= -30.f);
-        UNSCOPED_INFO("a spanning range reaches its ceiling");
         CHECK(spanning.mMax >= 45.f);
     }
 
@@ -176,18 +162,12 @@ namespace
         for (const auto& sample : samples)
         {
             const Scaled out = scale(sample[0], sample[1]);
-            UNSCOPED_INFO("scaled floor is at or below the data");
+            CAPTURE(sample[0], sample[1]);
             REQUIRE(out.mMin <= llmin(0.f, sample[0]));
-            UNSCOPED_INFO("scaled ceiling is at or above the data");
             REQUIRE(out.mMax >= llmax(0.f, sample[1]));
-            {
-                INFO("scaled range is finite");
-                REQUIRE(finite(out.mMin));
-                REQUIRE(finite(out.mMax));
-            }
-            UNSCOPED_INFO("tick spacing is finite");
+            REQUIRE(finite(out.mMin));
+            REQUIRE(finite(out.mMax));
             REQUIRE(finite(out.mTick));
-            UNSCOPED_INFO("tick spacing is not negative");
             REQUIRE(out.mTick >= 0.f);
         }
     }
@@ -198,13 +178,9 @@ namespace
     TEST_CASE_METHOD(llstatbar_data, "llstatbar: bounds handed the wrong way round come back ordered", "[llstatbar]")
     {
         const Scaled reversed = scale(60.f, 10.f);
-        UNSCOPED_INFO("a reversed range still comes back ordered");
         CHECK(reversed.mMin <= reversed.mMax);
-        {
-            INFO("a reversed range still contains zero");
-            CHECK(reversed.mMin <= 0.f);
-            CHECK(reversed.mMax >= 0.f);
-        }
+        CHECK(reversed.mMin <= 0.f);
+        CHECK(reversed.mMax >= 0.f);
     }
 
     // A range with nothing in it must not produce a spacing the tick walk would
@@ -212,12 +188,8 @@ namespace
     TEST_CASE_METHOD(llstatbar_data, "llstatbar: an empty range scales to finite bounds and spacing", "[llstatbar]")
     {
         const Scaled empty = scale(0.f, 0.f);
-        {
-            INFO("an empty range is finite");
-            CHECK(finite(empty.mMin));
-            CHECK(finite(empty.mMax));
-        }
-        UNSCOPED_INFO("an empty range yields no tick spacing");
+        CHECK(finite(empty.mMin));
+        CHECK(finite(empty.mMax));
         CHECK((empty.mTick == 0.f || finite(empty.mTick)));
     }
 
@@ -226,15 +198,11 @@ namespace
     TEST_CASE_METHOD(llstatbar_data, "llstatbar: equal bounds away from zero scale to take in zero and the data", "[llstatbar]")
     {
         const Scaled flat_positive = scale(42.f, 42.f);
-        UNSCOPED_INFO("a flat positive range contains zero");
         CHECK(flat_positive.mMin <= 0.f);
-        UNSCOPED_INFO("a flat positive range reaches its data");
         CHECK(flat_positive.mMax >= 42.f);
 
         const Scaled flat_negative = scale(-42.f, -42.f);
-        UNSCOPED_INFO("a flat negative range contains zero");
         CHECK(flat_negative.mMax >= 0.f);
-        UNSCOPED_INFO("a flat negative range reaches its data");
         CHECK(flat_negative.mMin <= -42.f);
     }
 
@@ -245,9 +213,7 @@ namespace
     {
         Scaled once = scale(0.f, 73.f);
         Scaled twice = scale(once.mMin, once.mMax);
-        UNSCOPED_INFO("re-scaling a scaled floor is a fixed point");
         CHECK(twice.mMin == once.mMin);
-        UNSCOPED_INFO("re-scaling a scaled ceiling is a fixed point");
         CHECK(twice.mMax == once.mMax);
     }
 }

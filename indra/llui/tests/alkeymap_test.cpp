@@ -31,7 +31,7 @@
 #include <set>
 #include <string>
 
-namespace tut
+namespace
 {
     struct alkeymap_data
     {
@@ -45,27 +45,22 @@ namespace tut
         {
             const C           command = static_cast<C>(i);
             const std::string name    = alEditorCommandName(command);
-            {
-                INFO("named");
-                REQUIRE_FALSE(name.empty());
-                REQUIRE(name != "none");
-            }
-            UNSCOPED_INFO("once");
+            CAPTURE(i, name);
+            REQUIRE_FALSE(name.empty());
+            REQUIRE(name != "none");
+            UNSCOPED_INFO("a name no other command has");
             REQUIRE(names.insert(name).second);
-            UNSCOPED_INFO("found again");
             REQUIRE(alEditorCommandFromName(name) == command);
         }
-        UNSCOPED_INFO("a name no command has");
-        REQUIRE_FALSE(alEditorCommandFromName("frobnicate"));
+        CHECK_FALSE(alEditorCommandFromName("frobnicate"));
         UNSCOPED_INFO("none is no command to find");
-        REQUIRE_FALSE(alEditorCommandFromName("none"));
+        CHECK_FALSE(alEditorCommandFromName("none"));
     }
 
     TEST_CASE_METHOD(alkeymap_data, "alkeymap: a key needs exactly its modifiers; a rebind replaces and an unbind frees", "[alkeymap]")
     {
         ALKeymap map;
         map.bind('K', MASK_CONTROL, C::DeleteLine);
-        UNSCOPED_INFO("found");
         CHECK(map.lookup('K', MASK_CONTROL) == C::DeleteLine);
         UNSCOPED_INFO("not with Shift too");
         CHECK(map.lookup('K', MASK_CONTROL | MASK_SHIFT) == C::None);
@@ -75,7 +70,7 @@ namespace tut
         {
             INFO("replaced");
             CHECK(map.lookup('K', MASK_CONTROL) == C::Cut);
-            REQUIRE(map.bindings().size() == 1);
+            CHECK(map.bindings().size() == 1);
         }
         map.bind(KEY_F5, MASK_NONE, C::Cut);
         KEY  key  = KEY_NONE;
@@ -87,7 +82,6 @@ namespace tut
             CHECK(mask == MASK_CONTROL);
         }
         map.unbind('K', MASK_CONTROL);
-        UNSCOPED_INFO("freed");
         CHECK(map.lookup('K', MASK_CONTROL) == C::None);
         {
             INFO("its other key now first");
@@ -98,20 +92,16 @@ namespace tut
         CHECK_FALSE(map.keysFor(C::Paste, key, mask));
     }
 
+    // The everyday keys, Backspace and Return under Shift as well, each key
+    // bound once, and off the Mac no Control-Alt with a key that types.
     TEST_CASE_METHOD(alkeymap_data, "alkeymap: the standard keys bind the everyday commands and each key once", "[alkeymap]")
     {
         const ALKeymap map = ALKeymap::standard();
-        UNSCOPED_INFO("undo");
         CHECK(map.lookup('Z', MASK_CONTROL) == C::Undo);
-        UNSCOPED_INFO("find");
         CHECK(map.lookup('F', MASK_CONTROL) == C::Find);
-        UNSCOPED_INFO("Backspace");
         CHECK(map.lookup(KEY_BACKSPACE, MASK_NONE) == C::DeleteLeft);
-        UNSCOPED_INFO("and under Shift");
         CHECK(map.lookup(KEY_BACKSPACE, MASK_SHIFT) == C::DeleteLeft);
-        UNSCOPED_INFO("Return");
         CHECK(map.lookup(KEY_RETURN, MASK_NONE) == C::NewLine);
-        UNSCOPED_INFO("and under Shift");
         CHECK(map.lookup(KEY_RETURN, MASK_SHIFT) == C::NewLine);
         KEY  key  = KEY_NONE;
         MASK mask = MASK_NONE;
@@ -129,12 +119,14 @@ namespace tut
             // Control and Alt together is AltGr on many a keyboard, which
             // types.
             const bool types = binding.key >= 0x20 && binding.key < 0x80;
-            UNSCOPED_INFO(std::string("no Control-Alt ") + static_cast<char>(binding.key));
+            UNSCOPED_INFO("no Control-Alt " << static_cast<char>(binding.key));
             REQUIRE((!types || (binding.mask & (MASK_CONTROL | MASK_ALT)) != (MASK_CONTROL | MASK_ALT)));
 #endif
         }
     }
 
+    // The Mac's conventions there, and the others' elsewhere; a key that
+    // needs no Fn is the one shown first.
     TEST_CASE_METHOD(alkeymap_data, "alkeymap: find next and replace and folding keep each platform's conventions", "[alkeymap]")
     {
         const ALKeymap map = ALKeymap::standard();
@@ -166,24 +158,22 @@ namespace tut
         UNSCOPED_INFO("Option with an arrow a word");
         CHECK(map.lookup(KEY_LEFT, MASK_ALT) == C::MoveWordLeft);
 #else
-        { UNSCOPED_INFO("Alt with an arrow left to whoever holds the editor, for back"); REQUIRE((map.lookup(KEY_LEFT, MASK_ALT) == C::None)); }
+        UNSCOPED_INFO("Alt with an arrow left to whoever holds the editor, for back");
+        CHECK(map.lookup(KEY_LEFT, MASK_ALT) == C::None);
         UNSCOPED_INFO("Control-H replaces");
-        REQUIRE((map.lookup('H', MASK_CONTROL) == C::Replace));
+        CHECK(map.lookup('H', MASK_CONTROL) == C::Replace);
         UNSCOPED_INFO("Control-Shift-[ folds");
-        REQUIRE((map.lookup('[', MASK_CONTROL | MASK_SHIFT) == C::Fold));
+        CHECK(map.lookup('[', MASK_CONTROL | MASK_SHIFT) == C::Fold);
         UNSCOPED_INFO("F3 the next match, shown");
-        REQUIRE((map.keysFor(C::FindNext, key, mask) && key == KEY_F3));
+        CHECK((map.keysFor(C::FindNext, key, mask) && key == KEY_F3));
 #endif
     }
 
     TEST_CASE_METHOD(alkeymap_data, "alkeymap: the keypad's slash KEY_DIVIDE looks up and binds as the slash key", "[alkeymap]")
     {
         ALKeymap map = ALKeymap::standard();
-        UNSCOPED_INFO("Control with the slash key as '/'");
         CHECK(map.lookup('/', MASK_CONTROL) == C::ToggleComment);
-        UNSCOPED_INFO("and as KEY_DIVIDE");
         CHECK(map.lookup(KEY_DIVIDE, MASK_CONTROL) == C::ToggleComment);
-        UNSCOPED_INFO("KEY_DIVIDE on its own nothing");
         CHECK(map.lookup(KEY_DIVIDE, MASK_NONE) == C::None);
 
         map.unbind(KEY_DIVIDE, MASK_CONTROL);

@@ -38,7 +38,7 @@
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct alvimkeymap_data
     {
@@ -285,7 +285,6 @@ namespace tut
         keys("cwseven<Esc>");
         UNSCOPED_INFO("cw changes the word, not the space");
         CHECK(flat(e.text()) == std::string("|seven five|six|"));
-        UNSCOPED_INFO("back in normal mode");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
         UNSCOPED_INFO("caret on the last character typed");
         CHECK(caretText() == std::string("1:4"));
@@ -338,8 +337,9 @@ namespace tut
         keys("j0.");
         UNSCOPED_INFO(". repeats the insert on the next line");
         CHECK(flat(e.text()) == std::string("-xyabc!|hihihiabove|hihihinew|"));
+        keys("u");
         UNSCOPED_INFO("an insert is one step to undo");
-        CHECK([&] { keys("u"); return alvimkeymap_data::flat(e.text()) =="-xyabc!|hihihiabove|new|"; }());
+        CHECK(flat(e.text()) == "-xyabc!|hihihiabove|new|");
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: text objects: diw daw da( yi( dap and ci inside quotes", "[alvimkeymap]")
@@ -372,7 +372,6 @@ namespace tut
         keys("vey");
         UNSCOPED_INFO("v e y yanks the word");
         CHECK(vim->registerText('"') == std::string("one"));
-        UNSCOPED_INFO("and leaves visual");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
         keys("vjd");
         UNSCOPED_INFO("v j d takes across the lines, the character under the caret too");
@@ -430,8 +429,8 @@ namespace tut
         keys("/nothing here<CR>");
         {
             INFO("a miss is said");
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("Pattern not found") != std::string::npos);
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("Pattern not found") != std::string::npos);
         }
         keys(":%s/alpha/omega/g<CR>");
         UNSCOPED_INFO(":s over every line");
@@ -455,9 +454,7 @@ namespace tut
         keys(":w<CR>");
         keys(":q!<CR>");
         keys(":format now<CR>");
-        UNSCOPED_INFO("three heard");
         REQUIRE(heard.size() == size_t(3));
-        UNSCOPED_INFO("w");
         CHECK(heard[0] == std::string("w|"));
         UNSCOPED_INFO("q! with its bang");
         CHECK(heard[1] == std::string("q!|"));
@@ -466,8 +463,8 @@ namespace tut
         keys(":frobnicate<CR>");
         {
             INFO("an unknown command is said");
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("Not an editor command") != std::string::npos);
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("Not an editor command") != std::string::npos);
         }
         e.setSoftTabs(true);
         keys("gg>>");
@@ -482,13 +479,13 @@ namespace tut
         keys("i");
         {
             INFO("insert says so");
-            REQUIRE(vim->status() == "-- INSERT --");
+            CHECK(vim->status() == "-- INSERT --");
             CHECK(vim->inserting());
         }
         keys("<Esc>v");
         {
             INFO("visual says so");
-            REQUIRE(vim->status() == "-- VISUAL --");
+            CHECK(vim->status() == "-- VISUAL --");
             CHECK_FALSE(vim->inserting());
         }
         keys("<Esc>3d");
@@ -503,15 +500,12 @@ namespace tut
         click(0, 7);
         UNSCOPED_INFO("past the end of a line lands on its last character");
         CHECK(caretText() == std::string("0:6"));
-        UNSCOPED_INFO("still normal");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
         drag(1, 0, 1, 4);
-        UNSCOPED_INFO("a drag is visual");
         CHECK(vim->mode() == ALVimKeymap::Mode::Visual);
         keys("d");
         UNSCOPED_INFO("and the operator takes what was dragged, up to where the drag stopped");
         CHECK(flat(e.text()) == std::string("one two| four|five six|"));
-        UNSCOPED_INFO("back to normal");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
         drag(2, 3, 2, 0);
         UNSCOPED_INFO("dragged backwards is visual too");
@@ -520,7 +514,6 @@ namespace tut
         UNSCOPED_INFO("yanked, as far as the drag reached");
         CHECK(vim->registerText('"') == std::string("five"));
         keys("V");
-        UNSCOPED_INFO("visual line");
         CHECK(vim->mode() == ALVimKeymap::Mode::VisualLine);
         click(0, 1);
         {
@@ -579,7 +572,6 @@ namespace tut
     {
         ALCodeEditor& e = make("one\ntwo\nthree\nfour\n");
         keys("qaA;<Esc>jq");
-        UNSCOPED_INFO("recording stopped");
         CHECK_FALSE(vim->recording());
         UNSCOPED_INFO("the register holds the keys as text");
         CHECK(vim->registerText('a') == std::string("A;<Esc>j"));
@@ -612,7 +604,6 @@ namespace tut
         keys("q");
         // The keys decode as they were encoded.
         const std::vector<ALVimKeymap::Input> back = ALVimKeymap::decodeInputs("a<lt>b<C-r><Esc>");
-        UNSCOPED_INFO("five inputs");
         REQUIRE(back.size() == size_t(5));
         {
             INFO("a literal <");
@@ -697,7 +688,6 @@ namespace tut
         keys(":g/keep/normal A;<CR>");
         UNSCOPED_INFO(":normal types on each");
         CHECK(flat(e.text()) == std::string("keep 1;|held 2|keep 3;|held 4|keep 5;|"));
-        UNSCOPED_INFO("and ends in normal mode");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
         keys(":2,3g/held/d<CR>");
         UNSCOPED_INFO("a range narrows it");
@@ -708,10 +698,11 @@ namespace tut
         keys(":g/keep/<CR>");
         {
             INFO("with no command, how many is said");
-            REQUIRE_FALSE(vim->messageIsError());
+            CHECK_FALSE(vim->messageIsError());
             CHECK(vim->message() == "3 lines");
         }
     }
+
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: :s takes vim's replacement spelling and flags; & g& and :&& repeat it", "[alvimkeymap]")
     {
         ALCodeEditor& e = make("cat hat\ncat bat\nrat\n");
@@ -726,7 +717,7 @@ namespace tut
         keys("u:s/at/A\\&B/gn<CR>");
         {
             INFO("n counts without changing");
-            REQUIRE_FALSE(vim->messageIsError());
+            CHECK_FALSE(vim->messageIsError());
             CHECK(vim->message() == "2 matches on 1 line");
         }
         UNSCOPED_INFO("nothing changed");
@@ -792,7 +783,6 @@ namespace tut
         UNSCOPED_INFO("Up walks only the lines that start as this one");
         CHECK(vim->commandLine() == std::string("s/a/b/"));
         keys("<CR>");
-        UNSCOPED_INFO("run");
         CHECK(flat(e.text()) == std::string("b1|c2|b3|a4|"));
         keys("j@:");
         UNSCOPED_INFO("@: runs the last line again");
@@ -840,6 +830,7 @@ namespace tut
         UNSCOPED_INFO("at in visual");
         CHECK(flat(e.text()) == std::string("<a></a>|"));
     }
+
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: patterns are vim's: magic levels; word bounds; zs and ze; lazy; case", "[alvimkeymap]")
     {
         ALCodeEditor& e = make("foo(bar) foo+bar Foo|bar foobar\n");
@@ -901,6 +892,7 @@ namespace tut
         UNSCOPED_INFO(":g takes vim's spelling too");
         CHECK(flat(e.text()) == std::string("lower W zed END|"));
     }
+
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: a pattern's ~ and optional sequence; %V %# %l %c pin its start", "[alvimkeymap]")
     {
         ALCodeEditor& e = make("fun func function\nfun func function\nfun func function\n");
@@ -934,6 +926,7 @@ namespace tut
         UNSCOPED_INFO("the setting is shared with whoever shares the state");
         CHECK(vim->shared().ignoreCase);
     }
+
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: a place before zs is the whole match's; %^ and %$; character codes", "[alvimkeymap]")
     {
         ALCodeEditor& e = make("foobar foobar\nfoobar\nfoobar foobar\n");
@@ -991,11 +984,11 @@ namespace tut
         UNSCOPED_INFO("a group before \\zs is still \\1");
         CHECK(flat(e.text()) == std::string("foo[barfbar]|"));
     }
+
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: :s with the c flag asks about each match: y n a l and escape; one undo", "[alvimkeymap]")
     {
         ALCodeEditor& e = make("a a a a\na a\n");
         keys(":%s/a/b/gc<CR>");
-        UNSCOPED_INFO("asking");
         CHECK(vim->mode() == ALVimKeymap::Mode::Confirm);
         UNSCOPED_INFO("the question");
         CHECK(vim->status() == std::string("replace with b (y/n/a/q/l)?"));
@@ -1012,7 +1005,6 @@ namespace tut
         keys("l");
         UNSCOPED_INFO("l: this one and no more");
         CHECK(flat(e.text()) == std::string("b a b a|a a|"));
-        UNSCOPED_INFO("done");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
         keys(":%s/a/c/gc<CR>a");
         UNSCOPED_INFO("a: all the rest");
@@ -1020,7 +1012,6 @@ namespace tut
         keys(":%s/c/d/gc<CR>yy<Esc>");
         UNSCOPED_INFO("escape stops it after the two");
         CHECK(flat(e.text()) == std::string("b d b d|c c|"));
-        UNSCOPED_INFO("normal again");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
         keys("u");
         UNSCOPED_INFO("the whole asking is one step to undo, as vim has it");
@@ -1032,6 +1023,7 @@ namespace tut
         UNSCOPED_INFO("the whole starts in the area, the match after the \\zs: only the first");
         CHECK(flat(e.text()) == std::string("xaY xab|xab|"));
     }
+
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: :s asking lights the matches to come and lets control-E and Y scroll", "[alvimkeymap]")
     {
         // Enough lines under the matches for the view to scroll.
@@ -1042,16 +1034,13 @@ namespace tut
         }
         ALCodeEditor& e = make(text.c_str());
         keys(":%s/a/b/gc<CR>");
-        UNSCOPED_INFO("all four lit");
-        REQUIRE(e.highlights().size() == size_t(4));
+        CHECK(e.highlights().size() == size_t(4));
         keys("y");
-        UNSCOPED_INFO("three left lit");
         REQUIRE(e.highlights().size() == size_t(3));
         UNSCOPED_INFO("the lit ones are the ones to come");
         CHECK(e.highlights()[0] == ALTextRange(ALTextPos(0, 2), ALTextPos(0, 3)));
         const S32 before = e.scrollY();
         keys("<C-E>");
-        UNSCOPED_INFO("still asking");
         CHECK(vim->mode() == ALVimKeymap::Mode::Confirm);
         UNSCOPED_INFO("scrolled a row");
         CHECK(e.scrollY() == before + e.layout().rowHeight());
@@ -1060,7 +1049,7 @@ namespace tut
         CHECK(e.scrollY() == before);
         keys("q");
         UNSCOPED_INFO("nothing lit once done");
-        REQUIRE(e.highlights().empty());
+        CHECK(e.highlights().empty());
         UNSCOPED_INFO("what was said yes to");
         CHECK(flat(e.text()).substr(0, 9) == std::string("b a|a|a|x"));
         // Patterns over a line's end.
@@ -1079,16 +1068,14 @@ namespace tut
         e.setText("a x\nb\na y\na z\n");
         vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
         keys(":g/^a/s/a/A/c<CR>");
-        UNSCOPED_INFO("asking");
         CHECK(vim->mode() == ALVimKeymap::Mode::Confirm);
         UNSCOPED_INFO("the line's one to ask about");
-        REQUIRE(e.highlights().size() == size_t(1));
+        CHECK(e.highlights().size() == size_t(1));
         UNSCOPED_INFO("the first line's first");
         CHECK(e.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)));
         keys("yny");
         UNSCOPED_INFO("the first and the third said yes to");
         CHECK(flat(e.text()) == std::string("A x|b|a y|A z|"));
-        UNSCOPED_INFO("done");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
         keys("u");
         UNSCOPED_INFO("one step to undo for the lot");
@@ -1101,12 +1088,10 @@ namespace tut
         // The lines are run from the top down: a line with none to
         // substitute is no error under :g, as in vim.
         keys(":g/a/s/x/X/c<CR>");
-        UNSCOPED_INFO("asking");
         CHECK(vim->mode() == ALVimKeymap::Mode::Confirm);
         keys("y");
         UNSCOPED_INFO("the one there was");
         CHECK(flat(e.text()) == std::string("a X|b|a y|a z|"));
-        UNSCOPED_INFO("done");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
         keys("u");
         // The first line asked about, then the command after it there,
@@ -1115,13 +1100,12 @@ namespace tut
         UNSCOPED_INFO("asking first");
         CHECK(vim->mode() == ALVimKeymap::Mode::Confirm);
         keys("y");
-        UNSCOPED_INFO("then not");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
-        UNSCOPED_INFO("the error");
         CHECK(vim->message() == std::string("E492: Not an editor command: nosuch"));
         UNSCOPED_INFO("what was said yes to made");
         CHECK(flat(e.text()) == std::string("a X|b|a y|a z|"));
     }
+
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: the : line is edited in place; q: goes through the host's window", "[alvimkeymap]")
     {
         ALCodeEditor& e = make("one\n");
@@ -1130,7 +1114,7 @@ namespace tut
         keys(":abc");
         {
             INFO("typing");
-            REQUIRE(vim->typingLine(line, caret));
+            CHECK(vim->typingLine(line, caret));
             CHECK(line == ":abc");
             CHECK(caret == 4);
         }
@@ -1189,12 +1173,11 @@ namespace tut
         keys("<Esc>");
         // A message goes at a click, as it does at a key.
         keys(":nosuch<CR>");
-        UNSCOPED_INFO("said");
-        REQUIRE_FALSE(vim->message().empty());
+        CHECK_FALSE(vim->message().empty());
         e.handleMouseDown(10, 10, MASK_NONE);
         e.handleMouseUp(10, 10, MASK_NONE);
         UNSCOPED_INFO("cleared by the click");
-        REQUIRE(vim->message().empty());
+        CHECK(vim->message().empty());
         // q: through the host's window: the history handed over, and
         // what is picked put on the line to edit.
         keys(":set number<CR>");
@@ -1208,7 +1191,7 @@ namespace tut
         {
             INFO("the history was offered");
             REQUIRE_FALSE(offered.empty());
-            REQUIRE(std::find(offered.begin(), offered.end(), "set number") != offered.end());
+            CHECK(std::find(offered.begin(), offered.end(), "set number") != offered.end());
         }
         UNSCOPED_INFO("the pick was run, as vim's window runs a row");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
@@ -1220,7 +1203,7 @@ namespace tut
             INFO("on the line to edit");
             CHECK(vim->typingLine(line, caret));
             CHECK(line == ":" + offered.front());
-            REQUIRE(caret == static_cast<S32>(line.size()));
+            CHECK(caret == static_cast<S32>(line.size()));
         }
         keys("<Esc>");
         // Shift-Left and Shift-Right go a WORD at a time on the line.
@@ -1268,14 +1251,11 @@ namespace tut
         };
         // One answer is put in, with no row.
         keys(":su<Tab>");
-        {
-            INFO("substitute");
-            REQUIRE(vim->typingLine(line, caret));
-            CHECK(line == ":substitute");
-            CHECK(caret == 11);
-        }
+        CHECK(vim->typingLine(line, caret));
+        CHECK(line == ":substitute");
+        CHECK(caret == 11);
         UNSCOPED_INFO("no row for one");
-        REQUIRE_FALSE(vim->menu(items, chosen));
+        CHECK_FALSE(vim->menu(items, chosen));
         keys("<Esc>");
         // Several: the first on the line, the row up, Tab walking on and
         // back round to what was typed; Shift-Tab back.
@@ -1297,7 +1277,7 @@ namespace tut
         keys("<Tab>");
         {
             INFO("the next");
-            REQUIRE(vim->typingLine(line, caret));
+            CHECK(vim->typingLine(line, caret));
             CHECK(line == ":wq");
             CHECK(vim->menu(items, chosen));
             CHECK(chosen == 1);
@@ -1305,7 +1285,7 @@ namespace tut
         keys("<Tab><Tab>");
         {
             INFO("past the last, the word as typed");
-            REQUIRE(vim->typingLine(line, caret));
+            CHECK(vim->typingLine(line, caret));
             CHECK(line == ":w");
             CHECK(vim->menu(items, chosen));
             CHECK(chosen == -1);
@@ -1322,7 +1302,7 @@ namespace tut
         keys("<Esc>");
         {
             INFO("the row gone, the word as typed");
-            REQUIRE_FALSE(vim->menu(items, chosen));
+            CHECK_FALSE(vim->menu(items, chosen));
             CHECK(vim->typingLine(line, caret));
             CHECK(line == ":w");
         }
@@ -1334,10 +1314,10 @@ namespace tut
         keys(":%set no<Tab>");
         {
             INFO("the options starting no");
-            REQUIRE(vim->typingLine(line, caret));
+            CHECK(vim->typingLine(line, caret));
             CHECK(line == ":%set noexpandtab");
             CHECK(vim->menu(items, chosen));
-            REQUIRE(items.size() == 8);
+            CHECK(items.size() == 8);
         }
         keys("<Tab><Tab><Tab><Tab>");
         {
@@ -1349,7 +1329,7 @@ namespace tut
         keys("x");
         {
             INFO("the row gone");
-            REQUIRE_FALSE(vim->menu(items, chosen));
+            CHECK_FALSE(vim->menu(items, chosen));
             CHECK(vim->typingLine(line, caret));
             CHECK(line == ":%set nonumberx");
         }
@@ -1358,7 +1338,7 @@ namespace tut
         keys(":zzz<Tab>");
         {
             INFO("as typed");
-            REQUIRE(vim->typingLine(line, caret));
+            CHECK(vim->typingLine(line, caret));
             CHECK(line == ":zzz");
             CHECK_FALSE(vim->menu(items, chosen));
         }
@@ -1484,7 +1464,7 @@ namespace tut
         CHECK(e.text() == std::string("pear\npear\napple\nbanana\nFig\n"));
         keys(":1,3m2<CR>");
         UNSCOPED_INFO("moving a range into itself is refused");
-        REQUIRE_FALSE(vim->message().empty());
+        CHECK_FALSE(vim->message().empty());
         keys(":2,3> 1<CR>");
         UNSCOPED_INFO("a count after > shifts so many from the range's end");
         CHECK(e.document().line(2) == std::string("\tapple"));
@@ -1503,14 +1483,12 @@ namespace tut
         UNSCOPED_INFO("nor for an edit, or its repeat");
         CHECK_FALSE(e.completionOpen());
         keys("A co");
-        UNSCOPED_INFO("inserting");
         CHECK(vim->inserting());
         UNSCOPED_INFO("the list opens as typing goes");
         CHECK(e.completionOpen());
         keys("<Esc>");
         UNSCOPED_INFO("one Escape closes the list");
         CHECK_FALSE(e.completionOpen());
-        UNSCOPED_INFO("and leaves insert");
         CHECK_FALSE(vim->inserting());
 
         keys("o");
@@ -1518,16 +1496,16 @@ namespace tut
         call.label = "llSay(integer channel, string msg)";
         e.showSignature(e.caret(), call);
         UNSCOPED_INFO("a signature while inserting");
-        REQUIRE(e.signature() != nullptr);
+        CHECK(e.signature() != nullptr);
         keys("<Esc>");
         {
             INFO("gone with the one Escape");
-            REQUIRE(e.signature() == nullptr);
+            CHECK(e.signature() == nullptr);
             CHECK_FALSE(vim->inserting());
         }
         e.showSignature(e.caret(), call);
         UNSCOPED_INFO("an answer arriving after is not shown");
-        REQUIRE(e.signature() == nullptr);
+        CHECK(e.signature() == nullptr);
 
         keys("ico");
         UNSCOPED_INFO("up again");
@@ -1554,7 +1532,6 @@ namespace tut
     {
         ALCodeEditor& e = make("\n");
         keys("iab");
-        UNSCOPED_INFO("inserting");
         CHECK(vim->inserting());
         e.setModalKeymap(nullptr);
         vim = nullptr;
@@ -1562,7 +1539,6 @@ namespace tut
         {
             e.handleUnicodeCharHere(static_cast<llwchar>(c));
         }
-        UNSCOPED_INFO("typed");
         CHECK(e.document().line(0) == std::string("abcd"));
         e.undo();
         UNSCOPED_INFO("the typing after undone alone");
@@ -1587,8 +1563,8 @@ namespace tut
         keys(":g/a/g/1/d<CR>");
         {
             INFO("refused");
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("E147") != std::string::npos);
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("E147") != std::string::npos);
         }
         UNSCOPED_INFO("nothing done");
         CHECK(flat(e.text()) == std::string("a1|b2|a3|"));
@@ -1625,13 +1601,11 @@ namespace tut
         CHECK(clipboard() == std::string("noe"));
 
         keys(":set clipboard=unnamed<CR>");
-        UNSCOPED_INFO("on again");
         CHECK(vim->shared().unnamedClipboard);
         keys("jyy");
         UNSCOPED_INFO("a yank goes by the clipboard");
         CHECK(clipboard() == std::string("two"));
         keys(":set clipboard=<CR>");
-        UNSCOPED_INFO("and off");
         CHECK_FALSE(vim->shared().unnamedClipboard);
         keys(":set clipboard=unnamed<CR>");
         keys(":set clipboard&<CR>");
@@ -1640,8 +1614,8 @@ namespace tut
         keys(":set clipboard=bogus<CR>");
         {
             INFO("a value vim has not is said");
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("E474") != std::string::npos);
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("E474") != std::string::npos);
         }
     }
 
@@ -1767,9 +1741,9 @@ namespace tut
         // and nothing put.
         keys("yiw100000p");
         {
-            INFO("said: " + vim->message());
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("Too large a count") != std::string::npos);
+            INFO("said: " << vim->message());
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("Too large a count") != std::string::npos);
         }
         UNSCOPED_INFO("nothing put");
         CHECK(flat(e.text()) == std::string("abcdefghijklmnopqrstuvwxyz|"));
@@ -1781,9 +1755,9 @@ namespace tut
         make("\n");
         keys("100000iabcdefghijk<Esc>");
         {
-            INFO("said: " + vim->message());
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("Too large a count") != std::string::npos);
+            INFO("said: " << vim->message());
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("Too large a count") != std::string::npos);
         }
         UNSCOPED_INFO("typed once");
         CHECK(flat(editor->text()) == std::string("abcdefghijk|"));
@@ -1793,7 +1767,7 @@ namespace tut
         // Within it, the lot in one edit, undone at once.
         keys("20000ixy<Esc>");
         UNSCOPED_INFO("forty thousand characters");
-        REQUIRE(editor->text().size() == size_t(40001));
+        CHECK(editor->text().size() == size_t(40001));
         keys("u");
         UNSCOPED_INFO("undone at once");
         CHECK(flat(editor->text()) == std::string("|"));
@@ -1823,7 +1797,6 @@ namespace tut
         composed('j');
         UNSCOPED_INFO("nor on the next");
         CHECK(flat(e.text()) == flat(was));
-        UNSCOPED_INFO("still in visual line mode");
         CHECK(vim->mode() == ALVimKeymap::Mode::VisualLine);
         UNSCOPED_INFO("over lines 2 to 4");
         CHECK(caretText().substr(0, 2) == std::string("3:"));
@@ -1872,7 +1845,6 @@ namespace tut
     {
         make("x");
         keys("ofoo<CR>bar<Esc>");
-        UNSCOPED_INFO("inserted");
         CHECK(flat(editor->text()) == std::string("x|foo|bar"));
         keys(".");
         UNSCOPED_INFO("both lines again");
@@ -1880,7 +1852,6 @@ namespace tut
 
         make("aaaa");
         keys("s1<CR>2<Esc>");
-        UNSCOPED_INFO("substituted");
         CHECK(flat(editor->text()) == std::string("1|2aaa"));
         keys("l.");
         UNSCOPED_INFO("and again, the break with it");
@@ -1917,7 +1888,7 @@ namespace tut
         heard.clear();
         keys("dgt");
         UNSCOPED_INFO("not after an operator");
-        REQUIRE(heard.empty());
+        CHECK(heard.empty());
         UNSCOPED_INFO("nothing changed");
         CHECK(flat(editor->text()) == std::string("a|b"));
     }
@@ -1952,7 +1923,7 @@ namespace tut
         vim->hooks().jumped = [&from](ALTextView&, const ALTextPos& at) { from.push_back(at); };
         keys("G");
         UNSCOPED_INFO("G from where it was");
-        CHECK(from == std::vector<ALTextPos>{ ALTextPos(0, 0) });
+        REQUIRE(from == std::vector<ALTextPos>{ ALTextPos(0, 0) });
         keys("''");
         {
             INFO("'' back to it");
@@ -1961,7 +1932,7 @@ namespace tut
         }
         keys("jl");
         UNSCOPED_INFO("j and l are no jumps");
-        REQUIRE(from.size() == 2);
+        CHECK(from.size() == 2);
         keys("gg");
         {
             INFO("gg");
@@ -1978,24 +1949,24 @@ namespace tut
         keys("/thr<CR>");
         {
             INFO("a search");
-            REQUIRE(from.size() == 5);
+            CHECK(from.size() == 5);
             CHECK(editor->caret().line == 2);
         }
         keys("mak:4<CR>");
         {
             INFO("a line on the : line");
-            REQUIRE(from.size() == 6);
+            CHECK(from.size() == 6);
             CHECK(editor->caret().line == 3);
         }
         keys("'a");
         {
             INFO("a mark");
-            REQUIRE(from.size() == 7);
+            CHECK(from.size() == 7);
             CHECK(editor->caret().line == 2);
         }
         keys("dG");
         UNSCOPED_INFO("not an operator's");
-        REQUIRE(from.size() == 7);
+        CHECK(from.size() == 7);
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: Ctrl-O Ctrl-I gd Ctrl-T Ctrl-G and K ask the host as its commands", "[alvimkeymap]")
@@ -2020,34 +1991,32 @@ namespace tut
         vim->hooks().listing = [&listed](ALTextView&, const std::string& text) { listed.push_back(text); };
         keys("yyj\"ayw");
         keys(":registers<CR>");
-        UNSCOPED_INFO("one listing");
         REQUIRE(listed.size() == size_t(1));
         UNSCOPED_INFO("the heading");
         CHECK(listed[0].compare(0, 17, "Type Name Content") == 0);
         UNSCOPED_INFO("a yank of lines");
-        REQUIRE(listed[0].find("\n  l  \"0   one^J") != std::string::npos);
+        CHECK(listed[0].find("\n  l  \"0   one^J") != std::string::npos);
         UNSCOPED_INFO("a named one, of characters, a tab as ^I");
-        REQUIRE(listed[0].find("\n  c  \"a   ^I") != std::string::npos);
+        CHECK(listed[0].find("\n  c  \"a   ^I") != std::string::npos);
         UNSCOPED_INFO("no : line run before it");
-        REQUIRE(listed[0].find("\":") == std::string::npos);
+        CHECK(listed[0].find("\":") == std::string::npos);
         keys(":di a<CR>");
         {
             INFO("only those named");
-            REQUIRE(listed[1].find("\"0") == std::string::npos);
-            REQUIRE(listed[1].find("\"a") != std::string::npos);
+            CHECK(listed[1].find("\"0") == std::string::npos);
+            CHECK(listed[1].find("\"a") != std::string::npos);
         }
         keys(":di :<CR>");
         UNSCOPED_INFO("the : line run before this one");
-        REQUIRE(listed.back().find("\n  c  \":   di a") != std::string::npos);
+        CHECK(listed.back().find("\n  c  \":   di a") != std::string::npos);
         listed.pop_back();
 
         keys("mb:marks<CR>");
-        UNSCOPED_INFO("marks");
         CHECK(listed[2] == std::string("mark line  col file/text\n b      2    0 two three"));
         keys("G");
         keys(":marks<CR>");
         UNSCOPED_INFO("a jump's");
-        REQUIRE(listed[3].find("\n '      2    0 two three") != std::string::npos);
+        CHECK(listed[3].find("\n '      2    0 two three") != std::string::npos);
 
         vim->hooks().listing = nullptr;
         keys(":reg<CR>");
@@ -2101,8 +2070,7 @@ namespace tut
         const size_t asked = heard.size();
         keys("jgf");
         UNSCOPED_INFO("nothing there");
-        REQUIRE(heard.size() == asked);
-        UNSCOPED_INFO("said");
+        CHECK(heard.size() == asked);
         CHECK(vim->message() == std::string("E446: No file name under cursor"));
     }
 
@@ -2171,7 +2139,6 @@ namespace tut
             CHECK(e.document().line(2).compare(0, 2, "//") == 0);
             CHECK(e.document().line(3) == "four;");
         }
-        UNSCOPED_INFO("visual left");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
     }
 
@@ -2181,10 +2148,8 @@ namespace tut
                                "    touch_start(integer n)\n    {\n        y();\n    }\n}\n");
         keys("3G");
         keys("zc");
-        UNSCOPED_INFO("closed");
         CHECK(e.isFolded(2));
         keys("zo");
-        UNSCOPED_INFO("open");
         CHECK_FALSE(e.isFolded(2));
         keys("za");
         UNSCOPED_INFO("za closes");
@@ -2196,12 +2161,9 @@ namespace tut
         UNSCOPED_INFO("every block");
         CHECK(e.isFolded(0));
         keys("zR");
-        {
-            INFO("none");
-            CHECK_FALSE(e.isFolded(0));
-            CHECK_FALSE(e.isFolded(2));
-            CHECK_FALSE(e.isFolded(6));
-        }
+        CHECK_FALSE(e.isFolded(0));
+        CHECK_FALSE(e.isFolded(2));
+        CHECK_FALSE(e.isFolded(6));
         keys("gg");
         keys("zj");
         UNSCOPED_INFO("zj to the next block's start");
@@ -2253,10 +2215,8 @@ namespace tut
         };
         keys("gg");
         keys("z=");
-        UNSCOPED_INFO("offered");
         CHECK(offered == std::vector<std::string>{ "the", "ten" });
         chose(0);
-        UNSCOPED_INFO("picked");
         CHECK(e.document().line(0) == std::string("the cat"));
         keys("z=");
         UNSCOPED_INFO("a word spelled right has none");
@@ -2284,17 +2244,15 @@ namespace tut
     {
         ALCodeEditor& e = make("x a x b x\n");
         keys("/x<CR>");
-        UNSCOPED_INFO("lit");
-        REQUIRE(e.highlights().size() == size_t(3));
+        CHECK(e.highlights().size() == size_t(3));
         keys(":set nohls<CR>");
-        UNSCOPED_INFO("cleared");
-        REQUIRE(e.highlights().empty());
+        CHECK(e.highlights().empty());
         keys("/x<CR>");
         UNSCOPED_INFO("left unlit");
-        REQUIRE(e.highlights().empty());
+        CHECK(e.highlights().empty());
         keys(":set hlsearch<CR>n");
         UNSCOPED_INFO("lit again");
-        REQUIRE(e.highlights().size() == size_t(3));
+        CHECK(e.highlights().size() == size_t(3));
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: gn selects the search's match for an operator; cgn then .; gN back", "[alvimkeymap]")
@@ -2392,8 +2350,8 @@ namespace tut
         keys("A<C-o>");
         {
             INFO("one command waits");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().find("-- (insert) --") != std::string::npos);
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().find("-- (insert) --") != std::string::npos);
         }
         keys("0");
         UNSCOPED_INFO("then inserting");
@@ -2420,21 +2378,21 @@ namespace tut
         ALCodeEditor& e = make("abc\nxyz\nabd\n");
         keys("/ab");
         UNSCOPED_INFO("each match lit as typed");
-        REQUIRE(e.highlights().size() == size_t(2));
+        CHECK(e.highlights().size() == size_t(2));
         UNSCOPED_INFO("the caret where it was");
         CHECK(e.caret() == ALTextPos(0, 0));
         keys("c");
         UNSCOPED_INFO("fewer as it narrows");
-        REQUIRE(e.highlights().size() == size_t(1));
+        CHECK(e.highlights().size() == size_t(1));
         keys("<Esc>");
         {
             INFO("let go of");
-            REQUIRE(e.highlights().empty());
+            CHECK(e.highlights().empty());
             CHECK(e.caret() == ALTextPos(0, 0));
         }
         keys(":set nois<CR>/ab");
         UNSCOPED_INFO("not lit where it is off");
-        REQUIRE(e.highlights().empty());
+        CHECK(e.highlights().empty());
         keys("<Esc>");
     }
 
@@ -2480,10 +2438,8 @@ namespace tut
         UNSCOPED_INFO(":j the line and the next");
         CHECK(flat(e.text()) == std::string("a b|  c|d|"));
         keys(":u<CR>");
-        UNSCOPED_INFO(":u");
         CHECK(flat(e.text()) == std::string("a|  b|  c|d|"));
         keys(":red<CR>");
-        UNSCOPED_INFO(":red");
         CHECK(flat(e.text()) == std::string("a b|  c|d|"));
         keys(":u<CR>:1,3j!<CR>");
         UNSCOPED_INFO(":j! a range, the blanks kept");
@@ -2514,7 +2470,6 @@ namespace tut
         UNSCOPED_INFO(":mark");
         CHECK(e.caret().line == 3);
         keys(":2k w<CR>gg'w");
-        UNSCOPED_INFO(":k");
         CHECK(e.caret().line == 1);
 
         make("x\n   yy\n");
@@ -2558,7 +2513,7 @@ namespace tut
             INFO("listed");
             REQUIRE(listed.size() == 1);
             CHECK(listed[0].compare(0, 21, "change line  col text") == 0);
-            REQUIRE(listed[0].find("\n>    0     3    1 c?") != std::string::npos);
+            CHECK(listed[0].find("\n>    0     3    1 c?") != std::string::npos);
         }
     }
 
@@ -2710,12 +2665,12 @@ namespace tut
         keys("a");
         {
             INFO("round and round is stopped");
-            REQUIRE(vim->message().find("E223") != std::string::npos);
+            CHECK(vim->message().find("E223") != std::string::npos);
             CHECK(vim->messageIsError());
         }
         ex("nunmap zz");
         UNSCOPED_INFO("no such mapping");
-        REQUIRE(vim->message().find("E31") != std::string::npos);
+        CHECK(vim->message().find("E31") != std::string::npos);
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: mappings: macros replay through mappings; :normal maps and :normal! not", "[alvimkeymap]")
@@ -2723,7 +2678,6 @@ namespace tut
         ALCodeEditor& e = make("a\nb\nc\nd\n");
         ex("inoremap jk <Esc>");
         keys("qaAxjkq");
-        UNSCOPED_INFO("typed");
         CHECK(flat(e.text()) == std::string("ax|b|c|d|"));
         UNSCOPED_INFO("the keys as they were typed");
         CHECK(vim->registerText('a') == std::string("Axjk"));
@@ -2751,24 +2705,23 @@ namespace tut
         ex("set ic scs tm=300");
         {
             INFO("all three");
-            REQUIRE(vim->shared().ignoreCase);
-            REQUIRE(vim->shared().smartCase);
+            CHECK(vim->shared().ignoreCase);
+            CHECK(vim->shared().smartCase);
             CHECK(vim->shared().timeoutLength == 300);
         }
         ex("set ic? tm?");
-        UNSCOPED_INFO("shown");
         CHECK(vim->message() == std::string("  ignorecase    timeoutlen=300"));
         ex("set invic scs!");
         {
             INFO("toggled");
-            REQUIRE_FALSE(vim->shared().ignoreCase);
+            CHECK_FALSE(vim->shared().ignoreCase);
             CHECK_FALSE(vim->shared().smartCase);
         }
         ex("set tm=x");
         {
             INFO("a number wanted");
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("E474") != std::string::npos);
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("E474") != std::string::npos);
         }
         ex("set clipboard+=unnamed");
         UNSCOPED_INFO("added to");
@@ -2780,9 +2733,9 @@ namespace tut
         std::string error;
         {
             INFO("tabstop");
-            REQUIRE(ALVimKeymap::setViewOption(e, "ts=2", shown, error));
+            CHECK(ALVimKeymap::setViewOption(e, "ts=2", shown, error));
             CHECK(e.getTabWidth() == 2);
-            REQUIRE(error.empty());
+            CHECK(error.empty());
         }
         {
             INFO("shiftwidth shown");
@@ -2797,7 +2750,7 @@ namespace tut
         {
             INFO("out of reach");
             CHECK(ALVimKeymap::setViewOption(e, "ts=99", shown, error));
-            REQUIRE_FALSE(error.empty());
+            CHECK_FALSE(error.empty());
             CHECK(e.getTabWidth() == 2);
         }
         UNSCOPED_INFO("not a view's");
@@ -2844,9 +2797,8 @@ namespace tut
         }
         const ALVimMappings& maps = shared.mappings;
         UNSCOPED_INFO("<leader>w with the leader a space");
-        REQUIRE(maps.match(ALVimMappings::NORMAL, maps.keysOf("<Space>w"), true).full != nullptr);
-        UNSCOPED_INFO("jk");
-        REQUIRE(maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full != nullptr);
+        CHECK(maps.match(ALVimMappings::NORMAL, maps.keysOf("<Space>w"), true).full != nullptr);
+        CHECK(maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full != nullptr);
         const ALVimMappings::Match y = maps.match(ALVimMappings::VISUAL, maps.keysOf("Y"), true);
         {
             INFO("a line that goes on with a backslash");
@@ -2858,9 +2810,9 @@ namespace tut
         {
             INFO("by their lines");
             CHECK(errors[0].find("line 7:") == 0);
-            REQUIRE(errors[0].find("E492") != std::string::npos);
+            CHECK(errors[0].find("E492") != std::string::npos);
             CHECK(errors[1].find("line 11:") == 0);
-            REQUIRE(errors[1].find("E518") != std::string::npos);
+            CHECK(errors[1].find("E518") != std::string::npos);
         }
 
         std::string listing;
@@ -2871,15 +2823,15 @@ namespace tut
         ALVimKeymap::source(shared, "nnoremap Z zz\n", host, errors);
         {
             INFO("read again, what it made before is gone");
-            REQUIRE(maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full == nullptr);
-            REQUIRE(maps.match(ALVimMappings::NORMAL, maps.keysOf("Z"), true).full != nullptr);
+            CHECK(maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full == nullptr);
+            CHECK(maps.match(ALVimMappings::NORMAL, maps.keysOf("Z"), true).full != nullptr);
         }
         UNSCOPED_INFO("and the leader vim's");
         CHECK(maps.leader() == "\\");
         UNSCOPED_INFO("one typed kept");
-        REQUIRE(maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true).full != nullptr);
+        CHECK(maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true).full != nullptr);
         UNSCOPED_INFO("and the view's options it no longer sets");
-        REQUIRE(shared.viewOptions.empty());
+        CHECK(shared.viewOptions.empty());
         const ALVimKeymap::Shared vims;
         {
             INFO("nor the mode's: those are vim's own again");
@@ -2896,12 +2848,10 @@ namespace tut
     {
         ALCodeEditor& e = make("say hello world\n");
         keys("wysiw)");
-        UNSCOPED_INFO("ysiw)");
         CHECK(flat(e.text()) == std::string("say (hello) world|"));
         UNSCOPED_INFO("the caret on the pair's start");
         CHECK(caretText() == std::string("0:4"));
         keys("ds)");
-        UNSCOPED_INFO("ds)");
         CHECK(flat(e.text()) == std::string("say hello world|"));
         keys("ysiw(");
         UNSCOPED_INFO("ysiw( has spaces inside");
@@ -2911,7 +2861,6 @@ namespace tut
         CHECK(flat(e.text()) == std::string("say hello world|"));
         keys("ysiw\"");
         keys("cs\"'");
-        UNSCOPED_INFO("cs\"'");
         CHECK(flat(e.text()) == std::string("say 'hello' world|"));
         keys("$ysiw]");
         UNSCOPED_INFO("ysiw] on the last word");
@@ -2926,7 +2875,7 @@ namespace tut
         {
             INFO("Escape lets it go");
             CHECK(flat(e.text()) == "[say] 'hello' [world]|");
-            REQUIRE(vim->status().empty());
+            CHECK(vim->status().empty());
         }
         keys("0x.");
         UNSCOPED_INFO("and the next command is one of its own, for . too");
@@ -2971,10 +2920,10 @@ namespace tut
         {
             const std::string before = flat(e.text());
             keys(seq);
-            UNSCOPED_INFO(std::string(seq) + ": none left open");
+            UNSCOPED_INFO(seq << ": none left open");
             REQUIRE_FALSE(e.undoJournal().inGroup());
             keys("u");
-            UNSCOPED_INFO(std::string(seq) + ": one step");
+            UNSCOPED_INFO(seq << ": one step");
             REQUIRE(flat(e.text()) == before);
             keys(seq);
         }
@@ -2998,12 +2947,12 @@ namespace tut
         ex("nmap Q iA<Esc>Q");
         keys("ggQ");
         {
-            INFO("stopped: " + vim->message());
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("E223") != std::string::npos);
+            INFO("stopped: " << vim->message());
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("E223") != std::string::npos);
         }
         UNSCOPED_INFO("having done what it did meanwhile");
-        REQUIRE(e.document().line(0).size() > 100);
+        CHECK(e.document().line(0).size() > 100);
         // Stopped wherever the mapping was -- here in insert mode, as vim
         // leaves it -- and a key typed after goes as typed.
         keys("<Esc>");
@@ -3037,7 +2986,6 @@ namespace tut
         keys(macro.c_str());
         const std::string recorded = e.text();
         keys("0@a");
-        UNSCOPED_INFO("played");
         CHECK(e.text() != recorded);
         keys("u");
         UNSCOPED_INFO("one step back");
@@ -3067,7 +3015,7 @@ namespace tut
         vim = nullptr;
         later("set nonumber", true);
         UNSCOPED_INFO("vim gone: nothing");
-        REQUIRE_FALSE(e.modalKeymap());
+        CHECK_FALSE(e.modalKeymap());
 
         auto keymap = std::make_unique<ALVimKeymap>();
         vim         = keymap.get();
@@ -3136,14 +3084,14 @@ namespace tut
         heard.clear();
         keys("<C-W>x");
         UNSCOPED_INFO("a split there is none of: nothing asked");
-        REQUIRE(heard.empty());
+        CHECK(heard.empty());
         UNSCOPED_INFO("and x not deleting");
         CHECK(flat(e.text()) == "a|");
         keys("<C-W><Esc>x");
         {
             INFO("Escape lets it go; x is x again");
             CHECK(flat(e.text()) == "|");
-            REQUIRE(heard.empty());
+            CHECK(heard.empty());
         }
     }
 
@@ -3152,16 +3100,16 @@ namespace tut
         ALCodeEditor& e = make("one two\n");
         keys("w");
 #if LL_DARWIN
-        UNSCOPED_INFO("taken");
         CHECK(e.handleKeyHere('K', ALVimKeymap::CONTROL));
         UNSCOPED_INFO("and the editor's ^K, to the line's end, not done");
         CHECK(flat(e.text()) == std::string("one two|"));
         UNSCOPED_INFO("^S too");
         CHECK(e.handleKeyHere('S', ALVimKeymap::CONTROL));
 #else
-        { UNSCOPED_INFO("^S on to the window, which saves"); REQUIRE((!e.handleKeyHere('S', ALVimKeymap::CONTROL))); }
+        UNSCOPED_INFO("^S on to the window, which saves");
+        CHECK_FALSE(e.handleKeyHere('S', ALVimKeymap::CONTROL));
         UNSCOPED_INFO("^K on to it, before a second key");
-        REQUIRE((!e.handleKeyHere('K', ALVimKeymap::CONTROL)));
+        CHECK_FALSE(e.handleKeyHere('K', ALVimKeymap::CONTROL));
         UNSCOPED_INFO("nothing changed");
         CHECK(flat(e.text()) == std::string("one two|"));
 #endif
@@ -3175,20 +3123,18 @@ namespace tut
         keys(":set hls<CR>");
         keys("/count<CR>");
         UNSCOPED_INFO("the search lit");
-        REQUIRE_FALSE(e.highlights(H::Search).empty());
+        CHECK_FALSE(e.highlights(H::Search).empty());
         keys(":noh<CR>");
-        UNSCOPED_INFO("put out");
-        REQUIRE(e.highlights(H::Search).empty());
+        CHECK(e.highlights(H::Search).empty());
         UNSCOPED_INFO("the references kept");
-        REQUIRE(e.highlights(H::References).size() == 1);
+        CHECK(e.highlights(H::References).size() == 1);
         keys("gg<C-V>jl");
         UNSCOPED_INFO("the block lit");
-        REQUIRE_FALSE(e.highlights(H::Block).empty());
+        CHECK_FALSE(e.highlights(H::Block).empty());
         keys("<Esc>");
-        UNSCOPED_INFO("put out");
-        REQUIRE(e.highlights(H::Block).empty());
+        CHECK(e.highlights(H::Block).empty());
         UNSCOPED_INFO("the references kept still");
-        REQUIRE(e.highlights(H::References).size() == 1);
+        CHECK(e.highlights(H::References).size() == 1);
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: :g visits lines top down; d s > < under it and . @ maps are one edit", "[alvimkeymap]")
@@ -3236,7 +3182,6 @@ namespace tut
         e.setText("x a a\ny a\nx a\n");
         edits = 0;
         keys(":g/x/s/a/b/g<CR>");
-        UNSCOPED_INFO("substituted");
         CHECK(flat(e.text()) == std::string("x b b|y a|x b|"));
         UNSCOPED_INFO("in one edit");
         CHECK(edits == 1);
@@ -3275,7 +3220,6 @@ namespace tut
         CHECK(flat(e.text()) == std::string("b b b|"));
         UNSCOPED_INFO("the first, then the rest in one edit");
         CHECK(edits == 2);
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("3 substitutions on 1 line"));
 
         e.setText("one\ntwo\nthree\n");
@@ -3289,14 +3233,12 @@ namespace tut
         keys("ggqaAxyz<Esc>q");
         edits = 0;
         keys("jj@a");
-        UNSCOPED_INFO("played");
         CHECK(flat(e.text()) == std::string("onehelloxyz|twohello|threexyz|"));
         UNSCOPED_INFO("in one edit");
         CHECK(edits == 1);
         ex("inoremap ;h hi there");
         edits = 0;
         keys("A;h<Esc>");
-        UNSCOPED_INFO("mapped");
         CHECK(flat(e.text()) == std::string("onehelloxyz|twohello|threexyzhi there|"));
         UNSCOPED_INFO("in one edit");
         CHECK(edits == 1);
@@ -3352,33 +3294,33 @@ namespace tut
         UNSCOPED_INFO("again on the next line");
         CHECK(flat(e.text()) == std::string("x    one|x    two|"));
         keys("0wgI");
-        UNSCOPED_INFO("in insert mode");
         CHECK(vim->inserting());
     }
+
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: every change of what the band shows moves the generation", "[alvimkeymap]")
     {
         make("one\ntwo\n");
         U32 was = vim->generation();
-        const auto moved = [&](const std::string& what) {
-            UNSCOPED_INFO(what);
+        const auto require_moved = [&](const std::string& what) {
+            INFO(what);
             REQUIRE(vim->generation() != was);
             was = vim->generation();
         };
         keys(":");
-        moved("the line opened");
+        require_moved("the line opened");
         for (const char* key : { "s", "/", "o", "/", "x" })
         {
             keys(key);
-            moved(std::string("typed ") + key);
+            require_moved(std::string("typed ") + key);
         }
         keys("<BS>");
-        moved("a character taken back");
+        require_moved("a character taken back");
         keys("<Esc>");
-        moved("the line closed");
+        require_moved("the line closed");
         keys("/nothing-here<CR>");
-        moved("a pattern not found said");
+        require_moved("a pattern not found said");
         keys("j");
-        moved("the message cleared by a key");
+        require_moved("the message cleared by a key");
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: a spelling search out of time says so and goes on from there next time", "[alvimkeymap]")
@@ -3388,7 +3330,6 @@ namespace tut
         e.setSpellCheck(true);
         ll_test::TextViewProbe::misspellingBudget(e, 0.f);
         keys("]s");
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("Still checking the spelling: search again to go on"));
         UNSCOPED_INFO("not moved");
         CHECK(e.caret() == ALTextPos(0, 0));
@@ -3430,7 +3371,6 @@ namespace tut
             CHECK(lit() == 4);
         }
         ex("noh");
-        UNSCOPED_INFO("put out");
         CHECK(lit() == 0);
         keys("n");
         {
@@ -3583,13 +3523,13 @@ namespace tut
         keys(">3j");
         {
             INFO("shifted");
-            REQUIRE(e.document().line(0).size() > 1);
-            REQUIRE(e.document().line(3).size() > 1);
+            CHECK(e.document().line(0).size() > 1);
+            CHECK(e.document().line(3).size() > 1);
         }
         UNSCOPED_INFO("a line of blanks too");
-        REQUIRE(e.document().line(1).size() > 2);
+        CHECK(e.document().line(1).size() > 2);
         UNSCOPED_INFO("an empty one not");
-        REQUIRE(e.document().line(2).empty());
+        CHECK(e.document().line(2).empty());
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: a register holding what gg and gc once stood for plays them as text", "[alvimkeymap]")
@@ -3621,8 +3561,7 @@ namespace tut
         auto keymap    = std::make_unique<ALVimKeymap>();
         ALVimKeymap* v = keymap.get();
         view->setModalKeymap(std::move(keymap));
-        UNSCOPED_INFO("no host");
-        REQUIRE(view->vimHost() == nullptr);
+        CHECK(view->vimHost() == nullptr);
         // As the viewer types: the key first, then the character.
         const auto type = [&](const char* text) {
             for (const char* c = text; *c; ++c)
@@ -3634,10 +3573,8 @@ namespace tut
             }
         };
         v->takeLine(*view, '/', "x", true);
-        UNSCOPED_INFO("searched");
         CHECK(view->caret() == ALTextPos(1, 2));
         type("n");
-        UNSCOPED_INFO("n");
         CHECK(view->caret() == ALTextPos(3, 0));
         view->setCaret(ALTextPos(0, 5));
         type("%");
@@ -3653,8 +3590,9 @@ namespace tut
     {
         ALCodeEditor& e = make("zero\none\ntwo\nthree\n");
         e.setLineNumberBase(-1);
+        e.setLineNumberBase(-5);
         UNSCOPED_INFO("no lower than -1");
-        CHECK((e.setLineNumberBase(-5), e.lineNumberBase()) == -1);
+        CHECK(e.lineNumberBase() == -1);
         keys("2G");
         UNSCOPED_INFO("2G the third line");
         CHECK(e.caret().line == 2);
@@ -3684,15 +3622,14 @@ namespace tut
         keys("75G");
         keys("?line 40");
         const S32 shown = e.layout().lineTop(44) - e.scrollY();
-        UNSCOPED_INFO("shown below the two pinned headers as it is typed: " + std::to_string(shown) + " of " + std::to_string(row_h));
+        UNSCOPED_INFO("shown below the two pinned headers as it is typed: " << shown << " of " << row_h);
         CHECK(shown >= 2 * row_h);
         UNSCOPED_INFO("the caret where it was");
         CHECK(e.caret().line == 74);
         keys("<CR>");
         const S32 below = e.layout().lineTop(44) - e.scrollY();
-        UNSCOPED_INFO("gone to");
         CHECK(e.caret().line == 44);
-        UNSCOPED_INFO("and below them there: " + std::to_string(below) + " of " + std::to_string(row_h));
+        UNSCOPED_INFO("and below them there: " << below << " of " << row_h);
         CHECK(below >= 2 * row_h);
     }
 
@@ -3714,7 +3651,6 @@ namespace tut
         keys("3iX<Esc>");
         UNSCOPED_INFO("once at each, the count's again at the main one only");
         CHECK(e.text() == std::string("Xabone\nXabtwo\nXXXabthree"));
-        UNSCOPED_INFO("one caret");
         CHECK_FALSE(e.hasOtherSelections());
     }
 
@@ -3734,7 +3670,6 @@ namespace tut
         CHECK(e.text() == std::string("Qxone\nQxtwo"));
         keys("<Esc>");
         keys("u");
-        UNSCOPED_INFO("undone");
         CHECK(e.text() == std::string("jxone\njxtwo"));
         UNSCOPED_INFO("one caret in normal mode after it");
         CHECK_FALSE(e.hasOtherSelections());
@@ -3783,14 +3718,14 @@ namespace tut
         {
             const std::string what(typed);
             keys(typed);
-            UNSCOPED_INFO(what + " leaves the text as it was");
+            UNSCOPED_INFO(what << " leaves the text as it was");
             REQUIRE(flat(e.text()) == std::string("foo bar|"));
             {
-                INFO(what + ": normal mode, nothing pending");
+                INFO(what << ": normal mode, nothing pending");
                 REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
                 REQUIRE(vim->status().empty());
             }
-            UNSCOPED_INFO(what + ": the caret where it was");
+            UNSCOPED_INFO(what << ": the caret where it was");
             REQUIRE(e.caret() == ALTextPos(0, 0));
         }
     }
@@ -3915,7 +3850,6 @@ namespace tut
     {
         ALCodeEditor& e = make("a\nTODO 1\nb\nc\nTODO 2\nd\ne\n");
         keys(":g/TODO/.,+1d<CR>");
-        UNSCOPED_INFO("no error");
         CHECK_FALSE(vim->messageIsError());
         UNSCOPED_INFO("each match and the line after it gone");
         CHECK(flat(e.text()) == std::string("a|c|e|"));
@@ -4141,8 +4075,8 @@ namespace tut
         keys("A<C-o>ox<Esc>");
         {
             INFO("normal mode after one Escape");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().find("-- (insert) --") == std::string::npos);
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().find("-- (insert) --") == std::string::npos);
         }
         UNSCOPED_INFO("the line opened and typed on");
         CHECK(flat(e.text()) == std::string("abc|x|"));
@@ -4186,12 +4120,12 @@ namespace tut
         make("ab\ncd\nef\n");
         keys("l<C-v>j:<Esc>");
         UNSCOPED_INFO("the block put out");
-        REQUIRE(editor->highlights(ALCodeEditor::Highlight::Block).empty());
+        CHECK(editor->highlights(ALCodeEditor::Highlight::Block).empty());
         keys("gv");
         {
             INFO("gv selects the block again");
             CHECK(vim->mode() == ALVimKeymap::Mode::VisualBlock);
-            REQUIRE(editor->highlights(ALCodeEditor::Highlight::Block).size() == 2);
+            CHECK(editor->highlights(ALCodeEditor::Highlight::Block).size() == 2);
         }
         keys("<Esc>");
     }
@@ -4203,7 +4137,7 @@ namespace tut
         UNSCOPED_INFO("q: opens the : line");
         CHECK(vim->mode() == ALVimKeymap::Mode::Command);
         UNSCOPED_INFO("the block put out");
-        REQUIRE(e.highlights(ALCodeEditor::Highlight::Block).empty());
+        CHECK(e.highlights(ALCodeEditor::Highlight::Block).empty());
         keys("<Esc>gv");
         UNSCOPED_INFO("gv selects it again");
         CHECK(vim->mode() == ALVimKeymap::Mode::VisualBlock);
@@ -4222,7 +4156,7 @@ namespace tut
         {
             INFO("insert mode puts the block out");
             CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(editor->highlights(ALCodeEditor::Highlight::Block).empty());
+            CHECK(editor->highlights(ALCodeEditor::Highlight::Block).empty());
         }
         keys("gv");
         UNSCOPED_INFO("and keeps it for gv");
@@ -4234,7 +4168,7 @@ namespace tut
         {
             INFO("an asking g& over a block puts it out");
             CHECK(vim->mode() == ALVimKeymap::Mode::Confirm);
-            REQUIRE(editor->highlights(ALCodeEditor::Highlight::Block).empty());
+            CHECK(editor->highlights(ALCodeEditor::Highlight::Block).empty());
         }
         keys("qgv");
         UNSCOPED_INFO("and keeps it for gv after");
@@ -4265,11 +4199,10 @@ namespace tut
 
         make("a a\n");
         keys(":s/a/b/gc<CR>");
-        UNSCOPED_INFO("asking");
         CHECK(vim->mode() == ALVimKeymap::Mode::Confirm);
         vim->takeLine(*editor, ':', "s/a/c/", true);
         UNSCOPED_INFO("the matches still to come put out");
-        REQUIRE(editor->highlights(ALCodeEditor::Highlight::Confirm).empty());
+        CHECK(editor->highlights(ALCodeEditor::Highlight::Confirm).empty());
         UNSCOPED_INFO("the line run once the asking ended");
         CHECK(editor->document().line(0) == std::string("c a"));
 
@@ -4290,8 +4223,8 @@ namespace tut
         keys("p");
         {
             INFO("a register never set: E353");
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("E353") != std::string::npos);
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("E353") != std::string::npos);
         }
         keys("jyyp");
         UNSCOPED_INFO("an empty line is something to put");
@@ -4443,7 +4376,6 @@ namespace tut
     {
         ALCodeEditor& e = make("abc\ndef\nghi\n");
         keys("A!<Esc>jj0vgi");
-        UNSCOPED_INFO("still visual");
         CHECK(vim->mode() == ALVimKeymap::Mode::Visual);
         UNSCOPED_INFO("the caret where inserting stopped");
         CHECK(caretText() == std::string("0:4"));
@@ -4469,8 +4401,8 @@ namespace tut
         CHECK(flat(e.text()) == std::string("foo two|"));
         {
             INFO("normal mode, nothing pending");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         UNSCOPED_INFO("what it took in the register");
         CHECK(vim->registerText('"') == std::string("one "));
@@ -4521,18 +4453,17 @@ namespace tut
     {
         ALCodeEditor& e = make("one two\n");
         keys("d/o");
-        UNSCOPED_INFO("the search line");
         CHECK(vim->mode() == ALVimKeymap::Mode::Search);
         UNSCOPED_INFO("each match lit as typed");
-        REQUIRE(e.highlights(ALCodeEditor::Highlight::Search).size() == size_t(2));
+        CHECK(e.highlights(ALCodeEditor::Highlight::Search).size() == size_t(2));
         keys("<Esc>");
         {
             INFO("let go of, the operator with it");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         UNSCOPED_INFO("the matches put out");
-        REQUIRE(e.highlights(ALCodeEditor::Highlight::Search).empty());
+        CHECK(e.highlights(ALCodeEditor::Highlight::Search).empty());
         UNSCOPED_INFO("nothing taken");
         CHECK(flat(e.text()) == std::string("one two|"));
         keys("x");
@@ -4546,13 +4477,13 @@ namespace tut
         keys("d/zzz<CR>");
         {
             INFO("not found, and said");
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("Pattern not found: zzz") != std::string::npos);
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("Pattern not found: zzz") != std::string::npos);
         }
         {
             INFO("the operator let go of");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         UNSCOPED_INFO("nothing taken");
         CHECK(flat(e.text()) == std::string("e two|"));
@@ -4564,7 +4495,6 @@ namespace tut
     {
         ALCodeEditor& e = make("a foo b bar c foo d bar\n");
         keys("d/foo<CR>");
-        UNSCOPED_INFO("d/foo");
         CHECK(flat(e.text()) == std::string("foo b bar c foo d bar|"));
         keys("/bar<CR>.");
         UNSCOPED_INFO(". up to the next foo, not the next bar");
@@ -4590,8 +4520,8 @@ namespace tut
         keys("3/<Esc>");
         {
             INFO("Escape: nothing pending");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         keys("x");
         UNSCOPED_INFO("x after it takes one character, not three");
@@ -4599,8 +4529,8 @@ namespace tut
         keys("3/<BS>");
         {
             INFO("a backspace on the empty line: nothing pending");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         keys("x");
         UNSCOPED_INFO("one character again");
@@ -4639,8 +4569,8 @@ namespace tut
         ex("put x");
         {
             INFO("a register never set: E353");
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("E353") != std::string::npos);
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("E353") != std::string::npos);
         }
         UNSCOPED_INFO("and nothing put");
         CHECK(flat(e.text()) == std::string("a||b|"));
@@ -4860,8 +4790,8 @@ namespace tut
         CHECK(flat(e.text()) == std::string("foo baz|"));
         {
             INFO("normal mode, nothing pending");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         UNSCOPED_INFO("what it took in the register");
         CHECK(vim->registerText('"') == std::string("foo bar "));
@@ -4921,8 +4851,8 @@ namespace tut
         keys("d*");
         {
             INFO("no word under the caret: the operator let go of");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         UNSCOPED_INFO("nothing taken");
         CHECK(flat(editor->text()) == std::string("foo   |bar|"));
@@ -4951,16 +4881,16 @@ namespace tut
             e.setCaret(ALTextPos(1, 3));
             keys(typed);
             {
-                INFO(what + ": normal mode, nothing pending");
+                INFO(what << ": normal mode, nothing pending");
                 REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
                 REQUIRE(vim->status().empty());
             }
-            UNSCOPED_INFO(what + ": nothing changed");
+            UNSCOPED_INFO(what << ": nothing changed");
             REQUIRE(flat(e.text()) == text);
-            UNSCOPED_INFO(what + ": the register as it was");
+            UNSCOPED_INFO(what << ": the register as it was");
             REQUIRE(vim->registerText('"') == std::string("THREE "));
             const std::string caret = what.find("gi") != std::string::npos ? "2:3" : what == "dgI" ? "1:0" : "1:3";
-            UNSCOPED_INFO(what + ": the caret");
+            UNSCOPED_INFO(what << ": the caret");
             REQUIRE(caretText() == caret);
         }
         e.setCaret(ALTextPos(1, 3));
@@ -4992,8 +4922,8 @@ namespace tut
         CHECK(flat(e.text()) == std::string("e two|three four|"));
         {
             INFO("normal mode, nothing pending");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         UNSCOPED_INFO("the caret where it began");
         CHECK(caretText() == std::string("0:0"));
@@ -5011,7 +4941,6 @@ namespace tut
         keys("cgvX<Esc>");
         UNSCOPED_INFO("cgv changes it");
         CHECK(flat(editor->text()) == std::string("one Xo|three four|"));
-        UNSCOPED_INFO("back in normal mode");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
 
         make("one two\nthree four\n");
@@ -5467,23 +5396,19 @@ namespace tut
         make("f(x) y\n");
         editor->setCaret(ALTextPos(0, 1));
         keys("d%");
-        UNSCOPED_INFO("d%");
         CHECK(vim->registerText('1') == std::string("(x)"));
 
         make("foo bar\n");
         editor->setCaret(ALTextPos(0, 4));
         keys("d{");
-        UNSCOPED_INFO("d{");
         CHECK(vim->registerText('1') == std::string("foo "));
 
         make("foo bar\n");
         keys("4|ma0d`a");
-        UNSCOPED_INFO("d`a");
         CHECK(vim->registerText('1') == std::string("foo"));
 
         make("foo bar foo\n");
         keys("d*");
-        UNSCOPED_INFO("d*");
         CHECK(vim->registerText('1') == std::string("foo bar "));
 
         make("a foo\n");
@@ -5540,7 +5465,6 @@ namespace tut
         CHECK(caretText() == std::string("0:1"));
         editor->setCaret(ALTextPos(0, 7));
         keys("g~g~");
-        UNSCOPED_INFO("g~g~");
         CHECK(editor->document().line(0) == std::string("   ABC DEF"));
         UNSCOPED_INFO("the caret to the first non-blank");
         CHECK(caretText() == std::string("0:3"));
@@ -5614,8 +5538,8 @@ namespace tut
         CHECK(flat(e.text()) == std::string("ee four|"));
         {
             INFO("normal mode, nothing pending");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         e.setText("three four\n");
         e.setCaret(ALTextPos(0, 3));
@@ -6204,12 +6128,12 @@ namespace tut
         {
             const std::string what(typed);
             keys(typed);
-            UNSCOPED_INFO(what + " on the last line: nothing changed");
+            UNSCOPED_INFO(what << " on the last line: nothing changed");
             REQUIRE(flat(e.text()) == std::string("a|b|c"));
-            UNSCOPED_INFO(what + ": nothing kept");
+            UNSCOPED_INFO(what << ": nothing kept");
             REQUIRE(vim->registerText('"') == std::string("a"));
             {
-                INFO(what + ": normal mode, nothing pending");
+                INFO(what << ": normal mode, nothing pending");
                 REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
                 REQUIRE(vim->status().empty());
             }
@@ -6234,16 +6158,16 @@ namespace tut
     {
         ALCodeEditor& e = make("\nabc\n");
         keys("\"xyiwjl\"xp");
-        UNSCOPED_INFO("nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         UNSCOPED_INFO("nothing put");
         CHECK(flat(e.text()) == std::string("|abc|"));
         UNSCOPED_INFO("the caret where it was");
         CHECK(caretText() == std::string("1:1"));
         keys("\"x3P");
         {
-            INFO("3P neither: " + vim->message());
-            REQUIRE(vim->message().empty());
+            INFO("3P neither: " << vim->message());
+            CHECK(vim->message().empty());
             CHECK(flat(e.text()) == "|abc|");
         }
         ex("put x");
@@ -6254,14 +6178,14 @@ namespace tut
         keys("\"zp");
         {
             INFO("a register never set: E353");
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("E353") != std::string::npos);
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("E353") != std::string::npos);
         }
 
         make("\nabc\n");
         keys("ciw<Esc>jp");
-        UNSCOPED_INFO("ciw on an empty line, then p: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("ciw on an empty line, then p: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         UNSCOPED_INFO("and nothing put");
         CHECK(flat(editor->text()) == std::string("|abc|"));
     }
@@ -6270,39 +6194,36 @@ namespace tut
     {
         ALCodeEditor& e = make("a\nb\nc\nd\ne\nf\n");
         keys("2yy");
-        UNSCOPED_INFO("2yy: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("2yy: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("3yy");
-        UNSCOPED_INFO("3yy");
         CHECK(vim->message() == std::string("3 lines yanked"));
         keys("2dd");
-        UNSCOPED_INFO("2dd: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("2dd: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         UNSCOPED_INFO("the two gone");
         CHECK(flat(e.text()) == std::string("c|d|e|f|"));
         keys("3dd");
-        UNSCOPED_INFO("3dd");
         CHECK(vim->message() == std::string("3 fewer lines"));
 
         make("a\nb\nc\n");
         keys("2>>");
-        UNSCOPED_INFO("2>>: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("2>>: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("3>>");
-        UNSCOPED_INFO("3>>");
         CHECK(vim->message() == std::string("3 lines >ed 1 time"));
 
         make("x\nx\ny\n");
         keys(":g/x/d<CR>");
-        UNSCOPED_INFO("two lines taken by :g: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("two lines taken by :g: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         UNSCOPED_INFO("both gone");
         CHECK(flat(editor->text()) == std::string("y|"));
 
         make("a a\nb\n");
         keys(":s/a/b/g<CR>");
-        UNSCOPED_INFO("two substitutions: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("two substitutions: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         UNSCOPED_INFO("both made");
         CHECK(flat(editor->text()) == std::string("b b|b|"));
     }
@@ -6311,7 +6232,6 @@ namespace tut
     {
         ALCodeEditor& e = make("one two three four\n");
         keys("$yiwbviw2p");
-        UNSCOPED_INFO("viw2p");
         CHECK(flat(e.text()) == std::string("one two fourfour four|"));
         UNSCOPED_INFO("the caret on the last character put");
         CHECK(caretText() == std::string("0:15"));
@@ -6479,7 +6399,6 @@ namespace tut
 
         make("abcdef\nx\nabcdefghij\n");
         keys("$2\"aj");
-        UNSCOPED_INFO("$ then 2\"aj");
         CHECK(caretText() == std::string("2:9"));
     }
 
@@ -6505,8 +6424,8 @@ namespace tut
         CHECK(caretText() == std::string("2:1"));
         {
             INFO("normal mode, nothing pending");
-            REQUIRE(vim->mode() == ALVimKeymap::Mode::Normal);
-            REQUIRE(vim->status().empty());
+            CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
+            CHECK(vim->status().empty());
         }
         keys("d9gk");
         UNSCOPED_INFO("d9gk: nothing taken");
@@ -6529,7 +6448,7 @@ namespace tut
         UNSCOPED_INFO("d99g$ runs out of rows and fails, nothing taken");
         CHECK(w.document().line(0) == line);
         UNSCOPED_INFO("the caret at the end of the last row all the same");
-        REQUIRE(caretText() == "0:" + std::to_string(line.size() - 1));
+        CHECK(caretText() == "0:" + std::to_string(line.size() - 1));
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: a counted g$ over wrapped rows wants line ends as $ does; g$ alone not", "[alvimkeymap]")
@@ -6587,14 +6506,14 @@ namespace tut
         UNSCOPED_INFO("100002J: the last line left");
         CHECK(editor->document().lineCount() == 2);
         UNSCOPED_INFO("the rest one line");
-        REQUIRE(editor->document().line(0).size() == size_t(200003));
+        CHECK(editor->document().line(0).size() == size_t(200003));
 
         make(text.c_str());
         keys("VGJ");
         UNSCOPED_INFO("VGJ: every line one");
         CHECK(editor->document().lineCount() == 1);
         UNSCOPED_INFO("all of them");
-        REQUIRE(editor->document().line(0).size() == size_t(200005));
+        CHECK(editor->document().line(0).size() == size_t(200005));
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: * keeps its word whole for :s// :g// and n; * and g* go by ignorecase", "[alvimkeymap]")
@@ -6667,13 +6586,13 @@ namespace tut
         const std::string typed(10001, 'x');
         keys(("qai" + typed + "<Esc>q").c_str());
         UNSCOPED_INFO("recorded, typed once");
-        REQUIRE(e.document().line(0).size() == static_cast<size_t>(10001));
+        CHECK(e.document().line(0).size() == static_cast<size_t>(10001));
         ex("nmap Q x");
         keys("@a");
-        UNSCOPED_INFO("no recursive mapping said: " + vim->message());
+        UNSCOPED_INFO("no recursive mapping said: " << vim->message());
         CHECK_FALSE(vim->messageIsError());
         UNSCOPED_INFO("played whole");
-        REQUIRE(e.document().line(0).size() == static_cast<size_t>(20002));
+        CHECK(e.document().line(0).size() == static_cast<size_t>(20002));
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: a visual count> too large says so and shifts nothing; else the levels", "[alvimkeymap]")
@@ -6683,9 +6602,9 @@ namespace tut
         e.setTabWidth(4);
         keys("VG99999>");
         {
-            INFO("said: " + vim->message());
-            REQUIRE(vim->messageIsError());
-            REQUIRE(vim->message().find("Too large a count") != std::string::npos);
+            INFO("said: " << vim->message());
+            CHECK(vim->messageIsError());
+            CHECK(vim->message().find("Too large a count") != std::string::npos);
         }
         UNSCOPED_INFO("nothing shifted");
         CHECK(flat(e.text()) == std::string("a|b|c|d|e|f|g|h|i|j|k|"));
@@ -6741,15 +6660,12 @@ namespace tut
         CHECK(flat(editor->text()) == std::string("c|a|b|c|"));
         make("a\nxb\nc\n");
         ex("gl/x/d");
-        UNSCOPED_INFO(":gl");
         CHECK(flat(editor->text()) == std::string("a|c|"));
         make("a\nxb\nc\n");
         ex("vg/x/d");
-        UNSCOPED_INFO(":vg");
         CHECK(flat(editor->text()) == std::string("xb|"));
         make("aa\n");
         ex("su/a/b/");
-        UNSCOPED_INFO(":su");
         CHECK(flat(editor->text()) == std::string("ba|"));
         make("a\nb\n");
         ex("ya");
@@ -6761,7 +6677,7 @@ namespace tut
         ex("und");
         UNSCOPED_INFO(":und undoes");
         CHECK(flat(editor->text()) == std::string("a|"));
-        UNSCOPED_INFO("none of them unknown: " + vim->message());
+        UNSCOPED_INFO("none of them unknown: " << vim->message());
         CHECK_FALSE(vim->messageIsError());
         make("a\nb\n");
         keys("gg");
@@ -7335,20 +7251,17 @@ namespace tut
     {
         make("one\ntwo\nthree\nfour\nfive\nsix\n");
         keys("\"a3yy");
-        UNSCOPED_INFO("\"a3yy");
         CHECK(vim->message() == std::string("3 lines yanked into \"a"));
         keys("\"A3yy");
-        UNSCOPED_INFO("\"A3yy");
         CHECK(vim->message() == std::string("3 lines yanked into \"A"));
         keys("\"\"3yy");
-        UNSCOPED_INFO("\"\"3yy");
         CHECK(vim->message() == std::string("3 lines yanked into \"\""));
         keys("\"a2yy");
-        UNSCOPED_INFO("\"a2yy: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("\"a2yy: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("\"_3yy");
-        UNSCOPED_INFO("\"_3yy: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("\"_3yy: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
 
         keys("<C-v>2jy");
         UNSCOPED_INFO("a block of three lines");
@@ -7357,8 +7270,8 @@ namespace tut
         UNSCOPED_INFO("into a register");
         CHECK(vim->message() == std::string("block of 3 lines yanked into \"b"));
         keys("<C-v>jy");
-        UNSCOPED_INFO("a block of two: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("a block of two: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
 
         editor->setCaret(ALTextPos(0, 1));
         keys("v2jy");
@@ -7368,8 +7281,8 @@ namespace tut
         UNSCOPED_INFO("into a register");
         CHECK(vim->message() == std::string("3 lines yanked into \"a"));
         keys("vjy");
-        UNSCOPED_INFO("over two: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("over two: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("v$jjy");
         UNSCOPED_INFO("through the third line's break, the fourth counted");
         CHECK(vim->message() == std::string("4 lines yanked"));
@@ -7377,8 +7290,8 @@ namespace tut
         UNSCOPED_INFO("y/four from the first line's second character: three lines");
         CHECK(vim->message() == std::string("3 lines yanked"));
         keys("y/three<CR>");
-        UNSCOPED_INFO("y/three: two, nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("y/three: two, nothing said: " << vim->message());
+        CHECK(vim->message().empty());
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: puts and case = and :m over more than two lines report as vim does", "[alvimkeymap]")
@@ -7386,20 +7299,18 @@ namespace tut
         const char* text = "one\ntwo\nthree\nfour\nfive\nsix\n";
         make(text);
         keys("gg3yyp");
-        UNSCOPED_INFO("3yyp");
         CHECK(vim->message() == std::string("3 more lines"));
         keys("uggyy3p");
-        UNSCOPED_INFO("yy3p");
         CHECK(vim->message() == std::string("3 more lines"));
         keys("ugg2yyp");
-        UNSCOPED_INFO("2yyp: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("2yyp: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("uggv$y3p");
         UNSCOPED_INFO("three of a line's characters and its break");
         CHECK(vim->message() == std::string("3 more lines"));
         keys("uggv$y2p");
-        UNSCOPED_INFO("two of them: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("two of them: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("u:1,3y<CR>:put<CR>");
         UNSCOPED_INFO(":put of three lines");
         CHECK(vim->message() == std::string("3 more lines"));
@@ -7409,45 +7320,38 @@ namespace tut
         UNSCOPED_INFO("a block's rows put past the last line");
         CHECK(vim->message() == std::string("3 more lines"));
         keys("uggp");
-        UNSCOPED_INFO("a block put over lines there are: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("a block put over lines there are: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
 
         make(text);
         keys("g~2j");
-        UNSCOPED_INFO("g~2j");
         CHECK(vim->message() == std::string("3 lines changed"));
         keys("ugggUj");
-        UNSCOPED_INFO("gUj: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("gUj: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("ugg3gUU");
-        UNSCOPED_INFO("3gUU");
         CHECK(vim->message() == std::string("3 lines changed"));
         keys("uggV2jU");
-        UNSCOPED_INFO("V2jU");
         CHECK(vim->message() == std::string("3 lines changed"));
         keys("uggv2j~");
-        UNSCOPED_INFO("v2j~");
         CHECK(vim->message() == std::string("3 lines changed"));
         keys("u");
 
         vim->hooks().format = [](ALTextView&, S32, S32) {};
         keys("gg=2j");
-        UNSCOPED_INFO("=2j");
         CHECK(vim->message() == std::string("3 lines indented"));
         keys("=j");
-        UNSCOPED_INFO("=j: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("=j: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("3==");
-        UNSCOPED_INFO("3==");
         CHECK(vim->message() == std::string("3 lines indented"));
 
         ex("1,3m$");
-        UNSCOPED_INFO(":1,3m$");
         CHECK(vim->message() == std::string("3 lines moved"));
         keys("u");
         ex("1,2m$");
-        UNSCOPED_INFO(":1,2m$: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO(":1,2m$: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("u");
         ex("1,3t$");
         UNSCOPED_INFO(":1,3t$ copies three");
@@ -7456,8 +7360,8 @@ namespace tut
         keys(":g/three/.,+2m0<CR>");
         UNSCOPED_INFO("moved by a :g");
         CHECK(flat(editor->text()) == std::string("three|four|five|one|two|six|"));
-        UNSCOPED_INFO(":m under a :g: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO(":m under a :g: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: more than two substitutions on one line are said only when typed", "[alvimkeymap]")
@@ -7470,21 +7374,21 @@ namespace tut
         keys("u@q");
         UNSCOPED_INFO("the macro made them");
         CHECK(flat(editor->text()) == std::string("b b b|x|"));
-        UNSCOPED_INFO("played from a macro: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("played from a macro: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("ugg@:");
         UNSCOPED_INFO("@: made them");
         CHECK(flat(editor->text()) == std::string("b b b|x|"));
-        UNSCOPED_INFO("run again by @:: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("run again by @:: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("ug&");
         UNSCOPED_INFO("g& typed");
         CHECK(vim->message() == std::string("3 substitutions on 1 line"));
         keys("u:g/a/s/a/b/g<CR>");
         UNSCOPED_INFO("a :g made them");
         CHECK(flat(editor->text()) == std::string("b b b|x|"));
-        UNSCOPED_INFO("under a :g over one line: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("under a :g over one line: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
 
         make("a a\na a\n");
         keys("qq:%s/a/b/g<CR>q");
@@ -7501,19 +7405,14 @@ namespace tut
             keys(sequence);
             return caretText();
         };
-        UNSCOPED_INFO("yy");
         CHECK(yank_from(1, 5, "yy") == std::string("1:5"));
-        UNSCOPED_INFO("2yy");
         CHECK(yank_from(1, 5, "2yy") == std::string("1:5"));
-        UNSCOPED_INFO("Y");
         CHECK(yank_from(1, 5, "Y") == std::string("1:5"));
-        UNSCOPED_INFO("yj");
         CHECK(yank_from(1, 5, "yj") == std::string("1:5"));
         UNSCOPED_INFO("yk: where k went");
         CHECK(yank_from(1, 5, "yk") == std::string("0:5"));
         UNSCOPED_INFO("y-: where - went");
         CHECK(yank_from(1, 5, "y-") == std::string("0:2"));
-        UNSCOPED_INFO("ygg");
         CHECK(yank_from(1, 5, "ygg") == std::string("0:2"));
         UNSCOPED_INFO("yip: the paragraph's start");
         CHECK(yank_from(1, 5, "yip") == std::string("0:0"));
@@ -7525,9 +7424,7 @@ namespace tut
         CHECK(yank_from(1, 5, "Vjy") == std::string("1:0"));
         UNSCOPED_INFO("Vky: the caret, above the lines selected from");
         CHECK(yank_from(1, 5, "Vky") == std::string("0:5"));
-        UNSCOPED_INFO("vjY");
         CHECK(yank_from(1, 5, "vjY") == std::string("1:0"));
-        UNSCOPED_INFO("vkY");
         CHECK(yank_from(1, 5, "vkY") == std::string("0:5"));
         e.setCaret(ALTextPos(0, 5));
         ex("2,4y");
@@ -7661,7 +7558,6 @@ namespace tut
         make(text);
         editor->setCaret(ALTextPos(1, 1));
         ex("y a");
-        UNSCOPED_INFO(":y a");
         CHECK(vim->registerText('a') == std::string("two"));
         UNSCOPED_INFO("the caret left where it was");
         CHECK(caretText() == std::string("1:1"));
@@ -7676,7 +7572,6 @@ namespace tut
         ex("y 3");
         UNSCOPED_INFO(":y 3: a count, not register 3");
         CHECK(vim->registerText('0') == std::string("two\nthree\nfour"));
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("3 lines yanked"));
         ex("y \"x");
         UNSCOPED_INFO("a \" begins a comment");
@@ -7684,11 +7579,9 @@ namespace tut
         UNSCOPED_INFO("and names no register");
         CHECK(vim->registerText('x') == std::string());
         ex("d x 3");
-        UNSCOPED_INFO(":d x 3");
         CHECK(flat(editor->text()) == std::string("one|five|six"));
         UNSCOPED_INFO("into x");
         CHECK(vim->registerText('x') == std::string("two\nthree\nfour"));
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("3 fewer lines"));
         ex("d 2");
         UNSCOPED_INFO(":d 2 from the caret's line");
@@ -7699,7 +7592,7 @@ namespace tut
         ex("d a b");
         {
             INFO("more after the register");
-            REQUIRE(vim->messageIsError());
+            CHECK(vim->messageIsError());
             CHECK(vim->message() == "E488: Trailing characters: b");
         }
         UNSCOPED_INFO("takes nothing");
@@ -7707,7 +7600,7 @@ namespace tut
         ex("y a 3l");
         {
             INFO("more after the count");
-            REQUIRE(vim->messageIsError());
+            CHECK(vim->messageIsError());
             CHECK(vim->message() == "E488: Trailing characters: l");
         }
         UNSCOPED_INFO("yanks nothing");
@@ -7715,7 +7608,7 @@ namespace tut
         ex("d 0");
         {
             INFO("a count of none");
-            REQUIRE(vim->messageIsError());
+            CHECK(vim->messageIsError());
             CHECK(vim->message() == "E939: Positive count required");
         }
         UNSCOPED_INFO("takes nothing either");
@@ -7723,7 +7616,7 @@ namespace tut
         ex("pu a b");
         {
             INFO(":put's register with more after it");
-            REQUIRE(vim->messageIsError());
+            CHECK(vim->messageIsError());
             CHECK(vim->message() == "E488: Trailing characters: b");
         }
         UNSCOPED_INFO("puts nothing");
@@ -7739,7 +7632,6 @@ namespace tut
 
         make(text);
         keys(":g/o/d A<CR>");
-        UNSCOPED_INFO(":g/o/d A");
         CHECK(flat(editor->text()) == std::string("three|five|six"));
         UNSCOPED_INFO("each line added to a");
         CHECK(vim->registerText('a') == std::string("one\ntwo\nfour"));
@@ -7755,7 +7647,6 @@ namespace tut
         keys("d/five<CR>");
         UNSCOPED_INFO("d/five from the first line's second character");
         CHECK(flat(editor->text()) == std::string("o|five|six"));
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("3 fewer lines"));
 
         make(text);
@@ -7763,7 +7654,6 @@ namespace tut
         keys("d/ive<CR>");
         UNSCOPED_INFO("d/ive into the fifth line");
         CHECK(flat(editor->text()) == std::string("oive|six"));
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("4 fewer lines"));
 
         make(text);
@@ -7771,15 +7661,13 @@ namespace tut
         keys("d/hree<CR>");
         UNSCOPED_INFO("d/hree into the third");
         CHECK(flat(editor->text()) == std::string("ohree|four|five|six"));
-        UNSCOPED_INFO("two fewer: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("two fewer: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
 
         make(text);
         editor->setCaret(ALTextPos(0, 1));
         keys("v3jx");
-        UNSCOPED_INFO("v3jx");
         CHECK(flat(editor->text()) == std::string("our|five|six"));
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("3 fewer lines"));
 
         make(text);
@@ -7805,8 +7693,8 @@ namespace tut
 
         make(text);
         keys("3cc");
-        UNSCOPED_INFO("3cc: two fewer, nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("3cc: two fewer, nothing said: " << vim->message());
+        CHECK(vim->message().empty());
         keys("<Esc>");
 
         make(text);
@@ -7814,15 +7702,14 @@ namespace tut
         keys("<C-v>3jd");
         UNSCOPED_INFO("a block over four lines");
         CHECK(flat(editor->text()) == std::string("oe|to|tree|fur|five|six"));
-        UNSCOPED_INFO("takes no line: nothing said: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("takes no line: nothing said: " << vim->message());
+        CHECK(vim->message().empty());
 
         make("a1\na2\na3\na4\n\nb");
         editor->setCaret(ALTextPos(0, 1));
         keys("d}");
         UNSCOPED_INFO("d} from the paragraph's second character");
         CHECK(flat(editor->text()) == std::string("a||b"));
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("3 fewer lines"));
     }
 
@@ -7833,7 +7720,6 @@ namespace tut
         keys("3yyGVp");
         UNSCOPED_INFO("3yy then Vp");
         CHECK(flat(editor->text()) == std::string("one|two|three|four|five|one|two|three"));
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("3 more lines"));
 
         make(text);
@@ -7872,8 +7758,8 @@ namespace tut
         keys("yyjV3jp");
         UNSCOPED_INFO("a line over four");
         CHECK(flat(editor->text()) == std::string("one|one|six"));
-        UNSCOPED_INFO("nothing said of the lines it replaced: " + vim->message());
-        REQUIRE(vim->message().empty());
+        UNSCOPED_INFO("nothing said of the lines it replaced: " << vim->message());
+        CHECK(vim->message().empty());
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: :put of vim's own : / and . registers and their errors when empty", "[alvimkeymap]")
@@ -7917,13 +7803,11 @@ namespace tut
         keys(":2put .<CR>");
         UNSCOPED_INFO("on the range's line, the column kept");
         CHECK(flat(editor->text()) == std::string("one abtwo|thabree"));
-        UNSCOPED_INFO("there");
         CHECK(caretText() == std::string("1:3"));
         editor->setCaret(ALTextPos(0, 2));
         keys(":put! .<CR>");
         UNSCOPED_INFO("with ! at the caret");
         CHECK(flat(editor->text()) == std::string("onabe abtwo|thabree"));
-        UNSCOPED_INFO("and there");
         CHECK(caretText() == std::string("0:3"));
         editor->setCaret(ALTextPos(1, 0));
         keys(":0put .<CR>");
@@ -7967,7 +7851,6 @@ namespace tut
         keys("<C-v>jly2jlvjp");
         UNSCOPED_INFO("characters over lines");
         CHECK(flat(editor->text()) == std::string("abcd|efgh|iabqrst| ef"));
-        UNSCOPED_INFO("there");
         CHECK(caretText() == std::string("2:1"));
 
         make(text);
@@ -7979,7 +7862,6 @@ namespace tut
         keys("<C-v>jly2j$vp");
         UNSCOPED_INFO("to the line's end: after its last");
         CHECK(flat(editor->text()) == std::string("abcd|efgh|ijklmab|op   ef"));
-        UNSCOPED_INFO("and there");
         CHECK(caretText() == std::string("2:5"));
 
         make("abcd\nefgh\nijklmn\no");
@@ -7999,7 +7881,6 @@ namespace tut
         keys(":s/zzz/y/ | s/c/d/<CR>");
         UNSCOPED_INFO("an error ends it");
         CHECK(flat(editor->text()) == std::string("a c"));
-        UNSCOPED_INFO("said");
         CHECK(vim->message() == std::string("E486: Pattern not found: zzz"));
 
         make("a|b c");
@@ -8082,13 +7963,13 @@ namespace tut
             CHECK(ALVimMappings::shown(w.full->to) == "ia<Bar>b<Esc>");
         }
         UNSCOPED_INFO("none after one that fails");
-        REQUIRE(maps.match(ALVimMappings::NORMAL, maps.keysOf("E"), true).full == nullptr);
+        CHECK(maps.match(ALVimMappings::NORMAL, maps.keysOf("E"), true).full == nullptr);
         UNSCOPED_INFO("the one said");
         REQUIRE(errors.size() == size_t(1));
         {
             INFO("by its line");
             CHECK(errors[0].find("line 2:") == 0);
-            REQUIRE(errors[0].find("E518") != std::string::npos);
+            CHECK(errors[0].find("E518") != std::string::npos);
         }
     }
 
@@ -8100,11 +7981,9 @@ namespace tut
             keys(line);
             return vim->message();
         };
-        UNSCOPED_INFO(":d");
         CHECK(run(five, ":g/a/d<CR>") == std::string("3 fewer lines"));
         UNSCOPED_INFO("two said of by none");
         CHECK(run("a\nb\na", ":g/a/d<CR>") == std::string());
-        UNSCOPED_INFO(":s");
         CHECK(run(five, ":g/a/s/a/x/<CR>") == std::string("3 substitutions on 3 lines"));
         UNSCOPED_INFO("several a line");
         CHECK(run("aa\nb\naaa", ":g/a/s/a/x/g<CR>") == std::string("5 substitutions on 2 lines"));
@@ -8118,11 +7997,9 @@ namespace tut
         CHECK_FALSE(vim->messageIsError());
         UNSCOPED_INFO("counted only, as substitutions");
         CHECK(run(five, ":g/./s/a//n<CR>") == std::string("3 substitutions on 3 lines"));
-        UNSCOPED_INFO(":t");
         CHECK(run(five, ":g/a/t.<CR>") == std::string("3 more lines"));
         UNSCOPED_INFO("each its own lines added up");
         CHECK(run("a\nb\na\nb\na\nb", ":g/a/t.|t.<CR>") == std::string("6 more lines"));
-        UNSCOPED_INFO(":j");
         CHECK(run("a\n1\na\n2\na\n3\na\n4", ":g/a/j<CR>") == std::string("4 fewer lines"));
         UNSCOPED_INFO(":j with a count");
         CHECK(run("a\n1\n2\na\n3\n4\na\n5\n6", ":g/a/j 3<CR>") == std::string("6 fewer lines"));
@@ -8150,7 +8027,6 @@ namespace tut
         keys(":s/o/0/<CR>\":P");
         UNSCOPED_INFO("\":P before it");
         CHECK(flat(editor->text()) == std::string("s/o/0/0ne|two"));
-        UNSCOPED_INFO("there too");
         CHECK(caretText() == std::string("0:5"));
         make("one\ntwo");
         keys(":s/o/0/<CR>2\":p");
@@ -8166,14 +8042,13 @@ namespace tut
         keys("Axy<Esc>0\".p");
         UNSCOPED_INFO("\".p the last insert's text");
         CHECK(flat(editor->text()) == std::string("oxynexy|two"));
-        UNSCOPED_INFO("and there");
         CHECK(caretText() == std::string("0:2"));
 
         make("one two");
         keys(":s/o/0/<CR>\":yy");
         {
             INFO("\":yy: nothing yanked");
-            REQUIRE_FALSE(vim->shared().registers.fetch('0', false).held);
+            CHECK_FALSE(vim->shared().registers.fetch('0', false).held);
             CHECK_FALSE(vim->shared().registers.fetch('"', false).held);
         }
         keys("\":dd\":x\":D");
@@ -8217,7 +8092,6 @@ namespace tut
         keys("\"#P");
         UNSCOPED_INFO("\"#P the alternate's before it");
         CHECK(flat(editor->text()) == std::string("Otherone|two"));
-        UNSCOPED_INFO("there too");
         CHECK(caretText() == std::string("0:4"));
         make("one\ntwo");
         named();
@@ -8235,7 +8109,7 @@ namespace tut
         keys("\"%yy");
         {
             INFO("\"%yy: nothing yanked");
-            REQUIRE_FALSE(vim->shared().registers.fetch('0', false).held);
+            CHECK_FALSE(vim->shared().registers.fetch('0', false).held);
             CHECK_FALSE(vim->shared().registers.fetch('"', false).held);
         }
         keys("\"#dd\"%x");
@@ -8250,10 +8124,9 @@ namespace tut
         std::vector<std::string> listed;
         vim->hooks().listing = [&listed](ALTextView&, const std::string& text) { listed.push_back(text); };
         keys("Axy<Esc>:s/o/0/<CR>/tw<CR>:registers<CR>");
-        UNSCOPED_INFO("one listing");
         REQUIRE(listed.size() == size_t(1));
         UNSCOPED_INFO("the last insert, the : line, the file, the alternate, the search, in vim's order");
-        REQUIRE(listed[0].find("\n  c  \".   xy\n  c  \":   s/o/0/\n  c  \"%   Script.lsl\n  c  \"#   Other\n  c  \"/   tw") != std::string::npos);
+        CHECK(listed[0].find("\n  c  \".   xy\n  c  \":   s/o/0/\n  c  \"%   Script.lsl\n  c  \"#   Other\n  c  \"/   tw") != std::string::npos);
         keys(":reg %.<CR>");
         UNSCOPED_INFO("those named");
         CHECK(listed.back() == std::string("Type Name Content\n  c  \".   xy\n  c  \"%   Script.lsl"));
@@ -8306,7 +8179,6 @@ namespace tut
         CHECK(run("a1\nb\na2\na3", ":g/a/s/a/x/c<CR>", "lyy") == std::string("x1|b|x2|x3"));
         UNSCOPED_INFO("said once through, as the :g's");
         CHECK(vim->message() == std::string("3 substitutions on 3 lines"));
-        UNSCOPED_INFO("done");
         CHECK(vim->mode() == ALVimKeymap::Mode::Normal);
 
         UNSCOPED_INFO("what follows reads what the answer made");

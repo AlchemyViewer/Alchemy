@@ -75,8 +75,6 @@ namespace
         }
     };
 
-    // The value is the name, whichever way it arrives, and typing one
-    // commits it.
     TEST_CASE_METHOD(alimagefield_data, "alimagefield: the value is the name however it arrives and typing one commits it", "[alimagefield]")
     {
         if (!ui.ok())
@@ -85,7 +83,6 @@ namespace
         }
         ALImageField* field = make();
         field->setValue("PushButton_Off");
-        UNSCOPED_INFO("holds the name");
         CHECK(field->getValue().asString() == std::string("PushButton_Off"));
 
         S32 commits = 0;
@@ -93,9 +90,7 @@ namespace
         LLLineEditor* text = field->getChild<LLLineEditor>("text");
         text->setText(std::string("Icon_Close"));
         text->onCommit();
-        UNSCOPED_INFO("typing commits");
         CHECK(commits == 1);
-        UNSCOPED_INFO("and the name follows");
         CHECK(field->getValue().asString() == std::string("Icon_Close"));
         field->die();
     }
@@ -118,30 +113,23 @@ namespace
         field->handleMouseDown(4, 10, MASK_NONE);
 
         ALSpecimenList* gallery = gFloaterView->findChild<ALSpecimenList>("images", true);
-        UNSCOPED_INFO("the popover has the gallery");
         REQUIRE(gallery != nullptr);
-        UNSCOPED_INFO("as cells");
         CHECK(gallery->cells());
         UNSCOPED_INFO("with every picture offered");
-        REQUIRE(gallery->count() == size_t(3));
+        CHECK(gallery->count() == size_t(3));
         UNSCOPED_INFO("open on the field's name");
         CHECK(gallery->chosen() == std::string("PushButton_Off"));
         ALPopover* popover = gallery->getParentByType<ALPopover>();
-        UNSCOPED_INFO("in a popover");
         REQUIRE(popover != nullptr);
 
         // Nothing chosen yet: closing keeps what the field had and says
         // nothing.
         popover->settle();
-        UNSCOPED_INFO("no change, no commit");
         CHECK(commits == 0);
-        UNSCOPED_INFO("same name");
         CHECK(field->getValue().asString() == std::string("PushButton_Off"));
         field->die();
     }
 
-    // The tool that edits a picture is a button in the popover, given the
-    // name that was chosen.
     TEST_CASE_METHOD(alimagefield_data, "alimagefield: the popover's edit button hands the editor the chosen name", "[alimagefield]")
     {
         if (!ui.ok())
@@ -156,10 +144,8 @@ namespace
         field->handleMouseDown(4, 10, MASK_NONE);
 
         LLUICtrl* edit = gFloaterView->findChild<LLUICtrl>("edit", true);
-        UNSCOPED_INFO("the popover offers the tool");
         REQUIRE(edit != nullptr);
         edit->onCommit();
-        UNSCOPED_INFO("which is given the name");
         CHECK(edited == std::string("Icon_Close"));
         field->die();
     }
@@ -187,7 +173,6 @@ namespace
         };
 
         ALSpecimenList* gallery = open();
-        UNSCOPED_INFO("open");
         REQUIRE(gallery != nullptr);
         gallery->choose("Icon_Close");
         gallery->getParentByType<ALPopover>()->escape();

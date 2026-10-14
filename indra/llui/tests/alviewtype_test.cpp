@@ -146,41 +146,27 @@ namespace
         ll_test::FloaterViewScope floater_view(fv.get());
         TestFloater* f = floater();     // parents itself into gFloaterView
 
-        UNSCOPED_INFO("a floater is a floater");
         CHECK(f->as<LLFloater>() == f);
-        UNSCOPED_INFO("a floater is a panel");
         CHECK(f->as<LLPanel>() == f);
-        UNSCOPED_INFO("a floater is a control");
         CHECK(f->as<LLUICtrl>() == f);
-        UNSCOPED_INFO("a floater is a view");
         CHECK(f->as<LLView>() == f);
-        UNSCOPED_INFO("a floater is not a floater view");
-        REQUIRE(f->as<LLFloaterView>() == nullptr);
+        CHECK(f->as<LLFloaterView>() == nullptr);
 
-        UNSCOPED_INFO("a floater view is a floater view");
         CHECK(fv->as<LLFloaterView>() == fv.get());
-        UNSCOPED_INFO("a floater view is a control");
         CHECK(fv->as<LLUICtrl>() == fv.get());
-        UNSCOPED_INFO("a floater view is not a panel");
-        REQUIRE(fv->as<LLPanel>() == nullptr);
-        UNSCOPED_INFO("a floater view is not a floater");
-        REQUIRE(fv->as<LLFloater>() == nullptr);
+        CHECK(fv->as<LLPanel>() == nullptr);
+        CHECK(fv->as<LLFloater>() == nullptr);
 
         std::unique_ptr<TestCtrl> c(ctrl("ctrl"));
-        UNSCOPED_INFO("a control is a control");
         CHECK(c->as<LLUICtrl>() == c.get());
-        UNSCOPED_INFO("a control is not a panel");
-        REQUIRE(c->as<LLPanel>() == nullptr);
+        CHECK(c->as<LLPanel>() == nullptr);
         UNSCOPED_INFO("a class declared in a test is found like any other");
         CHECK(c->as<TestCtrl>() == c.get());
 
         std::unique_ptr<TestView> v(view("plain"));
-        UNSCOPED_INFO("a plain view is a view");
         CHECK(v->as<LLView>() == v.get());
-        UNSCOPED_INFO("a plain view is not a control");
-        REQUIRE(v->as<LLUICtrl>() == nullptr);
-        UNSCOPED_INFO("nor the test's own class");
-        REQUIRE(v->as<TestCtrl>() == nullptr);
+        CHECK(v->as<LLUICtrl>() == nullptr);
+        CHECK(v->as<TestCtrl>() == nullptr);
 
         const LLView* cf = f;
         UNSCOPED_INFO("a const view answers the same");
@@ -189,17 +175,11 @@ namespace
         std::unique_ptr<LLLayoutStack> s(stack());
         LLLayoutPanel* lp = panel();
         s->addPanel(lp);
-        UNSCOPED_INFO("a layout stack is a layout stack");
         CHECK(s->as<LLLayoutStack>() == s.get());
-        UNSCOPED_INFO("a layout stack is not a control");
-        REQUIRE(s->as<LLUICtrl>() == nullptr);
-        UNSCOPED_INFO("a layout panel is a layout panel");
+        CHECK(s->as<LLUICtrl>() == nullptr);
         CHECK(lp->as<LLLayoutPanel>() == lp);
-        UNSCOPED_INFO("a layout panel is a panel");
         CHECK(lp->as<LLPanel>() == lp);
-        UNSCOPED_INFO("a layout panel is not a layout stack");
-        REQUIRE(lp->as<LLLayoutStack>() == nullptr);
-        UNSCOPED_INFO("its parent is its stack");
+        CHECK(lp->as<LLLayoutStack>() == nullptr);
         CHECK(lp->getParentAs<LLLayoutStack>() == s.get());
 
         fv.reset();
@@ -219,20 +199,16 @@ namespace
         TestView* inner = view("inner");
         f->addChild(inner);
 
-        UNSCOPED_INFO("the floater's parent is the floater view");
         CHECK(f->getParentAs<LLFloaterView>() == fv.get());
         UNSCOPED_INFO("the floater view has no parent");
-        REQUIRE(fv->getParentAs<LLFloater>() == nullptr);
-        UNSCOPED_INFO("the inner view's parent is not a floater view");
-        REQUIRE(inner->getParentAs<LLFloaterView>() == nullptr);
-        UNSCOPED_INFO("the inner view's parent is the floater");
+        CHECK(fv->getParentAs<LLFloater>() == nullptr);
+        CHECK(inner->getParentAs<LLFloaterView>() == nullptr);
         CHECK(inner->getParentAs<LLFloater>() == f);
-        UNSCOPED_INFO("the nearest floater above the inner view");
         CHECK(inner->getParentByType<LLFloater>() == f);
         UNSCOPED_INFO("the nearest floater view above it, through the floater");
         CHECK(inner->getParentByType<LLFloaterView>() == fv.get());
         UNSCOPED_INFO("no ancestor is a type with no kind");
-        REQUIRE(inner->getParentByType<TestCtrl>() == nullptr);
+        CHECK(inner->getParentByType<TestCtrl>() == nullptr);
 
         fv.reset();
     }
@@ -289,33 +265,19 @@ namespace
         sp.name = "separator";
         std::unique_ptr<LLMenuItemSeparatorGL> separator(LLUICtrlFactory::create<LLMenuItemSeparatorGL>(sp));
 
-        UNSCOPED_INFO("a menu is a menu");
         CHECK(menu->as<LLMenuGL>() == menu.get());
-        UNSCOPED_INFO("a menu is not a bar");
-        REQUIRE(menu->as<LLMenuBarGL>() == nullptr);
-        UNSCOPED_INFO("a menu is not a context menu");
-        REQUIRE(menu->as<LLContextMenu>() == nullptr);
-        UNSCOPED_INFO("a menu is not an item");
-        REQUIRE(menu->as<LLMenuItemGL>() == nullptr);
-        UNSCOPED_INFO("a bar is a menu");
+        CHECK(menu->as<LLMenuBarGL>() == nullptr);
+        CHECK(menu->as<LLContextMenu>() == nullptr);
+        CHECK(menu->as<LLMenuItemGL>() == nullptr);
         CHECK(bar->as<LLMenuGL>() == bar.get());
-        UNSCOPED_INFO("a bar is a bar");
         CHECK(bar->as<LLMenuBarGL>() == bar.get());
-        UNSCOPED_INFO("a context menu is a menu");
         CHECK(context->as<LLMenuGL>() == context.get());
-        UNSCOPED_INFO("a context menu is a context menu");
         CHECK(context->as<LLContextMenu>() == context.get());
-        UNSCOPED_INFO("a context menu is not a bar");
-        REQUIRE(context->as<LLMenuBarGL>() == nullptr);
-        UNSCOPED_INFO("an item is an item");
+        CHECK(context->as<LLMenuBarGL>() == nullptr);
         CHECK(item->as<LLMenuItemGL>() == item);
-        UNSCOPED_INFO("an item is not a separator");
-        REQUIRE(item->as<LLMenuItemSeparatorGL>() == nullptr);
-        UNSCOPED_INFO("an item is not a menu");
-        REQUIRE(item->as<LLMenuGL>() == nullptr);
-        UNSCOPED_INFO("a separator is an item");
+        CHECK(item->as<LLMenuItemSeparatorGL>() == nullptr);
+        CHECK(item->as<LLMenuGL>() == nullptr);
         CHECK(separator->as<LLMenuItemGL>() == separator.get());
-        UNSCOPED_INFO("a separator is a separator");
         CHECK(separator->as<LLMenuItemSeparatorGL>() == separator.get());
 
         menu->setParentMenuItem(item);
@@ -323,7 +285,7 @@ namespace
         CHECK(menu->getParentMenuItem() == item);
         delete item;
         UNSCOPED_INFO("and let go when it dies");
-        REQUIRE(menu->getParentMenuItem() == nullptr);
+        CHECK(menu->getParentMenuItem() == nullptr);
     }
 
     // Each class's place in the hierarchy is fixed at compile time, and a
@@ -372,50 +334,31 @@ namespace
         std::unique_ptr<LLSpinCtrl>       spin(LLUICtrlFactory::create<LLSpinCtrl>(spp));
         std::unique_ptr<LLTabContainer>   tabs(LLUICtrlFactory::create<LLTabContainer>(tcp));
 
-        UNSCOPED_INFO("a button is a button");
         CHECK(button->as<LLButton>() == button.get());
-        UNSCOPED_INFO("a text box is a text box");
         CHECK(text->as<LLTextBox>() == text.get());
-        UNSCOPED_INFO("a line editor is a line editor");
         CHECK(line->as<LLLineEditor>() == line.get());
-        UNSCOPED_INFO("a spin control is a spin control");
         CHECK(spin->as<LLSpinCtrl>() == spin.get());
-        UNSCOPED_INFO("a tab container is a tab container");
         CHECK(tabs->as<LLTabContainer>() == tabs.get());
 
-        UNSCOPED_INFO("a button is a control");
         CHECK(button->as<LLUICtrl>() == button.get());
         UNSCOPED_INFO("a spin control is a control, through its float base");
         CHECK(spin->as<LLUICtrl>() == spin.get());
-        UNSCOPED_INFO("a tab container is a panel");
         CHECK(tabs->as<LLPanel>() == tabs.get());
-        UNSCOPED_INFO("a text box is a text base");
         CHECK(text->as<LLTextBase>() == text.get());
 
-        UNSCOPED_INFO("a button is not a text box");
-        REQUIRE(button->as<LLTextBox>() == nullptr);
-        UNSCOPED_INFO("a text box is not a line editor");
-        REQUIRE(text->as<LLLineEditor>() == nullptr);
-        UNSCOPED_INFO("a line editor is not a spin control");
-        REQUIRE(line->as<LLSpinCtrl>() == nullptr);
-        UNSCOPED_INFO("a spin control is not a tab container");
-        REQUIRE(spin->as<LLTabContainer>() == nullptr);
-        UNSCOPED_INFO("a tab container is not a button");
-        REQUIRE(tabs->as<LLButton>() == nullptr);
-        UNSCOPED_INFO("a button is not a panel");
-        REQUIRE(button->as<LLPanel>() == nullptr);
-        {
-            INFO("none of them is a check box");
-            REQUIRE(button->as<LLCheckBoxCtrl>() == nullptr);
-            REQUIRE(line->as<LLCheckBoxCtrl>() == nullptr);
-        }
-        {
-            INFO("none of them is a combo box or a scroll list");
-            REQUIRE(spin->as<LLComboBox>() == nullptr);
-            REQUIRE(tabs->as<LLScrollListCtrl>() == nullptr);
-        }
+        CHECK(button->as<LLTextBox>() == nullptr);
+        CHECK(text->as<LLLineEditor>() == nullptr);
+        CHECK(line->as<LLSpinCtrl>() == nullptr);
+        CHECK(spin->as<LLTabContainer>() == nullptr);
+        CHECK(tabs->as<LLButton>() == nullptr);
+        CHECK(button->as<LLPanel>() == nullptr);
+        CHECK(button->as<LLCheckBoxCtrl>() == nullptr);
+        CHECK(line->as<LLCheckBoxCtrl>() == nullptr);
+        CHECK(spin->as<LLComboBox>() == nullptr);
+        CHECK(tabs->as<LLScrollListCtrl>() == nullptr);
     }
 
+    // Bound by on_check, a binding the item's own params do not name.
     TEST_CASE_METHOD(alviewtype_data, "alviewtype: a check item bound by on_check stays bound and shows the setting", "[alviewtype]")
     {
         LLControlGroup* config = LLUI::getInstance()->mSettingGroups["config"];
@@ -429,7 +372,6 @@ namespace
         cp.label                 = "Check";
         cp.on_check.control_name = "ViewTypeCheck";
         std::unique_ptr<LLMenuItemCheckGL> item(LLUICtrlFactory::create<LLMenuItemCheckGL>(cp));
-        UNSCOPED_INFO("bound to the setting");
         REQUIRE(item->getControlVariable() != nullptr);
         item->buildDrawLabel();
         UNSCOPED_INFO("checked while it is on");

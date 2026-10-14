@@ -42,13 +42,10 @@ namespace
         using namespace ALNotecardItems;
         UNSCOPED_INFO("the first item's is the first past the standard");
         CHECK(c(0) == std::string("\xF4\x80\x80\x80"));
-        UNSCOPED_INFO("read back");
         CHECK(itemAt(c(0), 0) == 0);
-        UNSCOPED_INFO("another");
         CHECK(itemAt(c(37), 0) == 37);
         UNSCOPED_INFO("the last there is");
         CHECK(itemAt(c(MOST - 1), 0) == static_cast<S32>(MOST - 1));
-        UNSCOPED_INFO("plain text");
         CHECK(itemAt("abcd", 0) == -1);
         UNSCOPED_INFO("an emoji, four bytes all the same");
         CHECK(itemAt("\xF0\x9F\x98\x80", 0) == -1);
@@ -70,11 +67,8 @@ namespace
         const std::string                       text = "a" + c(2) + "bc" + c(0) + "\n" + c(2);
         std::vector<std::pair<size_t, size_t>> found;
         ALNotecardItems::forEach(text, [&](size_t at, size_t item) { found.emplace_back(at, item); });
-        UNSCOPED_INFO("three");
         REQUIRE(found.size() == static_cast<size_t>(3));
-        UNSCOPED_INFO("the first");
         CHECK(found[0] == std::make_pair(size_t(1), size_t(2)));
-        UNSCOPED_INFO("the second");
         CHECK(found[1] == std::make_pair(size_t(7), size_t(0)));
         UNSCOPED_INFO("the third, after a line");
         CHECK(found[2] == std::make_pair(size_t(12), size_t(2)));
@@ -84,28 +78,23 @@ namespace
     {
         std::string text  = "x" + c(3) + c(1) + c(3) + c(7) + "y";
         const auto  order = ALNotecardItems::renumber(text, [](size_t item) { return item < 5; });
-        UNSCOPED_INFO("two carried");
         REQUIRE(order.size() == static_cast<size_t>(2));
         UNSCOPED_INFO("the first stood first");
         CHECK(order[0] == static_cast<size_t>(3));
-        UNSCOPED_INFO("then the other");
         CHECK(order[1] == static_cast<size_t>(1));
         UNSCOPED_INFO("each numbered by where it now is, and one not carried left");
         CHECK(text == "x" + c(0) + c(1) + c(0) + c(7) + "y");
 
         std::string plain = "no items here";
-        UNSCOPED_INFO("none");
-        REQUIRE(ALNotecardItems::renumber(plain, [](size_t) { return true; }).empty());
-        UNSCOPED_INFO("and the text as it was");
+        CHECK(ALNotecardItems::renumber(plain, [](size_t) { return true; }).empty());
+        UNSCOPED_INFO("the text as it was");
         CHECK(plain == std::string("no items here"));
     }
 
     TEST_CASE_METHOD(alnotecarditems_data, "alnotecarditems: withoutItems takes out every item's character and nothing else", "[alnotecarditems]")
     {
         const std::string text = "see " + ALNotecardItems::charOf(0) + " and " + ALNotecardItems::charOf(3) + "\xC3\xA9";
-        UNSCOPED_INFO("taken out");
         CHECK(ALNotecardItems::withoutItems(text) == std::string("see  and \xC3\xA9"));
-        UNSCOPED_INFO("nothing to take");
         CHECK(ALNotecardItems::withoutItems("plain") == std::string("plain"));
     }
 }

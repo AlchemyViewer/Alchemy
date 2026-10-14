@@ -100,20 +100,15 @@ namespace
         ALColorPicker* picker = make();
         picker->setValue("0.5, 0.25, 0, 1");
         const LLColor4& c = picker->color();
-        UNSCOPED_INFO("red read");
         CHECK(closeTo(c.mV[VRED], 0.5f));
-        UNSCOPED_INFO("green read");
         CHECK(closeTo(c.mV[VGREEN], 0.25f));
-        UNSCOPED_INFO("blue read");
         CHECK(closeTo(c.mV[VBLUE], 0.f));
-        UNSCOPED_INFO("alpha read");
         CHECK(closeTo(c.mV[VALPHA], 1.f));
-        UNSCOPED_INFO("written as four numbers");
         CHECK(picker->getValue().asString() ==
                       std::string("0.500, 0.250, 0.000, 1.000"));
 
         picker->setColor(LLColor4(0.f, 1.f, 0.f, 0.5f));
-        UNSCOPED_INFO("and a colour set as one is written the same way");
+        UNSCOPED_INFO("a colour set as one is written the same way");
         CHECK(picker->getValue().asString() == std::string("0.000, 1.000, 0.000, 0.500"));
         picker->die();
     }
@@ -135,8 +130,8 @@ namespace
         picker->handleMouseUp(slidersLeft(), value_y, MASK_NONE);
         {
             INFO("black");
-            REQUIRE(closeTo(picker->color().mV[VRED], 0.f));
-            REQUIRE(closeTo(picker->color().mV[VGREEN], 0.f));
+            CHECK(closeTo(picker->color().mV[VRED], 0.f));
+            CHECK(closeTo(picker->color().mV[VGREEN], 0.f));
             CHECK(closeTo(picker->color().mV[VBLUE], 0.f));
         }
 
@@ -145,9 +140,9 @@ namespace
         picker->handleMouseDown(right, value_y, MASK_NONE);
         picker->handleMouseUp(right, value_y, MASK_NONE);
         {
-            INFO("blue again: " + picker->getValue().asString());
-            REQUIRE(closeTo(picker->color().mV[VBLUE], 1.f));
-            REQUIRE(closeTo(picker->color().mV[VRED], 0.f));
+            INFO("blue again: " << picker->getValue().asString());
+            CHECK(closeTo(picker->color().mV[VBLUE], 1.f));
+            CHECK(closeTo(picker->color().mV[VRED], 0.f));
             CHECK(closeTo(picker->color().mV[VGREEN], 0.f));
         }
         picker->die();
@@ -175,7 +170,7 @@ namespace
             CHECK(closeTo(picker->color().mV[VRED], 0.f));
             {
                 INFO("and no other");
-                REQUIRE(closeTo(picker->color().mV[VGREEN], 1.f));
+                CHECK(closeTo(picker->color().mV[VGREEN], 1.f));
                 CHECK(closeTo(picker->color().mV[VBLUE], 1.f));
             }
             picker->handleMouseUp(slidersLeft(), red_y, MASK_NONE);

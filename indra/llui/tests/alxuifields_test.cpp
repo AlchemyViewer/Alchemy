@@ -94,14 +94,14 @@ namespace
         ALPropertyGrid::Field font = field("font");
         ALXUIFields::vocabularyFor(font);
         UNSCOPED_INFO("the fonts fonts.xml declares");
-        REQUIRE_FALSE(font.values.empty());
+        CHECK_FALSE(font.values.empty());
         UNSCOPED_INFO("the sans among them");
-        REQUIRE(std::find(font.values.begin(), font.values.end(), "SansSerif") != font.values.end());
+        CHECK(std::find(font.values.begin(), font.values.end(), "SansSerif") != font.values.end());
 
         ALPropertyGrid::Field size = field("font.size");
         ALXUIFields::vocabularyFor(size);
         UNSCOPED_INFO("and their sizes");
-        REQUIRE_FALSE(size.values.empty());
+        CHECK_FALSE(size.values.empty());
 
         ALPropertyGrid::Field style = field("font.style");
         ALXUIFields::vocabularyFor(style);
@@ -113,9 +113,9 @@ namespace
         ALPropertyGrid::Field follows = field("follows");
         ALXUIFields::vocabularyFor(follows);
         UNSCOPED_INFO("four edges");
-        REQUIRE(follows.values.size() == (size_t)4);
+        CHECK(follows.values.size() == (size_t)4);
         UNSCOPED_INFO("drawn in the picture's order");
-        REQUIRE(follows.edges.size() == (size_t)4);
+        CHECK(follows.edges.size() == (size_t)4);
         UNSCOPED_INFO("a word for all");
         CHECK(follows.allWord == std::string("all"));
         UNSCOPED_INFO("and for none");
@@ -125,11 +125,11 @@ namespace
         held.values = { "mine" };
         ALXUIFields::vocabularyFor(held);
         UNSCOPED_INFO("a field with its values keeps them");
-        REQUIRE(held.values.size() == (size_t)1);
+        CHECK(held.values.size() == (size_t)1);
 
         ALPropertyGrid::Field other = field("label");
         ALXUIFields::vocabularyFor(other);
         UNSCOPED_INFO("a field the viewer holds no words for gets none");
-        REQUIRE(other.values.empty());
+        CHECK(other.values.empty());
     }
 }

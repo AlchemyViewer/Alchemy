@@ -98,8 +98,7 @@ namespace
         ALOutputView& v = make(2);
         v.append(entry("", "one"));
         v.append(entry("error", "two\nmore"));
-        UNSCOPED_INFO("two kept");
-        REQUIRE(v.entries().size() == size_t(2));
+        CHECK(v.entries().size() == size_t(2));
         UNSCOPED_INFO("laid out as lines");
         CHECK(v.text() == std::string("[12:00:00] Thing: one\n[12:00:00] Thing (error): two\nmore"));
         v.append(entry("", "three"));
@@ -129,11 +128,8 @@ namespace
         UNSCOPED_INFO("no filter shows them all");
         CHECK(v.document().lineCount() == 2);
         v.clearEntries();
-        {
-            INFO("cleared");
-            REQUIRE(v.entries().empty());
-            REQUIRE(v.text().empty());
-        }
+        CHECK(v.entries().empty());
+        CHECK(v.text().empty());
         UNSCOPED_INFO("read-only, as a log is");
         CHECK(v.isReadOnly());
     }
@@ -145,7 +141,6 @@ namespace
         e.link    = true;
         e.tooltip = "Open Thing";
         v.append(e);
-        UNSCOPED_INFO("two links on the line");
         REQUIRE(v.substitutions().size() == size_t(2));
         const ALTextView::Substitution& source = v.substitutions()[0];
         {
@@ -153,7 +148,6 @@ namespace
             CHECK(source.range == ALTextRange(ALTextPos(0, 11), ALTextPos(0, 16)));
             CHECK(source.link);
         }
-        UNSCOPED_INFO("with the tooltip");
         CHECK(source.tooltip == std::string("Open Thing"));
         const ALTextView::Substitution& url = v.substitutions()[1];
         {
@@ -161,7 +155,6 @@ namespace
             CHECK(url.range == ALTextRange(ALTextPos(0, 22), ALTextPos(0, 45)));
             CHECK(url.link);
         }
-        UNSCOPED_INFO("the URL itself");
         CHECK(url.url == std::string("http://example.com/page"));
         std::string chosen;
         v.onEntryChosen([&chosen](const ALOutputView::Entry& picked) { chosen = picked.text; });
@@ -171,23 +164,21 @@ namespace
         pointOf(0, 12, x, y);
         v.handleMouseDown(x, y, MASK_NONE);
         v.handleMouseUp(x, y, MASK_NONE);
-        UNSCOPED_INFO("the entry back");
+        UNSCOPED_INFO("a click on the source hands the entry back");
         CHECK(chosen == std::string("see http://example.com/page now"));
         // In the middle of the link, however it is labelled.
         pointOf(0, 22, x, y);
         x = view->textRect().mLeft + static_cast<S32>((view->layout().xOf(0, 22) + view->layout().xOf(0, 45)) * 0.5f);
         v.handleMouseDown(x, y, MASK_NONE);
         v.handleMouseUp(x, y, MASK_NONE);
-        UNSCOPED_INFO("the URL followed");
+        UNSCOPED_INFO("a click on the URL follows it");
         CHECK(opened == std::string("http://example.com/page"));
         // The oldest going takes its links, and the rest slide up.
         v.setCapacity(1);
         v.append(entry("", "plain"));
-        UNSCOPED_INFO("one shown");
         CHECK(v.document().lineCount() == 1);
         UNSCOPED_INFO("its links went with it");
-        REQUIRE(v.substitutions().empty());
-        UNSCOPED_INFO("what stands is the new one");
+        CHECK(v.substitutions().empty());
         CHECK(v.text() == std::string("[12:00:00] Thing: plain"));
         ALOutputView::Entry unsourced;
         unsourced.text = "just words";
@@ -216,7 +207,7 @@ namespace
         UNSCOPED_INFO("one edit for the two dropped");
         CHECK(edits == U32(1));
         UNSCOPED_INFO("the first's links went with it");
-        REQUIRE(v.substitutions().empty());
+        CHECK(v.substitutions().empty());
         edits = 0;
         v.setFilter([](const ALOutputView::Entry& e) { return e.kind == "error" || e.text.find("http") != std::string::npos; });
         UNSCOPED_INFO("the linked one back at the top");
@@ -239,7 +230,7 @@ namespace
         v.setFilter([](const ALOutputView::Entry&) { return false; });
         {
             INFO("down to none");
-            REQUIRE(v.text().empty());
+            CHECK(v.text().empty());
             CHECK(v.document().lineCount() == 1);
         }
         v.setFilter(nullptr);
@@ -271,17 +262,14 @@ namespace
         e.links = { frame, word, part };
         v.append(entry("", "before"));
         v.append(e);
-        UNSCOPED_INFO("three links");
         REQUIRE(v.substitutions().size() == size_t(3));
         // On the first line, past the stamp and the source.
         UNSCOPED_INFO("the first line's word");
         CHECK(v.substitutions()[0].range == ALTextRange(ALTextPos(1, 26), ALTextPos(1, 30)));
-        UNSCOPED_INFO("which is the word");
         CHECK(v.document().line(1).substr(26, 4) == std::string("boom"));
         // The frame from its first word, past the indent, to the line's end.
         UNSCOPED_INFO("the frame's line");
         CHECK(v.substitutions()[1].range == ALTextRange(ALTextPos(3, 2), ALTextPos(3, 16)));
-        UNSCOPED_INFO("with its tooltip");
         CHECK(v.substitutions()[1].tooltip == std::string("Open s at line 7"));
         UNSCOPED_INFO("a stretch of a later line");
         CHECK(v.substitutions()[2].range == ALTextRange(ALTextPos(4, 4), ALTextPos(4, 8)));
@@ -330,7 +318,7 @@ namespace
         UNSCOPED_INFO("past its own fill, a lane's oldest goes from among the others");
         CHECK(v.text() == std::string("[12:00:00] Thing: chat1\n[12:00:00] Thing: chat2\n[12:00:00] Thing: chat3\n[12:00:00] Thing: again\n[12:00:00] Thing: third"));
         UNSCOPED_INFO("and the log holds what the lanes keep");
-        REQUIRE(v.entries().size() == size_t(5));
+        CHECK(v.entries().size() == size_t(5));
         v.setFilter([](const ALOutputView::Entry& one) { return one.lane == 0; });
         v.append(in_lane("fourth", 1));
         UNSCOPED_INFO("one not shown goes without a trace");
@@ -362,7 +350,7 @@ namespace
         UNSCOPED_INFO("the oldest gone at once, down to seven eighths of the fill");
         CHECK(v.entries().front().text == std::string("line 06"));
         UNSCOPED_INFO("and no more until it is full again");
-        REQUIRE(v.entries().size() == size_t(39));
+        CHECK(v.entries().size() == size_t(39));
         UNSCOPED_INFO("and the line read is where it was");
         CHECK(top_line() == std::string("[12:00:00] Thing: line 10"));
 
@@ -402,12 +390,14 @@ namespace
         U32 edits = 0;
         boost::signals2::scoped_connection counting = v.document().onChanged([&edits](const ALTextDocument::Edit&) { ++edits; });
         v.append(in_lane("a24", 0));
-        UNSCOPED_INFO("the lane's four oldest gone, the other's between them kept");
-        CHECK(v.document().line(0) == std::string("[12:00:00] Thing: b0"));
-        CHECK(v.document().line(3) == std::string("[12:00:00] Thing: b3"));
-        CHECK(v.document().line(4) == std::string("[12:00:00] Thing: a4"));
+        {
+            INFO("the lane's four oldest gone, the other's between them kept");
+            CHECK(v.document().line(0) == std::string("[12:00:00] Thing: b0"));
+            CHECK(v.document().line(3) == std::string("[12:00:00] Thing: b3"));
+            CHECK(v.document().line(4) == std::string("[12:00:00] Thing: a4"));
+        }
         UNSCOPED_INFO("twenty-one of the lane and twenty-four of the other");
-        REQUIRE(v.entries().size() == size_t(45));
+        CHECK(v.entries().size() == size_t(45));
         UNSCOPED_INFO("one edit to take them out, one to put the new one in");
         CHECK(edits == U32(2));
         UNSCOPED_INFO("and the line read is where it was");
@@ -423,15 +413,12 @@ namespace
         U32 edits = 0;
         boost::signals2::scoped_connection counting = v.document().onChanged([&edits](const ALTextDocument::Edit&) { ++edits; });
         v.setFilter([](const ALOutputView::Entry&) { return true; });
-        UNSCOPED_INFO("nothing to change");
         CHECK(edits == U32(0));
         v.setSelection(ALTextRange(ALTextPos(2, 18), ALTextPos(2, 23)));
         v.setFilter([](const ALOutputView::Entry& one) { return one.kind != "error"; });
-        UNSCOPED_INFO("one edit");
         CHECK(edits == U32(1));
         UNSCOPED_INFO("the selection on the same words, a line up");
         CHECK(v.selection() == ALTextRange(ALTextPos(1, 18), ALTextPos(1, 23)));
-        UNSCOPED_INFO("which are");
         CHECK(v.document().text(v.selection()) == std::string("three"));
     }
 
@@ -443,16 +430,14 @@ namespace
         again.time                = "12:00:05";
         v.append(again);
         v.append(again);
-        UNSCOPED_INFO("one entry");
-        REQUIRE(v.entries().size() == size_t(1));
+        CHECK(v.entries().size() == size_t(1));
         UNSCOPED_INFO("counted, at the last time");
         CHECK(v.document().line(0) == std::string("[12:00:05] Thing (error \xC3\x97" "3): Math Error"));
-        UNSCOPED_INFO("one line");
         CHECK(v.document().lineCount() == 1);
         v.append(entry("", "Math Error"));
         v.append(entry("error", "Math Error"));
         UNSCOPED_INFO("another kind between: three");
-        REQUIRE(v.entries().size() == size_t(3));
+        CHECK(v.entries().size() == size_t(3));
         v.append(entry("error", "Other"));
         v.append(entry("error", "Other"));
         UNSCOPED_INFO("other words: another, counted");
@@ -475,18 +460,17 @@ namespace
         v.append(entry("", "needle one"));
         v.showFind(false);
         v.findBar()->setQuery("needle");
-        UNSCOPED_INFO("one");
-        REQUIRE(v.findMatches().size() == size_t(1));
+        CHECK(v.findMatches().size() == size_t(1));
         v.append(entry("", "needle two"));
         v.append(entry("", "hay"));
         UNSCOPED_INFO("the one taken after it looked, found");
-        REQUIRE(v.findMatches().size() == size_t(2));
+        CHECK(v.findMatches().size() == size_t(2));
         v.setFilter([](const ALOutputView::Entry& e) { return e.text != "needle one"; });
         UNSCOPED_INFO("filtered out, not found");
-        REQUIRE(v.findMatches().size() == size_t(1));
+        CHECK(v.findMatches().size() == size_t(1));
         v.setFilter(nullptr);
         UNSCOPED_INFO("shown again, found again");
-        REQUIRE(v.findMatches().size() == size_t(2));
+        CHECK(v.findMatches().size() == size_t(2));
     }
 
     TEST_CASE_METHOD(aloutputview_data, "aloutputview: a lone CR is a line break when said again or dropped and for its links", "[aloutputview]")

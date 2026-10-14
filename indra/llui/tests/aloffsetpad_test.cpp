@@ -59,8 +59,6 @@ namespace
         }
     };
 
-    // A press puts the dot under the pointer, a drag moves it, and the
-    // release commits once.
     TEST_CASE_METHOD(aloffsetpad_data, "aloffsetpad: a press places the dot and a drag moves it; the release commits once", "[aloffsetpad]")
     {
         if (!ui.ok())
@@ -74,17 +72,14 @@ namespace
         p->handleMouseDown(35, 35, MASK_NONE);
         UNSCOPED_INFO("pressed at the centre, no offset");
         CHECK(p->getValue().asString() == std::string("0 0"));
-        UNSCOPED_INFO("and holds the mouse");
         CHECK(p->hasMouseCapture());
         p->handleHover(35 + 33, 35, MASK_NONE);
         UNSCOPED_INFO("dragged to the right edge, the whole reach");
         CHECK(p->getValue().asString() == std::string("32 0"));
-        UNSCOPED_INFO("nothing committed yet");
+        UNSCOPED_INFO("nothing committed while dragging");
         CHECK(commits == 0);
         p->handleMouseUp(35 + 33, 35, MASK_NONE);
-        UNSCOPED_INFO("the release commits once");
         CHECK(commits == 1);
-        UNSCOPED_INFO("and lets the mouse go");
         CHECK_FALSE(p->hasMouseCapture());
         p->die();
     }
@@ -101,7 +96,6 @@ namespace
         p->handleMouseDown(35, 35, MASK_NONE);
         gFocusMgr.setMouseCapture(nullptr);
         p->handleHover(35 + 33, 35, MASK_NONE);
-        UNSCOPED_INFO("a hover after the loss moves nothing");
         CHECK(p->getValue().asString() == std::string("0 0"));
         p->die();
     }
@@ -121,30 +115,23 @@ namespace
         LLSpinCtrl* x = p->getChild<LLSpinCtrl>("x");
         x->setValue(LLSD(5.0));
         x->onCommit();
-        UNSCOPED_INFO("typed");
         CHECK(p->getValue().asString() == std::string("5 2"));
-        UNSCOPED_INFO("committed once");
         CHECK(commits == 1);
         LLSpinCtrl* y = p->getChild<LLSpinCtrl>("y");
         y->setValue(LLSD(-1.0));
         y->onCommit();
         UNSCOPED_INFO("either box");
         CHECK(p->getValue().asString() == std::string("5 -1"));
-        UNSCOPED_INFO("committed again");
         CHECK(commits == 2);
 
         UNSCOPED_INFO("no default, no reset");
         CHECK_FALSE(p->resetToDefault());
-        UNSCOPED_INFO("and nothing committed");
         CHECK(commits == 2);
         p->setDefault("-3 4");
-        UNSCOPED_INFO("reset");
         CHECK(p->resetToDefault());
-        UNSCOPED_INFO("to the default");
         CHECK(p->getValue().asString() == std::string("-3 4"));
-        UNSCOPED_INFO("shown");
+        UNSCOPED_INFO("the box shows the default");
         CHECK(x->getValue().asReal() == -3.0);
-        UNSCOPED_INFO("committed");
         CHECK(commits == 3);
         UNSCOPED_INFO("reset again");
         CHECK(p->resetToDefault());

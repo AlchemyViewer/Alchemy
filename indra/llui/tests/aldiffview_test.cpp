@@ -126,66 +126,62 @@ namespace
         }
 
         // What an editor holds and is told, all of it, as another's.
-        static void same(ALCodeEditor* a, ALCodeEditor* b, const std::string& where)
+        static void require_same(ALCodeEditor* a, ALCodeEditor* b, const std::string& where)
         {
-            UNSCOPED_INFO(where + ": text");
+            INFO(where);
             REQUIRE(a->wholeText() == b->wholeText());
             const S32 count = a->document().lineCount();
             for (S32 l = 0; l <= count; ++l)
             {
-                const ALTextView::LineAnnotation& x  = a->lineAnnotation(l);
-                const ALTextView::LineAnnotation& y  = b->lineAnnotation(l);
-                const std::string                 at = where + ", line " + std::to_string(l);
+                const ALTextView::LineAnnotation& x = a->lineAnnotation(l);
+                const ALTextView::LineAnnotation& y = b->lineAnnotation(l);
+                CAPTURE(l);
                 {
-                    INFO(at + ": what is said of it");
+                    INFO("what is said of it");
                     REQUIRE(x.number == y.number);
                     REQUIRE(x.sign == y.sign);
                     REQUIRE(x.tint == y.tint);
                     REQUIRE(x.rulerTint == y.rulerTint);
                 }
                 {
-                    INFO(at + ": the rows above it");
+                    INFO("the rows above it");
                     REQUIRE(x.gap == y.gap);
                     REQUIRE(x.gapTint == y.gapTint);
                     REQUIRE(x.gapRulerTint == y.gapRulerTint);
                     REQUIRE(x.gapStop == y.gapStop);
                     REQUIRE(a->layout().gapRows(l) == b->layout().gapRows(l));
                 }
-                UNSCOPED_INFO(at + ": hidden or not");
+                UNSCOPED_INFO("hidden or not");
                 REQUIRE((l == count || a->layout().hidden(l) == b->layout().hidden(l)));
-                UNSCOPED_INFO(at + ": no bar: nobody changed it");
+                UNSCOPED_INFO("no bar: nobody changed it");
                 REQUIRE_FALSE(a->lineChanged(l));
             }
             const std::vector<ALCodeEditor::Decoration>& x = a->decorations();
             const std::vector<ALCodeEditor::Decoration>& y = b->decorations();
-            UNSCOPED_INFO(where + ": words");
+            UNSCOPED_INFO("the words marked");
             REQUIRE(x.size() == y.size());
             for (size_t i = 0; i < x.size(); ++i)
             {
-                {
-                    INFO(where + ": a word");
-                    REQUIRE(x[i].range == y[i].range);
-                    REQUIRE(x[i].color == y[i].color);
-                    REQUIRE(x[i].style == y[i].style);
-                }
+                CAPTURE(i);
+                REQUIRE(x[i].range == y[i].range);
+                REQUIRE(x[i].color == y[i].color);
+                REQUIRE(x[i].style == y[i].style);
             }
-            UNSCOPED_INFO(where + ": the caret");
             REQUIRE(a->caret() == b->caret());
-            UNSCOPED_INFO(where + ": the height");
             REQUIRE(a->layout().totalHeight() == b->layout().totalHeight());
         }
-        static void sameShown(ALDiffView& a, ALDiffView& b, const std::string& where)
+        static void require_same_shown(ALDiffView& a, ALDiffView& b, const std::string& where)
         {
-            UNSCOPED_INFO(where + ": the layout shown");
+            UNSCOPED_INFO(where << ": the layout shown");
             REQUIRE(a.isInline() == b.isInline());
             if (a.isInline())
             {
-                same(a.inlined(), b.inlined(), where + ", inline");
+                require_same(a.inlined(), b.inlined(), where + ", inline");
             }
             else
             {
-                same(a.left(), b.left(), where + ", left");
-                same(a.right(), b.right(), where + ", right");
+                require_same(a.left(), b.left(), where + ", left");
+                require_same(a.right(), b.right(), where + ", right");
             }
         }
 
@@ -238,7 +234,6 @@ namespace
         CHECK(d.right()->text() == std::string("a\nb = 2\nc\nd"));
         UNSCOPED_INFO("numbered as each text's own");
         CHECK(numbersOf(d.left()) == std::vector<S32>{ 1, 2, 3 });
-        UNSCOPED_INFO("the right's");
         CHECK(numbersOf(d.right()) == std::vector<S32>{ 1, 2, 3, 4 });
         UNSCOPED_INFO("a row of nothing below the left, to stand beside d");
         CHECK(gapsOf(d.left()) == std::vector<S32>{ 0, 0, 0, 1 });
@@ -246,32 +241,31 @@ namespace
         CHECK(gapsOf(d.right()) == std::vector<S32>{ 0, 0, 0, 0, 0 });
         {
             INFO("lined up");
-            REQUIRE(beside(d, 2, 2));
+            CHECK(beside(d, 2, 2));
             CHECK(d.left()->layout().totalHeight() == d.right()->layout().totalHeight());
         }
         {
             INFO("what is the same untinted");
-            REQUIRE_FALSE(tinted(*d.left(), 0));
+            CHECK_FALSE(tinted(*d.left(), 0));
             CHECK_FALSE(tinted(*d.right(), 2));
         }
         {
             INFO("what was taken out, and what was put in, tinted");
-            REQUIRE(tinted(*d.left(), 1));
-            REQUIRE(tinted(*d.right(), 1));
+            CHECK(tinted(*d.left(), 1));
+            CHECK(tinted(*d.right(), 1));
             CHECK(tinted(*d.right(), 3));
         }
         UNSCOPED_INFO("the gap too, quieter");
         CHECK(d.left()->lineAnnotation(3).gapTint.mV[VALPHA] > 0.f);
-        UNSCOPED_INFO("two changes");
         CHECK(d.changeCount() == 2);
         {
             INFO("the word changed marked on each side");
-            REQUIRE(d.left()->decorations().size() == 1);
-            REQUIRE(d.right()->decorations().size() == 1);
+            CHECK(d.left()->decorations().size() == 1);
+            CHECK(d.right()->decorations().size() == 1);
         }
         {
             INFO("neither side can be changed");
-            REQUIRE(d.left()->isReadOnly());
+            CHECK(d.left()->isReadOnly());
             CHECK(d.right()->isReadOnly());
         }
     }
@@ -279,28 +273,24 @@ namespace
     TEST_CASE_METHOD(aldiffview_data, "aldiffview: inline puts lines taken out above those put in numbered as the right", "[aldiffview]")
     {
         ALDiffView& d = make("a\nb = 1\nc", "a\nb = 2\nc\nd", true);
-        UNSCOPED_INFO("one text");
         CHECK(d.inlined()->text() == std::string("a\nb = 1\nb = 2\nc\nd"));
         UNSCOPED_INFO("the line taken out without a number");
         CHECK(numbersOf(d.inlined()) == std::vector<S32>{ 1, 0, 2, 3, 4 });
-        {
-            INFO("tinted");
-            REQUIRE(tinted(*d.inlined(), 1));
-            REQUIRE(tinted(*d.inlined(), 2));
-            REQUIRE_FALSE(tinted(*d.inlined(), 3));
-            CHECK(tinted(*d.inlined(), 4));
-        }
+        CHECK(tinted(*d.inlined(), 1));
+        CHECK(tinted(*d.inlined(), 2));
+        CHECK_FALSE(tinted(*d.inlined(), 3));
+        CHECK(tinted(*d.inlined(), 4));
         {
             INFO("the one shown");
-            REQUIRE(d.shown() == d.inlined());
-            REQUIRE(d.inlined()->getVisible());
+            CHECK(d.shown() == d.inlined());
+            CHECK(d.inlined()->getVisible());
             CHECK_FALSE(d.left()->getVisible());
         }
         d.setInline(false);
         {
             INFO("side by side again");
-            REQUIRE(d.left()->getVisible());
-            REQUIRE(d.right()->getVisible());
+            CHECK(d.left()->getVisible());
+            CHECK(d.right()->getVisible());
             CHECK_FALSE(d.inlined()->getVisible());
         }
         UNSCOPED_INFO("as before");
@@ -327,40 +317,31 @@ namespace
         CHECK(d.left()->caret().line == 1);
         bool told = false;
         d.setOnEscape([&told]() { told = true; });
-        {
-            INFO("escape");
-            CHECK(d.handleKey(KEY_ESCAPE, MASK_NONE, false));
-            CHECK(told);
-        }
+        CHECK(d.handleKey(KEY_ESCAPE, MASK_NONE, false));
+        CHECK(told);
     }
 
     TEST_CASE_METHOD(aldiffview_data, "aldiffview: same texts show no change and titles take a row only when given", "[aldiffview]")
     {
         ALDiffView& d = make("same\ntext", "same\ntext");
-        UNSCOPED_INFO("no changes");
         CHECK(d.changeCount() == 0);
-        {
-            INFO("nothing tinted");
-            REQUIRE_FALSE(tinted(*d.left(), 0));
-            CHECK_FALSE(tinted(*d.right(), 1));
-        }
+        CHECK_FALSE(tinted(*d.left(), 0));
+        CHECK_FALSE(tinted(*d.right(), 1));
         const S32 under_bar = d.getRect().getHeight() - ALDiffBar::wantedHeight();
         {
             INFO("no titles: no row for them, the sides up to the bar");
-            REQUIRE(d.right()->getRect().mTop == under_bar);
-            REQUIRE_FALSE(d.getChild<LLView>("left_title")->getVisible());
+            CHECK(d.right()->getRect().mTop == under_bar);
+            CHECK_FALSE(d.getChild<LLView>("left_title")->getVisible());
             CHECK_FALSE(d.getChild<LLView>("right_title")->getVisible());
         }
         d.setTitles("Compiled", "Made from the source");
         {
             INFO("titles: a row for them over the sides");
-            REQUIRE(d.right()->getRect().mTop < under_bar);
-            REQUIRE(d.getChild<LLView>("left_title")->getVisible());
+            CHECK(d.right()->getRect().mTop < under_bar);
+            CHECK(d.getChild<LLView>("left_title")->getVisible());
             CHECK(d.getChild<LLView>("right_title")->getVisible());
         }
-        UNSCOPED_INFO("the left's");
         CHECK(d.getChild<LLUICtrl>("left_title")->getValue().asString() == std::string("Compiled"));
-        UNSCOPED_INFO("the right's");
         CHECK(d.getChild<LLUICtrl>("right_title")->getValue().asString() == std::string("Made from the source"));
     }
 
@@ -373,7 +354,7 @@ namespace
         d.right()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
         {
             INFO("the selection first");
-            REQUIRE(d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false));
+            CHECK(d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false));
             CHECK_FALSE(d.right()->hasSelection());
             CHECK(told == 0);
         }
@@ -385,7 +366,7 @@ namespace
         d.setOnEscape(nullptr);
         {
             INFO("nobody to tell: kept, and the keyboard with it");
-            REQUIRE(d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false));
+            CHECK(d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false));
             CHECK(d.right()->hasFocus());
         }
     }
@@ -423,8 +404,8 @@ namespace
         CHECK(source->text() == std::string("-- written\n\nllx.Say(0, \"hi\")"));
         {
             INFO("the comparison as it was");
-            REQUIRE(d.right()->isReadOnly());
-            REQUIRE(d.right()->text().find("llx") == std::string::npos);
+            CHECK(d.right()->isReadOnly());
+            CHECK(d.right()->text().find("llx") == std::string::npos);
         }
 
         // From the left, the line beside it, from its start; from a line
@@ -514,7 +495,6 @@ namespace
         press(d, "next");
         UNSCOPED_INFO("the next, from the bar");
         CHECK(d.right()->caret().line == 6);
-        UNSCOPED_INFO("said");
         CHECK(d.bar()->countSaid() == std::string("Change 2 of 2"));
         {
             INFO("none after it");
@@ -528,7 +508,7 @@ namespace
         CHECK(d.bar()->countSaid() == std::string("2 changes"));
         {
             INFO("Alt-Up");
-            REQUIRE(d.right()->handleKey(KEY_UP, MASK_ALT, false));
+            CHECK(d.right()->handleKey(KEY_UP, MASK_ALT, false));
             CHECK(d.right()->caret().line == 1);
         }
         press(d, "previous");
@@ -553,7 +533,6 @@ namespace
         CHECK_FALSE(done->getVisible());
         S32 told = 0;
         d.setOnEscape([&told]() { ++told; });
-        UNSCOPED_INFO("done");
         CHECK(done->getVisible());
         press(d, "done");
         UNSCOPED_INFO("told, as for Escape");
@@ -590,7 +569,7 @@ namespace
         press(d, "swap");
         {
             INFO("swapped, and lit");
-            REQUIRE(d.isSwapped());
+            CHECK(d.isSwapped());
             CHECK(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("swap"))->getToggleState());
         }
         UNSCOPED_INFO("the right's text on the left");
@@ -601,12 +580,11 @@ namespace
         CHECK(gapsOf(d.right()) == std::vector<S32>{ 0, 0, 0, 1 });
         {
             INFO("its lines now the ones put in");
-            REQUIRE(tinted(*d.right(), 1));
+            CHECK(tinted(*d.right(), 1));
             CHECK_FALSE(tinted(*d.right(), 0));
         }
         UNSCOPED_INFO("the titles with them");
         CHECK(d.getChild<LLUICtrl>("left_title")->getValue().asString() == std::string("Now"));
-        UNSCOPED_INFO("both");
         CHECK(d.getChild<LLUICtrl>("right_title")->getValue().asString() == std::string("Saved"));
 
         S32 at_line   = -1;
@@ -658,7 +636,7 @@ namespace
         d.setInline(true);
         {
             INFO("inline: below the line taken out");
-            REQUIRE(d.inlined()->caret().line == 3);
+            CHECK(d.inlined()->caret().line == 3);
             CHECK(d.inlined()->caret().column == 3);
         }
         UNSCOPED_INFO("the keyboard with it");
@@ -666,13 +644,13 @@ namespace
         d.setInline(false);
         {
             INFO("side by side again");
-            REQUIRE(d.right()->caret().line == 2);
+            CHECK(d.right()->caret().line == 2);
             CHECK(d.right()->caret().column == 3);
         }
         d.setSwapped(true);
         {
             INFO("swapped: on the left, which shows the right's text");
-            REQUIRE(d.left()->caret().line == 2);
+            CHECK(d.left()->caret().line == 2);
             CHECK(d.left()->caret().column == 3);
         }
         UNSCOPED_INFO("the other side beside it");
@@ -705,7 +683,7 @@ namespace
         UNSCOPED_INFO("a count, as far as there are");
         CHECK(d.right()->caret().line == 7);
         UNSCOPED_INFO("nothing typed anywhere");
-        REQUIRE(d.right()->text().find(']') == std::string::npos);
+        CHECK(d.right()->text().find(']') == std::string::npos);
         UNSCOPED_INFO("j moves, as in a text that cannot be changed");
         CHECK((typed("gg"), typed("j"), d.right()->caret().line == 1));
 
@@ -739,6 +717,7 @@ namespace
         // change, 28-29 the same.
         for (ALCodeEditor* side : { d.left(), d.right() })
         {
+            CAPTURE(side->getName());
             {
                 INFO("context shown");
                 REQUIRE_FALSE(hidden(side, 5));
@@ -780,25 +759,25 @@ namespace
         side->goTo(ALTextPos(5, 3));
         {
             INFO("down onto its row");
-            REQUIRE(side->perform(ALEditorCommand::MoveDown));
-            REQUIRE(side->caretGap() == 24);
+            CHECK(side->perform(ALEditorCommand::MoveDown));
+            CHECK(side->caretGap() == 24);
             CHECK(side->caret() == ALTextPos(24, 0));
         }
         {
             INFO("on down, to the line under it, as far across");
-            REQUIRE(side->perform(ALEditorCommand::MoveDown));
-            REQUIRE(side->caretGap() == -1);
+            CHECK(side->perform(ALEditorCommand::MoveDown));
+            CHECK(side->caretGap() == -1);
             CHECK(side->caret() == ALTextPos(24, 3));
         }
         {
             INFO("up onto it again");
-            REQUIRE(side->perform(ALEditorCommand::MoveUp));
+            CHECK(side->perform(ALEditorCommand::MoveUp));
             CHECK(side->caretGap() == 24);
         }
         {
             INFO("and on up over it");
-            REQUIRE(side->perform(ALEditorCommand::MoveUp));
-            REQUIRE(side->caretGap() == -1);
+            CHECK(side->perform(ALEditorCommand::MoveUp));
+            CHECK(side->caretGap() == -1);
             CHECK(side->caret() == ALTextPos(5, 3));
         }
         side->perform(ALEditorCommand::MoveDown);
@@ -812,8 +791,8 @@ namespace
         }
         {
             INFO("its row gone, the caret on the first line it hid");
-            REQUIRE(side->layout().gapRows(24) == 0);
-            REQUIRE(side->caret().line == 6);
+            CHECK(side->layout().gapRows(24) == 0);
+            CHECK(side->caret().line == 6);
             CHECK(side->caretGap() == -1);
         }
 
@@ -837,12 +816,11 @@ namespace
         // Unfolding on the line beside it, as a fold of a script is.
         UNSCOPED_INFO("unfolding offered under its row");
         CHECK(side->canPerform(ALEditorCommand::Unfold));
-        UNSCOPED_INFO("unfolded");
         CHECK(side->perform(ALEditorCommand::Unfold));
         {
             INFO("opened, the caret where it was");
             CHECK(d.foldedCount() == 0);
-            REQUIRE(side->layout().gapRows(24) == 0);
+            CHECK(side->layout().gapRows(24) == 0);
             CHECK(side->caret().line == 24);
         }
         UNSCOPED_INFO("nothing more to unfold");
@@ -853,8 +831,8 @@ namespace
         d.left()->goTo(ALTextPos(12, 0));
         {
             INFO("the caret landing in it opens it, both sides");
-            REQUIRE(d.foldedCount() == 0);
-            REQUIRE_FALSE(hidden(d.right(), 12));
+            CHECK(d.foldedCount() == 0);
+            CHECK_FALSE(hidden(d.right(), 12));
             CHECK(d.left()->caret().line == 12);
         }
     }
@@ -874,7 +852,7 @@ namespace
         }
         {
             INFO("the gap");
-            REQUIRE(gapsOf(d.right())[16] == 1);
+            CHECK(gapsOf(d.right())[16] == 1);
             CHECK(d.right()->layout().lineTop(16) == d.right()->layout().rowHeight());
         }
 
@@ -889,7 +867,7 @@ namespace
         {
             INFO("opened, the caret on its first line, the side with the keyboard");
             CHECK(d.foldedCount() == 0);
-            REQUIRE(side->caret().line == 0);
+            CHECK(side->caret().line == 0);
             CHECK(side->hasFocus());
         }
         UNSCOPED_INFO("a click on a line of text is the side's");
@@ -913,7 +891,7 @@ namespace
         d.setInline(false);
         {
             INFO("side by side, folded, the caret under its row");
-            REQUIRE(d.foldedCount() == 1);
+            CHECK(d.foldedCount() == 1);
             CHECK(d.right()->caret().line == 16);
         }
         d.setSwapped(true);
@@ -990,7 +968,6 @@ namespace
         CHECK(d.foldedCount() == 0);
         // The right's line 25: context below the run.
         d.right()->goTo(ALTextPos(25, 2));
-        UNSCOPED_INFO("on the right's line 25");
         CHECK(d.rightAtCaret() == std::make_pair(25, 2));
         d.setRightText("inserted\n" + right);
         UNSCOPED_INFO("compared again: a change more");
@@ -1008,8 +985,8 @@ namespace
         d.setRightText("inserted\n" + right);
         {
             INFO("under a folded row: under it again, folded");
-            REQUIRE(d.foldedCount() == 1);
-            REQUIRE(d.right()->caret().line == 25);
+            CHECK(d.foldedCount() == 1);
+            CHECK(d.right()->caret().line == 25);
             CHECK(d.right()->layout().gapRows(25) == 1);
         }
     }
@@ -1024,8 +1001,8 @@ namespace
         source->setText("a\nB\nc\nx\ny\nd");
         {
             INFO("nothing offered without anyone to make it");
-            REQUIRE_FALSE(d.canTakeBack());
-            REQUIRE_FALSE(d.takeBack(0));
+            CHECK_FALSE(d.canTakeBack());
+            CHECK_FALSE(d.takeBack(0));
             CHECK_FALSE(d.bar()->getChild<LLView>("take_back")->getVisible());
         }
         const S32 narrow = d.right()->getRect().mLeft - d.left()->getRect().mRight;
@@ -1036,12 +1013,11 @@ namespace
         });
         {
             INFO("offered");
-            REQUIRE(d.canTakeBack());
+            CHECK(d.canTakeBack());
             CHECK(d.bar()->getChild<LLView>("take_back")->getVisible());
         }
         UNSCOPED_INFO("a gap wide enough for the arrows");
         CHECK(d.right()->getRect().mLeft - d.left()->getRect().mRight > narrow);
-        UNSCOPED_INFO("three changes");
         CHECK(d.changeCount() == 3);
 
         d.right()->setFocus(true);
@@ -1137,6 +1113,7 @@ namespace
         view->setTexts("default\n{\n    state_entry()\n    {\n        a();\n    }\n}", "default\n{\n    state_entry()\n    {\n        b();\n    }\n}");
         for (ALCodeEditor* each : { view->left(), view->right(), view->inlined() })
         {
+            CAPTURE(each->getName());
             {
                 INFO("no blocks to fold");
                 REQUIRE_FALSE(each->foldable());
@@ -1160,7 +1137,6 @@ namespace
         ALDiffView& d = make("default\n{\nstate_entry()\n{\nllSay(0, \"a\");\n}\n}", "default\n{\n    state_entry()\n    {\n        llSay(0,  \"b\");\n    }\n}");
         UNSCOPED_INFO("as they are: the re-indented lines changed");
         CHECK(d.changeCount() == 1);
-        UNSCOPED_INFO("off");
         CHECK_FALSE(d.ignores("whitespace"));
         d.right()->setFocus(true);
         d.right()->goTo(ALTextPos(static_cast<S32>(numbersOf(d.right()).size()) - 1, 0));
@@ -1168,18 +1144,18 @@ namespace
         d.setIgnore("whitespace", true);
         {
             INFO("on, and the bar's button lit");
-            REQUIRE(d.ignores("whitespace"));
+            CHECK(d.ignores("whitespace"));
             CHECK(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
         }
         UNSCOPED_INFO("one line changed: the word, not its indent");
         CHECK(d.changeCount() == 1);
         UNSCOPED_INFO("the right shown as it is");
-        REQUIRE(d.right()->text().find("\n    state_entry()\n") != std::string::npos);
+        CHECK(d.right()->text().find("\n    state_entry()\n") != std::string::npos);
         UNSCOPED_INFO("the caret kept");
         CHECK(d.rightAtCaret().first == line);
         const S32 say = 4;
         UNSCOPED_INFO("the changed line's word marked, not its blanks");
-        REQUIRE(d.right()->decorations().size() == 1);
+        CHECK(d.right()->decorations().size() == 1);
         UNSCOPED_INFO("the line before it the same");
         CHECK_FALSE(tinted(*d.right(), say - 1));
 
@@ -1192,7 +1168,6 @@ namespace
         UNSCOPED_INFO("a change of case a change");
         CHECK(d.changeCount() == 1);
         d.setOffersIgnoreCase(true);
-        UNSCOPED_INFO("offered");
         CHECK(d.offersIgnore("case"));
         d.setIgnore("case", true);
         {
@@ -1233,7 +1208,7 @@ namespace
         d.left()->scrollToCaret();
         {
             INFO("the caret kept in sight on one side: the other with it");
-            REQUIRE(d.left()->scrollY() > 300);
+            CHECK(d.left()->scrollY() > 300);
             CHECK(d.right()->scrollY() == d.left()->scrollY());
         }
         d.setInline(true);
@@ -1288,7 +1263,7 @@ namespace
         CHECK(d.handleMouseDown(frame.mLeft + text.mLeft / 2, y, MASK_NONE));
         {
             INFO("the right's caret on the other end, which has the keyboard");
-            REQUIRE(d.right()->caret().line == 4);
+            CHECK(d.right()->caret().line == 4);
             CHECK(d.right()->hasFocus());
         }
         // In the text rather than the gutter: not taken as a step.
@@ -1296,7 +1271,7 @@ namespace
         d.handleMouseDown(frame.mLeft + text.mLeft + 20, y, MASK_NONE);
         {
             INFO("a click in the text is the text's");
-            REQUIRE(d.right()->caret().line == 4);
+            CHECK(d.right()->caret().line == 4);
             CHECK_FALSE(d.right()->hasFocus());
         }
     }
@@ -1366,21 +1341,21 @@ namespace
 
         d.setNotes({ { 4, "LSL: integer division rounds toward zero", "the whole note" } });
         UNSCOPED_INFO("beside the LSL line");
-        REQUIRE(d.left()->noteAt(4).find("integer division") != std::string::npos);
+        CHECK(d.left()->noteAt(4).find("integer division") != std::string::npos);
         UNSCOPED_INFO("not on the SLua");
-        REQUIRE(d.right()->noteAt(4).empty());
+        CHECK(d.right()->noteAt(4).empty());
         const S32 inlined = d.model().lineShowing(ALDiffModel::Column::Inline, true, 4);
         {
             INFO("inline, beside where the line is");
             CHECK(inlined >= 0);
-            REQUIRE_FALSE(d.inlined()->noteAt(inlined).empty());
+            CHECK_FALSE(d.inlined()->noteAt(inlined).empty());
         }
         d.setRightText(std::string("-- one more\n") + slua);
         UNSCOPED_INFO("kept as the right is made anew");
-        REQUIRE_FALSE(d.left()->noteAt(4).empty());
+        CHECK_FALSE(d.left()->noteAt(4).empty());
         d.setTexts(lsl, slua);
         UNSCOPED_INFO("let go of with new texts");
-        REQUIRE(d.left()->noteAt(4).empty());
+        CHECK(d.left()->noteAt(4).empty());
     }
 
     TEST_CASE_METHOD(aldiffview_data, "aldiffview: vim search and command lines typed over a side never reach the source", "[aldiffview]")
@@ -1425,7 +1400,7 @@ namespace
         CHECK(edits == 0);
         {
             INFO("still the comparison's side, with the keyboard");
-            REQUIRE(d.right()->hasFocus());
+            CHECK(d.right()->hasFocus());
             CHECK(d.right()->getVisible());
         }
         typed("?thr\n");
@@ -1486,11 +1461,11 @@ namespace
         }
         {
             INFO("the buttons shown");
-            REQUIRE(d.bar()->getChild<LLView>("take_theirs")->getVisible());
+            CHECK(d.bar()->getChild<LLView>("take_theirs")->getVisible());
             CHECK(d.bar()->getChild<LLView>("keep_both")->getVisible());
         }
         UNSCOPED_INFO("the count says one left");
-        REQUIRE(d.bar()->countSaid().find("1 conflict left") != std::string::npos);
+        CHECK(d.bar()->countSaid().find("1 conflict left") != std::string::npos);
         d.right()->setFocus(true);
         d.right()->goTo(ALTextPos(2, 0));
         {
@@ -1516,8 +1491,8 @@ namespace
         CHECK(d.rightText() == source->text());
         {
             INFO("none left");
-            REQUIRE(d.conflictCount() == 0);
-            REQUIRE(d.bar()->countSaid().find("no conflicts left") != std::string::npos);
+            CHECK(d.conflictCount() == 0);
+            CHECK(d.bar()->countSaid().find("no conflicts left") != std::string::npos);
         }
         UNSCOPED_INFO("one edit");
         CHECK(asked == 1);
@@ -1548,9 +1523,9 @@ namespace
         d.setTexts(theirs, ours);
         {
             INFO("new texts let it go");
-            REQUIRE_FALSE(d.merging());
-            REQUIRE_FALSE(d.bar()->getChild<LLView>("take_theirs")->getVisible());
-            REQUIRE(d.bar()->countSaid().find("conflict") == std::string::npos);
+            CHECK_FALSE(d.merging());
+            CHECK_FALSE(d.bar()->getChild<LLView>("take_theirs")->getVisible());
+            CHECK(d.bar()->countSaid().find("conflict") == std::string::npos);
         }
         source->die();
     }
@@ -1575,7 +1550,7 @@ namespace
         {
             INFO("shown for three");
             CHECK(slider->getVisible());
-            REQUIRE(d.bar()->getChild<LLView>("older")->getVisible());
+            CHECK(d.bar()->getChild<LLView>("older")->getVisible());
             CHECK(d.bar()->versionShown() == 1);
         }
         {
@@ -1623,14 +1598,14 @@ namespace
         }
         bar->onCommit();
         UNSCOPED_INFO("let go where it was: nothing told");
-        REQUIRE(chosen.size() == 4);
+        CHECK(chosen.size() == 4);
 
         d.setTexts("a", "b");
         UNSCOPED_INFO("new texts let them go");
         CHECK_FALSE(slider->getVisible());
         press(d, "newer");
         UNSCOPED_INFO("nothing told");
-        REQUIRE(chosen.size() == 4);
+        CHECK(chosen.size() == 4);
     }
 
     TEST_CASE_METHOD(aldiffview_data, "aldiffview: a change copies from the side in front and the whole as a unified diff", "[aldiffview]")
@@ -1677,7 +1652,6 @@ namespace
                       std::string("--- new\n+++ old\n@@ -1,3 +1,3 @@\n a\n-B\n+b\n c\n\\ No newline at end of file\n"));
         d.setSwapped(false);
         d.setInline(false);
-        UNSCOPED_INFO("copied");
         CHECK(d.copyUnifiedDiff());
         UNSCOPED_INFO("from the left");
         CHECK(clipboard() == std::string("--- old\n+++ new\n@@ -1,3 +1,3 @@\n a\n-b\n+B\n c\n\\ No newline at end of file\n"));
@@ -1697,7 +1671,7 @@ namespace
         d.setTexts("same", "same");
         {
             INFO("the same: no diff");
-            REQUIRE(d.unifiedDiff().empty());
+            CHECK(d.unifiedDiff().empty());
             CHECK_FALSE(d.copyUnifiedDiff());
             CHECK(clipboard() == "kept");
         }
@@ -1707,10 +1681,10 @@ namespace
     {
         ALDiffView& d = make(lines(40).c_str(), lines(40, { { 5, "five" } }).c_str());
         UNSCOPED_INFO("side by side: inline not filled yet");
-        REQUIRE(d.inlined()->text().empty());
+        CHECK(d.inlined()->text().empty());
         d.setInline(true);
         UNSCOPED_INFO("filled as it is shown");
-        REQUIRE(d.inlined()->text() == lines(5) + "\nline 5\nfive\n" + lines(40).substr(lines(6).size() + 1));
+        CHECK(d.inlined()->text() == lines(5) + "\nline 5\nfive\n" + lines(40).substr(lines(6).size() + 1));
         UNSCOPED_INFO("its folds");
         CHECK(hidden(d.inlined(), 20));
         d.setInline(false);
@@ -1740,7 +1714,7 @@ namespace
         d.setInline(true);
         {
             INFO("inline filled again as it is shown");
-            REQUIRE(d.inlined()->text().find("thirty") != std::string::npos);
+            CHECK(d.inlined()->text().find("thirty") != std::string::npos);
             CHECK_FALSE(hidden(d.inlined(), 38));
         }
     }
@@ -1756,34 +1730,34 @@ namespace
         d.setMergeBase(base);
         {
             INFO("merging");
-            REQUIRE(d.merging());
+            CHECK(d.merging());
             CHECK(d.bar()->getChild<LLView>("take_theirs")->getVisible());
-            REQUIRE(d.model().ranges().size() == 1);
+            CHECK(d.model().ranges().size() == 1);
         }
         d.setLeftText(lines(8, { { 6, "older 6" } }));
         {
             INFO("merging no longer, the bar too");
-            REQUIRE_FALSE(d.merging());
-            REQUIRE_FALSE(d.bar()->getChild<LLView>("take_theirs")->getVisible());
-            REQUIRE(d.bar()->countSaid().find("conflict") == std::string::npos);
+            CHECK_FALSE(d.merging());
+            CHECK_FALSE(d.bar()->getChild<LLView>("take_theirs")->getVisible());
+            CHECK(d.bar()->countSaid().find("conflict") == std::string::npos);
         }
         UNSCOPED_INFO("the ranges let go");
-        REQUIRE(d.model().ranges().empty());
+        CHECK(d.model().ranges().empty());
 
         d.setTexts("x = 1; // one", "x = 1; // two");
         d.setIgnore("comments", true);
         {
             INFO("comments let go of: no change, the bar lit");
-            REQUIRE(d.ignores("comments"));
-            REQUIRE(d.changeCount() == 0);
+            CHECK(d.ignores("comments"));
+            CHECK(d.changeCount() == 0);
             CHECK(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
         }
         d.setGrammar(nullptr);
         {
             INFO("no grammar: not let go of, nor offered, the bar unlit");
-            REQUIRE_FALSE(d.ignores("comments"));
-            REQUIRE_FALSE(d.offersIgnore("comments"));
-            REQUIRE(d.changeCount() == 1);
+            CHECK_FALSE(d.ignores("comments"));
+            CHECK_FALSE(d.offersIgnore("comments"));
+            CHECK(d.changeCount() == 1);
             CHECK_FALSE(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("ignore"))->getToggleState());
         }
     }
@@ -1795,16 +1769,16 @@ namespace
         CHECK(d.left()->document().lineCount() == 4);
         {
             INFO("the third tinted, its neighbours not");
-            REQUIRE(tinted(*d.left(), 2));
-            REQUIRE_FALSE(tinted(*d.left(), 1));
-            REQUIRE_FALSE(tinted(*d.left(), 3));
+            CHECK(tinted(*d.left(), 2));
+            CHECK_FALSE(tinted(*d.left(), 1));
+            CHECK_FALSE(tinted(*d.left(), 3));
             CHECK(tinted(*d.right(), 2));
         }
         d.setRightText("a\rb\rC\rd\re");
         {
             INFO("typed in: the line put in the fifth");
-            REQUIRE(tinted(*d.right(), 4));
-            REQUIRE_FALSE(tinted(*d.right(), 3));
+            CHECK(tinted(*d.right(), 4));
+            CHECK_FALSE(tinted(*d.right(), 3));
             CHECK(d.right()->document().lineCount() == 5);
         }
     }
@@ -1813,27 +1787,27 @@ namespace
     {
         ALDiffView& d = make("a = 1; // one\nb = 2;\n", "a = 1; // two\nb = 3;\n");
         UNSCOPED_INFO("as they are, the comment said");
-        REQUIRE(d.unifiedDiff().find("-a = 1; // one\n") != std::string::npos);
+        CHECK(d.unifiedDiff().find("-a = 1; // one\n") != std::string::npos);
         d.setIgnore("comments", true);
         const std::string diff = d.unifiedDiff();
         UNSCOPED_INFO("the change still said");
-        REQUIRE(diff.find("-b = 2;\n+b = 3;\n") != std::string::npos);
+        CHECK(diff.find("-b = 2;\n+b = 3;\n") != std::string::npos);
         {
             INFO("the comment reworded the same, as the right has it");
-            REQUIRE(diff.find("-a = 1;") == std::string::npos);
-            REQUIRE(diff.find("\n a = 1; // two\n") != std::string::npos);
+            CHECK(diff.find("-a = 1;") == std::string::npos);
+            CHECK(diff.find("\n a = 1; // two\n") != std::string::npos);
         }
         d.setTexts("x = 1; // one", "x = 1; // two");
         {
             INFO("a comment reworded alone: nothing to copy");
             CHECK(d.changeCount() == 0);
-            REQUIRE(d.unifiedDiff().empty());
+            CHECK(d.unifiedDiff().empty());
         }
         d.setTexts("x = 1;\n", "x = 1;\n// a note put in\n");
         {
             INFO("a line of comment put in: nothing to copy");
             CHECK(d.changeCount() == 0);
-            REQUIRE(d.unifiedDiff().empty());
+            CHECK(d.unifiedDiff().empty());
         }
     }
 
@@ -1981,8 +1955,8 @@ namespace
                         }
                     }
                 }
-                const std::string where = "way " + std::to_string(way) + ", step " + std::to_string(step);
-                sameShown(kept, whole, where);
+                CAPTURE(way, step);
+                require_same_shown(kept, whole, "edited");
             }
         }
         UNSCOPED_INFO("filled again a stretch at a time, mostly");
@@ -2011,16 +1985,16 @@ namespace
         both([](ALDiffView& d) { d.setRightText(aldiffview_data::lines(40, { { 5, "FIVE" } }) + "\nput in\nand again"); });
         UNSCOPED_INFO("lines put in: a stretch at the end laid out again");
         CHECK(at_end(ALDiffModel::Column::Left));
-        sameShown(kept, whole, "put in at the end");
+        require_same_shown(kept, whole, "put in at the end");
         UNSCOPED_INFO("the left's rows below its last");
         CHECK(kept.left()->layout().gapRows(40) == 2);
         both([](ALDiffView& d) { d.setRightText(aldiffview_data::lines(40, { { 5, "FIVE" } })); });
-        UNSCOPED_INFO("again");
+        UNSCOPED_INFO("lines taken out: a stretch at the end laid out again");
         CHECK(at_end(ALDiffModel::Column::Left));
-        sameShown(kept, whole, "taken out again");
+        require_same_shown(kept, whole, "taken out again");
         {
             INFO("none now but the row of the run folded to the end");
-            REQUIRE(kept.left()->layout().gapRows(40) == 1);
+            CHECK(kept.left()->layout().gapRows(40) == 1);
             CHECK(kept.left()->lineAnnotation(40).gapStop);
         }
 
@@ -2034,14 +2008,14 @@ namespace
         both([](ALDiffView& d) { d.setLeftText(aldiffview_data::lines(40, { { 5, "five" }, { 39, "line 39!" } })); });
         UNSCOPED_INFO("the left's last line: a stretch at the end laid out again");
         CHECK(at_end(ALDiffModel::Column::Inline));
-        sameShown(kept, whole, "the left's last line");
+        require_same_shown(kept, whole, "the left's last line");
         // Typed in a line put in at the end: the edit takes the line before
         // it from its end.
         both([](ALDiffView& d) { d.setTexts(aldiffview_data::lines(40), aldiffview_data::lines(40) + "\nput in"); });
         both([](ALDiffView& d) { d.setRightText(aldiffview_data::lines(40) + "\nput in!"); });
         UNSCOPED_INFO("typed at the end: a stretch at the end laid out again");
         CHECK(at_end(ALDiffModel::Column::Inline));
-        sameShown(kept, whole, "typed at the end");
+        require_same_shown(kept, whole, "typed at the end");
     }
 
     TEST_CASE_METHOD(aldiffview_data, "aldiffview: typing far down relexes the edited side from the edit and not the other", "[aldiffview]")
@@ -2066,7 +2040,7 @@ namespace
         CHECK(kept.left()->highlighter().lastLexed() == 0);
         UNSCOPED_INFO("whole: lexed from the top");
         CHECK(whole.right()->highlighter().lastLexed() > 2500);
-        sameShown(kept, whole, "typed far down");
+        require_same_shown(kept, whole, "typed far down");
     }
 
     TEST_CASE_METHOD(aldiffview_data, "aldiffview: following another side's scroll copies only the axis that moved", "[aldiffview]")
@@ -2095,7 +2069,7 @@ namespace
         d.right()->scrollToCaret();
         {
             INFO("the caret kept in sight on the right: the left down with it");
-            REQUIRE(d.right()->scrollY() > 120);
+            CHECK(d.right()->scrollY() > 120);
             CHECK(d.left()->scrollY() == d.right()->scrollY());
         }
         UNSCOPED_INFO("and still across");
@@ -2124,13 +2098,13 @@ namespace
         const auto said = [](KEY key) { return LLKeyboard::stringFromAccelerator(MASK_ALT, key); };
         {
             INFO("each key said on its button's tip");
-            REQUIRE(tip("fold").find(said('F')) != std::string::npos);
-            REQUIRE(tip("swap").find(said('S')) != std::string::npos);
-            REQUIRE(tip("take_theirs").find(said('T')) != std::string::npos);
-            REQUIRE(tip("keep_mine").find(said('M')) != std::string::npos);
-            REQUIRE(tip("keep_both").find(said('B')) != std::string::npos);
-            REQUIRE(tip("older").find(said(',')) != std::string::npos);
-            REQUIRE(tip("newer").find(said('.')) != std::string::npos);
+            CHECK(tip("fold").find(said('F')) != std::string::npos);
+            CHECK(tip("swap").find(said('S')) != std::string::npos);
+            CHECK(tip("take_theirs").find(said('T')) != std::string::npos);
+            CHECK(tip("keep_mine").find(said('M')) != std::string::npos);
+            CHECK(tip("keep_both").find(said('B')) != std::string::npos);
+            CHECK(tip("older").find(said(',')) != std::string::npos);
+            CHECK(tip("newer").find(said('.')) != std::string::npos);
         }
 
         d.right()->setFocus(true);
@@ -2144,8 +2118,8 @@ namespace
         CHECK(d.right()->handleKey('F', MASK_ALT, false));
         {
             INFO("opened, and the button so");
-            REQUIRE_FALSE(d.foldsSame());
-            REQUIRE(d.foldedCount() == 0);
+            CHECK_FALSE(d.foldsSame());
+            CHECK(d.foldedCount() == 0);
             CHECK_FALSE(ALViewType::as<ALFlatButton>(d.bar()->getChild<LLView>("fold"))->getToggleState());
         }
         d.right()->handleKey('F', MASK_ALT, false);
@@ -2211,14 +2185,14 @@ namespace
         d.setVersions(3, 1, [&](S32 version) { chosen.push_back(version); });
         {
             INFO("Alt-comma: older");
-            REQUIRE(d.right()->handleKey(',', MASK_ALT, false));
+            CHECK(d.right()->handleKey(',', MASK_ALT, false));
             CHECK(chosen == std::vector<S32>{ 0 });
             CHECK(d.bar()->versionShown() == 0);
         }
         {
             INFO("no older than the oldest");
             CHECK(d.right()->handleKey(',', MASK_ALT, false));
-            REQUIRE(chosen.size() == 1);
+            CHECK(chosen.size() == 1);
         }
         {
             INFO("Alt-period: newer");
@@ -2241,7 +2215,7 @@ namespace
             INFO("on a button of the bar");
             REQUIRE(focus);
             CHECK(focus->getParent() == d.bar());
-            REQUIRE(ALViewType::as<ALFlatButton>(focus) != nullptr);
+            CHECK(ALViewType::as<ALFlatButton>(focus) != nullptr);
         }
         {
             INFO("nothing typed");
@@ -2274,6 +2248,7 @@ namespace
         d.setOnTakeBack([&](const ALTextRange& range, const std::string& text) { return source->replaceAll({ { range, text } }); });
         for (const char* button : { "take_theirs", "keep_both" })
         {
+            CAPTURE(button);
             d.setTexts(theirs, ours);
             source->setText(ours);
             d.setMergeBase(base);
@@ -2345,6 +2320,7 @@ namespace
         for (S32 width = 1000; width >= 60; width -= 10)
         {
             d.reshape(width, 300);
+            CAPTURE(width);
             UNSCOPED_INFO("nothing past the left edge");
             REQUIRE(nothing_past_left());
             lost_count  = !count->getVisible() && !lost_count ? width : lost_count;
@@ -2362,8 +2338,8 @@ namespace
             INFO("and all back");
             CHECK(count->getVisible());
             CHECK(glyph("take_theirs") == "Theirs");
-            REQUIRE(d.bar()->getChild<LLView>("versions")->getVisible());
-            REQUIRE(d.bar()->getChild<LLView>("take_theirs")->getVisible());
+            CHECK(d.bar()->getChild<LLView>("versions")->getVisible());
+            CHECK(d.bar()->getChild<LLView>("take_theirs")->getVisible());
             CHECK(d.bar()->getChild<LLView>("done")->getVisible());
         }
 
@@ -2373,27 +2349,27 @@ namespace
         {
             INFO("inline: the tip says the way back");
             CHECK(d.isInline());
-            REQUIRE(inline_button->getToolTip() != side_by_side);
-            REQUIRE(inline_button->getToolTip().find("side by side") != std::string::npos);
+            CHECK(inline_button->getToolTip() != side_by_side);
+            CHECK(inline_button->getToolTip().find("side by side") != std::string::npos);
         }
         press(d, "inline");
         UNSCOPED_INFO("and back");
         CHECK(inline_button->getToolTip() == side_by_side);
 
         UNSCOPED_INFO("no reason while it compares as asked");
-        REQUIRE(count->getToolTip().empty());
+        CHECK(count->getToolTip().empty());
         d.bar()->setFellBack(true);
         const std::string said = d.bar()->countSaid();
         {
             INFO("by lines, briefly");
             REQUIRE(said.size() >= 8);
-            REQUIRE(said.substr(said.size() - 8) == "by lines");
+            CHECK(said.substr(said.size() - 8) == "by lines");
         }
         UNSCOPED_INFO("the reason in the tip");
-        REQUIRE_FALSE(count->getToolTip().empty());
+        CHECK_FALSE(count->getToolTip().empty());
         d.bar()->setFellBack(false);
         UNSCOPED_INFO("let go");
-        REQUIRE(count->getToolTip().empty());
+        CHECK(count->getToolTip().empty());
     }
 
     TEST_CASE_METHOD(aldiffview_data, "aldiffview: runs opened while a layout was hidden are open when it is shown", "[aldiffview]")
@@ -2415,7 +2391,6 @@ namespace
             d.setInline(true);
             d.setInline(false);
         });
-        UNSCOPED_INFO("two runs folded");
         CHECK(kept.foldedCount() == 2);
 
         // Typed in far down: side by side filled again there, inline left
@@ -2437,13 +2412,13 @@ namespace
         const S32 first = model.foldFirstLine(Column::Inline, 0);
         {
             INFO("inline: its lines shown, its row gone");
-            REQUIRE_FALSE(hidden(kept.inlined(), first));
-            REQUIRE_FALSE(hidden(kept.inlined(), first + model.foldLines(0) - 1));
+            CHECK_FALSE(hidden(kept.inlined(), first));
+            CHECK_FALSE(hidden(kept.inlined(), first + model.foldLines(0) - 1));
             CHECK(kept.inlined()->layout().gapRows(model.foldGapLine(Column::Inline, 0)) == 0);
         }
         UNSCOPED_INFO("the second still folded");
         CHECK(hidden(kept.inlined(), model.foldFirstLine(Column::Inline, 1)));
-        sameShown(kept, whole, "a run opened side by side");
+        require_same_shown(kept, whole, "a run opened side by side");
 
         // Typed in again inline, side by side left as it was, every run
         // opened as Alt-F does, and side by side shown.
@@ -2454,12 +2429,12 @@ namespace
         });
         {
             INFO("side by side: every run open");
-            REQUIRE(kept.foldedCount() == 0);
-            REQUIRE_FALSE(hidden(kept.left(), model.foldFirstLine(Column::Left, 1)));
-            REQUIRE_FALSE(hidden(kept.right(), model.foldFirstLine(Column::Right, 1)));
+            CHECK(kept.foldedCount() == 0);
+            CHECK_FALSE(hidden(kept.left(), model.foldFirstLine(Column::Left, 1)));
+            CHECK_FALSE(hidden(kept.right(), model.foldFirstLine(Column::Right, 1)));
             CHECK(kept.right()->layout().gapRows(model.foldGapLine(Column::Right, 1)) == 0);
         }
-        sameShown(kept, whole, "every run opened inline");
+        require_same_shown(kept, whole, "every run opened inline");
     }
 
     TEST_CASE_METHOD(aldiffview_data, "aldiffview: notes stay by the left's line swapped or inline and go with a new left", "[aldiffview]")
@@ -2468,20 +2443,20 @@ namespace
         d.setNotes({ { 2, "about c", "the tip" } });
         {
             INFO("on the left");
-            REQUIRE(d.left()->noteAt(2) == "about c");
-            REQUIRE(d.right()->noteAt(2).empty());
+            CHECK(d.left()->noteAt(2) == "about c");
+            CHECK(d.right()->noteAt(2).empty());
         }
         d.setSwapped(true);
         {
             INFO("swapped: on the right, none on the left");
-            REQUIRE(d.right()->noteAt(2) == "about c");
-            REQUIRE(d.left()->noteAt(2).empty());
+            CHECK(d.right()->noteAt(2) == "about c");
+            CHECK(d.left()->noteAt(2).empty());
         }
         d.setSwapped(false);
         {
             INFO("and back");
-            REQUIRE(d.left()->noteAt(2) == "about c");
-            REQUIRE(d.right()->noteAt(2).empty());
+            CHECK(d.left()->noteAt(2) == "about c");
+            CHECK(d.right()->noteAt(2).empty());
         }
         d.setRightText("a\nB\nput in\nc\nd");
         UNSCOPED_INFO("the right made anew: the left's as it was");
@@ -2498,12 +2473,12 @@ namespace
         {
             INFO("and where it is after another edit, nowhere else");
             CHECK(now == at + 1);
-            REQUIRE(d.inlined()->noteAt(now) == "about c");
-            REQUIRE(d.inlined()->noteAt(at).empty());
+            CHECK(d.inlined()->noteAt(now) == "about c");
+            CHECK(d.inlined()->noteAt(at).empty());
         }
         d.setLeftText("a\nb\nc\nd!");
         UNSCOPED_INFO("a left of another version: let go of");
-        REQUIRE(d.inlined()->noteAt(d.model().lineShowing(ALDiffModel::Column::Inline, true, 2)).empty());
+        CHECK(d.inlined()->noteAt(d.model().lineShowing(ALDiffModel::Column::Inline, true, 2)).empty());
     }
 
     TEST_CASE_METHOD(aldiffview_data, "aldiffview: a change is copied only from a side in front that has lines of it", "[aldiffview]")
@@ -2555,7 +2530,7 @@ namespace
         ALDiffView& d = make("default\n{\n    state_entry()\n    {\n    }\n}\n", "default\n{\n    state_entry()\n    {\n        x();\n    }\n}\n");
         for (ALCodeEditor* side : { d.left(), d.right(), d.inlined() })
         {
-            UNSCOPED_INFO("no headers pinned on the " + side->getName() + " side");
+            CAPTURE(side->getName());
             REQUIRE_FALSE(side->getStickyHeaders());
         }
     }

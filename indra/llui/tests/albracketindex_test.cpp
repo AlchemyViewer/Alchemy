@@ -51,7 +51,7 @@ namespace
         // Line and block comments, strings, and brackets as punctuation;
         // and with `paths`, a string one word long with a dot or a slash in
         // it a path, as LSL's grammar has it.
-        static std::shared_ptr<const ALSyntaxGrammar> grammar(bool paths = false)
+        static std::shared_ptr<const ALSyntaxGrammar> require_grammar(bool paths = false)
         {
             LLSD description;
             description["name"] = "brackets";
@@ -71,8 +71,9 @@ namespace
             description["states"]["line_comment"] = line_comment;
             auto        loaded = std::make_shared<ALSyntaxGrammar>();
             std::string error;
-            UNSCOPED_INFO("grammar loads: " + error);
-            REQUIRE(loaded->load(description, error));
+            const bool  ok = loaded->load(description, error);
+            INFO("grammar loads: " << error);
+            REQUIRE(ok);
             return loaded;
         }
 
@@ -83,7 +84,7 @@ namespace
         void make(const char* text, bool paths = false)
         {
             doc.setText(text);
-            highlighter.setGrammar(grammar(paths));
+            highlighter.setGrammar(require_grammar(paths));
             highlighter.attach(&doc);
             index.attach(&doc);
         }
@@ -168,9 +169,7 @@ namespace
     TEST_CASE_METHOD(albracketindex_data, "albracketindex: the index follows edits to a line's text and to its tokens", "[albracketindex]")
     {
         make("(a\nb)\nc\n");
-        UNSCOPED_INFO("paired");
         CHECK(matched(0, 0) == std::string("1:1"));
-        UNSCOPED_INFO("depth");
         CHECK(index.depthBefore(1) == 1);
         doc.insert(ALTextPos(0, 0), "/*");
         UNSCOPED_INFO("the opener now in a comment");

@@ -105,12 +105,9 @@ namespace
         {
             SKIP("the source tree is not where the build said it was");
         }
-        UNSCOPED_INFO("some tags");
-        REQUIRE_FALSE(schema().tags().empty());
-        UNSCOPED_INFO("button is one of them");
-        REQUIRE(schema().tag("button") != nullptr);
-        UNSCOPED_INFO("and a tag nobody registers is not");
-        REQUIRE(schema().tag("no_such_widget") == nullptr);
+        CHECK_FALSE(schema().tags().empty());
+        CHECK(schema().tag("button") != nullptr);
+        CHECK(schema().tag("no_such_widget") == nullptr);
         UNSCOPED_INFO("nor does it accept anything");
         CHECK_FALSE(schema().accepts("no_such_widget", "name"));
     }
@@ -126,15 +123,11 @@ namespace
         }
         for (const ALXUISchema::Tag& tag : schema().tags())
         {
-            UNSCOPED_INFO("left on " + tag.name);
+            CAPTURE(tag.name);
             REQUIRE(has(tag, "left"));
-            UNSCOPED_INFO("width on " + tag.name);
             REQUIRE(has(tag, "width"));
-            UNSCOPED_INFO("height on " + tag.name);
             REQUIRE(has(tag, "height"));
-            UNSCOPED_INFO("name on " + tag.name);
             REQUIRE(has(tag, "name"));
-            UNSCOPED_INFO("follows on " + tag.name);
             REQUIRE(has(tag, "follows"));
         }
     }
@@ -149,13 +142,10 @@ namespace
             SKIP("the source tree is not where the build said it was");
         }
         const ALXUISchema::Tag* button = schema().tag("button");
-        UNSCOPED_INFO("button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("value is an attribute");
         CHECK(has(*button, "value"));
-        UNSCOPED_INFO("and initial_value beside it");
         CHECK(has(*button, "initial_value"));
-        UNSCOPED_INFO("and an element as well");
+        UNSCOPED_INFO("value is an element as well");
         CHECK(std::any_of(button->elements.begin(), button->elements.end(),
                            [](const ALXUISchema::Element& e) { return e.name == "button.value"; }));
         UNSCOPED_INFO("a callback's parameter is LLSD too");
@@ -173,15 +163,12 @@ namespace
             SKIP("the source tree is not where the build said it was");
         }
         const ALXUISchema::Tag* button = schema().tag("button");
-        UNSCOPED_INFO("button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("the font's own name");
         CHECK(has(*button, "font.name"));
-        UNSCOPED_INFO("and the font written as one");
+        UNSCOPED_INFO("the font written as one");
         CHECK(has(*button, "font"));
-        UNSCOPED_INFO("a colour's components");
         CHECK(has(*button, "label_color.red"));
-        UNSCOPED_INFO("and the colour written as one");
+        UNSCOPED_INFO("the colour written as one");
         CHECK(has(*button, "label_color"));
     }
 
@@ -194,23 +181,17 @@ namespace
             SKIP("the source tree is not where the build said it was");
         }
         const ALXUISchema::Tag* button = schema().tag("button");
-        UNSCOPED_INFO("button");
         REQUIRE(button != nullptr);
         const ALXUISchema::Attribute* halign = find(*button, "halign");
-        UNSCOPED_INFO("halign");
         REQUIRE(halign != nullptr);
-        UNSCOPED_INFO("its three names");
-        REQUIRE(halign->values.size() == 3u);
-        UNSCOPED_INFO("centre");
-        REQUIRE(std::find(halign->values.begin(), halign->values.end(), "center")
+        CHECK(halign->values.size() == 3u);
+        CHECK(std::find(halign->values.begin(), halign->values.end(), "center")
                              != halign->values.end());
 
         const ALXUISchema::Attribute* name = find(*button, "name");
-        UNSCOPED_INFO("name");
         REQUIRE(name != nullptr);
         UNSCOPED_INFO("a string names nothing");
-        REQUIRE(name->values.empty());
-        UNSCOPED_INFO("and is one");
+        CHECK(name->values.empty());
         CHECK((int)name->value == (int)ALParamType::STRING);
     }
 
@@ -221,9 +202,7 @@ namespace
         {
             SKIP("the source tree is not where the build said it was");
         }
-        UNSCOPED_INFO("a button takes a label");
         CHECK(schema().accepts("button", "label"));
-        UNSCOPED_INFO("and a line editor a watermark");
         CHECK(schema().accepts("line_editor", "watermark_text"));
         // A synonym for a parameter of a nested block is dropped where it is
         // written: the descriptor it names belongs to the inner block, and
@@ -245,11 +224,9 @@ namespace
         const std::string xsd = schema().asXSD();
         pugi::xml_document document;
         const pugi::xml_parse_result result = document.load_string(xsd.c_str());
-        UNSCOPED_INFO("the schema parses");
         CHECK(result.status == pugi::status_ok);
 
         const pugi::xml_node root = document.document_element();
-        UNSCOPED_INFO("a schema");
         CHECK(std::string(root.name()) == std::string("xs:schema"));
 
         size_t elements = 0;
@@ -260,7 +237,7 @@ namespace
             REQUIRE(schema().tag(child.attribute("name").as_string()) != nullptr);
         }
         UNSCOPED_INFO("one global element per tag");
-        REQUIRE(elements == schema().tags().size());
+        CHECK(elements == schema().tags().size());
     }
 
     // A registry of widgets valid below a tag is filled by static registrars,
@@ -274,11 +251,8 @@ namespace
             SKIP("the source tree is not where the build said it was");
         }
         const ALXUISchema::Tag* panel = schema().tag("panel");
-        UNSCOPED_INFO("panel");
         REQUIRE(panel != nullptr);
-        UNSCOPED_INFO("a panel takes a button");
         CHECK(hasChild(*panel, "button"));
-        UNSCOPED_INFO("and a panel");
         CHECK(hasChild(*panel, "panel"));
     }
 
@@ -292,14 +266,13 @@ namespace
             SKIP("the source tree is not where the build said it was");
         }
         const ALXUISchema::Tag* floater = schema().tag("floater");
-        UNSCOPED_INFO("floater");
         REQUIRE(floater != nullptr);
         UNSCOPED_INFO("with the widgets a floater holds");
         CHECK(hasChild(*floater, "button"));
         UNSCOPED_INFO("it is a view, so it has a rect");
         CHECK(has(*floater, "left"));
         UNSCOPED_INFO("and the tag it shares its block with");
-        REQUIRE(schema().tag("multi_floater") != nullptr);
+        CHECK(schema().tag("multi_floater") != nullptr);
     }
 
     // Both spellings of a parameter written as an element. A child whose tag
@@ -312,7 +285,6 @@ namespace
             SKIP("the source tree is not where the build said it was");
         }
         const ALXUISchema::Tag* panel = schema().tag("panel");
-        UNSCOPED_INFO("panel");
         REQUIRE(panel != nullptr);
         UNSCOPED_INFO("under the tag that owns it");
         CHECK(hasElement(*panel, "panel.string"));
@@ -322,7 +294,6 @@ namespace
         // A name that is both a tag and a parameter is read as the parameter,
         // since a child is only taken for a widget once the block refuses it.
         const ALXUISchema::Tag* button = schema().tag("button");
-        UNSCOPED_INFO("button");
         REQUIRE(button != nullptr);
         UNSCOPED_INFO("badge is a parameter of a button");
         CHECK(hasElement(*button, "badge"));
@@ -339,10 +310,9 @@ namespace
         }
         const std::string xsd = schema().asXSD();
         UNSCOPED_INFO("a widget template supplies what a file leaves out, so nothing is required");
-        REQUIRE(xsd.find("use=\"required\"") == std::string::npos);
+        CHECK(xsd.find("use=\"required\"") == std::string::npos);
 
         pugi::xml_document document;
-        UNSCOPED_INFO("the schema parses");
         CHECK(document.load_string(xsd.c_str()).status == pugi::status_ok);
 
         // stat_bar writes bar_max="100.f", and xs:decimal refuses the suffix.
@@ -355,9 +325,8 @@ namespace
         CHECK(found);
 
         const ALXUISchema::Attribute* alpha = find(*schema().tag("panel"), "bg_alpha_color.alpha");
-        UNSCOPED_INFO("a colour component is a real");
         REQUIRE(alpha != nullptr);
-        UNSCOPED_INFO("and reads as one");
+        UNSCOPED_INFO("a colour component is a real");
         CHECK((int)alpha->value == (int)ALParamType::REAL);
     }
 
@@ -370,13 +339,10 @@ namespace
         {
             SKIP("the source tree is not where the build said it was");
         }
-        UNSCOPED_INFO("a panel takes a button");
         CHECK(schema().acceptsChild("panel", "button"));
-        UNSCOPED_INFO("a scroll container takes a panel");
         CHECK(schema().acceptsChild("scroll_container", "panel"));
-        UNSCOPED_INFO("and takes nothing else it was not given");
+        UNSCOPED_INFO("a scroll container takes nothing it was not given");
         CHECK_FALSE(schema().acceptsChild("scroll_container", "button"));
-        UNSCOPED_INFO("a layout stack takes layout panels");
         CHECK(schema().acceptsChild("layout_stack", "layout_panel"));
         UNSCOPED_INFO("a tag the schema does not know accepts nothing");
         CHECK_FALSE(schema().acceptsChild("no_such_widget", "button"));
@@ -394,7 +360,6 @@ namespace
             SKIP("the source tree is not where the build said it was");
         }
         const ALXUISchema::Tag* text = schema().tag("text");
-        UNSCOPED_INFO("text");
         REQUIRE(text != nullptr);
 
         const ALXUISchema::Attribute* colour = find(*text, "text_color");
@@ -403,14 +368,14 @@ namespace
         UNSCOPED_INFO("as the type it is");
         CHECK(colour->type == std::string("LLUIColor"));
         UNSCOPED_INFO("and its parts are still there beside it");
-        REQUIRE(find(*text, "text_color.red") != nullptr);
+        CHECK(find(*text, "text_color.red") != nullptr);
 
         UNSCOPED_INFO("so is a font");
-        REQUIRE(find(*text, "font") != nullptr);
+        CHECK(find(*text, "font") != nullptr);
         UNSCOPED_INFO("and its parts");
-        REQUIRE(find(*text, "font.name") != nullptr);
+        CHECK(find(*text, "font.name") != nullptr);
         UNSCOPED_INFO("and an image");
-        REQUIRE(find(*schema().tag("button"), "image_unselected") != nullptr);
+        CHECK(find(*schema().tag("button"), "image_unselected") != nullptr);
     }
 
     // A registry knows that a button takes a label and cannot know what a
@@ -444,12 +409,12 @@ namespace
             missing += (missing.empty() ? "" : ", ") + name;
         }
         UNSCOPED_INFO("every tag says what it is for; these do not: " + missing);
-        REQUIRE(unwritten.empty());
+        CHECK(unwritten.empty());
 
         // And a tag nobody has written one for is not an error, it is one
         // fewer line: the schema still knows the tag.
         UNSCOPED_INFO("a name nobody wrote about has nothing to say");
-        REQUIRE(ALXUINotes::get().note("not_a_tag_anybody_registered").empty());
+        CHECK(ALXUINotes::get().note("not_a_tag_anybody_registered").empty());
     }
 
     // The generated schema carries them, so an editor pointed at xui.xsd
@@ -462,7 +427,6 @@ namespace
         }
         pugi::xml_document document;
         const std::string xsd = schema().asXSD();
-        UNSCOPED_INFO("the schema parses");
         CHECK(document.load_string(xsd.c_str()).status == pugi::status_ok);
 
         for (pugi::xml_node element : document.document_element().children("xs:element"))
@@ -495,13 +459,13 @@ namespace
         LLXMLNodePtr provided = new LLXMLNode("button", false);
         parser.writeXUI(provided, defaults);
         UNSCOPED_INFO("what was provided is nothing");
-        REQUIRE(provided->mAttributes.size() == 0u);
+        CHECK(provided->mAttributes.size() == 0u);
 
         LLXMLNodePtr held = new LLXMLNode("button", false);
         parser.writeXUI(held, defaults,
                         ll_make_predicate(LLInitParam::VALID) && !ll_make_predicate(LLInitParam::EMPTY));
         UNSCOPED_INFO("what is held is not");
-        REQUIRE(held->mAttributes.size() > 0u);
+        CHECK(held->mAttributes.size() > 0u);
 
         // But what C++ declares is not what an element carries: a button is
         // twenty-three pixels tall because the widget's own template says so,
@@ -515,10 +479,8 @@ namespace
         // The schema reads the block a widget is actually built from, which
         // is that one with its template over it and its base blocks' under.
         const ALXUISchema::Tag* button = schema().tag("button");
-        UNSCOPED_INFO("button");
         REQUIRE(button != nullptr);
         const ALXUISchema::Attribute* height = find(*button, "height");
-        UNSCOPED_INFO("height is in the schema");
         REQUIRE(height != nullptr);
         UNSCOPED_INFO("and the schema says what it holds");
         CHECK(height->holds);
@@ -554,24 +516,24 @@ namespace
 
         // Near nothing, so nothing is offered.
         UNSCOPED_INFO("a name near nothing");
-        REQUIRE(schema().nearestSpelling("button", "qqzzxwvu").empty());
+        CHECK(schema().nearestSpelling("button", "qqzzxwvu").empty());
 
         // A short name has no room to be wrong in. Two letters swapped is
         // two edits, and over five characters two edits reach a different
         // word: `lable` is as near `label` as it is to `table`, and a guess
         // between them is a coin toss with the file as the stake.
         UNSCOPED_INFO("two swapped in a short name");
-        REQUIRE(schema().nearestSpelling("button", "lable").empty());
+        CHECK(schema().nearestSpelling("button", "lable").empty());
 
         // And under four characters nothing is offered at all: `top` and
         // `pad` are each one edit from a great many things, every one of
         // which is a real name somebody meant.
         UNSCOPED_INFO("a short name is never a slip");
-        REQUIRE(schema().nearestSpelling("button", "top").empty());
+        CHECK(schema().nearestSpelling("button", "top").empty());
 
         // A tag nobody knows has no vocabulary to compare against.
         UNSCOPED_INFO("no tag, no suggestion");
-        REQUIRE(schema().nearestSpelling("no_such_tag", "labl").empty());
+        CHECK(schema().nearestSpelling("no_such_tag", "labl").empty());
     }
 
     // The three things no registry knows, and where each of them comes from.
@@ -592,12 +554,9 @@ namespace
         // so each is the other's and neither is invented here.
         const ALXUISchema::Attribute* wrap = schema().attribute("text", "wrap");
         const ALXUISchema::Attribute* old = schema().attribute("text", "word_wrap");
-        {
-            INFO("both names are attributes");
-            REQUIRE(wrap != nullptr);
-            REQUIRE(old != nullptr);
-        }
-        UNSCOPED_INFO("and each names the other");
+        REQUIRE(wrap != nullptr);
+        REQUIRE(old != nullptr);
+        UNSCOPED_INFO("each names the other");
         CHECK(wrap->alias == std::string("word_wrap"));
         UNSCOPED_INFO("both ways");
         CHECK(old->alias == std::string("wrap"));
@@ -612,24 +571,21 @@ namespace
 
         // A parameter with only one name has no alias and no opinion.
         const ALXUISchema::Attribute* name = schema().attribute("text", "name");
-        UNSCOPED_INFO("name");
         REQUIRE(name != nullptr);
         UNSCOPED_INFO("one name, no pair");
-        REQUIRE(name->alias.empty());
+        CHECK(name->alias.empty());
         UNSCOPED_INFO("and nothing said about it");
         CHECK_FALSE(name->deprecated);
 
         // One sentence per tag, for the Library and for the XSD.
         const ALXUISchema::Tag* button = schema().tag("button");
-        UNSCOPED_INFO("button");
         REQUIRE(button != nullptr);
-        UNSCOPED_INFO("has a sentence");
-        REQUIRE_FALSE(button->note.empty());
+        CHECK_FALSE(button->note.empty());
 
         // A tag nobody has written one for falls back to what it did before
         // there were sentences: nothing waits on prose.
         UNSCOPED_INFO("and the notes do not have to be complete");
-        REQUIRE(ALXUINotes::get().count() > 0);
+        CHECK(ALXUINotes::get().count() > 0);
     }
 
     // The kind a tag is looked for under, and whether a specimen of it can
@@ -642,17 +598,11 @@ namespace
             SKIP("the source tree is not where the build said it was");
         }
         const ALXUISchema& s = schema();
-        UNSCOPED_INFO("a button is a control");
         CHECK(s.groupOf("button") == ALXUISchema::Group::Controls);
-        UNSCOPED_INFO("a panel holds things");
         CHECK(s.groupOf("panel") == ALXUISchema::Group::Containers);
-        UNSCOPED_INFO("a layout stack too");
         CHECK(s.groupOf("layout_stack") == ALXUISchema::Group::Containers);
-        UNSCOPED_INFO("a menu item is chrome");
         CHECK(s.groupOf("menu_item_call") == ALXUISchema::Group::Chrome);
-        UNSCOPED_INFO("a scroll list is a list");
         CHECK(s.groupOf("scroll_list") == ALXUISchema::Group::Lists);
-        UNSCOPED_INFO("a line editor is text");
         CHECK(s.groupOf("line_editor") == ALXUISchema::Group::Text);
         UNSCOPED_INFO("a tag nobody registered is a control");
         CHECK(s.groupOf("no_such_tag") == ALXUISchema::Group::Controls);

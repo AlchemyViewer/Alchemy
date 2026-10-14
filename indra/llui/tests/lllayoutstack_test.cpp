@@ -126,16 +126,13 @@ namespace
         LLLayoutPanel* b = panel("b");
         s->addPanel(a);
         s->addPanel(b);
-        UNSCOPED_INFO("two panels");
         CHECK(s->getNumPanels() == 2);
 
         delete a;
-        UNSCOPED_INFO("a deleted panel has left the list");
         CHECK(s->getNumPanels() == 1);
 
         s->removeChild(b);
         delete b;
-        UNSCOPED_INFO("a removed panel has left the list");
         CHECK(s->getNumPanels() == 0);
     }
 
@@ -155,19 +152,13 @@ namespace
         LLLayoutPanel* p = panel("p");
 
         a->addPanel(p);
-        UNSCOPED_INFO("a panel added to a stack has a resize bar");
         REQUIRE(p->getResizeBar() != nullptr);
-        UNSCOPED_INFO("of that stack's");
         CHECK(p->getResizeBar()->getParent() == a.get());
 
         b->addChild(p);
-        UNSCOPED_INFO("the panel left the first stack");
         CHECK(a->getNumPanels() == 0);
-        UNSCOPED_INFO("and joined the second");
         CHECK(b->getNumPanels() == 1);
-        UNSCOPED_INFO("the moved panel has a resize bar");
         REQUIRE(p->getResizeBar() != nullptr);
-        UNSCOPED_INFO("of the stack that holds it now");
         CHECK(p->getResizeBar()->getParent() == b.get());
 
         // Reads the bar of every panel on the list.
@@ -188,9 +179,7 @@ namespace
 
         s->addPanel(p);
         s->addChild(p);
-        UNSCOPED_INFO("the panel is on the list once");
         CHECK(s->getNumPanels() == 1);
-        UNSCOPED_INFO("and still has a resize bar");
         REQUIRE(p->getResizeBar() != nullptr);
 
         s->updateLayout();
@@ -212,18 +201,15 @@ namespace
         s->addPanel(p);
 
         LLResizeBar* barp = p->getResizeBar();
-        UNSCOPED_INFO("the panel has a resize bar");
         REQUIRE(barp != nullptr);
 
         gFocusMgr.setMouseCapture(barp);
-        UNSCOPED_INFO("the bar holds the mouse");
         CHECK(gFocusMgr.getMouseCapture() == barp);
 
         s->removeChild(p);
-        UNSCOPED_INFO("the bar went with the panel it belonged to");
-        REQUIRE(gFocusMgr.getMouseCapture() == nullptr);
-        UNSCOPED_INFO("and the panel no longer names it");
-        REQUIRE(p->getResizeBar() == nullptr);
+        UNSCOPED_INFO("the bar was deleted, so it let go of the mouse");
+        CHECK(gFocusMgr.getMouseCapture() == nullptr);
+        CHECK(p->getResizeBar() == nullptr);
 
         delete p;
     }
@@ -275,7 +261,6 @@ namespace
 
         S32 target = p->getTargetDim();
         p->reshape(target + 50, p->getRect().getHeight());
-        UNSCOPED_INFO("a reshape the panel was told to ignore leaves its target alone");
         CHECK(p->getTargetDim() == target);
     }
 
@@ -303,11 +288,8 @@ namespace
         LLFrameTimer::updateFrameCount();
         LLLayoutStack::updateClass();       // the frame's animation pass
         F32 after_frame = p->getVisibleAmount();
-        {
-            INFO("the frame opened the panel part way");
-            CHECK(after_frame > 0.f);
-            CHECK(after_frame < 1.f);
-        }
+        CHECK(after_frame > 0.f);
+        CHECK(after_frame < 1.f);
 
         s->updateLayout();                  // what draw does, same frame
         UNSCOPED_INFO("a second pass in the same frame moves it no further");
@@ -340,9 +322,7 @@ namespace
         LLFrameTimer::updateFrameCount();
 
         s->updateLayout();
-        UNSCOPED_INFO("the first panel opened");
         CHECK(a->getVisibleAmount() == 1.f);
-        UNSCOPED_INFO("so did the second");
         CHECK(b->getVisibleAmount() == 1.f);
     }
 
@@ -360,14 +340,13 @@ namespace
         LLLayoutPanel* p = panel("p");
         s->addPanel(p);
 
-        UNSCOPED_INFO("expanded, its minimum is zero");
+        UNSCOPED_INFO("expanded");
         CHECK(p->getRelevantMinDim() == 0);
 
         s->collapsePanel(p, true);
         s->updateLayout();
-        UNSCOPED_INFO("collapsed, its minimum is still zero");
+        UNSCOPED_INFO("collapsed");
         CHECK(p->getRelevantMinDim() == 0);
-        UNSCOPED_INFO("and it takes no room");
         CHECK(p->getVisibleDim() == 0);
     }
 
@@ -421,7 +400,6 @@ namespace
         CHECK(p->getTargetDim() == 100);
 
         p->setTargetDim(10);
-        UNSCOPED_INFO("a target under the minimum is the minimum");
         CHECK(p->getTargetDim() == 100);
     }
 
@@ -503,14 +481,12 @@ namespace
         stack->updateLayout();
 
         LLView* handle = stack->findChild<LLView>("resize_handle_bg_panel", true);
-        UNSCOPED_INFO("a handle was made");
         REQUIRE(handle != nullptr);
-        UNSCOPED_INFO("and it is not drawn until a hand goes for it");
+        UNSCOPED_INFO("not drawn until a hand goes for it");
         CHECK_FALSE(handle->getVisible());
 
         // Where the bar is, which is where a hand going for it would be.
         const LLResizeBar* bar = stack->findChild<LLResizeBar>("resize", true);
-        UNSCOPED_INFO("the bar is there");
         REQUIRE(bar != nullptr);
         const LLRect on_it = bar->getRect();
 

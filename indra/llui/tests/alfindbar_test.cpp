@@ -67,7 +67,7 @@ namespace
 
         for (const char* name : { "expand", "match_case", "whole_word", "regex", "previous", "next", "in_selection", "close" })
         {
-            UNSCOPED_INFO(std::string(name) + " is reached by Tab");
+            CAPTURE(name);
             REQUIRE(bar->getChild<LLUICtrl>(name)->hasTabStop());
         }
 
@@ -137,8 +137,8 @@ namespace
         // The viewer gives the keys their names; here, as they are.
         ll_test::KeyNamesScope key_names([](std::string_view name) { return std::string(name); });
         const std::string tip = bar->getChild<LLUICtrl>("match_case")->getToolTip();
-        UNSCOPED_INFO("the tip says the key: " + tip);
-        REQUIRE(tip.find(LLKeyboard::stringFromAccelerator(toggle, 'C')) != std::string::npos);
+        UNSCOPED_INFO("the tip says the key: " << tip);
+        CHECK(tip.find(LLKeyboard::stringFromAccelerator(toggle, 'C')) != std::string::npos);
         bar->die();
     }
 
@@ -160,7 +160,6 @@ namespace
         LLUICtrl* field = bar->getChild<LLUICtrl>("find");
         UNSCOPED_INFO("Shift and Return, from the field, taken");
         CHECK(field->handleKey(KEY_RETURN, MASK_SHIFT, false));
-        UNSCOPED_INFO("back");
         CHECK(previous == 1);
         constexpr MASK replace_all = MASK_CONTROL | MASK_ALT;
         UNSCOPED_INFO("the Replace All key taken");
@@ -177,14 +176,14 @@ namespace
         CHECK(every == 1);
         ll_test::KeyNamesScope key_names([](std::string_view name) { return std::string(name); });
         const std::string tip = bar->getChild<LLUICtrl>("replace_all")->getToolTip();
-        UNSCOPED_INFO("the tip says the key: " + tip);
-        REQUIRE(tip.find(LLKeyboard::stringFromAccelerator(replace_all, KEY_RETURN)) != std::string::npos);
+        UNSCOPED_INFO("the tip says the key: " << tip);
+        CHECK(tip.find(LLKeyboard::stringFromAccelerator(replace_all, KEY_RETURN)) != std::string::npos);
         bar->setCount(0, 3, std::string(), false, 1);
         UNSCOPED_INFO("going round, in the count's tip");
-        REQUIRE_FALSE(bar->getChild<LLUICtrl>("count")->getToolTip().empty());
+        CHECK_FALSE(bar->getChild<LLUICtrl>("count")->getToolTip().empty());
         bar->setCount(0, 3, std::string());
         UNSCOPED_INFO("and gone with the next count");
-        REQUIRE(bar->getChild<LLUICtrl>("count")->getToolTip().empty());
+        CHECK(bar->getChild<LLUICtrl>("count")->getToolTip().empty());
         bar->die();
     }
 }

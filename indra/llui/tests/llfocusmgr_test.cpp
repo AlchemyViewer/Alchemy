@@ -71,25 +71,17 @@ namespace
         std::unique_ptr<TestView> other(view("other"));
 
         gFocusMgr.setKeyboardFocus(child);
-        UNSCOPED_INFO("the element is the child");
         CHECK(gFocusMgr.getKeyboardFocus() == child);
-        UNSCOPED_INFO("the view is the child");
         CHECK(gFocusMgr.getKeyboardFocusView() == child);
         UNSCOPED_INFO("a plain view is not a control");
-        REQUIRE(gFocusMgr.getKeyboardFocusCtrl() == nullptr);
-        UNSCOPED_INFO("the parent has it");
+        CHECK(gFocusMgr.getKeyboardFocusCtrl() == nullptr);
         CHECK(gFocusMgr.childHasKeyboardFocus(parent.get()));
-        UNSCOPED_INFO("the child has it");
         CHECK(gFocusMgr.childHasKeyboardFocus(child));
-        UNSCOPED_INFO("an unrelated view does not");
         CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(other.get()));
 
         gFocusMgr.removeKeyboardFocusWithoutCallback(child);
-        UNSCOPED_INFO("released: no element");
-        REQUIRE(gFocusMgr.getKeyboardFocus() == nullptr);
-        UNSCOPED_INFO("released: no view");
-        REQUIRE(gFocusMgr.getKeyboardFocusView() == nullptr);
-        UNSCOPED_INFO("released: the parent no longer has it");
+        CHECK(gFocusMgr.getKeyboardFocus() == nullptr);
+        CHECK(gFocusMgr.getKeyboardFocusView() == nullptr);
         CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(parent.get()));
     }
 
@@ -101,26 +93,17 @@ namespace
         TestFocusable element;
 
         gFocusMgr.setKeyboardFocus(&element);
-        UNSCOPED_INFO("the element has focus");
         CHECK(gFocusMgr.getKeyboardFocus() == &element);
-        UNSCOPED_INFO("but there is no view");
-        REQUIRE(gFocusMgr.getKeyboardFocusView() == nullptr);
-        UNSCOPED_INFO("and no control");
-        REQUIRE(gFocusMgr.getKeyboardFocusCtrl() == nullptr);
-        UNSCOPED_INFO("no view has it");
+        CHECK(gFocusMgr.getKeyboardFocusView() == nullptr);
+        CHECK(gFocusMgr.getKeyboardFocusCtrl() == nullptr);
         CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(parent.get()));
-        UNSCOPED_INFO("no accelerators to find");
         CHECK_FALSE(gFocusMgr.keyboardFocusHasAccelerators());
 
         gFocusMgr.setKeyboardFocus(nullptr);
-        {
-            INFO("released");
-            REQUIRE(gFocusMgr.getKeyboardFocus() == nullptr);
-            REQUIRE(gFocusMgr.getKeyboardFocusView() == nullptr);
-        }
+        CHECK(gFocusMgr.getKeyboardFocus() == nullptr);
+        CHECK(gFocusMgr.getKeyboardFocusView() == nullptr);
     }
 
-    // The view follows the element when focus moves.
     TEST_CASE_METHOD(llfocusmgr_data, "llfocusmgr: the focus view follows the element when focus moves", "[llfocusmgr]")
     {
         std::unique_ptr<TestView> a(view("a"));
@@ -128,15 +111,10 @@ namespace
 
         gFocusMgr.setKeyboardFocus(a.get());
         gFocusMgr.setKeyboardFocus(b.get());
-        UNSCOPED_INFO("the element moved");
         CHECK(gFocusMgr.getKeyboardFocus() == b.get());
-        UNSCOPED_INFO("the view moved with it");
         CHECK(gFocusMgr.getKeyboardFocusView() == b.get());
-        UNSCOPED_INFO("the last focus is remembered");
         CHECK(gFocusMgr.getLastKeyboardFocus() == a.get());
-        UNSCOPED_INFO("a no longer has it");
         CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(a.get()));
-        UNSCOPED_INFO("b has it");
         CHECK(gFocusMgr.childHasKeyboardFocus(b.get()));
     }
 
@@ -149,31 +127,22 @@ namespace
         std::unique_ptr<TestView> other(view("other"));
 
         gFocusMgr.setMouseCapture(child);
-        UNSCOPED_INFO("the handler is the child");
         CHECK(gFocusMgr.getMouseCapture() == child);
-        UNSCOPED_INFO("the view is the child");
         CHECK(gFocusMgr.getMouseCaptureView() == child);
-        UNSCOPED_INFO("the parent has it");
         CHECK(gFocusMgr.childHasMouseCapture(parent.get()));
-        UNSCOPED_INFO("an unrelated view does not");
         CHECK_FALSE(gFocusMgr.childHasMouseCapture(other.get()));
 
         gFocusMgr.setMouseCapture(nullptr);
-        UNSCOPED_INFO("released: no handler");
-        REQUIRE(gFocusMgr.getMouseCapture() == nullptr);
-        UNSCOPED_INFO("released: no view");
-        REQUIRE(gFocusMgr.getMouseCaptureView() == nullptr);
+        CHECK(gFocusMgr.getMouseCapture() == nullptr);
+        CHECK(gFocusMgr.getMouseCaptureView() == nullptr);
 
         gFocusMgr.setMouseCapture(child);
         gFocusMgr.removeMouseCaptureWithoutCallback(child);
-        UNSCOPED_INFO("removed: no view");
-        REQUIRE(gFocusMgr.getMouseCaptureView() == nullptr);
+        CHECK(gFocusMgr.getMouseCaptureView() == nullptr);
 
         gFocusMgr.setMouseCapture(child);
         parent.reset();     // takes the child with it
-        UNSCOPED_INFO("a dead captor let go");
-        REQUIRE(gFocusMgr.getMouseCapture() == nullptr);
-        UNSCOPED_INFO("and took its view with it");
-        REQUIRE(gFocusMgr.getMouseCaptureView() == nullptr);
+        CHECK(gFocusMgr.getMouseCapture() == nullptr);
+        CHECK(gFocusMgr.getMouseCaptureView() == nullptr);
     }
 }

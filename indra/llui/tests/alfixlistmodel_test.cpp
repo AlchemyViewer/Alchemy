@@ -63,17 +63,14 @@ namespace
         refactor.refactor  = true;
         std::vector<ALCodeFix> fixes = { fix("Suppress", false, true), refactor, fix("Cast"), fix("Declare", true), fix("Rename") };
         ALFixListModel::rank(fixes);
-        UNSCOPED_INFO("ranked");
         CHECK(titles(fixes) == std::string("Declare|Cast|Rename|Extract|Suppress"));
     }
 
     TEST_CASE_METHOD(alfixlistmodel_data, "ALFixListModel: notes are taken one per fix and only for the latest showing", "[ALFixListModel]")
     {
         const U32 first = model.show(4, { fix("A"), fix("B") });
-        UNSCOPED_INFO("the line");
         CHECK(model.line() == 4);
         const U32 second = model.show(4, { fix("A"), fix("B") });
-        UNSCOPED_INFO("counted");
         CHECK(second == first + 1);
         UNSCOPED_INFO("an earlier showing's notes dropped");
         CHECK_FALSE(model.note(first, { "1", "2" }));
@@ -85,11 +82,8 @@ namespace
             CHECK(model.fixes()[0].note == "-12 bytes");
         }
         model.close();
-        {
-            INFO("closed");
-            REQUIRE(model.fixes().empty());
-            CHECK(model.line() == -1);
-        }
+        CHECK(model.fixes().empty());
+        CHECK(model.line() == -1);
     }
 
     TEST_CASE_METHOD(alfixlistmodel_data, "ALFixListModel: refactors join the asked-for list keeping the choice or stand alone", "[ALFixListModel]")
@@ -98,30 +92,26 @@ namespace
         const ALTextPos   caret(2, 5);
         model.show(2, { fix("Declare", true), fix("Suppress", false, true) });
         UNSCOPED_INFO("not asked for: nothing");
-        REQUIRE_FALSE(model.join(at, caret, { fix("Extract") }, true, 1));
+        CHECK_FALSE(model.join(at, caret, { fix("Extract") }, true, 1));
         model.ask(at, caret);
-        UNSCOPED_INFO("awaited");
         CHECK(model.awaited());
         UNSCOPED_INFO("another place's: nothing");
-        REQUIRE_FALSE(model.join(ALTextRange(ALTextPos(3, 0), ALTextPos(3, 0)), caret, { fix("Extract") }, true, 1));
+        CHECK_FALSE(model.join(ALTextRange(ALTextPos(3, 0), ALTextPos(3, 0)), caret, { fix("Extract") }, true, 1));
         UNSCOPED_INFO("the caret moved: nothing");
-        REQUIRE_FALSE(model.join(at, ALTextPos(2, 4), { fix("Extract") }, true, 1));
+        CHECK_FALSE(model.join(at, ALTextPos(2, 4), { fix("Extract") }, true, 1));
         std::optional<ALFixListModel::Joined> joined = model.join(at, caret, { fix("Extract") }, true, 1);
-        UNSCOPED_INFO("joined");
         REQUIRE(joined.has_value());
         UNSCOPED_INFO("after the fixes, before the suppression");
-        CHECK(titles(joined->fixes) == std::string("Declare|Extract|Suppress"));
-        UNSCOPED_INFO("a refactor");
+        REQUIRE(titles(joined->fixes) == std::string("Declare|Extract|Suppress"));
         CHECK(joined->fixes[1].refactor);
         UNSCOPED_INFO("the suppression still chosen");
         CHECK(joined->chosen == 2);
-        UNSCOPED_INFO("no longer awaited");
         CHECK_FALSE(model.awaited());
 
         model.show(2, { fix("Declare", true) });
         model.ask(at, caret);
         UNSCOPED_INFO("nothing new for an open list: left as it is");
-        REQUIRE_FALSE(model.join(at, caret, {}, true, 0));
+        CHECK_FALSE(model.join(at, caret, {}, true, 0));
         model.close();
         model.ask(at, caret);
         joined = model.join(at, caret, { fix("Extract") }, false, -1);
@@ -133,8 +123,8 @@ namespace
             INFO("nothing at all: a word that says so, which makes nothing");
             REQUIRE(joined);
             REQUIRE(joined->fixes.size() == 1);
-            REQUIRE(ALFixListModel::isNothing(joined->fixes[0]));
-            REQUIRE_FALSE(joined->fixes[0].title.empty());
+            CHECK(ALFixListModel::isNothing(joined->fixes[0]));
+            CHECK_FALSE(joined->fixes[0].title.empty());
         }
         model.ask(at, caret);
         model.close();

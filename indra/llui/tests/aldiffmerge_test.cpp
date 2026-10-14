@@ -91,10 +91,10 @@ namespace
         std::vector<size_t> inOurs(S32 first, S32 count) const { return merge->conflictsIn(0, 0, first, count); }
         // The one conflict a line of ours is in settled: ours as it is
         // made, the base as it is left.
-        void settle(S32 line, ALTextMerge::Take take)
+        void require_settled(S32 line, ALTextMerge::Take take)
         {
             const std::optional<ALDiffMerge::Settling> settling = merge->settle(inOurs(line, 1), take);
-            UNSCOPED_INFO("settled");
+            INFO("the conflict at line " << line << " of ours settles");
             REQUIRE(settling.has_value());
             merge->settled(*settling);
             if (settling->edits)
@@ -129,7 +129,6 @@ namespace
         const std::string b = "alpha\nbeta\ngamma\ndelta\nepsilon\nzeta\neta";
         const std::string o = "alpha\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta mine";
         const std::string t = "alpha theirs\nbeta\ngamma\ndelta\nepsilon\nzeta\neta theirs";
-        UNSCOPED_INFO("merged");
         CHECK(ALDiffMerge::start(b, o, t) == std::string("alpha theirs\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta mine"));
         UNSCOPED_INFO("nothing of theirs, ours");
         CHECK(ALDiffMerge::start(b, o, b) == o);
@@ -142,18 +141,17 @@ namespace
         const std::string b = "alpha\nbeta\ngamma\ndelta\nepsilon\nzeta\neta";
         const std::string t = "alpha theirs\nbeta\ngamma\ndelta\nepsilon\nzeta\neta theirs";
         begin(b, ALDiffMerge::start(b, "alpha\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta mine", t), t);
-        UNSCOPED_INFO("one");
         CHECK(merge->conflictCount() == 1);
         UNSCOPED_INFO("by ours's line");
-        REQUIRE(inOurs(6, 1).size() == 1U);
+        CHECK(inOurs(6, 1).size() == 1U);
         UNSCOPED_INFO("by theirs's line");
-        REQUIRE(merge->conflictsIn(6, 1, 0, 0).size() == 1U);
+        CHECK(merge->conflictsIn(6, 1, 0, 0).size() == 1U);
         UNSCOPED_INFO("not by a line of ours's own change");
-        REQUIRE(inOurs(2, 1).empty());
+        CHECK(inOurs(2, 1).empty());
         UNSCOPED_INFO("nor by theirs taken");
-        REQUIRE(inOurs(0, 1).empty());
+        CHECK(inOurs(0, 1).empty());
         UNSCOPED_INFO("nor by a stretch of nothing");
-        REQUIRE(merge->conflictsIn(6, 0, 6, 0).empty());
+        CHECK(merge->conflictsIn(6, 0, 6, 0).empty());
 
         // Ours made theirs there by hand: no conflict.
         becomes("alpha theirs\nbeta\ngamma mine\ndelta\nepsilon\nzeta\neta theirs");
@@ -172,12 +170,10 @@ namespace
         const std::string t = "one\ntwo theirs\nthree";
 
         begin(b, o, t);
-        UNSCOPED_INFO("a conflict");
         CHECK(merge->conflictCount() == 1);
-        settle(1, ALTextMerge::Take::Theirs);
+        require_settled(1, ALTextMerge::Take::Theirs);
         UNSCOPED_INFO("theirs");
         CHECK(ours == t);
-        UNSCOPED_INFO("settled");
         CHECK(merge->conflictCount() == 0);
 
         begin(b, o, t);
@@ -190,21 +186,19 @@ namespace
         {
             INFO("kept as it was and as it will be, ours both");
             REQUIRE(kept->settled.size() == 1);
-            REQUIRE(joined(kept->settled[0].before) == "two mine");
+            CHECK(joined(kept->settled[0].before) == "two mine");
             CHECK(joined(kept->settled[0].after) == "two mine");
         }
         merge->settled(*kept);
-        UNSCOPED_INFO("settled");
         CHECK(merge->conflictCount() == 0);
         becomes("one\ntwo mine, and more\nthree");
         UNSCOPED_INFO("ours's own change, edited");
         CHECK(merge->conflictCount() == 0);
 
         begin(b, o, t);
-        settle(1, ALTextMerge::Take::OursThenTheirs);
+        require_settled(1, ALTextMerge::Take::OursThenTheirs);
         UNSCOPED_INFO("both");
         CHECK(ours == std::string("one\ntwo mine\ntwo theirs\nthree"));
-        UNSCOPED_INFO("settled");
         CHECK(merge->conflictCount() == 0);
     }
 
@@ -214,7 +208,6 @@ namespace
         const std::string o = "a mine\nb\nc\nd\ne mine";
         const std::string t = "a theirs\nb\nc\nd\ne theirs";
         begin(b, o, t);
-        UNSCOPED_INFO("two");
         CHECK(merge->conflictCount() == 2);
         const std::vector<size_t> both = inOurs(0, 5);
         UNSCOPED_INFO("both by a stretch over them");
@@ -229,12 +222,11 @@ namespace
         CHECK(settling->made == t);
         merge->settled(*settling);
         becomes(settling->made);
-        UNSCOPED_INFO("none left");
         CHECK(merge->conflictCount() == 0);
         UNSCOPED_INFO("nothing to settle");
-        REQUIRE_FALSE(merge->settle({ 0 }, ALTextMerge::Take::Theirs));
+        CHECK_FALSE(merge->settle({ 0 }, ALTextMerge::Take::Theirs));
         UNSCOPED_INFO("nor past the hunks");
-        REQUIRE_FALSE(merge->settle({ 99 }, ALTextMerge::Take::Theirs));
+        CHECK_FALSE(merge->settle({ 99 }, ALTextMerge::Take::Theirs));
     }
 
     TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: with blanks let go of a change of blanks alone is no conflict", "[aldiffmerge]")
@@ -342,12 +334,12 @@ namespace
         const std::string t = "one\ntwo theirs\nthree";
         for (const ALTextMerge::Take take : { ALTextMerge::Take::Theirs, ALTextMerge::Take::OursThenTheirs })
         {
+            CAPTURE(take);
             begin(b, o, t);
-            settle(1, take);
+            require_settled(1, take);
             const std::string made = ours;
             UNSCOPED_INFO("an edit");
             REQUIRE(made != o);
-            UNSCOPED_INFO("settled");
             REQUIRE(merge->conflictCount() == 0);
             UNSCOPED_INFO("the base as it was");
             REQUIRE(joined(merge->base()) == b);
@@ -378,7 +370,6 @@ namespace
         }
         merge->settled(*settling);
         becomes(settling->made);
-        UNSCOPED_INFO("none left");
         CHECK(merge->conflictCount() == 0);
         becomes(o2);
         UNSCOPED_INFO("undone: both again");
@@ -392,7 +383,7 @@ namespace
         UNSCOPED_INFO("one undone by hand");
         CHECK(merge->conflictCount() == 1);
         UNSCOPED_INFO("the one");
-        REQUIRE(inOurs(5, 1).size() == 1U);
+        CHECK(inOurs(5, 1).size() == 1U);
     }
 
     TEST_CASE_METHOD(aldiffmerge_data, "aldiffmerge: joining a settled conflict to an unsettled one leaves one to settle", "[aldiffmerge]")
@@ -401,9 +392,8 @@ namespace
         const std::string o = "A1\nb\nC1";
         const std::string t = "A2\nb\nC2";
         begin(b, o, t);
-        UNSCOPED_INFO("two");
         CHECK(merge->conflictCount() == 2);
-        settle(0, ALTextMerge::Take::Ours);
+        require_settled(0, ALTextMerge::Take::Ours);
         UNSCOPED_INFO("the first settled");
         CHECK(merge->conflictCount() == 1);
         // The line between edited: one stretch both changed, which holds
@@ -412,19 +402,19 @@ namespace
         UNSCOPED_INFO("joined: a conflict still");
         CHECK(merge->conflictCount() == 1);
         UNSCOPED_INFO("found by the line not settled");
-        REQUIRE(inOurs(2, 1).size() == 1U);
+        CHECK(inOurs(2, 1).size() == 1U);
         becomes(o);
         UNSCOPED_INFO("apart again: the one not settled");
         CHECK(merge->conflictCount() == 1);
         {
             INFO("the first settled still");
-            REQUIRE(inOurs(0, 1).empty());
-            REQUIRE(inOurs(2, 1).size() == 1U);
+            CHECK(inOurs(0, 1).empty());
+            CHECK(inOurs(2, 1).size() == 1U);
         }
 
         begin(b, o, t);
-        settle(0, ALTextMerge::Take::Ours);
-        settle(2, ALTextMerge::Take::Ours);
+        require_settled(0, ALTextMerge::Take::Ours);
+        require_settled(2, ALTextMerge::Take::Ours);
         UNSCOPED_INFO("both settled");
         CHECK(merge->conflictCount() == 0);
         becomes("A1\nB\nC1");
@@ -449,7 +439,6 @@ namespace
                       std::string("line 0\nline 1\nline 2\n  three\nline 4\nmine 5\nline 6\n    line 7"));
         // Merged so, no conflict, as a merge letting blanks go finds.
         begin(b, begun, t, loose);
-        UNSCOPED_INFO("none");
         CHECK(merge->conflictCount() == 0);
     }
 
@@ -472,18 +461,18 @@ namespace
         spliced.setOurs(ours_lines);
         whole.setOurs(ours_lines);
         const auto edit = [&](const auto& made, const std::string& where, S32 conflicts) {
+            CAPTURE(where);
             lines_t now = ours_lines;
             made(now);
             spliced.setOurs(now, ALDiffEdit::edgesOf(ours_lines, now));
             {
-                INFO(where + ": compared again only about the edit");
+                INFO("compared again only about the edit");
                 REQUIRE(ALDiffSplice::lastCompared() > 0);
                 REQUIRE(ALDiffSplice::lastCompared() <= 6);
             }
             whole.setOurs(now);
-            UNSCOPED_INFO(where + ": as with ours whole");
+            UNSCOPED_INFO("as with ours whole");
             REQUIRE(spliced.hunks() == whole.hunks());
-            UNSCOPED_INFO(where + ": conflicts");
             REQUIRE(spliced.conflictCount() == conflicts);
             ours_lines = std::move(now);
         };
@@ -534,6 +523,7 @@ namespace
         UNSCOPED_INFO("comments let go of: no conflict");
         CHECK(spliced.conflictCount() == 0);
         const auto edit = [&](const auto& made, const std::string& where, S32 most, S32 conflicts) {
+            CAPTURE(where);
             lines_t now = ours_lines;
             made(now);
             const U64 hashed = ALTextDiff::hashed();
@@ -541,24 +531,23 @@ namespace
             spliced.setOurs(now, ALDiffEdit::edgesOf(ours_lines, now));
             const U64 cost     = ALTextDiff::hashed() - hashed;
             const S32 compared = ALDiffSplice::lastCompared();
-            UNSCOPED_INFO(where + ": ours read by what the edit knows, none of its lines compared with those the lexer holds");
+            UNSCOPED_INFO("ours read by what the edit knows, none of its lines compared with those the lexer holds");
             REQUIRE(lexer->linesCompared() == looked);
             // A most of none: more than half the text read otherwise, which
             // is compared whole.
             if (most >= 0)
             {
                 {
-                    INFO(where + ": compared again only about the edit, " + std::to_string(compared));
+                    INFO("compared again only about the edit");
                     REQUIRE(compared > 0);
                     REQUIRE(compared <= most);
                 }
-                UNSCOPED_INFO(where + ": as many lines' regions made a number, " + std::to_string(cost));
+                UNSCOPED_INFO("as many lines' regions made a number");
                 REQUIRE(cost <= static_cast<U64>(2 * most));
             }
             whole.setOurs(now);
-            UNSCOPED_INFO(where + ": as with ours whole");
+            UNSCOPED_INFO("as with ours whole");
             REQUIRE(spliced.hunks() == whole.hunks());
-            UNSCOPED_INFO(where + ": conflicts");
             REQUIRE(spliced.conflictCount() == conflicts);
             ours_lines = std::move(now);
         };
@@ -590,7 +579,7 @@ namespace
         UNSCOPED_INFO("given whole: as with ours whole");
         CHECK(spliced.hunks() == whole.hunks());
         UNSCOPED_INFO("and the lines it closed over changes");
-        REQUIRE(spliced.hunks().size() > 3);
+        CHECK(spliced.hunks().size() > 3);
         UNSCOPED_INFO("the base as it was");
         CHECK(spliced.base() == base_lines);
     }

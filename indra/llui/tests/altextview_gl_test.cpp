@@ -204,12 +204,6 @@ namespace
             }
             return d;
         }
-
-        static std::string said(const Difference& d)
-        {
-            return " (most " + std::to_string(d.most) + ", covered " + std::to_string(d.covered) + " against " +
-                   std::to_string(d.compared) + ")";
-        }
     };
 
     // A squiggle is one quad over a texture of one wave, and covers what
@@ -221,12 +215,15 @@ namespace
         const std::vector<S32> was = expectedAll(40.f, 140.f, 128, 1.f);
         const std::vector<S32> now = coverage([&] { Painter::drawSquiggle(40.f, 140.f, 128, LLColor4::white, all); });
         const Difference       d   = differ(was, now, 40, 140);
-        UNSCOPED_INFO("the wave covers something" + said(d));
-        CHECK(d.covered > 0);
-        UNSCOPED_INFO("no pixel far from the wave's" + said(d));
-        CHECK(d.most <= 6);
-        UNSCOPED_INFO("as much covered as the wave" + said(d));
-        CHECK(std::abs(d.covered - d.compared) * 64 <= d.covered);
+        {
+            CAPTURE(d.most, d.covered, d.compared);
+            UNSCOPED_INFO("the wave covers something");
+            CHECK(d.covered > 0);
+            UNSCOPED_INFO("no pixel far from the wave's");
+            CHECK(d.most <= 6);
+            UNSCOPED_INFO("as much covered as the wave");
+            CHECK(std::abs(d.covered - d.compared) * 64 <= d.covered);
+        }
         // Nothing above or below the band it was drawn in.
         for (S32 y = 0; y < H; ++y)
         {
@@ -234,7 +231,8 @@ namespace
             {
                 if (std::abs(y - 128) > 3 && now[static_cast<size_t>(y) * W + x] != 0)
                 {
-                    FAIL("drawn at " + std::to_string(x) + "," + std::to_string(y));
+                    CAPTURE(x, y);
+                    FAIL("drawn outside the wave's band");
                 }
             }
         }
@@ -252,14 +250,15 @@ namespace
             for (S32 x = 0; x < W; ++x)
             {
                 const size_t i = static_cast<size_t>(y) * W + x;
+                CAPTURE(x, y);
                 if (x < 80 || x >= 120)
                 {
-                    UNSCOPED_INFO("nothing outside the clip at " + std::to_string(x) + "," + std::to_string(y));
+                    UNSCOPED_INFO("nothing outside the clip");
                     REQUIRE(clipped[i] == 0);
                 }
                 else
                 {
-                    UNSCOPED_INFO("the same wave inside the clip at " + std::to_string(x) + "," + std::to_string(y));
+                    UNSCOPED_INFO("the same wave inside the clip");
                     REQUIRE(std::abs(clipped[i] - whole[i]) <= 1);
                     inside += clipped[i];
                 }
@@ -290,11 +289,12 @@ namespace
         const std::vector<S32> now = scaled([] { Painter::drawSquiggle(10.f, 110.f, 64, LLColor4::white, LLRect(0, H, W, 0)); });
         scale = was_scale;
         const Difference d = differ(was, now, 20, 220);
-        UNSCOPED_INFO("the wave covers something" + said(d));
+        CAPTURE(d.most, d.covered, d.compared);
+        UNSCOPED_INFO("the wave covers something");
         CHECK(d.covered > 0);
-        UNSCOPED_INFO("no pixel far from the wave's" + said(d));
+        UNSCOPED_INFO("no pixel far from the wave's");
         CHECK(d.most <= 6);
-        UNSCOPED_INFO("as much covered as the wave" + said(d));
+        UNSCOPED_INFO("as much covered as the wave");
         CHECK(std::abs(d.covered - d.compared) * 64 <= d.covered);
     }
     // The map draws each line's runs from what it read last, and reads a
@@ -396,7 +396,8 @@ namespace
         // Every pixel that differs between two frames lies within a line's
         // band, a few pixels either way -- `below` more under it -- and
         // some do.
-        const auto only_on = [&](const std::string& what, const std::vector<U8>& a, const std::vector<U8>& b, S32 line, S32 below = 0) {
+        const auto require_only_on = [&](const std::string& what, const std::vector<U8>& a, const std::vector<U8>& b, S32 line, S32 below = 0) {
+            INFO(what);
             const S32 top    = editor->textRect().mTop - (editor->layout().lineTop(line) - editor->scrollY()) + 3;
             const S32 bottom = top - 3 - editor->layout().lineHeight(line) - 3 - below;
             bool      some   = false;
@@ -408,15 +409,14 @@ namespace
                     if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2])
                     {
                         some = true;
-                        {
-                            INFO(what + ": changed at " + std::to_string(x) + "," + std::to_string(y) + ", off line " + std::to_string(line));
-                            REQUIRE(y <= top);
-                            REQUIRE(y >= bottom);
-                        }
+                        CAPTURE(x, y, line);
+                        INFO("changed off the line");
+                        REQUIRE(y <= top);
+                        REQUIRE(y >= bottom);
                     }
                 }
             }
-            UNSCOPED_INFO(what + ": something changed");
+            UNSCOPED_INFO("something changed");
             REQUIRE(some);
         };
 
@@ -425,7 +425,7 @@ namespace
         CHECK(frame() == plain);
 
         editor->setSelection(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 20)));
-        only_on("a selection", plain, frame(), 2);
+        require_only_on("a selection", plain, frame(), 2);
         editor->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
         UNSCOPED_INFO("the selection gone");
         CHECK(frame() == plain);
@@ -436,7 +436,7 @@ namespace
         style.range = ALTextRange(ALTextPos(5, 8), ALTextPos(5, 13));
         style.color = LLColor4::red;
         editor->setStyles({ style });
-        only_on("a colour of its own", plain, frame(), 5);
+        require_only_on("a colour of its own", plain, frame(), 5);
         editor->clearStyles();
         UNSCOPED_INFO("the colour gone");
         CHECK(frame() == plain);
@@ -449,7 +449,7 @@ namespace
         // where the font's lines are closer than its letters are tall.
         const LLFontGL* mono     = LLFontGL::getFontMonospace();
         const S32       overhang = llmax(0, ll_round(mono->getDescenderHeight()) - (mono->getLineSpacing() - ll_round(mono->getAscenderHeight())));
-        only_on("a squiggle", plain, frame(), 7, overhang);
+        require_only_on("a squiggle", plain, frame(), 7, overhang);
 
         std::list<LLVertexBufferData> capture;
         gGL.beginList(&capture);
@@ -457,8 +457,8 @@ namespace
         gGL.flush();
         gGL.endList();
         glFinish();
-        UNSCOPED_INFO("a handful of draws: " + std::to_string(capture.size()));
-        REQUIRE(capture.size() <= 25);
+        UNSCOPED_INFO("the frame is a handful of draws");
+        CHECK(capture.size() <= 25);
         gFocusMgr.setKeyboardFocus(nullptr);
         editor->die();
     }
@@ -522,7 +522,7 @@ namespace
             const std::vector<U8> shown = drawn();
             const S32 text_from = left ? 60 : 0;
             const S32 text_to   = left ? W : W - 60;
-            UNSCOPED_INFO(std::string("the preview over the text, the map on the ") + (left ? "left" : "right"));
+            UNSCOPED_INFO("the preview over the text, the map on the " << (left ? "left" : "right"));
             REQUIRE(changed(plain, shown, text_from, text_to) > 1000);
         }
         view->die();
@@ -546,7 +546,8 @@ namespace
             {
                 if (now[static_cast<size_t>(y) * W + x] != 0)
                 {
-                    FAIL("over the text at " + std::to_string(x) + "," + std::to_string(y));
+                    CAPTURE(x, y);
+                    FAIL("drawn over the text");
                 }
             }
             under = llmax(under, now[static_cast<size_t>(baseline - 1) * W + x]);
@@ -557,7 +558,7 @@ namespace
         }
         UNSCOPED_INFO("drawn under the text");
         CHECK(drawn == 255);
-        UNSCOPED_INFO("only the fade just under the baseline: " + std::to_string(under));
+        UNSCOPED_INFO("only the fade just under the baseline");
         CHECK(under < 128);
     }
 
@@ -603,7 +604,8 @@ namespace
         };
         // Every pixel that differs between two frames lies within a line's
         // band, and some do.
-        const auto only_on = [&](const std::string& what, const std::vector<U8>& a, const std::vector<U8>& b, S32 line) {
+        const auto require_only_on = [&](const std::string& what, const std::vector<U8>& a, const std::vector<U8>& b, S32 line) {
+            INFO(what);
             const S32 top    = view->textRect().mTop - (view->layout().lineTop(line) - view->scrollY()) + 3;
             const S32 bottom = top - 3 - view->layout().lineHeight(line) - 3;
             bool      some   = false;
@@ -615,15 +617,14 @@ namespace
                     if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2])
                     {
                         some = true;
-                        {
-                            INFO(what + ": changed at " + std::to_string(x) + "," + std::to_string(y) + ", off line " + std::to_string(line));
-                            REQUIRE(y <= top);
-                            REQUIRE(y >= bottom);
-                        }
+                        CAPTURE(x, y, line);
+                        INFO("changed off the line");
+                        REQUIRE(y <= top);
+                        REQUIRE(y >= bottom);
                     }
                 }
             }
-            UNSCOPED_INFO(what + ": something changed");
+            UNSCOPED_INFO("something changed");
             REQUIRE(some);
         };
         const auto at = [](S32 line, S32 column) { return ALTextRange(ALTextPos(line, column), ALTextPos(line, column)); };
@@ -632,7 +633,7 @@ namespace
         const std::vector<U8> one = frame();
         view->addSelection(at(2, 5));
         const std::vector<U8> two = frame();
-        only_on("another caret", one, two, 2);
+        require_only_on("another caret", one, two, 2);
         view->setSelections(at(2, 5), { at(4, 0) });
         UNSCOPED_INFO("the two the other way round, the same frame");
         CHECK(frame() == two);
@@ -640,7 +641,7 @@ namespace
         const ALTextRange      span(ALTextPos(7, 2), ALTextPos(7, 10));
         view->setSelections(at(4, 0), { span });
         const std::vector<U8> other_span = frame();
-        only_on("another selection, its caret at its end", one, other_span, 7);
+        require_only_on("another selection, its caret at its end", one, other_span, 7);
         view->setSelections(span, { at(4, 0) });
         UNSCOPED_INFO("the same as the main selection");
         CHECK(frame() == other_span);
@@ -666,8 +667,8 @@ namespace
         gGL.flush();
         gGL.endList();
         glFinish();
-        UNSCOPED_INFO("twelve carets cost what one does: " + std::to_string(with_many) + " against " + std::to_string(capture.size()));
-        REQUIRE(with_many == capture.size());
+        UNSCOPED_INFO("twelve carets cost what one does");
+        CHECK(with_many == capture.size());
         gFocusMgr.setKeyboardFocus(nullptr);
         view->die();
     }
@@ -854,7 +855,7 @@ namespace
         lines[100].gapRulerTint = changed;
         view->setLineAnnotations(lines);
         const size_t every = draws();
-        UNSCOPED_INFO("two hundred marks and a gap's cost what one does: " + std::to_string(every) + " against " + std::to_string(one));
+        UNSCOPED_INFO("two hundred marks and a gap's cost what one does");
         CHECK(every == one);
         view->die();
     }
@@ -909,7 +910,7 @@ namespace
         lines[8].gapTint = tint;
         view->setLineAnnotations(lines);
         const size_t every_tint = draws();
-        UNSCOPED_INFO("a tint on every line and gap costs what one does: " + std::to_string(every_tint) + " against " + std::to_string(one_tint));
+        UNSCOPED_INFO("a tint on every line and gap costs what one does");
         CHECK(every_tint == one_tint);
         view->setLineAnnotations({});
 
@@ -939,7 +940,7 @@ namespace
         view->setStyles(styles);
         view->setSubstitutions(links);
         const size_t every_line = draws();
-        UNSCOPED_INFO("underlines on every line cost what one line's do: " + std::to_string(every_line) + " against " + std::to_string(one_line));
+        UNSCOPED_INFO("underlines on every line cost what one line's do");
         CHECK(every_line == one_line);
         view->die();
     }
@@ -984,12 +985,11 @@ namespace
         editor->document().insert(ALTextPos(0, 0), "\"");
         frame();
         editor->highlighter().tokens(last);
-        UNSCOPED_INFO("the frame after the edit left most of the text to lex: " + std::to_string(editor->highlighter().lastLexed()) + " of " +
-                   std::to_string(last + 1));
+        UNSCOPED_INFO("the frame after the edit left most of the text to lex");
         CHECK(editor->highlighter().lastLexed() > last / 2);
         frame();
         UNSCOPED_INFO("lexed to its end: the block gone");
-        REQUIRE(editor->foldRegions().empty());
+        CHECK(editor->foldRegions().empty());
         editor->die();
     }
 
@@ -1045,7 +1045,6 @@ namespace
         CHECK(end < rows[1].end);
         const std::vector<U8> plain = frame();
         view->preeditor().markAsPreedit(begin, end - begin);
-        UNSCOPED_INFO("composing");
         CHECK(view->hasPreedit());
         const std::vector<U8> composed = frame();
 
@@ -1080,10 +1079,9 @@ namespace
         const S32               first_from = text.mLeft + static_cast<S32>(view->layout().xOf(0, begin));
         const S32               first_to   = text.mLeft + static_cast<S32>(rows[0].width);
         const std::vector<bool> first      = columns(0);
-        UNSCOPED_INFO("nothing on the first row left of where it starts: " + std::to_string(changed_in(first, 0, first_from)));
+        UNSCOPED_INFO("nothing on the first row left of where it starts");
         CHECK(changed_in(first, 0, first_from) == 0);
-        UNSCOPED_INFO("under its text to the first row's end: " + std::to_string(changed_in(first, first_from, first_to)) + " of " +
-                   std::to_string(first_to - first_from));
+        UNSCOPED_INFO("under most of its text to the first row's end");
         CHECK(changed_in(first, first_from, first_to) * 4 >= (first_to - first_from) * 3);
         UNSCOPED_INFO("nothing past the first row's end");
         CHECK(changed_in(first, first_to, W) == 0);
@@ -1091,14 +1089,12 @@ namespace
         const S32               second_from = text.mLeft + static_cast<S32>(view->layout().xOf(0, rows[1].begin));
         const S32               second_to   = text.mLeft + static_cast<S32>(view->layout().xOf(0, end));
         const std::vector<bool> second      = columns(1);
-        UNSCOPED_INFO("under its text on the second row: " + std::to_string(changed_in(second, second_from, second_to)) + " of " +
-                   std::to_string(second_to - second_from));
+        UNSCOPED_INFO("under most of its text on the second row");
         CHECK(changed_in(second, second_from, second_to) * 4 >= (second_to - second_from) * 3);
-        {
-            INFO("nothing on the second row past where it ends");
-            CHECK(changed_in(second, 0, second_from) == 0);
-            CHECK(changed_in(second, second_to, W) == 0);
-        }
+        UNSCOPED_INFO("nothing on the second row left of its start");
+        CHECK(changed_in(second, 0, second_from) == 0);
+        UNSCOPED_INFO("nothing on the second row past where it ends");
+        CHECK(changed_in(second, second_to, W) == 0);
         view->die();
     }
 
@@ -1133,7 +1129,6 @@ namespace
         editor->setBackgroundColor(LLColor4(0.1f, 0.1f, 0.12f, 1.f));
         editor->setTextColor(LLColor4(0.9f, 0.9f, 0.9f, 1.f));
         ALTextRuler* map = editor->findChild<ALTextRuler>("ruler");
-        UNSCOPED_INFO("a map");
         REQUIRE(map != nullptr);
         const auto drawn = [&]() {
             ll_test::uiGL().clearFramebuffer();
@@ -1164,7 +1159,7 @@ namespace
         const std::vector<U8> from_one = drawn();
         editor->setLineNumberBase(1000);
         const std::vector<U8> from_base = drawn();
-        UNSCOPED_INFO("numbered past a thousand, the preview says so: " + std::to_string(changed(from_one, from_base)));
+        UNSCOPED_INFO("numbered past a thousand, the preview says so");
         CHECK(changed(from_one, from_base) > 0);
         editor->setLineNumberBase(0);
         UNSCOPED_INFO("and from one again as before");
@@ -1309,7 +1304,7 @@ namespace
         const size_t one = draws();
         fill(12);
         const size_t every = draws();
-        UNSCOPED_INFO("hints, notes and tabs on every line cost what one line's do: " + std::to_string(every) + " against " + std::to_string(one));
+        UNSCOPED_INFO("hints, notes and tabs on every line cost what one line's do");
         CHECK(every == one);
         editor->die();
     }
@@ -1360,9 +1355,9 @@ namespace
         {
             past += rgba[(static_cast<size_t>(y) * W + x) * 4 + 2] > 128 ? 1 : 0;
         }
-        UNSCOPED_INFO("drawn past the line's end: " + std::to_string(past));
+        UNSCOPED_INFO("drawn past the line's end");
         CHECK(past > 0);
-        UNSCOPED_INFO("a little, not as far again as the first line is in: " + std::to_string(past));
+        UNSCOPED_INFO("a little, not as far again as the first line is in");
         CHECK(past <= 10);
         view->die();
     }

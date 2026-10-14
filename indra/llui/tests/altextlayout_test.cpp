@@ -124,16 +124,15 @@ namespace
 
         // Every column and every half pixel of every row of a line, asked of
         // the layout and walked: the same answers.
-        void searchedAsWalked(S32 index)
+        void require_searched_as_walked(S32 index)
         {
             const ALTextLayout::Line& line   = layout.line(index);
             const S32                 length = static_cast<S32>(doc.line(index).size());
             for (S32 column = 0; column <= length; ++column)
             {
                 const S32 row = walkedRow(line, column);
-                UNSCOPED_INFO("the row of column " + std::to_string(column));
+                CAPTURE(index, column);
                 REQUIRE(layout.rowOf(index, column) == row);
-                UNSCOPED_INFO("the x of column " + std::to_string(column));
                 REQUIRE(layout.xOf(index, column) == walkedX(line, line.rows[static_cast<size_t>(row)], column));
             }
             for (size_t r = 0; r < line.rows.size(); ++r)
@@ -143,7 +142,7 @@ namespace
                 {
                     for (bool round : { false, true })
                     {
-                        UNSCOPED_INFO("the column at x " + std::to_string(x) + " of row " + std::to_string(r) + (round ? ", rounded" : ""));
+                        CAPTURE(index, r, x, round);
                         REQUIRE(layout.columnAt(index, static_cast<S32>(r), x, round) == walkedColumn(line, row, x, round));
                     }
                 }
@@ -155,17 +154,12 @@ namespace
     {
         ready("hello world");
         const ALTextLayout::Line& line = layout.line(0);
-        UNSCOPED_INFO("laid out");
         CHECK(line.valid);
         UNSCOPED_INFO("one glyph a character");
         REQUIRE(line.glyphs.size() == size_t(11));
-        UNSCOPED_INFO("one row");
         REQUIRE(line.rows.size() == size_t(1));
-        UNSCOPED_INFO("a width");
         CHECK(line.width > 0.f);
-        UNSCOPED_INFO("a row height");
         CHECK(layout.rowHeight() > 0);
-        UNSCOPED_INFO("the start");
         CHECK(layout.xOf(0, 0) == 0.f);
         UNSCOPED_INFO("the end is the width");
         CHECK(layout.xOf(0, 11) == line.width);
@@ -204,7 +198,7 @@ namespace
         CHECK(space > 0.f);
         const ALTextLayout::Line& line = layout.line(0);
         UNSCOPED_INFO("the tab draws nothing");
-        REQUIRE(line.placed.front().face == nullptr);
+        CHECK(line.placed.front().face == nullptr);
         // 'ab' then a tab to the next stop: twice the first tab's width.
         UNSCOPED_INFO("the second tab reaches the second stop");
         CHECK(close_to(layout.xOf(0, 4), space * 2.f, 1.f));
@@ -224,11 +218,9 @@ namespace
         const F32 nine = layout.xOf(0, 9);
         layout.setWrapWidth(static_cast<S32>(nine) + 2);
         const ALTextLayout::Line& line = layout.line(0);
-        UNSCOPED_INFO("two rows");
         REQUIRE(line.rows.size() == size_t(2));
         UNSCOPED_INFO("the first row ends where the next begins");
         CHECK(line.rows[0].end == 10);
-        UNSCOPED_INFO("the second row");
         CHECK(line.rows[1].begin == 10);
         UNSCOPED_INFO("to the end");
         CHECK(line.rows[1].end == 14);
@@ -250,7 +242,6 @@ namespace
         CHECK(layout.lineHeight(0) == 2 * layout.rowHeight());
         UNSCOPED_INFO("the next line starts below both");
         CHECK(layout.lineTop(1) == 2 * layout.rowHeight());
-        UNSCOPED_INFO("the whole");
         CHECK(layout.totalHeight() == 3 * layout.rowHeight());
         UNSCOPED_INFO("the line under a y in the second row");
         CHECK(layout.lineAtY(layout.rowHeight() + 1) == 0);
@@ -262,10 +253,10 @@ namespace
         // Too narrow for any word: a row per cluster, never none.
         layout.setWrapWidth(1);
         UNSCOPED_INFO("every row holds something");
-        REQUIRE(layout.line(0).rows.size() == 14);
+        CHECK(layout.line(0).rows.size() == 14);
         layout.setWrapWidth(0);
         UNSCOPED_INFO("no wrap, one row");
-        REQUIRE(layout.line(0).rows.size() == size_t(1));
+        CHECK(layout.line(0).rows.size() == size_t(1));
     }
 
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: an edit lays out again only the lines it touched", "[altextlayout]")
@@ -280,20 +271,17 @@ namespace
         CHECK(layout.line(0).valid);
         UNSCOPED_INFO("line 1 wider");
         CHECK(layout.line(1).width > two);
-        UNSCOPED_INFO("still three lines");
         CHECK(layout.lineCount() == 3);
         doc.insert(ALTextPos(0, 3), "\nnew");
-        UNSCOPED_INFO("four lines");
         CHECK(layout.lineCount() == 4);
         UNSCOPED_INFO("the new line lays out");
-        REQUIRE(layout.line(1).glyphs.size() == size_t(3));
+        CHECK(layout.line(1).glyphs.size() == size_t(3));
         UNSCOPED_INFO("tops follow");
         CHECK(layout.lineTop(3) == 3 * layout.rowHeight());
         doc.remove(ALTextRange(doc.start(), ALTextPos(3, 0)));
-        UNSCOPED_INFO("one left");
         CHECK(layout.lineCount() == 1);
         UNSCOPED_INFO("which is the last");
-        REQUIRE(layout.line(0).glyphs.size() == size_t(5));
+        CHECK(layout.line(0).glyphs.size() == size_t(5));
     }
 
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: a hidden line takes no height and an edit above it keeps it hidden", "[altextlayout]")
@@ -309,9 +297,7 @@ namespace
             CHECK(layout.hidden(2));
             CHECK_FALSE(layout.hidden(3));
         }
-        UNSCOPED_INFO("any");
         CHECK(layout.anyHidden());
-        UNSCOPED_INFO("no height");
         CHECK(layout.lineHeight(1) == 0);
         UNSCOPED_INFO("the fourth line sits second");
         CHECK(layout.lineTop(3) == row);
@@ -346,9 +332,7 @@ namespace
         UNSCOPED_INFO("three rows now");
         CHECK(layout.totalHeight() == 3 * row);
         layout.setHidden(ALTextLayout::HiddenBy::Folds, 0, 4, false);
-        UNSCOPED_INFO("none hidden");
         CHECK_FALSE(layout.anyHidden());
-        UNSCOPED_INFO("five rows");
         CHECK(layout.totalHeight() == 5 * row);
     }
 
@@ -411,7 +395,7 @@ namespace
         UNSCOPED_INFO("'ab', the box, 'cd', the tab, 'z'");
         REQUIRE(second.glyphs.size() == size_t(2 + 1 + 2 + 1 + 1));
         UNSCOPED_INFO("the box draws nothing");
-        REQUIRE(second.placed[2].face == nullptr);
+        CHECK(second.placed[2].face == nullptr);
         UNSCOPED_INFO("the box is as wide as asked");
         CHECK(close_to(second.glyphs[2].advance, 40.f));
         UNSCOPED_INFO("the box carries the atom's id");
@@ -448,7 +432,7 @@ namespace
         subs       = { url, over, box };
         layout.invalidateLine(0);
         UNSCOPED_INFO("the overlapping one is dropped");
-        REQUIRE(layout.line(0).glyphs.size() == size_t(4 + 9 + 4));
+        CHECK(layout.line(0).glyphs.size() == size_t(4 + 9 + 4));
         // A label longer than the text it stands for still wraps as a whole.
         url.shown = "a label much longer than the text";
         subs      = { url, box };
@@ -535,8 +519,7 @@ namespace
         // the indent.
         UNSCOPED_INFO("first row from the edge");
         CHECK(layout.xOf(0, 0) == 0.f);
-        UNSCOPED_INFO("two rows");
-        CHECK(layout.rowCount(0) == 2);
+        REQUIRE(layout.rowCount(0) == 2);
         UNSCOPED_INFO("the second row starts at the indent");
         CHECK(close_to(layout.xOf(0, layout.line(0).rows[1].begin), four));
         UNSCOPED_INFO("a point in the indent is the row's start");
@@ -633,6 +616,7 @@ namespace
             CHECK(layout.hidden(5));
         }
     }
+
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: rows and x and columns searched for agree with walking the line", "[altextlayout]")
     {
         ready("\tlocal e\xCC\x81 = f(a, b)\t-- and a note long enough to wrap onto rows\nshort");
@@ -648,8 +632,8 @@ namespace
         REQUIRE(layout.line(0).rows.size() > 2);
         UNSCOPED_INFO("in order");
         CHECK(layout.line(0).ordered);
-        searchedAsWalked(0);
-        searchedAsWalked(1);
+        require_searched_as_walked(0);
+        require_searched_as_walked(1);
     }
 
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: right-to-left text keeps clusters in order and a reversed row is not cut", "[altextlayout]")
@@ -658,7 +642,7 @@ namespace
         ready("abc \xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D def");
         UNSCOPED_INFO("in order");
         CHECK(layout.line(0).ordered);
-        searchedAsWalked(0);
+        require_searched_as_walked(0);
         // A row whose clusters go back, as a right-to-left run shaped as one
         // would have them: the search needs them in order, so it has all of
         // the row, whatever is in sight.
@@ -710,9 +694,8 @@ namespace
         F32 x = 0.f;
         for (size_t k = 0; k < whole.size(); ++k)
         {
-            UNSCOPED_INFO("the cluster of glyph " + std::to_string(k));
+            CAPTURE(k);
             REQUIRE(line.glyphs[k].cluster == whole[k].cluster);
-            UNSCOPED_INFO("the pen of glyph " + std::to_string(k));
             REQUIRE(close_to(line.glyphs[k].pen, x, 0.01f));
             x += whole[k].x_advance;
             if (!face->useSubpixelPen())
@@ -727,7 +710,7 @@ namespace
         doc.insert(ALTextPos(0, 10000), "q");
         const ALTextLayout::Line& again = layout.line(0);
         UNSCOPED_INFO("one glyph more");
-        REQUIRE(again.glyphs.size() == whole.size() + 1);
+        CHECK(again.glyphs.size() == whole.size() + 1);
         UNSCOPED_INFO("one piece shaped again");
         CHECK(ALFontShaping::cacheMutationCount() - made <= 2);
     }
@@ -756,7 +739,7 @@ namespace
         {
             INFO("cut down");
             CHECK(seen.glyphBegin > row.glyphBegin);
-            CHECK(seen.glyphEnd < row.glyphEnd);
+            REQUIRE(seen.glyphEnd < row.glyphEnd);
         }
         UNSCOPED_INFO("its first column");
         CHECK(seen.begin == line.glyphs[seen.glyphBegin].cluster);
@@ -768,11 +751,9 @@ namespace
             const bool                 in    = glyph.pen + glyph.advance - row.xStart >= from && glyph.pen - row.xStart <= to;
             if (in)
             {
-                {
-                    INFO("glyph " + std::to_string(k) + " in sight is held");
-                    REQUIRE(k >= seen.glyphBegin);
-                    REQUIRE(k < seen.glyphEnd);
-                }
+                INFO("glyph " << k << " in sight is held");
+                REQUIRE(k >= seen.glyphBegin);
+                REQUIRE(k < seen.glyphEnd);
             }
         }
         UNSCOPED_INFO("one more before, no more");
@@ -780,6 +761,7 @@ namespace
         UNSCOPED_INFO("one more after, no more");
         CHECK(line.glyphs[seen.glyphEnd - 2].pen - row.xStart <= to);
     }
+
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: a new wrap width cuts rows again from the glyphs without shaping", "[altextlayout]")
     {
         ready("aaaa bbbb cccc dddd eeee ffff\nzz");
@@ -787,7 +769,6 @@ namespace
         const F32 whole   = layout.line(0).width;
         layout.setWrapWidth(static_cast<S32>(fifteen));
         const U32 shaped = layout.linesLaidOut();
-        UNSCOPED_INFO("wrapped");
         REQUIRE(layout.line(0).rows.size() >= 2);
         UNSCOPED_INFO("cut into rows, not shaped");
         CHECK(layout.linesLaidOut() == shaped);
@@ -797,8 +778,7 @@ namespace
         layout.setWrapWidth(static_cast<S32>(whole) + 50);
         UNSCOPED_INFO("its height kept until it is laid out again");
         CHECK(layout.lineTop(1) == tall);
-        UNSCOPED_INFO("one row now");
-        REQUIRE(layout.line(0).rows.size() == size_t(1));
+        CHECK(layout.line(0).rows.size() == size_t(1));
         UNSCOPED_INFO("and the next line's top follows");
         CHECK(layout.lineTop(1) == layout.rowHeight());
         UNSCOPED_INFO("still not shaped again");
@@ -814,7 +794,8 @@ namespace
         }
         ready(text.c_str());
         layout.setWrapWidth(200);
-        const auto check = [&](const std::string& what) {
+        const auto require_heights_add_up = [&](const std::string& what) {
+            INFO(what);
             for (S32 i = 0; i < layout.lineCount(); ++i)
             {
                 layout.line(i);
@@ -822,34 +803,31 @@ namespace
             S32 top = 0;
             for (S32 i = 0; i < layout.lineCount(); ++i)
             {
-                UNSCOPED_INFO(what + ": the top of line " + std::to_string(i));
+                CAPTURE(i);
                 REQUIRE(layout.lineTop(i) == top);
                 const S32 height = layout.lineHeight(i);
                 if (height > 0)
                 {
-                    UNSCOPED_INFO(what + ": the line at its top");
                     REQUIRE(layout.lineAtY(top) == i);
-                    UNSCOPED_INFO(what + ": the line at its bottom");
                     REQUIRE(layout.lineAtY(top + height - 1) == i);
                 }
                 top += height;
             }
-            UNSCOPED_INFO(what + ": the whole");
             REQUIRE(layout.totalHeight() == top);
         };
-        check("laid out");
+        require_heights_add_up("laid out");
         doc.insert(ALTextPos(3, 2), std::string(300, 'x'));
-        check("typed in");
+        require_heights_add_up("typed in");
         doc.insert(ALTextPos(5, 0), "new\nlines\n");
-        check("lines made");
+        require_heights_add_up("lines made");
         doc.remove(ALTextRange(ALTextPos(1, 0), ALTextPos(4, 0)));
-        check("lines taken away");
+        require_heights_add_up("lines taken away");
         layout.setHidden(ALTextLayout::HiddenBy::Folds, 6, 9, true);
-        check("hidden");
+        require_heights_add_up("hidden");
         layout.setHidden(ALTextLayout::HiddenBy::Folds, 7, 7, false);
-        check("one shown");
+        require_heights_add_up("one shown");
         layout.setWrapWidth(120);
-        check("narrower");
+        require_heights_add_up("narrower");
     }
 
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: a line typed in keeps its height until it is laid out again", "[altextlayout]")
@@ -893,7 +871,6 @@ namespace
         CHECK(layout.linesHeld() >= layout.lineCount());
         UNSCOPED_INFO("all but 20..29 let go of");
         CHECK(layout.trim(20, 29) == layout.lineCount() - 10);
-        UNSCOPED_INFO("ten held");
         CHECK(layout.linesHeld() == 10);
         UNSCOPED_INFO("no top moved");
         CHECK(layout.lineTop(30) == top);
@@ -920,7 +897,6 @@ namespace
         CHECK(layout.lineHeight(7) == wrapped);
         UNSCOPED_INFO("nothing kept: nothing held");
         CHECK(layout.trim(0, -1) == 11);
-        UNSCOPED_INFO("none held");
         CHECK(layout.linesHeld() == 0);
         UNSCOPED_INFO("nothing more to let go of");
         CHECK(layout.trim(0, -1) == 0);
@@ -981,9 +957,9 @@ namespace
             CHECK(layout.hiddenBy(4, By::Folds));
         }
         layout.setHidden(By::Any, 0, 10, false);
-        UNSCOPED_INFO("all shown");
         CHECK_FALSE(layout.anyHidden());
     }
+
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: gap rows above a line count in its height and hide and change with it", "[altextlayout]")
     {
         ready("0\n1\n2\n3\n4\n5");
@@ -1062,7 +1038,6 @@ namespace
         // Made again where many changed.
         gaps.assign(7, 0);
         layout.gapsChanged();
-        UNSCOPED_INFO("none");
         CHECK(layout.totalHeight() == 6 * row_h);
         layout.setGapProvider(nullptr);
         {
@@ -1118,7 +1093,6 @@ namespace
         ready("aaaaaaaaaaaa bb cccccccccccccc");
         layout.setWrapWidth(static_cast<S32>(layout.xOf(0, 14)) + 2);
         const ALTextLayout::Line& line = layout.line(0);
-        UNSCOPED_INFO("three rows");
         REQUIRE(line.rows.size() == size_t(3));
         {
             INFO("the short one in the middle");
@@ -1127,14 +1101,14 @@ namespace
         }
         for (bool round : { false, true })
         {
-            const std::string how = round ? ", rounded" : "";
-            UNSCOPED_INFO("past the short row: before the space it hangs" + how);
+            CAPTURE(round);
+            UNSCOPED_INFO("past the short row: before the space it hangs");
             REQUIRE(layout.columnAt(0, 1, line.rows[1].width + 20.f, round) == 15);
-            UNSCOPED_INFO("on the space it hangs" + how);
+            UNSCOPED_INFO("on the space it hangs");
             REQUIRE(layout.columnAt(0, 1, line.rows[1].width - 0.5f, round) == 15);
-            UNSCOPED_INFO("past the first row" + how);
+            UNSCOPED_INFO("past the first row");
             REQUIRE(layout.columnAt(0, 0, line.rows[0].width + 20.f, round) == 12);
-            UNSCOPED_INFO("past the last row: the line's end" + how);
+            UNSCOPED_INFO("past the last row: the line's end");
             REQUIRE(layout.columnAt(0, 2, line.rows[2].width + 20.f, round) == 30);
         }
         // Up from the line's end and down again, at the x the caret kept:
@@ -1175,40 +1149,40 @@ namespace
         // short line made long, as Replace All makes one.
         layout.trim(0, 3);
         doc.replace(ALTextRange(ALTextPos(8, 0), ALTextPos(8, 4)), std::string(400, 'x'));
-        UNSCOPED_INFO("the line made long counts as long: " + std::to_string(layout.contentWidth()));
+        UNSCOPED_INFO("the line made long counts as long");
         CHECK(layout.contentWidth() >= 399.f * space);
         // And the long lines made short.
         doc.replace(ALTextRange(ALTextPos(12, 0), ALTextPos(12, doc.lineLength(12))), "x");
         doc.replace(ALTextRange(ALTextPos(8, 0), ALTextPos(8, 400)), "y");
-        UNSCOPED_INFO("the long lines made short count as short: " + std::to_string(layout.contentWidth()));
+        UNSCOPED_INFO("the long lines made short count as short");
         CHECK(layout.contentWidth() < long_width * 0.5f);
     }
 
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: the widest line is kept through edits as a count of every line finds it", "[altextlayout]")
     {
         ready("aa\nbbbbbb\ncc\nd");
-        const auto check = [&](const std::string& what) {
+        const auto require_widest_counted = [&](const std::string& what) {
             F32 widest = 0.f;
             for (S32 l = 0; l < layout.lineCount(); ++l)
             {
                 widest = llmax(widest, layout.line(l).width);
             }
-            UNSCOPED_INFO(what);
+            INFO(what);
             REQUIRE(layout.contentWidth() == widest);
         };
-        check("laid out");
+        require_widest_counted("laid out");
         doc.insert(ALTextPos(2, 2), "cccccccccc");
-        check("a line typed wider than the widest");
+        require_widest_counted("a line typed wider than the widest");
         doc.remove(ALTextRange(ALTextPos(2, 2), ALTextPos(2, 12)));
-        check("the widest cut short");
+        require_widest_counted("the widest cut short");
         doc.insert(ALTextPos(0, 0), "dddddddddddddddd\n\n");
-        check("lines made, one of them the widest");
+        require_widest_counted("lines made, one of them the widest");
         doc.remove(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 0)));
-        check("lines taken away with the widest");
+        require_widest_counted("lines taken away with the widest");
         doc.insert(ALTextPos(3, 1), "\neeeeeeeeeeeeeeeeeeee");
-        check("a line made below, wider than the rest");
+        require_widest_counted("a line made below, wider than the rest");
         layout.invalidateLine(4);
-        check("that line laid out again");
+        require_widest_counted("that line laid out again");
     }
 
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: lineAtY and visibleBefore skip a hidden run to the last line in sight", "[altextlayout]")
@@ -1298,7 +1272,7 @@ namespace
         CHECK(layout.columnAt(0, 0, b_left + (b_right - b_left) * 0.25f, true) == 5);
         UNSCOPED_INFO("the word's far half: b's column");
         CHECK(layout.columnAt(0, 0, b_left - 5.f, true) == 5);
-        searchedAsWalked(0);
+        require_searched_as_walked(0);
     }
 
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: hiddenCount for each owner is kept through hiding and showing and edits", "[altextlayout]")
@@ -1314,12 +1288,10 @@ namespace
             }
             return n;
         };
-        const auto as_counted = [&](const std::string& what) {
-            UNSCOPED_INFO(what + ": the folds'");
+        const auto require_counts_agree = [&](const std::string& what) {
+            INFO(what);
             REQUIRE(layout.hiddenCount(By::Folds) == counted(By::Folds));
-            UNSCOPED_INFO(what + ": the host's");
             REQUIRE(layout.hiddenCount(By::Host) == counted(By::Host));
-            UNSCOPED_INFO(what + ": either's");
             REQUIRE(layout.hiddenCount(By::Any) == counted(By::Any));
         };
         {
@@ -1340,7 +1312,7 @@ namespace
         UNSCOPED_INFO("hidden again, the same four");
         CHECK(layout.hiddenCount(By::Folds) == 4);
         const U32 asked = layout.hiddenByAsked();
-        as_counted("hidden");
+        require_counts_agree("hidden");
         UNSCOPED_INFO("each line asked who hides it, once for each owner");
         CHECK(layout.hiddenByAsked() == asked + 20);
 
@@ -1355,16 +1327,16 @@ namespace
         }
         UNSCOPED_INFO("the host's other two");
         CHECK(layout.hiddenCount(By::Host) == 2);
-        as_counted("an edit over hidden lines");
+        require_counts_agree("an edit over hidden lines");
         doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "new\n");
-        as_counted("a line made above");
+        require_counts_agree("a line made above");
         layout.setHidden(By::Any, 5, 5, false);
         {
             INFO("one both hid shown");
             CHECK(layout.hiddenCount(By::Folds) == 2);
             CHECK(layout.hiddenCount(By::Host) == 1);
         }
-        as_counted("one both hid shown");
+        require_counts_agree("one both hid shown");
         layout.setHidden(By::Any, 0, 20, false);
         {
             INFO("none hidden again");
@@ -1396,22 +1368,21 @@ namespace
         };
         layout.setGapProvider(gaps);
         const S32 row = layout.rowHeight();
-        const auto same = [&](const std::string& what) {
+        const auto require_same_tops = [&](const std::string& what) {
             ALTextLayout fresh;
             fresh.attach(&doc);
             fresh.setFont(LLFontGL::getFontMonospace());
             fresh.setGapProvider(gaps);
-            UNSCOPED_INFO(what + ": the whole height");
+            INFO(what);
             REQUIRE(layout.totalHeight() == fresh.totalHeight());
             for (S32 l = 0; l <= doc.lineCount(); l += 97)
             {
-                UNSCOPED_INFO(what + ": the top of " + std::to_string(l));
+                CAPTURE(l);
                 REQUIRE(layout.lineTop(l) == fresh.lineTop(l));
             }
-            UNSCOPED_INFO(what + ": the last's top");
             REQUIRE(layout.lineTop(doc.lineCount() - 1) == fresh.lineTop(doc.lineCount() - 1));
         };
-        same("as made");
+        require_same_tops("as made");
 
         doc.insert(ALTextPos(10, 0), "g new\n");
         asked = 0;
@@ -1419,32 +1390,32 @@ namespace
         CHECK(layout.lineTop(10) - layout.lineTop(9) == 2 * row);
         UNSCOPED_INFO("only the line made asked, and the rows below the text, a handful of times");
         CHECK(asked < 10);
-        same("a line made");
+        require_same_tops("a line made");
         doc.replace(ALTextRange(ALTextPos(20, 0), ALTextPos(25, 0)), std::string());
-        same("five lines taken");
+        require_same_tops("five lines taken");
         doc.replace(ALTextRange(ALTextPos(30, 2), ALTextPos(31, 3)), "g\ng\ng");
-        same("two lines made three");
+        require_same_tops("two lines made three");
         doc.replace(ALTextRange(ALTextPos(2000, 0), ALTextPos(2000, 0)), "a\nb\ng\n");
         doc.replace(ALTextRange(ALTextPos(5, 0), ALTextPos(6, 0)), std::string());
-        same("two edits before any is asked");
+        require_same_tops("two edits before any is asked");
         std::vector<std::pair<ALTextRange, std::string>> batch;
         batch.emplace_back(ALTextRange(ALTextPos(100, 0), ALTextPos(100, 0)), "g\n");
         batch.emplace_back(ALTextRange(ALTextPos(400, 0), ALTextPos(403, 0)), std::string());
         batch.emplace_back(ALTextRange(ALTextPos(900, 1), ALTextPos(900, 1)), "\n\n");
         doc.replaceMany(std::move(batch));
-        same("a batch's runs");
+        require_same_tops("a batch's runs");
         std::string pasted;
         for (S32 i = 0; i < 2000; ++i)
         {
             pasted += i % 3 ? "p\n" : "g\n";
         }
         doc.insert(ALTextPos(1500, 0), pasted);
-        same("a paste of thousands, summed again");
+        require_same_tops("a paste of thousands, summed again");
         for (S32 i = 0; i < 1500; ++i)
         {
             doc.insert(ALTextPos(i, 0), "\n");
         }
-        same("many lines made with no height asked between");
+        require_same_tops("many lines made with no height asked between");
         layout.setHidden(ALTextLayout::HiddenBy::Host, 50, 60, true);
         doc.replace(ALTextRange(ALTextPos(55, 0), ALTextPos(58, 0)), "g\n");
         {
@@ -1454,7 +1425,7 @@ namespace
             CHECK(layout.hidden(57));
         }
         layout.setHidden(ALTextLayout::HiddenBy::Host, 0, doc.lineCount(), false);
-        same("hidden lines replaced, then shown");
+        require_same_tops("hidden lines replaced, then shown");
         layout.setGapProvider(nullptr);
     }
 
@@ -1517,7 +1488,7 @@ namespace
                 batch.emplace_back(ALTextRange(ALTextPos(line + 200, 0), ALTextPos(line + 200, 0)), "d\n" + std::string(next(120), 'd'));
                 doc.replaceMany(std::move(batch));
             }
-            UNSCOPED_INFO("step " + std::to_string(step));
+            CAPTURE(step);
             REQUIRE(layout.contentWidth() == widest());
         }
         UNSCOPED_INFO("no edit had every line's width counted again");

@@ -92,37 +92,29 @@ namespace
             "</floater>\n");
         typedef ALXUIService::Context::Where Where;
         ALXUIService::Context c = ALXUIService::contextAt(doc, ALTextPos(4, 35));  // after fol
-        UNSCOPED_INFO("an attribute's name");
         CHECK(c.where == Where::AttributeName);
-        UNSCOPED_INFO("of the button");
         CHECK(c.tag == std::string("button"));
         UNSCOPED_INFO("with name and label carried already");
-        REQUIRE(c.present.size() == size_t(2));
+        CHECK(c.present.size() == size_t(2));
         {
             INFO("under the panel under the floater");
             REQUIRE(c.parents.size() == 2);
             CHECK(c.parents[1] == "panel");
         }
-        UNSCOPED_INFO(llformat("the word starts at fol (not %d)", c.wordStart.column));
+        UNSCOPED_INFO("the word starts at fol, not column " << c.wordStart.column);
         CHECK(c.wordStart == ALTextPos(4, 32));
         c = ALXUIService::contextAt(doc, ALTextPos(4, 29));  // inside "Go
-        UNSCOPED_INFO("a value");
         CHECK(c.where == Where::AttributeValue);
-        UNSCOPED_INFO("of label");
         CHECK(c.attribute == std::string("label"));
         c = ALXUIService::contextAt(doc, ALTextPos(5, 7));  // <bu
-        UNSCOPED_INFO("a tag being typed");
         CHECK(c.where == Where::TagName);
         UNSCOPED_INFO("under the panel (the button above was left open, as typing leaves it)");
-        REQUIRE_FALSE(c.parents.empty());
+        CHECK_FALSE(c.parents.empty());
         c = ALXUIService::contextAt(doc, ALTextPos(6, 6));  // </pa
-        UNSCOPED_INFO("a closing tag");
         CHECK(c.where == Where::ClosingTag);
         c = ALXUIService::contextAt(doc, ALTextPos(2, 8));
-        UNSCOPED_INFO("a comment");
         CHECK(c.where == Where::Comment);
         c = ALXUIService::contextAt(doc, ALTextPos(3, 0));
-        UNSCOPED_INFO("text between elements");
         CHECK(c.where == Where::Text);
     }
 
@@ -140,7 +132,7 @@ namespace
         std::vector<ALCodeEditor::Completion> out;
         ALXUIService::complete(doc, ALTextPos(1, 19), "", out);
         UNSCOPED_INFO("label offered: " + names(out));
-        CHECK(offers(out, "label"));
+        REQUIRE(offers(out, "label"));
         UNSCOPED_INFO("name, carried already, is not");
         CHECK_FALSE(offers(out, "name"));
         const auto label = std::find_if(out.begin(), out.end(), [](const ALCodeEditor::Completion& c) { return c.text == "label"; });
@@ -197,13 +189,11 @@ namespace
         REQUIRE((ALXUIService::hover(doc, ALTextPos(2, 0)).empty() || true));
         ALTextPos   where;
         std::string message;
-        UNSCOPED_INFO("whole parses");
-        REQUIRE(ALXUIService::parses(doc.text(), where, message));
-        UNSCOPED_INFO("broken does not");
+        CHECK(ALXUIService::parses(doc.text(), where, message));
         CHECK_FALSE(ALXUIService::parses("<floater name=\"f\">\n  <button name=\"b\"\n</floater>\n", where, message));
         {
             INFO("with a message and a place: " + message);
-            REQUIRE_FALSE(message.empty());
+            CHECK_FALSE(message.empty());
             CHECK(where.line >= 1);
         }
     }
@@ -211,7 +201,6 @@ namespace
     TEST_CASE_METHOD(alxuiservice_data, "alxuiservice: a whole source is set as one undo step and a line finds its element", "[alxuiservice]")
     {
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer("<floater name=\"f\">\n  <panel name=\"p\">\n    <button name=\"b\" />\n    <button name=\"b\" />\n  </panel>\n</floater>\n"));
         ALXUIEdit::path_t path;
         UNSCOPED_INFO("the second button at its line");
@@ -234,12 +223,12 @@ namespace
         {
             INFO("and the tree is the new text's");
             CHECK(edit.resolve({ "q" }));
-            CHECK(!edit.resolve({ "p" }));
+            CHECK_FALSE(edit.resolve({ "p" }));
         }
         {
             INFO("broken text is held but says so");
             CHECK_FALSE(edit.setSource("<floater name=\"f\">\n  <panel"));
-            REQUIRE_FALSE(edit.error().empty());
+            CHECK_FALSE(edit.error().empty());
         }
         {
             INFO("undo brings the whole back");

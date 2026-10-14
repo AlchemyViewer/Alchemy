@@ -87,28 +87,21 @@ namespace
         ALSpecimenList* list = make();
         list->setSpecimens(three());
 
-        UNSCOPED_INFO("all three");
-        REQUIRE(list->count() == 3u);
-        UNSCOPED_INFO("and all three shown");
+        CHECK(list->count() == 3u);
         CHECK(list->shown() == 3u);
 
         const LLView* controls = list->findChild<LLView>("heading_Controls", true);
         const LLView* containers = list->findChild<LLView>("heading_Containers", true);
-        {
-            INFO("a heading each");
-            REQUIRE(controls != nullptr);
-            REQUIRE(containers != nullptr);
-        }
+        REQUIRE(controls != nullptr);
+        REQUIRE(containers != nullptr);
         UNSCOPED_INFO("Controls came first, so it is first");
         CHECK(controls->getRect().mTop > containers->getRect().mTop);
 
         // The specimen itself is in the row, and it is the thing rather than
         // a picture of it.
         const LLView* row = list->findChild<LLView>("row_button", true);
-        UNSCOPED_INFO("a row for it");
         REQUIRE(row != nullptr);
-        UNSCOPED_INFO("with the widget in it");
-        REQUIRE(row->findChild<LLButton>("specimen", true) != nullptr);
+        CHECK(row->findChild<LLButton>("specimen", true) != nullptr);
         delete list;
     }
 
@@ -127,28 +120,20 @@ namespace
         list->onChose([&chosen](const std::string& value) { chosen.push_back(value); });
 
         LLView* row = list->findChild<LLView>("row_check_box", true);
-        UNSCOPED_INFO("the row is there");
         REQUIRE(row != nullptr);
 
         // On the specimen, which is the half a click would otherwise press.
         const LLView* specimen = row->findChild<LLButton>("specimen", true);
-        UNSCOPED_INFO("the specimen is there");
         REQUIRE(specimen != nullptr);
         const LLRect on_it = specimen->getRect();
-        UNSCOPED_INFO("taken");
         CHECK(row->handleMouseDown(on_it.getCenterX(), on_it.getCenterY(), MASK_NONE));
 
-        UNSCOPED_INFO("and it chose the row");
         REQUIRE(chosen.size() == 1u);
-        UNSCOPED_INFO("which one");
         CHECK(chosen.front() == std::string("check_box"));
-        UNSCOPED_INFO("and the list says so");
         CHECK(list->chosen() == std::string("check_box"));
         delete list;
     }
 
-    // The filter narrows to the rows that carry the words, and a heading left
-    // with nothing under it goes with what it held.
     TEST_CASE_METHOD(alspecimenlist_data, "alspecimenlist: filter narrows to matching rows and hides emptied headings", "[alspecimenlist]")
     {
         if (!ui.ok())
@@ -159,34 +144,25 @@ namespace
         list->setSpecimens(three());
 
         list->filter("CHECK");
-        UNSCOPED_INFO("one left");
         CHECK(list->shown() == 1u);
-        UNSCOPED_INFO("the one that matched is shown");
         CHECK(list->findChild<LLView>("row_check_box", true)->getVisible());
-        UNSCOPED_INFO("and the others are not");
         CHECK_FALSE(list->findChild<LLView>("row_panel", true)->getVisible());
-        UNSCOPED_INFO("the heading with nothing under it went too");
         CHECK_FALSE(list->findChild<LLView>("heading_Containers", true)->getVisible());
-        UNSCOPED_INFO("and the one that kept a row stayed");
         CHECK(list->findChild<LLView>("heading_Controls", true)->getVisible());
 
         // A heading is a word to filter by as well: everything under it.
         list->filter("containers");
         UNSCOPED_INFO("the group matched");
         CHECK(list->shown() == 1u);
-        UNSCOPED_INFO("which is what is under it");
         CHECK(list->findChild<LLView>("row_panel", true)->getVisible());
 
         list->filter(std::string());
-        UNSCOPED_INFO("and back");
         CHECK(list->shown() == 3u);
         UNSCOPED_INFO("with nothing rebuilt");
-        REQUIRE(list->count() == 3u);
+        CHECK(list->count() == 3u);
         delete list;
     }
 
-    // Narrowed to nothing is a pane with nothing in it, which still says
-    // something.
     TEST_CASE_METHOD(alspecimenlist_data, "alspecimenlist: filtered to nothing the list hides and the empty notice shows", "[alspecimenlist]")
     {
         if (!ui.ok())
@@ -197,11 +173,8 @@ namespace
         list->setSpecimens(three());
 
         list->filter("qqzzxw");
-        UNSCOPED_INFO("nothing left");
         CHECK(list->shown() == 0u);
-        UNSCOPED_INFO("so the list is out of the way");
         CHECK_FALSE(list->findChild<LLView>("scroller", true)->getVisible());
-        UNSCOPED_INFO("and something is said instead");
         CHECK(list->findChild<LLView>("empty", true)->getVisible());
         delete list;
     }
@@ -238,15 +211,14 @@ namespace
         CHECK(list->chosen() == "check_box");
         row->handleHover(x + 1, y, MASK_NONE);
         UNSCOPED_INFO("a press that has barely moved carries nothing");
-        REQUIRE(carried.empty());
+        CHECK(carried.empty());
         row->handleHover(x + 20, y, MASK_NONE);
         UNSCOPED_INFO("moved far enough, it carries the specimen");
         REQUIRE(carried.size() == 1u);
-        UNSCOPED_INFO("by value");
         CHECK(carried.front() == std::string("check_box"));
         row->handleHover(x + 40, y, MASK_NONE);
         UNSCOPED_INFO("once");
-        REQUIRE(carried.size() == 1u);
+        CHECK(carried.size() == 1u);
         row->handleMouseUp(x + 40, y, MASK_NONE);
         delete list;
     }
@@ -280,10 +252,9 @@ namespace
             pictures.push_back(one);
         }
         list->setSpecimens(pictures);
-        UNSCOPED_INFO("every picture shown");
         CHECK(list->shown() == size_t(3));
         UNSCOPED_INFO("no row was built for a cell");
-        REQUIRE(list->findChild<LLView>("row_PushButton_Off", true) == nullptr);
+        CHECK(list->findChild<LLView>("row_PushButton_Off", true) == nullptr);
 
         std::vector<std::string> chosen;
         list->onChose([&chosen](const std::string& value) { chosen.push_back(value); });
@@ -302,22 +273,20 @@ namespace
         list->handleKeyHere(KEY_UP, MASK_NONE);
         UNSCOPED_INFO("and back up");
         CHECK(list->chosen() == std::string("PushButton_Off"));
-        UNSCOPED_INFO("each said");
-        REQUIRE(chosen.size() == size_t(4));
+        UNSCOPED_INFO("each move said");
+        CHECK(chosen.size() == size_t(4));
 
         list->setChosen("Icon_Close");
         UNSCOPED_INFO("chosen quietly");
         CHECK(list->chosen() == std::string("Icon_Close"));
         UNSCOPED_INFO("and not said");
-        REQUIRE(chosen.size() == size_t(4));
+        CHECK(chosen.size() == size_t(4));
 
         list->filter("icon");
-        UNSCOPED_INFO("the filter narrows the cells");
         CHECK(list->shown() == size_t(1));
         list->filter("zzz");
-        UNSCOPED_INFO("to nothing");
         CHECK(list->shown() == size_t(0));
-        UNSCOPED_INFO("which the pane says");
+        UNSCOPED_INFO("the pane says so");
         CHECK(list->findChild<LLView>("empty", true)->getVisible());
         delete list;
     }
@@ -353,33 +322,30 @@ namespace
         list->onSelectionChanged([&changes]() { ++changes; });
 
         list->cellPressed(0, MASK_NONE);
-        UNSCOPED_INFO("chosen");
         CHECK(list->chosen() == std::string("A"));
         UNSCOPED_INFO("and alone selected");
-        REQUIRE(list->selection().size() == size_t(1));
+        CHECK(list->selection().size() == size_t(1));
 
         list->cellPressed(2, MASK_CONTROL);
         UNSCOPED_INFO("still chosen");
         CHECK(list->chosen() == std::string("A"));
-        UNSCOPED_INFO("two selected");
-        REQUIRE(list->selection().size() == size_t(2));
+        CHECK(list->selection().size() == size_t(2));
         list->cellPressed(2, MASK_CONTROL);
         UNSCOPED_INFO("and out again");
-        REQUIRE(list->selection().size() == size_t(1));
+        CHECK(list->selection().size() == size_t(1));
         list->cellPressed(0, MASK_CONTROL);
         UNSCOPED_INFO("the chosen one cannot be taken out");
-        REQUIRE(list->selection().size() == size_t(1));
+        CHECK(list->selection().size() == size_t(1));
 
         list->cellPressed(3, MASK_SHIFT);
         UNSCOPED_INFO("the run from the chosen one");
-        REQUIRE(list->selection().size() == size_t(4));
+        CHECK(list->selection().size() == size_t(4));
         UNSCOPED_INFO("with the chosen one still A");
         CHECK(list->chosen() == std::string("A"));
 
         list->cellPressed(1, MASK_NONE);
         UNSCOPED_INFO("a plain press is one thing");
-        REQUIRE(list->selection().size() == size_t(1));
-        UNSCOPED_INFO("that one");
+        CHECK(list->selection().size() == size_t(1));
         CHECK(list->chosen() == std::string("B"));
         UNSCOPED_INFO("every change was said");
         CHECK(changes >= 6);
@@ -393,13 +359,12 @@ namespace
         list->setSpecimens(three());
         UNSCOPED_INFO("select all is handled");
         CHECK(list->handleKeyHere('A', MASK_CONTROL));
-        UNSCOPED_INFO("all visible cells selected");
-        REQUIRE(list->selection().size() == size_t(3));
+        CHECK(list->selection().size() == size_t(3));
         list->filter("panel");
         UNSCOPED_INFO("filtered select all is handled");
         CHECK(list->handleKeyHere('A', MASK_CONTROL));
         UNSCOPED_INFO("only the visible cell remains selected");
-        REQUIRE(list->selection().size() == size_t(1));
+        CHECK(list->selection().size() == size_t(1));
         UNSCOPED_INFO("the chosen cell follows the visible selection");
         CHECK(list->chosen() == std::string("panel"));
         delete list;
@@ -446,7 +411,7 @@ namespace
         UNSCOPED_INFO("a control click leaves the chosen one");
         CHECK(list->chosen() == std::string("A"));
         UNSCOPED_INFO("and takes the pressed one too");
-        REQUIRE(list->selection().size() == size_t(2));
+        CHECK(list->selection().size() == size_t(2));
         tiles->handleHover(x + 20, y, MASK_CONTROL);
         UNSCOPED_INFO("moved, it carries the pressed one");
         REQUIRE(carried.size() == 1u);
@@ -480,7 +445,7 @@ namespace
         {
             INFO("the row shows the picture");
             REQUIRE(row != nullptr);
-            REQUIRE(row->findChild<LLView>("picture", true) != nullptr);
+            CHECK(row->findChild<LLView>("picture", true) != nullptr);
         }
 
         list->setCellSize(100, 0);
@@ -492,8 +457,8 @@ namespace
         LLView* tiles = list->findChild<LLView>("tiles", true);
         {
             INFO("the picture stayed with the row");
-            REQUIRE(tiles->findChild<LLView>("picture", true) == nullptr);
-            REQUIRE(row->findChild<LLView>("picture", true) != nullptr);
+            CHECK(tiles->findChild<LLView>("picture", true) == nullptr);
+            CHECK(row->findChild<LLView>("picture", true) != nullptr);
         }
         delete list;
     }
@@ -523,7 +488,6 @@ namespace
             REQUIRE(sample);
             CHECK(sample->getText() == "Aa Bb 0123");
         }
-        UNSCOPED_INFO("in the row's face");
         CHECK(sample->getFont() == LLFontGL::getFontSansSerif());
         UNSCOPED_INFO("the other row in its own");
         CHECK(list->findChild<LLView>("row_Monospace", true)->findChild<LLTextBox>("sample")->getFont() == LLFontGL::getFontMonospace());
@@ -539,16 +503,10 @@ namespace
         list->onChose([&chose](const std::string& v) { chose.push_back(v); });
         list->onPicked([&picked](const std::string& v) { picked.push_back(v); });
         LLView* row = list->findChild<LLView>("row_Monospace", true);
-        UNSCOPED_INFO("the row");
         REQUIRE(row != nullptr);
-        UNSCOPED_INFO("a double-click is taken");
         CHECK(row->handleDoubleClick(10, 10, MASK_NONE));
-        {
-            INFO("chosen and picked");
-            CHECK(chose == std::vector<std::string>{ "Monospace" });
-            CHECK(picked == std::vector<std::string>{ "Monospace" });
-        }
-        UNSCOPED_INFO("the choice");
+        CHECK(chose == std::vector<std::string>{ "Monospace" });
+        CHECK(picked == std::vector<std::string>{ "Monospace" });
         CHECK(list->chosen() == std::string("Monospace"));
         list->die();
     }

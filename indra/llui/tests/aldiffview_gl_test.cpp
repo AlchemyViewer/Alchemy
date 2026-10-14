@@ -185,7 +185,7 @@ namespace
             const S32  width = b.right - b.left - 8;
             const S32  edge  = llmax(count(outlined, b.left + 4, b.right - 4, b.top - 2, b.top + 1, yellow),
                                      count(outlined, b.left + 4, b.right - 4, b.bottom - 1, b.bottom + 2, yellow));
-            UNSCOPED_INFO("its edge drawn across the text, on " + side->getName());
+            UNSCOPED_INFO("its edge drawn across the text on " << side->getName());
             REQUIRE(edge >= width / 2);
         }
 
@@ -201,7 +201,6 @@ namespace
     TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: a folded run's gap row is written over and goes once the run opens", "[aldiffview_gl]")
     {
         ALDiffView& d = make();
-        UNSCOPED_INFO("one run folded");
         CHECK(d.foldedCount() == 1);
         // The right's lines: 0-1, the change at 2, 3-4, the line put in at
         // 5, context 6-8, the run 9-27, and its row the gap above 28.
@@ -236,7 +235,6 @@ namespace
         // An LSL line that became three of SLua, then one that became one.
         d.setTexts("default\n{\n    if (a) b();\n    c();\n}", "if a then\n    b()\nend\nc()", { { 2, 2, 0, 2 }, { 3, 3, 3, 3 } });
         const S32 gap = d.right()->getRect().mLeft - d.left()->getRect().mRight;
-        UNSCOPED_INFO("the gap wider");
         CHECK(gap > narrow);
         const std::vector<U8> drawn_now = drawn(d);
         // The gap's columns, inside its edges, down the rows of each range.
@@ -338,7 +336,6 @@ namespace
         };
         const U32 two  = draws({ { 0, 1, 0, 1 }, { 4, 5, 4, 5 } });
         const U32 four = draws({ { 0, 1, 0, 1 }, { 2, 3, 2, 3 }, { 4, 5, 4, 5 }, { 6, 7, 6, 7 } });
-        UNSCOPED_INFO("drawn");
         CHECK(two > 0);
         UNSCOPED_INFO("as many draws for four bands as for two");
         CHECK(four == two);

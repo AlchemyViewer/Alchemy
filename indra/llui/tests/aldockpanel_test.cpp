@@ -52,10 +52,11 @@ namespace
         // them on.
         ll_test::FocusScope  focus;
 
-        // A pane still out is put back, its window closed as test 4 shows
-        // that does, and each test's dead views reaped as it ends, as the
-        // next frame would: test 12 empties the graveyard itself, and then
-        // finds only its own views there.
+        // A pane still out is put back, its window closed as the case on
+        // closing a pane's window shows that does, and each test's dead views
+        // reaped as it ends, as the next frame would: the quitting case
+        // empties the graveyard itself, and then finds only its own views
+        // there.
         ~aldockpanel_data()
         {
             std::vector<LLHandle<LLFloater>> out;
@@ -152,19 +153,16 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
-        UNSCOPED_INFO("there is a pane");
         REQUIRE(pane != nullptr);
         UNSCOPED_INFO("it is in the layout panel");
-        REQUIRE(pane->getParent() == (LLView*)w.side);
+        CHECK(pane->getParent() == (LLView*)w.side);
         UNSCOPED_INFO("and what was there is in it");
-        REQUIRE(w.inside->getParent() == (LLView*)pane);
+        CHECK(w.inside->getParent() == (LLView*)pane);
         UNSCOPED_INFO("the window still finds it by name");
-        REQUIRE(w.floater->findChild<LLButton>("in_the_side", true) == w.inside);
+        CHECK(w.floater->findChild<LLButton>("in_the_side", true) == w.inside);
         w.floater->die();
     }
 
-    // Out: the pane is in a window of its own, and the room it left goes to
-    // what is still in the stack.
     TEST_CASE_METHOD(aldockpanel_data, "aldockpanel: popOut puts the pane in a window of its own and gives its room away", "[aldockpanel]")
     {
         Window w = build();
@@ -172,17 +170,16 @@ namespace
         const S32 was = w.middle->getRect().getWidth();
 
         pane->popOut();
-        UNSCOPED_INFO("it says it is out");
         CHECK(pane->poppedOut());
         UNSCOPED_INFO("it is not in the window any more");
         CHECK(pane->getParent() != (LLView*)w.side);
         UNSCOPED_INFO("it is in a window of its own");
-        REQUIRE(pane->getParentByType<ALPanelFloater>() != nullptr);
+        CHECK(pane->getParentByType<ALPanelFloater>() != nullptr);
         UNSCOPED_INFO("the pane it came out of is folded away");
         CHECK(w.side->isCollapsed());
 
         w.stack->updateLayout();
-        UNSCOPED_INFO("and the rest of the stack took the room " + std::to_string(w.middle->getRect().getWidth()));
+        UNSCOPED_INFO("and the rest of the stack took the room");
         CHECK(w.middle->getRect().getWidth() > was);
         w.floater->die();
     }
@@ -204,16 +201,15 @@ namespace
         pane->dock();
         w.stack->updateLayout();
 
-        UNSCOPED_INFO("it says it is back");
         CHECK_FALSE(pane->poppedOut());
         UNSCOPED_INFO("in the parent it came from");
-        REQUIRE(pane->getParent() == (LLView*)w.side);
+        CHECK(pane->getParent() == (LLView*)w.side);
         UNSCOPED_INFO("and the room came back with it");
         CHECK_FALSE(w.side->isCollapsed());
         UNSCOPED_INFO("at the size it had");
         CHECK(w.side->getTargetDim() == dim);
         UNSCOPED_INFO("the window finds what is in it again");
-        REQUIRE(w.floater->findChild<LLButton>("in_the_side", true) == w.inside);
+        CHECK(w.floater->findChild<LLButton>("in_the_side", true) == w.inside);
         w.floater->die();
     }
 
@@ -227,21 +223,18 @@ namespace
         pane->popOut();
 
         ALPanelFloater* window = pane->getParentByType<ALPanelFloater>();
-        UNSCOPED_INFO("there is a window");
         REQUIRE(window != nullptr);
         window->closeFloater();
 
         UNSCOPED_INFO("the pane came back");
         CHECK_FALSE(pane->poppedOut());
         UNSCOPED_INFO("to where it was");
-        REQUIRE(pane->getParent() == (LLView*)w.side);
+        CHECK(pane->getParent() == (LLView*)w.side);
         UNSCOPED_INFO("and it is still alive");
         CHECK_FALSE(pane->isDead());
         w.floater->die();
     }
 
-    // Popping twice is popping once, and docking one that is already home
-    // does nothing at all.
     TEST_CASE_METHOD(aldockpanel_data, "aldockpanel: popping out twice is once and docking a docked pane does nothing", "[aldockpanel]")
     {
         Window w = build();
@@ -249,13 +242,13 @@ namespace
 
         pane->dock();
         UNSCOPED_INFO("still where it was declared");
-        REQUIRE(pane->getParent() == (LLView*)w.side);
+        CHECK(pane->getParent() == (LLView*)w.side);
 
         pane->popOut();
         LLView* window = pane->getParent();
         pane->popOut();
         UNSCOPED_INFO("one window, not two");
-        REQUIRE(pane->getParent() == window);
+        CHECK(pane->getParent() == window);
         w.floater->die();
     }
 
@@ -269,10 +262,9 @@ namespace
         pane->popOut();
 
         ALPanelFloater* window = pane->getParentByType<ALPanelFloater>();
-        UNSCOPED_INFO("there is a window");
         REQUIRE(window != nullptr);
         UNSCOPED_INFO("and it knows where home is");
-        REQUIRE(window->home() == w.floater);
+        CHECK(window->home() == w.floater);
         UNSCOPED_INFO("it asks before the viewer's own menu does");
         CHECK(window->hasAccelerators());
         const std::vector<KEY>& heard = static_cast<Home*>(w.floater)->heard;
@@ -303,7 +295,6 @@ namespace
         pane->popOut();
 
         LLFloater* window = pane->getParentByType<ALPanelFloater>();
-        UNSCOPED_INFO("there is a window");
         REQUIRE(window != nullptr);
         UNSCOPED_INFO("the title bar has a band of its own");
         CHECK(window->getHeaderHeight() > 0);
@@ -359,9 +350,8 @@ namespace
         w.stack->updateLayout();
 
         UNSCOPED_INFO("in the parent it came from");
-        REQUIRE(pane->getParent() == (LLView*)w.side);
-        UNSCOPED_INFO("and as tall as it is now: " + std::to_string(pane->getRect().getHeight())
-                          + " in " + std::to_string(w.side->getRect().getHeight()));
+        CHECK(pane->getParent() == (LLView*)w.side);
+        UNSCOPED_INFO("and as tall as it is now");
         CHECK(pane->getRect() == w.side->getLocalRect());
         w.floater->die();
     }
@@ -415,10 +405,9 @@ namespace
         REQUIRE(on_page->getParent() == (LLView*)pane);
 
         pane->popOut();
-        UNSCOPED_INFO("it is out");
         CHECK(pane->poppedOut());
         UNSCOPED_INFO("in a window of its own");
-        REQUIRE(pane->getParentByType<ALPanelFloater>() != nullptr);
+        CHECK(pane->getParentByType<ALPanelFloater>() != nullptr);
         UNSCOPED_INFO("and the strip still has both pages");
         CHECK(tabs->getTabCount() == 2);
         UNSCOPED_INFO("the page it left is still a page");
@@ -432,14 +421,13 @@ namespace
         CHECK(tabs->getCurrentPanel() == one);
 
         pane->dock();
-        UNSCOPED_INFO("it is back");
         CHECK_FALSE(pane->poppedOut());
         UNSCOPED_INFO("on the page it came from");
-        REQUIRE(pane->getParent() == (LLView*)one);
+        CHECK(pane->getParent() == (LLView*)one);
         UNSCOPED_INFO("filling it");
         CHECK(pane->getRect() == one->getLocalRect());
         UNSCOPED_INFO("with what was on it");
-        REQUIRE(floater->findChild<LLButton>("on_the_page", true) == on_page);
+        CHECK(floater->findChild<LLButton>("on_the_page", true) == on_page);
         UNSCOPED_INFO("and its tab shows it");
         CHECK(tabs->getCurrentPanel() == one);
         floater->die();
@@ -458,7 +446,6 @@ namespace
         pane->popOut();
 
         ALPanelFloater* window = pane->getParentByType<ALPanelFloater>();
-        UNSCOPED_INFO("there is a window");
         REQUIRE(window != nullptr);
         const LLHandle<LLFloater> window_held = window->getHandle();
         window->closeFloater(true);
@@ -469,13 +456,13 @@ namespace
         UNSCOPED_INFO("the pane is not");
         CHECK_FALSE(held.isDead());
         UNSCOPED_INFO("it is home");
-        REQUIRE(pane->getParent() == (LLView*)w.side);
+        CHECK(pane->getParent() == (LLView*)w.side);
         UNSCOPED_INFO("no longer out");
         CHECK_FALSE(pane->poppedOut());
         UNSCOPED_INFO("but out when the viewer went");
         CHECK(pane->outAtQuit());
         UNSCOPED_INFO("and the window still finds what is in it");
-        REQUIRE(w.floater->findChild<LLButton>("in_the_side", true) == w.inside);
+        CHECK(w.floater->findChild<LLButton>("in_the_side", true) == w.inside);
 
         pane->popOut();
         {
@@ -486,7 +473,7 @@ namespace
         pane->getParentByType<ALPanelFloater>()->closeFloater();
         {
             INFO("closed by hand, it is simply home");
-            REQUIRE_FALSE(pane->poppedOut());
+            CHECK_FALSE(pane->poppedOut());
             CHECK_FALSE(pane->outAtQuit());
         }
         w.floater->die();

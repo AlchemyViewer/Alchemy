@@ -75,19 +75,14 @@ namespace
         fp.name = "floater";
         fp.rect = LLRect(0, 100, 200, 0);
         TestFloater* f = new TestFloater(fp);   // parents itself into gFloaterView
-        UNSCOPED_INFO("a floater is taken");
         CHECK(f->getParent() == fv.get());
-        UNSCOPED_INFO("one child");
         CHECK(fv->getChildCount() == 1);
 
         LLView::Params vp;
         vp.name = "plain";
         TestView* v = new TestView(vp);
-        UNSCOPED_INFO("a plain view is refused");
         CHECK_FALSE(fv->addChild(v));
-        UNSCOPED_INFO("and has no parent");
-        REQUIRE(v->getParent() == nullptr);
-        UNSCOPED_INFO("still one child");
+        CHECK(v->getParent() == nullptr);
         CHECK(fv->getChildCount() == 1);
         delete v;
 
@@ -113,18 +108,14 @@ namespace
         const std::string xml =
             "<floater name=\"built\" title=\"Held in memory\" width=\"123\" height=\"45\"/>";
         LLXMLNodePtr root;
-        UNSCOPED_INFO("the tree parses");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), (U32)xml.size(), root));
 
         LLFloater::Params fp;
         fp.name = "shell";
         fp.rect = LLRect(0, 10, 10, 0);
         TestFloater* f = new TestFloater(fp);
-        UNSCOPED_INFO("it builds from the tree");
         CHECK(f->buildFromXML(root, "floater_of_no_file.xml"));
-        UNSCOPED_INFO("as wide as the tree says");
         CHECK(f->getRect().getWidth() == 123);
-        UNSCOPED_INFO("and titled what it says");
         CHECK(f->getTitle() == std::string("Held in memory"));
 
         fv.reset();
@@ -162,7 +153,6 @@ namespace
             "</panel>"
             "</floater>";
         LLXMLNodePtr root;
-        UNSCOPED_INFO("the tree parses");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), (U32)xml.size(), root));
 
         LLFloater::Params fp;
@@ -171,36 +161,31 @@ namespace
         TestFloater* f = new TestFloater(fp);
 
         ALXUIDiagnostics sink;
-        UNSCOPED_INFO("it builds");
         CHECK(f->buildFromXML(root, "floater_of_no_file.xml"));
         UNSCOPED_INFO("nothing reached the factory that it could not build");
-        REQUIRE(sink.count(ALXUIDiagnostics::Kind::CreateFailed) == (size_t)0);
+        CHECK(sink.count(ALXUIDiagnostics::Kind::CreateFailed) == (size_t)0);
 
         for (const char* name : { "a", "b", "c", "d" })
         {
             std::string upper(name);
             upper[0] = (char)toupper(upper[0]);
-            UNSCOPED_INFO(std::string("floater string ") + name);
+            CAPTURE(name);
             REQUIRE(f->getString(name) == upper);
         }
         LLPanel* inner = f->findChild<LLPanel>("inner");
-        UNSCOPED_INFO("the panel was built");
         REQUIRE(inner != nullptr);
         for (const char* name : { "e", "f", "g" })
         {
             std::string upper(name);
             upper[0] = (char)toupper(upper[0]);
-            UNSCOPED_INFO(std::string("panel string ") + name);
+            CAPTURE(name);
             REQUIRE(inner->getString(name) == upper);
         }
 
         // The strings were taken out of the tree; the panel is what is left.
-        UNSCOPED_INFO("one child left under the floater");
         CHECK(root->getChildCount() == 1u);
         LLXMLNodePtr panel_node;
-        UNSCOPED_INFO("and it is the panel");
         REQUIRE(root->getChild("panel", panel_node));
-        UNSCOPED_INFO("with nothing left under it");
         CHECK(panel_node->getChildCount() == 0u);
 
         fv.reset();

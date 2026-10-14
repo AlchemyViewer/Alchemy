@@ -91,7 +91,6 @@ namespace
     TEST_CASE_METHOD(alcolorsheet_data, "alcolorsheet: values and references resolve in any declaration order", "[alcolorsheet]")
     {
         ALColorSheet sheet;
-        UNSCOPED_INFO("reads");
         REQUIRE(read(sheet,
             "<color name=\"Early\" reference=\"Base\"/>\n"
             "<color name=\"Base\" value=\"0.1 0.2 0.3 0.4\"/>\n"
@@ -110,16 +109,14 @@ namespace
         CHECK(is(sheet, "Early", 0.1f, 0.2f, 0.3f, 0.4f));
         UNSCOPED_INFO("three numbers are opaque");
         CHECK(is(sheet, "Opaque", 0.5f, 0.6f, 0.7f, 1.f));
-        UNSCOPED_INFO("nothing to say");
-        REQUIRE(sheet.diagnostics().empty());
-        UNSCOPED_INFO("nothing else");
-        REQUIRE(sheet.find("Nope") == nullptr);
+        CHECK(sheet.diagnostics().empty());
+        CHECK(sheet.find("Nope") == nullptr);
 
         const ALColorSheet::Declaration* used = sheet.declarationOf("Late");
         {
             INFO("the declaration used is Late's own");
             REQUIRE(used);
-            REQUIRE(used->name == "Late");
+            CHECK(used->name == "Late");
             CHECK(used->line == 5);
         }
         UNSCOPED_INFO("in the file it came from");
@@ -156,13 +153,13 @@ namespace
         UNSCOPED_INFO("a value over a reference");
         CHECK(is(sheet, "WasRef", 1, 1, 1));
         UNSCOPED_INFO("across files is not a duplicate");
-        REQUIRE(sheet.diagnostics().empty());
+        CHECK(sheet.diagnostics().empty());
 
         const ALColorSheet::Declaration* base = sheet.declarationOf("Base");
         {
             INFO("Base is the skin's declaration");
             REQUIRE(base);
-            REQUIRE(sheet.fileOf(*base) == "skin.xml");
+            CHECK(sheet.fileOf(*base) == "skin.xml");
             CHECK(base->line == 2);
         }
         {
@@ -172,7 +169,6 @@ namespace
         }
     }
 
-    // The same name twice in one file: the last wins and the line says so.
     TEST_CASE_METHOD(alcolorsheet_data, "alcolorsheet: a name declared twice in one file takes the last and says so", "[alcolorsheet]")
     {
         ALColorSheet sheet;
@@ -184,7 +180,6 @@ namespace
 
         UNSCOPED_INFO("the last declaration wins");
         CHECK(is(sheet, "Twice", 0, 1, 0));
-        UNSCOPED_INFO("one duplicate");
         CHECK(count(sheet, Kind::Duplicate) == 1u);
         UNSCOPED_INFO("naming both lines");
         CHECK(first(sheet, Kind::Duplicate) ==
@@ -204,16 +199,12 @@ namespace
             "<color name=\"Further\" reference=\"Through\"/>\n", "a.xml");
         sheet.resolve();
 
-        UNSCOPED_INFO("Dangling is undefined");
-        REQUIRE(sheet.find("Dangling") == nullptr);
-        UNSCOPED_INFO("and so is Through");
-        REQUIRE(sheet.find("Through") == nullptr);
-        UNSCOPED_INFO("and Further");
-        REQUIRE(sheet.find("Further") == nullptr);
-        UNSCOPED_INFO("Fine is fine");
+        CHECK(sheet.find("Dangling") == nullptr);
+        CHECK(sheet.find("Through") == nullptr);
+        CHECK(sheet.find("Further") == nullptr);
         CHECK(is(sheet, "Fine", 1, 1, 1));
-        UNSCOPED_INFO("one line for the root cause: " + all(sheet));
-        REQUIRE(sheet.diagnostics().size() == 1u);
+        UNSCOPED_INFO("one line for the root cause: " << all(sheet));
+        CHECK(sheet.diagnostics().size() == 1u);
         UNSCOPED_INFO("which names the target and the dependents");
         CHECK(first(sheet, Kind::Undefined) ==
                       "a.xml(3): \"Dangling\" refers to \"Nope\", which no colors.xml defines. "
@@ -242,14 +233,12 @@ namespace
             REQUIRE(used);
             CHECK(sheet.fileOf(*used) == "default.xml");
         }
-        UNSCOPED_INFO("one line");
-        REQUIRE(sheet.diagnostics().size() == 1u);
+        CHECK(sheet.diagnostics().size() == 1u);
         UNSCOPED_INFO("saying what is used instead");
         CHECK(first(sheet, Kind::Undefined) ==
                       "skin.xml(2): \"Kept\" refers to \"Nope\", which no colors.xml defines; default.xml(2) is used instead.");
     }
 
-    // A colour that refers to itself.
     TEST_CASE_METHOD(alcolorsheet_data, "alcolorsheet: a colour that refers to itself is undefined", "[alcolorsheet]")
     {
         ALColorSheet sheet;
@@ -258,11 +247,9 @@ namespace
             "<color name=\"Onlooker\" value=\"1 1 1 1\"/>\n", "a.xml");
         sheet.resolve();
 
-        UNSCOPED_INFO("Self is undefined");
-        REQUIRE(sheet.find("Self") == nullptr);
+        CHECK(sheet.find("Self") == nullptr);
         UNSCOPED_INFO("Onlooker is not");
         CHECK(is(sheet, "Onlooker", 1, 1, 1));
-        UNSCOPED_INFO("one cycle");
         CHECK(count(sheet, Kind::Cycle) == 1u);
         UNSCOPED_INFO("a loop of one");
         CHECK(first(sheet, Kind::Cycle) ==
@@ -287,12 +274,12 @@ namespace
 
         for (const char* name : { "A", "B", "X", "Y", "Z", "Behind" })
         {
-            UNSCOPED_INFO(std::string(name) + " is undefined");
+            CAPTURE(name);
             REQUIRE(sheet.find(name) == nullptr);
         }
         UNSCOPED_INFO("Onlooker is not");
         CHECK(is(sheet, "Onlooker", 1, 1, 1));
-        UNSCOPED_INFO("two lines: " + all(sheet));
+        UNSCOPED_INFO("two lines: " << all(sheet));
         REQUIRE(sheet.diagnostics().size() == 2u);
         UNSCOPED_INFO("the pair");
         CHECK(sheet.diagnostics()[0].message ==
@@ -322,8 +309,8 @@ namespace
         CHECK(is(sheet, "A", 1, 0, 0));
         UNSCOPED_INFO("B is the default's");
         CHECK(is(sheet, "B", 0, 1, 0));
-        UNSCOPED_INFO("one line: " + all(sheet));
-        REQUIRE(sheet.diagnostics().size() == 1u);
+        UNSCOPED_INFO("one line: " << all(sheet));
+        CHECK(sheet.diagnostics().size() == 1u);
         UNSCOPED_INFO("saying where each member went");
         CHECK(first(sheet, Kind::Cycle) ==
                       "skin.xml(2): \"A\" refers to itself through \"B\" (skin.xml(3)). "
@@ -341,11 +328,9 @@ namespace
             "<color name=\"Short\" value=\"0.5 0.5\"/>\n", "a.xml");
         sheet.resolve();
 
-        UNSCOPED_INFO("Named is undefined");
-        REQUIRE(sheet.find("Named") == nullptr);
-        UNSCOPED_INFO("Short is undefined");
-        REQUIRE(sheet.find("Short") == nullptr);
-        UNSCOPED_INFO("two bad values and nothing else: " + all(sheet));
+        CHECK(sheet.find("Named") == nullptr);
+        CHECK(sheet.find("Short") == nullptr);
+        UNSCOPED_INFO("two bad values and nothing else: " << all(sheet));
         REQUIRE(sheet.diagnostics().size() == 2u);
         UNSCOPED_INFO("none of them an undefined reference");
         CHECK(count(sheet, Kind::Undefined) == 0u);
@@ -369,11 +354,9 @@ namespace
             "<color name=\"Empty\"/>\n", "a.xml");
         sheet.resolve();
 
-        UNSCOPED_INFO("Capital is undefined");
-        REQUIRE(sheet.find("Capital") == nullptr);
-        UNSCOPED_INFO("Empty is undefined");
-        REQUIRE(sheet.find("Empty") == nullptr);
-        UNSCOPED_INFO("four lines: " + all(sheet));
+        CHECK(sheet.find("Capital") == nullptr);
+        CHECK(sheet.find("Empty") == nullptr);
+        UNSCOPED_INFO("four lines: " << all(sheet));
         REQUIRE(sheet.diagnostics().size() == 4u);
         UNSCOPED_INFO("the attribute");
         CHECK(sheet.diagnostics()[0].message ==
@@ -409,8 +392,8 @@ namespace
         UNSCOPED_INFO("Both takes the reference");
         CHECK(is(sheet, "Both", 0.9f, 0.0f, 0.66f, 1.f));
         UNSCOPED_INFO("Glued is not two numbers");
-        REQUIRE(sheet.find("Glued") == nullptr);
-        UNSCOPED_INFO("four lines: " + all(sheet));
+        CHECK(sheet.find("Glued") == nullptr);
+        UNSCOPED_INFO("four lines: " << all(sheet));
         REQUIRE(sheet.diagnostics().size() == 4u);
         UNSCOPED_INFO("the comma");
         CHECK(sheet.diagnostics()[0].message ==
@@ -427,8 +410,6 @@ namespace
                       "It is undefined.");
     }
 
-    // A base sheet answers the names this one lacks and none of the ones it
-    // has.
     TEST_CASE_METHOD(alcolorsheet_data, "alcolorsheet: a base sheet answers only the names this one lacks", "[alcolorsheet]")
     {
         ALColorSheet base;
@@ -449,16 +430,15 @@ namespace
         CHECK(is(user, "ToBase", 1, 0, 0));
         UNSCOPED_INFO("a name in both is this sheet's");
         CHECK(is(user, "ToBoth", 0, 0, 1));
-        UNSCOPED_INFO("the base is not the sheet");
-        REQUIRE(user.find("Base") == nullptr);
-        UNSCOPED_INFO("the base does not answer nothing");
-        REQUIRE(user.find("ToNothing") == nullptr);
-        UNSCOPED_INFO("one line");
-        REQUIRE(user.diagnostics().size() == 1u);
+        UNSCOPED_INFO("the base's names are not the sheet's");
+        CHECK(user.find("Base") == nullptr);
+        UNSCOPED_INFO("the base does not answer a name neither has");
+        CHECK(user.find("ToNothing") == nullptr);
+        CHECK(user.diagnostics().size() == 1u);
         {
             INFO("the base is untouched");
             CHECK(is(base, "Both", 0, 1, 0));
-            REQUIRE(base.diagnostics().empty());
+            CHECK(base.diagnostics().empty());
         }
     }
 
@@ -483,7 +463,7 @@ namespace
         CHECK(is(sheet, "Capital", 0.3f, 0.3f, 0.3f));
         UNSCOPED_INFO("Good is its earlier self");
         CHECK(is(sheet, "Good", 1, 1, 1));
-        UNSCOPED_INFO("five lines: " + all(sheet));
+        UNSCOPED_INFO("five lines: " << all(sheet));
         REQUIRE(sheet.diagnostics().size() == 5u);
         UNSCOPED_INFO("the bad value falls back");
         CHECK(sheet.diagnostics()[0].message ==
@@ -516,13 +496,12 @@ namespace
             "<color name=\"Menu\" reference=\"Panel\"/>\n", "skin.xml");
         sheet.resolve();
 
-        UNSCOPED_INFO("Background is undefined");
-        REQUIRE(sheet.find("Background") == nullptr);
+        CHECK(sheet.find("Background") == nullptr);
         UNSCOPED_INFO("Panel is the default's");
         CHECK(is(sheet, "Panel", 0.1f, 0.1f, 0.1f));
         UNSCOPED_INFO("Menu follows Panel");
         CHECK(is(sheet, "Menu", 0.1f, 0.1f, 0.1f));
-        UNSCOPED_INFO("two lines: " + all(sheet));
+        UNSCOPED_INFO("two lines: " << all(sheet));
         REQUIRE(sheet.diagnostics().size() == 2u);
         UNSCOPED_INFO("the root cause, undefined with nothing behind it");
         CHECK(sheet.diagnostics()[0].message ==
@@ -550,14 +529,11 @@ namespace
 
         std::vector<std::string> names;
         sheet.forEachResolved([&](std::string_view name, const LLColor4&) { names.emplace_back(name); });
-        UNSCOPED_INFO("two resolved");
         REQUIRE(names.size() == 2u);
-        UNSCOPED_INFO("Zed first");
         CHECK(names[0] == "Zed");
         UNSCOPED_INFO("then Alpha, first declared in a.xml");
         CHECK(names[1] == "Alpha");
 
-        UNSCOPED_INFO("three lines");
         REQUIRE(sheet.diagnostics().size() == 3u);
         UNSCOPED_INFO("a.xml first");
         CHECK(sheet.diagnostics()[0].declaration == 1);
@@ -569,14 +545,13 @@ namespace
         ALColorSheet other;
         LLXMLNodePtr root;
         const std::string xml = "<colours><color name=\"A\" value=\"1 1 1 1\"/></colours>";
-        UNSCOPED_INFO("parses");
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), root));
-        UNSCOPED_INFO("but is not a colours file");
-        REQUIRE_FALSE(other.read(root, "wrong.xml"));
+        UNSCOPED_INFO("a root not <colors> is not a colours file");
+        CHECK_FALSE(other.read(root, "wrong.xml"));
         {
             INFO("and left nothing behind");
-            REQUIRE(other.declarations().empty());
-            REQUIRE(other.files().empty());
+            CHECK(other.declarations().empty());
+            CHECK(other.files().empty());
         }
     }
 
@@ -594,21 +569,18 @@ namespace
         }
         for (const char* skin : { "default", "alchemy", "gemini", "heretic", "ionic" })
         {
+            CAPTURE(skin);
             ALColorSheet sheet;
-            UNSCOPED_INFO("the default reads");
             REQUIRE(sheet.read(default_root, "default/colors.xml"));
             if (std::string(skin) != "default")
             {
                 LLXMLNodePtr root;
-                UNSCOPED_INFO(std::string(skin) + " parses");
                 REQUIRE(LLXMLNode::parseFile(skins + skin + "/colors.xml", root, nullptr));
-                UNSCOPED_INFO(std::string(skin) + " reads");
                 REQUIRE(sheet.read(root, std::string(skin) + "/colors.xml"));
             }
             sheet.resolve();
-            UNSCOPED_INFO(std::string(skin) + " has EmphasisColor");
             REQUIRE(sheet.find("EmphasisColor") != nullptr);
-            UNSCOPED_INFO(std::string(skin) + " has nothing to report:\n" + all(sheet));
+            UNSCOPED_INFO("has nothing to report:\n" << all(sheet));
             REQUIRE(sheet.diagnostics().empty());
         }
 #else
@@ -627,7 +599,7 @@ namespace
             "<color name=\"B\" reference=\"A\"/>\n", "first.xml");
         sheet.resolve();
         UNSCOPED_INFO("one line the first time");
-        REQUIRE(sheet.diagnostics().size() == 1u);
+        CHECK(sheet.diagnostics().size() == 1u);
 
         read(sheet,
             "<color name=\"A\" value=\"1 1 1 1\"/>\n", "second.xml");
@@ -636,7 +608,7 @@ namespace
         CHECK(is(sheet, "A", 1, 1, 1));
         UNSCOPED_INFO("and so is B");
         CHECK(is(sheet, "B", 1, 1, 1));
-        UNSCOPED_INFO("and nothing is left to say: " + all(sheet));
-        REQUIRE(sheet.diagnostics().size() == 0u);
+        UNSCOPED_INFO("and nothing is left to say: " << all(sheet));
+        CHECK(sheet.diagnostics().size() == 0u);
     }
 }

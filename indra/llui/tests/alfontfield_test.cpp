@@ -108,24 +108,19 @@ namespace
         REQUIRE(field->font() != nullptr);
 
         field->setValue("SansSerif");
-        UNSCOPED_INFO("the value is the name");
         CHECK(field->getValue().asString() == std::string("SansSerif"));
-        UNSCOPED_INFO("and the line says it");
         CHECK(field->getChild<LLLineEditor>("text")->getText() == std::string("SansSerif"));
         const LLFontGL* plain = field->font();
 
         field->setStyle("BOLD");
-        UNSCOPED_INFO("style is its own");
         CHECK(field->style() == std::string("BOLD"));
-        UNSCOPED_INFO("and not the value");
+        UNSCOPED_INFO("a style does not change the value");
         CHECK(field->getValue().asString() == std::string("SansSerif"));
         UNSCOPED_INFO("a style is a different face");
         CHECK(field->font() != plain);
-        UNSCOPED_INFO("and the bold one");
         CHECK((field->font()->getFontDesc().getStyle() & LLFontGL::BOLD) != 0);
 
         field->setSize("Large");
-        UNSCOPED_INFO("size is its own");
         CHECK(field->size() == std::string("Large"));
 
         field->setValue("NoSuchFace");
@@ -134,7 +129,6 @@ namespace
         field->die();
     }
 
-    // Typing a name in the line commits it, and says which part changed.
     TEST_CASE_METHOD(alfontfield_data, "alfontfield: a name typed in the line commits it as the name part", "[alfontfield]")
     {
         if (!ui.ok())
@@ -154,22 +148,19 @@ namespace
         LLLineEditor* line = field->getChild<LLLineEditor>("text");
         line->setText(std::string("Monospace"));
         line->onCommit();
-        UNSCOPED_INFO("the field committed");
         CHECK(commits == 1);
         UNSCOPED_INFO("one part changed");
         REQUIRE(said.size() == 1u);
         UNSCOPED_INFO("the name, which is the part with no name");
-        REQUIRE(said.front().part.empty());
-        UNSCOPED_INFO("to what was typed");
+        CHECK(said.front().part.empty());
         CHECK(said.front().value == std::string("Monospace"));
-        UNSCOPED_INFO("and the value says so");
         CHECK(field->getValue().asString() == std::string("Monospace"));
 
         line->onCommit();
         UNSCOPED_INFO("committing the same name again is a commit");
         CHECK(commits == 2);
         UNSCOPED_INFO("but not a change");
-        REQUIRE(said.size() == 1u);
+        CHECK(said.size() == 1u);
         field->die();
     }
 
@@ -195,24 +186,17 @@ namespace
         // Pressing the specimen opens it.
         field->handleMouseDown(4, 10, MASK_NONE);
         ALPopover* popover = popoverOpen();
-        UNSCOPED_INFO("the popover opened");
         REQUIRE(popover != nullptr);
-        UNSCOPED_INFO("with the sizes in it");
         REQUIRE(popover->findChild<LLComboBox>("size", true) != nullptr);
 
         // Escaped: what was picked goes nowhere.
         LLCheckBoxCtrl* bold = popover->findChild<LLCheckBoxCtrl>("bold", true);
-        UNSCOPED_INFO("and the styles");
         REQUIRE(bold != nullptr);
         bold->setValue(true);
         bold->onCommit();
-        UNSCOPED_INFO("escape is taken");
         CHECK(popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
-        UNSCOPED_INFO("nothing was written");
-        REQUIRE(said.empty());
-        UNSCOPED_INFO("and nothing committed");
+        CHECK(said.empty());
         CHECK(commits == 0);
-        UNSCOPED_INFO("the style is what it was");
         CHECK(field->style() == std::string("NORMAL"));
 
         // Returned: what was picked is written, one part per attribute that
@@ -227,21 +211,16 @@ namespace
         LLComboBox* sizes = popover->findChild<LLComboBox>("size", true);
         sizes->setValue("Large");
         sizes->onCommit();
-        UNSCOPED_INFO("return is taken");
         CHECK(popover->handleKeyHere(KEY_RETURN, MASK_NONE));
-        UNSCOPED_INFO("two parts written");
         REQUIRE(said.size() == 2u);
-        UNSCOPED_INFO("the size");
         CHECK(said[0].part == std::string("size"));
-        UNSCOPED_INFO("as picked");
         CHECK(said[0].value == std::string("Large"));
-        UNSCOPED_INFO("and the style");
         CHECK(said[1].part == std::string("style"));
-        UNSCOPED_INFO("as a file writes it");
+        UNSCOPED_INFO("the style as a file writes it");
         CHECK(said[1].value == std::string("BOLD"));
         UNSCOPED_INFO("the name did not change and was not written");
         CHECK(field->getValue().asString() == std::string("SansSerif"));
-        UNSCOPED_INFO("and the field committed once for the answer");
+        UNSCOPED_INFO("the field committed once for the answer");
         CHECK(commits == 1);
         field->die();
     }
@@ -275,9 +254,8 @@ namespace
         bold->onCommit();
         field->die();
         LLMortician::updateClass();
-        UNSCOPED_INFO("nothing written");
+        UNSCOPED_INFO("nothing picked is written");
         CHECK_FALSE(written);
-        UNSCOPED_INFO("the keyboard back where it was");
         CHECK(gFocusMgr.getKeyboardFocus() == elsewhere);
         gFocusMgr.setKeyboardFocus(nullptr);
         elsewhere->die();
@@ -296,34 +274,29 @@ namespace
         field->onPartCommit([&said](const std::string& part, const std::string& value) { said.push_back({ part, value }); });
         field->handleMouseDown(4, 10, MASK_NONE);
         ALPopover* popover = popoverOpen();
-        UNSCOPED_INFO("open");
         REQUIRE(popover != nullptr);
         ALSpecimenList* fonts = popover->findChild<ALSpecimenList>("fonts", true);
-        {
-            INFO("the families listed");
-            REQUIRE(fonts);
-            REQUIRE(fonts->count() > 1);
-        }
-        UNSCOPED_INFO("the field's chosen");
+        REQUIRE(fonts);
+        REQUIRE(fonts->count() > 1);
+        UNSCOPED_INFO("the field's family chosen");
         CHECK(fonts->chosen() == std::string("SansSerif"));
-        UNSCOPED_INFO("each beside a specimen");
+        UNSCOPED_INFO("each family beside a specimen");
         REQUIRE(popover->findChild<LLTextBox>("sample", true) != nullptr);
         fonts->choose("Monospace");
         {
             INFO("a click shows it and writes nothing");
-            REQUIRE(said.empty());
+            CHECK(said.empty());
             CHECK(popoverOpen() == popover);
         }
         LLView* row = fonts->findChild<LLView>("row_Monospace", true);
-        UNSCOPED_INFO("its row");
         REQUIRE(row != nullptr);
         row->handleDoubleClick(10, 10, MASK_NONE);
-        UNSCOPED_INFO("a double-click settles");
-        REQUIRE(popoverOpen() == nullptr);
+        UNSCOPED_INFO("a double-click closes the popover");
+        CHECK(popoverOpen() == nullptr);
         {
-            INFO("and writes the name");
+            INFO("a double-click writes the name");
             REQUIRE(said.size() == 1);
-            REQUIRE(said[0].part.empty());
+            CHECK(said[0].part.empty());
             CHECK(said[0].value == "Monospace");
         }
         field->die();
@@ -345,7 +318,6 @@ namespace
         field->setValue("Inter");
         field->handleMouseDown(4, 10, MASK_NONE);
         ALPopover* popover = popoverOpen();
-        UNSCOPED_INFO("open");
         REQUIRE(popover != nullptr);
         ALSpecimenList* fonts = popover->findChild<ALSpecimenList>("fonts", true);
         {
@@ -356,7 +328,7 @@ namespace
         UNSCOPED_INFO("a monospace family listed");
         REQUIRE(fonts->findChild<LLView>("row_CascadiaCode", true) != nullptr);
         UNSCOPED_INFO("a proportional one not");
-        REQUIRE(fonts->findChild<LLView>("row_DejaVu", true) == nullptr);
+        CHECK(fonts->findChild<LLView>("row_DejaVu", true) == nullptr);
         fonts->choose("CascadiaCode");
         const LLTextBox* preview = popover->findChild<LLTextBox>("preview", true);
         {
@@ -378,12 +350,11 @@ namespace
         {
             INFO("Down alone: not taken, nothing opened");
             CHECK_FALSE(field->handleKeyHere(KEY_DOWN, MASK_NONE));
-            REQUIRE_FALSE(popoverOpen());
+            CHECK_FALSE(popoverOpen());
         }
-        UNSCOPED_INFO("Alt-Down");
         CHECK(field->handleKeyHere(KEY_DOWN, MASK_ALT));
         ALPopover* up = popoverOpen();
-        UNSCOPED_INFO("opened");
+        UNSCOPED_INFO("Alt-Down opened it");
         REQUIRE(up != nullptr);
         up->escape();
         {
@@ -406,17 +377,15 @@ namespace
         field->handleMouseDown(4, 10, MASK_NONE);
         ALPopover*  popover = popoverOpen();
         LLComboBox* sizes   = popover ? popover->findChild<LLComboBox>("size", true) : nullptr;
-        UNSCOPED_INFO("the sizes");
         REQUIRE(sizes != nullptr);
         sizes->setValue("Large");
         const F32 large = LLFontGL::pointsOf("SansSerif", "Large");
         UNSCOPED_INFO("fonts.xml gives Large");
         CHECK(large > 0.f);
-        UNSCOPED_INFO("said in points");
         CHECK(sizes->getSelectedItemLabel() == "Large" + llformat(" (%g pt)", large));
-        UNSCOPED_INFO("chosen by name");
+        UNSCOPED_INFO("the value is the name");
         CHECK(sizes->getValue().asString() == std::string("Large"));
-        UNSCOPED_INFO("the zoom's size not among them");
+        UNSCOPED_INFO("the size a zoom made is not among them");
         CHECK_FALSE(sizes->selectByValue(LLSD("23.0pt")));
         popover->escape();
         field->die();

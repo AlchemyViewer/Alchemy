@@ -85,19 +85,23 @@ namespace
             return *editor;
         }
 
-        void key(KEY k, MASK m = MASK_NONE) { UNSCOPED_INFO("key taken"); REQUIRE(editor->handleKeyHere(k, m)); }
+        void key(KEY k, MASK m = MASK_NONE)
+        {
+            INFO("key " << static_cast<int>(k) << ", mask " << m);
+            REQUIRE(editor->handleKeyHere(k, m));
+        }
 
         void type(const char* text)
         {
             for (const char* c = text; *c; ++c)
             {
+                CAPTURE(text, *c);
                 if (*c == '\n')
                 {
                     key(KEY_RETURN);
                 }
                 else
                 {
-                    UNSCOPED_INFO("char taken");
                     REQUIRE(editor->handleUnicodeCharHere(static_cast<llwchar>(static_cast<unsigned char>(*c))));
                 }
             }
@@ -108,7 +112,6 @@ namespace
     {
         ALCodeEditor& e = make("a");
         const S32 gutter = e.gutterWidth();
-        UNSCOPED_INFO("a gutter");
         CHECK(gutter > 0);
         UNSCOPED_INFO("the text starts past it");
         CHECK(e.textRect().mLeft == 4 + gutter);
@@ -127,7 +130,6 @@ namespace
             CHECK(e.gutterWidth() < gutter);
         }
         e.setShowFoldMarkers(false);
-        UNSCOPED_INFO("no gutter");
         CHECK(e.gutterWidth() == 0);
         UNSCOPED_INFO("the text starts at the pad");
         CHECK(e.textRect().mLeft == 4);
@@ -141,7 +143,6 @@ namespace
         e.setCaret(ALTextPos(0, 2));  // just after '('
         UNSCOPED_INFO("the call's parens");
         REQUIRE(e.matchingBrackets(open, close));
-        UNSCOPED_INFO("opens at 1");
         CHECK(open == ALTextPos(0, 1));
         UNSCOPED_INFO("closes on the next line, past the string and before the comment");
         CHECK(close == ALTextPos(1, 3));
@@ -188,9 +189,8 @@ namespace
         CHECK(e.decorations().front().range.begin.line == 3);
         e.document().replace(ALTextRange(ALTextPos(3, 0), ALTextPos(3, 2)), "TH");
         UNSCOPED_INFO("cut through, it went");
-        REQUIRE(e.decorations().empty());
+        CHECK(e.decorations().empty());
         e.clearMarks();
-        UNSCOPED_INFO("cleared");
         CHECK(e.markAt(2) == ALCodeEditor::Mark::None);
         e.setMark(99, ALCodeEditor::Mark::Note);
         UNSCOPED_INFO("a mark past the end is nowhere");
@@ -201,12 +201,10 @@ namespace
     {
         ALCodeEditor& e = make("  a\n\n  b");
         e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 3)));
-        UNSCOPED_INFO("toggled");
         CHECK(e.handleKeyHere('/', MASK_CONTROL));
         UNSCOPED_INFO("commented at the indentation, blank lines alone");
         CHECK(e.text() == std::string("  // a\n\n  // b"));
         e.handleKeyHere('/', MASK_CONTROL);
-        UNSCOPED_INFO("and back");
         CHECK(e.text() == std::string("  a\n\n  b"));
         e.setCaret(ALTextPos(2, 3));
         e.handleKeyHere('/', MASK_CONTROL);
@@ -215,7 +213,6 @@ namespace
         UNSCOPED_INFO("the caret kept its place in the text");
         CHECK(e.caret() == ALTextPos(2, 6));
         e.goToLine(1);
-        UNSCOPED_INFO("gone to the line");
         CHECK(e.caret() == ALTextPos(1, 0));
         ALCodeEditor& x = make("<a/>", "xml");
         UNSCOPED_INFO("no line comment in xml");
@@ -226,7 +223,6 @@ namespace
     {
         ALCodeEditor& e = make("default\n{\n    state_entry()\n    {\n        llSay(0, \"a\");\n    }\n}\nx");
         const std::vector<ALCodeEditor::FoldRegion>& regions = e.foldRegions();
-        UNSCOPED_INFO("two blocks");
         REQUIRE(regions.size() == size_t(2));
         {
             INFO("the state, from its header through its closing brace");
@@ -239,16 +235,11 @@ namespace
             CHECK(regions[1].end == 5);
         }
 
-        UNSCOPED_INFO("folds");
         CHECK(e.foldAt(2));
-        UNSCOPED_INFO("folded");
         CHECK(e.isFolded(2));
-        {
-            INFO("its lines are hidden");
-            CHECK(e.layout().hidden(3));
-            CHECK(e.layout().hidden(5));
-            CHECK_FALSE(e.layout().hidden(6));
-        }
+        CHECK(e.layout().hidden(3));
+        CHECK(e.layout().hidden(5));
+        CHECK_FALSE(e.layout().hidden(6));
         UNSCOPED_INFO("five rows in sight");
         CHECK(e.layout().totalHeight() == 5 * e.layout().rowHeight());
         UNSCOPED_INFO("not twice");
@@ -261,11 +252,8 @@ namespace
         }
 
         e.foldAll();
-        {
-            INFO("everything folded");
-            CHECK(e.isFolded(0));
-            CHECK(e.isFolded(2));
-        }
+        CHECK(e.isFolded(0));
+        CHECK(e.isFolded(2));
         {
             INFO("only the header and the last line in sight");
             CHECK_FALSE(e.layout().hidden(0));
@@ -276,7 +264,6 @@ namespace
         UNSCOPED_INFO("the caret left the block");
         CHECK(e.caret().line == 0);
         e.unfoldAll();
-        UNSCOPED_INFO("everything open");
         CHECK_FALSE(e.layout().anyHidden());
 
         // Command-Option with a bracket on the Mac, Control-Shift elsewhere.
@@ -298,7 +285,6 @@ namespace
         UNSCOPED_INFO("the key opens it");
         CHECK_FALSE(e.isFolded(2));
 
-        UNSCOPED_INFO("folds again");
         CHECK(e.foldAt(2));
         e.setCaret(ALTextPos(0, 0));
         type("\n");
@@ -323,7 +309,6 @@ namespace
         ALCodeEditor& e = make("integer count;\nllSay(0, co");
         e.setCaret(e.document().end());
         key(' ', MASK_CONTROL);
-        UNSCOPED_INFO("open");
         CHECK(e.completionOpen());
         {
             INFO("the word from the document");
@@ -339,7 +324,6 @@ namespace
         key(KEY_RETURN);
         UNSCOPED_INFO("closed by the choice");
         CHECK_FALSE(e.completionOpen());
-        UNSCOPED_INFO("the choice is in");
         CHECK(e.text() == std::string("integer count;\nllSay(0, count"));
         type(", de");
         UNSCOPED_INFO("opens on its own two letters in");
@@ -406,7 +390,6 @@ namespace
         CHECK(e.completionOpen());
         UNSCOPED_INFO("with the one that fits");
         REQUIRE(e.completions().size() == size_t(1));
-        UNSCOPED_INFO("which is");
         CHECK(e.completions()[0].text == std::string("abacus"));
         type("a");
         {
@@ -418,7 +401,7 @@ namespace
         CHECK(asked == ALTextPos(0, 4));
         e.supplyCompletions(ALTextPos(0, 9), late);
         UNSCOPED_INFO("an answer about another word is ignored");
-        REQUIRE(e.completions().size() == 1);
+        CHECK(e.completions().size() == 1);
         key(KEY_ESCAPE);
 
         std::vector<ALTextPos> signature_asks;
@@ -434,16 +417,12 @@ namespace
         sig.parameters = { { 11, 20 } };
         sig.active     = 0;
         e.showSignature(e.caret(), sig);
-        {
-            INFO("shown");
-            REQUIRE(e.signatureShown());
-            CHECK(e.signature()->label == sig.label);
-        }
+        REQUIRE(e.signatureShown());
+        CHECK(e.signature()->label == sig.label);
         type("4");
         UNSCOPED_INFO("typing inside asks nothing: the argument is followed here");
-        REQUIRE(signature_asks.size() == 1);
+        CHECK(signature_asks.size() == 1);
         e.hideSignature();
-        UNSCOPED_INFO("hidden");
         CHECK_FALSE(e.signatureShown());
         e.showSignature(e.caret(), sig);
         key(KEY_ESCAPE);
@@ -490,7 +469,7 @@ namespace
         {
             INFO("and no request is made");
             CHECK_FALSE(e.handleKeyHere(KEY_F2, MASK_NONE));
-            REQUIRE(asked.size() == 2);
+            CHECK(asked.size() == 2);
         }
 
         e.setHighlights(ALCodeEditor::Highlight::References, { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), ALTextRange(ALTextPos(1, 0), ALTextPos(1, 5)), ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)) });
@@ -523,7 +502,7 @@ namespace
         e.setCaret(ALTextPos(2, 2));
         type("y");
         UNSCOPED_INFO("text inside one drops it");
-        REQUIRE(e.highlights().size() == size_t(2));
+        CHECK(e.highlights().size() == size_t(2));
         e.undo();
         e.undo();
         UNSCOPED_INFO("back to the text before");
@@ -536,17 +515,16 @@ namespace
             { ALTextRange(ALTextPos(2, 0), ALTextPos(2, 5)), "total" },
             { ALTextRange(ALTextPos(2, 8), ALTextPos(2, 13)), "total" },
         };
-        UNSCOPED_INFO("replaced");
         CHECK(e.replaceAll(edits));
-        UNSCOPED_INFO("everywhere");
         CHECK(e.text() == std::string("\ninteger total = 1;\ntotal = total + 1;\n"));
         UNSCOPED_INFO("the caret keeps its place in the word");
         CHECK(e.caret() == ALTextPos(2, 10));
         e.undo();
         UNSCOPED_INFO("one step back undoes it all");
         CHECK(e.text() == std::string("\ninteger count = 1;\ncount = count + 1;\n"));
+        e.setReadOnly(true);
         UNSCOPED_INFO("read-only, a rename cannot be asked");
-        CHECK((e.setReadOnly(true), !e.canPerform(ALEditorCommand::Rename)));
+        CHECK_FALSE(e.canPerform(ALEditorCommand::Rename));
         UNSCOPED_INFO("but a definition can");
         CHECK(e.canPerform(ALEditorCommand::GoToDefinition));
     }
@@ -559,11 +537,11 @@ namespace
         UNSCOPED_INFO("ll alone");
         CHECK(e.identifierAt(ALTextPos(0, 1)) == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)));
         UNSCOPED_INFO("nothing on the dot");
-        REQUIRE(e.identifierAt(ALTextPos(0, 2)).empty());
+        CHECK(e.identifierAt(ALTextPos(0, 2)).empty());
         UNSCOPED_INFO("with digits and underscores");
         CHECK(e.identifierAt(ALTextPos(0, 12)) == ALTextRange(ALTextPos(0, 10), ALTextPos(0, 17)));
         UNSCOPED_INFO("not a number");
-        REQUIRE(e.identifierAt(ALTextPos(0, 23)).empty());
+        CHECK(e.identifierAt(ALTextPos(0, 23)).empty());
         e.setCaret(ALTextPos(0, 6));
         UNSCOPED_INFO("the caret at the end of Say");
         CHECK(e.identifierAtCaret() == ALTextRange(ALTextPos(0, 3), ALTextPos(0, 6)));
@@ -593,13 +571,12 @@ namespace
         CHECK(e.completionOpen());
         UNSCOPED_INFO("the members, by their own names");
         REQUIRE(e.completions().size() == size_t(2));
-        UNSCOPED_INFO("the first");
         CHECK(e.completions()[0].text == std::string("Abs"));
         {
             INFO("asked after the dot with nothing typed yet");
             REQUIRE_FALSE(asked.empty());
             CHECK(asked.back().first == ALTextPos(0, 3));
-            REQUIRE(asked.back().second.empty());
+            CHECK(asked.back().second.empty());
         }
         type("S");
         {
@@ -618,7 +595,6 @@ namespace
             REQUIRE(signatures.size() == 1);
             CHECK(signatures[0] == ALTextPos(0, 7));
         }
-        UNSCOPED_INFO("the list is closed");
         CHECK_FALSE(e.completionOpen());
     }
 
@@ -657,20 +633,18 @@ namespace
         }
         {
             INFO("none for none");
-            REQUIRE(ALCodeEditor::parameterNames("function").empty());
-            REQUIRE(ALCodeEditor::parameterNames("() -> ()").empty());
+            CHECK(ALCodeEditor::parameterNames("function").empty());
+            CHECK(ALCodeEditor::parameterNames("() -> ()").empty());
         }
 
         type("llS");
-        UNSCOPED_INFO("offered");
         CHECK(e.completionOpen());
         key(KEY_TAB);
         UNSCOPED_INFO("the call with its parameters");
         CHECK(e.text() == std::string("llSay(channel, msg)"));
         UNSCOPED_INFO("the first selected");
         CHECK(e.selectedText() == std::string("channel"));
-        UNSCOPED_INFO("two placeholders");
-        REQUIRE(e.placeholders().size() == size_t(2));
+        CHECK(e.placeholders().size() == size_t(2));
         type("0");
         UNSCOPED_INFO("typed over");
         CHECK(e.text() == std::string("llSay(0, msg)"));
@@ -682,9 +656,8 @@ namespace
         {
             INFO(llformat("past the last, after the call (not %d:%d), and done (%d left)", e.caret().line, e.caret().column, (int)e.placeholders().size()));
             CHECK(e.caret() == ALTextPos(0, 14));
-            REQUIRE(e.placeholders().empty());
+            CHECK(e.placeholders().empty());
         }
-        UNSCOPED_INFO("the text");
         CHECK(e.text() == std::string("llSay(0, \"hi\")"));
     }
 
@@ -696,8 +669,7 @@ namespace
         UNSCOPED_INFO("the lines follow the caret's indentation");
         CHECK(e.text() ==
                       std::string("    x;if (condition)\n    {\n        \n    }\n    cost: $5"));
-        UNSCOPED_INFO("two placeholders");
-        REQUIRE(e.placeholders().size() == size_t(2));
+        CHECK(e.placeholders().size() == size_t(2));
         UNSCOPED_INFO("the first selected");
         CHECK(e.selectedText() == std::string("condition"));
         type("a > b");
@@ -711,7 +683,7 @@ namespace
         {
             INFO(llformat("then where $0 stood (not %d:%d)", e.caret().line, e.caret().column));
             CHECK(e.caret() == ALTextPos(2, 8));
-            REQUIRE(e.placeholders().empty());
+            CHECK(e.placeholders().empty());
         }
 
         ALCodeEditor& f = make("", "lsl");
@@ -727,7 +699,6 @@ namespace
             }
         });
         type("fo");
-        UNSCOPED_INFO("offered");
         CHECK(f.completionOpen());
         key(KEY_TAB);
         UNSCOPED_INFO("the snippet in place of the prefix, a level of it a tab as the editor types");
@@ -749,7 +720,6 @@ namespace
         hints.push_back({ ALTextPos(0, 5), "count:", true });
         hints.push_back({ ALTextPos(1, 7), ": number", false });
         e.setInlayHints(hints);
-        UNSCOPED_INFO("three kept");
         REQUIRE(e.inlayHints().size() == size_t(3));
         const F32 now_a = lay.xOf(0, 2);
         UNSCOPED_INFO("a sits past the word before it");
@@ -771,7 +741,6 @@ namespace
         // A gap glyph is not a text glyph.
         S32 gaps = 0;
         for (const ALTextLayout::Glyph& g : lay.line(0).glyphs) gaps += g.inlay >= 0;
-        UNSCOPED_INFO("two gaps on the first line");
         CHECK(gaps == 2);
         // Typing at the end of x extends x, and the type after it moves along.
         e.setCaret(ALTextPos(1, 7));
@@ -802,8 +771,7 @@ namespace
         CHECK(lay.xOf(1, 2) > was_a);
         // Replaced whole, with none.
         e.setInlayHints({});
-        UNSCOPED_INFO("none left");
-        REQUIRE(e.inlayHints().empty());
+        CHECK(e.inlayHints().empty());
         UNSCOPED_INFO("the line back to its width");
         CHECK(lay.xOf(1, 2) == was_a);
     }
@@ -815,7 +783,6 @@ namespace
         tokens.push_back({ ALTextRange(ALTextPos(0, 8), ALTextPos(0, 9)), ALSyntaxKind::Variable, false });
         tokens.push_back({ ALTextRange(ALTextPos(1, 4), ALTextPos(1, 5)), ALSyntaxKind::Variable, true });
         e.setSemanticTokens(tokens);
-        UNSCOPED_INFO("two");
         REQUIRE(e.semanticTokens().size() == size_t(2));
         e.setCaret(ALTextPos(1, 0));
         type("y");
@@ -853,8 +820,7 @@ namespace
         CHECK_FALSE(e.cardShown());
         UNSCOPED_INFO("the rest is taken");
         CHECK(e.handleToolTip(x, y, MASK_NONE));
-        UNSCOPED_INFO("the card is shown");
-        CHECK(e.cardShown());
+        REQUIRE(e.cardShown());
         ALTextView& card = *e.card();
         UNSCOPED_INFO("with the words");
         CHECK(card.document().lineCount() == 3);
@@ -867,7 +833,7 @@ namespace
         {
             INFO("the deprecation in a colour");
             REQUIRE(card.styles().size() >= 2);
-            REQUIRE(card.styles()[1].color.has_value());
+            CHECK(card.styles()[1].color.has_value());
         }
         {
             INFO("the wiki page a link");
@@ -895,7 +861,6 @@ namespace
         UNSCOPED_INFO("gone off both");
         CHECK_FALSE(e.cardShown());
         e.handleToolTip(x, y, MASK_NONE);
-        UNSCOPED_INFO("shown again");
         CHECK(e.cardShown());
         key(KEY_RIGHT);
         UNSCOPED_INFO("a key hides it");
@@ -930,9 +895,9 @@ namespace
             REQUIRE(e.stringAt(ALTextPos(0, column)) == whole);
         }
         UNSCOPED_INFO("and nothing outside it");
-        REQUIRE(e.stringAt(ALTextPos(0, whole.end.column)).empty());
+        CHECK(e.stringAt(ALTextPos(0, whole.end.column)).empty());
         UNSCOPED_INFO("nor of a name");
-        REQUIRE(e.stringAt(ALTextPos(0, 0)).empty());
+        CHECK(e.stringAt(ALTextPos(0, 0)).empty());
         // Its size is of what it holds, not of what it is written as.
         UNSCOPED_INFO("the bytes between the quotes");
         CHECK(e.stringSize(whole) == std::string("14 bytes"));
@@ -940,7 +905,6 @@ namespace
         // An escape is one byte, and what it is written as is said too.
         ALCodeEditor& f = make("default { state_entry() { llSay(0, \"a\\tb\"); } }\n");
         const ALTextRange escaped = f.stringAt(ALTextPos(0, 36));
-        UNSCOPED_INFO("the whole literal");
         CHECK(f.document().text(escaped) == std::string("\"a\\tb\""));
         UNSCOPED_INFO("the tab counted once, and the source said");
         CHECK(f.stringSize(escaped) == std::string("3 bytes, 6 in source"));
@@ -951,7 +915,6 @@ namespace
         const F32    x    = f.layout().xOf(0, 36, &row);
         const S32    at_x = static_cast<S32>(static_cast<F32>(text.mLeft) + x) + 1;
         const S32    at_y = text.mTop - f.layout().rowHeight() / 2;
-        UNSCOPED_INFO("taken");
         CHECK(f.handleToolTip(at_x, at_y, MASK_NONE));
         {
             INFO("a card, and wider than one word wrapped");
@@ -973,7 +936,6 @@ namespace
         e.setTextColor(ink);
         e.setCaret(e.document().end());
         key(' ', MASK_CONTROL);
-        UNSCOPED_INFO("the list is open");
         CHECK(e.completionOpen());
         ALChoiceList* list = e.findChild<ALChoiceList>("completions");
         UNSCOPED_INFO("and is a child of the editor");
@@ -998,12 +960,12 @@ namespace
         const std::string source = "\tllSay(0, \"a" + std::string("\xc2\xa0") + "b\");  ";
         ALCodeEditor&     e      = make(source.c_str());
         UNSCOPED_INFO("the line is as counted");
-        REQUIRE(source.size() == size_t(20));
+        CHECK(source.size() == size_t(20));
 
         // Under the selection is the mode it starts in, and with nothing
         // selected that is nothing at all.
         UNSCOPED_INFO("nothing selected, nothing marked");
-        REQUIRE(e.blanksOn(0).empty());
+        CHECK(e.blanksOn(0).empty());
 
         e.setShowWhitespace(ALCodeEditor::Whitespace::All);
         std::vector<ALCodeEditor::Blank> all = e.blanksOn(0);
@@ -1044,8 +1006,7 @@ namespace
         }
 
         e.setShowWhitespace(ALCodeEditor::Whitespace::None);
-        UNSCOPED_INFO("and none is none");
-        REQUIRE(e.blanksOn(0).empty());
+        CHECK(e.blanksOn(0).empty());
 
         // Under the selection: what the selection covers, and no more.
         e.setShowWhitespace(ALCodeEditor::Whitespace::Selection);
@@ -1060,8 +1021,7 @@ namespace
         // nothing there for them to trail.
         ALCodeEditor& f = make("   ");
         f.setShowWhitespace(ALCodeEditor::Whitespace::Trailing);
-        UNSCOPED_INFO("all three");
-        REQUIRE(f.blanksOn(0).size() == size_t(3));
+        CHECK(f.blanksOn(0).size() == size_t(3));
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: a capital typed into a word keeps the list open and asks nothing new", "[alcodeeditor]")
@@ -1071,7 +1031,6 @@ namespace
         S32 asked = 0;
         e.setCompletionRequest([&asked](const ALTextPos&, std::string_view) { ++asked; });
         type("n");
-        UNSCOPED_INFO("open");
         CHECK(e.completionOpen());
         UNSCOPED_INFO("asked once about the word");
         CHECK(asked == 1);
@@ -1080,12 +1039,9 @@ namespace
         e.handleKeyHere('T', MASK_SHIFT);
         UNSCOPED_INFO("the shift closed nothing");
         CHECK(e.completionOpen());
-        UNSCOPED_INFO("char taken");
         CHECK(e.handleUnicodeCharHere('t'));
         e.handleKeyHere('D', MASK_SHIFT);
-        UNSCOPED_INFO("char taken");
         CHECK(e.handleUnicodeCharHere('D'));
-        UNSCOPED_INFO("still open");
         CHECK(e.completionOpen());
         UNSCOPED_INFO("and not asked again about the same word");
         CHECK(asked == 1);
@@ -1245,12 +1201,12 @@ namespace
         {
             INFO("the chosen one's documentation beside the list");
             REQUIRE(e.findChild<ALTextView>("completion_doc"));
-            REQUIRE(e.findChild<ALTextView>("completion_doc")->getVisible());
-            REQUIRE(e.findChild<ALTextView>("completion_doc")->text().find("What saying does.") != std::string::npos);
+            CHECK(e.findChild<ALTextView>("completion_doc")->getVisible());
+            CHECK(e.findChild<ALTextView>("completion_doc")->text().find("What saying does.") != std::string::npos);
         }
         key(KEY_DOWN);
         UNSCOPED_INFO("it follows the choice");
-        REQUIRE(e.findChild<ALTextView>("completion_doc")->text().find("What SAY_CHANNEL does.") != std::string::npos);
+        CHECK(e.findChild<ALTextView>("completion_doc")->text().find("What SAY_CHANNEL does.") != std::string::npos);
 
         // An answer joining the list keeps the choice on its word.
         ALCodeEditor::Completion late;
@@ -1286,11 +1242,8 @@ namespace
             }
         });
         type("llOld");
-        {
-            INFO("offered");
-            CHECK(e.completionOpen());
-            CHECK(e.completions()[0].deprecated);
-        }
+        CHECK(e.completionOpen());
+        CHECK(e.completions()[0].deprecated);
         key(KEY_RETURN);
         UNSCOPED_INFO("with its brackets and its parameter");
         CHECK(e.text() == std::string("llOldThing(n)"));
@@ -1317,7 +1270,6 @@ namespace
         const S32    x = text.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
         const S32    y = text.mTop - e.layout().rowHeight() / 2;
         e.handleHover(x, y, MASK_NONE);
-        UNSCOPED_INFO("taken");
         CHECK(e.handleToolTip(x, y, MASK_NONE));
         const ALTextView& card = *e.card();
         UNSCOPED_INFO("the problem, a blank, then the word");
@@ -1384,7 +1336,6 @@ namespace
         ALCodeEditor& e = make("");
         e.setAutoClose(true);
         type("llSay(");
-        UNSCOPED_INFO("closed");
         CHECK(e.text() == std::string("llSay()"));
         UNSCOPED_INFO("the caret between");
         CHECK(e.caret() == ALTextPos(0, 6));
@@ -1404,7 +1355,6 @@ namespace
         // One Backspace between a pair just put in takes both.
         e.setText("");
         type("x = [");
-        UNSCOPED_INFO("opened");
         CHECK(e.text() == std::string("x = []"));
         key(KEY_BACKSPACE);
         UNSCOPED_INFO("both gone");
@@ -1433,7 +1383,6 @@ namespace
         e.setText("a + b");
         e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 5)));
         type("(");
-        UNSCOPED_INFO("wrapped");
         CHECK(e.text() == std::string("(a + b)"));
         UNSCOPED_INFO("the inside still chosen");
         CHECK(e.selection().normalised() == ALTextRange(ALTextPos(0, 1), ALTextPos(0, 6)));
@@ -1501,7 +1450,6 @@ namespace
         UNSCOPED_INFO("but no card before the rest");
         CHECK_FALSE(e.cardShown());
         e.setHoverDelay(0.f);
-        UNSCOPED_INFO("taken");
         CHECK(e.handleToolTip(x, y, MASK_NONE));
         UNSCOPED_INFO("with no wait, the card");
         CHECK(e.cardShown());
@@ -1592,7 +1540,7 @@ namespace
         UNSCOPED_INFO("the mirrors show what the first holds");
         CHECK(e.document().line(0) == std::string("for (i = 0; i < n; ++i)"));
         UNSCOPED_INFO("three stops, not the mirrors");
-        REQUIRE(e.placeholders().size() == size_t(3));
+        CHECK(e.placeholders().size() == size_t(3));
         type("k");
         UNSCOPED_INFO("typed over the first alone");
         CHECK(e.document().line(0) == std::string("for (k = 0; i < n; ++i)"));
@@ -1606,19 +1554,17 @@ namespace
             INFO("on to a stop on another line, the stops still there");
             CHECK(e.selectedText() == "body");
             CHECK(e.caret().line == 2);
-            REQUIRE(e.placeholders().size() == 3);
+            CHECK(e.placeholders().size() == 3);
         }
         key(KEY_TAB);
         UNSCOPED_INFO("then $0, its text chosen");
         CHECK(e.selectedText() == std::string("done"));
-        UNSCOPED_INFO("and done");
-        REQUIRE(e.placeholders().empty());
+        CHECK(e.placeholders().empty());
         e.undo();
 
         // One inside another, and let go of when the caret leaves them.
         ALCodeEditor& f = make("x\n", "lsl");
         f.insertSnippet("f(${1:a, ${2:b}})");
-        UNSCOPED_INFO("the text");
         CHECK(f.document().line(0) == std::string("f(a, b)x"));
         UNSCOPED_INFO("the outer chosen whole");
         CHECK(f.selectedText() == std::string("a, b"));
@@ -1627,7 +1573,7 @@ namespace
         CHECK(f.selectedText() == std::string("b"));
         f.setCaret(ALTextPos(1, 0));
         UNSCOPED_INFO("the caret gone from their lines lets them go");
-        REQUIRE(f.placeholders().empty());
+        CHECK(f.placeholders().empty());
         ALCodeEditor& g = make("", "lsl");
         g.insertSnippet("a\\$b\\}c ${1:x}");
         UNSCOPED_INFO("escaped dollar and brace as themselves");
@@ -1678,7 +1624,6 @@ namespace
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: lines deleted right above a folded block leave it folded and moved up", "[alcodeeditor]")
     {
         ALCodeEditor& e = make("x\ny\ndefault\n{\n    state_entry()\n    {\n    }\n}\nz");
-        UNSCOPED_INFO("folds");
         CHECK(e.foldAt(2));
         e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 0)));
         key(KEY_DELETE);
@@ -1754,7 +1699,6 @@ namespace
             CHECK(e.handleKeyHere('.', MASK_CONTROL));
             CHECK(e.fixesOpen());
         }
-        UNSCOPED_INFO("three");
         REQUIRE(e.fixes().size() == static_cast<size_t>(3));
         UNSCOPED_INFO("the preferred first");
         CHECK(e.fixes().front().title == std::string("Insert ';'"));
@@ -1775,7 +1719,7 @@ namespace
         {
             INFO("escape lets it go");
             CHECK_FALSE(e.fixesOpen());
-            REQUIRE(taken.empty());
+            CHECK(taken.empty());
             CHECK_FALSE(box->getVisible());
         }
         e.handleKeyHere('.', MASK_CONTROL);
@@ -1902,8 +1846,7 @@ namespace
         });
         e.setFixHandler([](const LLSD&) {});
         e.showCard(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 7)), std::string(), { { "Missing ';'.", LLColor4::red } });
-        UNSCOPED_INFO("shown");
-        CHECK(e.cardShown());
+        REQUIRE(e.cardShown());
         UNSCOPED_INFO("each a line under the problem");
         CHECK(e.card()->text() == std::string("Missing ';'.\nFix: Insert ';'\nFix: Suppress it"));
     }
@@ -1943,7 +1886,7 @@ namespace
             CHECK(e.fixesOpen());
         }
         UNSCOPED_INFO("the fixes listed meanwhile");
-        REQUIRE(e.fixes().size() == static_cast<size_t>(2));
+        CHECK(e.fixes().size() == static_cast<size_t>(2));
         {
             INFO("the refactors asked for at the caret");
             REQUIRE(asked.size() == 1);
@@ -1956,7 +1899,7 @@ namespace
         extract.edits.emplace_back(ALTextRange(ALTextPos(0, 12), ALTextPos(0, 13)), "value");
         e.supplyActions(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), { extract });
         UNSCOPED_INFO("another place's dropped");
-        REQUIRE(e.fixes().size() == static_cast<size_t>(2));
+        CHECK(e.fixes().size() == static_cast<size_t>(2));
         e.supplyActions(asked.front(), { extract });
         UNSCOPED_INFO("joined");
         REQUIRE(e.fixes().size() == static_cast<size_t>(3));
@@ -1990,12 +1933,12 @@ namespace
             INFO("a word that there is nothing");
             CHECK(e.fixesOpen());
             REQUIRE(e.fixes().size() == 1);
-            REQUIRE(e.fixes().front().value.isUndefined());
+            CHECK(e.fixes().front().value.isUndefined());
         }
         key(KEY_RETURN);
         {
             INFO("which takes nothing");
-            REQUIRE(taken.size() == 1);
+            CHECK(taken.size() == 1);
             CHECK_FALSE(e.fixesOpen());
         }
         e.handleKeyHere('.', MASK_CONTROL);
@@ -2051,7 +1994,6 @@ namespace
         UNSCOPED_INFO("a tip says how it is written in");
         CHECK(e.handleToolTip(on_type + 2, rowY(0), MASK_NONE));
         // A double-click alone meant the name, and changes nothing.
-        UNSCOPED_INFO("taken");
         CHECK(e.handleDoubleClick(on_type + 2, rowY(0), MASK_NONE));
         UNSCOPED_INFO("nothing written");
         CHECK(e.document().line(0) == std::string("local count = 5"));
@@ -2059,10 +2001,9 @@ namespace
         CHECK(e.selection().normalised() == ALTextRange(ALTextPos(0, 6), ALTextPos(0, 11)));
         UNSCOPED_INFO("taken with Control");
         CHECK(e.handleDoubleClick(on_type + 2, rowY(0), MASK_CONTROL));
-        UNSCOPED_INFO("written in");
         CHECK(e.document().line(0) == std::string("local count: number = 5"));
         UNSCOPED_INFO("and the hint gone with its line's edit");
-        REQUIRE(e.inlayHints().size() == static_cast<size_t>(1));
+        CHECK(e.inlayHints().size() == static_cast<size_t>(1));
         e.undo();
         UNSCOPED_INFO("one step to undo");
         CHECK(e.document().line(0) == std::string("local count = 5"));
@@ -2110,7 +2051,7 @@ namespace
             CHECK(e.fixesOpen());
         }
         UNSCOPED_INFO("its fixes alone");
-        REQUIRE(asked.size() == 1);
+        CHECK(asked.size() == 1);
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: the heat strip is a gutter column and heat stays with its line", "[alcodeeditor]")
@@ -2122,12 +2063,9 @@ namespace
         CHECK(e.gutterWidth() > plain);
         const S32 with_heat = e.gutterWidth();
         e.setLineHeat({ { 1, 0.5f, "b's" }, { 2, 1.f, "c's" } });
-        {
-            INFO("as said");
-            CHECK(e.heatAt(1) == 0.5f);
-            CHECK(e.heatAt(2) == 1.f);
-            CHECK(e.heatAt(0) == 0.f);
-        }
+        CHECK(e.heatAt(1) == 0.5f);
+        CHECK(e.heatAt(2) == 1.f);
+        CHECK(e.heatAt(0) == 0.f);
         UNSCOPED_INFO("the gutter no wider for what is in it");
         CHECK(e.gutterWidth() == with_heat);
 
@@ -2170,10 +2108,9 @@ namespace
     {
         ALCodeEditor& e = make("integer twice(integer n)\n{\n    return n * 2;\n}\n");
         e.setLineNotes({ { 0, "28 bytes", "twice: 28 bytes of code" } });
-        UNSCOPED_INFO("as said");
         CHECK(e.noteAt(0) == std::string("28 bytes"));
         UNSCOPED_INFO("nowhere else");
-        REQUIRE(e.noteAt(1).empty());
+        CHECK(e.noteAt(1).empty());
         const LLRect text  = e.textRect();
         const S32    row_h = e.layout().rowHeight();
         const S32    y     = text.mTop - row_h / 2;
@@ -2198,12 +2135,12 @@ namespace
         e.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "// doubles\n");
         {
             INFO("pushed down with its line");
-            REQUIRE(e.noteAt(0).empty());
+            CHECK(e.noteAt(0).empty());
             CHECK(e.noteAt(1) == "28 bytes");
         }
         e.setLineNotes({});
         UNSCOPED_INFO("replaced whole");
-        REQUIRE(e.noteAt(1).empty());
+        CHECK(e.noteAt(1).empty());
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: a listener is told of each fix list made and its notes go to that one", "[alcodeeditor]")
@@ -2228,24 +2165,22 @@ namespace
         std::vector<std::pair<U32, size_t>> told;
         e.setFixesShown([&told](U32 shown, const std::vector<ALCodeEditor::Fix>& fixes) { told.emplace_back(shown, fixes.size()); });
         e.setFixable(0, true, true);
-        UNSCOPED_INFO("opened");
         CHECK(e.openFixes(0));
         {
             INFO("told what it lists");
             REQUIRE(told.size() == 1);
-            CHECK(told.back().second == 2);
+            REQUIRE(told.back().second == 2);
         }
         e.noteFixes(told.back().first, { "12 bytes lighter on LSO", "" });
         UNSCOPED_INFO("after its fix");
         CHECK(e.fixes()[0].note == std::string("12 bytes lighter on LSO"));
         UNSCOPED_INFO("the other has none");
-        REQUIRE(e.fixes()[1].note.empty());
+        CHECK(e.fixes()[1].note.empty());
         UNSCOPED_INFO("still open");
         CHECK(e.fixesOpen());
 
         // Made again: told again, and the last making's notes go nowhere.
         const U32 was = told.back().first;
-        UNSCOPED_INFO("opened again");
         CHECK(e.openFixes(0));
         {
             INFO("told again");
@@ -2254,14 +2189,14 @@ namespace
         }
         e.noteFixes(was, { "stale", "stale" });
         UNSCOPED_INFO("an old making's dropped");
-        REQUIRE(e.fixes()[0].note.empty());
+        CHECK(e.fixes()[0].note.empty());
         e.noteFixes(told.back().first, { "one" });
         UNSCOPED_INFO("one note for two fixes dropped");
-        REQUIRE(e.fixes()[0].note.empty());
+        CHECK(e.fixes()[0].note.empty());
         e.closeFixes();
         e.noteFixes(told.back().first, { "late", "late" });
         UNSCOPED_INFO("nothing to put them on once closed");
-        REQUIRE(e.fixes().empty());
+        CHECK(e.fixes().empty());
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: a press on the find bar is the bar's even over pinned headers", "[alcodeeditor]")
@@ -2280,7 +2215,7 @@ namespace
         e.setCaret(ALTextPos(70, 8));
         e.setCaret(ALTextPos(40, 8));
         const S32 below = e.layout().lineTop(40) - e.scrollY();
-        UNSCOPED_INFO("below the two pinned headers: " + std::to_string(below) + " of " + std::to_string(row_h));
+        UNSCOPED_INFO("below the two pinned headers");
         CHECK(below >= 2 * row_h);
 
         e.showFind(false);
@@ -2294,18 +2229,17 @@ namespace
         const S32 y = bar.mBottom + next->getRect().getCenterY();
         UNSCOPED_INFO("over the pinned headers");
         CHECK(y > e.textRect().mTop - 2 * row_h);
-        UNSCOPED_INFO("pressed");
         CHECK(e.handleMouseDown(x, y, MASK_NONE));
         e.handleMouseUp(x, y, MASK_NONE);
         // The next after the caret is further along its own line.
         {
-            INFO("the next match after the caret, not a header's line: " + std::to_string(e.caret().line));
+            INFO("the next match after the caret, not a header's line");
             CHECK(e.caret().line == 64);
             CHECK(e.findCurrent() >= 0);
         }
         e.handleMouseDown(x, y, MASK_NONE);
         e.handleMouseUp(x, y, MASK_NONE);
-        UNSCOPED_INFO("and the one after that on the next press: " + std::to_string(e.caret().line));
+        UNSCOPED_INFO("and the one after that on the next press");
         CHECK(e.caret().line == 65);
     }
 
@@ -2335,16 +2269,12 @@ namespace
         // A card of a few lines: all of it in sight, nothing for the wheel.
         said = "llSay(integer channel, string msg)\nSays something.";
         e.handleHover(x, y, MASK_NONE);
-        {
-            INFO("a card");
-            CHECK(e.handleToolTip(x, y, MASK_NONE));
-            CHECK(e.cardShown());
-        }
+        CHECK(e.handleToolTip(x, y, MASK_NONE));
+        REQUIRE(e.cardShown());
         const LLRect small = e.card()->getRect();
         e.handleHover(small.getCenterX(), small.getCenterY(), MASK_NONE);
         UNSCOPED_INFO("kept, the mouse on it");
         CHECK(e.cardShown());
-        UNSCOPED_INFO("the wheel taken");
         CHECK(e.handleScrollWheel(small.getCenterX(), small.getCenterY(), down));
         UNSCOPED_INFO("the card gone");
         CHECK_FALSE(e.cardShown());
@@ -2390,7 +2320,6 @@ namespace
         UNSCOPED_INFO("not the references");
         CHECK_FALSE(e.canPerform(ALEditorCommand::FindReferences));
         key(KEY_F12);
-        UNSCOPED_INFO("gone to");
         CHECK(followed == std::vector<ALTextPos>{ ALTextPos(0, 13) });
 
         e.setSymbolRequest([&](ALEditorCommand, const ALTextRange& word) { asked.push_back(word); });
@@ -2398,15 +2327,15 @@ namespace
         key(KEY_F12);
         {
             INFO("elsewhere, the identifier asked about");
-            REQUIRE(asked.size() == 1);
-            REQUIRE(followed.size() == 1);
+            CHECK(asked.size() == 1);
+            CHECK(followed.size() == 1);
         }
         e.setCaret(ALTextPos(0, 3));  // in `include`, an identifier
         key(KEY_F12);
         {
             INFO("the link before it");
-            REQUIRE(followed.size() == 2);
-            REQUIRE(asked.size() == 1);
+            CHECK(followed.size() == 2);
+            CHECK(asked.size() == 1);
         }
 
         const LLRect text = e.textRect();
@@ -2439,11 +2368,8 @@ namespace
         UNSCOPED_INFO("on it, with no one else to ask");
         CHECK(e.canPerform(ALEditorCommand::QuickFix));
         key('.', MASK_CONTROL);
-        {
-            INFO("the list");
-            CHECK(e.fixesOpen());
-            REQUIRE(e.fixes().size() == 2);
-        }
+        CHECK(e.fixesOpen());
+        REQUIRE(e.fixes().size() == 2);
         UNSCOPED_INFO("the first word");
         CHECK(e.fixes()[0].title == std::string("Change to \"the\""));
         {
@@ -2455,7 +2381,6 @@ namespace
         key(KEY_RETURN);
         UNSCOPED_INFO("the second put in");
         CHECK(e.document().line(0) == std::string("// ten note"));
-        UNSCOPED_INFO("the list gone");
         CHECK_FALSE(e.fixesOpen());
     }
 
@@ -2522,12 +2447,10 @@ namespace
         e.addAtom(tall);
         e.setCaret(e.document().end());
         key(' ', MASK_CONTROL);
-        UNSCOPED_INFO("open");
         CHECK(e.completionOpen());
         UNSCOPED_INFO("the row is taller");
         CHECK(e.layout().rowHeightOf(1, 0) == 3 * e.layout().rowHeight());
         const LLView* list = e.findChild<LLView>("completions");
-        UNSCOPED_INFO("the list");
         REQUIRE(list != nullptr);
         UNSCOPED_INFO("under the row, not over its text");
         CHECK(list->getRect().mTop ==
@@ -2548,8 +2471,7 @@ namespace
         ll_test::EditCount edits(e.document());
         e.setCaret(ALTextPos(0, 0));
         type("x");
-        UNSCOPED_INFO("one change");
-        REQUIRE(edits.count() == 1);
+        CHECK(edits.count() == 1);
         e.highlighter().tokens(last);
         UNSCOPED_INFO("the lines after it are not lexed again");
         CHECK(e.highlighter().lastLexed() <= 1);
@@ -2559,7 +2481,7 @@ namespace
         type("/*");
         e.highlighter().tokens(last);
         UNSCOPED_INFO("a change for each key");
-        REQUIRE(edits.count() == 2);
+        CHECK(edits.count() == 2);
         // The script's first block comment is on its sixth line: what is
         // after it lexes as it did.
         UNSCOPED_INFO("a comment opened lexes on to where the next one ends, not to the end");
@@ -2591,7 +2513,6 @@ namespace
 
         e.handleKeyHere('.', MASK_CONTROL);
         e.supplyActions(asked.back(), { extract });
-        UNSCOPED_INFO("listed");
         CHECK(e.fixesOpen());
         e.document().insert(ALTextPos(1, 0), "// ");
         UNSCOPED_INFO("an edit closes it");
@@ -2671,7 +2592,7 @@ namespace
         e.clearHighlights(H::Search);
         {
             INFO("the search's gone, the name's kept");
-            REQUIRE(e.highlights(H::Search).empty());
+            CHECK(e.highlights(H::Search).empty());
             REQUIRE(e.highlights(H::References).size() == 1);
         }
         e.setHighlights(H::Block, { ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)) });
@@ -2683,8 +2604,7 @@ namespace
             CHECK(e.highlights(H::Block)[0].begin == ALTextPos(2, 8));
         }
         e.clearHighlights();
-        UNSCOPED_INFO("all cleared");
-        REQUIRE(e.highlights().empty());
+        CHECK(e.highlights().empty());
 
         ALCodeEditor::Decoration worst, later;
         worst.range   = ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13));
@@ -2698,11 +2618,11 @@ namespace
         {
             INFO("as given");
             REQUIRE(listed.size() == 2);
-            REQUIRE(listed[0]->message == "worst");
+            CHECK(listed[0]->message == "worst");
             CHECK(listed[1]->message == "later");
         }
         UNSCOPED_INFO("none on another line");
-        REQUIRE(e.decorationsOn(2).empty());
+        CHECK(e.decorationsOn(2).empty());
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: in a 50000-line script Select All and Tab is one change and one undo", "[alcodeeditor]")
@@ -2712,21 +2632,19 @@ namespace
         const std::string  was = e.document().line(1);
         ll_test::EditCount edits(e.document());
         e.perform(ALEditorCommand::SelectAll);
-        UNSCOPED_INFO("taken");
         CHECK(e.handleKeyHere(KEY_TAB, MASK_NONE));
-        UNSCOPED_INFO("one change");
-        REQUIRE(edits.count() == 1);
+        CHECK(edits.count() == 1);
         const std::string& now = e.document().line(1);
         {
             INFO("a line indented");
-            REQUIRE_FALSE(was.empty());
+            CHECK_FALSE(was.empty());
             REQUIRE(now.size() > was.size());
-            REQUIRE(now.compare(now.size() - was.size(), was.size(), was) == 0);
+            CHECK(now.compare(now.size() - was.size(), was.size(), was) == 0);
         }
         edits.reset();
         e.undo();
         UNSCOPED_INFO("undone as one");
-        REQUIRE(edits.count() == 1);
+        CHECK(edits.count() == 1);
 
         ALCodeEditor& f = make("integer total;\nf()\n{\n    total = 1;\n}\n// a note\ntotal = total + 1;\n");
         f.setMark(5, ALCodeEditor::Mark::Warning);
@@ -2741,11 +2659,9 @@ namespace
                                                                      { ALTextRange(ALTextPos(6, 0), ALTextPos(6, 5)), "count" },
                                                                      { ALTextRange(ALTextPos(6, 8), ALTextPos(6, 13)), "count" } };
         ll_test::EditCount renamed(f.document());
-        UNSCOPED_INFO("replaced");
         CHECK(f.replaceAll(std::move(renames)));
         UNSCOPED_INFO("as one change");
-        REQUIRE(renamed.count() == 1);
-        UNSCOPED_INFO("the text");
+        CHECK(renamed.count() == 1);
         CHECK(f.text() == std::string("integer count;\nf()\n{\n    total = 1;\n}\n// a note\ncount = count + 1;\n"));
         UNSCOPED_INFO("the mark on a line between kept");
         CHECK(f.markAt(5) == ALCodeEditor::Mark::Warning);
@@ -2787,7 +2703,6 @@ namespace
             }
         });
         type("cou");
-        UNSCOPED_INFO("open");
         CHECK(e.completionOpen());
         type("nt");
         UNSCOPED_INFO("asked once for the word, narrowed as it grew");
@@ -2830,7 +2745,7 @@ namespace
         {
             INFO("listed with nothing typed");
             CHECK(e.completionOpen());
-            REQUIRE_FALSE(e.completions().empty());
+            CHECK_FALSE(e.completions().empty());
         }
         key(KEY_ESCAPE);
 
@@ -2842,7 +2757,7 @@ namespace
             INFO("asked after the colon with nothing typed");
             REQUIRE_FALSE(asked.empty());
             CHECK(asked.back().first == ALTextPos(0, 4));
-            REQUIRE(asked.back().second.empty());
+            CHECK(asked.back().second.empty());
         }
         ALCodeEditor::Completion method;
         method.text = "method";
@@ -2867,7 +2782,6 @@ namespace
         UNSCOPED_INFO("and back");
         CHECK(e.caret() == ALTextPos(0, 1));
         e.setCaret(ALTextPos(0, 7));
-        UNSCOPED_INFO("offered");
         CHECK(e.canPerform(ALEditorCommand::GoToMatchingBracket));
         e.perform(ALEditorCommand::GoToMatchingBracket);
         UNSCOPED_INFO("inside a pair, at no bracket: to its closer");
@@ -3049,21 +2963,30 @@ namespace
     {
         ALCodeEditor& e = make("f()\n{\n    ll.Say(0, \"hi there\");\n}", "slua");
         const auto grown = [&]() {
-            UNSCOPED_INFO("grows");
             REQUIRE(e.perform(ALEditorCommand::ExpandSelection));
             return e.selectedText();
         };
         e.setCaret(ALTextPos(2, 8));
-        UNSCOPED_INFO("the name");
-        CHECK(grown() == std::string("Say"));
-        UNSCOPED_INFO("with what it is a member of");
-        CHECK(grown() == std::string("ll.Say"));
-        UNSCOPED_INFO("the line's text");
-        CHECK(grown() == std::string("    ll.Say(0, \"hi there\");"));
-        UNSCOPED_INFO("the braces' inside");
-        CHECK(grown() == std::string("\n    ll.Say(0, \"hi there\");\n"));
-        UNSCOPED_INFO("with the braces");
-        CHECK(grown() == std::string("{\n    ll.Say(0, \"hi there\");\n}"));
+        {
+            INFO("the name");
+            CHECK(grown() == std::string("Say"));
+        }
+        {
+            INFO("with what it is a member of");
+            CHECK(grown() == std::string("ll.Say"));
+        }
+        {
+            INFO("the line's text");
+            CHECK(grown() == std::string("    ll.Say(0, \"hi there\");"));
+        }
+        {
+            INFO("the braces' inside");
+            CHECK(grown() == std::string("\n    ll.Say(0, \"hi there\");\n"));
+        }
+        {
+            INFO("with the braces");
+            CHECK(grown() == std::string("{\n    ll.Say(0, \"hi there\");\n}"));
+        }
         {
             INFO("shrinks back");
             CHECK(e.perform(ALEditorCommand::ShrinkSelection));
@@ -3084,16 +3007,26 @@ namespace
         CHECK_FALSE(e.canPerform(ALEditorCommand::ShrinkSelection));
 
         e.setCaret(ALTextPos(2, 17));
-        UNSCOPED_INFO("in a string: a word");
-        CHECK(grown() == std::string("hi"));
-        UNSCOPED_INFO("its inside");
-        CHECK(grown() == std::string("hi there"));
-        UNSCOPED_INFO("with its quotes");
-        CHECK(grown() == std::string("\"hi there\""));
-        UNSCOPED_INFO("the call's arguments");
-        CHECK(grown() == std::string("0, \"hi there\""));
-        UNSCOPED_INFO("with the brackets");
-        CHECK(grown() == std::string("(0, \"hi there\")"));
+        {
+            INFO("in a string: a word");
+            CHECK(grown() == std::string("hi"));
+        }
+        {
+            INFO("its inside");
+            CHECK(grown() == std::string("hi there"));
+        }
+        {
+            INFO("with its quotes");
+            CHECK(grown() == std::string("\"hi there\""));
+        }
+        {
+            INFO("the call's arguments");
+            CHECK(grown() == std::string("0, \"hi there\""));
+        }
+        {
+            INFO("with the brackets");
+            CHECK(grown() == std::string("(0, \"hi there\")"));
+        }
         e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
         UNSCOPED_INFO("moved by hand: nothing to go back through");
         CHECK_FALSE(e.canPerform(ALEditorCommand::ShrinkSelection));
@@ -3102,10 +3035,14 @@ namespace
         // pair around all of it, not the line.
         e.setText("f((a) + b)");
         e.setSelection(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 9)));
-        UNSCOPED_INFO("past the pair it crosses, the inside of the one around it");
-        CHECK(grown() == std::string("(a) + b"));
-        UNSCOPED_INFO("then with its brackets");
-        CHECK(grown() == std::string("((a) + b)"));
+        {
+            INFO("past the pair it crosses, the inside of the one around it");
+            CHECK(grown() == std::string("(a) + b"));
+        }
+        {
+            INFO("then with its brackets");
+            CHECK(grown() == std::string("((a) + b)"));
+        }
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: the name under the caret lights its other places in code only", "[alcodeeditor]")
@@ -3117,36 +3054,33 @@ namespace
         const std::vector<ALTextRange>& lit = e.highlights(H::Occurrences);
         UNSCOPED_INFO("three in code");
         REQUIRE(lit.size() == size_t(3));
-        {
-            INFO("where they are");
-            CHECK(lit[0] == ALTextRange(ALTextPos(0, 6), ALTextPos(0, 7)));
-            CHECK(lit[1] == ALTextRange(ALTextPos(0, 10), ALTextPos(0, 11)));
-            CHECK(lit[2] == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 7)));
-        }
+        CHECK(lit[0] == ALTextRange(ALTextPos(0, 6), ALTextPos(0, 7)));
+        CHECK(lit[1] == ALTextRange(ALTextPos(0, 10), ALTextPos(0, 11)));
+        CHECK(lit[2] == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 7)));
         e.setCaret(ALTextPos(0, 11));
         UNSCOPED_INFO("still on one: kept");
-        REQUIRE(e.highlights(H::Occurrences).size() == 3);
+        CHECK(e.highlights(H::Occurrences).size() == 3);
         e.setCaret(ALTextPos(0, 8));
         UNSCOPED_INFO("off it: put out");
-        REQUIRE(e.highlights(H::Occurrences).empty());
+        CHECK(e.highlights(H::Occurrences).empty());
         e.setCaret(ALTextPos(0, 14));
         e.lightOccurrences();
         UNSCOPED_INFO("a name that stands once: nothing");
-        REQUIRE(e.highlights(H::Occurrences).empty());
+        CHECK(e.highlights(H::Occurrences).empty());
         e.setCaret(ALTextPos(1, 12));
         e.lightOccurrences();
         UNSCOPED_INFO("in a comment: nothing");
-        REQUIRE(e.highlights(H::Occurrences).empty());
+        CHECK(e.highlights(H::Occurrences).empty());
         e.setCaret(ALTextPos(0, 6));
         e.lightOccurrences();
         e.insertText("z");
         UNSCOPED_INFO("the text changed: put out");
-        REQUIRE(e.highlights(H::Occurrences).empty());
+        CHECK(e.highlights(H::Occurrences).empty());
         e.setLightsOccurrences(false);
         e.setCaret(ALTextPos(1, 6));
         e.lightOccurrences();
         UNSCOPED_INFO("not asked: nothing");
-        REQUIRE(e.highlights(H::Occurrences).empty());
+        CHECK(e.highlights(H::Occurrences).empty());
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: Select Next Occurrence takes each place in turn and typing edits all", "[alcodeeditor]")
@@ -3189,7 +3123,7 @@ namespace
         e.setCaret(ALTextPos(0, 6));
         key('L', MASK_CONTROL | MASK_SHIFT);
         UNSCOPED_INFO("Change All: every place selected");
-        REQUIRE(e.otherSelections().size() == static_cast<size_t>(3));
+        CHECK(e.otherSelections().size() == static_cast<size_t>(3));
         type("n");
         UNSCOPED_INFO("every place of the name, as written");
         CHECK(e.text() == std::string("local n = 1\nn = n + xy\nprint(\"n\")"));
@@ -3215,7 +3149,7 @@ namespace
         e.showSignature(ALTextPos(0, 2), sig);
         e.setCaret(ALTextPos(1, 3));
         UNSCOPED_INFO("shown on the call's next line");
-        CHECK(e.signatureShown());
+        REQUIRE(e.signatureShown());
         UNSCOPED_INFO("the second argument, by the comma above");
         CHECK(e.signature()->active == 1);
         e.setCaret(ALTextPos(1, 5));
@@ -3354,13 +3288,13 @@ namespace
             whole.end        = editor->document().lineLength(0);
             return ll_test::TextViewProbe::colours(*editor, 0, whole);
         };
-        const auto same = [&](const std::string& what, const std::vector<LLColor4U>& all, const ALTextLayout::Row& row) {
+        const auto require_same_colours = [&](const char* what, const std::vector<LLColor4U>& all, const ALTextLayout::Row& row) {
             const std::vector<LLColor4U> colours = ll_test::TextViewProbe::colours(*editor, 0, row);
-            UNSCOPED_INFO(what + ": as many");
+            INFO(what);
             REQUIRE(colours.size() == row.glyphEnd - row.glyphBegin);
             for (size_t k = 0; k < colours.size(); ++k)
             {
-                UNSCOPED_INFO(what + ": glyph " + std::to_string(row.glyphBegin + k));
+                INFO("glyph " << row.glyphBegin + k);
                 REQUIRE(colours[k] == all[row.glyphBegin + k]);
             }
         };
@@ -3382,18 +3316,20 @@ namespace
         editor->setWordWrap(true);
         const ALTextLayout::Line& wrapped = editor->layout().line(0);
         UNSCOPED_INFO("wrapped into rows");
-        REQUIRE(wrapped.rows.size() > 10);
+        CHECK(wrapped.rows.size() > 10);
         for (size_t r = 0; r < wrapped.rows.size(); ++r)
         {
-            same("wrapped row " + std::to_string(r), all, wrapped.rows[r]);
+            CAPTURE(r);
+            require_same_colours("a wrapped row", all, wrapped.rows[r]);
         }
 
         editor->setWordWrap(false);
         const ALTextLayout::Line& one = editor->layout().line(0);
         for (F32 from = 0.f; from < one.width; from += 1500.f)
         {
+            CAPTURE(from);
             const ALTextLayout::Row seen = ALTextLayout::rowWithin(one, one.rows[0], from, from + 400.f);
-            same("in sight from " + std::to_string(from), all, seen);
+            require_same_colours("the part in sight", all, seen);
         }
 
         // An opener typed at the start: every bracket after it one deeper,
@@ -3407,7 +3343,8 @@ namespace
         const ALTextLayout::Line& again = editor->layout().line(0);
         for (size_t r = 0; r < again.rows.size(); ++r)
         {
-            same("wrapped row " + std::to_string(r) + " after the opener", deeper, again.rows[r]);
+            CAPTURE(r);
+            require_same_colours("a wrapped row after the opener", deeper, again.rows[r]);
         }
     }
 
@@ -3415,9 +3352,9 @@ namespace
     {
         ALCodeEditor& e = make("integer count;\nllSay(0, co");
         UNSCOPED_INFO("no completion list yet");
-        REQUIRE(e.findChild<LLView>("completions") == nullptr);
+        CHECK(e.findChild<LLView>("completions") == nullptr);
         UNSCOPED_INFO("no fix list yet");
-        REQUIRE(e.findChild<LLView>("fixes") == nullptr);
+        CHECK(e.findChild<LLView>("fixes") == nullptr);
         {
             INFO("neither open");
             CHECK_FALSE(e.completionOpen());
@@ -3428,10 +3365,10 @@ namespace
         {
             INFO("the completions listed");
             CHECK(e.completionOpen());
-            REQUIRE(e.findChild<LLView>("completions") != nullptr);
+            CHECK(e.findChild<LLView>("completions") != nullptr);
         }
         UNSCOPED_INFO("and still no fix list");
-        REQUIRE(e.findChild<LLView>("fixes") == nullptr);
+        CHECK(e.findChild<LLView>("fixes") == nullptr);
         key(KEY_ESCAPE);
         e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
             ALCodeEditor::Fix semi;
@@ -3445,7 +3382,7 @@ namespace
             INFO("the fixes listed");
             CHECK(e.handleKeyHere('.', MASK_CONTROL));
             CHECK(e.fixesOpen());
-            REQUIRE(e.findChild<LLView>("fixes") != nullptr);
+            CHECK(e.findChild<LLView>("fixes") != nullptr);
         }
     }
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: the next occurrence taken comes out from under the pinned headers", "[alcodeeditor]")
@@ -3467,7 +3404,7 @@ namespace
         const S32 below = e.layout().lineTop(4) - e.scrollY();
         UNSCOPED_INFO("in sight");
         CHECK(below < e.textRect().getHeight());
-        UNSCOPED_INFO("below the handler's state pinned over it: " + std::to_string(below) + " of " + std::to_string(row_h));
+        UNSCOPED_INFO("below the handler's state pinned over it");
         CHECK(below >= row_h);
     }
 
@@ -3476,7 +3413,6 @@ namespace
         ALCodeEditor& e = make("integer count;\ninteger total;\nllSay(0, co");
         e.setCaret(e.document().end());
         key(' ', MASK_CONTROL);
-        UNSCOPED_INFO("open");
         CHECK(e.completionOpen());
         ALChoicePopup* popup = e.findChild<ALChoicePopup>("completion_popup", false);
         UNSCOPED_INFO("found by its name among the editor's children");
@@ -3530,18 +3466,18 @@ namespace
         {
             INFO("on a popup of their own");
             REQUIRE(fixes);
-            REQUIRE(fixes != popup);
+            CHECK(fixes != popup);
             CHECK(fixes->findChild<ALChoiceList>("fixes", false) == &fixes->list());
         }
         {
             INFO("previewed in its own box");
-            REQUIRE(fixes->sideShown());
+            CHECK(fixes->sideShown());
             CHECK(e.findChild<ALTextView>("fix_preview") == &fixes->side());
         }
         key(KEY_ESCAPE);
         {
             INFO("and the box goes with the list");
-            REQUIRE_FALSE(fixes->sideShown());
+            CHECK_FALSE(fixes->sideShown());
             CHECK_FALSE(fixes->getVisible());
         }
     }
@@ -3612,7 +3548,7 @@ namespace
         {
             INFO("the next place not taken, the main one");
             CHECK(e.selection() == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 3)));
-            REQUIRE(e.otherSelections().size() == 2);
+            CHECK(e.otherSelections().size() == 2);
         }
         type("1");
         UNSCOPED_INFO("typed at each");
@@ -3657,7 +3593,6 @@ namespace
     {
         ALCodeEditor& e = make("default\n{\n    state_entry()\n    {\n        llSay(0, \"a\");\n        llSay(0, \"b\");\n    }\n}\nx");
         const auto caretAt = [](S32 line, S32 column) { return ALTextRange(ALTextPos(line, column), ALTextPos(line, column)); };
-        UNSCOPED_INFO("folds");
         CHECK(e.foldAt(2));
         e.setSelections(caretAt(8, 0), { caretAt(4, 8) });
         {
@@ -3667,7 +3602,6 @@ namespace
         }
 
         e.setSelections(caretAt(8, 0), { caretAt(4, 8), ALTextRange(ALTextPos(5, 8), ALTextPos(5, 13)) });
-        UNSCOPED_INFO("folds again");
         CHECK(e.foldAt(2));
         UNSCOPED_INFO("the main one where it was");
         CHECK(e.selection() == caretAt(8, 0));
@@ -3695,11 +3629,8 @@ namespace
         e.setText("f()\n{\n    llSay(0, \"a\");\n}\ng()\n{\n    llSay(0, \"b\");\n}\n");
         e.setSelections(caretAt(2, 4), { caretAt(6, 4) });
         e.foldAll();
-        {
-            INFO("both folded");
-            CHECK(e.isFolded(0));
-            CHECK(e.isFolded(4));
-        }
+        CHECK(e.isFolded(0));
+        CHECK(e.isFolded(4));
         UNSCOPED_INFO("the main one at its fold's line");
         CHECK(e.selection() == caretAt(0, 3));
         {
@@ -3752,11 +3683,8 @@ namespace
         e.resetDirty();
         e.goTo(ALTextPos(1, 0));
         e.insertText("2");
-        {
-            INFO("barred");
-            CHECK(e.lineChanged(1));
-            CHECK_FALSE(e.lineChanged(0));
-        }
+        CHECK(e.lineChanged(1));
+        CHECK_FALSE(e.lineChanged(0));
         const LLRect text = e.textRect();
         const auto   rowY = [&](S32 line) { return text.mTop - (e.layout().lineTop(line) - e.scrollY()) - e.layout().lineHeight(line) / 2; };
         const S32    bar  = e.leftEdge() + 1;
@@ -3766,7 +3694,6 @@ namespace
         CHECK(e.changeBarAt(bar, rowY(0)) == -1);
         UNSCOPED_INFO("past the bar");
         CHECK(e.changeBarAt(e.leftEdge() + 5, rowY(1)) == -1);
-        UNSCOPED_INFO("hovered: taken");
         CHECK(e.handleHover(bar, rowY(1), MASK_NONE));
         {
             INFO("a tip, not a card");
@@ -3775,7 +3702,7 @@ namespace
         }
         {
             INFO("a press peeks");
-            REQUIRE(e.handleMouseDown(bar, rowY(1), MASK_NONE));
+            CHECK(e.handleMouseDown(bar, rowY(1), MASK_NONE));
             REQUIRE(e.changePeek());
             CHECK(e.changePeek()->isOpen());
         }
@@ -3784,9 +3711,7 @@ namespace
         // No gutter: nothing to point at.
         e.setShowLineNumbers(false);
         e.setShowFoldMarkers(false);
-        UNSCOPED_INFO("no gutter");
         CHECK(e.gutterWidth() == 0);
-        UNSCOPED_INFO("no bar");
         CHECK(e.changeBarAt(e.leftEdge() + 1, rowY(1)) == -1);
     }
 
@@ -3812,26 +3737,33 @@ namespace
             e.setText("");
             asks.clear();
             type("hand");
-            UNSCOPED_INFO("offered");
             REQUIRE(e.completionOpen());
             key(KEY_TAB);
             return e.text();
         };
-        UNSCOPED_INFO("guessed: a function is called, its parameter to fill");
-        CHECK(take(ALCompletion::Brackets::Guess) == std::string("handler(n)"));
-        UNSCOPED_INFO("none: passed as it is");
-        CHECK(take(ALCompletion::Brackets::None) == std::string("handler"));
+        {
+            INFO("guessed: a function is called, its parameter to fill");
+            CHECK(take(ALCompletion::Brackets::Guess) == std::string("handler(n)"));
+        }
+        {
+            INFO("none: passed as it is");
+            CHECK(take(ALCompletion::Brackets::None) == std::string("handler"));
+        }
         UNSCOPED_INFO("and no signature asked");
-        REQUIRE(asks.empty());
-        UNSCOPED_INFO("after: an empty pair");
-        CHECK(take(ALCompletion::Brackets::After) == std::string("handler()"));
+        CHECK(asks.empty());
+        {
+            INFO("after: an empty pair");
+            CHECK(take(ALCompletion::Brackets::After) == std::string("handler()"));
+        }
         {
             INFO("the caret after it, and no signature asked");
             CHECK(e.caret() == ALTextPos(0, 9));
-            REQUIRE(asks.empty());
+            CHECK(asks.empty());
         }
-        UNSCOPED_INFO("inside: its parameter to fill");
-        CHECK(take(ALCompletion::Brackets::Inside) == std::string("handler(n)"));
+        {
+            INFO("inside: its parameter to fill");
+            CHECK(take(ALCompletion::Brackets::Inside) == std::string("handler(n)"));
+        }
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: a comment the grammar says completes opens the list on its own", "[alcodeeditor]")
@@ -3856,7 +3788,6 @@ namespace
             CHECK(e.completions()[0].text == "strict");
         }
         key(KEY_TAB);
-        UNSCOPED_INFO("taken");
         CHECK(e.text() == std::string("--!strict"));
         e.setText("");
         type("-- st");
@@ -3903,8 +3834,8 @@ namespace
         {
             INFO("open at the quote, asked of nothing yet");
             CHECK(e.completionOpen());
-            REQUIRE(e.completions().size() == 3);
-            REQUIRE(asked.back().empty());
+            CHECK(e.completions().size() == 3);
+            CHECK(asked.back().empty());
         }
         type("li");
         {
@@ -4050,14 +3981,14 @@ namespace
         {
             INFO("open at the quote, asked of nothing yet");
             CHECK(e.completionOpen());
-            REQUIRE(e.completions().size() == 3);
-            REQUIRE(asked.back().empty());
+            CHECK(e.completions().size() == 3);
+            CHECK(asked.back().empty());
         }
         type("Door ");
         {
             INFO("narrowed on all it holds, its space too");
             CHECK(e.completionOpen());
-            REQUIRE(e.completions().size() == 2);
+            CHECK(e.completions().size() == 2);
         }
         const size_t asks = asked.size();
         type("C");
@@ -4065,7 +3996,7 @@ namespace
             INFO("narrowed again, not asked again");
             REQUIRE(e.completions().size() == 1);
             CHECK(e.completions()[0].text == "Door Close");
-            REQUIRE(asked.size() == asks);
+            CHECK(asked.size() == asks);
         }
         key(KEY_TAB);
         UNSCOPED_INFO("the name in place, the quote kept");
@@ -4130,7 +4061,7 @@ namespace
         {
             INFO("open before what follows");
             CHECK(e.completionOpen());
-            REQUIRE(e.completions().size() == 2);
+            CHECK(e.completions().size() == 2);
         }
         key(KEY_TAB);
         UNSCOPED_INFO("the name in place of what was typed, closed, what follows kept");
@@ -4146,7 +4077,7 @@ namespace
         {
             INFO("open at the quote");
             CHECK(e.completionOpen());
-            REQUIRE(e.completions().size() == 3);
+            CHECK(e.completions().size() == 3);
         }
         key(KEY_TAB);
         UNSCOPED_INFO("nothing after the caret taken");
@@ -4219,20 +4150,14 @@ namespace
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: a folded block stays hidden through a rename and goes with its header", "[alcodeeditor]")
     {
         ALCodeEditor& e = make("integer n;\nf()\n{\n    n = 1;\n    llSay(0, (string)n);\n}\ng()\n{\n    n = 2;\n}");
-        UNSCOPED_INFO("folds");
         CHECK(e.foldAt(1));
-        {
-            INFO("its lines hidden");
-            CHECK(e.layout().hidden(2));
-            CHECK(e.layout().hidden(5));
-            CHECK_FALSE(e.layout().hidden(6));
-        }
+        CHECK(e.layout().hidden(2));
+        CHECK(e.layout().hidden(5));
+        CHECK_FALSE(e.layout().hidden(6));
         e.setCaret(ALTextPos(6, 0));
         // A name inside it replaced, as a rename or Replace All does: the
         // layout shows the line it made, which the fold still holds.
-        UNSCOPED_INFO("replaced");
         CHECK(e.replaceAll({ { ALTextRange(ALTextPos(3, 4), ALTextPos(3, 5)), "total" } }));
-        UNSCOPED_INFO("the line");
         CHECK(e.document().line(3) == std::string("    total = 1;"));
         {
             INFO("still folded, the line replaced hidden with the rest");
@@ -4250,22 +4175,15 @@ namespace
         key(KEY_DELETE);
         UNSCOPED_INFO("the header gone");
         CHECK(e.document().line(1) == std::string("{"));
-        {
-            INFO("nothing folded");
-            CHECK_FALSE(e.isFolded(0));
-            CHECK_FALSE(e.isFolded(1));
-        }
-        {
-            INFO("nothing hidden");
-            CHECK_FALSE(e.layout().anyHidden());
-            CHECK_FALSE(e.layout().hidden(1));
-        }
+        CHECK_FALSE(e.isFolded(0));
+        CHECK_FALSE(e.isFolded(1));
+        CHECK_FALSE(e.layout().anyHidden());
+        CHECK_FALSE(e.layout().hidden(1));
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: a folded header deleted with lines below folds nothing in its place", "[alcodeeditor]")
     {
         ALCodeEditor& e = make("foo()\n{\n    x();\n}\nbar()\n{\n    y();\n}");
-        UNSCOPED_INFO("folds");
         CHECK(e.foldAt(0));
         // From the header's start to the next line in sight, deleted.
         e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)));
@@ -4279,7 +4197,6 @@ namespace
         }
 
         ALCodeEditor& f = make("foo()\n{\n    x();\n}\nbar()");
-        UNSCOPED_INFO("folds");
         CHECK(f.foldAt(0));
         f.setCaret(ALTextPos(0, 0));
         key(KEY_RETURN);
@@ -4321,7 +4238,7 @@ namespace
         CHECK(e.scrollY() > e.layout().lineTop(86));
         e.setCaret(ALTextPos(40, 8));
         const S32 below = e.layout().lineTop(40) - e.scrollY();
-        UNSCOPED_INFO("below the two pinned headers: " + std::to_string(below) + " of " + std::to_string(row_h));
+        UNSCOPED_INFO("below the two pinned headers");
         CHECK(below >= 2 * row_h);
     }
 
@@ -4340,7 +4257,7 @@ namespace
         e.handleHover(x, y, MASK_NONE);
         {
             INFO("the gutter's card");
-            REQUIRE(e.handleToolTip(x, y, MASK_NONE));
+            CHECK(e.handleToolTip(x, y, MASK_NONE));
             REQUIRE(e.cardShown());
             CHECK(e.card()->text() == "something is wrong here");
         }
@@ -4374,11 +4291,8 @@ namespace
         const S32    x = text_rect.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
         const S32    y = text_rect.mTop - e.layout().rowHeight() / 2;
         e.handleHover(x, y, MASK_NONE);
-        {
-            INFO("a card");
-            CHECK(e.handleToolTip(x, y, MASK_NONE));
-            CHECK(e.cardShown());
-        }
+        CHECK(e.handleToolTip(x, y, MASK_NONE));
+        CHECK(e.cardShown());
         key(KEY_DOWN);
         UNSCOPED_INFO("a key put it away");
         CHECK_FALSE(e.cardShown());
@@ -4430,7 +4344,6 @@ namespace
             e.handleHover(x, y, MASK_NONE);
             e.handleToolTip(x, y, MASK_NONE);
         }
-        UNSCOPED_INFO("a card");
         CHECK(e.cardShown());
         UNSCOPED_INFO("the word asked about once");
         CHECK(hovered == size_t(1));
@@ -4445,7 +4358,7 @@ namespace
         {
             INFO("the mark's card");
             REQUIRE(e.cardShown());
-            REQUIRE(e.card()->text().find("something is wrong here") != std::string::npos);
+            CHECK(e.card()->text().find("something is wrong here") != std::string::npos);
         }
         UNSCOPED_INFO("its fixes asked for once");
         CHECK(fixed == size_t(1));
@@ -4480,12 +4393,11 @@ namespace
         e.setCaret(ALTextPos(70, 8));
         const S32 y      = text_rect.mTop - row_h - row_h / 2;
         const S32 hidden = e.posAtLocal(text_rect.mLeft, y, false).line;
-        UNSCOPED_INFO("a line of the handler's under the band: " + std::to_string(hidden));
+        UNSCOPED_INFO("a line of the handler's under the band");
         CHECK(hidden > 3);
 
         // Its number pressed chooses the header's line.
         const S32 number_x = e.leftEdge() + 18;
-        UNSCOPED_INFO("pressed");
         CHECK(e.handleMouseDown(number_x, y, MASK_NONE));
         e.handleMouseUp(number_x, y, MASK_NONE);
         const ALTextRange chosen = e.selection().normalised();
@@ -4502,7 +4414,7 @@ namespace
         {
             INFO("the header's card from the gutter");
             REQUIRE(e.cardShown());
-            REQUIRE(e.card()->text().find("a problem with the handler") != std::string::npos);
+            CHECK(e.card()->text().find("a problem with the handler") != std::string::npos);
         }
         e.handleHover(number_x, y, MASK_NONE);
         UNSCOPED_INFO("kept on the band's row in the gutter");
@@ -4563,22 +4475,17 @@ namespace
         e.setText(text);
         const S32 last = e.document().lineCount() - 1;
         e.setCaret(ALTextPos(0, 0));
-        UNSCOPED_INFO("folds");
         CHECK(e.foldAt(2));
-        {
-            INFO("its lines hidden");
-            CHECK(e.layout().hidden(3));
-            CHECK(e.layout().hidden(5));
-            CHECK_FALSE(e.layout().hidden(6));
-        }
+        CHECK(e.layout().hidden(3));
+        CHECK(e.layout().hidden(5));
+        CHECK_FALSE(e.layout().hidden(6));
 
         // A string opened at the top runs on to the end: every line after
         // it starts in it, and the block is gone.
         e.document().insert(ALTextPos(0, 0), "\"");
         e.pump();
         e.highlighter().tokens(last);
-        UNSCOPED_INFO("the frame after the edit left most of the text to lex: " + std::to_string(e.highlighter().lastLexed()) + " of " +
-                   std::to_string(last + 1));
+        UNSCOPED_INFO("the frame after the edit left most of the text to lex");
         CHECK(e.highlighter().lastLexed() > last / 2);
         {
             INFO("the fold as the edit left it meanwhile");
@@ -4596,21 +4503,16 @@ namespace
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: Return at a folded header's end opens the block and shows the caret", "[alcodeeditor]")
     {
         ALCodeEditor& e = make("foo() {\n    x();\n}\nbar()");
-        UNSCOPED_INFO("folds");
         CHECK(e.foldAt(0));
-        {
-            INFO("its lines hidden");
-            CHECK(e.layout().hidden(1));
-            CHECK(e.layout().hidden(2));
-            CHECK_FALSE(e.layout().hidden(3));
-        }
+        CHECK(e.layout().hidden(1));
+        CHECK(e.layout().hidden(2));
+        CHECK_FALSE(e.layout().hidden(3));
         e.setCaret(e.document().lineEnd(0));
         key(KEY_RETURN);
         UNSCOPED_INFO("the header as it was");
         CHECK(e.document().line(0) == std::string("foo() {"));
         UNSCOPED_INFO("the caret on the line made");
         CHECK(e.caret().line == 1);
-        UNSCOPED_INFO("the block opened");
         CHECK_FALSE(e.isFolded(0));
         {
             INFO("the caret's line in sight, and the rest of the block");
@@ -4621,21 +4523,16 @@ namespace
         // The brace under the header: the line made between them is the
         // block's too, the header found past it.
         ALCodeEditor& f = make("f()\n{\n    x();\n}\ng()");
-        UNSCOPED_INFO("folds");
         CHECK(f.foldAt(0));
-        {
-            INFO("its lines hidden");
-            CHECK(f.layout().hidden(1));
-            CHECK(f.layout().hidden(3));
-            CHECK_FALSE(f.layout().hidden(4));
-        }
+        CHECK(f.layout().hidden(1));
+        CHECK(f.layout().hidden(3));
+        CHECK_FALSE(f.layout().hidden(4));
         f.setCaret(f.document().lineEnd(0));
         key(KEY_RETURN);
         UNSCOPED_INFO("the brace a line down");
         CHECK(f.document().line(2) == std::string("{"));
         UNSCOPED_INFO("the caret on the line made");
         CHECK(f.caret().line == 1);
-        UNSCOPED_INFO("the block opened");
         CHECK_FALSE(f.isFolded(0));
         {
             INFO("the caret's line in sight, and the rest of the block");
@@ -4682,11 +4579,8 @@ namespace
         {
             found = c.text == "Vehicles" ? &c : found;
         }
-        {
-            INFO("offered");
-            CHECK(e.completionOpen());
-            REQUIRE(found);
-        }
+        CHECK(e.completionOpen());
+        REQUIRE(found);
         UNSCOPED_INFO("as a namespace");
         CHECK(found->kind == ALSyntaxKind::Namespace);
         UNSCOPED_INFO("and said to be one");
@@ -4699,7 +4593,6 @@ namespace
         const std::string grosse = "Gr\xC3\xB6\xC3\x9F" "e";
         ALCodeEditor&     e      = make((grosse + " Gr Gr\xC3\xBC" "n Gr").c_str(), "text");
         e.setCaret(ALTextPos(0, 1));
-        UNSCOPED_INFO("a word taken");
         CHECK(e.selectNextOccurrence());
         UNSCOPED_INFO("the whole of it");
         CHECK(e.selectedText() == grosse);
@@ -4714,10 +4607,9 @@ namespace
         {
             INFO("the next whole word, not the start of another");
             CHECK(e.selection().normalised() == ALTextRange(ALTextPos(0, 17), ALTextPos(0, 19)));
-            REQUIRE(e.otherSelections().size() == 1);
+            CHECK(e.otherSelections().size() == 1);
         }
         e.goTo(ALTextPos(0, 9));
-        UNSCOPED_INFO("every place");
         CHECK(e.changeAllOccurrences());
         {
             INFO("the one other whole word only");
@@ -4742,12 +4634,9 @@ namespace
         const std::vector<ALTextRange>& places = c.otherSelections();
         UNSCOPED_INFO("in and out of names, none over another");
         REQUIRE(places.size() == size_t(3));
-        {
-            INFO("where they are");
-            CHECK(places[0].normalised() == ALTextRange(ALTextPos(0, 13), ALTextPos(0, 15)));
-            CHECK(places[1].normalised() == ALTextRange(ALTextPos(0, 15), ALTextPos(0, 17)));
-            CHECK(places[2].normalised() == ALTextRange(ALTextPos(0, 20), ALTextPos(0, 22)));
-        }
+        CHECK(places[0].normalised() == ALTextRange(ALTextPos(0, 13), ALTextPos(0, 15)));
+        CHECK(places[1].normalised() == ALTextRange(ALTextPos(0, 15), ALTextPos(0, 17)));
+        CHECK(places[2].normalised() == ALTextRange(ALTextPos(0, 20), ALTextPos(0, 22)));
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: what a string holds is not code to occurrences or argument counting", "[alcodeeditor]")
@@ -4777,8 +4666,8 @@ namespace
         e.setText("x\ny");
         {
             INFO("no note on the new text");
-            REQUIRE(e.noteAt(0).empty());
-            REQUIRE(e.noteAt(1).empty());
+            CHECK(e.noteAt(0).empty());
+            CHECK(e.noteAt(1).empty());
         }
         {
             INFO("nor heat");
@@ -4793,7 +4682,7 @@ namespace
         UNSCOPED_INFO("the lines gone");
         CHECK(f.document().line(2) == std::string("z"));
         UNSCOPED_INFO("what was typed in their place has none");
-        REQUIRE(f.noteAt(2).empty());
+        CHECK(f.noteAt(2).empty());
         // Typed in at a line's start, the line is all still there.
         f.setLineNotes({ { 1, "b's", "" } });
         f.document().replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "q");
@@ -4813,7 +4702,7 @@ namespace
         {
             INFO("at the line's end, the stops still there");
             CHECK(e.caret() == ALTextPos(0, 25));
-            REQUIRE_FALSE(e.placeholders().empty());
+            CHECK_FALSE(e.placeholders().empty());
         }
         key(KEY_ESCAPE);
         UNSCOPED_INFO("the mirrors made what it holds");
@@ -4821,7 +4710,7 @@ namespace
         UNSCOPED_INFO("the caret still at the line's end: " + std::to_string(e.caret().column));
         CHECK(e.caret() == ALTextPos(0, 29));
         UNSCOPED_INFO("the stops let go");
-        REQUIRE(e.placeholders().empty());
+        CHECK(e.placeholders().empty());
     }
 
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: a press on the ruler scrolls and leaves a call's stops for Tab", "[alcodeeditor]")
@@ -4835,8 +4724,7 @@ namespace
         e.setText(text);
         e.setCaret(ALTextPos(0, 0));
         e.insertSnippet("f(${1:a}, ${2:b})");
-        UNSCOPED_INFO("the stops");
-        REQUIRE(e.placeholders().size() == size_t(2));
+        CHECK(e.placeholders().size() == size_t(2));
         ALTextRuler* ruler = e.findChild<ALTextRuler>("ruler");
         {
             INFO("a ruler down the side");
@@ -4844,13 +4732,12 @@ namespace
             CHECK(ruler->getVisible());
         }
         const LLRect bar = ruler->getRect();
-        UNSCOPED_INFO("the press taken");
         CHECK(e.handleMouseDown(bar.mLeft + bar.getWidth() / 2, bar.mBottom + 4, MASK_NONE));
         gFocusMgr.setMouseCapture(nullptr);
         UNSCOPED_INFO("the text scrolled");
         CHECK(e.scrollY() > 0);
         UNSCOPED_INFO("the stops still there");
-        REQUIRE(e.placeholders().size() == size_t(2));
+        CHECK(e.placeholders().size() == size_t(2));
         key(KEY_TAB);
         UNSCOPED_INFO("Tab goes on to the next");
         CHECK(e.selectedText() == std::string("b"));
@@ -4925,7 +4812,6 @@ namespace
         });
         e.setFixHandler([](const LLSD&) {});
         e.setCaret(ALTextPos(1, 0));
-        UNSCOPED_INFO("listed");
         CHECK(e.openFixes(1));
         const ALTextView* box = e.findChild<ALTextView>("fix_preview");
         {
@@ -4969,14 +4855,10 @@ namespace
         e.setText(text);
         const S32 count = e.document().lineCount();
         e.highlighter().tokens(count - 1);
-        UNSCOPED_INFO("folds");
         CHECK(e.foldAt(1));
-        {
-            INFO("its lines hidden");
-            CHECK(e.layout().hidden(2));
-            CHECK(e.layout().hidden(4));
-            CHECK_FALSE(e.layout().hidden(5));
-        }
+        CHECK(e.layout().hidden(2));
+        CHECK(e.layout().hidden(4));
+        CHECK_FALSE(e.layout().hidden(5));
 
         e.setCaret(e.document().lineEnd(0));
         U32 asked = e.layout().hiddenByAsked();
@@ -4994,7 +4876,7 @@ namespace
             CHECK_FALSE(e.layout().hidden(6));
         }
         U32 lines = e.layout().hiddenByAsked() - asked;
-        UNSCOPED_INFO("Return: " + std::to_string(lines) + " lines asked who hides them, of " + std::to_string(count + 1));
+        UNSCOPED_INFO("lines asked who hides them after Return");
         CHECK(lines < 100u);
 
         // Three lines pasted at the top.
@@ -5014,7 +4896,7 @@ namespace
             CHECK_FALSE(e.layout().hidden(9));
         }
         lines = e.layout().hiddenByAsked() - asked;
-        UNSCOPED_INFO("a paste: " + std::to_string(lines) + " lines asked who hides them, of " + std::to_string(count + 4));
+        UNSCOPED_INFO("lines asked who hides them after a paste");
         CHECK(lines < 100u);
     }
 
@@ -5052,7 +4934,7 @@ namespace
         S32               folded_steps = 0;
         for (S32 step = 0; step < 400; ++step)
         {
-            const std::string at = "step " + std::to_string(step);
+            CAPTURE(step);
             // A block folded every other step or so, to have folds to edit
             // in and around.
             if (pick(2) == 0)
@@ -5159,15 +5041,15 @@ namespace
                 hidden += by_folds ? 1 : 0;
                 if (by_folds != wanted)
                 {
-                    UNSCOPED_INFO(at + ", line " + std::to_string(l) + ": hidden for the folds as they hide it");
+                    CAPTURE(l);
                     REQUIRE(by_folds == wanted);
                 }
             }
-            UNSCOPED_INFO(at + ": as many hidden for the folds as the layout counts");
+            UNSCOPED_INFO("as many hidden for the folds as the layout counts");
             REQUIRE(e.layout().hiddenCount(By::Folds) == hidden);
             folded_steps += hidden > 0 ? 1 : 0;
         }
-        UNSCOPED_INFO("folded blocks to edit around on many of the steps: " + std::to_string(folded_steps));
+        UNSCOPED_INFO("folded blocks to edit around on many of the steps");
         CHECK(folded_steps > 50);
     }
 

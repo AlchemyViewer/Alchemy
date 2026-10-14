@@ -74,18 +74,12 @@ namespace
     {
         std::unique_ptr<TestView> v(view("lonely"));
 
-        UNSCOPED_INFO("no children");
         CHECK(v->getChildCount() == 0);
-        UNSCOPED_INFO("no first child");
-        REQUIRE(v->getFirstChild() == nullptr);
-        UNSCOPED_INFO("child list is readable");
+        CHECK(v->getFirstChild() == nullptr);
         REQUIRE(v->getChildList() != nullptr);
-        UNSCOPED_INFO("child list is empty");
-        REQUIRE(v->getChildList()->empty());
-        UNSCOPED_INFO("child iteration is empty");
+        CHECK(v->getChildList()->empty());
         CHECK(v->beginChild() == v->endChild());
-        UNSCOPED_INFO("tab order is empty");
-        REQUIRE(v->getTabOrder().empty());
+        CHECK(v->getTabOrder().empty());
     }
 
     // A view that had children and lost them still owns the list, and the list
@@ -95,14 +89,11 @@ namespace
         std::unique_ptr<TestView> v(view("parent"));
         TestView* child = view("child");
         v->addChild(child);
-        UNSCOPED_INFO("first child is the child");
         CHECK(v->getFirstChild() == child);
 
         v->removeChild(child);
-        UNSCOPED_INFO("no children left");
         CHECK(v->getChildCount() == 0);
-        UNSCOPED_INFO("no first child once emptied");
-        REQUIRE(v->getFirstChild() == nullptr);
+        CHECK(v->getFirstChild() == nullptr);
         delete child;
     }
 
@@ -116,17 +107,13 @@ namespace
         v->addChild(first);
         v->addChild(second);
 
-        UNSCOPED_INFO("both children");
         CHECK(v->getChildCount() == 2);
-        UNSCOPED_INFO("last added is at the front");
         CHECK(v->getFirstChild() == second);
 
         v->sendChildToFront(first);
-        UNSCOPED_INFO("sent to front");
         CHECK(v->getFirstChild() == first);
 
         v->sendChildToBack(first);
-        UNSCOPED_INFO("sent to back");
         CHECK(v->getFirstChild() == second);
     }
 
@@ -140,18 +127,13 @@ namespace
         v->addChild(grouped, 7);
         v->addChild(plain);
 
-        UNSCOPED_INFO("one child in the tab order");
-        REQUIRE(v->getTabOrder().size() == size_t(1));
-        UNSCOPED_INFO("the grouped one");
+        CHECK(v->getTabOrder().size() == size_t(1));
         REQUIRE(v->getTabOrder().find(grouped) != v->getTabOrder().end());
-        UNSCOPED_INFO("with its group");
         CHECK(v->getTabOrder().find(grouped)->second == 7);
-        UNSCOPED_INFO("the ungrouped one is absent");
-        REQUIRE(v->getTabOrder().find(plain) == v->getTabOrder().end());
+        CHECK(v->getTabOrder().find(plain) == v->getTabOrder().end());
 
         v->removeChild(grouped);
-        UNSCOPED_INFO("tab order empty once the child is gone");
-        REQUIRE(v->getTabOrder().empty());
+        CHECK(v->getTabOrder().empty());
         delete grouped;
     }
 
@@ -167,14 +149,10 @@ namespace
         root->addChild(branch);
         root->addChild(near_child);
 
-        UNSCOPED_INFO("direct child wins");
         CHECK(root->findChildView("target") == near_child);
-        UNSCOPED_INFO("deep one is still reachable from its own parent");
         CHECK(branch->findChildView("target") == deep);
-        UNSCOPED_INFO("a name nobody has is not found");
-        REQUIRE(root->findChildView("absent") == nullptr);
-        UNSCOPED_INFO("and not found deep either");
-        REQUIRE(root->findChildView("absent", true) == nullptr);
+        CHECK(root->findChildView("absent") == nullptr);
+        CHECK(root->findChildView("absent", true) == nullptr);
     }
 
     // The follows flags decide what a parent's resize does to a child. Both
@@ -220,17 +198,13 @@ namespace
         root->addChild(child);
 
         // The root is not in the path.
-        UNSCOPED_INFO("child under root");
         CHECK(child->getPathname() == std::string("/child"));
-        UNSCOPED_INFO("root itself has no path");
         CHECK(root->getPathname() == std::string(""));
 
         TestView* slashed = view("a/b");
         root->addChild(slashed);
-        UNSCOPED_INFO("separator in a name is escaped");
         CHECK(slashed->getPathname() == std::string("/a%2Fb"));
 
-        UNSCOPED_INFO("the static form handles no view at all");
         CHECK(LLView::getPathname(nullptr) == std::string("NULL"));
     }
 
@@ -241,7 +215,6 @@ namespace
     TEST_CASE_METHOD(llview_data, "llview: popVisible restores what pushVisible saved and nothing else", "[llview]")
     {
         std::unique_ptr<TestView> never(view("never pushed"));
-        UNSCOPED_INFO("visible to begin with");
         CHECK(never->getVisible());
         never->popVisible();
         UNSCOPED_INFO("an unmatched pop leaves it alone");
@@ -249,10 +222,8 @@ namespace
 
         std::unique_ptr<TestView> pushed(view("pushed"));
         pushed->pushVisible(false);
-        UNSCOPED_INFO("hidden by the push");
         CHECK_FALSE(pushed->getVisible());
         pushed->popVisible();
-        UNSCOPED_INFO("and put back by the pop");
         CHECK(pushed->getVisible());
 
         // A second pop has nothing left to restore.
@@ -280,7 +251,6 @@ namespace
 
         // root and shown; the hidden one holds the value and is not descended
         // into, so the view under it is never reached.
-        UNSCOPED_INFO("the walk stops at a hidden view");
         CHECK(LLView::sTransparencyViewsWalked == 2);
 
         LLView::sTransparencyViewsWalked = 0;
@@ -299,15 +269,12 @@ namespace
         root->addChild(under);
         root->addChild(over);   // added last, so front-most
 
-        UNSCOPED_INFO("front-most child wins");
         CHECK(root->childFromPoint(10, 10) == over);
 
         over->setVisible(false);
-        UNSCOPED_INFO("a hidden child is not offered");
         CHECK(root->childFromPoint(10, 10) == under);
 
-        UNSCOPED_INFO("a point outside every child finds none");
-        REQUIRE(root->childFromPoint(80, 80) == nullptr);
+        CHECK(root->childFromPoint(80, 80) == nullptr);
     }
 
     // followsAll is the four edges together, which is what its name says and
@@ -315,19 +282,15 @@ namespace
     TEST_CASE_METHOD(llview_data, "llview: followsAll is true for the four edges together only", "[llview]")
     {
         std::unique_ptr<TestView> v(view("follower", LLRect(0, 10, 10, 0), FOLLOWS_LEFT));
-        UNSCOPED_INFO("one edge is not all of them");
         CHECK_FALSE(v->followsAll());
 
         v->setFollows(FOLLOWS_LEFT | FOLLOWS_RIGHT | FOLLOWS_TOP);
-        UNSCOPED_INFO("three edges are not all of them");
         CHECK_FALSE(v->followsAll());
 
         v->setFollowsAll();
-        UNSCOPED_INFO("four edges are");
         CHECK(v->followsAll());
 
         v->setFollowsNone();
-        UNSCOPED_INFO("none are not");
         CHECK_FALSE(v->followsAll());
     }
 
@@ -359,11 +322,10 @@ namespace
             root->addChild(counters.back());
         }
 
-        UNSCOPED_INFO("somebody handled it");
+        UNSCOPED_INFO("a child handled it");
         CHECK(root->notifyChildren(LLSD().with("action", "store_state")));
         for (CountingView* counter : counters)
         {
-            UNSCOPED_INFO("every child heard it");
             REQUIRE(counter->mHeard == 1);
         }
     }
@@ -380,21 +342,17 @@ namespace
         tree_a->addChild(leaf);
 
         S32 x = 0, y = 0;
-        UNSCOPED_INFO("a view in another tree is not reachable");
         CHECK_FALSE(leaf->localPointToOtherView(1, 1, &x, &y, tree_b.get()));
 
         LLRect rect;
-        UNSCOPED_INFO("nor is its rect");
         CHECK_FALSE(leaf->localRectToOtherView(leaf->getLocalRect(), &rect, tree_b.get()));
 
         // And a view that does share a root still answers, with the offset.
         TestView* sibling = view("sibling", LLRect(50, 80, 70, 60));
         tree_a->addChild(sibling);
-        UNSCOPED_INFO("a view in the same tree is");
         CHECK(leaf->localPointToOtherView(0, 0, &x, &y, sibling));
         UNSCOPED_INFO("offset by the difference of their origins");
         CHECK(x == 10 - 50);
-        UNSCOPED_INFO("on both axes");
         CHECK(y == 10 - 60);
     }
 
@@ -414,15 +372,11 @@ namespace
         ll_test::FocusScope focus;
 
         gFocusMgr.setKeyboardFocus(my_combo);
-        UNSCOPED_INFO("the view holding it owns the child");
         CHECK(mine->childHasKeyboardFocus("combo"));
-        UNSCOPED_INFO("a view of the same name elsewhere does not");
         CHECK_FALSE(theirs->childHasKeyboardFocus("combo"));
-        UNSCOPED_INFO("nor does a name nobody under it has");
         CHECK_FALSE(mine->childHasKeyboardFocus("absent"));
 
         gFocusMgr.setKeyboardFocus(mine.get());
-        UNSCOPED_INFO("a view holding focus itself has no child holding it");
         CHECK_FALSE(mine->childHasKeyboardFocus("mine"));
 
         gFocusMgr.setKeyboardFocus(nullptr);

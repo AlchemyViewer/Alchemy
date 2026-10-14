@@ -47,8 +47,9 @@ namespace
         altextspelling_data()
         {
             std::string error;
-            UNSCOPED_INFO("lsl loads: " + error);
-            REQUIRE(library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error));
+            const bool  loaded = library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+            INFO("lsl loads: " << error);
+            REQUIRE(loaded);
             spelling.setChecker(
                 [this](const std::string& word) {
                     asked.push_back(word);
@@ -82,9 +83,9 @@ namespace
         UNSCOPED_INFO("the words it lacks");
         CHECK(words(doc, 0, spelling.misspellings(doc, highlighter, 0, true)) == std::string("catt|Xyzzy"));
         UNSCOPED_INFO("none off");
-        REQUIRE(ALTextSpelling().misspellings(doc, highlighter, 0, false).empty());
+        CHECK(ALTextSpelling().misspellings(doc, highlighter, 0, false).empty());
         UNSCOPED_INFO("none past the text");
-        REQUIRE(spelling.misspellings(doc, highlighter, 5, true).empty());
+        CHECK(spelling.misspellings(doc, highlighter, 5, true).empty());
     }
 
     TEST_CASE_METHOD(altextspelling_data, "altextspelling: in code only comments and strings are prose even one opened above", "[altextspelling]")
@@ -96,7 +97,7 @@ namespace
         UNSCOPED_INFO("the comment and the string");
         CHECK(words(doc, 0, spelling.misspellings(doc, highlighter, 0, true)) == std::string("speling|dogg"));
         UNSCOPED_INFO("the code under them, never");
-        REQUIRE(spelling.misspellings(doc, highlighter, 1, true).empty());
+        CHECK(spelling.misspellings(doc, highlighter, 1, true).empty());
         // A comment opened above: the line under it is prose now, and
         // checked again though its own text did not change.
         doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "/*\n");
@@ -117,7 +118,7 @@ namespace
         const size_t checked = asked.size();
         spelling.misspellings(doc, highlighter, 1, true);
         UNSCOPED_INFO("asked again, nothing checked again");
-        REQUIRE(asked.size() == checked);
+        CHECK(asked.size() == checked);
 
         // A line put in above: the two below slide, and only the new one is
         // checked.
@@ -128,17 +129,17 @@ namespace
         UNSCOPED_INFO("and the last");
         CHECK(words(doc, 3, spelling.misspellings(doc, highlighter, 3, true)) == std::string("matt"));
         UNSCOPED_INFO("still nothing checked again");
-        REQUIRE(asked.size() == checked);
+        CHECK(asked.size() == checked);
         UNSCOPED_INFO("the line put in");
         CHECK(words(doc, 1, spelling.misspellings(doc, highlighter, 1, true)) == std::string("ratt"));
         UNSCOPED_INFO("checked now");
-        REQUIRE(asked.size() > checked);
+        CHECK(asked.size() > checked);
 
         spelling.recheck();
         const size_t before = asked.size();
         spelling.misspellings(doc, highlighter, 3, true);
         UNSCOPED_INFO("all of it checked again once the dictionary changed");
-        REQUIRE(asked.size() > before);
+        CHECK(asked.size() > before);
     }
 
     TEST_CASE_METHOD(altextspelling_data, "altextspelling: the misspelling at a place gets suggestions and one can be taken", "[altextspelling]")
@@ -167,29 +168,29 @@ namespace
         {
             INFO("taken");
             REQUIRE(taken.has_value());
-            REQUIRE(taken->first == word);
+            CHECK(taken->first == word);
             CHECK(taken->second == "cat");
         }
         {
             INFO("and let go of");
-            REQUIRE(spelling.suggestions().empty());
-            REQUIRE(spelling.suggestedFor().empty());
+            CHECK(spelling.suggestions().empty());
+            CHECK(spelling.suggestedFor().empty());
         }
         UNSCOPED_INFO("none past the end");
-        REQUIRE_FALSE(spelling.take(5));
+        CHECK_FALSE(spelling.take(5));
 
         spelling.suggestAt(doc, highlighter, ALTextPos(0, 10), true);
         {
             INFO("nothing for a word spelled right");
-            REQUIRE(spelling.suggestions().empty());
-            REQUIRE(spelling.suggestedFor().empty());
+            CHECK(spelling.suggestions().empty());
+            CHECK(spelling.suggestedFor().empty());
         }
         spelling.suggestAt(doc, highlighter, ALTextPos(0, 5), false);
         UNSCOPED_INFO("nor while it is off");
-        REQUIRE(spelling.suggestedFor().empty());
+        CHECK(spelling.suggestedFor().empty());
         spelling.suggestAt(doc, highlighter, ALTextPos(0, 5), true);
         spelling.edited(ALTextDocument::Edit{ ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), std::string(), "x" }, doc.lineCount());
         UNSCOPED_INFO("an edit lets them go");
-        REQUIRE(spelling.suggestions().empty());
+        CHECK(spelling.suggestions().empty());
     }
 }

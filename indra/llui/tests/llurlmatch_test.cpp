@@ -57,12 +57,10 @@ namespace
         // test the empty() method
         //
         LLUrlMatch match;
-        UNSCOPED_INFO("empty()");
-        REQUIRE(match.empty());
+        CHECK(match.empty());
 
         match.setValues(0, 1, "http://secondlife.com", "", "Second Life", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("! empty()");
-        REQUIRE_FALSE(match.empty());
+        CHECK_FALSE(match.empty());
     }
 
     TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getStart is 0 by default and then the start set", "[LLUrlMatch]")
@@ -75,11 +73,9 @@ namespace
         // test the getStart() method
         //
         LLUrlMatch match;
-        UNSCOPED_INFO("getStart() == 0");
         CHECK(match.getStart() == 0);
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getStart() == 10");
         CHECK(match.getStart() == 10);
     }
 
@@ -93,11 +89,9 @@ namespace
         // test the getEnd() method
         //
         LLUrlMatch match;
-        UNSCOPED_INFO("getEnd() == 0");
         CHECK(match.getEnd() == 0);
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getEnd() == 20");
         CHECK(match.getEnd() == 20);
     }
 
@@ -111,15 +105,12 @@ namespace
         // test the getUrl() method
         //
         LLUrlMatch match;
-        UNSCOPED_INFO("getUrl() == ''");
         CHECK(match.getUrl() == "");
 
         match.setValues(10, 20, "http://slurl.com/", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getUrl() == 'http://slurl.com/'");
         CHECK(match.getUrl() == "http://slurl.com/");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getUrl() == '' (2)");
         CHECK(match.getUrl() == "");
     }
 
@@ -133,15 +124,12 @@ namespace
         // test the getLabel() method
         //
         LLUrlMatch match;
-        UNSCOPED_INFO("getLabel() == ''");
         CHECK(match.getLabel() == "");
 
         match.setValues(10, 20, "", "Label", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getLabel() == 'Label'");
         CHECK(match.getLabel() == "Label");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getLabel() == '' (2)");
         CHECK(match.getLabel() == "");
     }
 
@@ -155,15 +143,12 @@ namespace
         // test the getTooltip() method
         //
         LLUrlMatch match;
-        UNSCOPED_INFO("getTooltip() == ''");
         CHECK(match.getTooltip() == "");
 
         match.setValues(10, 20, "", "", "", "Info", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getTooltip() == 'Info'");
         CHECK(match.getTooltip() == "Info");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getTooltip() == '' (2)");
         CHECK(match.getTooltip() == "");
     }
 
@@ -177,15 +162,12 @@ namespace
         // test the getIcon() method
         //
         LLUrlMatch match;
-        UNSCOPED_INFO("getIcon() == ''");
         CHECK(match.getIcon() == "");
 
         match.setValues(10, 20, "", "", "", "", "Icon", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getIcon() == 'Icon'");
         CHECK(match.getIcon() == "Icon");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getIcon() == '' (2)");
         CHECK(match.getIcon() == "");
     }
 
@@ -199,16 +181,13 @@ namespace
         // test the getMenuName() method
         //
         LLUrlMatch match;
-        UNSCOPED_INFO("getMenuName() empty");
-        REQUIRE(match.getMenuName().empty());
+        CHECK(match.getMenuName().empty());
 
         match.setValues(10, 20, "", "", "", "", "Icon", LLStyle::Params(), "xui_file.xml", "", LLUUID::null);
-        UNSCOPED_INFO("getMenuName() == \"xui_file.xml\"");
         CHECK(match.getMenuName() == "xui_file.xml");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getMenuName() empty (2)");
-        REQUIRE(match.getMenuName().empty());
+        CHECK(match.getMenuName().empty());
     }
 
     TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getLocation is empty by default and then the location last set", "[LLUrlMatch]")
@@ -221,15 +200,12 @@ namespace
         // test the getLocation() method
         //
         LLUrlMatch match;
-        UNSCOPED_INFO("getLocation() empty");
-        REQUIRE(match.getLocation().empty());
+        CHECK(match.getLocation().empty());
 
         match.setValues(10, 20, "", "", "", "", "Icon", LLStyle::Params(), "xui_file.xml", "Paris", LLUUID::null);
-        UNSCOPED_INFO("getLocation() == \"Paris\"");
         CHECK(match.getLocation() == "Paris");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        UNSCOPED_INFO("getLocation() empty (2)");
-        REQUIRE(match.getLocation().empty());
+        CHECK(match.getLocation().empty());
     }
 }

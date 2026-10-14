@@ -176,28 +176,26 @@ namespace
         const S32 dy = 3;
         for (const Form& form : forms)
         {
+            CAPTURE(form.layout, form.attributes);
             const std::string xml = file(form.layout, form.attributes);
-            const std::string what = std::string(form.layout) + " " + form.attributes;
 
             Build before;
-            UNSCOPED_INFO("builds: " + what);
             REQUIRE(before.run(xml));
             const LLRect was = before.rectOf("target");
-            UNSCOPED_INFO("the element is there: " + what);
+            UNSCOPED_INFO("the element is there");
             REQUIRE(was.getWidth() > 0);
 
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads: " + what);
             REQUIRE(edit.loadBuffer(xml));
-            UNSCOPED_INFO("translates: " + what + ": " + edit.error());
-            REQUIRE(edit.translate({ "target" }, dx, dy, anchorOf(was, std::string(form.layout) == "topleft")));
+            const bool translated = edit.translate({ "target" }, dx, dy, anchorOf(was, std::string(form.layout) == "topleft"));
+            UNSCOPED_INFO("translates: " + edit.error());
+            REQUIRE(translated);
 
             Build after;
-            UNSCOPED_INFO("rebuilds: " + what);
             REQUIRE(after.run(edit.text()));
             LLRect expected(was);
             expected.translate(dx, dy);
-            UNSCOPED_INFO("moved by the delta and nothing else: " + what + " " + describe(after.rectOf("target"))
+            UNSCOPED_INFO("moved by the delta and nothing else: " + describe(after.rectOf("target"))
                           + " wanted " + describe(expected) + "\n" + edit.text());
             REQUIRE(after.rectOf("target") == expected);
         }
@@ -214,23 +212,21 @@ namespace
         const std::string xml = file("topleft", "width=\"40\" height=\"20\"");
 
         Build before;
-        UNSCOPED_INFO("builds");
         REQUIRE(before.run(xml));
         const LLRect was = before.rectOf("target");
 
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(xml));
+        const bool translated = edit.translate({ "target" }, 7, 3, anchorOf(was, true));
         UNSCOPED_INFO("translates: " + edit.error());
-        CHECK(edit.translate({ "target" }, 7, 3, anchorOf(was, true)));
+        CHECK(translated);
         {
             INFO("wrote left and top: " + edit.text());
-            REQUIRE(edit.text().find("left=") != std::string::npos);
-            REQUIRE(edit.text().find("top=") != std::string::npos);
+            CHECK(edit.text().find("left=") != std::string::npos);
+            CHECK(edit.text().find("top=") != std::string::npos);
         }
 
         Build after;
-        UNSCOPED_INFO("rebuilds");
         REQUIRE(after.run(edit.text()));
         LLRect expected(was);
         expected.translate(7, 3);
@@ -249,18 +245,16 @@ namespace
         const std::string xml = file("topleft", "left=\"20\" top=\"30\" width=\"40\" height=\"20\"");
 
         Build before;
-        UNSCOPED_INFO("builds");
         REQUIRE(before.run(xml));
         const LLRect was = before.rectOf("target");
 
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(xml));
+        const bool resized = edit.resize({ "target" }, 10, 5, anchorOf(was, true));
         UNSCOPED_INFO("resizes: " + edit.error());
-        CHECK(edit.resize({ "target" }, 10, 5, anchorOf(was, true)));
+        CHECK(resized);
 
         Build after;
-        UNSCOPED_INFO("rebuilds");
         REQUIRE(after.run(edit.text()));
         const LLRect now = after.rectOf("target");
         UNSCOPED_INFO("wider by the delta: " + describe(now));
@@ -277,7 +271,6 @@ namespace
     TEST_CASE_METHOD(alxuiedit_data, "alxuiedit: a file read and written with no edit is the same file", "[alxuiedit]")
     {
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(raw()));
         UNSCOPED_INFO("byte for byte");
         CHECK(edit.text() == raw());
@@ -289,21 +282,16 @@ namespace
     TEST_CASE_METHOD(alxuiedit_data, "alxuiedit: one attribute changed changes its own bytes and no others", "[alxuiedit]")
     {
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(raw()));
-        UNSCOPED_INFO("sets");
         CHECK(edit.setAttribute({ "target" }, "left", "25"));
         UNSCOPED_INFO("only the value moved");
         CHECK(edit.text() == replaced(raw(), "left=\"20\"", "left=\"25\""));
-        UNSCOPED_INFO("dirty");
         CHECK(edit.dirty());
 
         // A value with a character XML spells differently is written
         // spelled that way.
         ALXUIEdit second;
-        UNSCOPED_INFO("loads");
         REQUIRE(second.loadBuffer(raw()));
-        UNSCOPED_INFO("sets");
         CHECK(second.setAttribute({}, "label", "Tom & Jerry & Co"));
         UNSCOPED_INFO("escaped as it is read");
         CHECK(second.text() ==
@@ -315,9 +303,7 @@ namespace
     TEST_CASE_METHOD(alxuiedit_data, "alxuiedit: a removed attribute takes the line it was written on", "[alxuiedit]")
     {
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(raw()));
-        UNSCOPED_INFO("removes");
         CHECK(edit.removeAttribute({ "target" }, "top"));
         UNSCOPED_INFO("its line and nothing else");
         CHECK(edit.text() == replaced(raw(), "\r\n     top=\"10\"", ""));
@@ -331,7 +317,6 @@ namespace
     TEST_CASE_METHOD(alxuiedit_data, "alxuiedit: a move taking a positive edge past zero is refused", "[alxuiedit]")
     {
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(raw()));
         ALXUIEdit::Anchor now;
         now.left = 20;
@@ -341,7 +326,7 @@ namespace
         UNSCOPED_INFO("refused");
         CHECK_FALSE(edit.translate({ "target" }, -25, 0, now));
         UNSCOPED_INFO("said why");
-        REQUIRE_FALSE(edit.error().empty());
+        CHECK_FALSE(edit.error().empty());
         UNSCOPED_INFO("and wrote nothing");
         CHECK(edit.text() == raw());
     }
@@ -443,18 +428,14 @@ namespace
             "</panel>\n";
         {
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads");
             REQUIRE(edit.loadBuffer(source));
-            UNSCOPED_INFO("sets");
             CHECK(edit.setText({ "a" }, "Bonjour"));
             UNSCOPED_INFO("the text and nothing else");
             CHECK(edit.text() == replaced(source, ">Hello<", ">Bonjour<"));
         }
         {
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads");
             REQUIRE(edit.loadBuffer(source));
-            UNSCOPED_INFO("sets");
             CHECK(edit.setText({ "b" }, "Bonjour"));
             UNSCOPED_INFO("the tag opens for it");
             CHECK(edit.text() ==
@@ -463,9 +444,7 @@ namespace
         {
             // What XML spells differently is spelled that way.
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads");
             REQUIRE(edit.loadBuffer(source));
-            UNSCOPED_INFO("sets");
             CHECK(edit.setText({ "a" }, "Salt & Pepper"));
             UNSCOPED_INFO("escaped");
             CHECK(edit.text() == replaced(source, ">Hello<", ">Salt &amp; Pepper<"));
@@ -483,9 +462,7 @@ namespace
             "\t</panel>\n"
             "</panel>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
-        UNSCOPED_INFO("inserts");
         CHECK(edit.insertElement({ "inner" }, "<text name=\"b\">Bonjour</text>"));
         UNSCOPED_INFO("beside its sibling, indented like it");
         CHECK(edit.text() ==
@@ -499,9 +476,7 @@ namespace
             "    <panel name=\"inner\"/>\n"
             "</panel>\n";
         ALXUIEdit second;
-        UNSCOPED_INFO("loads");
         REQUIRE(second.loadBuffer(bare));
-        UNSCOPED_INFO("inserts");
         CHECK(second.insertElement({ "inner" }, "<text name=\"b\"/>"));
         UNSCOPED_INFO("the tag opens for it");
         CHECK(second.text() ==
@@ -521,9 +496,7 @@ namespace
             "    </panel>\n"
             "</panel>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
-        UNSCOPED_INFO("moves");
         CHECK(edit.moveElement({ "a" }, { "inner" }));
         UNSCOPED_INFO("under its new parent, and gone from where it was");
         CHECK(edit.text() ==
@@ -546,9 +519,7 @@ namespace
             "    <text name=\"a\">Hello</text>\n"
             "</panel>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
-        UNSCOPED_INFO("removes");
         CHECK(edit.removeElement({ "inner" }));
         UNSCOPED_INFO("with everything under it");
         CHECK(edit.text() ==
@@ -572,9 +543,7 @@ namespace
             "    <text name=\"z\">End</text>\n"
             "</panel>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
-        UNSCOPED_INFO("removes");
         CHECK(edit.removeElement({ "a" }));
         UNSCOPED_INFO("all of it and no more");
         CHECK(edit.text() ==
@@ -593,11 +562,8 @@ namespace
             "    <item name=\"b\"/>\n"
             "</menu>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
-        UNSCOPED_INFO("before");
         CHECK(edit.insertBefore({ "b" }, "<item name=\"x\"/>"));
-        UNSCOPED_INFO("after");
         CHECK(edit.insertAfter({ "a" }, "<item name=\"y\"/>"));
         UNSCOPED_INFO("each where it was asked for");
         CHECK(edit.text() ==
@@ -620,7 +586,6 @@ namespace
             "    <item name=\"c\"/>\n"
             "</menu>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
         UNSCOPED_INFO("last goes first");
         CHECK(edit.moveBefore({ "c" }, { "a" }));
@@ -648,7 +613,6 @@ namespace
             "    <item name=\"last\"/>\n"
             "</menu>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
 
         // The ordinal is the index counted from zero, so x#2 is the third
@@ -692,25 +656,18 @@ namespace
     TEST_CASE_METHOD(alxuiedit_data, "alxuiedit: each operation is one undo step and undoing restores the file exactly", "[alxuiedit]")
     {
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(raw()));
         UNSCOPED_INFO("nothing to undo yet");
         CHECK_FALSE(edit.canUndo());
         UNSCOPED_INFO("and it is not dirty");
         CHECK_FALSE(edit.dirty());
 
-        UNSCOPED_INFO("one");
         CHECK(edit.setAttribute({ "target" }, "left", "30"));
-        UNSCOPED_INFO("two");
         CHECK(edit.setAttribute({ "target" }, "top", "40"));
-        UNSCOPED_INFO("two steps");
         CHECK(edit.undoDepth() == 2u);
-        UNSCOPED_INFO("dirty");
         CHECK(edit.dirty());
 
-        UNSCOPED_INFO("undo");
         CHECK(edit.undo());
-        UNSCOPED_INFO("undo");
         CHECK(edit.undo());
         UNSCOPED_INFO("back to the file it was");
         CHECK(edit.text() == raw());
@@ -719,14 +676,12 @@ namespace
         UNSCOPED_INFO("with nothing left to undo");
         CHECK_FALSE(edit.canUndo());
 
-        UNSCOPED_INFO("redo");
         CHECK(edit.redo());
-        UNSCOPED_INFO("redo");
         CHECK(edit.redo());
         {
             INFO("both back");
-            REQUIRE(edit.text().find("left=\"30\"") != std::string::npos);
-            REQUIRE(edit.text().find("top=\"40\"") != std::string::npos);
+            CHECK(edit.text().find("left=\"30\"") != std::string::npos);
+            CHECK(edit.text().find("top=\"40\"") != std::string::npos);
         }
 
         // A move is a removal and an insertion; one undo is the whole move.
@@ -752,13 +707,10 @@ namespace
             "    </panel>\n"
             "</panel>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
-        UNSCOPED_INFO("moves");
         CHECK(edit.moveElement({ "a" }, { "inner" }));
         UNSCOPED_INFO("one step for the move");
         CHECK(edit.undoDepth() == 1u);
-        UNSCOPED_INFO("undo");
         CHECK(edit.undo());
         UNSCOPED_INFO("the whole move came back");
         CHECK(edit.text() == source);
@@ -782,7 +734,6 @@ namespace
             " left=\"1\" top=\"2\" width=\"9\" height=\"8\" follows=\"left|top\" />\n"
             "</panel>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
 
         ALXUIEdit::Anchor want;
@@ -791,33 +742,22 @@ namespace
         want.width = 50;
         want.height = 60;
         want.topLeft = true;
-        UNSCOPED_INFO("re-authors");
         CHECK(edit.reauthor({ "a" }, want));
 
         const pugi::xml_node node = edit.resolve({ "a" });
-        UNSCOPED_INFO("left");
         CHECK(node.attribute("left").as_int() == 30);
-        UNSCOPED_INFO("top");
         CHECK(node.attribute("top").as_int() == 40);
-        UNSCOPED_INFO("width");
         CHECK(node.attribute("width").as_int() == 50);
-        UNSCOPED_INFO("height");
         CHECK(node.attribute("height").as_int() == 60);
-        UNSCOPED_INFO("left_delta is gone");
-        CHECK(!node.attribute("left_delta"));
-        UNSCOPED_INFO("top_pad is gone");
-        CHECK(!node.attribute("top_pad"));
-        UNSCOPED_INFO("right is gone");
-        CHECK(!node.attribute("right"));
-        UNSCOPED_INFO("bottom is gone");
-        CHECK(!node.attribute("bottom"));
+        CHECK_FALSE(node.attribute("left_delta"));
+        CHECK_FALSE(node.attribute("top_pad"));
+        CHECK_FALSE(node.attribute("right"));
+        CHECK_FALSE(node.attribute("bottom"));
         UNSCOPED_INFO("what is not a position is untouched");
         CHECK(std::string_view(node.attribute("follows").value()) == "left|top");
 
         // And it is one step, however many splices it took.
-        UNSCOPED_INFO("one step");
         CHECK(edit.undoDepth() == 1u);
-        UNSCOPED_INFO("undo");
         CHECK(edit.undo());
         UNSCOPED_INFO("the file it was");
         CHECK(edit.text() == source);
@@ -842,33 +782,25 @@ namespace
 
         {
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads");
             REQUIRE(edit.loadBuffer(source));
             want.topLeft = true;
             UNSCOPED_INFO("re-authors as a size");
             CHECK(edit.reauthor({ "a" }, want, ALXUIEdit::AUTHOR_SIZE));
             const pugi::xml_node node = edit.resolve({ "a" });
-            UNSCOPED_INFO("width");
             CHECK(node.attribute("width").as_int() == 50);
-            UNSCOPED_INFO("height");
             CHECK(node.attribute("height").as_int() == 60);
-            UNSCOPED_INFO("no left");
-            CHECK(!node.attribute("left"));
-            UNSCOPED_INFO("no top");
-            CHECK(!node.attribute("top"));
+            CHECK_FALSE(node.attribute("left"));
+            CHECK_FALSE(node.attribute("top"));
         }
         {
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads");
             REQUIRE(edit.loadBuffer(source));
             want.topLeft = false;
             UNSCOPED_INFO("re-authors from the bottom");
             CHECK(edit.reauthor({ "a" }, want));
             const pugi::xml_node node = edit.resolve({ "a" });
-            UNSCOPED_INFO("bottom");
             CHECK(node.attribute("bottom").as_int() == 70);
-            UNSCOPED_INFO("and not top");
-            CHECK(!node.attribute("top"));
+            CHECK_FALSE(node.attribute("top"));
         }
     }
 
@@ -883,12 +815,9 @@ namespace
             "    <panel name=\"a\" left=\"1\" top=\"2\" width=\"9\" height=\"8\" />\n"
             "</panel>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
 
-        UNSCOPED_INFO("writes");
         CHECK(edit.setAttribute({ "a" }, "width", "40"));
-        UNSCOPED_INFO("undo");
         CHECK(edit.undo());
         UNSCOPED_INFO("the step wrote one field");
         CHECK(edit.lastChange().oneField);
@@ -896,11 +825,10 @@ namespace
         CHECK(edit.lastChange().field == std::string("width"));
         std::string value;
         UNSCOPED_INFO("the element writes it still");
-        REQUIRE(edit.fieldText({ "a" }, "width", value));
+        CHECK(edit.fieldText({ "a" }, "width", value));
         UNSCOPED_INFO("with what it read before the step");
         CHECK(value == std::string("9"));
 
-        UNSCOPED_INFO("redo");
         CHECK(edit.redo());
         UNSCOPED_INFO("the same step, the other way");
         CHECK(edit.lastChange().oneField);
@@ -914,7 +842,6 @@ namespace
         // onto anything.
         UNSCOPED_INFO("adds one");
         CHECK(edit.setAttribute({ "a" }, "tool_tip", "hello"));
-        UNSCOPED_INFO("undo");
         CHECK(edit.undo());
         UNSCOPED_INFO("still one field");
         CHECK(edit.lastChange().oneField);
@@ -927,19 +854,15 @@ namespace
         // which of the two the element is at.
         {
             ALXUIEdit named;
-            UNSCOPED_INFO("loads");
             REQUIRE(named.loadBuffer(
                 "<panel name=\"root\">\n"
                 "    <panel name=\"a\" width=\"9\" height=\"8\" />\n"
                 "    <panel name=\"b\" width=\"9\" height=\"8\" />\n"
                 "</panel>\n"));
-            UNSCOPED_INFO("renames");
             CHECK(named.setAttribute({ "b" }, "name", "a"));
-            UNSCOPED_INFO("undo");
             CHECK(named.undo());
             UNSCOPED_INFO("undone, it is where it was");
             CHECK(ALXUISelection::toString(named.lastPath()) == std::string("b"));
-            UNSCOPED_INFO("redo");
             CHECK(named.redo());
             // Its new name is one a sibling before it already carries, so it
             // is the second of that name and the step says so.
@@ -954,7 +877,6 @@ namespace
         // sibling of the name it took.
         {
             ALXUIEdit doc;
-            UNSCOPED_INFO("loads");
             REQUIRE(doc.loadBuffer(
                 "<panel name=\"root\">\n"
                 "    <panel name=\"a\" width=\"9\" height=\"8\" />\n"
@@ -966,8 +888,7 @@ namespace
                 "</panel>\n"));
 
             ALXUIEdit::path_t moved;
-            UNSCOPED_INFO("renames");
-            REQUIRE(doc.rename({ "b" }, "a", moved));
+            CHECK(doc.rename({ "b" }, "a", moved));
             UNSCOPED_INFO("and says where it went");
             CHECK(ALXUISelection::toString(moved) ==
                           ALXUISelection::step("a", 1));
@@ -996,21 +917,15 @@ namespace
         // afterwards it has moved to the other stack.
         {
             ALXUIEdit doc;
-            UNSCOPED_INFO("loads");
             REQUIRE(doc.loadBuffer(
                 "<panel name=\"root\">\n"
                 "    <panel name=\"a\" width=\"9\" height=\"8\">Hello</panel>\n"
                 "</panel>\n"));
 
-            UNSCOPED_INFO("writes");
             CHECK(doc.setAttribute({ "a" }, "width", "40"));
-            UNSCOPED_INFO("takes one out");
             CHECK(doc.removeAttribute({ "a" }, "height"));
-            UNSCOPED_INFO("writes text");
             CHECK(doc.setText({ "a" }, "Goodbye"));
-            UNSCOPED_INFO("adds one");
             CHECK(doc.insertElement({ "a" }, "<panel name=\"b\"/>"));
-            UNSCOPED_INFO("takes one out again");
             CHECK(doc.removeElement({ "a", "b" }));
 
             // The stack, read from the top down as undo would take it.
@@ -1034,16 +949,14 @@ namespace
                 REQUIRE(doc.lastChange().did == did);
             }
             UNSCOPED_INFO("and then there is not");
-            REQUIRE(doc.nextUndo() == nullptr);
+            CHECK(doc.nextUndo() == nullptr);
             UNSCOPED_INFO("but there is one to do again");
-            REQUIRE(doc.nextRedo() != nullptr);
+            CHECK(doc.nextRedo() != nullptr);
         }
 
         // A whole element arriving is not one field of one element.
         const std::string before = edit.text();
-        UNSCOPED_INFO("inserts");
         CHECK(edit.insertElement({}, "<panel name=\"b\" width=\"4\" height=\"4\"/>"));
-        UNSCOPED_INFO("undo");
         CHECK(edit.undo());
         UNSCOPED_INFO("which the step does not claim to be");
         CHECK_FALSE(edit.lastChange().oneField);
@@ -1063,7 +976,6 @@ namespace
             "    <panel name=\"a\"  tool_tp='say &amp; do'  width=\"9\" />\n"
             "</panel>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
 
         UNSCOPED_INFO("spelt again");
@@ -1082,7 +994,6 @@ namespace
         CHECK(edit.nextUndo()->did == ALXUIEdit::Did::SpeltFieldAgain);
         UNSCOPED_INFO("under the name it now has");
         CHECK(edit.nextUndo()->field == std::string("tool_tip"));
-        UNSCOPED_INFO("put back");
         CHECK(edit.undo());
         UNSCOPED_INFO("the whole of it");
         CHECK(edit.text() == source);
@@ -1094,7 +1005,7 @@ namespace
         UNSCOPED_INFO("refuses to make a second width");
         CHECK_FALSE(edit.renameAttribute({ "a" }, "tool_tp", "width"));
         UNSCOPED_INFO("and says why");
-        REQUIRE_FALSE(edit.error().empty());
+        CHECK_FALSE(edit.error().empty());
         UNSCOPED_INFO("having changed nothing");
         CHECK(edit.text() == source);
         UNSCOPED_INFO("a name the element does not carry");
@@ -1118,7 +1029,6 @@ namespace
             "    </panel>\n"
             "</panel>\n";
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(source));
         UNSCOPED_INFO("not into itself");
         CHECK_FALSE(edit.moveElement({ "outer" }, { "outer" }));
@@ -1133,7 +1043,7 @@ namespace
         UNSCOPED_INFO("with nothing to undo");
         CHECK_FALSE(edit.canUndo());
         UNSCOPED_INFO("and a reason given");
-        REQUIRE_FALSE(edit.error().empty());
+        CHECK_FALSE(edit.error().empty());
     }
 
     // A step says where it leaves the element it moved or made, read off
@@ -1144,7 +1054,6 @@ namespace
     TEST_CASE_METHOD(alxuiedit_data, "alxuiedit: a step records where the element it moved or made ends up", "[alxuiedit]")
     {
         ALXUIEdit doc;
-        UNSCOPED_INFO("loads");
         REQUIRE(doc.loadBuffer(
             "<panel name=\"root\">\n"
             "    <panel name=\"a\" width=\"1\"/>\n"
@@ -1164,7 +1073,6 @@ namespace
 
         // Up, before a sibling of its own name: it takes that sibling's
         // place among them.
-        UNSCOPED_INFO("moves up");
         CHECK(doc.moveBefore({ ALXUISelection::step("a", 1) }, { "a" }));
         UNSCOPED_INFO("and is the first of the name now");
         CHECK(after() == std::string("a"));
@@ -1174,7 +1082,6 @@ namespace
         CHECK(widthAt(ALXUISelection::step("a", 1)) == std::string("1"));
 
         // After another sibling, past the other of its name.
-        UNSCOPED_INFO("moves after b");
         CHECK(doc.moveAfter({ "a" }, { "b" }));
         UNSCOPED_INFO("and is the second of the name again");
         CHECK(after() == ALXUISelection::step("a", 1));
@@ -1182,7 +1089,6 @@ namespace
         CHECK(widthAt(ALXUISelection::step("a", 1)) == std::string("2"));
 
         // Into another element.
-        UNSCOPED_INFO("moves into b");
         CHECK(doc.moveElement({ ALXUISelection::step("a", 1) }, { "b" }));
         UNSCOPED_INFO("and is under it");
         CHECK(after() == std::string("b/a"));
@@ -1190,36 +1096,30 @@ namespace
         CHECK(widthAt("b/a") == std::string("2"));
 
         // Made, last among a parent's children; before a sibling; after one.
-        UNSCOPED_INFO("adds last");
         CHECK(doc.insertElement({}, "<panel name=\"a\" width=\"3\"/>"));
         UNSCOPED_INFO("which is the second of that name among the root's children");
         CHECK(after() == ALXUISelection::step("a", 1));
         UNSCOPED_INFO("and is the new one");
         CHECK(widthAt(ALXUISelection::step("a", 1)) == std::string("3"));
-        UNSCOPED_INFO("adds before");
         CHECK(doc.insertBefore({ "a" }, "<panel name=\"a\" width=\"4\"/>"));
         UNSCOPED_INFO("which is now the first of them");
         CHECK(after() == std::string("a"));
         UNSCOPED_INFO("and is the new one");
         CHECK(widthAt("a") == std::string("4"));
-        UNSCOPED_INFO("adds after");
         CHECK(doc.insertAfter({ "b" }, "<panel name=\"c\"/>"));
         UNSCOPED_INFO("where it was put");
         CHECK(after() == std::string("c"));
 
         // Taken out: what is left where it was is what held it.
-        UNSCOPED_INFO("removes");
         CHECK(doc.removeElement({ "b", "a" }));
         UNSCOPED_INFO("leaving its parent");
         CHECK(after() == std::string("b"));
 
         // The record travels with the step: put back, the element reads as
         // it did before; done again, it is where the step put it.
-        UNSCOPED_INFO("undo the removal");
         CHECK(doc.undo());
         UNSCOPED_INFO("undone, the element is where it was");
         CHECK(ALXUISelection::toString(doc.lastPath()) == std::string("b/a"));
-        UNSCOPED_INFO("redo");
         CHECK(doc.redo());
         UNSCOPED_INFO("done again, its parent is what is left");
         CHECK(ALXUISelection::toString(doc.lastPath()) == std::string("b"));
@@ -1237,29 +1137,21 @@ namespace
             "    <panel name=\"a\" width=\"1\"/>\n"
             "</panel>\n";
         ALXUIEdit doc;
-        UNSCOPED_INFO("loads");
         REQUIRE(doc.loadBuffer(heavy));
         UNSCOPED_INFO("nothing taken yet");
         CHECK(doc.stepsTaken() == 0u);
-        UNSCOPED_INFO("one");
         CHECK(doc.setAttribute({ "a" }, "width", "2"));
-        UNSCOPED_INFO("one taken");
         CHECK(doc.stepsTaken() == 1u);
-        UNSCOPED_INFO("and one held");
         CHECK(doc.undoDepth() == 1u);
-        UNSCOPED_INFO("two");
         CHECK(doc.setAttribute({ "a" }, "width", "3"));
-        UNSCOPED_INFO("two taken");
         CHECK(doc.stepsTaken() == 2u);
         UNSCOPED_INFO("but the stack is full, so still one held");
         CHECK(doc.undoDepth() == 1u);
-        UNSCOPED_INFO("undo");
         CHECK(doc.undo());
         UNSCOPED_INFO("which puts back the last of them");
         CHECK(doc.resolve({ "a" }).attribute("width").as_int() == 2);
         UNSCOPED_INFO("and takes back none of the count");
         CHECK(doc.stepsTaken() == 2u);
-        UNSCOPED_INFO("read again");
         CHECK(doc.loadBuffer(heavy));
         UNSCOPED_INFO("which starts the count over");
         CHECK(doc.stepsTaken() == 0u);
@@ -1270,7 +1162,6 @@ namespace
     TEST_CASE_METHOD(alxuiedit_data, "alxuiedit: duplicateElement copies an element and its children right after it", "[alxuiedit]")
     {
         ALXUIEdit doc;
-        UNSCOPED_INFO("loads");
         REQUIRE(doc.loadBuffer(
             "<panel name=\"root\">\n"
             "    <panel name=\"row\" width=\"9\">\n"
@@ -1278,7 +1169,6 @@ namespace
             "    </panel>\n"
             "    <panel name=\"after\"/>\n"
             "</panel>\n"));
-        UNSCOPED_INFO("copies");
         CHECK(doc.duplicateElement({ "row" }));
         UNSCOPED_INFO("after the original, as it was written");
         CHECK(doc.text() ==
@@ -1292,7 +1182,6 @@ namespace
             "    <panel name=\"after\"/>\n"
             "</panel>\n");
         const ALXUIEdit::Change* step = doc.nextUndo();
-        UNSCOPED_INFO("one step");
         REQUIRE(step != nullptr);
         UNSCOPED_INFO("which added an element");
         CHECK(step->did == ALXUIEdit::Did::AddedElement);
@@ -1303,7 +1192,6 @@ namespace
         CHECK_FALSE(doc.duplicateElement({}));
         UNSCOPED_INFO("nor nothing");
         CHECK_FALSE(doc.duplicateElement({ "nowhere" }));
-        UNSCOPED_INFO("undo");
         CHECK(doc.undo());
         UNSCOPED_INFO("puts it back");
         CHECK(doc.text() ==
@@ -1321,12 +1209,10 @@ namespace
     TEST_CASE_METHOD(alxuiedit_data, "alxuiedit: fieldText reads a value as the parser does with entities decoded", "[alxuiedit]")
     {
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(
             "<panel name=\"root\">\n"
             "    <button name=\"a\" label=\"Save\"/>\n"
             "</panel>\n"));
-        UNSCOPED_INFO("writes");
         CHECK(edit.setAttribute({ "a" }, "label", "Save & Close"));
         UNSCOPED_INFO("escaped in the file");
         CHECK(edit.text() ==
@@ -1334,8 +1220,7 @@ namespace
             "    <button name=\"a\" label=\"Save &amp; Close\"/>\n"
             "</panel>\n");
         std::string value;
-        UNSCOPED_INFO("the field reads");
-        REQUIRE(edit.fieldText({ "a" }, "label", value));
+        CHECK(edit.fieldText({ "a" }, "label", value));
         UNSCOPED_INFO("as the parser reads it");
         CHECK(value == std::string("Save & Close"));
     }
@@ -1347,18 +1232,14 @@ namespace
     TEST_CASE_METHOD(alxuiedit_data, "alxuiedit: a move that fails part way leaves the file and the redo stack as they were", "[alxuiedit]")
     {
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads");
         REQUIRE(edit.loadBuffer(
             "<panel name=\"root\">\n"
             "    <button name=\"a\"/>\n"
             "    <panel name=\"b\"/>\n"
             "</panel>\n"));
         // Something to redo, which a failed step must not take away.
-        UNSCOPED_INFO("writes");
         CHECK(edit.setAttribute({ "a" }, "width", "40"));
-        UNSCOPED_INFO("undo");
         CHECK(edit.undo());
-        UNSCOPED_INFO("can redo");
         CHECK(edit.canRedo());
         const std::string before = edit.text();
         const size_t taken = edit.stepsTaken();
@@ -1366,7 +1247,7 @@ namespace
         UNSCOPED_INFO("a move into nowhere fails");
         CHECK_FALSE(edit.moveElement({ "a" }, { "no_such" }));
         UNSCOPED_INFO("and says so");
-        REQUIRE_FALSE(edit.error().empty());
+        CHECK_FALSE(edit.error().empty());
         UNSCOPED_INFO("the file is as it was");
         CHECK(edit.text() == before);
         UNSCOPED_INFO("no step was taken");

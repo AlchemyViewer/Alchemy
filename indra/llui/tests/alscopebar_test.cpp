@@ -93,8 +93,6 @@ namespace
         }
     };
 
-    // The whole of it, read back by the names its parts were given. A word
-    // chooses nothing and is not in the query.
     TEST_CASE_METHOD(alscopebar_data, "alscopebar: query reads back each choosing part by name and leaves words out", "[alscopebar]")
     {
         if (!ui.ok())
@@ -107,22 +105,18 @@ namespace
         const LLSD said = bar->query();
         UNSCOPED_INFO("four parts choose something");
         REQUIRE(said.size() == 4);
-        UNSCOPED_INFO("the first option of each, unless told otherwise");
-        CHECK(said["field"].asString() == std::string("any"));
-        UNSCOPED_INFO("and so on");
-        CHECK(said["how"].asString() == std::string("containing"));
-        UNSCOPED_INFO("and so on");
-        CHECK(said["scope"].asString() == std::string("all"));
-        UNSCOPED_INFO("the field starts empty");
-        REQUIRE(said["query"].asString().empty());
-        UNSCOPED_INFO("and a word is not in it");
-        REQUIRE_FALSE(said.has("Find"));
+        {
+            INFO("each choice starts at its first option");
+            CHECK(said["field"].asString() == std::string("any"));
+            CHECK(said["how"].asString() == std::string("containing"));
+            CHECK(said["scope"].asString() == std::string("all"));
+        }
+        CHECK(said["query"].asString().empty());
+        CHECK_FALSE(said.has("Find"));
 
         bar->setValue("query", "close");
         bar->setValue("scope", "skin");
-        UNSCOPED_INFO("what was typed");
         CHECK(bar->valueOf("query") == std::string("close"));
-        UNSCOPED_INFO("and what was chosen");
         CHECK(bar->valueOf("scope") == std::string("skin"));
         delete bar;
     }
@@ -140,25 +134,20 @@ namespace
 
         const LLLineEditor* field = bar->getChild<LLLineEditor>("query");
         const LLComboBox* scope = bar->getChild<LLComboBox>("scope");
-        UNSCOPED_INFO("the field is there");
         REQUIRE(field != nullptr);
-        UNSCOPED_INFO("and so is the last part");
         REQUIRE(scope != nullptr);
 
         // In the order the sentence reads, left to right, none overlapping.
-        UNSCOPED_INFO("the field comes before the last choice");
         CHECK(field->getRect().mRight <= scope->getRect().mLeft);
-        UNSCOPED_INFO("and the field is the wide one");
         CHECK(field->getRect().getWidth() > scope->getRect().getWidth());
-        UNSCOPED_INFO("everything fits");
+        UNSCOPED_INFO("everything fits in the bar");
         CHECK(scope->getRect().mRight <= 500);
 
         // Narrower, and the field is what gives up the room.
         const S32 was = field->getRect().getWidth();
         bar->reshape(360, 30);
-        UNSCOPED_INFO("the field gave up the room");
         CHECK(field->getRect().getWidth() < was);
-        UNSCOPED_INFO("and the parts that are words did not");
+        UNSCOPED_INFO("the last choice still has some width");
         CHECK(scope->getRect().getWidth() > 0);
         delete bar;
     }
@@ -180,10 +169,9 @@ namespace
         shorter.pop_back();     // the scope goes
         bar->setSentence(shorter);
 
-        UNSCOPED_INFO("what was typed is still there");
         CHECK(bar->valueOf("query") == std::string("close"));
         UNSCOPED_INFO("and the part that went says nothing");
-        REQUIRE(bar->valueOf("scope").empty());
+        CHECK(bar->valueOf("scope").empty());
         delete bar;
     }
 
@@ -205,13 +193,10 @@ namespace
 
         bar->getChild<LLComboBox>("scope")->setSelectedByValue(LLSD("skin"), true);
         bar->getChild<LLComboBox>("scope")->onCommit();
-        UNSCOPED_INFO("choosing is a change");
         CHECK(changed == 1);
-        UNSCOPED_INFO("and is not a run");
         CHECK(ran == 0);
 
         bar->getChild<LLLineEditor>("query")->onCommit();
-        UNSCOPED_INFO("committing the field runs it");
         CHECK(ran == 1);
         delete bar;
     }
@@ -235,13 +220,9 @@ namespace
         bar->setAdornment(LLUICtrlFactory::create<LLTextBox>(p));
 
         const LLView* count = bar->getChild<LLView>("count");
-        UNSCOPED_INFO("the slot is filled");
         REQUIRE(count != nullptr);
-        UNSCOPED_INFO("at the right end");
         CHECK(count->getRect().mRight == 500);
-        UNSCOPED_INFO("keeping its width");
         CHECK(count->getRect().getWidth() == 90);
-        UNSCOPED_INFO("and the field gave up the room");
         CHECK(bar->getChild<LLLineEditor>("query")->getRect().getWidth() < was);
         delete bar;
     }
@@ -274,18 +255,17 @@ namespace
         LLComboBox* how = bar->getChild<LLComboBox>("how");
         how->setValue("starting");
         how->onCommit();
-        UNSCOPED_INFO("the change was heard");
         CHECK(changed == 1);
         UNSCOPED_INFO("the part that was pressed is still there");
         CHECK(bar->findChild<LLComboBox>("how") == how);
         UNSCOPED_INFO("and so is the one the new sentence drops");
-        REQUIRE(bar->findChild<LLComboBox>("scope") != nullptr);
+        CHECK(bar->findChild<LLComboBox>("scope") != nullptr);
         UNSCOPED_INFO("and the query still answers");
         CHECK(bar->valueOf("query") == std::string("close"));
 
         gIdleCallbacks.callFunctions();
         UNSCOPED_INFO("once the part has finished, the sentence is the new one");
-        REQUIRE(bar->findChild<LLComboBox>("scope") == nullptr);
+        CHECK(bar->findChild<LLComboBox>("scope") == nullptr);
         UNSCOPED_INFO("with what was chosen kept");
         CHECK(bar->valueOf("how") == std::string("starting"));
         UNSCOPED_INFO("and what was typed");

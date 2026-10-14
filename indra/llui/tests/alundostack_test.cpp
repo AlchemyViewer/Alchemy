@@ -35,12 +35,12 @@
 
 namespace
 {
-        // A step here is the names a change touched.
-        struct Step
-        {
-            std::vector<std::string> mNames;
-            std::string mLabel;
-        };
+    // A step here is the names a change touched.
+    struct Step
+    {
+        std::vector<std::string> mNames;
+        std::string mLabel;
+    };
 
     struct alundostack_data
     {
@@ -61,7 +61,6 @@ namespace
     TEST_CASE_METHOD(alundostack_data, "alundostack: a step taken back is a step forward once pushed; a new change forgets it", "[alundostack]")
     {
         ALUndoStack<Step> stack;
-        UNSCOPED_INFO("nothing to undo yet");
         CHECK_FALSE(stack.canUndo());
 
         stack.note({ { "a" } }, "", 0.0, 1.0, join);
@@ -76,15 +75,12 @@ namespace
             CHECK(back->mNames.front() == "b");
         }
         stack.pushRedo(*back);
-        UNSCOPED_INFO("and it is the step forward");
         CHECK(stack.canRedo());
-        UNSCOPED_INFO("one in force");
         CHECK(stack.inForce() == size_t(1));
 
         stack.note({ { "c" } }, "", 10.0, 1.0, join);
         UNSCOPED_INFO("a new change forgets the way forward");
         CHECK_FALSE(stack.canRedo());
-        UNSCOPED_INFO("two in force");
         CHECK(stack.inForce() == size_t(2));
     }
 
@@ -98,9 +94,9 @@ namespace
         stack.note({ { "slider" } }, "shape:fill", 0.3, 1.0, join);
         stack.note({ { "slider", "shadow" } }, "shape:fill", 0.6, 1.0, join);
         UNSCOPED_INFO("one step for the run");
-        CHECK(stack.inForce() == size_t(1));
+        REQUIRE(stack.inForce() == size_t(1));
         UNSCOPED_INFO("grown to cover what the run touched");
-        REQUIRE(stack.undone().front().mNames.size() == size_t(2));
+        CHECK(stack.undone().front().mNames.size() == size_t(2));
 
         stack.note({ { "slider" } }, "shape:fill", 2.0, 1.0, join);
         UNSCOPED_INFO("a pause starts another");
@@ -150,8 +146,7 @@ namespace
         {
             stack.note({ { std::to_string(i) } }, "", i * 10.0, 1.0, join);
         }
-        UNSCOPED_INFO("three kept");
-        CHECK(stack.inForce() == size_t(3));
+        REQUIRE(stack.inForce() == size_t(3));
         UNSCOPED_INFO("the oldest gone");
         CHECK(stack.undone().front().mNames.front() == std::string("2"));
         stack.clear();
@@ -170,9 +165,9 @@ namespace
         stack.pushRedo(*step);
         stack.note({ { "c" } }, "other", 0.2, 1.0, join);
         UNSCOPED_INFO("an edit after undo starts a new step");
-        CHECK(stack.inForce() == size_t(2));
+        REQUIRE(stack.inForce() == size_t(2));
         UNSCOPED_INFO("the earlier step is unchanged");
-        REQUIRE(stack.undone().front().mNames.size() == size_t(1));
+        CHECK(stack.undone().front().mNames.size() == size_t(1));
     }
 
     TEST_CASE_METHOD(alundostack_data, "alundostack: restore drops and counts what is past the depth and keeps the redo order", "[alundostack]")
@@ -182,8 +177,7 @@ namespace
         std::vector<Step> redo{ { { "z" } }, { { "y" } } };
         UNSCOPED_INFO("two forgotten");
         CHECK(stack.restore(undo, redo) == size_t(2));
-        UNSCOPED_INFO("three kept");
-        CHECK(stack.inForce() == size_t(3));
+        REQUIRE(stack.inForce() == size_t(3));
         UNSCOPED_INFO("from the third");
         CHECK(stack.undone().front().mNames.front() == std::string("3"));
         std::optional<Step> back = stack.takeUndo();
@@ -211,7 +205,6 @@ namespace
         ALUndoStack<Step> stack;
         stack.note({ { "before" } }, "slider", 0.0, 1.0, join);
         stack.beginGroup("Reset Bloom");
-        UNSCOPED_INFO("open");
         CHECK(stack.inGroup());
         stack.note({ { "a" } }, "slider", 0.1, 1.0, join);
         stack.beginGroup("inner");
@@ -221,12 +214,11 @@ namespace
         CHECK(stack.inGroup());
         stack.note({ { "c" } }, "", 500.0, 1.0, join);
         stack.endGroup();
-        UNSCOPED_INFO("closed");
         CHECK_FALSE(stack.inGroup());
         UNSCOPED_INFO("one step, not joined to the run before it");
-        CHECK(stack.inForce() == size_t(2));
+        REQUIRE(stack.inForce() == size_t(2));
         UNSCOPED_INFO("all of it");
-        REQUIRE(stack.undone().back().mNames.size() == size_t(3));
+        CHECK(stack.undone().back().mNames.size() == size_t(3));
         UNSCOPED_INFO("the outermost's name");
         CHECK(stack.undoLabel() == std::string("Reset Bloom"));
         stack.label("typed");
@@ -278,8 +270,8 @@ namespace
         stack.note({ { "drag" } }, "slider", 10.3, 1.0, join, back_to_start);
         {
             INFO("a change after it is a step of its own");
-            CHECK(stack.inForce() == 2);
-            REQUIRE(stack.undone().back().mNames.size() == 1);
+            REQUIRE(stack.inForce() == 2);
+            CHECK(stack.undone().back().mNames.size() == 1);
         }
 
         const auto trim = [](Step& step) {
@@ -292,7 +284,7 @@ namespace
         stack.endGroup(trim);
         {
             INFO("trimmed, kept");
-            CHECK(stack.inForce() == 3);
+            REQUIRE(stack.inForce() == 3);
             CHECK(stack.undone().back().mNames == std::vector<std::string>{ "kept" });
         }
         stack.beginGroup("Look");
@@ -318,7 +310,7 @@ namespace
         {
             INFO("when it closes");
             CHECK(stack.endGroup());
-            CHECK(stack.inForce() == 2);
+            REQUIRE(stack.inForce() == 2);
             CHECK(stack.undone().front().mNames.front() == "2");
         }
         stack.beginGroup();
@@ -368,7 +360,7 @@ namespace
         UNSCOPED_INFO("still open");
         CHECK(stack.inGroup());
         UNSCOPED_INFO("nothing forgotten while it is");
-        CHECK(stack.inForce() == size_t(3));
+        REQUIRE(stack.inForce() == size_t(3));
         {
             INFO("each whole");
             CHECK(stack.undone()[1].mNames == std::vector<std::string>{ "a", "b" });
@@ -383,7 +375,7 @@ namespace
         CHECK(stack.endGroup() == size_t(2));
         {
             INFO("the newest kept");
-            CHECK(stack.inForce() == 1);
+            REQUIRE(stack.inForce() == 1);
             CHECK(stack.undone()[0].mNames == std::vector<std::string>{ "c", "d" });
         }
     }
@@ -401,14 +393,14 @@ namespace
         CHECK(stack.forgetOverBudget(5, weight) == size_t(1));
         {
             INFO("the newer kept");
-            CHECK(stack.inForce() == 2);
+            REQUIRE(stack.inForce() == 2);
             CHECK(stack.undone().front().mNames.front() == "bbb");
         }
         UNSCOPED_INFO("the newest kept whatever it weighs");
         CHECK(stack.forgetOverBudget(0, weight) == size_t(1));
         {
             INFO("alone");
-            CHECK(stack.inForce() == 1);
+            REQUIRE(stack.inForce() == 1);
             CHECK(stack.undone().front().mNames.front() == "cc");
         }
 
@@ -420,7 +412,7 @@ namespace
         std::vector<Step> forward = stack.takeForward();
         {
             INFO("taken out");
-            REQUIRE(forward.size() == 2);
+            CHECK(forward.size() == 2);
             CHECK_FALSE(stack.canRedo());
         }
         stack.putForward(std::move(forward));
@@ -444,7 +436,7 @@ namespace
         CHECK(held == size_t(5));
         {
             INFO("the newer kept");
-            CHECK(kept.inForce() == 2);
+            REQUIRE(kept.inForce() == 2);
             CHECK(kept.undone().front().mNames.front() == "bbb");
         }
     }

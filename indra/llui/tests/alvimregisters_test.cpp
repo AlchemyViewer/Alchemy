@@ -54,7 +54,6 @@ namespace
     TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: a named register keeps its text and its capital adds to it", "[alvimregisters]")
     {
         registers.store('a', "one", false, false, true, true);
-        UNSCOPED_INFO("kept");
         CHECK(registers.fetch('a', true).text == std::string("one"));
         registers.store('A', "two", false, false, true, true);
         UNSCOPED_INFO("added straight on");
@@ -72,10 +71,11 @@ namespace
         CHECK(copies == 0);
     }
 
+    // A yank goes in 0, a delete of lines in 1 with the rest moved along, a
+    // smaller one in -, and _ keeps nothing.
     TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: yanks go in 0 and deletes of lines shift through 1 and small ones go in -", "[alvimregisters]")
     {
         registers.store(0, "yanked", false, false, true, false);
-        UNSCOPED_INFO("0");
         CHECK(registers.fetch('0', false).text == std::string("yanked"));
         for (int i = 1; i <= 10; ++i)
         {
@@ -131,12 +131,13 @@ namespace
         CHECK(registers.fetch('*', false).text == std::string("plus"));
     }
 
+    // A macro's keys go in its register alone, as characters, its capital adding
+    // to them.
     TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: a macro's keys go in its register alone as characters", "[alvimregisters]")
     {
         registers.store(0, "before", true, false, true, true);
         const int copied = copies;
         registers.record('q', "dd");
-        UNSCOPED_INFO("kept");
         CHECK(registers.fetch('q', true).text == std::string("dd"));
         registers.record('Q', "j");
         const ALVimRegisters::Register macro = registers.fetch('q', true);
@@ -152,12 +153,14 @@ namespace
         }
     }
 
+    // An empty line is kept as a line, and read back so through the clipboard it
+    // leaves empty; a register never set is no line.
     TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: an empty line is kept as a line even through an empty clipboard", "[alvimregisters]")
     {
         const ALVimRegisters::Register unset = registers.fetch('a', false);
         {
             INFO("never set: no text, and no line");
-            REQUIRE(unset.text.empty());
+            CHECK(unset.text.empty());
             CHECK_FALSE(unset.linewise);
         }
         registers.store(0, "", true, false, true, true);
@@ -168,11 +171,14 @@ namespace
         const ALVimRegisters::Register back = registers.fetch(0, true);
         {
             INFO("read back through the clipboard as the line it was");
-            REQUIRE(back.text.empty());
+            CHECK(back.text.empty());
             CHECK(back.linewise);
         }
     }
 
+    // A delete of a line or more into a named register goes in 1 as well, the
+    // rest moved along, and so does one over a search; a smaller one and a yank
+    // leave 1 alone.
     TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: a delete of lines into a named register goes in 1 as well", "[alvimregisters]")
     {
         registers.store(0, "older", true, false, false, false);
@@ -197,7 +203,7 @@ namespace
         UNSCOPED_INFO("a smaller one over a search in 1 too");
         CHECK(registers.fetch('1', false).text == std::string("word "));
         UNSCOPED_INFO("but not in -");
-        REQUIRE(registers.fetch('-', false).text.empty());
+        CHECK(registers.fetch('-', false).text.empty());
         registers.store('d', "small", false, false, false, false);
         UNSCOPED_INFO("a smaller one: 1 as it was");
         CHECK(registers.fetch('1', false).text == std::string("word "));
@@ -205,9 +211,11 @@ namespace
         UNSCOPED_INFO("a yank: 1 as it was");
         CHECK(registers.fetch('1', false).text == std::string("word "));
         UNSCOPED_INFO("and 0 never set");
-        REQUIRE(registers.fetch('0', false).text.empty());
+        CHECK(registers.fetch('0', false).text.empty());
     }
 
+    // A digit or - named keeps it as a letter does, and neither 0, the small
+    // delete register nor the clipboard takes it too.
     TEST_CASE_METHOD(alvimregisters_data, "alvimregisters: a digit or - named keeps text as a letter does and nothing else takes it", "[alvimregisters]")
     {
         registers.store(0, "Z0", false, false, true, true);

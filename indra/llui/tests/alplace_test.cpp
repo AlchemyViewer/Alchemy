@@ -30,6 +30,8 @@
 
 namespace
 {
+    // Left edges lined up and the gap clear; over where under runs out and
+    // over does not, under where neither fits.
     TEST_CASE("alplace: under places a box below the anchor unless only over it fits", "[alplace]")
     {
         const LLRect bounds(0, 400, 600, 0);
@@ -73,6 +75,7 @@ namespace
         CHECK(ALPlace::under(LLRect(300, 300, 380, 285), 700, 50, bounds) == LLRect(100, 285, 800, 235));
     }
 
+    // Tops lined up.
     TEST_CASE("alplace: beside places a box right of the anchor else left else under else over", "[alplace]")
     {
         const LLRect bounds(0, 400, 600, 0);

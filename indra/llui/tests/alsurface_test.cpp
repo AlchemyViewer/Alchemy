@@ -59,15 +59,12 @@ namespace
     {
         const LLColor4 paper(0.1f, 0.2f, 0.3f, 0.5f);
         const LLColor4 ink(0.9f, 0.8f, 0.7f, 1.f);
-        UNSCOPED_INFO("none of the way is the paper, opaque");
+        UNSCOPED_INFO("none of the way is the paper made opaque");
         CHECK(nearest(ALSurface::shade(paper, ink, 0.f), LLColor4(0.1f, 0.2f, 0.3f, 1.f)));
         UNSCOPED_INFO("all of it the ink");
         CHECK(nearest(ALSurface::shade(paper, ink, 1.f), LLColor4(0.9f, 0.8f, 0.7f, 1.f)));
-        UNSCOPED_INFO("the ground its own way");
         CHECK(nearest(ALSurface::ground(paper, ink), ALSurface::shade(paper, ink, ALSurface::GROUND)));
-        UNSCOPED_INFO("the chosen band its own");
         CHECK(nearest(ALSurface::chosen(paper, ink), ALSurface::shade(paper, ink, ALSurface::CHOSEN)));
-        UNSCOPED_INFO("the frame the ink thinned");
         CHECK(nearest(ALSurface::frame(ink, 0.5f), LLColor4(0.9f, 0.8f, 0.7f, ALSurface::FRAME * 0.5f)));
 
         // The ink at the chosen weight, laid over the paper as a draw lays
@@ -97,34 +94,25 @@ namespace
         table.setColor("LabelDisabledColor", LLColor4(0.2f, 0.3f, 0.4f, 1.f));
         table.setColor("EmphasisColor", LLColor4(0.9f, 0.6f, 0.1f, 1.f));
         table.setColor("LabelTextColor", LLColor4(0.8f, 0.8f, 0.9f, 1.f));
-        UNSCOPED_INFO("the well");
         CHECK(nearest(ALSurface::well().get(), LLColor4(0.1f, 0.1f, 0.1f, 1.f)));
-        UNSCOPED_INFO("the rim");
         CHECK(nearest(ALSurface::rim().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
-        UNSCOPED_INFO("the handle");
         CHECK(nearest(ALSurface::handle().get(), LLColor4(0.9f, 0.6f, 0.1f, 1.f)));
-        UNSCOPED_INFO("the text");
         CHECK(nearest(ALSurface::text().get(), LLColor4(0.8f, 0.8f, 0.9f, 1.f)));
-        UNSCOPED_INFO("the quiet words");
         CHECK(nearest(ALSurface::quiet().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
         // And they follow a theme that changes after.
         table.setColor("EmphasisColor", LLColor4(0.1f, 0.6f, 0.9f, 1.f));
-        UNSCOPED_INFO("followed");
+        UNSCOPED_INFO("the handle follows a changed EmphasisColor");
         CHECK(nearest(ALSurface::handle().get(), LLColor4(0.1f, 0.6f, 0.9f, 1.f)));
     }
 
     TEST_CASE_METHOD(alsurface_data, "alsurface: contrast is the WCAG ratio and legible lifts a faint colour to it", "[alsurface]")
     {
         const LLColor4 white(1.f, 1.f, 1.f, 1.f), black(0.f, 0.f, 0.f, 1.f);
-        UNSCOPED_INFO("black on white");
         CHECK(std::fabs(ALSurface::contrast(black, white) - 21.f) < 0.01f);
-        UNSCOPED_INFO("either way round");
         CHECK(std::fabs(ALSurface::contrast(white, black) - 21.f) < 0.01f);
-        UNSCOPED_INFO("a colour on itself");
         CHECK(std::fabs(ALSurface::contrast(white, white) - 1.f) < 0.0001f);
         // #777777 on white is the grey that just misses 4.5.
         const LLColor4 grey(0x77 / 255.f, 0x77 / 255.f, 0x77 / 255.f, 1.f);
-        UNSCOPED_INFO("#777 on white");
         CHECK(std::fabs(ALSurface::contrast(grey, white) - 4.48f) < 0.01f);
         UNSCOPED_INFO("half of black over white reads as the grey between");
         CHECK(std::fabs(ALSurface::contrast(LLColor4(0.f, 0.f, 0.f, 0.5f), white) - ALSurface::contrast(LLColor4(0.5f, 0.5f, 0.5f, 1.f), white)) < 0.01f);

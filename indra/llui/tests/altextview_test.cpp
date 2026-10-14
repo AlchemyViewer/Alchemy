@@ -85,13 +85,17 @@ namespace
             return *view;
         }
 
-        void key(KEY k, MASK m = MASK_NONE) { UNSCOPED_INFO("key taken"); REQUIRE(view->handleKeyHere(k, m)); }
+        void require_key(KEY k, MASK m = MASK_NONE)
+        {
+            CAPTURE(k, m);
+            REQUIRE(view->handleKeyHere(k, m));
+        }
 
-        void type(const char* text)
+        void require_typed(const char* text)
         {
             for (const char* c = text; *c; ++c)
             {
-                UNSCOPED_INFO("char taken");
+                CAPTURE(text, *c);
                 REQUIRE(view->handleUnicodeCharHere(static_cast<llwchar>(static_cast<unsigned char>(*c))));
             }
         }
@@ -110,21 +114,19 @@ namespace
     TEST_CASE_METHOD(altextview_data, "altextview: typing goes in at the caret and Backspace and Delete take it out", "[altextview]")
     {
         ALTextView& v = make("");
-        type("ab");
-        UNSCOPED_INFO("typed");
+        require_typed("ab");
         CHECK(v.text() == std::string("ab"));
         UNSCOPED_INFO("caret after");
         CHECK(v.caret() == ALTextPos(0, 2));
-        UNSCOPED_INFO("dirty");
         CHECK(v.isDirty());
-        key(KEY_BACKSPACE);
+        require_key(KEY_BACKSPACE);
         UNSCOPED_INFO("one gone");
         CHECK(v.text() == std::string("a"));
-        key(KEY_LEFT);
-        type("z");
+        require_key(KEY_LEFT);
+        require_typed("z");
         UNSCOPED_INFO("in front");
         CHECK(v.text() == std::string("za"));
-        key(KEY_DELETE);
+        require_key(KEY_DELETE);
         UNSCOPED_INFO("the one after the caret");
         CHECK(v.text() == std::string("z"));
         UNSCOPED_INFO("control characters are not text");
@@ -140,37 +142,37 @@ namespace
 #else
         const MASK word = MASK_CONTROL;
 #endif
-        key(KEY_RIGHT, word);
+        require_key(KEY_RIGHT, word);
         {
             INFO("a word along");
             CHECK(v.caret() > ALTextPos(0, 0));
             CHECK(v.caret() <= ALTextPos(0, 4));
         }
-        key(KEY_END);
+        require_key(KEY_END);
         UNSCOPED_INFO("line end");
         CHECK(v.caret() == ALTextPos(0, 7));
-        key(KEY_RIGHT);
+        require_key(KEY_RIGHT);
         UNSCOPED_INFO("onto the next line");
         CHECK(v.caret() == ALTextPos(1, 0));
-        key(KEY_END, MASK_SHIFT);
+        require_key(KEY_END, MASK_SHIFT);
         UNSCOPED_INFO("selected to the end");
         CHECK(v.selectedText() == "three");
-        key(KEY_LEFT);
+        require_key(KEY_LEFT);
         {
             INFO("collapsed to the start of the selection");
             CHECK_FALSE(v.hasSelection());
             CHECK(v.caret() == ALTextPos(1, 0));
         }
-        key(KEY_UP);
+        require_key(KEY_UP);
         UNSCOPED_INFO("up keeps the column");
         CHECK(v.caret() == ALTextPos(0, 0));
-        key(KEY_END, MASK_CONTROL);
+        require_key(KEY_END, MASK_CONTROL);
         UNSCOPED_INFO("document end");
-        REQUIRE(v.caret() == v.document().end());
-        key(KEY_HOME, MASK_CONTROL | MASK_SHIFT);
+        CHECK(v.caret() == v.document().end());
+        require_key(KEY_HOME, MASK_CONTROL | MASK_SHIFT);
         UNSCOPED_INFO("everything selected");
         CHECK(v.selectedText() == v.text());
-        key('A', MASK_CONTROL);
+        require_key('A', MASK_CONTROL);
         UNSCOPED_INFO("select all too");
         CHECK(v.selectedText() == v.text());
     }
@@ -178,29 +180,29 @@ namespace
     TEST_CASE_METHOD(altextview_data, "altextview: Return keeps the indent; Tab pads to the next stop; Home toggles", "[altextview]")
     {
         ALTextView& v = make("    x");
-        key(KEY_END);
-        key(KEY_RETURN);
+        require_key(KEY_END);
+        require_key(KEY_RETURN);
         UNSCOPED_INFO("indented");
         CHECK(v.text() == std::string("    x\n    "));
         UNSCOPED_INFO("caret after the indent");
         CHECK(v.caret() == ALTextPos(1, 4));
-        type("y");
-        key(KEY_TAB);
+        require_typed("y");
+        require_key(KEY_TAB);
         UNSCOPED_INFO("to the next stop");
         CHECK(v.text() == std::string("    x\n    y   "));
-        key(KEY_HOME);
+        require_key(KEY_HOME);
         UNSCOPED_INFO("home to the first thing");
         CHECK(v.caret() == ALTextPos(1, 4));
-        key(KEY_HOME);
+        require_key(KEY_HOME);
         UNSCOPED_INFO("and then the start");
         CHECK(v.caret() == ALTextPos(1, 0));
         // From the end of the second line up into the first: both lines.
-        key(KEY_END);
-        key(KEY_UP, MASK_SHIFT);
-        key(KEY_TAB, MASK_SHIFT);
+        require_key(KEY_END);
+        require_key(KEY_UP, MASK_SHIFT);
+        require_key(KEY_TAB, MASK_SHIFT);
         UNSCOPED_INFO("unindented both lines");
         CHECK(v.text() == std::string("x\ny   "));
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         UNSCOPED_INFO("indented both lines");
         CHECK(v.text() == std::string("    x\n    y   "));
     }
@@ -209,22 +211,21 @@ namespace
     {
         ALTextView& v = make("a");
         v.resetDirty();
-        key(KEY_END);
-        type("bc");
-        UNSCOPED_INFO("dirty");
+        require_key(KEY_END);
+        require_typed("bc");
         CHECK(v.isDirty());
-        key('Z', MASK_CONTROL);
+        require_key('Z', MASK_CONTROL);
         UNSCOPED_INFO("the run undone");
         CHECK(v.text() == std::string("a"));
         UNSCOPED_INFO("clean again");
         CHECK_FALSE(v.isDirty());
-        key('Y', MASK_CONTROL);
+        require_key('Y', MASK_CONTROL);
         UNSCOPED_INFO("redone");
         CHECK(v.text() == std::string("abc"));
-        key('Z', MASK_CONTROL | MASK_SHIFT);
+        require_key('Z', MASK_CONTROL | MASK_SHIFT);
         UNSCOPED_INFO("redo the other way");
         CHECK(v.text() == std::string("abc"));
-        key('Z', MASK_CONTROL);
+        require_key('Z', MASK_CONTROL);
         UNSCOPED_INFO("caret back where it was");
         CHECK(v.caret() == ALTextPos(0, 1));
     }
@@ -234,7 +235,6 @@ namespace
         ALTextView& v = make("hello world\nsecond");
         S32 x, y;
         pointOf(0, 3, x, y);
-        UNSCOPED_INFO("down");
         CHECK(v.handleMouseDown(x, y, MASK_NONE));
         UNSCOPED_INFO("caret at three");
         CHECK(v.caret() == ALTextPos(0, 3));
@@ -244,7 +244,6 @@ namespace
         CHECK(v.handleHover(x2, y2, MASK_NONE));
         UNSCOPED_INFO("selection follows");
         CHECK(v.selection().normalised() == ALTextRange(ALTextPos(0, 3), ALTextPos(1, 2)));
-        UNSCOPED_INFO("up");
         CHECK(v.handleMouseUp(x2, y2, MASK_NONE));
         UNSCOPED_INFO("capture released");
         CHECK_FALSE(v.hasMouseCapture());
@@ -262,7 +261,6 @@ namespace
         // second press told apart; one somewhere else is a plain click.
         v.handleMouseDown(x, y, MASK_NONE);
         v.handleMouseUp(x, y, MASK_NONE);
-        UNSCOPED_INFO("double");
         CHECK(v.handleDoubleClick(x, y, MASK_NONE));
         UNSCOPED_INFO("the word");
         CHECK(v.selectedText() == std::string("world"));
@@ -309,19 +307,18 @@ namespace
         v.setText(many);
         UNSCOPED_INFO("at the top");
         CHECK(v.scrollY() == 0);
-        key(KEY_END, MASK_CONTROL);
+        require_key(KEY_END, MASK_CONTROL);
         UNSCOPED_INFO("scrolled down");
         CHECK(v.scrollY() > 0);
         UNSCOPED_INFO("the caret's line is in sight");
         CHECK(v.firstVisibleLine() <= v.caret().line);
-        key(KEY_HOME, MASK_CONTROL);
+        require_key(KEY_HOME, MASK_CONTROL);
         UNSCOPED_INFO("back at the top");
         CHECK(v.scrollY() == 0);
-        key(KEY_PAGE_DOWN);
+        require_key(KEY_PAGE_DOWN);
         UNSCOPED_INFO("a page down moves the caret");
         CHECK(v.caret().line > 0);
         v.setWordWrap(true);
-        UNSCOPED_INFO("wrapping is on");
         CHECK(v.getWordWrap());
     }
 
@@ -331,7 +328,6 @@ namespace
         UNSCOPED_INFO("grammars on disk");
         REQUIRE_FALSE(ALTextView::syntaxLibrary().names().empty());
         v.setSyntax("lsl");
-        UNSCOPED_INFO("grammar set");
         REQUIRE(v.highlighter().grammar() != nullptr);
         const std::vector<ALSyntaxToken>& tokens = v.highlighter().tokens(0);
         {
@@ -340,7 +336,6 @@ namespace
             CHECK(tokens.front().kind == ALSyntaxKind::Comment);
         }
         v.setValue("new");
-        UNSCOPED_INFO("value in");
         CHECK(v.getValue().asString() == std::string("new"));
         UNSCOPED_INFO("caret at the start");
         CHECK(v.caret() == ALTextPos(0, 0));
@@ -358,12 +353,12 @@ namespace
         CHECK(v.hasHorizontalScrollbar());
         UNSCOPED_INFO("at the left");
         CHECK(v.scrollX() == 0.f);
-        key(KEY_END);
+        require_key(KEY_END);
         UNSCOPED_INFO("the caret's end scrolls the text");
         CHECK(v.scrollX() > 0.f);
         UNSCOPED_INFO("the bar lies over the text rather than taking room");
         CHECK(v.textRect().mBottom <= 2);
-        key(KEY_HOME);
+        require_key(KEY_HOME);
         UNSCOPED_INFO("back to the left");
         CHECK(v.scrollX() == 0.f);
         v.setWordWrap(true);
@@ -375,38 +370,38 @@ namespace
     {
         ALTextView& v = make("a\nb\nc");
         v.setCaret(ALTextPos(1, 1));
-        key(KEY_UP, MASK_ALT);
+        require_key(KEY_UP, MASK_ALT);
         UNSCOPED_INFO("moved up");
         CHECK(v.text() == std::string("b\na\nc"));
         UNSCOPED_INFO("the caret went with it");
         CHECK(v.caret() == ALTextPos(0, 1));
-        key(KEY_UP, MASK_ALT);
+        require_key(KEY_UP, MASK_ALT);
         UNSCOPED_INFO("no further up");
         CHECK(v.text() == std::string("b\na\nc"));
-        key(KEY_DOWN, MASK_ALT);
+        require_key(KEY_DOWN, MASK_ALT);
         UNSCOPED_INFO("moved down");
         CHECK(v.text() == std::string("a\nb\nc"));
         UNSCOPED_INFO("the caret came back");
         CHECK(v.caret() == ALTextPos(1, 1));
-        key('D', MASK_CONTROL | MASK_SHIFT);
+        require_key('D', MASK_CONTROL | MASK_SHIFT);
         UNSCOPED_INFO("duplicated");
         CHECK(v.text() == std::string("a\nb\nb\nc"));
         UNSCOPED_INFO("the caret is on the copy");
         CHECK(v.caret() == ALTextPos(2, 1));
-        key('K', MASK_CONTROL | MASK_SHIFT);
+        require_key('K', MASK_CONTROL | MASK_SHIFT);
         UNSCOPED_INFO("the copy is gone");
         CHECK(v.text() == std::string("a\nb\nc"));
         UNSCOPED_INFO("the caret is on the line that took its place");
         CHECK(v.caret() == ALTextPos(2, 1));
         v.setCaret(ALTextPos(2, 0));
-        key('K', MASK_CONTROL | MASK_SHIFT);
+        require_key('K', MASK_CONTROL | MASK_SHIFT);
         UNSCOPED_INFO("the last line goes with its newline");
         CHECK(v.text() == std::string("a\nb"));
-        key('Z', MASK_CONTROL);
+        require_key('Z', MASK_CONTROL);
         UNSCOPED_INFO("and comes back as one step");
         CHECK(v.text() == std::string("a\nb\nc"));
         v.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
-        key(KEY_DOWN, MASK_ALT);
+        require_key(KEY_DOWN, MASK_ALT);
         UNSCOPED_INFO("a selection of a whole line moves that line");
         CHECK(v.text() == std::string("b\na\nc"));
     }
@@ -456,7 +451,7 @@ namespace
         CHECK(v.caret() == ALTextPos(0, 1));
         UNSCOPED_INFO("still not an edit");
         CHECK_FALSE(v.isDirty());
-        type("x");
+        require_typed("x");
         UNSCOPED_INFO("typing after is an edit");
         CHECK(v.isDirty());
         // Reconversion: the text is marked as the composition, and what the
@@ -479,7 +474,7 @@ namespace
         UNSCOPED_INFO("no bar yet");
         CHECK_FALSE(v.findShown());
         v.setSelection(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)));
-        key('F', MASK_CONTROL);
+        require_key('F', MASK_CONTROL);
         UNSCOPED_INFO("control-F shows the bar");
         CHECK(v.findShown());
         UNSCOPED_INFO("seeded with the selection");
@@ -494,43 +489,41 @@ namespace
             CHECK(v.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
             CHECK(v.findCurrent() == 0);
         }
-        key(KEY_F3);
+        require_key(KEY_F3);
         UNSCOPED_INFO("F3 goes on");
         CHECK(v.selection().normalised() == ALTextRange(ALTextPos(0, 8), ALTextPos(0, 11)));
         UNSCOPED_INFO("no going round said");
         CHECK(v.findBar()->countSaid() == std::string("2 of 3"));
-        key(KEY_F3);
-        key(KEY_F3);
+        require_key(KEY_F3);
+        require_key(KEY_F3);
         UNSCOPED_INFO("and round to the first");
         CHECK(v.findCurrent() == 0);
         UNSCOPED_INFO("going round said, on from the top");
         CHECK(v.findBar()->countSaid() == std::string("\xE2\x86\xBB 1 of 3"));
-        key(KEY_F3, MASK_SHIFT);
+        require_key(KEY_F3, MASK_SHIFT);
         UNSCOPED_INFO("shift-F3 goes back round to the last");
         CHECK(v.selection().normalised() == ALTextRange(ALTextPos(1, 4), ALTextPos(1, 7)));
         UNSCOPED_INFO("and back from the bottom");
         CHECK(v.findBar()->countSaid() == std::string("\xE2\x86\xBA 3 of 3"));
-        key(KEY_F3, MASK_SHIFT);
+        require_key(KEY_F3, MASK_SHIFT);
         UNSCOPED_INFO("said until the next step");
         CHECK(v.findBar()->countSaid() == std::string("2 of 3"));
-        key(KEY_F3);
+        require_key(KEY_F3);
 
         v.findBar()->setReplacement("1");
         v.findNext(true);  // the first again
         UNSCOPED_INFO("replaces the current and finds the next");
         CHECK(v.replaceMatch());
-        UNSCOPED_INFO("the text");
         CHECK(v.text() == std::string("1 two one\ntwo one\n"));
         UNSCOPED_INFO("two left");
         REQUIRE(v.findMatches().size() == size_t(2));
         UNSCOPED_INFO("all of them, as one step");
         CHECK(v.replaceAllMatches() == 2);
-        UNSCOPED_INFO("replaced");
         CHECK(v.text() == std::string("1 two 1\ntwo 1\n"));
         v.undo();
         UNSCOPED_INFO("one step back");
         CHECK(v.text() == std::string("1 two one\ntwo one\n"));
-        key(KEY_ESCAPE);
+        require_key(KEY_ESCAPE);
         {
             INFO("escape closes the bar");
             CHECK_FALSE(v.findShown());
@@ -593,7 +586,7 @@ namespace
         CHECK(v.scrollY() > 0);
         v.handleMouseUp(394, 10, MASK_NONE);
         UNSCOPED_INFO("and lets the mouse go");
-        REQUIRE(gFocusMgr.getMouseCapture() == nullptr);
+        CHECK(gFocusMgr.getMouseCapture() == nullptr);
         v.setText("short\n");
         UNSCOPED_INFO("no ruler for a short text");
         CHECK(v.textRect().getWidth() > width);
@@ -603,7 +596,7 @@ namespace
     {
         ALTextView& v = make("    x = 1\n    y = 2\n");
         v.setCaret(ALTextPos(0, 9));
-        key(KEY_TAB, MASK_SHIFT);
+        require_key(KEY_TAB, MASK_SHIFT);
         UNSCOPED_INFO("unindented");
         CHECK(v.text() == std::string("x = 1\n    y = 2\n"));
         {
@@ -612,14 +605,14 @@ namespace
             CHECK_FALSE(v.hasSelection());
         }
         v.setCaret(ALTextPos(1, 2));
-        key(KEY_TAB, MASK_SHIFT);
+        require_key(KEY_TAB, MASK_SHIFT);
         {
             INFO("a caret inside the taken space lands at the start");
             CHECK(v.caret() == ALTextPos(1, 0));
             CHECK_FALSE(v.hasSelection());
         }
         v.setSelection(ALTextRange(ALTextPos(0, 2), ALTextPos(1, 3)));
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         UNSCOPED_INFO("both indented");
         CHECK(v.text() == std::string("    x = 1\n    y = 2\n"));
         UNSCOPED_INFO("the selection moved with the text");
@@ -639,22 +632,22 @@ namespace
         UNSCOPED_INFO("held");
         REQUIRE(v.substitutions().size() == 1);
         UNSCOPED_INFO("found by a position inside");
-        REQUIRE(v.substitutionAt(ALTextPos(0, 10)) != nullptr);
+        CHECK(v.substitutionAt(ALTextPos(0, 10)) != nullptr);
         UNSCOPED_INFO("not by one after");
-        REQUIRE(v.substitutionAt(ALTextPos(0, 32)) == nullptr);
+        CHECK(v.substitutionAt(ALTextPos(0, 32)) == nullptr);
         UNSCOPED_INFO("the text is untouched");
         CHECK(v.text().rfind("see http://x.example/a-long-path now", 0) == 0);
         UNSCOPED_INFO("the line is narrower than its text");
         CHECK(v.layout().line(0).width < v.layout().line(1).width * 6.f);
         // The caret steps over the stretch as one thing.
         v.setCaret(ALTextPos(0, 3));
-        key(KEY_RIGHT);
+        require_key(KEY_RIGHT);
         UNSCOPED_INFO("to its start");
         CHECK(v.caret() == ALTextPos(0, 4));
-        key(KEY_RIGHT);
+        require_key(KEY_RIGHT);
         UNSCOPED_INFO("over it in one step");
         CHECK(v.caret() == ALTextPos(0, 32));
-        key(KEY_LEFT);
+        require_key(KEY_LEFT);
         UNSCOPED_INFO("and back");
         CHECK(v.caret() == ALTextPos(0, 4));
         // A click on the label follows the link once let go of.
@@ -666,7 +659,7 @@ namespace
         v.handleHover(x, y, MASK_NONE);
         v.handleMouseDown(x, y, MASK_NONE);
         UNSCOPED_INFO("not yet");
-        REQUIRE(followed.empty());
+        CHECK(followed.empty());
         v.handleMouseUp(x, y, MASK_NONE);
         UNSCOPED_INFO("followed on the release");
         CHECK(followed == std::string("opened"));
@@ -678,9 +671,8 @@ namespace
         v.handleHover(x2, y2, MASK_NONE);
         v.handleMouseUp(x2, y2, MASK_NONE);
         UNSCOPED_INFO("a drag follows nothing");
-        REQUIRE(followed.empty());
+        CHECK(followed.empty());
         // A name that arrives later changes what is shown, not the text.
-        UNSCOPED_INFO("relabelled");
         CHECK(v.relabel(url.range, "Example"));
         UNSCOPED_INFO("shown");
         CHECK(v.substitutions().front().shown == std::string("Example"));
@@ -723,11 +715,11 @@ namespace
         UNSCOPED_INFO("held");
         REQUIRE(v.atoms().size() == 1);
         UNSCOPED_INFO("found inside its placeholder");
-        REQUIRE(v.atomAt(ALTextPos(0, 3)) != nullptr);
+        CHECK(v.atomAt(ALTextPos(0, 3)) != nullptr);
         UNSCOPED_INFO("as wide as asked");
         CHECK(v.layout().xOf(0, 5) - v.layout().xOf(0, 2) >= 29.f);
         v.setCaret(ALTextPos(0, 2));
-        key(KEY_RIGHT);
+        require_key(KEY_RIGHT);
         UNSCOPED_INFO("over the placeholder whole");
         CHECK(v.caret() == ALTextPos(0, 5));
         S32 x, y;
@@ -763,12 +755,12 @@ namespace
         v.placeAtomViews();
         {
             INFO("shown once placed, as a frame places it, the layer over the text");
-            REQUIRE(button->getVisible());
+            CHECK(button->getVisible());
             CHECK(button->getParent()->getRect() == v.textRect());
         }
         {
             INFO("in the box, which is as tall as asked");
-            REQUIRE(button->getRect().getWidth() == 40);
+            CHECK(button->getRect().getWidth() == 40);
             CHECK(button->getRect().getHeight() == v.layout().rowHeight() * 2);
         }
         UNSCOPED_INFO("the row grew to it");
@@ -786,7 +778,7 @@ namespace
         {
             INFO("the view is dying, and no longer a child");
             CHECK((handle.isDead() || handle.get()->isDead()));
-            REQUIRE_FALSE(v.findChildView("inline", false));
+            CHECK_FALSE(v.findChildView("inline", false));
         }
     }
 
@@ -806,7 +798,6 @@ namespace
             REQUIRE(v.misspellings(0).empty());
         }
         v.setSpellCheck(true);
-        UNSCOPED_INFO("on");
         CHECK(v.getSpellCheck());
         UNSCOPED_INFO("one on the first line");
         REQUIRE(v.misspellings(0).size() == size_t(1));
@@ -826,7 +817,6 @@ namespace
         v.refreshSuggestions();
         UNSCOPED_INFO("one suggestion");
         CHECK(v.getSuggestionCount() == U32(1));
-        UNSCOPED_INFO("what it is");
         CHECK(v.getSuggestion(0) == std::string("the"));
         {
             INFO("the dictionary alone takes words in");
@@ -845,7 +835,7 @@ namespace
         CHECK(v.document().line(0) == std::string("teh cat"));
         // Typing changes the line, which is checked again.
         v.setCaret(ALTextPos(0, 3));
-        type("n");
+        require_typed("n");
         UNSCOPED_INFO("the word is now fine");
         REQUIRE(v.misspellings(0).empty());
         // Code: only what is written to be read.
@@ -948,11 +938,11 @@ namespace
         LLUrlAction::setIsObjectBlockedCallback(nullptr);
         LLUrlAction::setIsObjectReachableCallback(nullptr);
         UNSCOPED_INFO("unknown without a callback");
-        REQUIRE_FALSE(LLUrlAction::isFriend(agent).has_value());
+        CHECK_FALSE(LLUrlAction::isFriend(agent).has_value());
         LLUrlAction::adjustMenu(menu, agent);
         {
             INFO("both friend items stay enabled");
-            REQUIRE(menu->getChild<LLView>("add_friend")->getEnabled());
+            CHECK(menu->getChild<LLView>("add_friend")->getEnabled());
             CHECK(menu->getChild<LLView>("remove_friend")->getEnabled());
         }
         // Installed: the menu follows the answers.
@@ -964,13 +954,13 @@ namespace
         LLUrlAction::adjustMenu(menu, agent);
         {
             INFO("add is off, remove on");
-            REQUIRE_FALSE(menu->getChild<LLView>("add_friend")->getEnabled());
+            CHECK_FALSE(menu->getChild<LLView>("add_friend")->getEnabled());
             CHECK(menu->getChild<LLView>("remove_friend")->getEnabled());
         }
         LLUrlAction::adjustMenu(menu, object);
         {
             INFO("blocked: unblock shown, block hidden");
-            REQUIRE_FALSE(menu->getChild<LLView>("block_object")->getVisible());
+            CHECK_FALSE(menu->getChild<LLView>("block_object")->getVisible());
             CHECK(menu->getChild<LLView>("unblock_object")->getVisible());
         }
         UNSCOPED_INFO("out of reach: no zoom");
@@ -1006,7 +996,7 @@ namespace
         CHECK(v.styles()[1].font == LLFontGL::getFontMonospace()->faceFor(LLFontGL::ITALIC));
         {
             INFO("the underline keeps no font of its own");
-            REQUIRE(v.styles()[2].font == nullptr);
+            CHECK(v.styles()[2].font == nullptr);
             CHECK(v.styles()[2].flags & LLFontGL::UNDERLINE);
         }
     }
@@ -1047,44 +1037,44 @@ namespace
             CHECK(v.hasFocus());
             CHECK_FALSE(v.atomViewFocused());
         }
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         {
             INFO("Tab goes into the first view after the caret");
             CHECK(first->hasFocus());
             CHECK(v.atomViewFocused());
         }
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         UNSCOPED_INFO("and on to the next");
         CHECK(second->hasFocus());
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         {
             INFO("and to the far one, brought into sight");
-            REQUIRE(distant->hasFocus());
+            CHECK(distant->hasFocus());
             CHECK(distant->getVisible());
             CHECK(v.scrollY() > 0);
         }
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         {
             INFO("past the last: the text again");
             CHECK(gFocusMgr.getKeyboardFocus() == &v);
             CHECK_FALSE(v.atomViewFocused());
         }
-        key(KEY_TAB, MASK_SHIFT);
+        require_key(KEY_TAB, MASK_SHIFT);
         UNSCOPED_INFO("Shift-Tab goes to the last view before the caret");
         CHECK(distant->hasFocus());
-        key(KEY_TAB, MASK_SHIFT);
+        require_key(KEY_TAB, MASK_SHIFT);
         UNSCOPED_INFO("and back to the one before");
         CHECK(second->hasFocus());
-        key(KEY_ESCAPE);
+        require_key(KEY_ESCAPE);
         UNSCOPED_INFO("Escape comes back to the text");
         CHECK(gFocusMgr.getKeyboardFocus() == &v);
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         UNSCOPED_INFO("Tab from the text goes to the view at the caret, which followed the last one looked at");
         CHECK(second->hasFocus());
         // A view scrolled away hands the keyboard back.
-        key(KEY_ESCAPE);
+        require_key(KEY_ESCAPE);
         v.setCaret(ALTextPos(1, 0));
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         UNSCOPED_INFO("second again");
         CHECK(second->hasFocus());
         v.setScrollY(v.layout().rowHeight() * 20);
@@ -1098,7 +1088,7 @@ namespace
         v.setScrollY(0);
         v.placeAtomViews();
         v.setCaret(ALTextPos(0, 0));
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         UNSCOPED_INFO("first again");
         CHECK(first->hasFocus());
         v.document().remove(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
@@ -1112,10 +1102,10 @@ namespace
         v.setCaret(ALTextPos(0, 0));
         UNSCOPED_INFO("Tab is a tab now");
         CHECK((!v.handleKeyHere(KEY_TAB, MASK_NONE) || !v.atomViewFocused()));
-        key(KEY_F6);
+        require_key(KEY_F6);
         UNSCOPED_INFO("F6 goes into the first view");
         CHECK(second->hasFocus());
-        key(KEY_F6, MASK_SHIFT);
+        require_key(KEY_F6, MASK_SHIFT);
         UNSCOPED_INFO("Shift-F6 past the start: the text");
         CHECK(gFocusMgr.getKeyboardFocus() == &v);
     }
@@ -1180,27 +1170,27 @@ namespace
         // MASK_MAC_CONTROL.
         v.setText("  alpha beta\ngamma");
         v.setCaret(ALTextPos(0, 5));
-        key(KEY_RIGHT, MASK_CONTROL);
+        require_key(KEY_RIGHT, MASK_CONTROL);
         UNSCOPED_INFO("command-right to the line's end");
         CHECK(v.caret() == ALTextPos(0, 12));
-        key(KEY_LEFT, MASK_CONTROL);
+        require_key(KEY_LEFT, MASK_CONTROL);
         UNSCOPED_INFO("command-left to the first thing on it");
         CHECK(v.caret() == ALTextPos(0, 2));
-        key(KEY_DOWN, MASK_CONTROL);
+        require_key(KEY_DOWN, MASK_CONTROL);
         UNSCOPED_INFO("command-down to the end");
         CHECK(v.caret() == ALTextPos(1, 5));
-        key(KEY_UP, MASK_CONTROL);
+        require_key(KEY_UP, MASK_CONTROL);
         UNSCOPED_INFO("command-up to the start");
         CHECK(v.caret() == ALTextPos(0, 0));
-        key('E', MASK_MAC_CONTROL);
+        require_key('E', MASK_MAC_CONTROL);
         UNSCOPED_INFO("control-e to the line's end");
         CHECK(v.caret() == ALTextPos(0, 12));
-        key(KEY_BACKSPACE, MASK_CONTROL);
+        require_key(KEY_BACKSPACE, MASK_CONTROL);
         UNSCOPED_INFO("command-backspace to the line's start");
         CHECK(v.document().line(0) == std::string(""));
-        type("x y");
-        key('A', MASK_MAC_CONTROL);
-        key('K', MASK_MAC_CONTROL);
+        require_typed("x y");
+        require_key('A', MASK_MAC_CONTROL);
+        require_key('K', MASK_MAC_CONTROL);
         UNSCOPED_INFO("control-k to the line's end");
         CHECK(v.document().line(0) == std::string(""));
 #endif
@@ -1209,7 +1199,7 @@ namespace
     TEST_CASE_METHOD(altextview_data, "altextview: a composition is removed before an undo or edit measured without it", "[altextview]")
     {
         ALTextView& v = make("");
-        type("hello");
+        require_typed("hello");
         v.setCaret(ALTextPos(0, 0));
         v.preeditor().updatePreedit("xy", LLPreeditor::segment_lengths_t{ 2 }, LLPreeditor::standouts_t{ false }, 2);
         UNSCOPED_INFO("composing before the typing");
@@ -1226,7 +1216,6 @@ namespace
         UNSCOPED_INFO("composing");
         CHECK(v.text() == std::string("abcXY def"));
         // def measured where it stands with the composition in.
-        UNSCOPED_INFO("replaced");
         CHECK(v.replaceAll({ { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 9)), "DEF" } }));
         UNSCOPED_INFO("the word it was measured on, the composition gone");
         CHECK(v.text() == std::string("abc DEF"));
@@ -1248,7 +1237,6 @@ namespace
         v.findBar()->setReplacement("a");
         UNSCOPED_INFO("both replaced");
         CHECK(v.replaceAllMatches() == 2);
-        UNSCOPED_INFO("the text");
         CHECK(v.text() == std::string("a a aa"));
         v.findBar()->setQuery("a");
         UNSCOPED_INFO("the stretch shrank with them: the third pair is still outside it");
@@ -1264,7 +1252,7 @@ namespace
         UNSCOPED_INFO("code is left alone");
         REQUIRE(v.misspellings(1).empty());
         v.setCaret(ALTextPos(0, 0));
-        type("/*");
+        require_typed("/*");
         UNSCOPED_INFO("the line below, a comment now, checked");
         REQUIRE(v.misspellings(1).size() == size_t(1));
     }
@@ -1315,8 +1303,7 @@ namespace
     {
         ALTextView& v = make("abc");
         v.setSelection(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 2)));
-        type("b");
-        UNSCOPED_INFO("the text");
+        require_typed("b");
         CHECK(v.text() == std::string("abc"));
         {
             INFO("the caret past it, nothing selected");
@@ -1348,9 +1335,7 @@ namespace
         CHECK_FALSE(v.hasSelection());
         v.setSyntax("lsl");
         v.setSelection(ALTextRange(ALTextPos(0, 1), ALTextPos(1, 1)));
-        UNSCOPED_INFO("commented");
         CHECK(v.toggleComment());
-        UNSCOPED_INFO("the text");
         CHECK(v.text() == std::string("// one\n// two"));
         UNSCOPED_INFO("the lines selected");
         CHECK(v.selection() == ALTextRange(ALTextPos(0, 0), ALTextPos(1, 6)));
@@ -1360,7 +1345,7 @@ namespace
     {
         ALTextView& v = make("one two three");
         v.setSelection(ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)));
-        type("2");
+        require_typed("2");
         UNSCOPED_INFO("typed over");
         CHECK(v.text() == std::string("one 2 three"));
         v.undo();
@@ -1377,9 +1362,7 @@ namespace
 
         v.setText("aa bb aa");
         v.setCaret(ALTextPos(0, 4));
-        UNSCOPED_INFO("replaced");
         CHECK(v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)), "xxxx" }, { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 8)), "y" } }));
-        UNSCOPED_INFO("the text");
         CHECK(v.text() == std::string("xxxx bb y"));
         UNSCOPED_INFO("the caret kept its place in bb");
         CHECK(v.caret() == ALTextPos(0, 6));
@@ -1407,13 +1390,13 @@ namespace
     TEST_CASE_METHOD(altextview_data, "altextview: setTextWithHistory undoes through its history and refuses another text's", "[altextview]")
     {
         ALTextView& v = make("one");
-        type("x");
+        require_typed("x");
         const std::string first   = v.text();
         const LLSD        history = v.undoJournal().asLLSD();
 
         // Another text, typed in: its own step back and its unsaved state.
         v.setText("other");
-        type("y");
+        require_typed("y");
         const std::string second = v.text();
         {
             INFO("typed in");
@@ -1496,7 +1479,6 @@ namespace
         ALTextView& v = make(lines.c_str());
         S32 x, y;
         pointOf(0, 1, x, y);
-        UNSCOPED_INFO("down");
         CHECK(v.handleMouseDown(x, y, MASK_NONE));
         const LLRect text  = v.textRect();
         const S32    row_h = v.layout().rowHeight();
@@ -1531,7 +1513,6 @@ namespace
         UNSCOPED_INFO("offered once a frame, not at each change");
         CHECK(primary == elsewhere);
         ll_test::TextViewProbe::nextFrame(v);
-        UNSCOPED_INFO("selected");
         CHECK(clipboard.pasteFromClipboard(primary, true));
         UNSCOPED_INFO("is the primary selection");
         CHECK(primary == std::string("beta"));
@@ -1554,7 +1535,6 @@ namespace
         CHECK(primary == std::string("gam"));
         // Put at the press, the selection left as text.
         pointOf(0, 5, x, y);
-        UNSCOPED_INFO("taken");
         CHECK(v.handleMiddleMouseDown(x, y, MASK_NONE));
         UNSCOPED_INFO("put where pressed");
         CHECK(v.text() == std::string("alphagam beta\ngamma\n"));
@@ -1572,9 +1552,8 @@ namespace
     TEST_CASE_METHOD(altextview_data, "altextview: edits slide find matches and the text is searched again only when needed", "[altextview]")
     {
         ALTextView& v = make("one two one\n");
-        key('F', MASK_CONTROL);
+        require_key('F', MASK_CONTROL);
         v.findBar()->setQuery("one");
-        UNSCOPED_INFO("two");
         CHECK(v.findBar()->countSaid() == std::string("2"));
         v.setCaret(ALTextPos(0, 11));
         v.insertText(" one");
@@ -1606,13 +1585,13 @@ namespace
             CHECK(v.canPerform(ALEditorCommand::PreviousMisspelling));
         }
         v.setCaret(ALTextPos(0, 2));
-        key(KEY_F7);
+        require_key(KEY_F7);
         UNSCOPED_INFO("the next, selected");
         CHECK(v.selection() == ALTextRange(ALTextPos(2, 4), ALTextPos(2, 7)));
-        key(KEY_F7);
+        require_key(KEY_F7);
         UNSCOPED_INFO("round past the end");
         CHECK(v.selection() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
-        key(KEY_F7, MASK_SHIFT);
+        require_key(KEY_F7, MASK_SHIFT);
         UNSCOPED_INFO("back round past the start");
         CHECK(v.selection() == ALTextRange(ALTextPos(2, 4), ALTextPos(2, 7)));
         v.setText("all fine");
@@ -1624,11 +1603,11 @@ namespace
     {
         ALTextView& v = make("one\n  two\n  three\nfour");
         v.setCaret(ALTextPos(0, 1));
-        key('J', MASK_CONTROL);
+        require_key('J', MASK_CONTROL);
         UNSCOPED_INFO("the next joined on");
         CHECK(v.text() == std::string("one two\n  three\nfour"));
         v.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 2)));
-        key('J', MASK_CONTROL);
+        require_key('J', MASK_CONTROL);
         UNSCOPED_INFO("the lines selected");
         CHECK(v.text() == std::string("one two three four"));
         v.undo();
@@ -1675,10 +1654,10 @@ namespace
             CHECK(v.changes()[1] == ALTextPos(4, 0));
         }
         v.setCaret(ALTextPos(4, 3));
-        key(KEY_BACKSPACE, MASK_CONTROL | MASK_SHIFT);
+        require_key(KEY_BACKSPACE, MASK_CONTROL | MASK_SHIFT);
         UNSCOPED_INFO("back to the newest");
         CHECK(v.caret() == ALTextPos(0, 0));
-        key(KEY_BACKSPACE, MASK_CONTROL | MASK_SHIFT);
+        require_key(KEY_BACKSPACE, MASK_CONTROL | MASK_SHIFT);
         UNSCOPED_INFO("and the one before");
         CHECK(v.caret() == ALTextPos(4, 0));
         {
@@ -1711,7 +1690,6 @@ namespace
         UNSCOPED_INFO("the whole row for an empty one");
         CHECK(v.anchorOf(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 2))) == LLRect(text.mLeft, second, text.mRight, second - row_h));
         v.setScrollX(30.f);
-        UNSCOPED_INFO("scrolled");
         CHECK(v.scrollX() == 30.f);
         UNSCOPED_INFO("the place, as scrolled");
         CHECK(v.anchorOf(ALTextPos(1, 5)).mLeft == at(1, 5, 30.f));
@@ -1757,9 +1735,7 @@ namespace
         UNSCOPED_INFO("and the current one");
         CHECK(v.findCurrent() == 0);
         v.findBar()->setReplacement("on");
-        UNSCOPED_INFO("all three");
         CHECK(v.replaceAllMatches() == 3);
-        UNSCOPED_INFO("replaced");
         CHECK(v.text() == std::string("on two on\ntwo on\n"));
         UNSCOPED_INFO("the query no longer stands anywhere");
         REQUIRE(v.findMatches().size() == size_t(0));
@@ -1772,7 +1748,6 @@ namespace
     {
         ALTextView& v = make("one\ntwo");
         const std::string& whole = v.wholeText();
-        UNSCOPED_INFO("the text");
         CHECK(whole == v.text());
         {
             INFO("the same kept text read again");
@@ -1780,7 +1755,7 @@ namespace
             CHECK(v.wholeText() == "one\ntwo");
         }
         v.setCaret(ALTextPos(1, 3));
-        type("!");
+        require_typed("!");
         UNSCOPED_INFO("after an edit, the text as it is");
         CHECK(v.wholeText() == std::string("one\ntwo!"));
     }
@@ -1795,7 +1770,6 @@ namespace
         around->addChild(&v);
         v.setFocus(true);
         v.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
-        UNSCOPED_INFO("taken");
         CHECK(v.handleKey(KEY_ESCAPE, MASK_NONE, false));
         UNSCOPED_INFO("the selection let go of");
         CHECK_FALSE(v.hasSelection());
@@ -1820,8 +1794,8 @@ namespace
         passing->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 5)));
         {
             INFO("a selection let go of first");
-            REQUIRE(passing->handleKey(KEY_ESCAPE, MASK_NONE, false));
-            REQUIRE_FALSE(passing->hasSelection());
+            CHECK(passing->handleKey(KEY_ESCAPE, MASK_NONE, false));
+            CHECK_FALSE(passing->hasSelection());
             CHECK(passing->hasFocus());
         }
         passing->handleKey(KEY_ESCAPE, MASK_NONE, false);
@@ -1832,14 +1806,15 @@ namespace
         around->die();
     }
 
+    // Held with Shift, as they are half the time in code.
     TEST_CASE_METHOD(altextview_data, "altextview: Shift-Backspace and Shift-Return still delete and break the line", "[altextview]")
     {
         ALTextView& v = make("CONST");
         v.setCaret(ALTextPos(0, 5));
-        key(KEY_BACKSPACE, MASK_SHIFT);
+        require_key(KEY_BACKSPACE, MASK_SHIFT);
         UNSCOPED_INFO("deleted");
         CHECK(v.text() == std::string("CONS"));
-        key(KEY_RETURN, MASK_SHIFT);
+        require_key(KEY_RETURN, MASK_SHIFT);
         UNSCOPED_INFO("a new line");
         CHECK(v.text() == std::string("CONS\n"));
         UNSCOPED_INFO("the caret on it");
@@ -1975,15 +1950,15 @@ namespace
     {
         ALTextView& v = make("        x = 1;");
         v.setCaret(ALTextPos(0, 8));
-        key(KEY_BACKSPACE);
+        require_key(KEY_BACKSPACE);
         UNSCOPED_INFO("a level");
         CHECK(v.text() == std::string("    x = 1;"));
-        key(KEY_BACKSPACE);
+        require_key(KEY_BACKSPACE);
         UNSCOPED_INFO("another");
         CHECK(v.text() == std::string("x = 1;"));
         v.setText("a  b");
         v.setCaret(ALTextPos(0, 3));
-        key(KEY_BACKSPACE);
+        require_key(KEY_BACKSPACE);
         UNSCOPED_INFO("within the text, one");
         CHECK(v.text() == std::string("a b"));
     }
@@ -2012,7 +1987,7 @@ namespace
         UNSCOPED_INFO("Replace All: every one, not only those listed");
         CHECK(v.replaceAllMatches() == static_cast<S32>(ALTextFind::LIMIT + 5));
         UNSCOPED_INFO("none left");
-        REQUIRE(v.text().find('a') == std::string::npos);
+        CHECK(v.text().find('a') == std::string::npos);
 
         // Past a script's size: the count waits for the query to settle.
         std::string big;
@@ -2145,7 +2120,7 @@ namespace
         bool cut = false;
         {
             INFO("cut short");
-            REQUIRE_FALSE(v.misspellingFrom(ALTextPos(0, 0), true, &cut));
+            CHECK_FALSE(v.misspellingFrom(ALTextPos(0, 0), true, &cut));
             CHECK(cut);
         }
         std::optional<ALTextRange> found;
@@ -2165,11 +2140,11 @@ namespace
 
         v.recheckSpelling();
         v.setCaret(ALTextPos(0, 0));
-        key(KEY_F7);
+        require_key(KEY_F7);
         {
             INFO("still looking");
             CHECK(ll_test::TextViewProbe::seeking(v));
-            REQUIRE(v.selection().empty());
+            CHECK(v.selection().empty());
         }
         S32 frames = 0;
         for (; ll_test::TextViewProbe::seeking(v) && frames < 20; ++frames)
@@ -2183,31 +2158,31 @@ namespace
 
         v.recheckSpelling();
         v.setCaret(ALTextPos(0, 0));
-        key(KEY_F7);
+        require_key(KEY_F7);
         v.setCaret(ALTextPos(1, 2));
         ll_test::TextViewProbe::nextFrame(v);
         {
             INFO("the caret moved: dropped");
             CHECK_FALSE(ll_test::TextViewProbe::seeking(v));
-            REQUIRE(v.selection().empty());
+            CHECK(v.selection().empty());
             CHECK(v.caret() == ALTextPos(1, 2));
         }
 
         v.recheckSpelling();
         v.setCaret(ALTextPos(0, 0));
-        key(KEY_F7);
+        require_key(KEY_F7);
         v.document().insert(ALTextPos(3, 0), "x");
         ll_test::TextViewProbe::nextFrame(v);
         {
             INFO("the text changed: dropped");
             CHECK_FALSE(ll_test::TextViewProbe::seeking(v));
-            REQUIRE(v.selection().empty());
+            CHECK(v.selection().empty());
         }
 
         // None at all: it looks through every line, then stops.
         v.setText("all fine\nall fine\nall fine");
         v.setCaret(ALTextPos(0, 0));
-        key(KEY_F7);
+        require_key(KEY_F7);
         for (frames = 0; ll_test::TextViewProbe::seeking(v) && frames < 20; ++frames)
         {
             ll_test::TextViewProbe::nextFrame(v);
@@ -2216,14 +2191,14 @@ namespace
             INFO("none: it stopped, and nothing selected");
             CHECK_FALSE(ll_test::TextViewProbe::seeking(v));
             CHECK(frames < 20);
-            REQUIRE(v.selection().empty());
+            CHECK(v.selection().empty());
         }
 
         // With the time it has, all at once as before.
         ll_test::TextViewProbe::misspellingBudget(v, ALTextView::MISSPELLING_BUDGET);
         v.setText("all fine\nteh");
         v.setCaret(ALTextPos(0, 0));
-        key(KEY_F7);
+        require_key(KEY_F7);
         {
             INFO("at once");
             CHECK_FALSE(ll_test::TextViewProbe::seeking(v));
@@ -2282,7 +2257,7 @@ namespace
         boost::signals2::scoped_connection heard = v.onFull([&fulls]() { ++fulls; });
         v.setMaxBytes(10);
         v.setCaret(ALTextPos(0, 5));
-        type("abcdefgh");
+        require_typed("abcdefgh");
         UNSCOPED_INFO("typed as far as it fits");
         CHECK(v.text() == std::string("helloabcde"));
         UNSCOPED_INFO("and said");
@@ -2326,7 +2301,7 @@ namespace
         CHECK(v.text() == std::string("far more than eight bytes"));
         v.setMaxBytes(0);
         v.setCaret(ALTextPos(0, 0));
-        type("no cap ");
+        require_typed("no cap ");
         UNSCOPED_INFO("and with no cap, nothing held");
         CHECK(v.text() == std::string("no cap far more than eight bytes"));
     }
@@ -2335,7 +2310,7 @@ namespace
     {
         ALTextView& v = make("one\ntwo\n");
         v.setCaret(ALTextPos(0, 3));
-        type("!");
+        require_typed("!");
         UNSCOPED_INFO("typed");
         CHECK(v.document().line(0) == std::string("one!"));
         v.showFind(false);
@@ -2372,7 +2347,7 @@ namespace
         const S32 after = 3 + static_cast<S32>(ALTextView::atomPlaceholder().size());
 
         v.setSelection(ALTextRange(ALTextPos(0, after + 5), ALTextPos(0, after + 9)));
-        key('F', MASK_CONTROL);
+        require_key('F', MASK_CONTROL);
         UNSCOPED_INFO("a selection of text seeds it");
         CHECK(v.findBar()->query() == std::string("word"));
         v.setSelection(ALTextRange(ALTextPos(0, 3), ALTextPos(0, after)));
@@ -2403,6 +2378,7 @@ namespace
                                                ALEditorCommand::GoToMatchingBracket, ALEditorCommand::QuickFix, ALEditorCommand::GoToDefinition,
                                                ALEditorCommand::Rename })
         {
+            CAPTURE(command);
             UNSCOPED_INFO("none could be done");
             REQUIRE_FALSE(v.canPerform(command));
             UNSCOPED_INFO("nor is done");
@@ -2443,14 +2419,14 @@ namespace
         CHECK(ruler->getVisible());
         {
             INFO("down the right edge, the text short of it");
-            REQUIRE(ruler->getRect() == LLRect(400 - ALTextRuler::WIDTH, 200, 400, 0));
+            CHECK(ruler->getRect() == LLRect(400 - ALTextRuler::WIDTH, 200, 400, 0));
             CHECK(v.textRect().mRight <= ruler->getRect().mLeft);
         }
         v.setScrollMap(true);
         v.setScrollMapWidth(80);
         {
             INFO("the map on the right");
-            REQUIRE(ruler->getVisible());
+            CHECK(ruler->getVisible());
             CHECK(ruler->getRect() == LLRect(320, 200, 400, 0));
         }
         v.setScrollMapOnLeft(true);
@@ -2495,7 +2471,7 @@ namespace
         ruler->handleMouseUp(40, 20, MASK_NONE);
         {
             INFO("let go");
-            REQUIRE(gFocusMgr.getMouseCapture() == nullptr);
+            CHECK(gFocusMgr.getMouseCapture() == nullptr);
             CHECK_FALSE(ruler->dragging());
         }
         UNSCOPED_INFO("no tip on the map");
@@ -2604,7 +2580,7 @@ namespace
         ALTextView& v = make("one\ntwo\nthree\n");
         const std::vector<ALTextRange> before = { caretRange(1, 3), ALTextRange(ALTextPos(2, 0), ALTextPos(2, 5)) };
         v.setSelections(caretRange(0, 3), before);
-        type("ab");
+        require_typed("ab");
         UNSCOPED_INFO("at each");
         CHECK(v.text() == std::string("oneab\ntwoab\nab\n"));
         UNSCOPED_INFO("the main caret after it");
@@ -2630,9 +2606,9 @@ namespace
     {
         ALTextView& v = make("abc\nabc\nabc");
         v.setSelections(caretRange(0, 3), { caretRange(1, 3), caretRange(2, 3) });
-        type("x");
-        key(KEY_BACKSPACE);
-        key(KEY_BACKSPACE);
+        require_typed("x");
+        require_key(KEY_BACKSPACE);
+        require_key(KEY_BACKSPACE);
         UNSCOPED_INFO("two taken at each");
         CHECK(v.text() == std::string("ab\nab\nab"));
         v.undo();
@@ -2643,7 +2619,7 @@ namespace
         CHECK(v.text() == std::string("abc\nabc\nabc"));
 
         v.setSelections(caretRange(0, 0), { caretRange(1, 1), ALTextRange(ALTextPos(2, 3), ALTextPos(2, 1)) });
-        key(KEY_DELETE);
+        require_key(KEY_DELETE);
         UNSCOPED_INFO("one forward at each caret, the selection whole");
         CHECK(v.text() == std::string("bc\nac\na"));
         UNSCOPED_INFO("each where it erased");
@@ -2654,7 +2630,7 @@ namespace
     {
         ALTextView& v = make("  one\n  two");
         v.setSelections(caretRange(0, 5), { caretRange(1, 5) });
-        key(KEY_RETURN);
+        require_key(KEY_RETURN);
         UNSCOPED_INFO("each line broken, the new one as far in");
         CHECK(v.text() == std::string("  one\n  \n  two\n  "));
         UNSCOPED_INFO("the main caret on its new line");
@@ -2664,17 +2640,17 @@ namespace
 
         v.setText("a\nb\nc");
         v.setSelections(caretRange(0, 1), { caretRange(2, 0) });
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         UNSCOPED_INFO("a tab to the next stop at each caret");
         CHECK(v.text() == std::string("a   \nb\n    c"));
         v.setText("a\nb\nc");
         v.setSelections(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 1)), { caretRange(2, 1) });
-        key(KEY_TAB);
+        require_key(KEY_TAB);
         UNSCOPED_INFO("the selection's lines in, a tab at the caret");
         CHECK(v.text() == std::string("    a\n    b\nc   "));
         UNSCOPED_INFO("the selection with its lines");
         CHECK(v.selection() == ALTextRange(ALTextPos(0, 4), ALTextPos(1, 5)));
-        key(KEY_TAB, MASK_SHIFT);
+        require_key(KEY_TAB, MASK_SHIFT);
         UNSCOPED_INFO("out again, every selection's lines");
         CHECK(v.text() == std::string("a\nb\nc   "));
         v.undo();
@@ -2687,29 +2663,29 @@ namespace
     {
         ALTextView& v = make("hello world\nhi\nhello world\nx\nhello world");
         v.setSelections(caretRange(0, 8), { caretRange(2, 8) });
-        key(KEY_DOWN);
+        require_key(KEY_DOWN);
         UNSCOPED_INFO("the main caret down to the short line's end");
         CHECK(v.selection() == caretRange(1, 2));
         UNSCOPED_INFO("the other to its");
         CHECK(rangesSaid(v.otherSelections()) == rangesSaid({ caretRange(3, 1) }));
-        key(KEY_DOWN);
+        require_key(KEY_DOWN);
         UNSCOPED_INFO("each back in its own column");
         CHECK(v.selection() == caretRange(2, 8));
         UNSCOPED_INFO("the other too");
         CHECK(rangesSaid(v.otherSelections()) == rangesSaid({ caretRange(4, 8) }));
-        key(KEY_HOME);
-        key(KEY_RIGHT, MASK_SHIFT);
-        key(KEY_RIGHT, MASK_SHIFT);
+        require_key(KEY_HOME);
+        require_key(KEY_RIGHT, MASK_SHIFT);
+        require_key(KEY_RIGHT, MASK_SHIFT);
         UNSCOPED_INFO("extended at the main");
         CHECK(v.selection() == ALTextRange(ALTextPos(2, 0), ALTextPos(2, 2)));
         UNSCOPED_INFO("and at the other");
         CHECK(rangesSaid(v.otherSelections()) == rangesSaid({ ALTextRange(ALTextPos(4, 0), ALTextPos(4, 2)) }));
-        key(KEY_LEFT);
+        require_key(KEY_LEFT);
         UNSCOPED_INFO("collapsed to its start");
         CHECK(v.selection() == caretRange(2, 0));
         UNSCOPED_INFO("both");
         CHECK(rangesSaid(v.otherSelections()) == rangesSaid({ caretRange(4, 0) }));
-        key(KEY_END);
+        require_key(KEY_END);
         UNSCOPED_INFO("to each line's end");
         CHECK(rangesSaid(v.otherSelections()) == rangesSaid({ caretRange(4, 11) }));
         v.perform(ALEditorCommand::MoveWordLeft);
@@ -2855,33 +2831,33 @@ namespace
         }
 
         v.setSelections(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 5)), { caretRange(2, 0) });
-        key(KEY_ESCAPE);
+        require_key(KEY_ESCAPE);
         {
             INFO("Escape: one caret, its selection kept");
             CHECK_FALSE(v.hasOtherSelections());
             CHECK(v.hasSelection());
         }
-        key(KEY_ESCAPE);
+        require_key(KEY_ESCAPE);
         UNSCOPED_INFO("and then the selection let go");
         CHECK_FALSE(v.hasSelection());
 
         v.setCaret(ALTextPos(0, 8));
-        key(KEY_DOWN, MASK_CONTROL | MASK_ALT);
+        require_key(KEY_DOWN, MASK_CONTROL | MASK_ALT);
         UNSCOPED_INFO("a caret below, at the short line's end, the main one");
         CHECK(v.selection() == caretRange(1, 2));
-        key(KEY_DOWN, MASK_CONTROL | MASK_ALT);
+        require_key(KEY_DOWN, MASK_CONTROL | MASK_ALT);
         UNSCOPED_INFO("and below that, back in its column");
         CHECK(v.selection() == caretRange(2, 8));
         UNSCOPED_INFO("each kept");
         CHECK(rangesSaid(v.otherSelections()) == rangesSaid({ caretRange(0, 8), caretRange(1, 2) }));
-        type("!");
+        require_typed("!");
         UNSCOPED_INFO("typed at each");
         CHECK(v.text() == std::string("hello wo!rld\nhi!\nhello wo!rld\nx\nhello world"));
         v.setCaret(ALTextPos(4, 2));
         v.singleSelection();
         UNSCOPED_INFO("nothing below the last line");
         CHECK_FALSE(v.perform(ALEditorCommand::AddCaretBelow));
-        key(KEY_UP, MASK_CONTROL | MASK_ALT);
+        require_key(KEY_UP, MASK_CONTROL | MASK_ALT);
         {
             INFO("one above it");
             CHECK(v.selection() == caretRange(3, 1));
@@ -2902,13 +2878,12 @@ namespace
         v.findBar()->setQuery("cat");
         UNSCOPED_INFO("three found");
         REQUIRE(v.findMatches().size() == 3);
-        UNSCOPED_INFO("taken");
         CHECK(v.findBar()->handleKeyHere(KEY_RETURN, MASK_ALT));
         UNSCOPED_INFO("each a selection");
         REQUIRE(ll_test::TextViewProbe::selections(v).size() == static_cast<size_t>(3));
         UNSCOPED_INFO("the keyboard on the text");
         CHECK(v.keyboardOnText());
-        type("cow");
+        require_typed("cow");
         UNSCOPED_INFO("typed over each");
         CHECK(v.text() == std::string("cow dog cow bird cow"));
     }
@@ -2929,7 +2904,6 @@ namespace
         S32 x6, y6, x_line2, y_line2;
         pointOf(0, 6, x6, y6);
         pointOf(2, 0, x_line2, y_line2);
-        UNSCOPED_INFO("pressed");
         CHECK(v.handleMouseDown(x6, y_line2, MASK_SHIFT | MASK_ALT));
         UNSCOPED_INFO("from column three to six on each row");
         CHECK(rangesSaid(ll_test::TextViewProbe::selections(v)) ==
@@ -2940,7 +2914,6 @@ namespace
         S32 x1, y1, x_line1, y_line1;
         pointOf(0, 1, x1, y1);
         pointOf(1, 0, x_line1, y_line1);
-        UNSCOPED_INFO("dragged");
         CHECK(v.handleHover(x1, y_line1, MASK_SHIFT | MASK_ALT));
         UNSCOPED_INFO("each from three back to one");
         CHECK(rangesSaid(ll_test::TextViewProbe::selections(v)) ==
@@ -2948,7 +2921,7 @@ namespace
         v.handleMouseUp(x1, y_line1, MASK_SHIFT | MASK_ALT);
         UNSCOPED_INFO("capture released");
         CHECK_FALSE(v.hasMouseCapture());
-        type("X");
+        require_typed("X");
         UNSCOPED_INFO("typed at each");
         CHECK(v.text() == std::string("aXdefgh\naX\n\tcdefgh\nabcdefgh"));
         v.undo();
@@ -2972,20 +2945,20 @@ namespace
         ALTextView& v = make("abcdefgh\nab\n\tcdefgh\nabcdefgh");
         const MASK column = MASK_CONTROL | MASK_SHIFT | MASK_ALT;
         v.setCaret(ALTextPos(0, 3));
-        key(KEY_RIGHT, column);
-        key(KEY_RIGHT, column);
-        key(KEY_RIGHT, column);
+        require_key(KEY_RIGHT, column);
+        require_key(KEY_RIGHT, column);
+        require_key(KEY_RIGHT, column);
         {
             INFO("three columns on its row");
             CHECK(v.selection() == spanRange(0, 3, 6));
             CHECK_FALSE(v.hasOtherSelections());
         }
-        key(KEY_DOWN, column);
-        key(KEY_DOWN, column);
+        require_key(KEY_DOWN, column);
+        require_key(KEY_DOWN, column);
         UNSCOPED_INFO("and two rows down");
         CHECK(rangesSaid(ll_test::TextViewProbe::selections(v)) ==
                       rangesSaid({ spanRange(0, 3, 6), caretRange(1, 2), spanRange(2, 1, 3) }));
-        type("X");
+        require_typed("X");
         UNSCOPED_INFO("typed at each");
         CHECK(v.text() == std::string("abcXgh\nabX\n\tXefgh\nabcdefgh"));
         v.undo();
@@ -2996,18 +2969,18 @@ namespace
         // caret put among them would be taken into the one it touches.
         v.singleSelection();
         v.setCaret(ALTextPos(0, 3));
-        key(KEY_DOWN, column);
-        key(KEY_RIGHT, column);
-        key(KEY_RIGHT, column);
-        key(KEY_RIGHT, column);
-        key(KEY_LEFT, column);
+        require_key(KEY_DOWN, column);
+        require_key(KEY_RIGHT, column);
+        require_key(KEY_RIGHT, column);
+        require_key(KEY_RIGHT, column);
+        require_key(KEY_LEFT, column);
         UNSCOPED_INFO("a row, then two columns");
         CHECK(rangesSaid(ll_test::TextViewProbe::selections(v)) ==
                       rangesSaid({ spanRange(0, 3, 5), caretRange(1, 2) }));
-        key(KEY_UP, column);
-        key(KEY_LEFT, column);
-        key(KEY_LEFT, column);
-        key(KEY_LEFT, column);
+        require_key(KEY_UP, column);
+        require_key(KEY_LEFT, column);
+        require_key(KEY_LEFT, column);
+        require_key(KEY_LEFT, column);
         {
             INFO("back to its row and past where it began");
             CHECK(v.selection() == spanRange(0, 3, 2));
@@ -3019,7 +2992,7 @@ namespace
         // From a selection that is not a column: its anchor and caret the
         // corners. Column one is nearer the tab's start than its end.
         v.setSelection(spanRange(3, 1, 4));
-        key(KEY_UP, column);
+        require_key(KEY_UP, column);
         UNSCOPED_INFO("the tab, as drawn, above three columns");
         CHECK(rangesSaid(ll_test::TextViewProbe::selections(v)) ==
                       rangesSaid({ spanRange(2, 0, 1), spanRange(3, 1, 4) }));
@@ -3036,7 +3009,7 @@ namespace
         {
             v.singleSelection();
             v.setSelection(spanRange(0, 0, 6));
-            key(KEY_DOWN, column);
+            require_key(KEY_DOWN, column);
             UNSCOPED_INFO("as many columns as they are drawn across");
             CHECK(rangesSaid({ v.selection() }) ==
                           rangesSaid({ spanRange(1, 0, ll_round(columns)) }));
@@ -3070,7 +3043,7 @@ namespace
         UNSCOPED_INFO("none of it an edit");
         CHECK_FALSE(v.isDirty());
         // What the input method commits comes as typed characters.
-        type("Z");
+        require_typed("Z");
         UNSCOPED_INFO("committed: typed at each");
         CHECK(v.text() == std::string("aZbcZd\naZbcd"));
     }
@@ -3120,10 +3093,10 @@ namespace
         CHECK(v.selectedText() == std::string("def"));
         const std::vector<ALTextRange>& others = v.otherSelections();
         UNSCOPED_INFO("the caret on its line moved with it");
-        REQUIRE(std::ranges::find(others, caretRange(0, 5)) != others.end());
+        CHECK(std::ranges::find(others, caretRange(0, 5)) != others.end());
         const std::string& second = v.document().line(1);
         {
-            INFO("a tab put in at the caret elsewhere: " + second);
+            INFO("a tab put in at the caret elsewhere: " << second);
             REQUIRE(second.size() > 2);
             CHECK(second.front() == 'x');
             CHECK(second.back() == 'y');
@@ -3419,7 +3392,7 @@ namespace
             INFO("below the text, a stop");
             CHECK(v.perform(ALEditorCommand::MoveDown));
             CHECK(v.caretGap() == 5);
-            REQUIRE(v.caret() == v.document().end());
+            CHECK(v.caret() == v.document().end());
         }
         {
             INFO("nowhere further down");
@@ -3503,7 +3476,7 @@ namespace
         lines[1].number = 0;
         lines[3].sign   = '+';
         lines[4].number = 7;
-        type("x");
+        require_typed("x");
         {
             INFO("typed: to take back, and changed");
             CHECK(v.canPerform(ALEditorCommand::Undo));
@@ -3515,7 +3488,6 @@ namespace
         v.onTextChanged([&told]() { ++told; });
         // Lines one and two, one line now.
         v.replaceText(ALTextRange(ALTextPos(1, 0), ALTextPos(2, 3)), "ONE");
-        UNSCOPED_INFO("the text");
         CHECK(v.text() == std::string("xzero\nONE\nthree\nfour"));
         {
             INFO("nothing to take back, nothing changed, and told");
@@ -3536,7 +3508,7 @@ namespace
         // The caret past what is left: at the end of it.
         v.replaceText(ALTextRange(ALTextPos(2, 0), v.document().end()), "");
         UNSCOPED_INFO("the caret where the text now ends");
-        REQUIRE(v.caret() == v.document().end());
+        CHECK(v.caret() == v.document().end());
 
         v.setLineAnnotations(lines);
         v.renumberLines(1, 3);
@@ -3779,7 +3751,6 @@ namespace
         pointOf(0, 8, x, y);
         v.handleMouseDown(x, y, MASK_NONE);
         v.handleMouseUp(x, y, MASK_NONE);
-        UNSCOPED_INFO("double");
         CHECK(v.handleDoubleClick(x, y, MASK_NONE));
         UNSCOPED_INFO("the word");
         CHECK(v.selectedText() == std::string("world"));
@@ -3813,22 +3784,18 @@ namespace
         }
         const ALTextPos end(0, 2 * fits + 2);
         v.setCaret(end);
-        UNSCOPED_INFO("up");
         CHECK(v.perform(ALEditorCommand::MoveUp));
         {
             INFO("onto the short row, before the space it hangs");
             CHECK(v.caret() == ALTextPos(0, fits + 2));
             CHECK(v.layout().rowOf(0, fits + 2) == 1);
         }
-        UNSCOPED_INFO("up again");
         CHECK(v.perform(ALEditorCommand::MoveUp));
         UNSCOPED_INFO("onto the first row, not stuck");
         CHECK(v.layout().rowOf(0, v.caret().column) == 0);
-        UNSCOPED_INFO("down");
         CHECK(v.perform(ALEditorCommand::MoveDown));
         UNSCOPED_INFO("onto the short row, not past it");
         CHECK(v.caret() == ALTextPos(0, fits + 2));
-        UNSCOPED_INFO("down again");
         CHECK(v.perform(ALEditorCommand::MoveDown));
         UNSCOPED_INFO("to where it began");
         CHECK(v.caret() == end);
@@ -3871,7 +3838,7 @@ namespace
         UNSCOPED_INFO("from the third, where it ends");
         CHECK(click(2 * fits + 1) == std::string("followed"));
         UNSCOPED_INFO("not from the word after it");
-        REQUIRE(click(length + 2).empty());
+        CHECK(click(length + 2).empty());
     }
 
     TEST_CASE_METHOD(altextview_data, "altextview: an atom ending a row takes clicks and places its view on that row", "[altextview]")
@@ -3890,7 +3857,7 @@ namespace
         v.addAtom(picture);
         {
             INFO("the atom ends the first row");
-            CHECK(v.layout().rowCount(0) == 2);
+            REQUIRE(v.layout().rowCount(0) == 2);
             CHECK(v.layout().line(0).rows[0].end == 5);
         }
         S32 clicked = 0;
@@ -3911,7 +3878,6 @@ namespace
         widget.view             = button;
         v.setAtoms({ widget });
         v.placeAtomViews();
-        UNSCOPED_INFO("shown");
         CHECK(button->getVisible());
         UNSCOPED_INFO("from where the layout put its box");
         CHECK(button->getRect().mLeft == before);
@@ -3926,7 +3892,6 @@ namespace
         v.setCaret(ALTextPos(0, 14));
         UNSCOPED_INFO("renamed");
         CHECK(v.replaceAll({ { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 10)), "total" }, { ALTextRange(ALTextPos(0, 13), ALTextPos(0, 15)), "total" } }));
-        UNSCOPED_INFO("the text");
         CHECK(v.text() == std::string("integer total = total;"));
         UNSCOPED_INFO("the caret where it was in the name, past the first grown");
         CHECK(v.caret() == ALTextPos(0, 17));
@@ -3940,9 +3905,7 @@ namespace
         // A stretch before it grown, and then its line broken before it.
         v.setText("ab cd ef");
         v.setCaret(ALTextPos(0, 6));
-        UNSCOPED_INFO("replaced");
         CHECK(v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)), "XXX" }, { ALTextRange(ALTextPos(0, 3), ALTextPos(0, 4)), "\n" } }));
-        UNSCOPED_INFO("the text");
         CHECK(v.text() == std::string("XXXb \nd ef"));
         UNSCOPED_INFO("the caret still before ef, on the line made");
         CHECK(v.caret() == ALTextPos(1, 2));
@@ -3951,7 +3914,6 @@ namespace
         // across lines: past what replaced it, on the line it moved to.
         v.setText("l0\nl1\nl2\nl3\nl4\nabcdef\nxyz");
         v.setCaret(ALTextPos(5, 4));
-        UNSCOPED_INFO("replaced");
         CHECK(v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "\n\n" }, { ALTextRange(ALTextPos(5, 2), ALTextPos(6, 1)), "q" } }));
         UNSCOPED_INFO("the line it was on");
         CHECK(v.document().line(7) == std::string("abqyz"));
@@ -3984,7 +3946,7 @@ namespace
         v.setSelections(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 3)), {});
         S32 moved = 0;
         boost::signals2::scoped_connection heard = v.onCaretMoved([&moved]() { ++moved; });
-        type("x");
+        require_typed("x");
         UNSCOPED_INFO("typed");
         CHECK(v.document().line(0) == std::string("onex"));
         {
@@ -4001,12 +3963,12 @@ namespace
         ALTextView& v = make("default\n{\n    x;\n    ");
         v.setSyntax("lsl");
         v.setCaret(v.document().end());
-        type("}");
+        require_typed("}");
         UNSCOPED_INFO("brought out as it was typed");
         CHECK(v.document().line(3) == std::string("}"));
         UNSCOPED_INFO("the caret after it");
         CHECK(v.caret() == ALTextPos(3, 1));
-        type(";");
+        require_typed(";");
         UNSCOPED_INFO("typed on after it");
         CHECK(v.document().line(3) == std::string("};"));
         v.undo();
@@ -4022,12 +3984,12 @@ namespace
         v.setText("default\n{\n    x;\n    \n}\nstate s\n{\n    y;\n    ");
         v.setSyntax("lsl");
         v.setSelections(ALTextRange(ALTextPos(8, 4), ALTextPos(8, 4)), { ALTextRange(ALTextPos(3, 4), ALTextPos(3, 4)) });
-        type("}");
+        require_typed("}");
         UNSCOPED_INFO("the first brought out");
         CHECK(v.document().line(3) == std::string("}"));
         UNSCOPED_INFO("the second brought out");
         CHECK(v.document().line(8) == std::string("}"));
-        type(";");
+        require_typed(";");
         UNSCOPED_INFO("typed on after each");
         CHECK(v.document().line(3) + v.document().line(8) == std::string("};};"));
         v.undo();
@@ -4040,7 +4002,7 @@ namespace
         v.setText("if x then\n    y()\n    end");
         v.setSyntax("slua");
         v.setCaret(v.document().end());
-        key(KEY_RETURN);
+        require_key(KEY_RETURN);
         UNSCOPED_INFO("brought out, then the line broken");
         CHECK(v.text() == std::string("if x then\n    y()\nend\n"));
         v.undo();
@@ -4058,7 +4020,6 @@ namespace
         ALTextView& v = make("one two one\n");
         v.showFind(false);
         v.findBar()->setQuery("one");
-        UNSCOPED_INFO("two");
         REQUIRE(v.findMatches().size() == size_t(2));
         v.setText("one one one\none\n");
         UNSCOPED_INFO("put in whole: every one of the new text");
@@ -4080,6 +4041,7 @@ namespace
         LLPreeditor& ime = v.preeditor();
         for (const char* composing : { "ab\rcd", "ab\r\ncd", "ab\ncd" })
         {
+            CAPTURE(composing);
             ime.updatePreedit(composing, { 5 }, { false }, 5);
             UNSCOPED_INFO("on its line, the break a space");
             REQUIRE(v.text() == std::string("xab cdy"));
@@ -4110,7 +4072,7 @@ namespace
         v.showFind(false);
         {
             INFO("patterns on");
-            REQUIRE(v.findBar()->handleKeyHere('R', toggle));
+            CHECK(v.findBar()->handleKeyHere('R', toggle));
             CHECK(v.findBar()->options().regex);
         }
         v.findBar()->setQuery("^");
@@ -4118,42 +4080,37 @@ namespace
         REQUIRE(v.findMatches().size() == size_t(3));
         UNSCOPED_INFO("the one at the caret current");
         CHECK(v.findCurrent() == 0);
-        UNSCOPED_INFO("found");
         CHECK(v.findNext(true));
         {
             INFO("on to the second line's");
             CHECK(v.caret() == ALTextPos(1, 0));
             CHECK_FALSE(v.hasSelection());
         }
-        UNSCOPED_INFO("found");
         CHECK(v.findNext(true));
         UNSCOPED_INFO("on to the third's");
         CHECK(v.caret() == ALTextPos(2, 0));
-        UNSCOPED_INFO("found");
         CHECK(v.findNext(true));
         {
             INFO("round to the first");
             CHECK(v.caret() == ALTextPos(0, 0));
             CHECK(v.findCurrent() == 0);
         }
-        UNSCOPED_INFO("found back");
         CHECK(v.findNext(false));
         UNSCOPED_INFO("back round to the last");
         CHECK(v.caret() == ALTextPos(2, 0));
         v.setCaret(ALTextPos(1, 0));
-        UNSCOPED_INFO("found");
         CHECK(v.findNext(true));
         {
             INFO("the one the caret was put on, first");
             CHECK(v.caret() == ALTextPos(1, 0));
             CHECK(v.findCurrent() == 1);
         }
-        UNSCOPED_INFO("found");
         CHECK(v.findNext(true));
         UNSCOPED_INFO("then on from it");
         CHECK(v.caret() == ALTextPos(2, 0));
     }
 
+    // A card over an editor, say.
     TEST_CASE_METHOD(altextview_data, "altextview: a view taking no focus selects a double-clicked word and leaves focus", "[altextview]")
     {
         ALTextView& editor = make("the editor");
@@ -4174,7 +4131,6 @@ namespace
             CHECK(editor.hasFocus());
             CHECK_FALSE(card->hasFocus());
         }
-        UNSCOPED_INFO("double");
         CHECK(card->handleDoubleClick(x, y, MASK_NONE));
         UNSCOPED_INFO("the word");
         CHECK(card->selectedText() == std::string("world"));
@@ -4220,7 +4176,6 @@ namespace
         v.goTo(ALTextPos(0, 1));
         UNSCOPED_INFO("one caret again");
         CHECK_FALSE(v.hasOtherSelections());
-        UNSCOPED_INFO("Duplicate Line");
         CHECK(v.perform(ALEditorCommand::DuplicateLine));
         UNSCOPED_INFO("the line again");
         CHECK(v.text() == std::string("abc\nabc\n\n\ndef"));
@@ -4329,7 +4284,7 @@ namespace
         S32 moved_top = 0;
         ll_test::TextViewProbe::mapWindow(*ruler, moved_top, bottom);
         // To a map row, which is two pixels.
-        UNSCOPED_INFO(llformat("the window under the mouse: %d for %d", top - moved_top, 30));
+        UNSCOPED_INFO("the window under the mouse: moved " << top - moved_top << " for 30");
         CHECK(std::abs(top - moved_top - 30) <= 2);
         // Resting there, frame after frame: where it is.
         const S32 there = v.scrollY();

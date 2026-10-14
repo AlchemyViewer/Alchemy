@@ -60,13 +60,9 @@ namespace
             CHECK(filter.getFirstRequiredGeneration() == first + 1);
             CHECK(filter.getFirstSuccessGeneration() == first + 1);
         }
-        UNSCOPED_INFO("modified");
         CHECK(filter.isModified());
-        {
-            INFO("active");
-            CHECK(filter.isActive());
-            CHECK(filter.isNotDefault());
-        }
+        CHECK(filter.isActive());
+        CHECK(filter.isNotDefault());
         filter.clearModified();
         filter.setWords("PANEL ärger");
         {
@@ -74,9 +70,7 @@ namespace
             CHECK(filter.getCurrentGeneration() == first + 1);
             CHECK_FALSE(filter.isModified());
         }
-        UNSCOPED_INFO("said as it is");
         CHECK(filter.getFilterText() == std::string("panel ärger"));
-        UNSCOPED_INFO("named");
         CHECK(filter.getName() == std::string("test"));
     }
 

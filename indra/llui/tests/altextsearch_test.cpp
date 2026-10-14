@@ -73,7 +73,7 @@ namespace
         UNSCOPED_INFO("within a stretch");
         CHECK(said(ALTextSearch::matches(doc, "hello", options, &stretch)) == std::string("0:6-11 0:12-17"));
         UNSCOPED_INFO("nothing for nothing");
-        REQUIRE(ALTextSearch::matches(doc, "", options).empty());
+        CHECK(ALTextSearch::matches(doc, "", options).empty());
     }
 
     TEST_CASE_METHOD(altextsearch_data, "altextsearch: a pattern finds and says when it is not one and replaces with groups", "[altextsearch]")
@@ -82,13 +82,12 @@ namespace
         doc.setText("a1 b22 c333\n");
         ALTextSearchOptions options;
         options.regex = true;
-        UNSCOPED_INFO("found");
         CHECK(said(ALTextSearch::matches(doc, "[a-z]\\d+", options)) == std::string("0:0-2 0:3-6 0:7-11"));
         std::string error;
         UNSCOPED_INFO("a broken pattern finds nothing");
-        REQUIRE(ALTextSearch::matches(doc, "[a-z", options, nullptr, &error).empty());
+        CHECK(ALTextSearch::matches(doc, "[a-z", options, nullptr, &error).empty());
         UNSCOPED_INFO("and says why");
-        REQUIRE_FALSE(error.empty());
+        CHECK_FALSE(error.empty());
         const std::vector<ALTextRange> found = ALTextSearch::matches(doc, "([a-z])(\\d+)", options);
         UNSCOPED_INFO("groups filled");
         CHECK(ALTextSearch::replacement(doc, found[1], "([a-z])(\\d+)", options, "$2$1") == std::string("22b"));
@@ -122,7 +121,6 @@ namespace
         ALTextSearchOptions options;
         options.preserveCase = true;
         const std::vector<ALTextRange> found = ALTextSearch::matches(doc, "hello", options);
-        UNSCOPED_INFO("four");
         REQUIRE(found.size() == size_t(4));
         UNSCOPED_INFO("lower");
         CHECK(ALTextSearch::replacement(doc, found[0], "hello", options, "wORld") == std::string("world"));
@@ -222,7 +220,7 @@ namespace
         CHECK(said(ALTextSearch::matches(doc, "foo", options)) == std::string("0:0-3 1:6-9 2:0-3"));
         options.wholeWord = false;
         UNSCOPED_INFO("no line break in a plain query crosses where lines are not");
-        REQUIRE(ALTextSearch::matches(doc, "bar\n", options).empty());
+        CHECK(ALTextSearch::matches(doc, "bar\n", options).empty());
     }
 
     TEST_CASE_METHOD(altextsearch_data, "altextsearch: a pattern that takes too long is said not thrown and replaces nothing", "[altextsearch]")
@@ -233,15 +231,14 @@ namespace
         options.regex = true;
         std::string error;
         const std::vector<ALTextRange> found = ALTextSearch::matches(doc, "(a*)*b", options, nullptr, &error);
-        UNSCOPED_INFO("nothing found");
-        REQUIRE(found.empty());
+        CHECK(found.empty());
         UNSCOPED_INFO("and why");
-        REQUIRE_FALSE(error.empty());
+        CHECK_FALSE(error.empty());
         // A search that goes through after one that did not.
         UNSCOPED_INFO("the next search is its own");
         CHECK(said(ALTextSearch::matches(doc, "abc", options, nullptr, &error)) == std::string("1:0-3"));
         UNSCOPED_INFO("with nothing to say");
-        REQUIRE(error.empty());
+        CHECK(error.empty());
         // A replacement over a match the engine gives up on again is the
         // words as written.
         const std::string with = ALTextSearch::replacement(doc, ALTextRange(ALTextPos(0, 0), ALTextPos(0, 4000)), "(a*)*b|a+", options, "x");
@@ -258,26 +255,26 @@ namespace
 
         std::vector<ALTextRange> found = ALTextSearch::matches(doc, "(foo)(?=bar)", options);
         UNSCOPED_INFO("the one before bar");
-        CHECK(said(found) == std::string("0:0-3"));
+        REQUIRE(said(found) == std::string("0:0-3"));
         UNSCOPED_INFO("its group, though what it looks at is not in it");
         CHECK(ALTextSearch::replacement(doc, found[0], "(foo)(?=bar)", options, "[$1]") ==
                       std::string("[foo]"));
 
         found = ALTextSearch::matches(doc, "(?<=x)(y)", options);
         UNSCOPED_INFO("the y after an x");
-        CHECK(said(found) == std::string("1:1-2"));
+        REQUIRE(said(found) == std::string("1:1-2"));
         UNSCOPED_INFO("looked back past its start");
         CHECK(ALTextSearch::replacement(doc, found[0], "(?<=x)(y)", options, "<$1>") == std::string("<y>"));
 
         found = ALTextSearch::matches(doc, "\\Bba", options);
         UNSCOPED_INFO("inside a word");
-        CHECK(said(found) == std::string("0:3-5 0:10-12"));
+        REQUIRE(said(found) == std::string("0:3-5 0:10-12"));
         UNSCOPED_INFO("still inside one");
         CHECK(ALTextSearch::replacement(doc, found[0], "\\Bba", options, "[$&]") == std::string("[ba]"));
 
         found = ALTextSearch::matches(doc, "^( +)(\\w)", options);
         UNSCOPED_INFO("at a line's start");
-        CHECK(said(found) == std::string("2:0-3"));
+        REQUIRE(said(found) == std::string("2:0-3"));
         UNSCOPED_INFO("in its place");
         CHECK(ALTextSearch::replacement(doc, found[0], "^( +)(\\w)", options, "$2") == std::string("i"));
 
@@ -298,7 +295,7 @@ namespace
         const std::vector<ALTextRange> empties = ALTextSearch::matches(doc, "x*", options);
         for (const ALTextRange& m : empties)
         {
-            UNSCOPED_INFO(("never inside a character: " + said({ m })));
+            INFO("never inside a character: " << said({ m }));
             REQUIRE(m.begin.column != 1);
         }
         UNSCOPED_INFO("at each character and the end");
@@ -307,12 +304,12 @@ namespace
         doc.setText("foo bar foo");
         const ALTextRange stretch(ALTextPos(0, 0), ALTextPos(0, 7));
         UNSCOPED_INFO("bar is not at the line's end");
-        REQUIRE(ALTextSearch::matches(doc, "bar$", options, &stretch).empty());
+        CHECK(ALTextSearch::matches(doc, "bar$", options, &stretch).empty());
         const ALTextRange first(ALTextPos(0, 0), ALTextPos(0, 3));
         UNSCOPED_INFO("a look past the stretch's end sees what is there");
         CHECK(said(ALTextSearch::matches(doc, "foo(?= bar)", options, &first)) == std::string("0:0-3"));
         UNSCOPED_INFO("and a match past it is not in it");
-        REQUIRE(ALTextSearch::matches(doc, "foo bar", options, &first).empty());
+        CHECK(ALTextSearch::matches(doc, "foo bar", options, &first).empty());
     }
 
     TEST_CASE_METHOD(altextsearch_data, "altextsearch: patterns cached a few at once answer as their own and on two threads", "[altextsearch]")
@@ -322,21 +319,18 @@ namespace
         regex.regex = true;
         for (int round = 0; round < 20; ++round)
         {
-            UNSCOPED_INFO("alpha");
             REQUIRE(ALTextSearch::matches(doc, "al\\w+", regex).size() == size_t(2));
-            UNSCOPED_INFO("beta");
             REQUIRE(ALTextSearch::matches(doc, "be\\w+", regex).size() == size_t(3));
-            UNSCOPED_INFO("gamma");
             REQUIRE(ALTextSearch::matches(doc, "ga\\w+", regex).size() == size_t(1));
         }
         std::string bad;
         ALTextSearch::matches(doc, "(", regex, nullptr, &bad);
         UNSCOPED_INFO("a pattern that does not read, said");
-        REQUIRE_FALSE(bad.empty());
+        CHECK_FALSE(bad.empty());
         bad.clear();
         ALTextSearch::matches(doc, "(", regex, nullptr, &bad);
         UNSCOPED_INFO("and said again, kept as it is");
-        REQUIRE_FALSE(bad.empty());
+        CHECK_FALSE(bad.empty());
         std::atomic<bool> wrong{ false };
         std::thread other([&]() {
             for (int round = 0; round < 200; ++round)
@@ -377,15 +371,13 @@ namespace
             options.acrossLines  = one.across;
             const auto made      = ALTextSearch::replacements(doc, one.query, options, one.with);
             const auto matches   = ALTextSearch::matches(doc, one.query, options);
-            UNSCOPED_INFO(std::string(one.query) + ": as many");
+            CAPTURE(one.query);
             REQUIRE(made.size() == matches.size());
-            UNSCOPED_INFO(std::string(one.query) + ": found at all");
             REQUIRE_FALSE(made.empty());
             for (size_t i = 0; i < made.size(); ++i)
             {
-                UNSCOPED_INFO(std::string(one.query) + ": the same place");
+                CAPTURE(i);
                 REQUIRE(made[i].first == matches[i]);
-                UNSCOPED_INFO(std::string(one.query) + ": the same text");
                 REQUIRE(made[i].second == ALTextSearch::replacement(doc, matches[i], one.query, options, one.with));
             }
         }
@@ -402,8 +394,8 @@ namespace
         std::string bad;
         {
             INFO("a pattern that does not read makes none");
-            REQUIRE(ALTextSearch::replacements(doc, "(", regex, "x", nullptr, &bad).empty());
-            REQUIRE_FALSE(bad.empty());
+            CHECK(ALTextSearch::replacements(doc, "(", regex, "x", nullptr, &bad).empty());
+            CHECK_FALSE(bad.empty());
         }
     }
 
@@ -428,7 +420,6 @@ namespace
         // What replaces each takes the whole character out, and the text
         // stays well-formed.
         std::vector<std::pair<ALTextRange, std::string>> edits = ALTextSearch::replacements(doc, ".$", options, "[$&]");
-        UNSCOPED_INFO("as many");
         REQUIRE(edits.size() == size_t(2));
         UNSCOPED_INFO("the whole of the last character");
         CHECK(edits[0].first == ALTextRange(ALTextPos(0, 3), ALTextPos(0, 5)));
@@ -449,7 +440,7 @@ namespace
         UNSCOPED_INFO("each word whole");
         CHECK(said(ALTextSearch::matches(doc, "\\w+", options)) == std::string("0:0-5 0:6-11"));
         UNSCOPED_INFO("no word's edge inside one");
-        REQUIRE(ALTextSearch::matches(doc, "\\bcaf\\b", options).empty());
+        CHECK(ALTextSearch::matches(doc, "\\bcaf\\b", options).empty());
         options.caseSensitive = true;
         UNSCOPED_INFO("by case, only itself");
         CHECK(said(ALTextSearch::matches(doc, "caf\xc3\xa9", options)) == std::string("0:0-5"));
@@ -463,7 +454,7 @@ namespace
         UNSCOPED_INFO("each byte one");
         CHECK(said(ALTextSearch::matches(doc, ".", options, nullptr, &error)) == std::string("0:0-1 0:1-2 0:2-3 0:3-4"));
         UNSCOPED_INFO("and nothing to say");
-        REQUIRE(error.empty());
+        CHECK(error.empty());
     }
 
     TEST_CASE_METHOD(altextsearch_data, "altextsearch: a stretch that begins inside a character is searched from the next", "[altextsearch]")
@@ -514,7 +505,7 @@ namespace
         options.caseSensitive = false;
         std::vector<std::pair<ALTextRange, std::string>> edits = ALTextSearch::replacements(doc, "aa", options, "b");
         UNSCOPED_INFO("as many replaced as there are");
-        REQUIRE(edits.size() == size_t(4));
+        CHECK(edits.size() == size_t(4));
         doc.replaceMany(std::move(edits));
         UNSCOPED_INFO("each replaced whole");
         CHECK(doc.text() == std::string("bb\n///x\nba b\n"));
@@ -545,16 +536,16 @@ namespace
         ALTextSearchOptions  options;
         options.stop = &stop;
         UNSCOPED_INFO("plainly");
-        REQUIRE(ALTextSearch::matches(doc, "a", options).size() <= 1);
+        CHECK(ALTextSearch::matches(doc, "a", options).size() <= 1);
         options.regex = true;
         UNSCOPED_INFO("by pattern");
-        REQUIRE(ALTextSearch::matches(doc, "a", options).size() <= 1);
+        CHECK(ALTextSearch::matches(doc, "a", options).size() <= 1);
         options.acrossLines = true;
         UNSCOPED_INFO("over the lines as one");
-        REQUIRE(ALTextSearch::matches(doc, "a", options).size() <= 1);
+        CHECK(ALTextSearch::matches(doc, "a", options).size() <= 1);
         stop = false;
         UNSCOPED_INFO("not stopped, every one");
-        REQUIRE(ALTextSearch::matches(doc, "a", options).size() == size_t(1000));
+        CHECK(ALTextSearch::matches(doc, "a", options).size() == size_t(1000));
     }
 
     TEST_CASE_METHOD(altextsearch_data, "altextsearch: firstPerLine keeps only the first match of each line in every mode", "[altextsearch]")

@@ -62,9 +62,7 @@ namespace
     TEST_CASE_METHOD(alflagsfield_data, "alflagsfield: read sets a bit for each name and every bit for the word for all", "[alflagsfield]")
     {
         const std::vector<std::string> edges = { "left", "bottom", "right", "top" };
-        UNSCOPED_INFO("one name");
         CHECK(ALFlagsField::read("left", edges, "all") == 1u);
-        UNSCOPED_INFO("two with a bar");
         CHECK(ALFlagsField::read("left|top", edges, "all") == (1u | 8u));
         UNSCOPED_INFO("the word for all");
         CHECK(ALFlagsField::read("all", edges, "all") == 15u);
@@ -74,7 +72,7 @@ namespace
         CHECK(ALFlagsField::read("lefty|top", edges, "all") == 8u);
         UNSCOPED_INFO("nor with the word for all in it");
         CHECK(ALFlagsField::read("allow", edges, "all") == 0u);
-        UNSCOPED_INFO("as may a name");
+        UNSCOPED_INFO("a name may be spelt how it likes too");
         CHECK(ALFlagsField::read("Left|TOP", edges, "all") == (1u | 8u));
         UNSCOPED_INFO("a name not carried is passed over");
         CHECK(ALFlagsField::read("left|middle", edges, "all") == 1u);
@@ -109,8 +107,6 @@ namespace
         CHECK(ALFlagsField::read(ALFlagsField::write(5u, edges, "all", "none"), edges, "all") == 5u);
     }
 
-    // The field: what it is given comes back the way a file writes it, and
-    // the boxes say the same.
     TEST_CASE_METHOD(alflagsfield_data, "alflagsfield: the field gives back its value as a file writes it and ticks the boxes", "[alflagsfield]")
     {
         if (!ui.ok())
@@ -124,11 +120,8 @@ namespace
         field->setValue("BOLD|ITALIC");
         UNSCOPED_INFO("read back as written");
         CHECK(field->getValue().asString() == std::string("BOLD|ITALIC"));
-        UNSCOPED_INFO("bold is ticked");
         CHECK(field->getChild<LLCheckBoxCtrl>("BOLD")->getValue().asBoolean());
-        UNSCOPED_INFO("italic is ticked");
         CHECK(field->getChild<LLCheckBoxCtrl>("ITALIC")->getValue().asBoolean());
-        UNSCOPED_INFO("underline is not");
         CHECK_FALSE(field->getChild<LLCheckBoxCtrl>("UNDERLINE")->getValue().asBoolean());
 
         field->setValue("NORMAL");
@@ -153,7 +146,6 @@ namespace
         LLCheckBoxCtrl* underline = field->getChild<LLCheckBoxCtrl>("UNDERLINE");
         underline->setValue(true);
         underline->onCommit();
-        UNSCOPED_INFO("one commit");
         REQUIRE(said.size() == 1u);
         UNSCOPED_INFO("saying the name ticked");
         CHECK(said.back() == std::string("UNDERLINE"));
@@ -171,7 +163,6 @@ namespace
         delete field;
     }
 
-    // The boxes share the width, and go on sharing it when there is more.
     TEST_CASE_METHOD(alflagsfield_data, "alflagsfield: the boxes share the width and share it again when it grows", "[alflagsfield]")
     {
         if (!ui.ok())

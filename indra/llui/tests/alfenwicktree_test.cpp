@@ -55,21 +55,20 @@ namespace
             return at;
         }
 
-        static void same(const std::string& what, const ALFenwickTree<S32>& tree, const std::vector<S32>& values)
+        static void require_same(const std::string& what, const ALFenwickTree<S32>& tree, const std::vector<S32>& values)
         {
-            UNSCOPED_INFO(what + ": size");
+            INFO(what);
             REQUIRE(tree.size() == values.size());
             for (size_t i = 0; i <= values.size(); ++i)
             {
-                UNSCOPED_INFO(what + ": before " + std::to_string(i));
+                CAPTURE(i);
                 REQUIRE(tree.before(i) == before(values, i));
             }
             const S32 total = before(values, values.size());
-            UNSCOPED_INFO(what + ": total");
             REQUIRE(tree.total() == total);
             for (S32 sum = -1; sum <= total + 2; ++sum)
             {
-                UNSCOPED_INFO(what + ": reach " + std::to_string(sum));
+                CAPTURE(sum);
                 REQUIRE(tree.reach(sum) == reach(values, sum));
             }
         }
@@ -84,7 +83,7 @@ namespace
         }
         ALFenwickTree<S32> tree;
         tree.assign(values);
-        same("made", tree, values);
+        require_same("made", tree, values);
         U32 seed = 12345;
         for (S32 step = 0; step < 200; ++step)
         {
@@ -93,16 +92,15 @@ namespace
             const S32    value = static_cast<S32>((seed >> 20) % 9);
             values[index]      = value;
             tree.set(index, value);
-            UNSCOPED_INFO("the value kept");
             REQUIRE(tree.at(index) == value);
         }
-        same("changed", tree, values);
+        require_same("changed", tree, values);
     }
 
     TEST_CASE_METHOD(alfenwicktree_data, "alfenwicktree: reach passes a run of zeros whole and empty or one-value trees work", "[alfenwicktree]")
     {
         ALFenwickTree<S32> tree;
-        same("none", tree, {});
+        require_same("none", tree, {});
         tree.assign({ 3, 0, 0, 2 });
         UNSCOPED_INFO("past the run of nothing");
         CHECK(tree.reach(3) == size_t(3));
@@ -111,6 +109,6 @@ namespace
         UNSCOPED_INFO("past them all");
         CHECK(tree.reach(5) == size_t(4));
         tree.assign({ 4 });
-        same("one", tree, { 4 });
+        require_same("one", tree, { 4 });
     }
 }

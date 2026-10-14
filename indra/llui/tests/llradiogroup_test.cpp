@@ -92,7 +92,6 @@ namespace
         group->setValue(LLSD(false));
         UNSCOPED_INFO("no picks the item that says 0");
         CHECK(group->getSelectedIndex() == 1);
-        UNSCOPED_INFO("and the group can say so");
         CHECK(group->getIndexForBool(true) == 0);
         group->die();
     }
@@ -152,7 +151,7 @@ namespace
         group->setSelectedIndex(0);
         UNSCOPED_INFO("the item named false writes no");
         CHECK_FALSE(config().getBOOL("RadioGroupTestNamed"));
-        UNSCOPED_INFO("as a no");
+        UNSCOPED_INFO("as a no, not as a name");
         CHECK(setting->getValue().isBoolean());
         group->die();
     }
@@ -167,8 +166,7 @@ namespace
         }
 
         LLRadioGroup* plain = choice("a", "b");
-        UNSCOPED_INFO("no border unless asked");
-        REQUIRE(plain->findChild<LLViewBorder>("radio group border", false) == nullptr);
+        CHECK(plain->findChild<LLViewBorder>("radio group border", false) == nullptr);
         plain->die();
 
         LLRadioGroup::Params p(LLUICtrlFactory::getDefaultParams<LLRadioGroup>());
@@ -182,12 +180,10 @@ namespace
         LLRadioGroup* bordered = LLUICtrlFactory::create<LLRadioGroup>(p);
 
         LLViewBorder* border = bordered->findChild<LLViewBorder>("radio group border", false);
-        UNSCOPED_INFO("asked for, a border is held");
         REQUIRE(border != nullptr);
-        UNSCOPED_INFO("around the whole group");
         CHECK(border->getRect() == bordered->getLocalRect());
         bordered->reshape(300, 60);
-        UNSCOPED_INFO("and around it still once it has grown");
+        UNSCOPED_INFO("once it has grown");
         CHECK(border->getRect() == bordered->getLocalRect());
         bordered->die();
     }

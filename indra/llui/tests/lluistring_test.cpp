@@ -54,9 +54,7 @@ namespace
         LLUIString copy(original);
         copy.setArg("[NAME]", "Bob");
 
-        UNSCOPED_INFO("the copy substitutes its own argument");
         CHECK(copy.getString() == std::string("Hello Bob"));
-        UNSCOPED_INFO("and the original is untouched by it");
         CHECK(original.getString() == std::string("Hello Alice"));
     }
 
@@ -67,11 +65,9 @@ namespace
         original.setArg("[WHO]", "there");
         {
             LLUIString copy = original;
-            UNSCOPED_INFO("a copy reads the same");
             CHECK(copy.getString() == std::string("Hi there"));
             copy.setArg("[WHO]", "elsewhere");
         }
-        UNSCOPED_INFO("an original outlives its copy");
         CHECK(original.getString() == std::string("Hi there"));
     }
 
@@ -92,9 +88,7 @@ namespace
         CHECK(before > fresh.getGeneration());
 
         worn = fresh;
-        UNSCOPED_INFO("assignment moves this string's own count on");
         CHECK(worn.getGeneration() > before);
-        UNSCOPED_INFO("and takes the other's text");
         CHECK(worn.getString() == std::string("fresh"));
     }
 
@@ -113,9 +107,7 @@ namespace
         donor.setArg("[K]", "1");
         worn = std::move(donor);
 
-        UNSCOPED_INFO("a move assignment moves this string's own count on");
         CHECK(worn.getGeneration() > before);
-        UNSCOPED_INFO("and takes the other's text and arguments");
         CHECK(worn.getString() == std::string("donor 1"));
     }
 
@@ -128,11 +120,10 @@ namespace
         const U32 settled = label.getGeneration();
 
         label.assign("Inventory");
-        UNSCOPED_INFO("assigning the same value is not a change");
         CHECK(label.getGeneration() == settled);
 
         label.assign("Received Items");
-        UNSCOPED_INFO("assigning a different one is");
+        UNSCOPED_INFO("a different value is a change");
         CHECK(label.getGeneration() > settled);
     }
 
@@ -143,11 +134,9 @@ namespace
     {
         LLUIString field("abcdef");
         field.truncate(3);
-        UNSCOPED_INFO("truncate cuts the result");
         CHECK(field.getString() == std::string("abc"));
 
         field.assign("abcdef");
-        UNSCOPED_INFO("assigning the original back restores it");
         CHECK(field.getString() == std::string("abcdef"));
     }
 
@@ -161,18 +150,16 @@ namespace
         const U32 settled = message.getGeneration();
 
         message.setArg("[A]", "x");
-        UNSCOPED_INFO("setting an argument to what it holds is not a change");
         CHECK(message.getGeneration() == settled);
 
         message.setArg("[A]", "y");
-        UNSCOPED_INFO("setting it to something else is");
+        UNSCOPED_INFO("a different value is a change");
         CHECK(message.getGeneration() > settled);
 
         const U32 before_new = message.getGeneration();
         message.setArg("[B]", LLStringUtil::null);
         UNSCOPED_INFO("naming an argument for the first time is, even to nothing");
         CHECK(message.getGeneration() > before_new);
-        UNSCOPED_INFO("and the placeholder is gone");
         CHECK(message.getString() == std::string("y and "));
     }
 
@@ -183,14 +170,11 @@ namespace
     {
         LLUIString greeting("Hello [NAME]");
         greeting.setArg("[NAME]", "Alice");
-        UNSCOPED_INFO("the argument substitutes");
         CHECK(greeting.getString() == std::string("Hello Alice"));
 
         const U32 settled = greeting.getGeneration();
         greeting.clearArgs();
-        UNSCOPED_INFO("clearing arguments is a change");
         CHECK(greeting.getGeneration() > settled);
-        UNSCOPED_INFO("and the placeholder is back");
         CHECK(greeting.getString() == std::string("Hello [NAME]"));
 
         const U32 cleared = greeting.getGeneration();
@@ -210,13 +194,11 @@ namespace
 
         const std::string_view same("Region (128, 64, 22)");
         label.assign(same);
-        UNSCOPED_INFO("assigning the value already held is not a change");
         CHECK(label.getGeneration() == settled);
 
         label.assign(std::string_view("Region (130, 64, 22)"));
-        UNSCOPED_INFO("assigning a different value is");
+        UNSCOPED_INFO("a different value is a change");
         CHECK(label.getGeneration() > settled);
-        UNSCOPED_INFO("and the value is the new one");
         CHECK(label.getString() == std::string("Region (130, 64, 22)"));
 
         // A view need not be null-terminated, and need not outlive the call.

@@ -81,26 +81,24 @@ namespace
         }
         ALTabStrip* strip = make();
         strip->setTabs(three(), "b");
-        UNSCOPED_INFO("three tabs");
         REQUIRE(strip->tabs().size() == 3u);
-        UNSCOPED_INFO("the chosen one");
         CHECK(strip->chosen() == std::string("b"));
 
         S32 right = -1;
         for (size_t i = 0; i < 3; ++i)
         {
             const LLRect r = strip->rectOf(i);
-            UNSCOPED_INFO("tab " + std::to_string(i) + " starts after the one before: "
-                       + std::to_string(r.mLeft) + " > " + std::to_string(right));
+            CAPTURE(i);
+            UNSCOPED_INFO("starts after the one before");
             REQUIRE(r.mLeft > right);
-            UNSCOPED_INFO("and ends inside the strip: " + std::to_string(r.mRight));
+            UNSCOPED_INFO("and ends inside the strip");
             REQUIRE(r.mRight <= WIDTH);
             {
                 INFO("and is as tall as it");
                 REQUIRE(r.mTop == HEIGHT);
                 REQUIRE(r.mBottom == 0);
             }
-            UNSCOPED_INFO("and wide enough to read: " + std::to_string(r.getWidth()));
+            UNSCOPED_INFO("and wide enough to read");
             REQUIRE(r.getWidth() >= 64);
             right = r.mRight;
         }
@@ -108,6 +106,7 @@ namespace
         for (size_t i = 0; i < 3; ++i)
         {
             const LLRect r = strip->rectOf(i);
+            CAPTURE(i);
             UNSCOPED_INFO("the tab under its own middle");
             REQUIRE(strip->at(r.getCenterX(), r.getCenterY()) == (S32)i);
         }
@@ -143,7 +142,6 @@ namespace
         CHECK(strip->chosen() == std::string("b"));
         UNSCOPED_INFO("saying so once");
         REQUIRE(chosen.size() == 1u);
-        UNSCOPED_INFO("by value");
         CHECK(chosen.front() == std::string("b"));
         UNSCOPED_INFO("and closes nothing");
         REQUIRE(closed.empty());
@@ -175,7 +173,6 @@ namespace
         strip->handleMouseUp(out.getCenterX(), out.getCenterY(), MASK_NONE);
         UNSCOPED_INFO("let go of over it, it asks for it to go");
         REQUIRE(closed.size() == 1u);
-        UNSCOPED_INFO("by value");
         CHECK(closed.front() == std::string("a"));
         UNSCOPED_INFO("without choosing it");
         CHECK(strip->chosen() == std::string("b"));
@@ -185,7 +182,6 @@ namespace
         strip->handleMiddleMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
         UNSCOPED_INFO("the middle button closes");
         REQUIRE(closed.size() == 2u);
-        UNSCOPED_INFO("that tab");
         CHECK(closed.back() == std::string("c"));
         strip->die();
     }
@@ -212,11 +208,12 @@ namespace
         for (size_t i = 0; i < 5; ++i)
         {
             const LLRect r = strip->rectOf(i);
-            UNSCOPED_INFO("tab " + std::to_string(i) + " is as wide as the first");
+            CAPTURE(i);
+            UNSCOPED_INFO("as wide as the first");
             REQUIRE(r.getWidth() == first);
-            UNSCOPED_INFO("and inside the strip: " + std::to_string(r.mRight));
+            UNSCOPED_INFO("and inside the strip");
             REQUIRE(r.mRight <= 400);
-            UNSCOPED_INFO("and no narrower than the least: " + std::to_string(r.getWidth()));
+            UNSCOPED_INFO("and no narrower than the least");
             REQUIRE(r.getWidth() >= 64);
         }
         UNSCOPED_INFO("and the share is less than a name wants");
@@ -227,7 +224,8 @@ namespace
         strip->reshape(200, HEIGHT);
         for (size_t i = 0; i < 5; ++i)
         {
-            UNSCOPED_INFO("at the least: " + std::to_string(strip->rectOf(i).getWidth()));
+            CAPTURE(i);
+            UNSCOPED_INFO("at the least");
             REQUIRE(strip->rectOf(i).getWidth() == 64);
         }
         UNSCOPED_INFO("and the last runs past the edge");
@@ -239,11 +237,10 @@ namespace
         for (size_t i = 0; i < 5; ++i)
         {
             const S32 w = strip->rectOf(i).getWidth();
-            {
-                INFO("wants its words: " + std::to_string(w));
-                REQUIRE(w > 64);
-                REQUIRE(w < 300);
-            }
+            CAPTURE(i);
+            INFO("wants its words");
+            REQUIRE(w > 64);
+            REQUIRE(w < 300);
         }
 
         // A short name beside a long one: the short keeps its words, the
@@ -252,12 +249,12 @@ namespace
         strip->reshape(200, HEIGHT);
         const S32 words = LLFontGL::getFontSansSerifSmall()->getWidth("a.lsl");
         {
-            INFO("the short one keeps what it wants: " + std::to_string(strip->rectOf(0).getWidth()));
+            INFO("the short one keeps what it wants");
             REQUIRE(strip->rectOf(0).getWidth() < 200 / 2);
             CHECK(strip->rectOf(0).getWidth() >= words);
         }
         {
-            INFO("the long one takes the rest: " + std::to_string(strip->rectOf(1).mRight));
+            INFO("the long one takes the rest");
             REQUIRE(strip->rectOf(1).mRight <= 200);
             CHECK(strip->rectOf(1).getWidth() > strip->rectOf(0).getWidth());
         }
@@ -267,12 +264,12 @@ namespace
         strip->reshape(2000, HEIGHT);
         const S32 long_words = LLFontGL::getFontSansSerifSmall()->getWidth("a_very_long_name_that_wants_a_great_deal_of_room.lsl");
         {
-            INFO("the long name runs on past the usual most: " + std::to_string(strip->rectOf(1).getWidth()));
+            INFO("the long name runs on past the usual most");
             REQUIRE(strip->rectOf(1).getWidth() > 220);
             CHECK(strip->rectOf(1).getWidth() > long_words);
         }
         strip->reshape(500, HEIGHT);
-        UNSCOPED_INFO("but to half the strip: " + std::to_string(strip->rectOf(1).getWidth()));
+        UNSCOPED_INFO("but to half the strip");
         CHECK(strip->rectOf(1).getWidth() <= 250);
         strip->die();
 
@@ -298,18 +295,18 @@ namespace
         CHECK(ALTabStrip::shortened(font, name, 10000) == name);
         const std::string cut = ALTabStrip::shortened(font, name, font->getWidth(name) / 2);
         {
-            INFO("shorter: " + cut);
+            INFO("shorter: " << cut);
             REQUIRE(cut.size() < name.size());
             CHECK(font->getWidth(cut) <= font->getWidth(name) / 2);
         }
         {
-            INFO("the end kept: " + cut);
+            INFO("the end kept: " << cut);
             REQUIRE(cut.size() >= 7);
             REQUIRE(cut.compare(cut.size() - 7, 7, "oom.lsl") == 0);
         }
-        UNSCOPED_INFO("the start kept: " + cut);
+        UNSCOPED_INFO("the start kept: " << cut);
         CHECK(cut.compare(0, 2, "a_") == 0);
-        UNSCOPED_INFO("an ellipsis between: " + cut);
+        UNSCOPED_INFO("an ellipsis between: " << cut);
         REQUIRE(cut.find("\xE2\x80\xA6") != std::string::npos);
         UNSCOPED_INFO("no room for even the end: the whole, for the renderer to cut");
         CHECK(ALTabStrip::shortened(font, name, 4) == name);
@@ -392,7 +389,6 @@ namespace
             many.push_back(tab("script_" + std::to_string(i) + ".lsl", std::to_string(i)));
         }
         strip->setTabs(many, "0");
-        UNSCOPED_INFO("overflowing");
         CHECK(strip->overflowing());
         const LLRect list = strip->listRect();
         {
@@ -406,7 +402,7 @@ namespace
         strip->choose("5");
         const LLRect last = strip->rectOf(5);
         {
-            INFO("the chosen tab brought into sight: " + std::to_string(last.mLeft) + ".." + std::to_string(last.mRight));
+            INFO("the chosen tab brought into sight");
             CHECK(last.mLeft >= 0);
             CHECK(last.mRight <= list.mLeft);
         }
@@ -769,7 +765,6 @@ namespace
         strip->handleMouseUp(second.getCenterX() + 5, -120, MASK_NONE);
         UNSCOPED_INFO("said once");
         REQUIRE(torn.size() == size_t(1));
-        UNSCOPED_INFO("which");
         CHECK(torn.front() == std::string("b"));
         S32 screen_x = 0, screen_y = 0;
         strip->localPointToScreen(second.getCenterX() + 5, -120, &screen_x, &screen_y);
@@ -809,6 +804,7 @@ namespace
         strip->setTabs({}, "");
         for (KEY key : { KEY_LEFT, KEY_RIGHT, KEY_HOME, KEY_END })
         {
+            CAPTURE(key);
             UNSCOPED_INFO("kept");
             REQUIRE(strip->handleKeyHere(key, MASK_NONE));
         }
@@ -860,7 +856,7 @@ namespace
 
         UNSCOPED_INFO("a longer name");
         CHECK(strip->setTab(tab("floater_b_with_a_much_longer_name.xml", "b")));
-        UNSCOPED_INFO("the tabs after it moved along: " + std::to_string(strip->rectOf(2).mLeft) + " > " + std::to_string(before.mLeft));
+        UNSCOPED_INFO("the tabs after it moved along");
         CHECK(strip->rectOf(2).mLeft > before.mLeft);
         {
             INFO("no such tab");
@@ -887,11 +883,13 @@ namespace
             }
             return tabs;
         };
-        const auto check = [&](const std::string& what) {
+        const auto require_laid_out = [&](const std::string& what) {
+            INFO(what);
             const S32 gap = strip->rectOf(1).mLeft - strip->rectOf(0).mRight;
             for (size_t i = 0; i + 1 < 40; ++i)
             {
-                UNSCOPED_INFO(what + ": tab " + std::to_string(i + 1) + " a gap after the one before");
+                CAPTURE(i + 1);
+                UNSCOPED_INFO("a gap after the one before");
                 REQUIRE(strip->rectOf(i + 1).mLeft - strip->rectOf(i).mRight == gap);
             }
             for (size_t i = 0; i < 40; ++i)
@@ -899,19 +897,20 @@ namespace
                 const LLRect r = strip->rectOf(i);
                 if (r.getCenterX() >= 0 && r.getCenterX() < strip->getRect().getWidth() - 40)
                 {
-                    UNSCOPED_INFO(what + ": the tab under its own middle");
+                    CAPTURE(i);
+                    UNSCOPED_INFO("the tab under its own middle");
                     REQUIRE(strip->at(r.getCenterX(), r.getCenterY()) == (S32)i);
                 }
             }
         };
         strip->setTabs(many("panel_"), "0");
-        check("from the start");
+        require_laid_out("from the start");
         strip->choose("39");
         UNSCOPED_INFO("scrolled to the last");
         CHECK(strip->rectOf(0).mLeft < 0);
-        check("scrolled");
+        require_laid_out("scrolled");
         strip->setTabs(many("a_much_longer_name_"), "39");
-        check("renamed");
+        require_laid_out("renamed");
         strip->die();
     }
 
@@ -930,15 +929,15 @@ namespace
         const std::string name = "a_very_long_name_that_wants_a_great_deal_of_room_xe\xCC\xA3\xCC\x81yz.lsl";
         const std::string cut  = ALTabStrip::shortened(font, name, font->getWidth(name) / 2);
         {
-            INFO("cut, with an ellipsis: " + cut);
+            INFO("cut, with an ellipsis: " << cut);
             REQUIRE(cut.size() < name.size());
             REQUIRE(cut.find("\xE2\x80\xA6") != std::string::npos);
         }
-        UNSCOPED_INFO("the extension kept: " + cut);
+        UNSCOPED_INFO("the extension kept: " << cut);
         REQUIRE(cut.compare(cut.size() - 4, 4, ".lsl") == 0);
-        UNSCOPED_INFO("no mark after the ellipsis, parted from its e: " + cut);
+        UNSCOPED_INFO("no mark after the ellipsis, parted from its e: " << cut);
         REQUIRE(cut.find("\xE2\x80\xA6\xCC") == std::string::npos);
-        UNSCOPED_INFO("the e kept with both its marks: " + cut);
+        UNSCOPED_INFO("the e kept with both its marks: " << cut);
         REQUIRE(cut.find("e\xCC\xA3\xCC\x81") != std::string::npos);
     }
 

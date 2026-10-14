@@ -43,8 +43,8 @@
 #include <vector>
 
 // A place, as a failed check says it. Static rather than in the anonymous
-// namespace: tut's ensure_equals finds it by argument-dependent lookup,
-// which looks in ALTextPos's namespace and not in a nested one.
+// namespace: Catch2 finds it by argument-dependent lookup, which looks
+// in ALTextPos's namespace and not in a nested one.
 static std::ostream& operator<<(std::ostream& out, const ALTextPos& pos)
 {
     return out << pos.line << ":" << pos.column;
@@ -214,7 +214,7 @@ namespace
         UNSCOPED_INFO("escaped: back");
         CHECK(v.caret() == ALTextPos(0, 1));
         UNSCOPED_INFO("nothing told");
-        REQUIRE(went.empty());
+        CHECK(went.empty());
 
         ask();
         quick->setQuery("4");
@@ -256,10 +256,9 @@ namespace
         ask(-1);
         for (const char* typed : { "x", ":", "-3" })
         {
+            CAPTURE(typed);
             quick->setQuery(typed);
-            UNSCOPED_INFO(std::string(typed) + ": said to be no line");
             REQUIRE(word == std::string("GoToLineNone"));
-            UNSCOPED_INFO(std::string(typed) + ": the caret where it was");
             REQUIRE(v.caret() == ALTextPos(2, 1));
         }
         UNSCOPED_INFO("said as typed");
@@ -268,7 +267,7 @@ namespace
         UNSCOPED_INFO("Return leaves it there");
         CHECK(v.caret() == ALTextPos(2, 1));
         UNSCOPED_INFO("and tells of no way back");
-        REQUIRE(went.empty());
+        CHECK(went.empty());
     }
 
     TEST_CASE_METHOD(altextgotoline_data, "altextgotoline: a number too big for a line goes nowhere rather than wrapping round", "[altextgotoline]")
@@ -312,12 +311,12 @@ namespace
         UNSCOPED_INFO("opened: the selection as it was");
         CHECK(v.selection() == block);
         UNSCOPED_INFO("and the caret besides it");
-        REQUIRE(v.otherSelections().size() == size_t(1));
+        CHECK(v.otherSelections().size() == size_t(1));
         popover()->escape();
         UNSCOPED_INFO("escaped with nothing typed: the selection");
         CHECK(v.selection() == block);
         UNSCOPED_INFO("and the other caret");
-        REQUIRE(v.otherSelections().size() == size_t(1));
+        CHECK(v.otherSelections().size() == size_t(1));
 
         ask();
         quick->setQuery("3");
@@ -332,14 +331,14 @@ namespace
         {
             INFO("emptied: the selection back");
             CHECK(v.selection() == block);
-            REQUIRE(v.otherSelections().size() == 1);
+            CHECK(v.otherSelections().size() == 1);
         }
         quick->setQuery("2");
         popover()->escape();
         {
             INFO("escaped after going: the selection back");
             CHECK(v.selection() == block);
-            REQUIRE(v.otherSelections().size() == 1);
+            CHECK(v.otherSelections().size() == 1);
         }
     }
 }

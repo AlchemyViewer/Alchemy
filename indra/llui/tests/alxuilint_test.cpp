@@ -180,7 +180,6 @@ namespace
         };
     };
 
-    // A clean file carries nothing.
     TEST_CASE_METHOD(alxuilint_data, "alxuilint: a clean file has no findings", "[alxuilint]")
     {
         if (!ui.ok())
@@ -188,12 +187,11 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        UNSCOPED_INFO("builds");
         REQUIRE(run.build(
             "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"40\"/>\n"
             "  <panel name=\"b\" left=\"100\" top=\"0\" width=\"90\" height=\"40\"/>"));
-        UNSCOPED_INFO("a clean file has no findings: " + run.describe());
-        REQUIRE((S32)run.lint.findings().size() == 0);
+        UNSCOPED_INFO("findings: " + run.describe());
+        CHECK((S32)run.lint.findings().size() == 0);
     }
 
     // Two siblings shown together that intersect, against two where one
@@ -206,30 +204,24 @@ namespace
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"40\"/>\n"
                 "  <panel name=\"b\" left=\"40\" top=\"0\" width=\"90\" height=\"40\"/>"));
             UNSCOPED_INFO("one overlap: " + run.describe());
             REQUIRE(run.count(ALXUILint::Rule::Overlap) == 1);
-            UNSCOPED_INFO("and no alternatives");
-            REQUIRE(run.count(ALXUILint::Rule::Alternatives) == 0);
+            CHECK(run.count(ALXUILint::Rule::Alternatives) == 0);
             UNSCOPED_INFO("named for the pair");
             CHECK(run.first(ALXUILint::Rule::Overlap)->what == std::string("a"));
-            UNSCOPED_INFO("with the element's path");
             CHECK(ALXUISelection::toString(run.first(ALXUILint::Rule::Overlap)->path) == std::string("a"));
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"40\"/>\n"
                 "  <panel name=\"b\" left=\"40\" top=\"0\" width=\"90\" height=\"40\" visible=\"false\"/>"));
             UNSCOPED_INFO("stacked alternatives are a note: " + run.describe());
             REQUIRE(run.count(ALXUILint::Rule::Alternatives) == 1);
-            UNSCOPED_INFO("and not an overlap");
-            REQUIRE(run.count(ALXUILint::Rule::Overlap) == 0);
-            UNSCOPED_INFO("a note");
+            CHECK(run.count(ALXUILint::Rule::Overlap) == 0);
             CHECK((int)run.first(ALXUILint::Rule::Alternatives)->severity ==
                           (int)ALXUILint::Severity::Note);
         }
@@ -245,23 +237,20 @@ namespace
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"150\" top=\"0\" width=\"90\" height=\"40\"/>"));
             UNSCOPED_INFO("out of bounds: " + run.describe());
-            REQUIRE(run.count(ALXUILint::Rule::OutOfBounds) == 1);
+            CHECK(run.count(ALXUILint::Rule::OutOfBounds) == 1);
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"0\" height=\"40\"/>"));
             UNSCOPED_INFO("empty rect: " + run.describe());
-            REQUIRE(run.count(ALXUILint::Rule::EmptyRect) == 1);
+            CHECK(run.count(ALXUILint::Rule::EmptyRect) == 1);
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"40\" height=\"20\"/>\n"
                 "  <panel name=\"a\" left=\"0\" top=\"50\" width=\"40\" height=\"20\"/>"));
@@ -282,62 +271,55 @@ namespace
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" font=\"NoSuchFont\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>"));
             UNSCOPED_INFO("dangling font: " + run.describe());
-            REQUIRE(run.count(ALXUILint::Rule::DanglingFont) == 1);
+            CHECK(run.count(ALXUILint::Rule::DanglingFont) == 1);
         }
         {
             // The names every shipped file uses answer to the registry
             // rather than to the four legacy ones.
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" font=\"SansSerif\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>\n"
                 "  <panel name=\"b\" font=\"SansSerifSmall\" left=\"0\" top=\"30\" width=\"90\" height=\"20\"/>\n"
                 "  <panel name=\"c\" font=\"Monospace\" left=\"0\" top=\"60\" width=\"90\" height=\"20\"/>"));
             UNSCOPED_INFO("a font fonts.xml declares is not dangling: " + run.describe());
-            REQUIRE(run.count(ALXUILint::Rule::DanglingFont) == 0);
+            CHECK(run.count(ALXUILint::Rule::DanglingFont) == 0);
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" bg_opaque_color=\"NoSuchColour\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>"));
             UNSCOPED_INFO("dangling colour: " + run.describe());
-            REQUIRE(run.count(ALXUILint::Rule::DanglingColor) == 1);
+            CHECK(run.count(ALXUILint::Rule::DanglingColor) == 1);
         }
         {
             // A literal is not a name and is passed over, and so is a
             // colour the table has.
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" bg_opaque_color=\"1 1 1 1\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>\n"
                 "  <panel name=\"b\" bg_opaque_color=\"White\" left=\"0\" top=\"40\" width=\"90\" height=\"20\"/>"));
             UNSCOPED_INFO("neither is dangling: " + run.describe());
-            REQUIRE(run.count(ALXUILint::Rule::DanglingColor) == 0);
+            CHECK(run.count(ALXUILint::Rule::DanglingColor) == 0);
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" control_name=\"NoSuchSetting\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>"));
             UNSCOPED_INFO("control missing: " + run.describe());
-            REQUIRE(run.count(ALXUILint::Rule::ControlMissing) == 1);
+            CHECK(run.count(ALXUILint::Rule::ControlMissing) == 1);
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" control_name=\"UIScrollbarSize\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>"));
             UNSCOPED_INFO("a setting a group has is not missing: " + run.describe());
-            REQUIRE(run.count(ALXUILint::Rule::ControlMissing) == 0);
+            CHECK(run.count(ALXUILint::Rule::ControlMissing) == 0);
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"20\">\n"
                 "    <panel.commit_callback function=\"NoSuch.Function\"/>\n"
@@ -350,7 +332,6 @@ namespace
         }
         {
             Run run;
-            UNSCOPED_INFO("builds");
             REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"20\">\n"
                 "    <panel.commit_callback function=\"NoSuch.Function\"/>\n"
@@ -370,13 +351,12 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        UNSCOPED_INFO("builds");
         REQUIRE(run.build(
             "  <panel name=\"outer\" left=\"0\" top=\"0\" width=\"150\" height=\"80\">\n"
             "    <panel name=\"t\" font=\"NoSuchFont\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>\n"
             "  </panel>"));
         UNSCOPED_INFO("one finding: " + run.describe());
-        REQUIRE((S32)run.lint.findings().size() == 1);
+        CHECK((S32)run.lint.findings().size() == 1);
         UNSCOPED_INFO("on the element");
         CHECK(run.lint.countUnder(ALXUISelection::fromString("outer/t")) == 1);
         UNSCOPED_INFO("on its parent");
@@ -434,7 +414,6 @@ namespace
                 REQUIRE(f.what == std::string("checkbox"));
                 // The parser reads the root's attributes whatever it is
                 // called, so this is worth a look and not a defect.
-                UNSCOPED_INFO("a note");
                 REQUIRE((int)f.severity == (int)ALXUILint::Severity::Note);
             }
         }
@@ -455,7 +434,6 @@ namespace
         }
 
         Run run;
-        UNSCOPED_INFO("built");
         REQUIRE(run.build(
             "<layout_stack name=\"stack\" orientation=\"horizontal\" left=\"0\" top=\"0\" width=\"200\" height=\"100\">\n"
             "  <layout_panel name=\"across\" min_height=\"20\"/>\n"
@@ -464,12 +442,11 @@ namespace
             "</layout_stack>"));
 
         UNSCOPED_INFO(run.describe());
-        REQUIRE(run.count(ALXUILint::Rule::LayoutDimension) == 2);
+        CHECK(run.count(ALXUILint::Rule::LayoutDimension) == 2);
 
         const ALXUILint::Finding* first = run.first(ALXUILint::Rule::LayoutDimension);
-        UNSCOPED_INFO("the cross-axis name is the one reported");
         REQUIRE(first != nullptr);
-        UNSCOPED_INFO("named by attribute");
+        UNSCOPED_INFO("the cross-axis name is the one reported");
         CHECK(first->what == std::string("min_height"));
     }
 
@@ -486,7 +463,6 @@ namespace
         }
 
         Run run;
-        UNSCOPED_INFO("built");
         REQUIRE(run.build(
             "<panel name=\"root\" left=\"0\" top=\"0\" width=\"200\" height=\"100\">\n"
             "  <button name=\"said\" left=\"0\" top=\"0\" width=\"80\" height=\"23\"/>\n"
@@ -494,9 +470,8 @@ namespace
             "</panel>"));
 
         UNSCOPED_INFO(run.describe());
-        REQUIRE(run.count(ALXUILint::Rule::WroteTheDefault) == 1);
+        CHECK(run.count(ALXUILint::Rule::WroteTheDefault) == 1);
         const ALXUILint::Finding* said = run.first(ALXUILint::Rule::WroteTheDefault);
-        UNSCOPED_INFO("the one that wrote it is the one reported");
         REQUIRE(said != nullptr);
         UNSCOPED_INFO("named by attribute");
         CHECK(said->what == std::string("height"));
@@ -518,7 +493,6 @@ namespace
         }
 
         Run run;
-        UNSCOPED_INFO("built");
         REQUIRE(run.build(
             "<panel name=\"root\" left=\"0\" top=\"0\" width=\"200\" height=\"100\">\n"
             "  <button name=\"slip\" left=\"0\" top=\"0\" width=\"80\" tool_tp=\"near\"/>\n"
@@ -527,7 +501,7 @@ namespace
             "</panel>"));
 
         UNSCOPED_INFO(run.describe());
-        REQUIRE(run.count(ALXUILint::Rule::UnknownAttribute) == 2);
+        CHECK(run.count(ALXUILint::Rule::UnknownAttribute) == 2);
 
         const ALXUILint::Finding* slip = nullptr;
         const ALXUILint::Finding* nothing = nullptr;
@@ -538,22 +512,19 @@ namespace
             if (f.what == "qqzzxw") { nothing = &f; }
         }
 
-        UNSCOPED_INFO("the near one is found");
         REQUIRE(slip != nullptr);
-        UNSCOPED_INFO("and is offered the spelling it meant");
+        UNSCOPED_INFO("the near one is offered the spelling it meant");
         CHECK(slip->fix.did == ALXUILint::Fix::Do::SpellAttribute);
         UNSCOPED_INFO("which is the real name");
         CHECK(slip->fix.spelling == std::string("tool_tip"));
 
-        UNSCOPED_INFO("the far one is found");
         REQUIRE(nothing != nullptr);
-        UNSCOPED_INFO("and there is nothing to be but gone");
+        UNSCOPED_INFO("the far one can only be taken out");
         CHECK(nothing->fix.did == ALXUILint::Fix::Do::TakeAttributeOut);
 
         const ALXUILint::Finding* out = run.first(ALXUILint::Rule::OutOfBounds);
-        UNSCOPED_INFO("the one outside is found");
         REQUIRE(out != nullptr);
-        UNSCOPED_INFO("and can be moved in");
+        UNSCOPED_INFO("the one outside can be moved in");
         CHECK(out->fix.did == ALXUILint::Fix::Do::MoveInside);
         UNSCOPED_INFO("by exactly how far outside it is");
         CHECK(out->fix.dx == -40);
@@ -572,7 +543,6 @@ namespace
         }
 
         Run run;
-        UNSCOPED_INFO("built");
         REQUIRE(run.build(
             "<panel name=\"wider\" left=\"10\" top=\"0\" width=\"300\" height=\"20\"/>"));
 
@@ -597,17 +567,13 @@ namespace
         // whitespace that separated it comes off with it.
         {
             Run run;
-            UNSCOPED_INFO("built");
             REQUIRE(run.build(
                 "  <button name=\"said\" left=\"0\" top=\"0\" width=\"80\" height=\"23\"/>"));
             const ALXUILint::Finding* f = run.first(ALXUILint::Rule::WroteTheDefault);
-            UNSCOPED_INFO("found");
             REQUIRE(f != nullptr);
 
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads the same bytes");
             REQUIRE(edit.loadBuffer(run.source));
-            UNSCOPED_INFO("fixed");
             CHECK(f->applyFix(edit, run.anchorFor(f->path)));
             UNSCOPED_INFO("the height is gone and nothing else moved");
             CHECK(edit.text() ==
@@ -624,19 +590,14 @@ namespace
         // and the author's value is untouched.
         {
             Run run;
-            UNSCOPED_INFO("built");
             REQUIRE(run.build(
                 "  <button name=\"slip\" left=\"0\" top=\"0\" width=\"80\" tool_tp=\"near\"/>"));
             const ALXUILint::Finding* f = run.first(ALXUILint::Rule::UnknownAttribute);
-            UNSCOPED_INFO("found");
             REQUIRE(f != nullptr);
-            UNSCOPED_INFO("and it is the one");
             CHECK(f->fix.did == ALXUILint::Fix::Do::SpellAttribute);
 
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads the same bytes");
             REQUIRE(edit.loadBuffer(run.source));
-            UNSCOPED_INFO("fixed");
             CHECK(f->applyFix(edit, run.anchorFor(f->path)));
             UNSCOPED_INFO("spelt right, in place");
             CHECK(edit.text() ==
@@ -662,19 +623,14 @@ namespace
 
         {
             Run run;
-            UNSCOPED_INFO("built");
             REQUIRE(run.build(
                 "  <panel name=\"out\" left=\"150\" top=\"60\" width=\"90\" height=\"20\"/>"));
             const ALXUILint::Finding* f = run.first(ALXUILint::Rule::OutOfBounds);
-            UNSCOPED_INFO("found");
             REQUIRE(f != nullptr);
-            UNSCOPED_INFO("forty pixels over");
             CHECK(f->fix.dx == -40);
 
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads the same bytes");
             REQUIRE(edit.loadBuffer(run.source));
-            UNSCOPED_INFO("fixed");
             CHECK(f->applyFix(edit, run.anchorFor(f->path)));
             UNSCOPED_INFO("the left it was written with is the left that moved");
             CHECK(edit.text() ==
@@ -692,21 +648,16 @@ namespace
         // is being watched is that it lands on `width` and nowhere else.
         {
             Run run;
-            UNSCOPED_INFO("built");
             REQUIRE(run.build(
                 "  <text name=\"long\" left=\"0\" top=\"0\" width=\"10\" height=\"16\">A good deal of text</text>"));
             const ALXUILint::Finding* f = run.first(ALXUILint::Rule::Truncation);
             UNSCOPED_INFO("found: " + run.describe());
             REQUIRE(f != nullptr);
-            UNSCOPED_INFO("and it can be widened");
             CHECK(f->fix.did == ALXUILint::Fix::Do::WidenBy);
-            UNSCOPED_INFO("by something");
             CHECK(f->fix.dx > 0);
 
             ALXUIEdit edit;
-            UNSCOPED_INFO("loads the same bytes");
             REQUIRE(edit.loadBuffer(run.source));
-            UNSCOPED_INFO("fixed");
             CHECK(f->applyFix(edit, run.anchorFor(f->path)));
             UNSCOPED_INFO("only the width moved");
             CHECK(edit.text() ==
@@ -733,7 +684,6 @@ namespace
         }
 
         Run run;
-        UNSCOPED_INFO("built");
         REQUIRE(run.build(
             "  <layout_stack name=\"stack\" orientation=\"vertical\" left=\"0\" top=\"0\""
             " width=\"200\" height=\"60\">\n"
@@ -768,7 +718,6 @@ namespace
         }
 
         Run run;
-        UNSCOPED_INFO("built");
         REQUIRE(run.build(
             "  <text name=\"old\" left=\"0\" top=\"0\" width=\"80\" height=\"20\""
             " word_wrap=\"true\">Hello</text>\n"
@@ -776,9 +725,8 @@ namespace
             " wrap=\"true\">Hello</text>"));
 
         UNSCOPED_INFO(run.describe());
-        REQUIRE(run.count(ALXUILint::Rule::DeprecatedAttribute) == 1);
+        CHECK(run.count(ALXUILint::Rule::DeprecatedAttribute) == 1);
         const ALXUILint::Finding* f = run.first(ALXUILint::Rule::DeprecatedAttribute);
-        UNSCOPED_INFO("found");
         REQUIRE(f != nullptr);
         UNSCOPED_INFO("the old spelling is the one reported");
         CHECK(f->what == std::string("word_wrap"));
@@ -791,14 +739,12 @@ namespace
 
         // Applied, it is the same edit as any other spelling fix.
         ALXUIEdit edit;
-        UNSCOPED_INFO("loads the same bytes");
         REQUIRE(edit.loadBuffer(run.source));
-        UNSCOPED_INFO("fixed");
         CHECK(f->applyFix(edit, run.anchorFor(f->path)));
         UNSCOPED_INFO("the old name is gone");
-        REQUIRE(edit.text().find("word_wrap=\"true\"") == std::string::npos);
+        CHECK(edit.text().find("word_wrap=\"true\"") == std::string::npos);
         UNSCOPED_INFO("and the new one is where it was");
-        REQUIRE(edit.text().find("wrap=\"true\">Hello</text>") != std::string::npos);
+        CHECK(edit.text().find("wrap=\"true\">Hello</text>") != std::string::npos);
     }
 
     // An element already carrying both names is not one to write a second of:
@@ -811,7 +757,6 @@ namespace
         }
 
         Run run;
-        UNSCOPED_INFO("built");
         REQUIRE(run.build(
             "  <text name=\"both\" left=\"0\" top=\"0\" width=\"80\" height=\"20\""
             " word_wrap=\"true\" wrap=\"true\">Hello</text>"));
@@ -854,7 +799,6 @@ namespace
         }
         ALXUICatalog has_it;
         has_it.scan(skins);
-        UNSCOPED_INFO("the catalog has the file");
         REQUIRE(has_it.find(REAL) != nullptr);
         ALXUICatalog has_not;
 
@@ -863,21 +807,18 @@ namespace
         {
             Run run;
             run.catalog = &has_it;
-            UNSCOPED_INFO("builds");
-            CHECK(run.build(body));
+            REQUIRE(run.build(body));
             UNSCOPED_INFO("the panel was built");
             CHECK(run.panel->getChildCount() > 0);
             UNSCOPED_INFO("a file the catalog has: " + run.describe());
-            REQUIRE(run.count(ALXUILint::Rule::FileMissing) == 0);
+            CHECK(run.count(ALXUILint::Rule::FileMissing) == 0);
         }
         {
             Run run;
             run.catalog = &has_not;
-            UNSCOPED_INFO("builds");
             CHECK(run.build(body));
             UNSCOPED_INFO("and one it has not: " + run.describe());
             REQUIRE(run.count(ALXUILint::Rule::FileMissing) == 1);
-            UNSCOPED_INFO("named");
             CHECK(run.first(ALXUILint::Rule::FileMissing)->what == std::string("filename"));
         }
     }
@@ -892,7 +833,6 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        UNSCOPED_INFO("builds");
         REQUIRE(run.build(
             "  <panel name=\"a\" tool_tp=\"slip\" left=\"0\" top=\"0\" width=\"300\" height=\"20\"/>\n"
             "  <panel name=\"a\" left=\"0\" top=\"30\" width=\"20\" height=\"0\"/>\n"
@@ -913,7 +853,6 @@ namespace
         }
 
         const ALXUILint::Finding* slip = run.first(ALXUILint::Rule::UnknownAttribute);
-        UNSCOPED_INFO("the slip was found");
         REQUIRE(slip != nullptr);
         UNSCOPED_INFO("as the sentence with the spelling in it");
         CHECK(slip->key == std::string("LintUnknownAttributeSlip"));
@@ -925,7 +864,6 @@ namespace
         CHECK(slip->args.at("[MEANT]")() == std::string("tool_tip"));
 
         const ALXUILint::Finding* empty = run.first(ALXUILint::Rule::EmptyRect);
-        UNSCOPED_INFO("the empty rect was found");
         REQUIRE(empty != nullptr);
         UNSCOPED_INFO("with its height");
         CHECK(empty->args.at("[HEIGHT]")() == std::string("0"));
@@ -945,7 +883,7 @@ namespace
         {
             const std::string said = ALXUILint::wording(key, none);
             {
-                INFO("the file has a line for " + std::string(key));
+                INFO("the file has a line for " << key);
                 REQUIRE_FALSE(said.empty());
                 REQUIRE(said != key);
             }
@@ -955,7 +893,7 @@ namespace
             const ALXUILint::Rule rule = (ALXUILint::Rule)i;
             const std::string label = ALXUILint::ruleLabel(rule);
             {
-                INFO("the file names the rule " + std::string(ALXUILint::ruleKey(rule)));
+                INFO("the file names the rule " << ALXUILint::ruleKey(rule));
                 REQUIRE_FALSE(label.empty());
                 REQUIRE(label != ALXUILint::ruleKey(rule));
             }
@@ -971,7 +909,7 @@ namespace
         {
             const std::string label = ALXUILint::severityLabel(severity);
             {
-                INFO("the file names the severity " + std::string(ALXUILint::severityKey(severity)));
+                INFO("the file names the severity " << ALXUILint::severityKey(severity));
                 REQUIRE_FALSE(label.empty());
                 REQUIRE(label != ALXUILint::severityKey(severity));
             }
@@ -995,7 +933,6 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        UNSCOPED_INFO("builds");
         REQUIRE(run.build(
             "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"20\" height=\"20\"/>\n"
             "  <panel name=\"a\" left=\"100\" top=\"0\" width=\"20\" height=\"20\"/>\n"
@@ -1029,11 +966,8 @@ namespace
             "</floater>\n";
         LLXMLNodePtr base;
         LLXMLNodePtr layer;
-        {
-            INFO("parses");
-            REQUIRE(LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base));
-            REQUIRE(LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
-        }
+        REQUIRE(LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base));
+        REQUIRE(LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
         ALXUIOverlay overlay;
         overlay.layerParsed(0, "floater_x.xml");
         overlay.layerParsed(1, "de/floater_x.xml");
@@ -1054,18 +988,15 @@ namespace
         }
         UNSCOPED_INFO("the attribute the base lacks is a drop");
         REQUIRE(drop != nullptr);
-        UNSCOPED_INFO("which is a warning");
         CHECK(drop->severity == ALXUILint::Severity::Warning);
         UNSCOPED_INFO("in the layer's file");
         CHECK(drop->file == std::string("de/floater_x.xml"));
-        UNSCOPED_INFO("naming the attribute");
         CHECK(drop->what == std::string("extra"));
         UNSCOPED_INFO("in the sentence's words");
         CHECK(drop->message == ALXUILint::wording("LintDropAttribute", drop->args));
 
         UNSCOPED_INFO("the value applied where the base moved it is a rescue");
         REQUIRE(rescue != nullptr);
-        UNSCOPED_INFO("which is a note");
         CHECK(rescue->severity == ALXUILint::Severity::Note);
         UNSCOPED_INFO("on the element it landed on");
         CHECK(ALXUISelection::toString(rescue->path) == std::string("stack/note"));
@@ -1098,7 +1029,6 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        UNSCOPED_INFO("builds");
         REQUIRE(run.build(
             "  <string name=\"shared\">Hello</string>\n"
             "  <panel name=\"shared\" left=\"0\" top=\"0\" width=\"20\" height=\"20\"/>\n"
@@ -1109,7 +1039,6 @@ namespace
         const ALXUILint::Finding* f = run.first(ALXUILint::Rule::NameCollision);
         UNSCOPED_INFO("said as the parameter sentence");
         CHECK(f->key == std::string("LintNameCollisionParameter"));
-        UNSCOPED_INFO("naming the name");
         CHECK(f->what == std::string("shared"));
         UNSCOPED_INFO("the parameter element");
         CHECK(f->args.at("[TAG]")() == std::string("string"));
@@ -1118,6 +1047,6 @@ namespace
         UNSCOPED_INFO("under the parent");
         CHECK(f->args.at("[PARENT]")() == std::string("root"));
         UNSCOPED_INFO("on the parent's path, since a path cannot name the pair");
-        REQUIRE(f->path.empty());
+        CHECK(f->path.empty());
     }
 }

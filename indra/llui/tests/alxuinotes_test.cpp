@@ -48,12 +48,9 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const ALXUINotes& notes = ALXUINotes::get();
-        UNSCOPED_INFO("the file was read: " + std::to_string(notes.count()));
-        REQUIRE(notes.count() > 100);
-        UNSCOPED_INFO("a button has a sentence");
-        REQUIRE_FALSE(notes.note("button").empty());
-        UNSCOPED_INFO("a tag nobody wrote about has none");
-        REQUIRE(notes.note("no_such_tag").empty());
+        CHECK(notes.count() > 100);
+        CHECK_FALSE(notes.note("button").empty());
+        CHECK(notes.note("no_such_tag").empty());
         UNSCOPED_INFO("and asking twice is the same file");
         CHECK(&ALXUINotes::get() == &notes);
     }
@@ -67,15 +64,12 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const ALXUINotes& notes = ALXUINotes::get();
-        UNSCOPED_INFO("there are corrections: " + std::to_string(notes.attributeCount()));
         CHECK(notes.attributeCount() > 10);
 
         const ALXUINotes::Attribute* watermark = notes.attribute("line_editor", "watermark_text");
         UNSCOPED_INFO("watermark_text is a mistake under a line editor");
         REQUIRE(watermark != nullptr);
-        UNSCOPED_INFO("and is deprecated");
         CHECK(watermark->deprecated);
-        UNSCOPED_INFO("for label");
         CHECK(watermark->instead == std::string("label"));
         UNSCOPED_INFO("and the same mistake under a text editor");
         CHECK(notes.attribute("text_editor", "watermark_text") == watermark);
@@ -83,12 +77,11 @@ namespace
         const ALXUINotes::Attribute* min_width = notes.attribute("layout_panel", "min_width");
         UNSCOPED_INFO("min_width is a mistake on a layout panel");
         REQUIRE(min_width != nullptr);
-        UNSCOPED_INFO("written min_dim instead");
         CHECK(min_width->instead == std::string("min_dim"));
         UNSCOPED_INFO("and is not one on a panel, which has no min_dim to write");
-        REQUIRE(notes.attribute("panel", "min_width") == nullptr);
+        CHECK(notes.attribute("panel", "min_width") == nullptr);
 
         UNSCOPED_INFO("a name nobody corrected has no line");
-        REQUIRE(notes.attribute("button", "label") == nullptr);
+        CHECK(notes.attribute("button", "label") == nullptr);
     }
 }

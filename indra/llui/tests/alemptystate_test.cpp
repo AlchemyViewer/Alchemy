@@ -62,7 +62,6 @@ namespace
         }
     };
 
-    // The parts are read down the middle in the order they are given.
     TEST_CASE_METHOD(alemptystate_data, "alemptystate: headline then sentence then button read down the middle", "[alemptystate]")
     {
         if (!ui.ok())
@@ -77,13 +76,13 @@ namespace
         const LLRect sentence = part(state, "sentence")->getRect();
         const LLRect action = part(state, "action")->getRect();
 
-        UNSCOPED_INFO("the sentence is under the headline " + where(sentence));
+        UNSCOPED_INFO("the sentence is under the headline " << where(sentence));
         CHECK(sentence.mTop <= headline.mBottom);
-        UNSCOPED_INFO("and the button under the sentence " + where(action));
+        UNSCOPED_INFO("and the button under the sentence " << where(action));
         CHECK(action.mTop <= sentence.mBottom);
         {
             INFO("all of it is inside the room");
-            REQUIRE(state->getLocalRect().contains(headline));
+            CHECK(state->getLocalRect().contains(headline));
             CHECK(state->getLocalRect().contains(action));
         }
         state->die();
@@ -105,7 +104,7 @@ namespace
         const LLRect sentence = part(state, "sentence")->getRect();
         const S32 above = 400 - headline.mTop;
         const S32 below = sentence.mBottom;
-        UNSCOPED_INFO("as much room above as below: " + std::to_string(above) + " and " + std::to_string(below));
+        CAPTURE(above, below);
         CHECK(llabs(above - below) <= 2);
         state->die();
     }
@@ -122,11 +121,9 @@ namespace
         ALEmptyState* state = build();
         state->say(LLStringUtil::null, "Nothing matches that.");
 
-        UNSCOPED_INFO("no headline is shown");
         CHECK_FALSE(part(state, "headline")->getVisible());
         UNSCOPED_INFO("nor a button nobody gave");
         CHECK_FALSE(part(state, "action")->getVisible());
-        UNSCOPED_INFO("the sentence is shown");
         CHECK(part(state, "sentence")->getVisible());
 
         // And it is in the middle of the room, not under where a headline
@@ -134,14 +131,13 @@ namespace
         const LLRect sentence = part(state, "sentence")->getRect();
         const S32 middle = state->getRect().getHeight() / 2;
         {
-            INFO("centred on its own " + where(sentence));
+            INFO("centred on its own " << where(sentence));
             CHECK(sentence.mTop >= middle);
             CHECK(sentence.mBottom <= middle);
         }
         state->die();
     }
 
-    // A sentence too long for the width is read down rather than cut off.
     TEST_CASE_METHOD(alemptystate_data, "alemptystate: a sentence too long for the width wraps rather than being cut off", "[alemptystate]")
     {
         if (!ui.ok())
@@ -158,7 +154,7 @@ namespace
                    "and every field the tag answers to is on this page.");
         const S32 many = part(state, "sentence")->getRect().getHeight();
 
-        UNSCOPED_INFO("it takes more than one line: " + std::to_string(one_line) + " then " + std::to_string(many));
+        CAPTURE(one_line, many);
         CHECK(many > one_line);
         UNSCOPED_INFO("and stays inside the room");
         CHECK(state->getLocalRect().contains(part(state, "sentence")->getRect()));
@@ -186,7 +182,6 @@ namespace
         state->die();
     }
 
-    // Saying something else says something else.
     TEST_CASE_METHOD(alemptystate_data, "alemptystate: saying something new replaces the headline and the sentence", "[alemptystate]")
     {
         if (!ui.ok())
@@ -196,13 +191,10 @@ namespace
 
         ALEmptyState* state = build();
         state->say("Nothing selected", "Choose one.");
-        UNSCOPED_INFO("it says what it was told");
         CHECK(state->headline() == std::string("Nothing selected"));
 
         state->say("No field of that name", "Clear the filter.");
-        UNSCOPED_INFO("and then the other thing");
         CHECK(state->headline() == std::string("No field of that name"));
-        UNSCOPED_INFO("with its own sentence");
         CHECK(state->sentence() == std::string("Clear the filter."));
         UNSCOPED_INFO("and no button, since none was given");
         CHECK_FALSE(part(state, "action")->getVisible());
@@ -224,18 +216,15 @@ namespace
         state->say("No script open", "Open one, or make one.", "Open File...", "New Script...");
         const LLRect a = part(state, "action")->getRect();
         const LLRect b = part(state, "second_action")->getRect();
-        {
-            INFO("both shown");
-            REQUIRE(part(state, "action")->getVisible());
-            CHECK(part(state, "second_action")->getVisible());
-        }
+        CHECK(part(state, "action")->getVisible());
+        CHECK(part(state, "second_action")->getVisible());
         UNSCOPED_INFO("on one row");
         CHECK(a.mTop == b.mTop);
         UNSCOPED_INFO("side by side");
         CHECK(a.mRight <= b.mLeft);
         {
             INFO("inside the room");
-            REQUIRE(state->getLocalRect().contains(a));
+            CHECK(state->getLocalRect().contains(a));
             CHECK(state->getLocalRect().contains(b));
         }
         UNSCOPED_INFO("under the sentence");
@@ -269,7 +258,6 @@ namespace
         CHECK_FALSE(part(state, "link")->getVisible());
         state->setLink("Open a file...");
         const LLRect link = part(state, "link")->getRect();
-        UNSCOPED_INFO("shown");
         CHECK(part(state, "link")->getVisible());
         UNSCOPED_INFO("under the buttons");
         CHECK(link.mTop <= part(state, "action")->getRect().mBottom);
@@ -282,7 +270,6 @@ namespace
         const S32  y    = link.getHeight() / 2;
         text->handleMouseDown(x, y, MASK_NONE);
         text->handleMouseUp(x, y, MASK_NONE);
-        UNSCOPED_INFO("clicked");
         CHECK(clicked == 1);
         state->setLink(std::string());
         UNSCOPED_INFO("gone when taken away");

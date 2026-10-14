@@ -142,7 +142,7 @@ namespace
         // twenty-six is not a defect -- and a stack beside other children is
         // exempt too, because a window puts one between its menu bar and its
         // status line deliberately.
-        static void ensureFills(const std::string& file, LLView* view, std::vector<std::string>& gaps)
+        static void collectGaps(const std::string& file, LLView* view, std::vector<std::string>& gaps)
         {
             for (LLView* child : *view->getChildList())
             {
@@ -171,7 +171,7 @@ namespace
                                        + view->getName() + ", which is " + where(want) + bands);
                     }
                 }
-                ensureFills(file, child, gaps);
+                collectGaps(file, child, gaps);
             }
         }
     };
@@ -193,7 +193,7 @@ namespace
         REQUIRE(floater != nullptr);
 
         std::vector<std::string> gaps;
-        ensureFills("floater_xui_studio.xml", floater, gaps);
+        collectGaps("floater_xui_studio.xml", floater, gaps);
 
         std::string report;
         for (const std::string& gap : gaps)
@@ -201,7 +201,7 @@ namespace
             report += "\n  " + gap;
         }
         UNSCOPED_INFO("every stack fills what it is in:" + report);
-        REQUIRE(gaps.empty());
+        CHECK(gaps.empty());
 
         // The band of tables is dragged against the canvas, and the bar that
         // does it belongs to the panel above it. Put anything between them
@@ -211,7 +211,7 @@ namespace
         UNSCOPED_INFO("the centre is a stack");
         REQUIRE(centre != nullptr);
         UNSCOPED_INFO("the band of tables is in it");
-        REQUIRE(centre->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
+        CHECK(centre->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
 
         S32 draggable = 0;
         for (LLView* child : *centre->getChildList())
@@ -242,7 +242,7 @@ namespace
         REQUIRE(floater != nullptr);
 
         std::vector<std::string> gaps;
-        ensureFills("floater_xui_library.xml", floater, gaps);
+        collectGaps("floater_xui_library.xml", floater, gaps);
 
         std::string report;
         for (const std::string& gap : gaps)
@@ -250,7 +250,7 @@ namespace
             report += "\n  " + gap;
         }
         UNSCOPED_INFO("every stack fills what it is in:" + report);
-        REQUIRE(gaps.empty());
+        CHECK(gaps.empty());
         stage->die();
     }
 
@@ -270,7 +270,7 @@ namespace
         REQUIRE(floater != nullptr);
 
         std::vector<std::string> gaps;
-        ensureFills("floater_script_studio.xml", floater, gaps);
+        collectGaps("floater_script_studio.xml", floater, gaps);
 
         std::string report;
         for (const std::string& gap : gaps)
@@ -278,16 +278,16 @@ namespace
             report += "\n  " + gap;
         }
         UNSCOPED_INFO("every stack fills what it is in:" + report);
-        REQUIRE(gaps.empty());
+        CHECK(gaps.empty());
 
         LLLayoutStack* main = floater->findChild<LLLayoutStack>("main_stack", true);
         UNSCOPED_INFO("the window is a stack");
         REQUIRE(main != nullptr);
         UNSCOPED_INFO("the band of problems is in it");
-        REQUIRE(main->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
+        CHECK(main->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
         LLLayoutPanel* editor = main->findChild<LLLayoutPanel>("editor_host", true);
         UNSCOPED_INFO("the editor is in it");
-        REQUIRE(editor != nullptr);
+        CHECK(editor != nullptr);
         // The bar between the band and what is above it belongs to the panel
         // above the boundary -- the strip under the editor, since the
         // breadcrumb moved there -- so it is that panel's bar that drags

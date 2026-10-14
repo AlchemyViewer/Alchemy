@@ -63,7 +63,6 @@ namespace
         ALCornerField*        f    = field();
         const LLCheckBoxCtrl* link = f->getChild<LLCheckBoxCtrl>("link");
         f->setValue("1 2 3 4");
-        UNSCOPED_INFO("four");
         CHECK(f->getValue().asString() == std::string("1 2 3 4"));
         {
             INFO("each in its box");
@@ -72,17 +71,14 @@ namespace
             CHECK(box(f, "br") == 3.0);
             CHECK(box(f, "bl") == 4.0);
         }
-        UNSCOPED_INFO("not linked");
         CHECK_FALSE(link->get());
         f->setValue("3");
         UNSCOPED_INFO("one is all four");
         CHECK(f->getValue().asString() == std::string("3 3 3 3"));
-        UNSCOPED_INFO("and linked");
         CHECK(link->get());
         f->setValue("1 2");
         UNSCOPED_INFO("two are the diagonals");
         CHECK(f->getValue().asString() == std::string("1 2 1 2"));
-        UNSCOPED_INFO("not linked");
         CHECK_FALSE(link->get());
         f->setValue("5 6 7 8 9");
         UNSCOPED_INFO("past four, the first four");
@@ -90,7 +86,6 @@ namespace
         f->setValue("");
         UNSCOPED_INFO("none is none");
         CHECK(f->getValue().asString() == std::string("0 0 0 0"));
-        UNSCOPED_INFO("and linked");
         CHECK(link->get());
         f->die();
     }
@@ -115,7 +110,6 @@ namespace
             CHECK(box(f, "tl") == 5.0);
             CHECK(box(f, "bl") == 5.0);
         }
-        UNSCOPED_INFO("committed once");
         CHECK(commits == 1);
 
         f->getChild<LLCheckBoxCtrl>("link")->set(false);
@@ -126,7 +120,6 @@ namespace
         CHECK(f->getValue().asString() == std::string("1 5 5 5"));
         UNSCOPED_INFO("the others' boxes as they were");
         CHECK(box(f, "tr") == 5.0);
-        UNSCOPED_INFO("committed again");
         CHECK(commits == 2);
         f->die();
     }

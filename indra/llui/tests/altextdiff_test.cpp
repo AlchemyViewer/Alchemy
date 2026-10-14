@@ -58,8 +58,8 @@ namespace
         // An anchored diff's runs may part two changes with a Same run of
         // no lines, where `partings`; lines the same, told so as `like` has
         // it.
-        static S32 walk(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<Run>& runs, bool partings = false,
-                        const ALTextDiff::Likeness& like = ALTextDiff::Likeness())
+        static S32 require_walks(const std::vector<std::string>& left, const std::vector<std::string>& right, const std::vector<Run>& runs,
+                                 bool partings = false, const ALTextDiff::Likeness& like = ALTextDiff::Likeness())
         {
             S32 l = 0, r = 0, changed = 0;
             for (const Run& run : runs)
@@ -74,7 +74,7 @@ namespace
                 {
                     for (S32 i = 0; i < run.count; ++i)
                     {
-                        UNSCOPED_INFO("the same, the same");
+                        UNSCOPED_INFO("a Same run's lines alike");
                         REQUIRE(ALTextDiff::likenessOf(left[l + i], like) == ALTextDiff::likenessOf(right[r + i], like));
                     }
                     l += run.count;
@@ -153,7 +153,6 @@ namespace
 
     TEST_CASE_METHOD(altextdiff_data, "altextdiff: split breaks lines at LF and CR LF and a lone CR as a document does", "[altextdiff]")
     {
-        UNSCOPED_INFO("one empty line");
         CHECK(ALTextDiff::split("") == std::vector<std::string>{ "" });
         UNSCOPED_INFO("a last line after the last break");
         CHECK(ALTextDiff::split("a\nb\n") == std::vector<std::string>{ "a", "b", "" });
@@ -174,35 +173,51 @@ namespace
             REQUIRE(same.size() == 1);
             CHECK(same[0] == Run{ Kind::Same, 0, 0, 3 });
         }
-        UNSCOPED_INFO("all put in");
-        CHECK(walk({}, three, ALTextDiff::lines({}, three)) == 3);
-        UNSCOPED_INFO("all taken out");
-        CHECK(walk(three, {}, ALTextDiff::lines(three, {})) == 3);
-        UNSCOPED_INFO("nothing for nothing");
+        {
+            INFO("all put in");
+            CHECK(require_walks({}, three, ALTextDiff::lines({}, three)) == 3);
+        }
+        {
+            INFO("all taken out");
+            CHECK(require_walks(three, {}, ALTextDiff::lines(three, {})) == 3);
+        }
         REQUIRE(ALTextDiff::lines({}, {}).empty());
     }
 
     TEST_CASE_METHOD(altextdiff_data, "altextdiff: a line changed or put in or taken out costs the fewest lines", "[altextdiff]")
     {
         const std::vector<std::string> was = { "a", "b", "c", "d", "e" };
-        UNSCOPED_INFO("one changed: one out, one in");
-        CHECK(walk(was, { "a", "b", "x", "d", "e" }, ALTextDiff::lines(was, { "a", "b", "x", "d", "e" })) == 2);
-        UNSCOPED_INFO("one put in");
-        CHECK(walk(was, { "a", "b", "n", "c", "d", "e" }, ALTextDiff::lines(was, { "a", "b", "n", "c", "d", "e" })) == 1);
-        UNSCOPED_INFO("one taken out");
-        CHECK(walk(was, { "a", "c", "d", "e" }, ALTextDiff::lines(was, { "a", "c", "d", "e" })) == 1);
-        UNSCOPED_INFO("at the top");
-        CHECK(walk(was, { "t", "a", "b", "c", "d", "e" }, ALTextDiff::lines(was, { "t", "a", "b", "c", "d", "e" })) == 1);
-        UNSCOPED_INFO("at the end");
-        CHECK(walk(was, { "a", "b", "c", "d", "e", "z" }, ALTextDiff::lines(was, { "a", "b", "c", "d", "e", "z" })) == 1);
-        UNSCOPED_INFO("two apart");
-        CHECK(walk(was, { "x", "b", "c", "d", "y" }, ALTextDiff::lines(was, { "x", "b", "c", "d", "y" })) == 4);
+        {
+            INFO("one changed: one out, one in");
+            CHECK(require_walks(was, { "a", "b", "x", "d", "e" }, ALTextDiff::lines(was, { "a", "b", "x", "d", "e" })) == 2);
+        }
+        {
+            INFO("one put in");
+            CHECK(require_walks(was, { "a", "b", "n", "c", "d", "e" }, ALTextDiff::lines(was, { "a", "b", "n", "c", "d", "e" })) == 1);
+        }
+        {
+            INFO("one taken out");
+            CHECK(require_walks(was, { "a", "c", "d", "e" }, ALTextDiff::lines(was, { "a", "c", "d", "e" })) == 1);
+        }
+        {
+            INFO("at the top");
+            CHECK(require_walks(was, { "t", "a", "b", "c", "d", "e" }, ALTextDiff::lines(was, { "t", "a", "b", "c", "d", "e" })) == 1);
+        }
+        {
+            INFO("at the end");
+            CHECK(require_walks(was, { "a", "b", "c", "d", "e", "z" }, ALTextDiff::lines(was, { "a", "b", "c", "d", "e", "z" })) == 1);
+        }
+        {
+            INFO("two apart");
+            CHECK(require_walks(was, { "x", "b", "c", "d", "y" }, ALTextDiff::lines(was, { "x", "b", "c", "d", "y" })) == 4);
+        }
         // Repeated lines, where a greedy match would pair the wrong ones.
         const std::vector<std::string> braces = { "{", "a", "}", "{", "b", "}" };
-        UNSCOPED_INFO("a block put in between the same braces");
-        CHECK(walk(braces, { "{", "a", "}", "{", "n", "}", "{", "b", "}" },
-                                                                   ALTextDiff::lines(braces, { "{", "a", "}", "{", "n", "}", "{", "b", "}" })) ==
-                      3);
+        {
+            INFO("a block put in between the same braces");
+            CHECK(require_walks(braces, { "{", "a", "}", "{", "n", "}", "{", "b", "}" },
+                                ALTextDiff::lines(braces, { "{", "a", "}", "{", "n", "}", "{", "b", "}" })) == 3);
+        }
         const std::vector<Run> runs = ALTextDiff::lines(was, { "a", "b", "x", "d", "e" });
         {
             INFO("runs joined: same, out, in, same");
@@ -221,15 +236,18 @@ namespace
             right[static_cast<size_t>(at)] = "changed " + std::to_string(at);
         }
         right.insert(right.begin() + 12345, "new");
-        UNSCOPED_INFO("five changed, one put in");
-        CHECK(walk(left, right, ALTextDiff::lines(left, right)) == 11);
+        {
+            INFO("five changed, one put in");
+            CHECK(require_walks(left, right, ALTextDiff::lines(left, right)) == 11);
+        }
 
         const std::vector<std::string> other = numbered(2000, "other ");
         const std::vector<std::string> mine  = numbered(2000, "mine ");
         const std::vector<Run>         runs  = ALTextDiff::lines(mine, other);
-        UNSCOPED_INFO("nothing shared: all out and in");
-        CHECK(walk(mine, other, runs) == 4000);
-        UNSCOPED_INFO("as two runs");
+        {
+            INFO("nothing shared: all out and in");
+            CHECK(require_walks(mine, other, runs) == 4000);
+        }
         REQUIRE(runs.size() == 2);
     }
 
@@ -289,7 +307,7 @@ namespace
         // state_entry's call to its call; the blank before the end.
         const ALTextDiff::anchors_t anchors = { { 4, 2 }, { 6, 3 } };
         const std::vector<Run>      runs    = ALTextDiff::lines(lsl, slua, at(anchors));
-        walk(lsl, slua, runs, true);
+        require_walks(lsl, slua, runs, true);
         // The call stands first in its change, beside its own.
         bool paired = false;
         for (size_t i = 0; i + 1 < runs.size(); ++i)
@@ -330,7 +348,7 @@ namespace
             "// Frobs foo heartily", "int frobnitz(int foo)", "{", "    int i;", "    for(i = 0; i < 10; i++)", "    {", "        printf(\"%d\\n\", foo);", "    }", "}", "",
             "int main(int argc, char **argv)", "{", "    frobnitz(fib(10));", "}" };
         const std::vector<Run> runs = ALTextDiff::lines(was, now);
-        walk(was, now, runs);
+        require_walks(was, now, runs);
         // Each line of frobnitz on the left, and what it stands beside.
         std::vector<S32> beside(was.size(), -1);
         for (const Run& run : runs)
@@ -367,7 +385,7 @@ namespace
         // last line could be taken for the next's first.
         now.insert(now.begin() + 4, { "if (n)", "{", "    new();", "}" });
         std::vector<Run> runs = ALTextDiff::lines(was, now);
-        walk(was, now, runs);
+        require_walks(was, now, runs);
         {
             INFO("one run put in, from its if");
             REQUIRE(runs.size() == 3);
@@ -379,7 +397,7 @@ namespace
         std::vector<std::string>       added   = wrapped;
         added.insert(added.begin() + 3, { "{", "    n();", "}" });
         runs = ALTextDiff::lines(wrapped, added);
-        walk(wrapped, added, runs);
+        require_walks(wrapped, added, runs);
         {
             INFO("a braced block from its opening brace");
             REQUIRE(runs.size() == 3);
@@ -391,7 +409,7 @@ namespace
         const std::vector<std::string> functions = { "f() {", "}", "", "g() {", "}" };
         const std::vector<std::string> more      = { "f() {", "}", "", "n() {", "}", "", "g() {", "}" };
         runs = ALTextDiff::lines(functions, more);
-        walk(functions, more, runs);
+        require_walks(functions, more, runs);
         {
             INFO("a function and the blank line after it");
             REQUIRE(runs.size() == 3);
@@ -409,8 +427,10 @@ namespace
             right[i] = "changed " + std::to_string(i);
         }
         const std::vector<Run> runs = ALTextDiff::lines(left, right);
-        UNSCOPED_INFO("each changed line out and in, the rest the same");
-        CHECK(walk(left, right, runs) == 3000);
+        {
+            INFO("each changed line out and in, the rest the same");
+            CHECK(require_walks(left, right, runs) == 3000);
+        }
     }
 
     TEST_CASE_METHOD(altextdiff_data, "altextdiff: the runs of any two texts walk both with or without anchors", "[altextdiff]")
@@ -421,6 +441,7 @@ namespace
         std::uniform_int_distribution<int> length(0, 60);
         for (S32 round = 0; round < 300; ++round)
         {
+            CAPTURE(round);
             std::vector<std::string> left;
             std::vector<std::string> right;
             for (S32 i = length(random); i > 0; --i)
@@ -441,13 +462,13 @@ namespace
                 }
                 right.push_back(what == 2 ? pieces[static_cast<size_t>(piece(random))] : line);
             }
-            walk(left, right, ALTextDiff::lines(left, right));
+            require_walks(left, right, ALTextDiff::lines(left, right));
             ALTextDiff::anchors_t anchors;
             for (S32 i = 0; i < 3 && !left.empty() && !right.empty(); ++i)
             {
                 anchors.emplace_back(static_cast<S32>(random() % left.size()), static_cast<S32>(random() % right.size()));
             }
-            walk(left, right, ALTextDiff::lines(left, right, at(anchors)), true);
+            require_walks(left, right, ALTextDiff::lines(left, right, at(anchors)), true);
         }
     }
 
@@ -459,6 +480,7 @@ namespace
         std::uniform_int_distribution<int> length(0, 40);
         for (S32 round = 0; round < 400; ++round)
         {
+            CAPTURE(round);
             // Each mark a word of its own.
             std::string left;
             std::string right;
@@ -491,9 +513,10 @@ namespace
             {
                 put += end - begin;
             }
-            UNSCOPED_INFO("taken out, at least: " + left + " | " + right);
+            CAPTURE(left, right);
+            UNSCOPED_INFO("taken out, at least");
             REQUIRE(taken >= static_cast<S32>(left.size()) - lcs[0][0]);
-            UNSCOPED_INFO("put in, at least: " + left + " | " + right);
+            UNSCOPED_INFO("put in, at least");
             REQUIRE(put >= static_cast<S32>(right.size()) - lcs[0][0]);
             // What is left unmarked on each side reads the same.
             const auto unmarked = [](const std::string& text, const ALTextDiff::spans_t& spans) {
@@ -512,7 +535,7 @@ namespace
                 }
                 return out;
             };
-            UNSCOPED_INFO("unmarked, the same: " + left + " | " + right);
+            UNSCOPED_INFO("unmarked, the same");
             REQUIRE(unmarked(left, lout) == unmarked(right, rout));
         }
     }
@@ -523,11 +546,15 @@ namespace
         blanks.ignoreWhitespace = true;
         const std::vector<std::string> was = { "integer x;", "if (a) {", "a b", "end" };
         const std::vector<std::string> now = { "    integer x;  ", "if (a)\t  {", "ab", "end" };
-        UNSCOPED_INFO("as they are: three changed");
-        CHECK(walk(was, now, ALTextDiff::lines(was, now)) == 6);
+        {
+            INFO("as they are: three changed");
+            CHECK(require_walks(was, now, ALTextDiff::lines(was, now)) == 6);
+        }
         std::vector<Run> runs = ALTextDiff::lines(was, now, as(blanks));
-        UNSCOPED_INFO("re-indented and re-spaced the same; a blank gone altogether not");
-        CHECK(walk(was, now, runs, false, blanks) == 2);
+        {
+            INFO("re-indented and re-spaced the same; a blank gone altogether not");
+            CHECK(require_walks(was, now, runs, false, blanks) == 2);
+        }
         {
             INFO("the one changed the third: out and in");
             REQUIRE(runs.size() == 4);
@@ -538,15 +565,19 @@ namespace
 
         ALTextDiff::Likeness cased;
         cased.ignoreCase = true;
-        UNSCOPED_INFO("case let go of");
-        CHECK(walk({ "Hello World" }, { "hello world" }, ALTextDiff::lines({ "Hello World" }, { "hello world" }, as(cased)), false, cased) == 0);
-        UNSCOPED_INFO("but not blanks");
-        CHECK(walk({ "Hello World" }, { "hello  world" }, ALTextDiff::lines({ "Hello World" }, { "hello  world" }, as(cased)), false, cased) == 2);
+        {
+            INFO("case let go of");
+            CHECK(require_walks({ "Hello World" }, { "hello world" }, ALTextDiff::lines({ "Hello World" }, { "hello world" }, as(cased)), false, cased) == 0);
+        }
+        {
+            INFO("but not blanks");
+            CHECK(require_walks({ "Hello World" }, { "hello  world" }, ALTextDiff::lines({ "Hello World" }, { "hello  world" }, as(cased)), false, cased) == 2);
+        }
 
         const std::vector<std::string> lsl  = { "default", "{", "        llSay(0, x);", "}" };
         const std::vector<std::string> slua = { "-- a", "llSay(0,  x);" };
         runs = ALTextDiff::lines(lsl, slua, at({ { 2, 1 } }, blanks));
-        walk(lsl, slua, runs, true, blanks);
+        require_walks(lsl, slua, runs, true, blanks);
         bool same = false;
         for (const Run& run : runs)
         {
@@ -601,7 +632,6 @@ namespace
         CHECK(ALTextDiff::anchorsOf({ { 4, 4, 2, 6 }, { 4, 4, 4, 4 } }) == A{ { 4, 2 }, { 5, 7 } });
         UNSCOPED_INFO("ranges in a row: one line each way between them");
         CHECK(ALTextDiff::anchorsOf({ { 0, 0, 0, 1 }, { 1, 2, 2, 2 } }) == A{ { 0, 0 }, { 1, 2 }, { 3, 3 } });
-        UNSCOPED_INFO("none: none");
         REQUIRE(ALTextDiff::anchorsOf({}).empty());
     }
 
@@ -744,6 +774,7 @@ namespace
         std::uniform_int_distribution<int> length(0, 40);
         for (S32 round = 0; round < 300; ++round)
         {
+            CAPTURE(round);
             std::vector<std::string> left;
             std::vector<std::string> right;
             for (S32 i = length(random); i > 0; --i)
@@ -772,12 +803,18 @@ namespace
                 }
             }
             const S32 fewest = static_cast<S32>(left.size() + right.size()) - 2 * lcs[0][0];
-            UNSCOPED_INFO("minimal: the fewest");
-            REQUIRE(walk(left, right, ALTextDiff::lines(left, right, by(A::Minimal))) == fewest);
-            UNSCOPED_INFO("patience: no fewer");
-            REQUIRE(walk(left, right, ALTextDiff::lines(left, right, by(A::Patience))) >= fewest);
-            UNSCOPED_INFO("histogram: no fewer");
-            REQUIRE(walk(left, right, ALTextDiff::lines(left, right, by(A::Histogram))) >= fewest);
+            {
+                INFO("minimal: the fewest");
+                REQUIRE(require_walks(left, right, ALTextDiff::lines(left, right, by(A::Minimal))) == fewest);
+            }
+            {
+                INFO("patience: no fewer");
+                REQUIRE(require_walks(left, right, ALTextDiff::lines(left, right, by(A::Patience))) >= fewest);
+            }
+            {
+                INFO("histogram: no fewer");
+                REQUIRE(require_walks(left, right, ALTextDiff::lines(left, right, by(A::Histogram))) >= fewest);
+            }
         }
 
         const std::vector<std::string> was = {
@@ -800,47 +837,62 @@ namespace
         };
         const std::vector<Run> patience = ALTextDiff::lines(was, now, by(A::Patience));
         const std::vector<Run> minimal  = ALTextDiff::lines(was, now, by(A::Minimal));
-        walk(was, now, patience);
-        walk(was, now, minimal);
+        require_walks(was, now, patience);
+        require_walks(was, now, minimal);
         {
             INFO("patience: frobnitz's head beside its own");
             CHECK(beside(patience, 3) == 12);
             CHECK(beside(patience, 4) == 13);
             CHECK(beside(patience, 11) == 19);
         }
-        UNSCOPED_INFO("minimal: fewer or as few as patience");
-        CHECK(walk(was, now, minimal) <= walk(was, now, patience));
-        UNSCOPED_INFO("all three alike here: minimal no more");
-        CHECK(walk(was, now, minimal) <= walk(was, now, patience));
+        {
+            INFO("minimal: fewer or as few as patience");
+            CHECK(require_walks(was, now, minimal) <= require_walks(was, now, patience));
+        }
+        {
+            INFO("all three alike here: minimal no more");
+            CHECK(require_walks(was, now, minimal) <= require_walks(was, now, patience));
+        }
 
         // Where they differ. A line moved from the top to the bottom past
         // lines all alike: histogram and patience keep the line that is
         // once in each, minimal the four alike.
         const std::vector<std::string> top    = { "u", "c", "c", "c", "c" };
         const std::vector<std::string> bottom = { "c", "c", "c", "c", "u" };
-        UNSCOPED_INFO("histogram: the moved line kept");
-        CHECK(walk(top, bottom, ALTextDiff::lines(top, bottom, by(A::Histogram))) == 8);
-        UNSCOPED_INFO("patience likewise");
-        CHECK(walk(top, bottom, ALTextDiff::lines(top, bottom, by(A::Patience))) == 8);
-        UNSCOPED_INFO("minimal: the moved line out and in");
-        CHECK(walk(top, bottom, ALTextDiff::lines(top, bottom, by(A::Minimal))) == 2);
+        {
+            INFO("histogram: the moved line kept");
+            CHECK(require_walks(top, bottom, ALTextDiff::lines(top, bottom, by(A::Histogram))) == 8);
+        }
+        {
+            INFO("patience likewise");
+            CHECK(require_walks(top, bottom, ALTextDiff::lines(top, bottom, by(A::Patience))) == 8);
+        }
+        {
+            INFO("minimal: the moved line out and in");
+            CHECK(require_walks(top, bottom, ALTextDiff::lines(top, bottom, by(A::Minimal))) == 2);
+        }
         // Lines once in each that cross: patience keeps one -- the later
         // -- where histogram keeps the run around the other, which is
         // also the fewest.
         const std::vector<std::string> crossed_left  = { "a", "b", "a", "X" };
         const std::vector<std::string> crossed_right = { "X", "a", "b", "a" };
-        UNSCOPED_INFO("histogram: a b a kept");
-        CHECK(walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Histogram))) == 2);
-        UNSCOPED_INFO("patience: X kept");
-        CHECK(walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Patience))) == 6);
-        UNSCOPED_INFO("minimal: the fewest");
-        CHECK(walk(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Minimal))) == 2);
+        {
+            INFO("histogram: a b a kept");
+            CHECK(require_walks(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Histogram))) == 2);
+        }
+        {
+            INFO("patience: X kept");
+            CHECK(require_walks(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Patience))) == 6);
+        }
+        {
+            INFO("minimal: the fewest");
+            CHECK(require_walks(crossed_left, crossed_right, ALTextDiff::lines(crossed_left, crossed_right, by(A::Minimal))) == 2);
+        }
         for (const A algorithm : { A::Histogram, A::Patience, A::Minimal })
         {
             UNSCOPED_INFO("each by its name and back");
             REQUIRE(ALTextDiff::algorithmFromName(ALTextDiff::algorithmName(algorithm)) == algorithm);
         }
-        UNSCOPED_INFO("a name of none, nothing");
         REQUIRE_FALSE(ALTextDiff::algorithmFromName("myers").has_value());
     }
 
@@ -962,8 +1014,10 @@ namespace
         CHECK(ALTextDiff::likenessOf("x = 1;  \t", trailing) == std::string("x = 1;"));
         UNSCOPED_INFO("not inside");
         CHECK(ALTextDiff::likenessOf("x  = 1;", trailing) == std::string("x  = 1;"));
-        UNSCOPED_INFO("one changed at its end alone: none");
-        CHECK(walk({ "a", "b  " }, { "a", "b" }, ALTextDiff::lines({ "a", "b  " }, { "a", "b" }, as(trailing)), false, trailing) == 0);
+        {
+            INFO("one changed at its end alone: none");
+            CHECK(require_walks({ "a", "b  " }, { "a", "b" }, ALTextDiff::lines({ "a", "b  " }, { "a", "b" }, as(trailing)), false, trailing) == 0);
+        }
 
         ALTextDiff::Likeness blank;
         blank.ignoreBlankLines = true;
@@ -1050,6 +1104,7 @@ namespace
         S32                                spliced = 0;
         for (S32 round = 0; round < 400; ++round)
         {
+            CAPTURE(round);
             std::vector<std::string> left;
             for (S32 i = length(random); i > 0; --i)
             {
@@ -1076,7 +1131,7 @@ namespace
             if (ALDiffSplice::splice(runs, left, left_now, right, right_now, ALTextDiff::Options()))
             {
                 ++spliced;
-                walk(left_now, right_now, runs);
+                require_walks(left_now, right_now, runs);
             }
         }
         UNSCOPED_INFO("most spliced");
@@ -1093,8 +1148,10 @@ namespace
         CHECK(ALDiffSplice::splice(runs, left, left, right, typed, ALTextDiff::Options()));
         UNSCOPED_INFO("a few lines compared");
         CHECK(ALDiffSplice::lastCompared() <= 4);
-        UNSCOPED_INFO("both changes found");
-        CHECK(walk(left, typed, runs) == 4);
+        {
+            INFO("both changes found");
+            CHECK(require_walks(left, typed, runs) == 4);
+        }
         UNSCOPED_INFO("as the whole would find them");
         CHECK(runs == ALTextDiff::lines(left, typed));
 
@@ -1150,7 +1207,7 @@ namespace
         const std::vector<std::string> call  = { "default", "{", "    llSay(0, \"a\" + b);", "}" };
         const std::vector<std::string> flown = { "default", "{", "    llSay(", "        0,", "        \"a\" + b", "    );", "}" };
         const Result reflowed = ALStructuralDiff::compare(call, flown, ALTextDiff::Options());
-        walk(call, flown, reflowed.runs);
+        require_walks(call, flown, reflowed.runs);
         {
             INFO("arguments put one to a line: a change, nothing marked");
             REQUIRE(reflowed.runs.size() > 1);
@@ -1172,7 +1229,7 @@ namespace
         const std::vector<std::string> brace = { "if (x) {", "    go();", "}" };
         const std::vector<std::string> own   = { "if (x)", "{", "    go();", "}" };
         const Result moved_brace = ALStructuralDiff::compare(brace, own, ALTextDiff::Options());
-        walk(brace, own, moved_brace.runs);
+        require_walks(brace, own, moved_brace.runs);
         UNSCOPED_INFO("a brace moved to its own line: nothing marked");
         CHECK(unmarked(moved_brace));
 
@@ -1183,7 +1240,7 @@ namespace
 
         const std::vector<std::string> changed = { "default", "{", "    llSay(", "        1,", "        \"a\" + b", "    );", "}" };
         const Result real = ALStructuralDiff::compare(call, changed, ALTextDiff::Options());
-        walk(call, changed, real.runs);
+        require_walks(call, changed, real.runs);
         {
             INFO("the change inside the reformatting marked, and nothing else");
             CHECK(real.leftMarks[2] == ALTextDiff::spans_t{ { 10, 11 } });
@@ -1306,7 +1363,7 @@ namespace
         in_two.insert(in_two.begin() + 4, "theirs");
         UNSCOPED_INFO("put in at one place");
         CHECK(ALTextMerge::merge(base, in_one, in_two)[1].kind == K::Conflict);
-        UNSCOPED_INFO("alike");
+        UNSCOPED_INFO("put in alike at one place");
         CHECK(ALTextMerge::merge(base, in_one, in_one)[1].kind == K::Both);
 
         // A block moved down by ours, a line in it changed by theirs where
@@ -1316,7 +1373,6 @@ namespace
         std::vector<std::string>       editor = blocky;
         editor[2]                             = "m2 changed";
         const ALTextMerge::hunks_t crossed = ALTextMerge::merge(blocky, mover, editor);
-        UNSCOPED_INFO("a conflict");
         CHECK(std::any_of(crossed.begin(), crossed.end(), [](const H& hunk) { return hunk.kind == K::Conflict; }));
         UNSCOPED_INFO("nothing changed: one hunk the same");
         CHECK(ALTextMerge::merge(base, base, base) == ALTextMerge::hunks_t{ H{ K::Same, 0, 8, 0, 8, 0, 8 } });
@@ -1353,6 +1409,7 @@ namespace
         };
         for (S32 round = 0; round < 300; ++round)
         {
+            CAPTURE(round);
             std::vector<std::string> start;
             for (S32 n = static_cast<S32>(random() % 30); n > 0; --n)
             {
@@ -1393,6 +1450,7 @@ namespace
         std::mt19937 random(23);
         for (S32 round = 0; round < 400; ++round)
         {
+            CAPTURE(round);
             const S32        kinds = 1 + static_cast<S32>(random() % (round % 2 ? 6 : 300));
             std::vector<S32> a(random() % 400);
             for (S32& line : a)
@@ -1469,6 +1527,7 @@ namespace
         std::mt19937 random(20261006);
         for (S32 round = 0; round < 200; ++round)
         {
+            CAPTURE(round);
             A anchors;
             for (S32 n = static_cast<S32>(random() % 12); n > 0; --n)
             {
@@ -1510,9 +1569,9 @@ namespace
                 }
                 most = std::max(most, longest[i]);
             }
-            UNSCOPED_INFO("round " + std::to_string(round) + ": a run rising, of them");
+            UNSCOPED_INFO("a run rising, of them");
             REQUIRE(good);
-            UNSCOPED_INFO("round " + std::to_string(round) + ": as long as any");
+            UNSCOPED_INFO("as long as any");
             REQUIRE(kept.size() == most);
         }
         // Ranges given out of order: the anchors of them in order.
@@ -1580,7 +1639,7 @@ namespace
                 const std::vector<ALTextDiff::Run> runs = ALTextDiff::lines(left, right, options);
                 const M kept  = finder.find(texts[0], texts[1], runs, options, swapped);
                 const M fresh = ALDiffMoves::find(left, right, runs, options);
-                UNSCOPED_INFO("way " + std::to_string(way) + ", step " + std::to_string(step) + ": as found afresh");
+                CAPTURE(way, step);
                 REQUIRE(kept == fresh);
             }
         }
@@ -1601,7 +1660,7 @@ namespace
         finder.edited(false, 50, 51, 51);
         UNSCOPED_INFO("found again");
         REQUIRE(finder.find(left, right, ALTextDiff::lines(left, right), ALTextDiff::Options()).size() == size_t(1));
-        UNSCOPED_INFO("the line changed, and the line it is now a change with: " + std::to_string(finder.lastKeyed()));
+        UNSCOPED_INFO("the line changed, and the line it is now a change with");
         CHECK(finder.lastKeyed() <= 2);
     }
 
@@ -1709,7 +1768,7 @@ namespace
             {
                 changed += run.kind != Kind::Same ? run.count : 0;
             }
-            UNSCOPED_INFO(std::to_string(times) + " times");
+            CAPTURE(times);
             REQUIRE(changed == (times == 64 ? 140 : 130));
         }
     }
@@ -1777,7 +1836,7 @@ namespace
         finder.edited(false, 20, 21, 10);
         UNSCOPED_INFO("found again");
         REQUIRE(finder.find(left, right, runs, ALTextDiff::Options()).size() == size_t(1));
-        UNSCOPED_INFO("keyed afresh: " + std::to_string(finder.lastKeyed()));
+        UNSCOPED_INFO("keyed afresh");
         CHECK(finder.lastKeyed() >= 12);
     }
 

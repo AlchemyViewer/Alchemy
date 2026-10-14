@@ -142,17 +142,13 @@ namespace
         ALQuickOpen* first = window->quickOpen(candidates({ "state_entry", "touch_start" }), "Type a symbol", "Go to Symbol",
                                                [&](const std::string& v) { symbols.push_back(v); }, nullptr, 0, 0,
                                                [&]() { ++symbols_escaped; });
-        UNSCOPED_INFO("a quick open");
         REQUIRE(first != nullptr);
         const LLHandle<LLFloater> first_up = first->getParentByType<LLFloater>()->getHandle();
 
         ALQuickOpen* second = window->quickOpen(candidates({ "save", "compile" }), "Type a command", "Commands",
                                                 [&](const std::string& v) { commands.push_back(v); });
-        {
-            INFO("another");
-            REQUIRE(second != nullptr);
-            CHECK(second != first);
-        }
+        REQUIRE(second != nullptr);
+        CHECK(second != first);
         UNSCOPED_INFO("the first put away");
         CHECK((first_up.isDead() || first_up.get()->isDead() || !first_up.get()->getVisible()));
         UNSCOPED_INFO("escaped, for whoever asked it");
@@ -164,7 +160,7 @@ namespace
         UNSCOPED_INFO("the best of them");
         CHECK(commands.front() == std::string("save"));
         UNSCOPED_INFO("and nothing to the symbols");
-        REQUIRE(symbols.empty());
+        CHECK(symbols.empty());
         UNSCOPED_INFO("which were told once");
         CHECK(symbols_escaped == 1);
         window->closeFloater();
@@ -185,18 +181,13 @@ namespace
         first->setQuery("be");
         ALQuickOpen* again = window->quickOpen(candidates({ "alpha", "beta", "beetle" }), "Type a name", "Tabs",
                                                [&](const std::string& v) { second_heard.push_back(v); });
-        UNSCOPED_INFO("the same one");
         CHECK(again == first);
-        UNSCOPED_INFO("what was typed kept");
         CHECK(again->query() == std::string("be"));
         choose(again);
-        {
-            INFO("the latest asking hears the answer");
-            REQUIRE(second_heard.size() == 1);
-            CHECK(second_heard.front() == "beta");
-        }
+        REQUIRE(second_heard.size() == 1);
+        CHECK(second_heard.front() == "beta");
         UNSCOPED_INFO("the first does not");
-        REQUIRE(first_heard.empty());
+        CHECK(first_heard.empty());
         window->closeFloater();
     }
 
@@ -221,27 +212,22 @@ namespace
         const auto popoverOf = [](ALQuickOpen* quick) { return ALViewType::as<ALPopover>(quick->getParentByType<LLFloater>()); };
 
         ALQuickOpen* quick = ask();
-        UNSCOPED_INFO("in a popover");
         REQUIRE(popoverOf(quick) != nullptr);
         popoverOf(quick)->onFocusLost();
         UNSCOPED_INFO("looked away from, it was left");
         CHECK(left == 1);
-        UNSCOPED_INFO("not escaped");
         CHECK(escaped == 0);
-        UNSCOPED_INFO("and nothing chosen");
-        REQUIRE(chosen.empty());
+        CHECK(chosen.empty());
 
         quick = ask();
         popoverOf(quick)->escape();
-        UNSCOPED_INFO("escaped");
         CHECK(escaped == 1);
-        UNSCOPED_INFO("not left");
+        UNSCOPED_INFO("escaping is not leaving");
         CHECK(left == 1);
 
         quick = ask();
         choose(quick);
-        UNSCOPED_INFO("chosen");
-        REQUIRE(chosen.size() == (size_t)1);
+        CHECK(chosen.size() == (size_t)1);
         {
             INFO("and neither of the others");
             CHECK(escaped == 1);
@@ -260,7 +246,6 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLControlGroup* config = LLUI::getInstance()->getSettingGroup("config");
-        UNSCOPED_INFO("a config group");
         REQUIRE(config != nullptr);
         const std::string setting = "ALStudioFloaterTestState";
         if (!config->controlExists(setting))
@@ -275,18 +260,14 @@ namespace
         window->setCanMinimize(true);
         const LLRect whole = window->getRect();
         window->setMinimized(true);
-        UNSCOPED_INFO("minimized");
         CHECK(window->isMinimized());
         UNSCOPED_INFO("drawn as its title bar");
         CHECK(window->getRect().getHeight() < whole.getHeight());
 
         window->saveState();
         const LLSD rect = config->getLLSD(setting)["rect"];
-        UNSCOPED_INFO("four numbers");
         REQUIRE(rect.size() == 4);
-        UNSCOPED_INFO("as wide as the window");
         CHECK(rect[2].asInteger() - rect[0].asInteger() == whole.getWidth());
-        UNSCOPED_INFO("and as tall");
         CHECK(rect[3].asInteger() - rect[1].asInteger() == whole.getHeight());
         window->setMinimized(false);
         window->closeFloater();
@@ -315,22 +296,16 @@ namespace
             return true;
         };
         ALStudioFloater::goToStep(2, count, back, forward, 100);
-        {
-            INFO("back three");
-            CHECK(in_force == 2);
-            CHECK(taken == "uuu");
-        }
+        CHECK(in_force == 2);
+        CHECK(taken == "uuu");
         taken.clear();
         ALStudioFloater::goToStep(4, count, back, forward, 100);
-        {
-            INFO("forward two");
-            CHECK(in_force == 4);
-            CHECK(taken == "rr");
-        }
+        CHECK(in_force == 4);
+        CHECK(taken == "rr");
         taken.clear();
         ALStudioFloater::goToStep(4, count, back, forward, 100);
         UNSCOPED_INFO("there already: nothing");
-        REQUIRE(taken.empty());
+        CHECK(taken.empty());
         refuse = 3;
         ALStudioFloater::goToStep(0, count, back, forward, 100);
         {
@@ -374,21 +349,19 @@ namespace
         {
             INFO("a key none has is not taken");
             CHECK_FALSE(window->runCommandKey('Q', MASK_CONTROL));
-            REQUIRE(ran.empty());
+            CHECK(ran.empty());
         }
         window->addCommand({ "unbound", KEY_NONE, MASK_NONE }, [&]() { ran.push_back("unbound"); return true; });
         {
             INFO("nor no key at all, a command with none");
             CHECK_FALSE(window->runCommandKey(KEY_NONE, MASK_NONE));
-            REQUIRE(ran.empty());
+            CHECK(ran.empty());
         }
-        UNSCOPED_INFO("taken");
         CHECK(window->handleKeyHere('F', MASK_CONTROL));
         UNSCOPED_INFO("by the second, the first unable");
         CHECK(ran == std::vector<std::string>({ "find", "filter" }));
         ran.clear();
         can = true;
-        UNSCOPED_INFO("taken");
         CHECK(window->runCommandKey('F', MASK_CONTROL));
         UNSCOPED_INFO("by the first, able now");
         CHECK(ran == std::vector<std::string>({ "find" }));
@@ -432,7 +405,6 @@ namespace
         CHECK(typing->handleKey('L', MASK_CONTROL, false));
         UNSCOPED_INFO("Control-Shift-H, which goes home");
         CHECK(typing->handleKey('H', MASK_CONTROL | MASK_SHIFT, false));
-        UNSCOPED_INFO("an Alt chord");
         CHECK(typing->handleKey('R', MASK_ALT, false));
         UNSCOPED_INFO("the Mac's own Control key");
         CHECK(typing->handleKey('D', MASK_MAC_CONTROL, false));
@@ -445,7 +417,7 @@ namespace
         CHECK_FALSE(typing->handleKey('Q', MASK_CONTROL, false));
         {
             INFO("and moving between windows");
-            REQUIRE_FALSE(typing->handleKey(KEY_TAB, MASK_CONTROL, false));
+            CHECK_FALSE(typing->handleKey(KEY_TAB, MASK_CONTROL, false));
             CHECK_FALSE(typing->handleKey(KEY_TAB, MASK_CONTROL | MASK_SHIFT, false));
         }
         UNSCOPED_INFO("a key held with nothing goes on");
@@ -468,16 +440,14 @@ namespace
         LLLineEditor* typing = field(window, "hello");
         {
             INFO("select all");
-            REQUIRE(typing->handleKey('A', MASK_CONTROL, false));
+            CHECK(typing->handleKey('A', MASK_CONTROL, false));
             CHECK(typing->hasSelection());
         }
         UNSCOPED_INFO("cut");
         CHECK(typing->handleKey('X', MASK_CONTROL, false));
-        UNSCOPED_INFO("gone");
         CHECK(typing->getText() == std::string());
         UNSCOPED_INFO("paste");
         CHECK(typing->handleKey('V', MASK_CONTROL, false));
-        UNSCOPED_INFO("back");
         CHECK(typing->getText() == std::string("hello"));
 
         // A popover's field, whose keys come home to the window.
@@ -487,7 +457,7 @@ namespace
         quick->setQuery("world");
         {
             INFO("select all there");
-            REQUIRE(query->handleKey('A', MASK_CONTROL, false));
+            CHECK(query->handleKey('A', MASK_CONTROL, false));
             CHECK(query->hasSelection());
         }
         UNSCOPED_INFO("copy there");
@@ -523,7 +493,6 @@ namespace
 
         UNSCOPED_INFO("the first taken");
         CHECK(typing->handleKey('K', MASK_CONTROL, false));
-        UNSCOPED_INFO("and waited on");
         CHECK(ALKeyChords::waiting());
         {
             INFO("a modifier on its own is no second key");
@@ -534,7 +503,6 @@ namespace
         CHECK(ALKeyChords::takeKey('S', MASK_NONE));
         UNSCOPED_INFO("the command the two are");
         CHECK(saved == 1);
-        UNSCOPED_INFO("waiting no longer");
         CHECK_FALSE(ALKeyChords::waiting());
         UNSCOPED_INFO("its character taken with it");
         CHECK(ALKeyChords::takeChar('s'));
@@ -592,12 +560,9 @@ namespace
     {
         ll_test::KeyNamesScope key_names([](std::string_view name) { return std::string(name); });
         const ALKeyChord two{ 'S', MASK_NONE, 'K', MASK_CONTROL };
-        UNSCOPED_INFO("the two");
         CHECK(two.describe() == LLKeyboard::stringFromAccelerator(MASK_CONTROL, 'K') + " " + LLKeyboard::stringFromAccelerator(MASK_NONE, 'S'));
-        UNSCOPED_INFO("one");
         CHECK(ALKeyChord{ 'S', MASK_CONTROL }.describe() == LLKeyboard::stringFromAccelerator(MASK_CONTROL, 'S'));
-        UNSCOPED_INFO("none");
-        REQUIRE(ALKeyChord{}.describe().empty());
+        CHECK(ALKeyChord{}.describe().empty());
         {
             INFO("led by the first");
             CHECK(two.ledBy('K', MASK_CONTROL));
@@ -613,7 +578,6 @@ namespace
         p.label = "Save All";
         LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(p);
         item->setShownKeys(two.describe());
-        UNSCOPED_INFO("shown");
         CHECK(item->getAcceleratorString() == two.describe());
         UNSCOPED_INFO("and answered to by nothing");
         CHECK(item->getAcceleratorKey() == KEY_NONE);
@@ -656,6 +620,7 @@ namespace
         const LLColor4 text   = ALSurface::text().get();
         for (const LLColor4& ground : { LLColor4(0.1f, 0.1f, 0.1f, 1.f), LLColor4(0.95f, 0.95f, 0.95f, 1.f), text })
         {
+            CAPTURE(ground);
             window->setBackgroundColor(ground);
             const LLColor4 quiet = window->quietStatusColor();
             UNSCOPED_INFO("no louder than the text");

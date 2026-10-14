@@ -117,8 +117,7 @@ namespace
         CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(2, 1) }));
         carets.assign({ sel(0, 0, 2), sel(0, 1, 4), sel(0, 3, 8), caret(0, 10) });
         UNSCOPED_INFO("a run of overlaps one, the one after them not");
-        CHECK(said(carets.selections()) ==
-                      said(std::vector<ALTextRange>{ sel(0, 0, 8), caret(0, 10) }));
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ sel(0, 0, 8), caret(0, 10) }));
         carets.add(caret(0, 8));
         UNSCOPED_INFO("one more added merges as it goes in");
         CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ sel(0, 0, 8), caret(0, 10) }));
@@ -134,11 +133,9 @@ namespace
         ALTextRange main = sel(0, 5, 0);
         UNSCOPED_INFO("the main one as it was");
         CHECK_FALSE(carets.merge(main));
-        UNSCOPED_INFO("and still so");
         CHECK(said(main) == said(sel(0, 5, 0)));
         UNSCOPED_INFO("the caret it covers taken in, not the selection it only touches");
-        CHECK(said(carets.selections()) ==
-                      said(std::vector<ALTextRange>{ sel(0, 5, 8), caret(3, 0) }));
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ sel(0, 5, 8), caret(3, 0) }));
 
         main = sel(0, 2, 6);
         UNSCOPED_INFO("changed again");
@@ -174,18 +171,15 @@ namespace
         // where it began, and meet.
         carets.apply(doc.remove(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 11))));
         UNSCOPED_INFO("cut back and merged");
-        CHECK(said(carets.selections()) ==
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(1, 2), caret(2, 1) }));
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(1, 2), caret(2, 1) }));
         // A line put in above the second: those below move down a line.
         carets.apply(doc.insert(ALTextPos(1, 0), "new\n"));
         UNSCOPED_INFO("moved down");
-        CHECK(said(carets.selections()) ==
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(2, 2), caret(3, 1) }));
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(2, 2), caret(3, 1) }));
         // A line joined to the one before: the caret on it goes onto that one.
         carets.apply(doc.remove(ALTextRange(ALTextPos(2, 4), ALTextPos(3, 0))));
         UNSCOPED_INFO("onto the line it was joined to");
-        CHECK(said(carets.selections()) ==
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(2, 2), caret(2, 5) }));
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(2, 2), caret(2, 5) }));
         UNSCOPED_INFO("the text as the carets have it");
         CHECK(doc.text() == std::string("one ee\nnew\nfoursix"));
     }
@@ -198,18 +192,14 @@ namespace
         // "b" made "BB", and "d" made "" -- the caret at 3 is right after b.
         carets.apply(doc.replaceMany({ { ALTextRange(ALTextPos(0, 2), ALTextPos(0, 3)), "BB" }, { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 7)), "" } }));
         UNSCOPED_INFO("each along by what went before it");
-        CHECK(said(carets.selections()) ==
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), sel(0, 5, 6), caret(0, 9) }));
-        UNSCOPED_INFO("the text");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), sel(0, 5, 6), caret(0, 9) }));
         CHECK(doc.text() == std::string("a BB c  e"));
         // Text put in at the selection's start and at its end: it keeps
         // what it held; the caret at the end of the text pushed.
         carets.apply(doc.replaceMany({ { ALTextRange(ALTextPos(0, 5), ALTextPos(0, 5)), "<" }, { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 6)), ">" },
                                        { ALTextRange(ALTextPos(0, 9), ALTextPos(0, 9)), "!" } }));
         UNSCOPED_INFO("the selection still over c alone, the last caret past the !");
-        CHECK(said(carets.selections()) ==
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), sel(0, 6, 7), caret(0, 12) }));
-        UNSCOPED_INFO("the text again");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), sel(0, 6, 7), caret(0, 12) }));
         CHECK(doc.text() == std::string("a BB <c>  e!"));
     }
 
@@ -232,11 +222,9 @@ namespace
         // The long one takes in what it covers.
         UNSCOPED_INFO("all, merged");
         REQUIRE(carets.size() == static_cast<size_t>(2));
-        UNSCOPED_INFO("line 0");
         CHECK(on(0) == said(caret(0, 0)));
         UNSCOPED_INFO("line 2 is the long one's");
         CHECK(on(2) == said(ALTextRange(ALTextPos(4, 2), ALTextPos(1, 3))));
-        UNSCOPED_INFO("line 5 nothing");
         CHECK(on(5) == std::string());
     }
 }

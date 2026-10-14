@@ -46,11 +46,11 @@ namespace
         // The parameters a file's attributes reach, without building the
         // widget: a spinner measures the text of its label, and text
         // measurement is the one thing this fixture has no fonts for.
-        static LLSpinCtrl::Params parse(const std::string& attributes)
+        static LLSpinCtrl::Params require_parse(const std::string& attributes)
         {
             const std::string source = "<spinner name=\"s\" " + attributes + "/>\n";
             LLXMLNodePtr node;
-            UNSCOPED_INFO("parses");
+            CAPTURE(source);
             REQUIRE(LLXMLNode::parseBuffer(source.data(), source.size(), node));
 
             LLSpinCtrl::Params p;
@@ -70,12 +70,9 @@ namespace
             SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
-        UNSCOPED_INFO("off unless asked for");
-        CHECK_FALSE(parse("").scrub());
-        UNSCOPED_INFO("asked for");
-        CHECK(parse("scrub=\"true\"").scrub());
-        UNSCOPED_INFO("asked against");
-        CHECK_FALSE(parse("scrub=\"false\"").scrub());
+        CHECK_FALSE(require_parse("").scrub());
+        CHECK(require_parse("scrub=\"true\"").scrub());
+        CHECK_FALSE(require_parse("scrub=\"false\"").scrub());
     }
 
     // One increment per four pixels, in the direction of travel.
@@ -83,13 +80,9 @@ namespace
     {
         const F32 step = LLSpinCtrl::SCRUB_PIXELS_PER_STEP;
 
-        UNSCOPED_INFO("nowhere is where it started");
         CHECK(LLSpinCtrl::scrubbedValue(5.f, 0, 1.f, MASK_NONE, 2, -100.f, 100.f) == 5.f);
-        UNSCOPED_INFO("one step right is one increment");
         CHECK(LLSpinCtrl::scrubbedValue(5.f, (S32)step, 1.f, MASK_NONE, 2, -100.f, 100.f) == 6.f);
-        UNSCOPED_INFO("one step left is one increment back");
         CHECK(LLSpinCtrl::scrubbedValue(5.f, -(S32)step, 1.f, MASK_NONE, 2, -100.f, 100.f) == 4.f);
-        UNSCOPED_INFO("ten steps is ten increments");
         CHECK(LLSpinCtrl::scrubbedValue(0.f, (S32)(10.f * step), 2.f, MASK_NONE, 2, -100.f, 100.f) == 20.f);
     }
 
@@ -99,11 +92,8 @@ namespace
     {
         const S32 one = (S32)LLSpinCtrl::SCRUB_PIXELS_PER_STEP;
 
-        UNSCOPED_INFO("shift is a hundredth");
         CHECK(LLSpinCtrl::scrubbedValue(0.f, one, 1.f, MASK_SHIFT, 4, -100.f, 100.f) == 0.01f);
-        UNSCOPED_INFO("control is a tenth");
         CHECK(LLSpinCtrl::scrubbedValue(0.f, one, 1.f, MASK_CONTROL, 4, -100.f, 100.f) == 0.1f);
-        UNSCOPED_INFO("alt is ten");
         CHECK(LLSpinCtrl::scrubbedValue(0.f, one, 1.f, MASK_ALT, 4, -100.f, 100.f) == 10.f);
     }
 
@@ -113,16 +103,14 @@ namespace
     {
         const S32 far_right = (S32)(1000.f * LLSpinCtrl::SCRUB_PIXELS_PER_STEP);
 
-        UNSCOPED_INFO("clamped above");
         CHECK(LLSpinCtrl::scrubbedValue(0.f, far_right, 1.f, MASK_NONE, 2, 0.f, 10.f) == 10.f);
-        UNSCOPED_INFO("clamped below");
         CHECK(LLSpinCtrl::scrubbedValue(0.f, -far_right, 1.f, MASK_NONE, 2, 0.f, 10.f) == 0.f);
 
         // One pixel of a four-pixel step is a quarter of an increment, and a
         // spinner showing no decimals rounds it away rather than carrying it.
-        UNSCOPED_INFO("rounded to what it shows");
+        UNSCOPED_INFO("no decimals: rounded away");
         CHECK(LLSpinCtrl::scrubbedValue(0.f, 1, 1.f, MASK_NONE, 0, -100.f, 100.f) == 0.f);
-        UNSCOPED_INFO("kept where it shows it");
+        UNSCOPED_INFO("one decimal: kept");
         CHECK(LLSpinCtrl::scrubbedValue(0.f, 2, 1.f, MASK_NONE, 1, -100.f, 100.f) == 0.5f);
     }
 
@@ -147,29 +135,21 @@ namespace
         LLSpinCtrl* spin = LLUICtrlFactory::create<LLSpinCtrl>(p);
 
         LLLineEditor* editor = spin->getChild<LLLineEditor>("SpinCtrl Editor");
-        UNSCOPED_INFO("the spinner has its editor");
         REQUIRE(editor != nullptr);
-        UNSCOPED_INFO("a number somebody wrote is in the box");
         CHECK(editor->getText() == std::string("42"));
-        UNSCOPED_INFO("and nothing is behind it");
-        REQUIRE(editor->getLabel().empty());
+        CHECK(editor->getLabel().empty());
 
         spin->setUnset(true);
-        UNSCOPED_INFO("nobody wrote it, so the box is empty");
-        REQUIRE(editor->getText().empty());
-        UNSCOPED_INFO("and the number in force is behind it");
+        CHECK(editor->getText().empty());
         CHECK(editor->getLabel() == std::string("42"));
-        UNSCOPED_INFO("which the spinner says of itself");
         CHECK(spin->isUnset());
 
         // Choosing the number puts it back in the box. Stepping, dragging and
         // typing each do exactly this and are not driven from here: they read
         // the keyboard for their modifiers, and this fixture has none.
         spin->setUnset(false);
-        UNSCOPED_INFO("chosen, it is in the box");
         CHECK(editor->getText() == std::string("42"));
-        UNSCOPED_INFO("and nothing is behind it");
-        REQUIRE(editor->getLabel().empty());
+        CHECK(editor->getLabel().empty());
 
         spin->die();
     }
@@ -203,13 +183,10 @@ namespace
         // A whole number is a real number too.
         editor->setText(std::string("2"));
         spin->forceEditorCommit();
-        UNSCOPED_INFO("what was typed is what is committed");
         CHECK(committed == 2.f);
-        UNSCOPED_INFO("and what the spinner holds");
         CHECK(spin->getValueF32() == 2.f);
-        UNSCOPED_INFO("shown as the spinner shows a number");
+        UNSCOPED_INFO("shown with the spinner's three decimals");
         CHECK(editor->getText() == std::string("2.000"));
-        UNSCOPED_INFO("which somebody chose");
         CHECK_FALSE(spin->isUnset());
 
         // Leaving the unset state with nothing typed still shows the number

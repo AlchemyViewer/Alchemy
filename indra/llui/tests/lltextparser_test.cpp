@@ -79,23 +79,18 @@ namespace
 
     TEST_CASE_METHOD(lltextparser_data, "lltextparser: a line is split at each keyword in any case unless case is asked for", "[lltextparser]")
     {
-        UNSCOPED_INFO("no keywords, the line whole");
         CHECK(pieces("hi alice and bob") == std::string("hi alice and bob|"));
         add("alice");
         UNSCOPED_INFO("a keyword in any case");
         CHECK(pieces("Hi ALICE and bob") == std::string("Hi |[ALICE:alice]| and bob|"));
         add("bob");
-        UNSCOPED_INFO("two");
         CHECK(pieces("Hi ALICE and bob") == std::string("Hi |[ALICE:alice]| and |[bob:bob]||"));
-        UNSCOPED_INFO("one twice");
         CHECK(pieces("bob, alice, bob") == std::string("[bob:bob]|, |[alice:alice]|, |[bob:bob]||"));
         add("Carol", LLHighlightEntry::CONTAINS, true);
         UNSCOPED_INFO("a keyword whose case is asked for");
         CHECK(pieces("carol and Carol") == std::string("carol and |[Carol:Carol]||"));
-        UNSCOPED_INFO("none held");
         CHECK(pieces("nobody here") == std::string("nobody here|"));
         add("jos\xC3\xA9");
-        UNSCOPED_INFO("a keyword beyond ASCII");
         CHECK(pieces("hi jos\xC3\xA9!") == std::string("hi |[jos\xC3\xA9:jos\xC3\xA9]|!|"));
     }
 
@@ -104,53 +99,39 @@ namespace
         add("hey", LLHighlightEntry::STARTS_WITH);
         add("bye", LLHighlightEntry::ENDS_WITH);
         add("im only", LLHighlightEntry::CONTAINS, false, LLHighlightEntry::CAT_IM);
-        UNSCOPED_INFO("at the start");
         CHECK(pieces("hey there") == std::string("[hey:hey]| there|"));
-        UNSCOPED_INFO("not after it");
+        UNSCOPED_INFO("a STARTS_WITH keyword not at the start");
         CHECK(pieces("they said hey") == std::string("they said hey|"));
-        UNSCOPED_INFO("at the end");
         CHECK(pieces("ok bye") == std::string("ok |[bye:bye]||"));
-        UNSCOPED_INFO("not before it");
+        UNSCOPED_INFO("an ENDS_WITH keyword not at the end");
         CHECK(pieces("bye now") == std::string("bye now|"));
-        UNSCOPED_INFO("not in nearby chat");
+        UNSCOPED_INFO("an IM keyword in nearby chat");
         CHECK(pieces("this is im only") == std::string("this is im only|"));
-        UNSCOPED_INFO("in an IM");
         CHECK(pieces("this is im only", LLHighlightEntry::CAT_IM) == std::string("this is |[im only:im only]||"));
 
         add("urgent", LLHighlightEntry::CONTAINS, false, LLHighlightEntry::CAT_ALL, LLHighlightEntry::ALL);
         add("exactly this", LLHighlightEntry::MATCHES);
         const LLHighlightEntry* entry = nullptr;
-        UNSCOPED_INFO("a whole-line keyword held");
         CHECK(parser.parseFullLineHighlights("this is URGENT now", LLHighlightEntry::CAT_NEARBYCHAT, &entry));
-        UNSCOPED_INFO("and which");
-        REQUIRE((entry ? entry->mPattern : std::string()) == std::string("urgent"));
-        {
-            INFO("the whole line alone");
-            REQUIRE(parser.parseFullLineHighlights("Exactly This", LLHighlightEntry::CAT_NEARBYCHAT, &entry));
-            REQUIRE(entry);
-            CHECK(entry->mPattern == "exactly this");
-        }
-        UNSCOPED_INFO("not a part of one");
+        CHECK((entry ? entry->mPattern : std::string()) == std::string("urgent"));
+        REQUIRE(parser.parseFullLineHighlights("Exactly This", LLHighlightEntry::CAT_NEARBYCHAT, &entry));
+        REQUIRE(entry);
+        CHECK(entry->mPattern == "exactly this");
         CHECK_FALSE(parser.parseFullLineHighlights("not exactly this", LLHighlightEntry::CAT_NEARBYCHAT, &entry));
     }
 
     TEST_CASE_METHOD(lltextparser_data, "lltextparser: an entry changed in place or removed is found as it now is", "[lltextparser]")
     {
         const LLUUID id = add("alice");
-        UNSCOPED_INFO("as it was");
         CHECK(pieces("carol and alice") == std::string("carol and |[alice:alice]||"));
         LLHighlightEntry* entry = parser.getHighlightById(id);
-        UNSCOPED_INFO("there");
         REQUIRE(entry != nullptr);
         entry->mPattern = "carol";
-        UNSCOPED_INFO("as it is");
         CHECK(pieces("carol and alice") == std::string("[carol:carol]| and alice|"));
         entry = parser.getHighlightById(id);
         entry->mCaseSensitive = true;
-        UNSCOPED_INFO("its case asked for");
         CHECK(pieces("Carol and carol") == std::string("Carol and |[carol:carol]||"));
         parser.removeHighlight(id);
-        UNSCOPED_INFO("removed");
         CHECK(pieces("carol and alice") == std::string("carol and alice|"));
     }
 }

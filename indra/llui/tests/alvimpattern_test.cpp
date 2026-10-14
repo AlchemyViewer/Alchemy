@@ -110,6 +110,8 @@ namespace
         CHECK(regexOf("a~", "x.y") == std::string("a(?:x\\.y)"));
     }
 
+    // \zs splits off where the match starts, \ze looks ahead, and a line may
+    // be crossed only where the pattern says.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: the zs and ze marks cut the match and only some patterns cross lines", "[alvimpattern]")
     {
         const ALVimPattern zs = ALVimPattern::of("foo\\zsbar", std::string(), plain);
@@ -131,6 +133,8 @@ namespace
         CHECK_FALSE(ALVimPattern::of("a b", std::string(), plain).acrossLines);
     }
 
+    // Case: the pattern's \c and \C first, then what the caller forces, then
+    // ignorecase and smartcase.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: case comes from the pattern then the caller then ignorecase and smartcase", "[alvimpattern]")
     {
         ALVimPattern::Case ignore;
@@ -187,6 +191,8 @@ namespace
                       std::string("t|w|o|t"));
     }
 
+    // A replacement: & and \0 the match, \1 a group, a $ only a $, \r a line
+    // break, and the case changes kept.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: replacementOf spells vim's specials in the engine's replacement", "[alvimpattern]")
     {
         UNSCOPED_INFO("the match");
@@ -203,6 +209,7 @@ namespace
         CHECK(ALVimPattern::replacementOf("\\u\\1\\e") == std::string("\\u${1}\\E"));
     }
 
+    // \{,m} counts from none, as many as m, the lazy one and very magic's too.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: a count with no lower bound counts from none in every form", "[alvimpattern]")
     {
         UNSCOPED_INFO("up to two");
@@ -219,6 +226,8 @@ namespace
         CHECK(found("---a", ALVimPattern::of("\\v-{,3}a", std::string(), plain)) == std::string("---a"));
     }
 
+    // A magic ^ is a line's start only first in a branch, a $ its end only last
+    // in one, and either is itself elsewhere.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: magic ^ and $ anchor only at a branch's ends and are characters elsewhere", "[alvimpattern]")
     {
         UNSCOPED_INFO("a power");
@@ -253,6 +262,8 @@ namespace
         CHECK(found("ab\nb a", ALVimPattern::of("a$\\|^b", std::string(), plain)) == std::string("b|a"));
     }
 
+    // \ze at the top looks ahead to the end of its branch alone, and \@= \@!
+    // \@<= \@<! \@> look round the atom before them.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: ze looks ahead within its branch and the @ multis look round their atom", "[alvimpattern]")
     {
         UNSCOPED_INFO("closed at the \\|");
@@ -293,6 +304,8 @@ namespace
         CHECK(found("aaab", ALVimPattern::of("\\(a*\\)\\@>ab", std::string(), plain)) == std::string());
     }
 
+    // Smartcase passes over the letter after a backslash, as vim's does, but not
+    // in very magic, and counts a capital past ASCII.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: smartcase ignores a letter after a backslash except in very magic", "[alvimpattern]")
     {
         ALVimPattern::Case smart;
@@ -322,6 +335,8 @@ namespace
         CHECK(found("FOO1 foo1", ALVimPattern::of("foo\\S", std::string(), smart)) == std::string("FOO1|foo1"));
     }
 
+    // Very nomagic's bare ^ and $ are themselves and \^ \$ a line's ends
+    // anywhere, and nomagic's ^ and $ are magic's.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: very nomagic's bare ^ and $ are characters and nomagic's are magic's", "[alvimpattern]")
     {
         UNSCOPED_INFO("a ^ under \\V is the character");
@@ -344,6 +359,8 @@ namespace
         CHECK(found("a^b$c", ALVimPattern::of("\\Ma^b$c", std::string(), plain)) == std::string("a^b$c"));
     }
 
+    // \_^ and \_$ are a line's start and end wherever they stand, and never the
+    // characters.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: the _^ and _$ atoms are a line's start and end wherever they stand", "[alvimpattern]")
     {
         UNSCOPED_INFO("the engine's own");
@@ -358,6 +375,8 @@ namespace
         CHECK(found("xa\nb", ALVimPattern::of("a\\n\\_^b", std::string(), plain)) == std::string("a\nb"));
     }
 
+    // \ze in a group ends the match there while the rest of the pattern, the
+    // group's and what follows it, matches on past it.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: ze in a group ends the match while the rest of the pattern matches on", "[alvimpattern]")
     {
         UNSCOPED_INFO("what follows the group");
@@ -390,6 +409,8 @@ namespace
                       std::string("<ab|c|a>"));
     }
 
+    // \Z anywhere has composing characters passed over: each character takes the
+    // marks after it, and the pattern's own count for nothing.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: Z anywhere passes over composing characters", "[alvimpattern]")
     {
         UNSCOPED_INFO("no end of the text");
@@ -411,6 +432,8 @@ namespace
         CHECK(found("a\xCC\x81" "b", ALVimPattern::of("\\Z^ab$", std::string(), plain)) == std::string("a\xCC\x81" "b"));
     }
 
+    // Very nomagic's and nomagic's \. \* \~ \[ are magic's . * ~ [, and their
+    // bare ones the characters.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: nomagic's escaped dot and star and tilde and bracket are magic's", "[alvimpattern]")
     {
         UNSCOPED_INFO("the engine's own");
@@ -443,6 +466,8 @@ namespace
         CHECK(found("abc a.c", ALVimPattern::of("a\\.c", std::string(), plain)) == std::string("a.c"));
     }
 
+    // \& has each concat but a branch's last match where the last does, and the
+    // last is the match.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: concats joined by & must all match where the last does", "[alvimpattern]")
     {
         UNSCOPED_INFO("looked ahead at");
@@ -504,6 +529,8 @@ namespace
                       std::string("<c1|ab0|a1>"));
     }
 
+    // A \ze with nothing after it in its branch ends the match there and looks
+    // ahead at nothing.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: a ze with nothing after it in its branch looks ahead at nothing", "[alvimpattern]")
     {
         UNSCOPED_INFO("no look ahead");
@@ -519,6 +546,8 @@ namespace
                       std::string("foo|foo"));
     }
 
+    // A bracket expression is read as vim reads one: its [:classes:] whole, and a
+    // backslash itself before what means nothing there.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: bracket expressions read classes whole and keep useless backslashes", "[alvimpattern]")
     {
         UNSCOPED_INFO("a class");
@@ -601,21 +630,25 @@ namespace
         CHECK(found("*a", ALVimPattern::of("\\%(*a\\)", std::string(), plain)).rfind("error", 0) == 0);
     }
 
+    // A ~ with no last replacement, or only an empty one, reads as no pattern:
+    // vim's E33, and no match looked for.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: a ~ with no last replacement is vim's E33 and nothing is looked for", "[alvimpattern]")
     {
         const ALVimPattern none = ALVimPattern::of("a~*b", std::string(), plain);
-        UNSCOPED_INFO("said");
         CHECK(none.readError == std::string("E33: No previous substitute regular expression"));
         UNSCOPED_INFO("and nothing found");
         CHECK(found("aab ab", none) == std::string("error: E33: No previous substitute regular expression"));
         UNSCOPED_INFO("very magic's");
         CHECK(ALVimPattern::of("\\va~+", std::string(), plain).readError == none.readError);
         UNSCOPED_INFO("one to stand for");
-        REQUIRE(ALVimPattern::of("a~*b", std::string("x"), plain).readError.empty());
+        CHECK(ALVimPattern::of("a~*b", std::string("x"), plain).readError.empty());
         UNSCOPED_INFO("very nomagic's bare ~ itself");
-        REQUIRE(ALVimPattern::of("\\Va~b", std::string(), plain).readError.empty());
+        CHECK(ALVimPattern::of("\\Va~b", std::string(), plain).readError.empty());
     }
 
+    // In a bracket expression \d123 \o40 \x20 \u20AC and \U0001F600 are
+    // characters by their codes, read as vim reads them; with no digit, a
+    // backslash and the letter.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: bracket expressions take characters by decimal and octal and hex codes", "[alvimpattern]")
     {
         const auto in = [this](const std::string& text, const char* vim) { return alvimpattern_data::found(text, ALVimPattern::of(vim, std::string(), this->plain)); };
@@ -661,6 +694,9 @@ namespace
         CHECK(in(std::string("a\0b\nc", 5), "\\%x0a") == std::string(1, '\0'));
     }
 
+    // A range in a bracket expression from 0, or over 10, takes in the NUL as vim
+    // keeps it, and what is between, and never a line break, as vim 9.2 finds
+    // them.
     TEST_CASE_METHOD(alvimpattern_data, "alvimpattern: a bracket range from 0 or over 10 takes in the NUL but never a line break", "[alvimpattern]")
     {
         const auto in = [this](const std::string& text, const char* vim) { return alvimpattern_data::found(text, ALVimPattern::of(vim, std::string(), this->plain)); };

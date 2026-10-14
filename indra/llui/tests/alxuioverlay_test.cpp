@@ -53,10 +53,8 @@ namespace
     {
         ALXUIOverlay overlay;
         LLXMLNodePtr base = attribute("width", "100", 4);
-        UNSCOPED_INFO("nothing wrote over it");
-        REQUIRE(overlay.writersOf(base.get()).empty());
-        UNSCOPED_INFO("so nothing is its origin");
-        REQUIRE(overlay.originOf(base.get()) == nullptr);
+        CHECK(overlay.writersOf(base.get()).empty());
+        CHECK(overlay.originOf(base.get()) == nullptr);
     }
 
     // Every layer that wrote it is kept, in the order they were applied,
@@ -72,17 +70,13 @@ namespace
         overlay.attributeApplied(2, base.get(), language.get());
 
         const std::vector<ALXUIOverlay::Origin>& writers = overlay.writersOf(base.get());
-        UNSCOPED_INFO("both layers are kept");
         REQUIRE((S32)writers.size() == 2);
         UNSCOPED_INFO("the first is the one applied first");
         CHECK(writers[0].layer == 1);
-        UNSCOPED_INFO("with what it said");
         CHECK(writers[0].value == std::string("120"));
-        UNSCOPED_INFO("and the line it said it on");
         CHECK(writers[0].line == 7);
         UNSCOPED_INFO("the second is the later one");
         CHECK(writers[1].layer == 2);
-        UNSCOPED_INFO("with what it said");
         CHECK(writers[1].value == std::string("160"));
     }
 
@@ -99,7 +93,6 @@ namespace
         overlay.attributeApplied(2, base.get(), language.get());
 
         const ALXUIOverlay::Origin* winner = overlay.originOf(base.get());
-        UNSCOPED_INFO("something wrote it");
         REQUIRE(winner != nullptr);
         UNSCOPED_INFO("the last one did");
         CHECK(winner->layer == 2);
@@ -118,9 +111,9 @@ namespace
         overlay.attributeApplied(1, label.get(), overlaid.get());
 
         UNSCOPED_INFO("the one written over has a writer");
-        REQUIRE((S32)overlay.writersOf(label.get()).size() == 1);
+        CHECK((S32)overlay.writersOf(label.get()).size() == 1);
         UNSCOPED_INFO("the one beside it has none");
-        REQUIRE(overlay.writersOf(width.get()).empty());
+        CHECK(overlay.writersOf(width.get()).empty());
     }
 
     // Clearing forgets all of it, which is what a fresh build of the file
@@ -132,8 +125,7 @@ namespace
         LLXMLNodePtr skin = attribute("width", "120", 7);
         overlay.attributeApplied(1, base.get(), skin.get());
         overlay.clear();
-        UNSCOPED_INFO("nothing is remembered");
-        REQUIRE(overlay.writersOf(base.get()).empty());
+        CHECK(overlay.writersOf(base.get()).empty());
     }
 
     // Through a merge: every decision that applied nothing arrives as a
@@ -157,9 +149,7 @@ namespace
             "</floater>\n";
         LLXMLNodePtr base;
         LLXMLNodePtr layer;
-        UNSCOPED_INFO("the base parses");
         REQUIRE(LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base));
-        UNSCOPED_INFO("the layer parses");
         REQUIRE(LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
 
         ALXUIOverlay overlay;
@@ -167,7 +157,6 @@ namespace
         overlay.layerParsed(1, "de/base.xml");
         ALXmlLayerMerge::merge(base, layer, 1, &overlay);
 
-        UNSCOPED_INFO("one rescue");
         REQUIRE(overlay.rescues().size() == 1u);
         const ALXUIOverlay::Rescue& r = overlay.rescues().front();
         UNSCOPED_INFO("from where the layer wrote it");
@@ -180,7 +169,7 @@ namespace
         CHECK(r.line == 2);
 
         UNSCOPED_INFO("three drops: the attribute, the name nowhere, the unnamed");
-        REQUIRE(overlay.drops().size() == 3u);
+        CHECK(overlay.drops().size() == 3u);
         const auto dropped = [&overlay](const char* key) -> const ALXUIOverlay::Drop*
         {
             for (const ALXUIOverlay::Drop& d : overlay.drops())
@@ -195,7 +184,6 @@ namespace
         const ALXUIOverlay::Drop* attribute = dropped("LintDropAttribute");
         UNSCOPED_INFO("the attribute the base lacks");
         REQUIRE(attribute != nullptr);
-        UNSCOPED_INFO("named");
         CHECK(attribute->what == std::string("extra"));
         UNSCOPED_INFO("at the root");
         CHECK(attribute->path == std::string());
@@ -234,14 +222,10 @@ namespace
             "</panel>\n";
         LLXMLNodePtr base;
         LLXMLNodePtr layer;
-        {
-            INFO("parses");
-            REQUIRE(LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base));
-            REQUIRE(LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
-        }
+        REQUIRE(LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base));
+        REQUIRE(LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
         ALXUIOverlay overlay;
         ALXmlLayerMerge::merge(base, layer, 1, &overlay);
-        UNSCOPED_INFO("one drop");
         REQUIRE(overlay.drops().size() == 1u);
         UNSCOPED_INFO("the bare name");
         CHECK(overlay.drops().front().key == std::string("LintDropTextEmpty"));

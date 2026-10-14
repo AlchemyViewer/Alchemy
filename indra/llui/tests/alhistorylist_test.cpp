@@ -79,16 +79,12 @@ namespace
         ALHistoryList* history = make();
         history->setSteps(three(), 3);
 
-        UNSCOPED_INFO("all three");
-        REQUIRE(history->count() == 3u);
-        UNSCOPED_INFO("and all three in force");
+        CHECK(history->count() == 3u);
         CHECK(history->inForce() == 3u);
 
         LLScrollListCtrl* list = listOf(history);
-        UNSCOPED_INFO("the list is there");
         REQUIRE(list != nullptr);
-        UNSCOPED_INFO("one row each");
-        CHECK(list->getItemCount() == 3);
+        REQUIRE(list->getItemCount() == 3);
         UNSCOPED_INFO("newest first");
         CHECK(list->getFirstData()->getValue().asInteger() == 2);
         delete history;
@@ -107,10 +103,8 @@ namespace
         history->setSteps(three(), 1);
 
         UNSCOPED_INFO("all three are still listed");
-        REQUIRE(history->count() == 3u);
-        UNSCOPED_INFO("one of them in force");
+        CHECK(history->count() == 3u);
         CHECK(history->inForce() == 1u);
-        UNSCOPED_INFO("and three rows");
         CHECK(listOf(history)->getItemCount() == 3);
 
         // More in force than there are steps is not a thing a stack can be.
@@ -138,7 +132,6 @@ namespace
         LLScrollListCtrl* list = listOf(history);
         list->setSelectedByValue(LLSD(0), true);        // the oldest step
         history->goToSelected();
-        UNSCOPED_INFO("asked once");
         REQUIRE(asked.size() == 1u);
         UNSCOPED_INFO("for one step in force");
         CHECK(asked.front() == 1u);
@@ -146,8 +139,7 @@ namespace
         // The present, chosen: nothing to ask for.
         list->setSelectedByValue(LLSD(2), true);
         history->goToSelected();
-        UNSCOPED_INFO("and asked no more");
-        REQUIRE(asked.size() == 1u);
+        CHECK(asked.size() == 1u);
         delete history;
     }
 
@@ -168,9 +160,7 @@ namespace
         // Selecting is what says it: the list commits on a change of
         // selection, since a row chosen is the whole of the gesture.
         listOf(history)->setSelectedByValue(LLSD(1), true);
-        UNSCOPED_INFO("said which");
         REQUIRE(chosen.size() == 1u);
-        UNSCOPED_INFO("the middle one");
         CHECK(chosen.front() == 1u);
         delete history;
     }
@@ -185,14 +175,11 @@ namespace
         }
         ALHistoryList* history = make();
         history->setSteps({}, 0);
-        UNSCOPED_INFO("nothing listed");
         CHECK(listOf(history)->getItemCount() == 0);
         ALPaneList* pane = history->getChild<ALPaneList>("steps");
-        UNSCOPED_INFO("the list says so");
         CHECK(pane->saysEmpty());
 
         history->setSteps(three(), 3);
-        UNSCOPED_INFO("and not once there is something");
         CHECK_FALSE(pane->saysEmpty());
         std::vector<size_t> asked;
         history->onGoTo([&asked](size_t want) { asked.push_back(want); });
@@ -209,11 +196,9 @@ namespace
         std::vector<ALHistoryList::Step> more = three();
         more.push_back({ "name on title", "floater_a.xml" });
         history->setSteps(more, 4);
-        UNSCOPED_INFO("four now");
         CHECK(listOf(history)->getItemCount() == 4);
         UNSCOPED_INFO("the row a person was on is still the row they are on");
         REQUIRE(listOf(history)->getFirstSelected() != nullptr);
-        UNSCOPED_INFO("which is the same step");
         CHECK(listOf(history)->getFirstSelected()->getValue().asInteger() == 1);
         delete history;
     }
@@ -242,12 +227,10 @@ namespace
         UNSCOPED_INFO("the row is kept");
         CHECK(listOf(history)->getFirstSelected()->getValue().asInteger() == 1);
         UNSCOPED_INFO("and not said again");
-        REQUIRE(chosen.size() == 1u);
+        CHECK(chosen.size() == 1u);
         delete history;
     }
 
-    // The column that says which document is there only where a step names
-    // one.
     TEST_CASE_METHOD(alhistorylist_data, "alhistorylist: the document column shows only where a step names a document", "[alhistorylist]")
     {
         if (!ui.ok())
@@ -257,13 +240,12 @@ namespace
         ALHistoryList* history = make();
         history->setSteps({ { "width on close_btn", "" }, { "height on close_btn", "" } }, 2);
         LLScrollListColumn* where = listOf(history)->getColumn("where");
-        UNSCOPED_INFO("the column exists");
         REQUIRE(where != nullptr);
-        UNSCOPED_INFO("and takes no room when nothing names a document");
+        UNSCOPED_INFO("no room when nothing names a document");
         CHECK(where->getWidth() == 0);
 
         history->setSteps(three(), 3);
-        UNSCOPED_INFO("and is back when something does");
+        UNSCOPED_INFO("back when something does");
         CHECK(where->getWidth() > 0);
         delete history;
     }
@@ -282,9 +264,9 @@ namespace
         history->setSteps(three(), 2);
         LLScrollListCtrl* list = listOf(history);
         UNSCOPED_INFO("a row a step, and the start");
-        CHECK(list->getItemCount() == 4);
+        REQUIRE(list->getItemCount() == 4);
         UNSCOPED_INFO("still three steps");
-        REQUIRE(history->count() == 3u);
+        CHECK(history->count() == 3u);
 
         std::vector<size_t> asked;
         std::vector<size_t> pointed;
@@ -297,7 +279,7 @@ namespace
                       std::string("As the files were opened"));
         list->selectNthItem(3);
         UNSCOPED_INFO("pointed at, it tells nobody of a step");
-        REQUIRE(pointed.empty());
+        CHECK(pointed.empty());
         history->goToSelected();
         {
             INFO("chosen, it asks for none in force");
@@ -311,10 +293,9 @@ namespace
         UNSCOPED_INFO("still chosen after a refill");
         CHECK(list->getFirstSelectedIndex() == 3);
         UNSCOPED_INFO("the present is the start");
-        REQUIRE_FALSE(list->getAllData().back()->getColumn(0)->getValue().asString().empty());
+        CHECK_FALSE(list->getAllData().back()->getColumn(0)->getValue().asString().empty());
         history->goToSelected();
-        UNSCOPED_INFO("and asks for nothing");
-        REQUIRE(asked.size() == 1u);
+        CHECK(asked.size() == 1u);
 
         history->setSteps({}, 0);
         UNSCOPED_INFO("no steps, no start");

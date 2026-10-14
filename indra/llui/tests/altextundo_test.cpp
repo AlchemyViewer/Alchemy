@@ -66,32 +66,27 @@ namespace
         ALTextPos at = type(ALTextPos(0, 0), "a");
         at           = type(at, "b");
         at           = type(at, "c");
-        UNSCOPED_INFO("typed");
         CHECK(doc.text() == std::string("abc"));
-        UNSCOPED_INFO("can undo");
         CHECK(undo.canUndo());
         std::optional<ALTextRange> caret = undo.undo();
-        UNSCOPED_INFO("undone");
         REQUIRE(caret.has_value());
         UNSCOPED_INFO("all of it");
         CHECK(doc.text() == std::string());
         {
             INFO("caret back at the start, nothing selected");
-            REQUIRE(caret->end == ALTextPos(0, 0));
-            REQUIRE(caret->empty());
+            CHECK(caret->end == ALTextPos(0, 0));
+            CHECK(caret->empty());
         }
-        UNSCOPED_INFO("nothing more to undo");
         CHECK_FALSE(undo.canUndo());
         caret = undo.redo();
         UNSCOPED_INFO("redone");
         CHECK(doc.text() == std::string("abc"));
         {
             INFO("caret after the run");
-            REQUIRE(caret->end == ALTextPos(0, 3));
-            REQUIRE(caret->empty());
+            CHECK(caret->end == ALTextPos(0, 3));
+            CHECK(caret->empty());
         }
-        UNSCOPED_INFO("nothing to redo");
-        REQUIRE_FALSE(undo.redo().has_value());
+        CHECK_FALSE(undo.redo().has_value());
     }
 
     TEST_CASE_METHOD(altextundo_data, "altextundo: a pause or a move elsewhere or a line break ends the run", "[altextundo]")
@@ -171,7 +166,6 @@ namespace
         undo.undo();
         UNSCOPED_INFO("and its own step, so undoing it is the saved text");
         CHECK(undo.isPristine());
-        UNSCOPED_INFO("text");
         CHECK(doc.text() == std::string("xy"));
     }
 
@@ -197,10 +191,8 @@ namespace
     {
         type(ALTextPos(0, 0), "a");
         undo.label("Type");
-        UNSCOPED_INFO("undo says");
         CHECK(undo.undoLabel() == std::string("Type"));
         undo.undo();
-        UNSCOPED_INFO("redo says");
         CHECK(undo.redoLabel() == std::string("Type"));
         undo.record(ALTextDocument::Edit(), ALTextPos(), ALTextPos(), now);
         UNSCOPED_INFO("an empty edit is not a step");
@@ -247,6 +239,9 @@ namespace
         CHECK(undo.isPristine());
     }
 
+    // A save point is taken when a text is sent to be saved, and marks that
+    // text saved when the answer comes, whatever was typed or undone
+    // meanwhile.
     TEST_CASE_METHOD(altextundo_data, "altextundo: a save point marks the sent text saved whatever was typed or undone since", "[altextundo]")
     {
         ALTextPos       at    = type(ALTextPos(0, 0), "a");
@@ -331,14 +326,12 @@ namespace
         at = backspace(at, 5.0);
         undo.label("rename");
         undo.undo();
-        UNSCOPED_INFO("where it stands");
         CHECK(doc.text() == std::string("one\ntwo three"));
         const LLSD written = undo.asLLSD();
 
         // Another session: the same text, a journal of its own.
         ALTextDocument later(doc.text());
         ALTextUndo     again(later);
-        UNSCOPED_INFO("put back");
         CHECK(again.fromLLSD(written));
         UNSCOPED_INFO("unsaved, as it was");
         CHECK_FALSE(again.isPristine());
@@ -403,7 +396,7 @@ namespace
         undo.undo();
         undo.markNeverSaved();
         UNSCOPED_INFO("never saved has none");
-        REQUIRE_FALSE(undo.savedText().has_value());
+        CHECK_FALSE(undo.savedText().has_value());
     }
 
     TEST_CASE_METHOD(altextundo_data, "altextundo: a history past its budget keeps the newest steps and the mark they reach", "[altextundo]")
@@ -416,12 +409,11 @@ namespace
         // characters, and its carets, label and edit's places.
         const LLSD kept = undo.asLLSD(400);
         UNSCOPED_INFO("the two newest steps");
-        REQUIRE(kept["undo"].size() == 2);
+        CHECK(kept["undo"].size() == 2);
         UNSCOPED_INFO("the saved mark at the oldest kept");
         CHECK(kept["saved"].asInteger() == 0);
         ALTextDocument later(doc.text());
         ALTextUndo     again(later);
-        UNSCOPED_INFO("put back");
         CHECK(again.fromLLSD(kept));
         again.undo();
         again.undo();
@@ -431,7 +423,7 @@ namespace
         CHECK_FALSE(again.canUndo());
         const LLSD tight = undo.asLLSD(200);
         UNSCOPED_INFO("only the newest");
-        REQUIRE(tight["undo"].size() == 1);
+        CHECK(tight["undo"].size() == 1);
         UNSCOPED_INFO("the saved text out of reach");
         CHECK(tight["saved"].asInteger() == -1);
     }
@@ -456,11 +448,9 @@ namespace
         now += 0.1;
         ALTextDocument::Edit second = doc.remove(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 4)));
         undo.record(second, ALTextPos(0, 3), ALTextPos(0, 3), now);
-        UNSCOPED_INFO("where it stands");
         CHECK(doc.text() == std::string("onewo\nthr"));
 
         const LLSD written = undo.asLLSD();
-        UNSCOPED_INFO("five steps");
         REQUIRE(written["undo"].size() == 5);
         UNSCOPED_INFO("the typing one edit");
         REQUIRE(written["undo"][2]["edits"].size() == 1);
@@ -477,7 +467,6 @@ namespace
 
         ALTextDocument later(doc.text());
         ALTextUndo     again(later);
-        UNSCOPED_INFO("put back");
         CHECK(again.fromLLSD(written));
         again.undo();
         UNSCOPED_INFO("the deletes back");
@@ -499,6 +488,8 @@ namespace
         CHECK_FALSE(again.fromLLSD(older));
     }
 
+    // A group's edits fold where each carries on from the last, across lines
+    // too, and a run of erasing both ways folds as one.
     TEST_CASE_METHOD(altextundo_data, "altextundo: edits that carry on from the last fold into one in a group or a run", "[altextundo]")
     {
         doc.setText("a\nbc\ndef");
@@ -512,14 +503,12 @@ namespace
         // Two lines put in, and typed on at their end: one insertion.
         ALTextDocument::Edit made = edit(doc.insert(ALTextPos(0, 1), "x\ny"));
         edit(doc.insert(made.endAfter(), "z"));
-        UNSCOPED_INFO("put in");
         CHECK(doc.text() == std::string("ax\nyz\nbc\ndef"));
         // A line break taken, then the letter that moved into its place,
         // then the letter before them: one removal, across a line.
         edit(doc.remove(ALTextRange(ALTextPos(1, 2), ALTextPos(2, 0))));
         edit(doc.remove(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 3))));
         edit(doc.remove(ALTextRange(ALTextPos(1, 1), ALTextPos(1, 2))));
-        UNSCOPED_INFO("taken");
         CHECK(doc.text() == std::string("ax\nyc\ndef"));
         // And somewhere else: an edit of its own.
         edit(doc.insert(ALTextPos(2, 3), "!"));
@@ -537,7 +526,6 @@ namespace
 
         ALTextDocument later(after);
         ALTextUndo     again(later);
-        UNSCOPED_INFO("put back");
         CHECK(again.fromLLSD(written));
         again.undo();
         UNSCOPED_INFO("stepped back to where it began");
@@ -557,15 +545,12 @@ namespace
         ALTextDocument::Edit ahead = doc.remove(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
         undo.record(ahead, ALTextPos(0, 4), ALTextPos(0, 4), now);
         const LLSD run = undo.asLLSD();
-        UNSCOPED_INFO("one step");
         REQUIRE(run["undo"].size() == 1);
-        UNSCOPED_INFO("one edit");
         REQUIRE(run["undo"][0]["edits"].size() == 1);
         UNSCOPED_INFO("both letters");
         CHECK(run["undo"][0]["edits"][0][4].asString() == std::string("ef"));
         ALTextDocument erased(doc.text());
         ALTextUndo     restored(erased);
-        UNSCOPED_INFO("put back");
         CHECK(restored.fromLLSD(run));
         restored.undo();
         UNSCOPED_INFO("stepped back whole");
@@ -607,7 +592,6 @@ namespace
         const LLSD written = undo.asLLSD();
         ALTextDocument later(doc.text());
         ALTextUndo     again(later);
-        UNSCOPED_INFO("put back");
         CHECK(again.fromLLSD(written));
         back = again.undo();
         {
@@ -680,6 +664,8 @@ namespace
         CHECK(doc.text() == std::string("hello world"));
     }
 
+    // Hundreds of small steps are kept; of big ones the oldest are let go,
+    // and the saved mark with them.
     TEST_CASE_METHOD(altextundo_data, "altextundo: the steps back are held by what they weigh and not by how many", "[altextundo]")
     {
         ALTextPos at(0, 0);
@@ -714,15 +700,15 @@ namespace
         CHECK(big.canUndo());
         put(5.0);
         UNSCOPED_INFO("three written");
-        REQUIRE(big_doc.text().size() == part.size() * 3);
+        CHECK(big_doc.text().size() == part.size() * 3);
         UNSCOPED_INFO("past the budget, the oldest went: the saved text still reached");
-        REQUIRE(big.savedText().value_or(std::string()).size() == part.size());
+        CHECK(big.savedText().value_or(std::string()).size() == part.size());
         big.undo();
         big.undo();
         UNSCOPED_INFO("two back, and no more");
         CHECK_FALSE(big.canUndo());
         UNSCOPED_INFO("the first's text stands");
-        REQUIRE(big_doc.text().size() == part.size());
+        CHECK(big_doc.text().size() == part.size());
         UNSCOPED_INFO("which is the saved one");
         CHECK(big.isPristine());
 
@@ -736,6 +722,9 @@ namespace
         CHECK_FALSE(big.canUndo());
     }
 
+    // What one key typed does -- a pair with the caret between, a closer
+    // typed over, a line broken and indented, an outdent -- is one with the
+    // typing run.
     TEST_CASE_METHOD(altextundo_data, "altextundo: all one key does joins the typing run", "[altextundo]")
     {
         // A key typed where `at` is: its text put in, the caret where the
@@ -768,7 +757,6 @@ namespace
         const ALTextDocument::Edit outdent = doc.remove(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 4)));
         undo.record(outdent, ALTextPos(1, 6), ALTextPos(1, 2), now);
         undo.endTyping();
-        UNSCOPED_INFO("typed");
         CHECK(doc.text() == std::string("f(x)\ny}"));
         undo.undo();
         UNSCOPED_INFO("one step takes all of it back");
@@ -794,12 +782,12 @@ namespace
         type(at, " two", 2.0);
         const LLSD written = undo.asLLSD();
         UNSCOPED_INFO("another text's is no history");
-        REQUIRE_FALSE(ALTextUndo::historyFrom(written, "one six").has_value());
+        CHECK_FALSE(ALTextUndo::historyFrom(written, "one six").has_value());
         std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(written, doc.text());
         UNSCOPED_INFO("its own text's is");
         REQUIRE(read.has_value());
         UNSCOPED_INFO("both steps back");
-        REQUIRE(read->undo.size() == size_t(2));
+        CHECK(read->undo.size() == size_t(2));
         ALTextDocument again(doc.text());
         ALTextUndo     journal{ again };
         journal.restore(std::move(*read));
@@ -809,35 +797,39 @@ namespace
         CHECK(again.text() == std::string());
     }
 
+    // The newest step is written again as it changes, and the whole still
+    // reads back as asLLSD's.
     TEST_CASE_METHOD(altextundo_data, "altextundo: asNotation reads back as asLLSD writes it as the newest step changes", "[altextundo]")
     {
-        const auto same = [this](const char* what) {
+        const auto require_notation_as_llsd = [this](const char* what) {
+            INFO(what);
             std::istringstream in(undo.asNotation());
             LLSD               read;
-            UNSCOPED_INFO(std::string(what) + ": reads back");
             REQUIRE(LLSDSerialize::fromNotation(read, in, LLSDSerialize::SIZE_UNLIMITED) > 0);
             std::ostringstream a, b;
             LLSDSerialize::toNotation(read, a);
             LLSDSerialize::toNotation(undo.asLLSD(), b);
-            UNSCOPED_INFO(std::string(what) + ": as asLLSD writes it");
+            UNSCOPED_INFO("as asLLSD writes it");
             REQUIRE(a.str() == b.str());
         };
         ALTextPos at = type(ALTextPos(0, 0), "one", 2.0);
         at           = type(at, " two", 2.0);
         undo.label("Typing");
-        same("two steps, one named");
+        require_notation_as_llsd("two steps, one named");
         at = type(at, "s");
-        same("the newest joined");
+        require_notation_as_llsd("the newest joined");
         undo.settle(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)));
-        same("its selection settled");
+        require_notation_as_llsd("its selection settled");
         undo.markSaved();
         undo.undo();
-        same("one taken back, the saved mark past it");
+        require_notation_as_llsd("one taken back, the saved mark past it");
         std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(undo.asLLSD(), doc.text());
         UNSCOPED_INFO("and it is a history of the text");
-        REQUIRE(read.has_value());
+        CHECK(read.has_value());
     }
 
+    // A group closed to wait goes on with its step where nothing came
+    // between: not after a change, a save, an undo or another's group.
     TEST_CASE_METHOD(altextundo_data, "altextundo: resumeGroup carries on a group's step only where nothing came between", "[altextundo]")
     {
         doc.setText("abc");
@@ -908,6 +900,8 @@ namespace
         CHECK(doc.text() == std::string("qpsx12abcy"));
     }
 
+    // A step keeps the other selections before and after it: a run the
+    // first edit's before and the last's after; written and read back.
     TEST_CASE_METHOD(altextundo_data, "altextundo: a step keeps the other selections before and after and writes them out", "[altextundo]")
     {
         doc.setText("abc\nabc\nabc");
@@ -938,7 +932,7 @@ namespace
         std::optional<ALTextRange> back = undo.undo(&others);
         {
             INFO("one step");
-            REQUIRE(back.has_value());
+            CHECK(back.has_value());
             CHECK(doc.text() == "abc\nabc\nabc");
         }
         UNSCOPED_INFO("the others as they stood before the run");
@@ -955,14 +949,13 @@ namespace
         // Written out and read back over the same text.
         ALTextDocument copy(doc.text());
         ALTextUndo     again(copy);
-        UNSCOPED_INFO("read back");
         CHECK(again.fromLLSD(undo.asLLSD()));
         std::istringstream notation(undo.asNotation());
         LLSD               written;
         {
             INFO("and in notation");
             CHECK(LLSDSerialize::fromNotation(written, notation, LLSDSerialize::SIZE_UNLIMITED) > 0);
-            REQUIRE(written["undo"][0]["others_after"].size() == 1);
+            CHECK(written["undo"][0]["others_after"].size() == 1);
         }
         again.undo(&others);
         UNSCOPED_INFO("the others before, read back");
@@ -982,14 +975,17 @@ namespace
         CHECK(said(others) == said({ at(2, 0) }));
         undo.redo(&others);
         UNSCOPED_INFO("after, none");
-        REQUIRE(others.empty());
+        CHECK(others.empty());
         now += 5.0;
         type(ALTextPos(0, 0), "w");
         undo.undo(&others);
         UNSCOPED_INFO("none where there were none");
-        REQUIRE(others.empty());
+        CHECK(others.empty());
     }
 
+    // A batch is kept by its stretches' own text, not the whole of the text
+    // from the first to the last: keys typed at carets far apart keep the
+    // steps before them, and step back and forward as batches.
     TEST_CASE_METHOD(altextundo_data, "altextundo: a batch keeps its stretches' own text and not the text between them", "[altextundo]")
     {
         // A name on the first line and on the last, forty thousand bytes
@@ -1029,7 +1025,7 @@ namespace
         UNSCOPED_INFO("the saved text still reached, past the run");
         CHECK(undo.savedText() == std::optional<std::string>(saved));
         UNSCOPED_INFO("the history written a few bytes a key");
-        REQUIRE(undo.asNotation().size() < 16 * 1024);
+        CHECK(undo.asNotation().size() < 16 * 1024);
 
         // Read back over the text as it stands, in another journal: the run
         // steps back to where it began.
@@ -1055,7 +1051,7 @@ namespace
         UNSCOPED_INFO("the run one step");
         CHECK(doc.text() == before);
         UNSCOPED_INFO("each key put back as one change");
-        REQUIRE(changes == static_cast<S32>(typed.size()));
+        CHECK(changes == static_cast<S32>(typed.size()));
         UNSCOPED_INFO("each a batch of both stretches");
         CHECK(batches == changes);
         UNSCOPED_INFO("the steps before it kept");
@@ -1080,7 +1076,6 @@ namespace
                                                             { ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "Z" },
                                                             { ALTextRange(ALTextPos(3, 2), ALTextPos(3, 5)), "" } });
         undo.record(many, ALTextPos(0, 1), many.endAfter(), now);
-        UNSCOPED_INFO("made");
         CHECK(doc.text() == std::string("aX\nYta\nZgamma\nde"));
         const LLSD written = undo.asLLSD();
         const LLSD edits   = written["undo"][0]["edits"];
@@ -1098,13 +1093,14 @@ namespace
         CHECK(doc.text() == std::string("aX\nYta\nZgamma\nde"));
         ALTextDocument copy(doc.text());
         ALTextUndo     restored(copy);
-        UNSCOPED_INFO("read back");
         CHECK(restored.fromLLSD(written));
         restored.undo();
         UNSCOPED_INFO("and stepped back from the history");
         CHECK(copy.text() == std::string("alpha\nbeta\ngamma\ndelta"));
     }
 
+    // The key that would take a run's step past the budget begins a step of
+    // its own, and the history is written within the budget.
     TEST_CASE_METHOD(altextundo_data, "altextundo: a run stays in its step only while the step is within the budget", "[altextundo]")
     {
         // Ten keys typed one after the other, each putting in 300 KB: three
@@ -1118,14 +1114,14 @@ namespace
             undo.endTyping();
         }
         UNSCOPED_INFO("all typed");
-        REQUIRE(doc.text().size() == 10 * put.size());
+        CHECK(doc.text().size() == 10 * put.size());
         UNSCOPED_INFO("the history written within the budget");
-        REQUIRE(undo.asNotation().size() <= ALTextUndo::BUDGET);
+        CHECK(undo.asNotation().size() <= ALTextUndo::BUDGET);
         undo.undo();
         UNSCOPED_INFO("the last key a step of its own");
-        REQUIRE(doc.text().size() == 9 * put.size());
+        CHECK(doc.text().size() == 9 * put.size());
         undo.redo();
         UNSCOPED_INFO("and put back");
-        REQUIRE(doc.text().size() == 10 * put.size());
+        CHECK(doc.text().size() == 10 * put.size());
     }
 }

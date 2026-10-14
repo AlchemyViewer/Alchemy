@@ -43,22 +43,15 @@ namespace
     TEST_CASE_METHOD(alsnippetsession_data, "ALSnippetSession: expand reads stops and mirrors and escapes and indents a body", "[ALSnippetSession]")
     {
         const ALSnippetSession::Expansion x = ALSnippetSession::expand("for (${1:i} = 0; $1 < ${2:n}; ++$1)\n{\n$0\n}", ALTextPos(0, 4), "    ");
-        UNSCOPED_INFO("the text");
         CHECK(x.text == std::string("for (i = 0; i < n; ++i)\n    {\n    \n    }"));
         const ALTextDocument doc("    " + x.text);
-        {
-            INFO("two stops");
-            REQUIRE(x.stops.size() == 2);
-            CHECK(doc.text(x.stops[0]) == "i");
-            CHECK(doc.text(x.stops[1]) == "n");
-        }
-        {
-            INFO("two mirrors of the first");
-            REQUIRE(x.mirrors.size() == 2);
-            CHECK(x.mirrors[0].of == 0);
-            CHECK(x.mirrors[1].of == 0);
-            CHECK(doc.text(x.mirrors[1].range) == "i");
-        }
+        REQUIRE(x.stops.size() == 2);
+        CHECK(doc.text(x.stops[0]) == "i");
+        CHECK(doc.text(x.stops[1]) == "n");
+        REQUIRE(x.mirrors.size() == 2);
+        CHECK(x.mirrors[0].of == 0);
+        CHECK(x.mirrors[1].of == 0);
+        CHECK(doc.text(x.mirrors[1].range) == "i");
         UNSCOPED_INFO("$0 on the indented line");
         CHECK(x.landing == range(2, 4, 4));
 
@@ -76,11 +69,8 @@ namespace
         const ALSnippetSession::Expansion plain = ALSnippetSession::expand("\\$1 costs $$5 \\}", ALTextPos(0, 0), "");
         UNSCOPED_INFO("escaped");
         CHECK(plain.text == std::string("$1 costs $5 }"));
-        {
-            INFO("no stops, landing at the end");
-            REQUIRE(plain.stops.empty());
-            CHECK(plain.landing == range(0, 13, 13));
-        }
+        CHECK(plain.stops.empty());
+        CHECK(plain.landing == range(0, 13, 13));
     }
 
     TEST_CASE_METHOD(alsnippetsession_data, "ALSnippetSession: stops follow edits and one an edit cuts into is dropped", "[ALSnippetSession]")
@@ -109,7 +99,7 @@ namespace
         session.slide(doc.replace(range(0, 9, 11), ""));
         {
             INFO("the one cut into goes");
-            REQUIRE(session.stops().size() == 1);
+            CHECK(session.stops().size() == 1);
             CHECK(session.at() == 0);
         }
         session.slide(doc.replace(range(0, 2, 4), ""));
@@ -129,7 +119,7 @@ namespace
         const std::vector<S32> stale = session.staleMirrors(0, doc, wanted);
         UNSCOPED_INFO("what the stop holds");
         CHECK(wanted == std::string("count"));
-        UNSCOPED_INFO("both");
+        UNSCOPED_INFO("both mirrors are stale");
         CHECK(stale == std::vector<S32>({ 0, 1 }));
         std::vector<std::pair<ALTextRange, std::string>> edits;
         for (const S32 k : stale)
@@ -144,12 +134,10 @@ namespace
             CHECK(doc.text(session.mirrors()[0].range) == "count");
             CHECK(doc.text(session.mirrors()[1].range) == "count");
         }
-        UNSCOPED_INFO("the line");
         CHECK(doc.line(0) == std::string("count = count + count;"));
-        UNSCOPED_INFO("none left");
-        REQUIRE(session.staleMirrors(0, doc, wanted).empty());
+        CHECK(session.staleMirrors(0, doc, wanted).empty());
         UNSCOPED_INFO("none for another stop");
-        REQUIRE(session.staleMirrors(3, doc, wanted).empty());
+        CHECK(session.staleMirrors(3, doc, wanted).empty());
     }
 
     TEST_CASE_METHOD(alsnippetsession_data, "ALSnippetSession: reaches spans from the first stop's line to where it ends", "[ALSnippetSession]")
@@ -169,7 +157,7 @@ namespace
         {
             INFO("cleared");
             CHECK_FALSE(session.active());
-            REQUIRE(session.mirrors().empty());
+            CHECK(session.mirrors().empty());
             CHECK(session.landing() == 0);
         }
     }
@@ -216,7 +204,6 @@ namespace
         session.start(whole.stops, whole.landing.begin, whole.mirrors);
         session.slide(doc.replace(session.stops()[0], "json"));
         sync(doc, 0);
-        UNSCOPED_INFO("brought up");
         CHECK(doc.text() == std::string("local json = require(\"json\")"));
         {
             INFO("both stops kept");
@@ -231,7 +218,6 @@ namespace
         session.start(around.stops, around.landing.begin, around.mirrors);
         session.slide(text.replace(session.stops()[0], "abc"));
         sync(text, 0);
-        UNSCOPED_INFO("brought up inside");
         CHECK(text.text() == std::string("abc the abc thing"));
         UNSCOPED_INFO("the stop around it kept");
         REQUIRE(session.stops().size() == 2);
@@ -260,7 +246,7 @@ namespace
         std::string wanted;
         {
             INFO("nothing to bring up as the stop is left");
-            REQUIRE(session.staleMirrors(0, doc, wanted).empty());
+            CHECK(session.staleMirrors(0, doc, wanted).empty());
             CHECK(wanted == "value");
         }
 

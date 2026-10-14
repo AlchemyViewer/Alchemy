@@ -72,17 +72,13 @@ namespace
         d->handleMouseDown(60, 35, MASK_NONE);
         UNSCOPED_INFO("pressed to the right, it points right");
         CHECK(d->getValue().asString() == std::string("1 0"));
-        UNSCOPED_INFO("and holds the mouse");
         CHECK(d->hasMouseCapture());
         d->handleHover(35, 60, MASK_NONE);
         UNSCOPED_INFO("dragged up, it points up");
         CHECK(d->getValue().asString().ends_with(" 1"));
-        UNSCOPED_INFO("nothing committed yet");
         CHECK(commits == 0);
         d->handleMouseUp(35, 60, MASK_NONE);
-        UNSCOPED_INFO("the release commits once");
         CHECK(commits == 1);
-        UNSCOPED_INFO("and lets the mouse go");
         CHECK_FALSE(d->hasMouseCapture());
         d->die();
     }
@@ -118,7 +114,6 @@ namespace
         degrees->onCommit();
         UNSCOPED_INFO("typed: it points right");
         CHECK(d->getValue().asString() == std::string("1 0"));
-        UNSCOPED_INFO("committed once");
         CHECK(commits == 1);
         d->setValue("0 1");
         UNSCOPED_INFO("a value pointing up is ninety degrees");

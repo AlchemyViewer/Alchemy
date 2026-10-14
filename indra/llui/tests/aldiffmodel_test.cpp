@@ -119,111 +119,90 @@ namespace
         bool beside(S32 left, S32 right) const { return m.rowOfLine(Column::Left, left) == m.rowOfLine(Column::Right, right); }
         // Two models' layouts the same in everything they say: each
         // column's lines, rows, changes, folds, moves and inline lines.
-        static void sameLayout(const ALDiffModel& a, const ALDiffModel& b, const std::string& where)
+        static void require_same_layout(const ALDiffModel& a, const ALDiffModel& b, const std::string& where)
         {
+            INFO(where);
             for (const Column c : { Column::Left, Column::Right, Column::Inline })
             {
-                UNSCOPED_INFO(where + ": lines");
+                CAPTURE(c);
                 REQUIRE(a.lineCount(c) == b.lineCount(c));
-                UNSCOPED_INFO(where + ": text");
                 REQUIRE(a.text(c) == b.text(c));
-                UNSCOPED_INFO(where + ": rows of nothing at the end");
+                UNSCOPED_INFO("rows of nothing at the end");
                 REQUIRE(a.endPadding(c) == b.endPadding(c));
                 for (S32 l = 0; l < a.lineCount(c); ++l)
                 {
+                    CAPTURE(l);
                     const ALDiffModel::Line& x = a.line(c, l);
                     const ALDiffModel::Line& y = b.line(c, l);
-                    const std::string        at = where + ", line " + std::to_string(l);
-                    {
-                        INFO(at + ": kind, sign, number, padding");
-                        REQUIRE(x.kind == y.kind);
-                        REQUIRE(x.sign == y.sign);
-                        REQUIRE(x.number == y.number);
-                        REQUIRE(x.padding == y.padding);
-                    }
-                    {
-                        INFO(at + ": words and move");
-                        REQUIRE(x.words == y.words);
-                        REQUIRE(x.move == y.move);
-                    }
-                    UNSCOPED_INFO(at + ": its row");
+                    REQUIRE(x.kind == y.kind);
+                    REQUIRE(x.sign == y.sign);
+                    REQUIRE(x.number == y.number);
+                    REQUIRE(x.padding == y.padding);
+                    REQUIRE(x.words == y.words);
+                    REQUIRE(x.move == y.move);
                     REQUIRE(a.rowOfLine(c, l) == b.rowOfLine(c, l));
-                    UNSCOPED_INFO(at + ": its move's other end");
                     REQUIRE(a.moveOtherEnd(c, l) == b.moveOtherEnd(c, l));
                 }
-        }
-        for (const Layout layout : { Layout::Sides, Layout::Inline })
-        {
-            UNSCOPED_INFO(where + ": rows");
-            REQUIRE(a.rowCount(layout) == b.rowCount(layout));
-            for (S32 row = 0; row < a.rowCount(layout); ++row)
-            {
-                UNSCOPED_INFO(where + ": the right's line at a row");
-                REQUIRE(a.rightLineOfRow(layout, row) == b.rightLineOfRow(layout, row));
-                UNSCOPED_INFO(where + ": drawn");
-                REQUIRE(a.rowDrawn(layout, row) == b.rowDrawn(layout, row));
             }
-            for (const Column c : { Column::Left, Column::Right, Column::Inline })
+            for (const Layout layout : { Layout::Sides, Layout::Inline })
             {
-                if (ALDiffModel::layoutOf(c) == layout)
+                CAPTURE(layout);
+                REQUIRE(a.rowCount(layout) == b.rowCount(layout));
+                for (S32 row = 0; row < a.rowCount(layout); ++row)
                 {
-                    for (S32 row = 0; row < a.rowCount(layout); ++row)
+                    CAPTURE(row);
+                    REQUIRE(a.rightLineOfRow(layout, row) == b.rightLineOfRow(layout, row));
+                    REQUIRE(a.rowDrawn(layout, row) == b.rowDrawn(layout, row));
+                }
+                for (const Column c : { Column::Left, Column::Right, Column::Inline })
+                {
+                    if (ALDiffModel::layoutOf(c) == layout)
                     {
-                        UNSCOPED_INFO(where + ": a row's line");
-                        REQUIRE(a.lineOfRow(c, row) == b.lineOfRow(c, row));
+                        CAPTURE(c);
+                        for (S32 row = 0; row < a.rowCount(layout); ++row)
+                        {
+                            CAPTURE(row);
+                            REQUIRE(a.lineOfRow(c, row) == b.lineOfRow(c, row));
+                        }
                     }
                 }
             }
-        }
-        UNSCOPED_INFO(where + ": changes");
-        REQUIRE(a.changeCount() == b.changeCount());
-        for (S32 n = 0; n < a.changeCount(); ++n)
-        {
-            const ALDiffModel::ChangeLines& x = a.changeLines(n);
-            const ALDiffModel::ChangeLines& y = b.changeLines(n);
+            REQUIRE(a.changeCount() == b.changeCount());
+            for (S32 n = 0; n < a.changeCount(); ++n)
             {
-                INFO(where + ": a change's rows");
+                CAPTURE(n);
+                const ALDiffModel::ChangeLines& x = a.changeLines(n);
+                const ALDiffModel::ChangeLines& y = b.changeLines(n);
                 REQUIRE(a.changeFirst(Layout::Sides, n) == b.changeFirst(Layout::Sides, n));
                 REQUIRE(a.changeEnd(Layout::Sides, n) == b.changeEnd(Layout::Sides, n));
                 REQUIRE(a.changeFirst(Layout::Inline, n) == b.changeFirst(Layout::Inline, n));
                 REQUIRE(a.changeEnd(Layout::Inline, n) == b.changeEnd(Layout::Inline, n));
-            }
-            {
-                INFO(where + ": a change's lines");
                 REQUIRE(x.leftFirst == y.leftFirst);
                 REQUIRE(x.leftCount == y.leftCount);
                 REQUIRE(x.rightFirst == y.rightFirst);
                 REQUIRE(x.rightCount == y.rightCount);
             }
-        }
-        UNSCOPED_INFO(where + ": folds");
-        REQUIRE(a.foldCount() == b.foldCount());
-        for (S32 n = 0; n < a.foldCount(); ++n)
-        {
+            REQUIRE(a.foldCount() == b.foldCount());
+            for (S32 n = 0; n < a.foldCount(); ++n)
             {
-                INFO(where + ": a fold");
+                CAPTURE(n);
                 REQUIRE(a.foldFirst(Layout::Sides, n) == b.foldFirst(Layout::Sides, n));
                 REQUIRE(a.foldFirst(Layout::Inline, n) == b.foldFirst(Layout::Inline, n));
                 REQUIRE(a.foldLines(n) == b.foldLines(n));
                 REQUIRE(a.foldOpen(n) == b.foldOpen(n));
             }
-        }
-        UNSCOPED_INFO(where + ": moves");
-        REQUIRE(a.moveCount() == b.moveCount());
-        for (const bool given_left : { true, false })
-        {
-            for (S32 line = 0; line < 200; ++line)
+            REQUIRE(a.moveCount() == b.moveCount());
+            for (const bool given_left : { true, false })
             {
-                UNSCOPED_INFO(where + ": the inline line showing a line");
-                REQUIRE(a.lineShowing(Column::Inline, given_left, line) ==
-                              b.lineShowing(Column::Inline, given_left, line));
+                CAPTURE(given_left);
+                for (S32 line = 0; line < 200; ++line)
+                {
+                    CAPTURE(line);
+                    REQUIRE(a.lineShowing(Column::Inline, given_left, line) == b.lineShowing(Column::Inline, given_left, line));
+                }
             }
         }
-        }
-
     };
-    // More than TUT's fifty a group holds by default, which runs the first
-    // fifty and says nothing of the rest: keep this above the highest test.
 
     TEST_CASE_METHOD(aldiffmodel_data, "aldiffmodel: side by side the texts line up with a gap beside a line put in", "[aldiffmodel]")
     {
@@ -250,14 +229,10 @@ namespace
         CHECK(paddingOf(Column::Left) == std::vector<S32>{ 0, 0, 0, 1 });
         UNSCOPED_INFO("none on the right");
         CHECK(paddingOf(Column::Right) == std::vector<S32>{ 0, 0, 0, 0, 0 });
-        UNSCOPED_INFO("four rows");
         CHECK(m.rowCount(Layout::Sides) == 4);
-        {
-            INFO("lined up");
-            CHECK(beside(0, 0));
-            CHECK(beside(1, 1));
-            CHECK(beside(2, 2));
-        }
+        CHECK(beside(0, 0));
+        CHECK(beside(1, 1));
+        CHECK(beside(2, 2));
         {
             INFO("the left's last row its gap's");
             CHECK(m.lineOfRow(Column::Left, 3) == -1);
@@ -279,13 +254,10 @@ namespace
     TEST_CASE_METHOD(aldiffmodel_data, "aldiffmodel: inline shows lines taken out above those put in and unnumbered", "[aldiffmodel]")
     {
         m.setTexts("a\nb = 1\nc", "a\nb = 2\nc\nd");
-        UNSCOPED_INFO("one text");
         CHECK(m.text(Column::Inline) == std::string("a\nb = 1\nb = 2\nc\nd"));
         UNSCOPED_INFO("numbered as the right");
         CHECK(numbersOf(Column::Inline) == std::vector<S32>{ 1, 0, 2, 3, 4 });
-        UNSCOPED_INFO("what each is");
         CHECK(kindsOf(Column::Inline) == std::string("=-+=+"));
-        UNSCOPED_INFO("signed");
         CHECK(signsOf(Column::Inline) == std::string("\0-+\0+", 5));
         UNSCOPED_INFO("no rows of nothing");
         CHECK(paddingOf(Column::Inline) == std::vector<S32>(6, 0));
@@ -301,21 +273,14 @@ namespace
     TEST_CASE_METHOD(aldiffmodel_data, "aldiffmodel: changes know their rows and lines and step from one to the next", "[aldiffmodel]")
     {
         m.setTexts("a\nb = 1\nc", "a\nb = 2\nc\nd");
-        UNSCOPED_INFO("two");
-        CHECK(m.changeCount() == 2);
-        {
-            INFO("the first's rows");
-            CHECK(m.changeFirst(Layout::Sides, 0) == 1);
-            CHECK(m.changeEnd(Layout::Sides, 0) == 2);
-            CHECK(m.changeFirst(Layout::Inline, 0) == 1);
-            CHECK(m.changeEnd(Layout::Inline, 0) == 3);
-        }
-        {
-            INFO("the second's");
-            CHECK(m.changeFirst(Layout::Sides, 1) == 3);
-            CHECK(m.changeEnd(Layout::Sides, 1) == 4);
-            CHECK(m.changeFirst(Layout::Inline, 1) == 4);
-        }
+        REQUIRE(m.changeCount() == 2);
+        CHECK(m.changeFirst(Layout::Sides, 0) == 1);
+        CHECK(m.changeEnd(Layout::Sides, 0) == 2);
+        CHECK(m.changeFirst(Layout::Inline, 0) == 1);
+        CHECK(m.changeEnd(Layout::Inline, 0) == 3);
+        CHECK(m.changeFirst(Layout::Sides, 1) == 3);
+        CHECK(m.changeEnd(Layout::Sides, 1) == 4);
+        CHECK(m.changeFirst(Layout::Inline, 1) == 4);
         const ALDiffModel::ChangeLines& first = m.changeLines(0);
         {
             INFO("a line for a line");
@@ -332,26 +297,17 @@ namespace
             CHECK(second.rightFirst == 3);
             CHECK(second.rightCount == 1);
         }
-        {
-            INFO("a row's");
-            CHECK(m.changeOfRow(Layout::Sides, 1) == 0);
-            CHECK(m.changeOfRow(Layout::Sides, 2) == -1);
-            CHECK(m.changeOfRow(Layout::Inline, 2) == 0);
-        }
-        {
-            INFO("a line's");
-            CHECK(m.changeOfLine(Column::Right, 1) == 0);
-            CHECK(m.changeOfLine(Column::Right, 2) == -1);
-            CHECK(m.changeOfLine(Column::Right, 3) == 1);
-        }
+        CHECK(m.changeOfRow(Layout::Sides, 1) == 0);
+        CHECK(m.changeOfRow(Layout::Sides, 2) == -1);
+        CHECK(m.changeOfRow(Layout::Inline, 2) == 0);
+        CHECK(m.changeOfLine(Column::Right, 1) == 0);
+        CHECK(m.changeOfLine(Column::Right, 2) == -1);
+        CHECK(m.changeOfLine(Column::Right, 3) == 1);
         UNSCOPED_INFO("the left's last line, over the gap at the end: its change");
         CHECK(m.changeOfLine(Column::Left, 2) == 1);
-        {
-            INFO("lines in it");
-            CHECK(m.hasLinesIn(Column::Right, 1));
-            CHECK_FALSE(m.hasLinesIn(Column::Left, 1));
-            CHECK(m.hasLinesIn(Column::Left, 0));
-        }
+        CHECK(m.hasLinesIn(Column::Right, 1));
+        CHECK_FALSE(m.hasLinesIn(Column::Left, 1));
+        CHECK(m.hasLinesIn(Column::Left, 0));
         {
             INFO("on from before the first");
             CHECK(m.changeStep(Column::Right, 0, true) == 0);
@@ -406,22 +362,15 @@ namespace
     TEST_CASE_METHOD(aldiffmodel_data, "aldiffmodel: a long unchanged run folds beyond three lines of context", "[aldiffmodel]")
     {
         m.setTexts(lines(30).c_str(), lines(30, { { 2, "line two" }, { 27, "line 27 changed" } }).c_str());
-        {
-            INFO("one, folded");
-            CHECK(m.foldCount() == 1);
-            CHECK(m.foldedCount() == 1);
-            CHECK_FALSE(m.foldOpen(0));
-        }
+        REQUIRE(m.foldCount() == 1);
+        CHECK(m.foldedCount() == 1);
+        CHECK_FALSE(m.foldOpen(0));
         // Side by side: 0-1 the same, 2 a change, 3-5 context, 6-23 the run,
         // its row 24, 25-27 context, 28 a change, 29-30 the same.
-        UNSCOPED_INFO("eighteen lines");
         CHECK(m.foldLines(0) == 18);
-        {
-            INFO("side by side");
-            CHECK(m.foldFirst(Layout::Sides, 0) == 6);
-            CHECK(m.foldRow(Layout::Sides, 0) == 24);
-            CHECK(m.rowCount(Layout::Sides) == 31);
-        }
+        CHECK(m.foldFirst(Layout::Sides, 0) == 6);
+        CHECK(m.foldRow(Layout::Sides, 0) == 24);
+        CHECK(m.rowCount(Layout::Sides) == 31);
         {
             INFO("its row no line's");
             CHECK(m.lineOfRow(Column::Left, 24) == -1);
@@ -435,30 +384,21 @@ namespace
             CHECK(m.foldGapLine(Column::Right, 0) == 24);
         }
         // Inline: the change two rows, so all a row on, and its row no line.
-        {
-            INFO("inline");
-            CHECK(m.foldFirst(Layout::Inline, 0) == 7);
-            CHECK(m.foldRow(Layout::Inline, 0) == 25);
-        }
+        CHECK(m.foldFirst(Layout::Inline, 0) == 7);
+        CHECK(m.foldRow(Layout::Inline, 0) == 25);
         {
             INFO("inline's lines of it");
             CHECK(m.foldFirstLine(Column::Inline, 0) == 7);
             CHECK(m.foldGapLine(Column::Inline, 0) == 25);
         }
-        {
-            INFO("a row's fold");
-            CHECK(m.foldOfRow(Layout::Sides, 24, false) == 0);
-            CHECK(m.foldOfRow(Layout::Sides, 10, false) == -1);
-            CHECK(m.foldOfRow(Layout::Sides, 10, true) == 0);
-            CHECK(m.foldOfRow(Layout::Sides, 5, true) == -1);
-            CHECK(m.foldOfRow(Layout::Sides, 25, true) == -1);
-        }
-        {
-            INFO("its gap's");
-            CHECK(m.foldOfGap(Column::Right, 24) == 0);
-            CHECK(m.foldOfGap(Column::Right, 25) == -1);
-            CHECK(m.foldOfGap(Column::Inline, 25) == 0);
-        }
+        CHECK(m.foldOfRow(Layout::Sides, 24, false) == 0);
+        CHECK(m.foldOfRow(Layout::Sides, 10, false) == -1);
+        CHECK(m.foldOfRow(Layout::Sides, 10, true) == 0);
+        CHECK(m.foldOfRow(Layout::Sides, 5, true) == -1);
+        CHECK(m.foldOfRow(Layout::Sides, 25, true) == -1);
+        CHECK(m.foldOfGap(Column::Right, 24) == 0);
+        CHECK(m.foldOfGap(Column::Right, 25) == -1);
+        CHECK(m.foldOfGap(Column::Inline, 25) == 0);
         {
             INFO("its row drawn while folded");
             CHECK(m.rowDrawn(Layout::Sides, 24));
@@ -496,7 +436,7 @@ namespace
         m.setTexts(lines(20).c_str(), lines(20, { { 19, "nineteen" } }).c_str());
         {
             INFO("one, at the start");
-            CHECK(m.foldCount() == 1);
+            REQUIRE(m.foldCount() == 1);
             CHECK(m.foldFirst(Layout::Sides, 0) == 0);
             CHECK(m.foldLines(0) == 16);
         }
@@ -509,7 +449,7 @@ namespace
         m.setTexts(lines(20, { { 0, "zero" } }).c_str(), lines(20).c_str());
         {
             INFO("one at the end");
-            CHECK(m.foldCount() == 1);
+            REQUIRE(m.foldCount() == 1);
             CHECK(m.foldLines(0) == 16);
             CHECK(m.foldFirstLine(Column::Left, 0) == 4);
         }
@@ -548,7 +488,6 @@ namespace
         CHECK(kindsOf(Column::Left) == std::string("=-=-"));
         UNSCOPED_INFO("the gap now the right's");
         CHECK(paddingOf(Column::Right) == std::vector<S32>{ 0, 0, 0, 1 });
-        UNSCOPED_INFO("the column showing the right's text");
         CHECK(static_cast<S32>(m.rightColumn()) == static_cast<S32>(Column::Left));
         const ALDiffModel::ChangeLines& last = m.changeLines(1);
         {
@@ -574,7 +513,7 @@ namespace
         m.setSwapped(true);
         {
             INFO("swapped, open still");
-            CHECK(m.foldCount() == 1);
+            REQUIRE(m.foldCount() == 1);
             CHECK(m.foldOpen(0));
         }
 
@@ -583,23 +522,20 @@ namespace
         // shown on.
         m.setSwapped(false);
         m.setTexts(lines(30).c_str(), ("new 0\nnew 1\n" + lines(30, { { 27, "line 27 changed" } })).c_str());
-        {
-            INFO("the run's first lines the left's 3 and the right's 5");
-            CHECK(m.foldCount() == 1);
-            CHECK(m.foldFirstLine(Column::Left, 0) == 3);
-            CHECK(m.foldFirstLine(Column::Right, 0) == 5);
-        }
+        REQUIRE(m.foldCount() == 1);
+        CHECK(m.foldFirstLine(Column::Left, 0) == 3);
+        CHECK(m.foldFirstLine(Column::Right, 0) == 5);
         m.setFoldOpen(0, true);
         m.setSwapped(true);
         {
             INFO("lines put in before it: swapped, open still");
-            CHECK(m.foldCount() == 1);
+            REQUIRE(m.foldCount() == 1);
             CHECK(m.foldOpen(0));
         }
         m.setSwapped(false);
         {
             INFO("and swapped back");
-            CHECK(m.foldCount() == 1);
+            REQUIRE(m.foldCount() == 1);
             CHECK(m.foldOpen(0));
         }
     }
@@ -649,7 +585,7 @@ namespace
         CHECK(m.changeCount() == 3);
         {
             INFO("the run as open as it was");
-            CHECK(m.foldCount() == 1);
+            REQUIRE(m.foldCount() == 1);
             CHECK(m.foldOpen(0));
         }
         const ALDiffModel::LineMap gone = m.setRightText("inserted\n" + lines(30, { { 2, "line two" }, { 27, "line 27 changed" }, { 25, "changed" } }));
@@ -682,7 +618,6 @@ namespace
         std::string text;
         std::string made;
         m.setTexts("a\nb\nc\nd\ne", "a\nB\nc\nx\ny\nd");
-        UNSCOPED_INFO("three changes");
         CHECK(m.changeCount() == 3);
         UNSCOPED_INFO("the lines put in");
         REQUIRE(m.takeBack(1, range, text, made));
@@ -804,7 +739,6 @@ namespace
     {
         // Six lines edited, the third of them taken out as well.
         m.setTexts("a = 1;\nb = 2;\nc = 3;\nd = 4;\ne = 5;\nf = 6;", "a = 10;\nb = 20;\nd = 40;\ne = 50;\nf = 60;");
-        UNSCOPED_INFO("one change");
         CHECK(m.changeCount() == 1);
         UNSCOPED_INFO("the left: two paired, one alone, the rest paired");
         CHECK(signsOf(Column::Left) == std::string("~~-~~~"));
@@ -850,11 +784,8 @@ namespace
             CHECK(m.rowOfLine(Column::Left, 1) == 1);
             CHECK(m.rowOfLine(Column::Right, 1) == 2);
         }
-        {
-            INFO("no words marked");
-            REQUIRE(m.line(Column::Left, 1).words.empty());
-            REQUIRE(m.line(Column::Right, 1).words.empty());
-        }
+        REQUIRE(m.line(Column::Left, 1).words.empty());
+        REQUIRE(m.line(Column::Right, 1).words.empty());
 
         // Lines kept beside each other by a range: a pair however unlike.
         m.setTexts("default\n{\n    touch_start(integer d)", "-- x\nLLEvents:on(\"touch_start\", function(detected)", { { 2, 2, 1, 1 } });
@@ -946,7 +877,6 @@ namespace
     {
         const std::string block = "llOwnerSay(\"a block of lines\");\nllOwnerSay(\"moved as one\");";
         m.setTexts(block + "\nstay one\nstay two", "stay one\nstay two\n" + block);
-        UNSCOPED_INFO("one move");
         CHECK(m.moveCount() == 1);
         {
             INFO("taken out at the top, signed >");
@@ -970,7 +900,6 @@ namespace
             CHECK(m.moveOtherEnd(Column::Inline, 1) == std::make_pair(Column::Inline, 5));
             CHECK(m.moveOtherEnd(Column::Inline, 4) == std::make_pair(Column::Inline, 0));
         }
-        UNSCOPED_INFO("no words marked");
         REQUIRE(m.line(Column::Left, 0).words.empty());
         UNSCOPED_INFO("still changes, stepped through");
         CHECK(m.changeCount() == 2);
@@ -1031,13 +960,12 @@ namespace
             m.setRightText(text(right));
             ALDiffModel fresh;
             fresh.setTexts(left, text(right));
-            const std::string where = "after an edit at " + std::to_string(at);
-            UNSCOPED_INFO(where + ": changes");
+            CAPTURE(at, how);
             REQUIRE(m.changeCount() == fresh.changeCount());
-            UNSCOPED_INFO(where + ": rows");
             REQUIRE(m.rowCount(Layout::Sides) == fresh.rowCount(Layout::Sides));
             for (Column c : { Column::Left, Column::Right, Column::Inline })
             {
+                CAPTURE(c);
                 std::string mine, theirs;
                 for (S32 l = 0; l < m.lineCount(c); ++l)
                 {
@@ -1047,7 +975,7 @@ namespace
                 {
                     theirs.push_back(fresh.line(c, l).sign);
                 }
-                UNSCOPED_INFO(where + ": signs");
+                UNSCOPED_INFO("signs");
                 REQUIRE(mine == theirs);
             }
         }
@@ -1233,12 +1161,9 @@ namespace
             CHECK_FALSE(m.merging());
             CHECK(m.conflictCount() == 0);
         }
-        UNSCOPED_INFO("two changes");
         CHECK(m.changeCount() == 2);
         m.setMergeBase(base);
-        UNSCOPED_INFO("merging");
         CHECK(m.merging());
-        UNSCOPED_INFO("one conflict");
         CHECK(m.conflictCount() == 1);
         UNSCOPED_INFO("ours's own change is none");
         CHECK_FALSE(m.changeConflicts(0));
@@ -1255,7 +1180,6 @@ namespace
         // Typed elsewhere in the right: still the one conflict, its change
         // the second still.
         m.setRightText(lines(8, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, "mine 4" }, { 6, "mine 6" } }));
-        UNSCOPED_INFO("three changes");
         CHECK(m.changeCount() == 3);
         {
             INFO("the conflict's change found again");
@@ -1266,23 +1190,16 @@ namespace
 
         // Settled as both: the settling kept, then the right made anew.
         const std::optional<ALDiffMerge::Settling> settling = m.settle(2, ALTextMerge::Take::OursThenTheirs);
-        {
-            INFO("an edit");
-            REQUIRE(settling);
-            CHECK(settling->edits);
-        }
+        REQUIRE(settling);
+        CHECK(settling->edits);
         UNSCOPED_INFO("ours then theirs");
         CHECK(settling->made == lines(9, { { 0, "theirs 0" }, { 2, "mine 2" }, { 4, "mine 4" }, { 6, "mine 6" }, { 7, "theirs 6" }, { 8, "line 7" } }));
         m.settled(*settling);
         m.setRightText(settling->made);
-        UNSCOPED_INFO("none left");
         CHECK(m.conflictCount() == 0);
-        {
-            INFO("no change a conflict");
-            CHECK_FALSE(m.changeConflicts(0));
-            CHECK_FALSE(m.changeConflicts(1));
-            CHECK_FALSE(m.changeConflicts(2));
-        }
+        CHECK_FALSE(m.changeConflicts(0));
+        CHECK_FALSE(m.changeConflicts(1));
+        CHECK_FALSE(m.changeConflicts(2));
 
         m.setTexts(theirs, ours);
         {
@@ -1316,9 +1233,9 @@ namespace
         right += "\nmore\nmore\ntail!";
         for (const bool swapped : { false, true })
         {
+            CAPTURE(swapped);
             m.setTexts(left, right);
             m.setSwapped(swapped);
-            UNSCOPED_INFO("folded");
             REQUIRE(m.foldCount() > 1);
             bool alone[2] = { false, false };
             for (S32 change = 0; change < m.changeCount(); ++change)
@@ -1333,6 +1250,7 @@ namespace
             }
             for (const Column c : { Column::Left, Column::Right, Column::Inline })
             {
+                CAPTURE(c);
                 const Layout layout = ALDiffModel::layoutOf(c);
                 for (S32 row = -1; row <= m.rowCount(layout) + 1; ++row)
                 {
@@ -1345,7 +1263,7 @@ namespace
                             break;
                         }
                     }
-                    UNSCOPED_INFO("the line below a row");
+                    CAPTURE(row);
                     REQUIRE(m.lineBelowRow(c, row) == below);
                 }
                 for (S32 change = 0; change < m.changeCount(); ++change)
@@ -1355,7 +1273,7 @@ namespace
                     {
                         has = has || m.lineOfRow(c, row) >= 0;
                     }
-                    UNSCOPED_INFO("a change's lines in a column");
+                    CAPTURE(change);
                     REQUIRE(m.hasLinesIn(c, change) == has);
                 }
                 // How far up a gap a row is, its runs folded and open.
@@ -1369,6 +1287,7 @@ namespace
                         {
                             drawn += m.rowDrawn(layout, at) ? 1 : 0;
                         }
+                        CAPTURE(open, row);
                         UNSCOPED_INFO("the rows drawn from a row to the line below");
                         REQUIRE(m.gapRowsFrom(c, row) == drawn);
                     }
@@ -1384,7 +1303,7 @@ namespace
                     {
                         row = line >= 0 && m.rightLineOfRow(layout, at) == line ? at : -1;
                     }
-                    UNSCOPED_INFO("the right's line's row");
+                    CAPTURE(layout, line);
                     REQUIRE(m.rowOfRightLine(layout, line) == row);
                 }
             }
@@ -1419,7 +1338,7 @@ namespace
         CHECK(m.lineCount(Column::Left) == 3);
         {
             INFO("the changed line the second");
-            CHECK(m.changeCount() == 1);
+            REQUIRE(m.changeCount() == 1);
             CHECK(m.changeLines(0).leftFirst == 1);
             CHECK(m.changeLines(0).rightFirst == 1);
         }
@@ -1575,6 +1494,7 @@ namespace
             }
             for (S32 step = 0; step < 60; ++step)
             {
+                CAPTURE(way, step);
                 // The right typed in, mostly; the left another now and then.
                 const bool on_left = way != 3 && next(4) == 0;
                 (on_left ? left : right) = edited(on_left ? left : right);
@@ -1591,9 +1511,8 @@ namespace
                 }
                 ++rebuilds;
                 reused += model.relaid().whole ? 0 : 1;
-                UNSCOPED_INFO("the other laid out whole");
                 REQUIRE(whole.relaid().whole);
-                sameLayout(model, whole, "way " + std::to_string(way) + ", step " + std::to_string(step));
+                require_same_layout(model, whole, "after an edit");
             }
         }
         UNSCOPED_INFO("laid out again only in part, mostly");
@@ -1615,23 +1534,20 @@ namespace
             }
             return std::make_pair(std::move(model), std::move(whole));
         };
-        const auto same = [](const ALDiffModel& a, const ALDiffModel& b, const std::string& where) {
+        const auto require_same_texts_and_folds = [](const ALDiffModel& a, const ALDiffModel& b, const std::string& where) {
+            INFO(where);
             for (const ALDiffModel::Column c : { ALDiffModel::Column::Left, ALDiffModel::Column::Right, ALDiffModel::Column::Inline })
             {
-                UNSCOPED_INFO(where + ": text");
+                CAPTURE(c);
                 REQUIRE(a.text(c) == b.text(c));
-                UNSCOPED_INFO(where + ": lines");
                 REQUIRE(a.lineCount(c) == b.lineCount(c));
             }
-            UNSCOPED_INFO(where + ": folds");
             REQUIRE(a.foldCount() == b.foldCount());
             for (S32 n = 0; n < a.foldCount(); ++n)
             {
-                {
-                    INFO(where + ": a fold");
-                    REQUIRE(a.foldFirst(Layout::Sides, n) == b.foldFirst(Layout::Sides, n));
-                    REQUIRE(a.foldLines(n) == b.foldLines(n));
-                }
+                CAPTURE(n);
+                REQUIRE(a.foldFirst(Layout::Sides, n) == b.foldFirst(Layout::Sides, n));
+                REQUIRE(a.foldLines(n) == b.foldLines(n));
             }
         };
 
@@ -1664,7 +1580,7 @@ namespace
         {
             each->setRightText(right(false));
         }
-        same(model, whole, "the last change taken back");
+        require_same_texts_and_folds(model, whole, "the last change taken back");
 
         // Blank lines taken out at the start, let go of, and a line put in
         // before them: inline, nothing before the lines after the change, then
@@ -1675,14 +1591,14 @@ namespace
         {
             each->setRightText(lines(30, { { 29, "END" } }));
         }
-        same(first, first_whole, "the line before them taken out");
+        require_same_texts_and_folds(first, first_whole, "the line before them taken out");
         UNSCOPED_INFO("laid out again in part");
         CHECK_FALSE(first.relaid().whole);
         for (ALDiffModel* each : { &first, &first_whole })
         {
             each->setRightText("put in\n" + lines(30, { { 29, "END" } }));
         }
-        same(first, first_whole, "and put back");
+        require_same_texts_and_folds(first, first_whole, "and put back");
         UNSCOPED_INFO("laid out again in part again");
         CHECK_FALSE(first.relaid().whole);
     }
@@ -1725,7 +1641,7 @@ namespace
         {
             ALDiffModel fresh;
             fresh.setTexts(joinedOf(left), joinedOf(right), model.ranges());
-            sameLayout(model, fresh, "cut inside a run the same");
+            require_same_layout(model, fresh, "cut inside a run the same");
             {
                 INFO("laid out again around the edit");
                 CHECK_FALSE(model.relaid().whole);
@@ -1764,7 +1680,8 @@ namespace
             relaid += model.relaid().whole ? model.lineCount(Column::Right) : model.relaid().now[1];
             ALDiffModel fresh;
             fresh.setTexts(joinedOf(left), joinedOf(right), model.ranges());
-            sameLayout(model, fresh, "step " + std::to_string(step));
+            CAPTURE(step);
+            require_same_layout(model, fresh, "after an edit");
         }
         UNSCOPED_INFO("laid out again only around each edit, mostly");
         CHECK(relaid < 80 * 12);
@@ -1829,7 +1746,7 @@ namespace
                     // The right's line 40 is 41 now, below the line put in.
                     UNSCOPED_INFO(way + ": laid out again past the line read otherwise");
                     REQUIRE((kept.relaid().whole || kept.relaid().first[1] + kept.relaid().now[1] > 41));
-                    sameLayout(kept, whole, way + (opened ? ": opened" : ": closed"));
+                    require_same_layout(kept, whole, way + (opened ? ": opened" : ": closed"));
                 }
             }
         }
@@ -1885,7 +1802,7 @@ namespace
             REQUIRE(ALStructuralDiff::lastRead() == whole.changeCount());
             UNSCOPED_INFO(where + ": read again");
             REQUIRE(kept_read == read);
-            aldiffmodel_data::sameLayout(kept, whole, where);
+            aldiffmodel_data::require_same_layout(kept, whole, where);
         };
         both(right({ { 90, "x = 90 - 12;" } }), "typed in a change", 1);
         both(right({ { 90, "x = 90 - 12;" }, { 60, "y = 60;" } }), "a change made where there was none", 1);
@@ -1933,11 +1850,8 @@ namespace
         m.setLeftText("-- a note\n" + left);
         UNSCOPED_INFO("the left's too");
         CHECK(m.pairs()[0].leftFirst == 1);
-        {
-            INFO("beside");
-            CHECK(beside(1, 6));
-            CHECK(beside(5, 9));
-        }
+        CHECK(beside(1, 6));
+        CHECK(beside(5, 9));
         m.setSwapped(true);
         UNSCOPED_INFO("swapped: the right's lines on the left");
         CHECK(m.rowOfLine(Column::Left, 6) == m.rowOfLine(Column::Right, 1));
@@ -1990,10 +1904,9 @@ namespace
         const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
             done(kept);
             done(whole);
-            aldiffmodel_data::sameLayout(kept, whole, where);
+            aldiffmodel_data::require_same_layout(kept, whole, where);
         };
         both([&](ALDiffModel& m) { m.setTexts(joined(base), joined(moved)); }, "moved");
-        UNSCOPED_INFO("a move");
         CHECK(kept.moveCount() == 1);
 
         // Other texts as long: the block's lines others on each side.
@@ -2005,7 +1918,6 @@ namespace
             other_right[static_cast<size_t>(80 + n)] += " on the right";
         }
         both([&](ALDiffModel& m) { m.setTexts(joined(other_left), joined(other_right)); }, "other texts");
-        UNSCOPED_INFO("no move");
         CHECK(kept.moveCount() == 0);
 
         // Ranges, and a left of another version as long: a line of the
@@ -2024,7 +1936,6 @@ namespace
             indented[static_cast<size_t>(80 + n)] = "  " + indented[static_cast<size_t>(80 + n)];
         }
         both([&](ALDiffModel& m) { m.setTexts(joined(base), joined(indented)); }, "indented");
-        UNSCOPED_INFO("no move");
         CHECK(kept.moveCount() == 0);
         ALTextDiff::Likeness like;
         like.ignoreWhitespace = true;
@@ -2060,7 +1971,7 @@ namespace
         const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
             done(kept);
             done(whole);
-            aldiffmodel_data::sameLayout(kept, whole, where);
+            aldiffmodel_data::require_same_layout(kept, whole, where);
         };
         both([&](ALDiffModel& m) { m.setTexts(joined(base), joined(twice)); }, "twice");
         UNSCOPED_INFO("one move, to the first copy");
@@ -2082,22 +1993,21 @@ namespace
     {
         // Two runs: lines 6 to 16, and 23 to 33.
         m.setTexts(lines(40, { { 2, "two" }, { 20, "twenty" }, { 37, "thirty-seven" } }), lines(40, { { 2, "2" }, { 20, "20" }, { 37, "37" } }));
-        UNSCOPED_INFO("two runs");
-        CHECK(m.foldCount() == 2);
+        REQUIRE(m.foldCount() == 2);
         m.setFoldOpen(1, true);
         ALTextDiff::Likeness like;
         like.ignoreWhitespace = true;
         m.setLikeness(like);
         {
             INFO("blanks let go of: the second open still, the first folded");
-            CHECK(m.foldCount() == 2);
+            REQUIRE(m.foldCount() == 2);
             CHECK_FALSE(m.foldOpen(0));
             CHECK(m.foldOpen(1));
         }
         m.setAlgorithm(ALTextDiff::Algorithm::Patience);
         {
             INFO("another way: the same");
-            CHECK(m.foldCount() == 2);
+            REQUIRE(m.foldCount() == 2);
             CHECK_FALSE(m.foldOpen(0));
             CHECK(m.foldOpen(1));
         }
@@ -2184,7 +2094,6 @@ namespace
         m.setLexer(lexer(asked));
         m.setLikeness(like);
         m.setTexts(left, right);
-        UNSCOPED_INFO("two changes");
         CHECK(m.changeCount() == 2);
         asked->clear();
         m.setRightText(typed);
@@ -2199,7 +2108,7 @@ namespace
         fresh.setLexer(lexer(nullptr));
         fresh.setLikeness(like);
         fresh.setTexts(left, typed);
-        sameLayout(m, fresh, "typed inside the comment");
+        require_same_layout(m, fresh, "typed inside the comment");
     }
 
     TEST_CASE_METHOD(aldiffmodel_data, "aldiffmodel: a merge on the two-text lexer still lays out again only around an edit", "[aldiffmodel]")
@@ -2251,7 +2160,6 @@ namespace
         m.setTexts(theirs, ours("line 4"));
         m.setSwapped(true);
         m.setMergeBase(base);
-        UNSCOPED_INFO("one conflict");
         CHECK(m.conflictCount() == 1);
 
         // Typed in above the conflict: the lines below the edit read as
@@ -2274,7 +2182,6 @@ namespace
             CHECK_FALSE(settling->edits);
         }
         m.settled(*settling);
-        UNSCOPED_INFO("none left");
         CHECK(m.conflictCount() == 0);
         m.setRightText(ours("line 4 typed again"));
         {
@@ -2288,7 +2195,7 @@ namespace
         fresh.setLikeness(like);
         fresh.setTexts(theirs, ours("line 4 typed again"));
         fresh.setSwapped(true);
-        sameLayout(m, fresh, "as afresh");
+        require_same_layout(m, fresh, "as afresh");
     }
 
     TEST_CASE_METHOD(aldiffmodel_data, "aldiffmodel: a merge with its own lexer keeps the base from the comparison's lexer", "[aldiffmodel]")
@@ -2318,7 +2225,6 @@ namespace
         m.setSwapped(true);
         compared->clear();
         m.setMergeBase(lines(8));
-        UNSCOPED_INFO("one conflict");
         CHECK(m.conflictCount() == 1);
         UNSCOPED_INFO("begun: the merge read by its own");
         CHECK(has_base(*merged));
@@ -2339,7 +2245,6 @@ namespace
             CHECK_FALSE(has_base(*merged));
             REQUIRE(compared->empty());
         }
-        UNSCOPED_INFO("none left");
         CHECK(m.conflictCount() == 0);
 
         // Typed in: the merge's asked for ours alone, the base's regions and
@@ -2441,7 +2346,7 @@ namespace
             fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
             fresh.setLikeness(like);
             fresh.setTexts(left, right);
-            aldiffmodel_data::sameLayout(m, fresh, where);
+            aldiffmodel_data::require_same_layout(m, fresh, where);
             UNSCOPED_INFO(where + ": compared again down to the comment's close");
             REQUIRE(compared == 14);
         };
@@ -2454,15 +2359,14 @@ namespace
         // Two runs: the right's lines 6 to 16, and 24 to 33.
         const std::string right = lines(40, { { 2, "2" }, { 20, "20" }, { 37, "37" } });
         m.setTexts(lines(40, { { 2, "two" }, { 20, "twenty" }, { 37, "thirty-seven" } }), right);
-        UNSCOPED_INFO("two runs");
-        CHECK(m.foldCount() == 2);
+        REQUIRE(m.foldCount() == 2);
         m.setFoldOpen(1, true);
         // Changed near both ends: more than half of each to compare again,
         // so all of it.
         m.setLeftText(lines(40, { { 2, "TWO" }, { 20, "twenty" }, { 37, "THIRTY-SEVEN" } }));
         {
             INFO("compared afresh: the second open still, the first folded");
-            CHECK(m.foldCount() == 2);
+            REQUIRE(m.foldCount() == 2);
             CHECK_FALSE(m.foldOpen(0));
             CHECK(m.foldOpen(1));
         }
@@ -2470,7 +2374,7 @@ namespace
         m.setLeftText(lines(40, { { 2, "TWO" }, { 20, "TWENTY" }, { 37, "THIRTY-SEVEN" } }));
         {
             INFO("compared again in part: the same");
-            CHECK(m.foldCount() == 2);
+            REQUIRE(m.foldCount() == 2);
             CHECK_FALSE(m.foldOpen(0));
             CHECK(m.foldOpen(1));
         }
@@ -2478,13 +2382,13 @@ namespace
         // Ranges, which the left of another version lets go of.
         m.setTexts(lines(40, { { 2, "two" }, { 20, "twenty" }, { 37, "thirty-seven" } }), right, { { 0, 0, 0, 0 } });
         UNSCOPED_INFO("two runs, lined up by the range");
-        CHECK(m.foldCount() == 2);
+        REQUIRE(m.foldCount() == 2);
         m.setFoldOpen(0, true);
         m.setLeftText(lines(40, { { 2, "two" }, { 20, "twenty!" }, { 37, "thirty-seven" } }));
         {
             INFO("ranges let go of: the first open still, the second folded");
             REQUIRE(m.ranges().empty());
-            CHECK(m.foldCount() == 2);
+            REQUIRE(m.foldCount() == 2);
             CHECK(m.foldOpen(0));
             CHECK_FALSE(m.foldOpen(1));
         }
@@ -2508,20 +2412,20 @@ namespace
         const std::string rest  = block("rest ", 30);
         m.setTexts(same + moved + rest + "end", same + rest + moved + "end");
         UNSCOPED_INFO("by lines: the twenty folded, and the thirty");
-        CHECK(m.foldCount() == 2);
+        REQUIRE(m.foldCount() == 2);
         m.setFoldOpen(0, true);
         UNSCOPED_INFO("paired: laid out again");
         CHECK(m.setPairs({ { 20, 29, 50, 59 } }));
         {
             INFO("the thirty a change now, the ten too few to fold: the twenty alone, open still");
-            CHECK(m.foldCount() == 1);
+            REQUIRE(m.foldCount() == 1);
             CHECK(m.foldOpen(0));
         }
         UNSCOPED_INFO("unpaired: laid out again");
         CHECK(m.setPairs({}));
         {
             INFO("two runs again: the twenty open still, the thirty folded");
-            CHECK(m.foldCount() == 2);
+            REQUIRE(m.foldCount() == 2);
             CHECK(m.foldOpen(0));
             CHECK_FALSE(m.foldOpen(1));
         }
@@ -2557,7 +2461,6 @@ namespace
         m.setTexts(at_top, at_end);
         UNSCOPED_INFO("the comments taken out no change: the line put in alone");
         CHECK(m.changeCount() == 1);
-        UNSCOPED_INFO("no block moved");
         CHECK(m.moveCount() == 0);
         UNSCOPED_INFO("the comments put in signed as put in");
         CHECK(signsOf(Column::Right) == ten_same + "+++" + std::string(1, '\0'));
@@ -2572,7 +2475,6 @@ namespace
         m.setTexts(at_end, at_top);
         UNSCOPED_INFO("the comments put in no change: the line taken out alone");
         CHECK(m.changeCount() == 1);
-        UNSCOPED_INFO("no block moved either");
         CHECK(m.moveCount() == 0);
         UNSCOPED_INFO("the comments taken out signed as taken out");
         CHECK(signsOf(Column::Left) == ten_same + "---" + std::string(1, '\0'));
@@ -2642,7 +2544,7 @@ namespace
         const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
             done(kept);
             done(whole);
-            aldiffmodel_data::sameLayout(kept, whole, where);
+            aldiffmodel_data::require_same_layout(kept, whole, where);
         };
         ALTextDiff::Likeness cased;
         cased.ignoreCase = true;
@@ -2767,10 +2669,10 @@ namespace
             const U64 hashed = ALTextDiff::hashed();
             told.setRightText(typed);
             const U64 cost = ALTextDiff::hashed() - hashed;
-            UNSCOPED_INFO(where + ": typed in, no line after it hashed: " + std::to_string(cost));
+            UNSCOPED_INFO(where + ": typed in, no line after it hashed");
             REQUIRE(cost <= (blanks ? 4u : 0u));
             hashing.setRightText(typed);
-            aldiffmodel_data::sameLayout(told, hashing, where + ": typed in");
+            aldiffmodel_data::require_same_layout(told, hashing, where + ": typed in");
 
             // The comment's opener broken, and mended: the lines down to its
             // close read otherwise, compared again and laid out again as far
@@ -2784,12 +2686,12 @@ namespace
                 REQUIRE(told_compared == ALDiffSplice::lastCompared());
                 UNSCOPED_INFO(step + ": laid out again as far");
                 REQUIRE(sameRelaid(told_relaid, hashing.relaid()));
-                aldiffmodel_data::sameLayout(told, hashing, step);
+                aldiffmodel_data::require_same_layout(told, hashing, step);
                 ALDiffModel fresh;
                 fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
                 fresh.setLikeness(like);
                 fresh.setTexts(left, text);
-                aldiffmodel_data::sameLayout(told, fresh, step + ", as afresh");
+                aldiffmodel_data::require_same_layout(told, fresh, step + ", as afresh");
             };
             as_hashed(broken, where + ": the opener broken");
             as_hashed(typed, where + ": mended");
@@ -2833,7 +2735,7 @@ namespace
         const auto both = [&](const std::function<void(ALDiffModel&)>& done, const std::string& where) {
             done(kept);
             done(whole);
-            aldiffmodel_data::sameLayout(kept, whole, where);
+            aldiffmodel_data::require_same_layout(kept, whole, where);
         };
         ALTextDiff::Likeness cased;
         cased.ignoreCase = true;
@@ -2853,10 +2755,10 @@ namespace
         const U64 hashed = ALTextDiff::hashed();
         kept.setRightText(joined(typed));
         const U64 cost = ALTextDiff::hashed() - hashed;
-        UNSCOPED_INFO("typed in: the lines keyed alone made a number: " + std::to_string(cost));
+        UNSCOPED_INFO("typed in: the lines keyed alone made a number");
         CHECK(cost <= 4u);
         whole.setRightText(joined(typed));
-        aldiffmodel_data::sameLayout(kept, whole, "typed in");
+        aldiffmodel_data::require_same_layout(kept, whole, "typed in");
         UNSCOPED_INFO("two moves still");
         CHECK(kept.moveCount() == 2);
 
@@ -2937,16 +2839,16 @@ namespace
                 REQUIRE_FALSE(told.relaid().whole);
                 UNSCOPED_INFO(at + ": no line compared");
                 REQUIRE(lexer->linesCompared() - told_was == U64(0));
-                UNSCOPED_INFO(at + ": not told, both texts compared: " + std::to_string(other->linesCompared() - untold_was));
+                UNSCOPED_INFO(at + ": not told, both texts compared");
                 REQUIRE(other->linesCompared() - untold_was >= 200);
                 UNSCOPED_INFO(at + ": laid out again as far");
                 REQUIRE(sameRelaid(told.relaid(), untold.relaid()));
-                aldiffmodel_data::sameLayout(told, untold, at);
+                aldiffmodel_data::require_same_layout(told, untold, at);
                 ALDiffModel fresh;
                 fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
                 fresh.setLikeness(like);
                 fresh.setTexts(left_now, right_now);
-                aldiffmodel_data::sameLayout(told, fresh, at + ", as afresh");
+                aldiffmodel_data::require_same_layout(told, fresh, at + ", as afresh");
             };
             step(false, typed, "typed in on the right");
             step(true, older, "another version on the left");
@@ -2964,7 +2866,7 @@ namespace
             {
                 each->setRightText(right_now);
             }
-            aldiffmodel_data::sameLayout(told, untold, where + ", merging");
+            aldiffmodel_data::require_same_layout(told, untold, where + ", merging");
             UNSCOPED_INFO(where + ", merging: conflicts");
             REQUIRE(told.conflictCount() == untold.conflictCount());
         }
@@ -3018,17 +2920,17 @@ namespace
                 }
                 const S32 compared = ALDiffSplice::lastCompared();
                 {
-                    INFO(what + ": compared again only about the edit: " + std::to_string(compared));
+                    INFO(what + ": compared again only about the edit");
                     REQUIRE(compared > 0);
                     REQUIRE(compared <= 130);
                 }
             }
-            aldiffmodel_data::sameLayout(told, hashing, what);
+            aldiffmodel_data::require_same_layout(told, hashing, what);
             ALDiffModel fresh;
             fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
             fresh.setLikeness(like);
             fresh.setTexts(joined(left), joined(right));
-            aldiffmodel_data::sameLayout(told, fresh, what + ", as afresh");
+            aldiffmodel_data::require_same_layout(told, fresh, what + ", as afresh");
         };
 
         // A comment put at a line's end: no change, laid out again in part.
@@ -3131,14 +3033,14 @@ namespace
                 const U64 cost = ALTextDiff::askedIgnorable() - asked;
                 whole.setRightText(joined(typed));
                 const std::string here = where + ", " + what;
-                UNSCOPED_INFO(here + ": only the change compared again asked about: " + std::to_string(cost));
+                UNSCOPED_INFO(here + ": only the change compared again asked about");
                 REQUIRE(cost <= 3u);
-                aldiffmodel_data::sameLayout(kept, whole, here);
+                aldiffmodel_data::require_same_layout(kept, whole, here);
                 ALDiffModel fresh;
                 fresh.setLexer(ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)));
                 fresh.setLikeness(like);
                 fresh.setTexts(joined(left), joined(typed));
-                aldiffmodel_data::sameLayout(kept, fresh, here + ", as afresh");
+                aldiffmodel_data::require_same_layout(kept, fresh, here + ", as afresh");
             };
             typed[static_cast<size_t>(at(typed, "line 101"))] += " typed";
             step("a line the same typed in");

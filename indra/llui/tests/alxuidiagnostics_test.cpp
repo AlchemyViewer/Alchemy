@@ -146,12 +146,12 @@ namespace
             {
                 const bool from_factory = e.kind == ALXUIDiagnostics::Kind::InvalidChild
                                        || e.kind == ALXUIDiagnostics::Kind::CreateFailed;
-                UNSCOPED_INFO(std::string("file on ") + ALXUIDiagnostics::kindName(e.kind) + " " + e.path);
+                INFO("file on " << ALXUIDiagnostics::kindName(e.kind) << " " << e.path);
                 REQUIRE(e.file == (from_factory ? std::string() : std::string("diag_test.xml")));
             }
         }
         UNSCOPED_INFO("the sink detaches when it dies");
-        REQUIRE(ALXUIDiagnostics::active() == nullptr);
+        CHECK(ALXUIDiagnostics::active() == nullptr);
 
         fv.reset();
     }
@@ -172,7 +172,6 @@ namespace
 
         ALXUIDiagnostics sink;
         LLFloater* view = build(fv.get());
-        UNSCOPED_INFO("built");
         REQUIRE(view != nullptr);
 
         UNSCOPED_INFO("the child's known attribute shows up only as the parent's miss");

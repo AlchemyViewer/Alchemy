@@ -144,7 +144,6 @@ namespace
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
-        UNSCOPED_INFO("built");
         REQUIRE(floater != nullptr);
 
         ALXUISourceMap map;
@@ -174,13 +173,9 @@ namespace
             REQUIRE(same);
         }
 
-        UNSCOPED_INFO("the floater's line");
         CHECK(map.find(floater)->line == 1);
-        UNSCOPED_INFO("the floater's tag");
         CHECK(map.find(floater)->tag == std::string("floater"));
-        UNSCOPED_INFO("outer");
         CHECK(map.find(outer)->line == 3);
-        UNSCOPED_INFO("the first inner");
         CHECK(map.find(inner1)->line == 4);
         UNSCOPED_INFO("the second inner, not the first again");
         CHECK(map.find(inner2)->line == 5);
@@ -189,7 +184,6 @@ namespace
         UNSCOPED_INFO("other, after a parameter element and a subtree");
         CHECK(map.find(other)->line == 10);
 
-        UNSCOPED_INFO("the floater has a drag handle");
         REQUIRE(dragHandle(floater) != nullptr);
         UNSCOPED_INFO("which came from no element");
         CHECK_FALSE(map.isFromXML(dragHandle(floater)));
@@ -197,25 +191,24 @@ namespace
         {
             if (child != outer && child != other && child != childNamed(floater, "line"))
             {
-                UNSCOPED_INFO(std::string("no element for ") + child->getName());
+                UNSCOPED_INFO("no element for " << child->getName());
                 REQUIRE_FALSE(map.isFromXML(child));
             }
         }
 
         UNSCOPED_INFO("a line maps to the view starting on it");
-        REQUIRE(map.viewAtLine(5) == inner2);
+        CHECK(map.viewAtLine(5) == inner2);
         UNSCOPED_INFO("a line inside an element maps to the element before it");
-        REQUIRE(map.viewAtLine(6) == inner2);
+        CHECK(map.viewAtLine(6) == inner2);
         UNSCOPED_INFO("a line before the first element maps to nothing");
-        REQUIRE(map.viewAtLine(0) == (const LLView*)nullptr);
+        CHECK(map.viewAtLine(0) == (const LLView*)nullptr);
         UNSCOPED_INFO("two elements opening on one line: the inner one is the nearer");
-        REQUIRE(map.viewAtLine(11) == same);
+        CHECK(map.viewAtLine(11) == same);
 
         map.clear();
-        UNSCOPED_INFO("cleared");
-        REQUIRE(map.size() == 0u);
+        CHECK(map.size() == 0u);
         UNSCOPED_INFO("nothing maps after a clear");
-        REQUIRE(map.find(outer) == nullptr);
+        CHECK(map.find(outer) == nullptr);
 
         delete floater;
         fv.reset();

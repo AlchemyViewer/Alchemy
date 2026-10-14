@@ -96,8 +96,7 @@ namespace
         const LLUIColorTable& table = LLUIColorTable::instance();
         ALColorTablePanel* panel = make();
         const ALPropertyGrid* grid = panel->getChild<ALPropertyGrid>("color_grid");
-        UNSCOPED_INFO("a row per loaded colour, at least");
-        REQUIRE(grid->fields().size() >= table.getLoadedColors().size());
+        CHECK(grid->fields().size() >= table.getLoadedColors().size());
 
         const ALPropertyGrid::Field* white = rowNamed(panel, "White");
         UNSCOPED_INFO("the table's White has a row");
@@ -105,10 +104,9 @@ namespace
         UNSCOPED_INFO("with the colour as the picker writes it");
         CHECK(white->value == ALColorTablePanel::valueText(LLColor4::white));
         UNSCOPED_INFO("declared somewhere");
-        REQUIRE_FALSE(white->source.empty());
+        CHECK_FALSE(white->source.empty());
         UNSCOPED_INFO("and nobody's until changed");
         CHECK_FALSE(white->authored);
-        UNSCOPED_INFO("a colour row");
         CHECK(white->type == "LLColor4");
         panel->die();
     }
@@ -142,7 +140,6 @@ namespace
         CHECK(table.getColor("White").get() == picked);
         UNSCOPED_INFO("and the change was said");
         REQUIRE(said.size() == size_t(1));
-        UNSCOPED_INFO("by name");
         CHECK(said.front() == std::string("White"));
 
         panel->refresh();
@@ -156,7 +153,7 @@ namespace
         // The words are the viewer's strings, which these tests do not
         // load; that the row says something about the skin's is enough.
         UNSCOPED_INFO("saying what the skin had");
-        REQUIRE_FALSE(white->description.empty());
+        CHECK_FALSE(white->description.empty());
 
         table.resetToDefault("White");
         panel->refresh();
@@ -173,7 +170,6 @@ namespace
     // What a value is written as, and read back from.
     TEST_CASE_METHOD(alcolortablepanel_data, "alcolortablepanel: valueText writes four numbers with commas", "[alcolortablepanel]")
     {
-        UNSCOPED_INFO("four numbers with commas");
         CHECK(ALColorTablePanel::valueText(LLColor4(1.f, 0.5f, 0.f, 1.f)) == std::string("1, 0.5, 0, 1"));
     }
 }

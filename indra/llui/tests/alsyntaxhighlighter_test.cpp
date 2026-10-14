@@ -99,7 +99,7 @@ namespace
             return grammar;
         }
 
-        static std::shared_ptr<const ALSyntaxGrammar> loaded(const LLSD& description)
+        static std::shared_ptr<const ALSyntaxGrammar> require_loaded(const LLSD& description)
         {
             auto        grammar = std::make_shared<ALSyntaxGrammar>();
             std::string error;
@@ -135,36 +135,30 @@ namespace
 
     TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a line lexes into kinds with words looked up in tables", "[alsyntaxhighlighter]")
     {
-        auto          grammar = loaded(mini());
+        auto          grammar = require_loaded(mini());
         ALSyntaxWords words;
         words.set("keyword", { "while" });
         words.set("function", { "foo" });
         ALSyntaxState state = grammar->initialState();
-        UNSCOPED_INFO("tokens");
         CHECK(lexed(*grammar, "x = foo(12) // hi", state, words) ==
                       std::string("text:x |operator:=|text: |function:foo|punctuation:(|number:12|punctuation:)|text: |comment:// hi"));
         UNSCOPED_INFO("back in main after the line");
         CHECK(state == grammar->initialState());
-        UNSCOPED_INFO("a table word");
         CHECK(lexed(*grammar, "while", state, words) == std::string("control:while"));
         UNSCOPED_INFO("a whole-word literal, and not inside a word");
         CHECK(lexed(*grammar, "if iffy", state, words) == std::string("keyword:if|text: iffy"));
         UNSCOPED_INFO("the longer operator first");
         CHECK(lexed(*grammar, "a==b", state, words) == std::string("text:a|operator:==|text:b"));
-        UNSCOPED_INFO("tables named");
         REQUIRE(grammar->wordTables().size() == size_t(2));
-        UNSCOPED_INFO("extension");
         CHECK(grammar->extensions().front() == std::string("mini"));
     }
 
     TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a string with an escape ends with its line", "[alsyntaxhighlighter]")
     {
-        auto          grammar = loaded(mini());
+        auto          grammar = require_loaded(mini());
         ALSyntaxWords words;
         ALSyntaxState state = grammar->initialState();
-        UNSCOPED_INFO("escape inside");
         CHECK(lexed(*grammar, "\"a\\\"b\" c", state, words) == std::string("string:\"a|escape:\\\"|string:b\"|text: c"));
-        UNSCOPED_INFO("unterminated");
         CHECK(lexed(*grammar, "\"open", state, words) == std::string("string:\"open"));
         UNSCOPED_INFO("and closed by the line end");
         CHECK(state == grammar->initialState());
@@ -174,16 +168,14 @@ namespace
 
     TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a block comment runs on across lines and the state says so", "[alsyntaxhighlighter]")
     {
-        auto          grammar = loaded(mini());
+        auto          grammar = require_loaded(mini());
         ALSyntaxWords words;
         ALSyntaxState state = grammar->initialState();
-        UNSCOPED_INFO("opened");
         CHECK(lexed(*grammar, "a /* b", state, words) == std::string("text:a |comment:/* b"));
         UNSCOPED_INFO("still inside");
         CHECK(state != grammar->initialState());
-        UNSCOPED_INFO("all comment");
+        UNSCOPED_INFO("the next line all comment");
         CHECK(lexed(*grammar, "c 12", state, words) == std::string("comment:c 12"));
-        UNSCOPED_INFO("closed");
         CHECK(lexed(*grammar, "d */ 3", state, words) == std::string("comment:d */|text: |number:3"));
         UNSCOPED_INFO("out again");
         CHECK(state == grammar->initialState());
@@ -191,13 +183,11 @@ namespace
 
     TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: a span's end can carry what its opening captured", "[alsyntaxhighlighter]")
     {
-        auto          grammar = loaded(brackets());
+        auto          grammar = require_loaded(brackets());
         ALSyntaxWords words;
         ALSyntaxState state = grammar->initialState();
         UNSCOPED_INFO("level two ends at level two");
-        CHECK(lexed(*grammar, "[==[ a ]=] b ]==] c", state, words) ==
-                      std::string("string:[==[ a ]=] b ]==]|text: c"));
-        UNSCOPED_INFO("open across lines");
+        CHECK(lexed(*grammar, "[==[ a ]=] b ]==] c", state, words) == std::string("string:[==[ a ]=] b ]==]|text: c"));
         CHECK(lexed(*grammar, "[=[ x", state, words) == std::string("string:[=[ x"));
         UNSCOPED_INFO("with the level in the state");
         CHECK(state.frames.back().payload == std::string("="));
@@ -213,14 +203,14 @@ namespace
         bad["states"]["main"][0]["kind"] = "purple";
         UNSCOPED_INFO("unknown kind");
         REQUIRE_FALSE(grammar.load(bad, error));
-        UNSCOPED_INFO("named: " + error);
+        UNSCOPED_INFO("named: " << error);
         REQUIRE(error.find("purple") != std::string::npos);
 
         bad = mini();
         bad["states"]["main"][0]["push"] = "nowhere";
         UNSCOPED_INFO("unknown state");
         CHECK_FALSE(grammar.load(bad, error));
-        UNSCOPED_INFO("named: " + error);
+        UNSCOPED_INFO("named: " << error);
         REQUIRE(error.find("nowhere") != std::string::npos);
 
         LLSD nameless;
@@ -238,7 +228,7 @@ namespace
         bad["states"]["main"] = rules({ LLSD().with("regex", "x(?=y)").with("kind", "keyword") });
         UNSCOPED_INFO("lookahead");
         CHECK_FALSE(grammar.load(bad, error));
-        UNSCOPED_INFO("said as a regex: " + error);
+        UNSCOPED_INFO("said as a regex: " << error);
         REQUIRE(error.find("x(?=y)") != std::string::npos);
 
         bad = mini();
@@ -253,7 +243,7 @@ namespace
 
         LLSD good = mini();
         good["states"]["main"] = rules({ LLSD().with("regex", "(x)y").with("consume", 1).with("not_after_chars", "a-z").with("kind", "keyword") });
-        UNSCOPED_INFO("both on a regex: " + error);
+        UNSCOPED_INFO("both on a regex: " << error);
         CHECK(grammar.load(good, error));
     }
 
@@ -261,54 +251,40 @@ namespace
     {
         ALTextDocument      doc("a\nb /* c\nd\ne */ f\ng");
         ALSyntaxHighlighter highlighter;
-        highlighter.setGrammar(loaded(mini()));
+        highlighter.setGrammar(require_loaded(mini()));
         highlighter.attach(&doc);
-        UNSCOPED_INFO("line 2 is comment");
         CHECK(said(doc.line(2), highlighter.tokens(2)) == std::string("comment:d"));
         UNSCOPED_INFO("three lines lexed to get there");
         CHECK(highlighter.lastLexed() == 3);
-        UNSCOPED_INFO("line 3 closes it");
         CHECK(said(doc.line(3), highlighter.tokens(3)) == std::string("comment:e */|text: f"));
-        UNSCOPED_INFO("line 4 is code");
         CHECK(said(doc.line(4), highlighter.tokens(4)) == std::string("text:g"));
         const U32 revision_of_4 = highlighter.revision(4);
 
         // A change inside the comment reaches the line it is on and no
         // further, since the next line still starts inside the comment.
         doc.replace(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 1)), "dd");
-        UNSCOPED_INFO("line 2 again");
         CHECK(said(doc.line(2), highlighter.tokens(2)) == std::string("comment:dd"));
-        UNSCOPED_INFO("one line lexed");
         CHECK(highlighter.lastLexed() == 1);
         highlighter.tokens(4);
-        UNSCOPED_INFO("nothing more");
         CHECK(highlighter.lastLexed() == 0);
-        UNSCOPED_INFO("line 4 unchanged");
         CHECK(highlighter.revision(4) == revision_of_4);
 
         // Taking the opening out reaches every line until one starts in
         // the same state as before: line 4 does.
         doc.replace(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 4)), "");
-        UNSCOPED_INFO("line 3 is code now");
         CHECK(said(doc.line(3), highlighter.tokens(3)) == std::string("text:e */ f"));
         UNSCOPED_INFO("lines 1 to 3 lexed");
         CHECK(highlighter.lastLexed() == 3);
         highlighter.tokens(4);
-        UNSCOPED_INFO("line 4 still not");
         CHECK(highlighter.revision(4) == revision_of_4);
 
         // A line added and a line removed keep the lines lined up.
         doc.insert(ALTextPos(0, 1), "\n1");
-        UNSCOPED_INFO("six lines");
         CHECK(doc.lineCount() == 6);
-        UNSCOPED_INFO("the new line");
         CHECK(said(doc.line(1), highlighter.tokens(1)) == std::string("number:1"));
-        UNSCOPED_INFO("the last still there");
         CHECK(said(doc.line(5), highlighter.tokens(5)) == std::string("text:g"));
         doc.remove(ALTextRange(doc.start(), ALTextPos(2, 0)));
-        UNSCOPED_INFO("the first now");
         CHECK(said(doc.line(0), highlighter.tokens(0)) == std::string("text:b  c"));
-        UNSCOPED_INFO("the last still there");
         CHECK(said(doc.line(3), highlighter.tokens(3)) == std::string("text:g"));
     }
 
@@ -317,14 +293,11 @@ namespace
         ALTextDocument      doc("foo bar");
         ALSyntaxHighlighter highlighter;
         highlighter.attach(&doc);
-        UNSCOPED_INFO("nothing without a grammar");
         REQUIRE(highlighter.tokens(0).empty());
-        highlighter.setGrammar(loaded(mini()));
-        UNSCOPED_INFO("plain words");
+        highlighter.setGrammar(require_loaded(mini()));
         CHECK(said(doc.line(0), highlighter.tokens(0)) == std::string("text:foo bar"));
         highlighter.ownWords().set("function", { "bar" });
         highlighter.wordsChanged();
-        UNSCOPED_INFO("a function now");
         CHECK(said(doc.line(0), highlighter.tokens(0)) == std::string("text:foo |function:bar"));
     }
 
@@ -333,12 +306,12 @@ namespace
         ALTextDocument      first("a\nb\nc");
         ALTextDocument      second("x\ny\nz");
         ALSyntaxHighlighter highlighter;
-        highlighter.setGrammar(loaded(mini()));
+        highlighter.setGrammar(require_loaded(mini()));
         highlighter.attach(&first);
         highlighter.tokens(2);
         highlighter.attach(&second);
         highlighter.tokens(2);
-        UNSCOPED_INFO("the second lexed");
+        UNSCOPED_INFO("the second's three lines lexed");
         CHECK(highlighter.lastLexed() == 3);
         first.insert(ALTextPos(0, 0), "/* one\ntwo\n");
         highlighter.tokens(2);
@@ -357,7 +330,7 @@ namespace
         }
         doc.setText(text);
         ALSyntaxHighlighter highlighter;
-        highlighter.setGrammar(loaded(brackets()));
+        highlighter.setGrammar(require_loaded(brackets()));
         highlighter.attach(&doc);
         highlighter.tokens(99);
         UNSCOPED_INFO("one state for every line in the same state");
@@ -373,18 +346,18 @@ namespace
             highlighter.tokens(99);
         }
         highlighter.tokens(99);
-        UNSCOPED_INFO("let go of past a number: " + std::to_string(highlighter.statesKept()));
+        UNSCOPED_INFO("let go of past a number");
         CHECK(highlighter.statesKept() <= 4096 + 100);
 
         // One more edit, and every line's tokens as a highlighter made
         // afresh has them.
         doc.replace(ALTextRange(ALTextPos(50, 0), ALTextPos(50, 1)), "]" + std::string(60, '=') + "] b");
         ALSyntaxHighlighter fresh;
-        fresh.setGrammar(loaded(brackets()));
+        fresh.setGrammar(require_loaded(brackets()));
         fresh.attach(&doc);
         for (S32 line = 0; line < doc.lineCount(); ++line)
         {
-            UNSCOPED_INFO("line " + std::to_string(line) + " as lexed afresh");
+            CAPTURE(line);
             REQUIRE(highlighter.tokens(line) == fresh.tokens(line));
         }
     }
@@ -395,33 +368,29 @@ namespace
         ALTextDocument doc;
         doc.setText("foo bar\n");
         ALSyntaxHighlighter a, b;
-        a.setGrammar(loaded(mini()));
-        b.setGrammar(loaded(mini()));
+        a.setGrammar(require_loaded(mini()));
+        b.setGrammar(require_loaded(mini()));
         a.attach(&doc);
         b.attach(&doc);
         a.setWords(shared);
         b.setWords(shared);
-        UNSCOPED_INFO("the same words");
         CHECK(&a.words() == &b.words());
-        UNSCOPED_INFO("a word of them");
         CHECK(said(doc.line(0), a.tokens(0)) == std::string("function:foo|text: bar"));
 
         b.ownWords().set("function", { "bar" });
         b.wordsChanged();
-        UNSCOPED_INFO("its own now");
         CHECK(&a.words() != &b.words());
         {
             INFO("the other's as they were");
             REQUIRE(a.words().has("function", "foo"));
             REQUIRE_FALSE(a.words().has("function", "bar"));
         }
-        UNSCOPED_INFO("its own word");
         CHECK(said(doc.line(0), b.tokens(0)) == std::string("text:foo |function:bar"));
         UNSCOPED_INFO("and the other's");
         CHECK(said(doc.line(0), a.tokens(0)) == std::string("function:foo|text: bar"));
 
         a.setWords(nullptr);
-        UNSCOPED_INFO("none set, none");
+        UNSCOPED_INFO("no words set, none looked up");
         CHECK(said(doc.line(0), a.tokens(0)) == std::string("text:foo bar"));
     }
     TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: lexSome lexes no more than asked and passes lines that lex as before", "[alsyntaxhighlighter]")
@@ -437,7 +406,7 @@ namespace
         ALSyntaxHighlighter highlighter;
         UNSCOPED_INFO("nothing to lex without a grammar");
         REQUIRE(highlighter.lexSome(1));
-        highlighter.setGrammar(loaded(mini()));
+        highlighter.setGrammar(require_loaded(mini()));
         highlighter.attach(&doc);
         highlighter.tokens(last);
         {
@@ -477,11 +446,11 @@ namespace
         }
 
         ALSyntaxHighlighter fresh;
-        fresh.setGrammar(loaded(mini()));
+        fresh.setGrammar(require_loaded(mini()));
         fresh.attach(&doc);
         for (S32 line = 0; line < doc.lineCount(); ++line)
         {
-            UNSCOPED_INFO("line " + std::to_string(line) + " as lexed afresh");
+            CAPTURE(line);
             REQUIRE(highlighter.tokens(line) == fresh.tokens(line));
         }
     }
@@ -490,35 +459,34 @@ namespace
     {
         ALSyntaxGrammar grammar;
         std::string     error;
-        const auto      refused = [&](const LLSD& bad, const std::string& what) {
+        const auto      require_refused = [&](const LLSD& bad, const std::string& what) {
             LLSD description              = alsyntaxhighlighter_data::mini();
             description["states"]["main"] = alsyntaxhighlighter_data::rules({ bad });
-            UNSCOPED_INFO(what + " refused");
+            INFO(what);
             REQUIRE_FALSE(grammar.load(description, error));
-            UNSCOPED_INFO(what + ", and said why");
             REQUIRE_FALSE(error.empty());
         };
-        refused(LLSD().with("regex", "x+").with("span", "\"").with("end", "\"").with("kind", "string"), "a span opened by a regex too");
-        refused(LLSD().with("span", "\"").with("span_regex", "'").with("end", "\""), "a span with two openings");
-        refused(LLSD().with("span", "(").with("end", ")").with("pop", true), "a span that pops");
-        refused(LLSD().with("span", "(").with("end", ")").with("push", "line_comment"), "a span that pushes");
-        refused(LLSD().with("span", "(").with("end", ")").with("next", "line_comment"), "a span that goes on to a state");
-        refused(LLSD().with("span", "if").with("end", "fi").with("whole_word", true), "a span of whole words");
-        refused(LLSD().with("span", "\"").with("end", "\"").with("escape", ""), "a span whose escape is empty");
-        refused(LLSD().with("span", "\"").with("end", "\"").with("unless_after", "\\"), "a span that runs on and ends with its line");
-        refused(LLSD().with("match", "x").with("end", "y"), "a span's end on a literal");
-        refused(LLSD().with("chars", "a-z").with("whole_word", true), "whole words of a class");
-        refused(LLSD().with("word", true).with("min", 2), "a class's least on a word");
-        refused(LLSD().with("span", "\"").with("end", "\"").with("mutliline", false), "a key misspelt");
-        UNSCOPED_INFO("named: " + error);
+        require_refused(LLSD().with("regex", "x+").with("span", "\"").with("end", "\"").with("kind", "string"), "a span opened by a regex too");
+        require_refused(LLSD().with("span", "\"").with("span_regex", "'").with("end", "\""), "a span with two openings");
+        require_refused(LLSD().with("span", "(").with("end", ")").with("pop", true), "a span that pops");
+        require_refused(LLSD().with("span", "(").with("end", ")").with("push", "line_comment"), "a span that pushes");
+        require_refused(LLSD().with("span", "(").with("end", ")").with("next", "line_comment"), "a span that goes on to a state");
+        require_refused(LLSD().with("span", "if").with("end", "fi").with("whole_word", true), "a span of whole words");
+        require_refused(LLSD().with("span", "\"").with("end", "\"").with("escape", ""), "a span whose escape is empty");
+        require_refused(LLSD().with("span", "\"").with("end", "\"").with("unless_after", "\\"), "a span that runs on and ends with its line");
+        require_refused(LLSD().with("match", "x").with("end", "y"), "a span's end on a literal");
+        require_refused(LLSD().with("chars", "a-z").with("whole_word", true), "whole words of a class");
+        require_refused(LLSD().with("word", true).with("min", 2), "a class's least on a word");
+        require_refused(LLSD().with("span", "\"").with("end", "\"").with("mutliline", false), "a key misspelt");
+        UNSCOPED_INFO("named: " << error);
         REQUIRE(error.find("mutliline") != std::string::npos);
 
         LLSD good = mini();
         good["states"]["main"] = rules({ LLSD().with("span", "\"").with("end", "\"").with("escape", "\\").with("multiline", false).with("unless_after", "\\"),
                                          LLSD().with("eol", true).with("unless_after", "\\").with("pop", true) });
-        UNSCOPED_INFO("a span its line ends, but for a backslash, and an eol that says the same: " + error);
+        UNSCOPED_INFO("a span its line ends, but for a backslash, and an eol that says the same: " << error);
         CHECK(grammar.load(good, error));
-        UNSCOPED_INFO("and the little language: " + error);
+        UNSCOPED_INFO("and the little language: " << error);
         CHECK(grammar.load(mini(), error));
     }
 
@@ -527,7 +495,7 @@ namespace
         ALTextDocument      doc("foo\nbar");
         ALTextDocument      other("foo\nbar");
         ALSyntaxHighlighter highlighter;
-        const auto          grammar = loaded(mini());
+        const auto          grammar = require_loaded(mini());
         highlighter.setGrammar(grammar);
         highlighter.attach(&doc);
         const U32 foo = highlighter.revision(0);
@@ -571,7 +539,7 @@ namespace
         }
         ALTextDocument      doc(text);
         ALSyntaxHighlighter highlighter;
-        highlighter.setGrammar(loaded(mini()));
+        highlighter.setGrammar(require_loaded(mini()));
         highlighter.attach(&doc);
         const S32 last = doc.lineCount() - 1;
         highlighter.tokens(last);
@@ -589,7 +557,7 @@ namespace
         UNSCOPED_INFO("and the line after each looked at");
         CHECK(highlighter.lastLooked() <= 5);
         ALSyntaxHighlighter fresh;
-        fresh.setGrammar(loaded(mini()));
+        fresh.setGrammar(require_loaded(mini()));
         fresh.attach(&doc);
         {
             INFO("lexed as they read");
@@ -600,7 +568,7 @@ namespace
 
     TEST_CASE_METHOD(alsyntaxhighlighter_data, "alsyntaxhighlighter: random edits leave every line's tokens as a fresh lexing gives", "[alsyntaxhighlighter]")
     {
-        const auto grammar = loaded(mini());
+        const auto grammar = require_loaded(mini());
         const char* pieces[] = { "if a == 1", "/* open", "close */", "x = \"s", "// note", "y = \"a\" + 2", "", "end */ if", "\"", "/**/ z" };
         U32         seed     = 777;
         const auto  next     = [&seed](U32 below) {
@@ -675,7 +643,7 @@ namespace
                     const std::vector<ALSyntaxToken> mine = highlighter.tokens(l);
                     if (mine != fresh.tokens(l))
                     {
-                        UNSCOPED_INFO("step " + std::to_string(step) + ", line " + std::to_string(l));
+                        CAPTURE(step, l);
                         REQUIRE(said(doc.line(l), mine) == said(doc.line(l), fresh.tokens(l)));
                     }
                 }

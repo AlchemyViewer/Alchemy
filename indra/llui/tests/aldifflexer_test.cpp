@@ -74,7 +74,6 @@ namespace
         ALDiffLexer                    lexer(lsl);
         const std::vector<std::string> lines = { "llSay(0, \"hi there\"); // greet", "/* a note", "   over lines */ x = 1;" };
         const auto&                    regions = lexer.regions(lines);
-        UNSCOPED_INFO("as many as the lines");
         REQUIRE(regions.size() == lines.size());
         UNSCOPED_INFO("a call, its string, a comment");
         CHECK(drawn(lines[0], regions[0]) == std::string("ccccccccc" "ssssssssss" "ccc" "########"));
@@ -184,6 +183,7 @@ namespace
         ALDiffLexer lexer(lsl);
         for (S32 round = 0; round < 300; ++round)
         {
+            CAPTURE(round);
             std::vector<std::string>& text = texts[round % 2];
             const size_t              at   = next(static_cast<U32>(text.size()));
             switch (next(3))
@@ -232,7 +232,7 @@ namespace
         UNSCOPED_INFO("the first read whole");
         CHECK(lexer.lastRead() == 400);
         const auto& read = lexer.regions(right);
-        UNSCOPED_INFO("only the lines that differ read: " + std::to_string(lexer.lastRead()));
+        UNSCOPED_INFO("only the lines that differ read");
         CHECK(lexer.lastRead() <= 6);
         ALDiffLexer fresh(lsl);
         UNSCOPED_INFO("as read afresh");
@@ -246,7 +246,7 @@ namespace
         apart[250]                     = "integer two;";
         lexer.regions(left);
         const auto& again              = lexer.regions(apart);
-        UNSCOPED_INFO("the two read, those between taken: " + std::to_string(lexer.lastRead()));
+        UNSCOPED_INFO("the two read, those between taken");
         CHECK(lexer.lastRead() <= 3);
         ALDiffLexer fresh_apart(lsl);
         UNSCOPED_INFO("as read afresh");
@@ -268,7 +268,7 @@ namespace
             CHECK(commented[30][0].region == ALTextDiff::Region::Comment);
         }
         {
-            INFO("those in it read, to where it closes: " + std::to_string(twice.lastRead()));
+            INFO("those in it read, to where it closes");
             CHECK(twice.lastRead() >= 31);
             CHECK(twice.lastRead() <= 34);
         }
@@ -459,7 +459,7 @@ namespace
         UNSCOPED_INFO("no line compared to know either");
         CHECK(told.linesCompared() - compared == U64(0));
         {
-            INFO("the right read again in its place, the line typed alone: " + std::to_string(told.lastRead()));
+            INFO("the right read again in its place, the line typed alone");
             CHECK(&typed_read == &right_read);
             CHECK(told.lastRead() >= 1);
             CHECK(told.lastRead() <= 2);
@@ -470,7 +470,7 @@ namespace
         const U64                found_was  = found.linesCompared();
         found.regions(left);
         const ALTextDiff::Reread found_said = found.reread(found.regions(typed));
-        UNSCOPED_INFO("not told: every line of both compared with those held: " + std::to_string(found.linesCompared() - found_was));
+        UNSCOPED_INFO("not told: every line of both compared with those held");
         CHECK(found.linesCompared() - found_was >= 200);
         const ALTextDiff::Reread typed_said = told.reread(typed_read);
         {

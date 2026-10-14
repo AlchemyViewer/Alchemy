@@ -47,7 +47,6 @@ namespace
         doc.onChanged([&find](const ALTextDocument::Edit& edit) { find.edited(edit); });
         const U32 was = find.generation();
         find.search(doc, "one", ALTextSearchOptions(), false, ALTextRange(ALTextPos(0, 8), ALTextPos(0, 11)));
-        UNSCOPED_INFO("three");
         REQUIRE(find.count() == size_t(3));
         UNSCOPED_INFO("the selection the current one");
         CHECK(find.current() == 1);
@@ -67,14 +66,14 @@ namespace
 
         find.search(doc, "one", ALTextSearchOptions(), true, ALTextRange(ALTextPos(0, 0), ALTextPos(0, 13)));
         UNSCOPED_INFO("in the selection only");
-        REQUIRE(find.count() == size_t(2));
+        CHECK(find.count() == size_t(2));
         doc.insert(ALTextPos(0, 5), " one");
         find.search(doc, "one", ALTextSearchOptions(), true, ALTextRange());
         UNSCOPED_INFO("kept to it as it grew, not to the selection now");
-        REQUIRE(find.count() == size_t(3));
+        CHECK(find.count() == size_t(3));
         find.search(doc, "one", ALTextSearchOptions(), false, ALTextRange());
         UNSCOPED_INFO("let go of");
-        REQUIRE(find.count() == size_t(4));
+        CHECK(find.count() == size_t(4));
     }
 
     TEST_CASE_METHOD(altextfind_data, "altextfind: matches stop at LIMIT but not for a replace and can be taken back", "[altextfind]")
@@ -90,20 +89,20 @@ namespace
         {
             INFO("capped");
             CHECK(find.capped());
-            REQUIRE(find.count() == ALTextFind::LIMIT);
+            CHECK(find.count() == ALTextFind::LIMIT);
         }
         UNSCOPED_INFO("every one for a replace");
-        REQUIRE(find.replacements(doc, "z", ALTextSearchOptions(), "y").size() == ALTextFind::LIMIT + 2);
+        CHECK(find.replacements(doc, "z", ALTextSearchOptions(), "y").size() == ALTextFind::LIMIT + 2);
         std::vector<ALTextRange> taken = find.take();
         {
             INFO("taken");
-            REQUIRE(find.count() == 0);
-            REQUIRE(taken.size() == ALTextFind::LIMIT);
+            CHECK(find.count() == 0);
+            CHECK(taken.size() == ALTextFind::LIMIT);
         }
         find.restore(std::move(taken), 3);
         {
             INFO("put back");
-            REQUIRE(find.count() == ALTextFind::LIMIT);
+            CHECK(find.count() == ALTextFind::LIMIT);
             CHECK(find.current() == 3);
         }
         find.stale();
@@ -115,7 +114,7 @@ namespace
         find.clear();
         {
             INFO("put away");
-            REQUIRE(find.count() == 0);
+            CHECK(find.count() == 0);
             CHECK_FALSE(find.isStale());
             CHECK(find.current() == -1);
         }
@@ -141,7 +140,7 @@ namespace
         }
         const size_t lines = static_cast<size_t>(doc.lineCount() - 1);
         UNSCOPED_INFO("every line's");
-        REQUIRE(find.count() == llmin(lines, ALTextFind::LIMIT));
+        CHECK(find.count() == llmin(lines, ALTextFind::LIMIT));
 
         find.search(doc, "haystack", ALTextSearchOptions(), false, ALTextRange());
         doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "haystack ");
@@ -157,7 +156,7 @@ namespace
         {
             INFO("put away with a worker out: let go of");
             CHECK_FALSE(find.searching());
-            REQUIRE(find.count() == 0);
+            CHECK(find.count() == 0);
         }
     }
 
@@ -232,7 +231,7 @@ namespace
         ALTextFind           find;
         find.search(doc, "one", ALTextSearchOptions(), true, ALTextRange(ALTextPos(0, 0), ALTextPos(0, 7)));
         UNSCOPED_INFO("in the first line's selection");
-        REQUIRE(find.count() == size_t(1));
+        CHECK(find.count() == size_t(1));
         find.clear();
         find.search(doc, "one", ALTextSearchOptions(), true, ALTextRange(ALTextPos(1, 0), ALTextPos(2, 7)));
         UNSCOPED_INFO("in the selection made since");

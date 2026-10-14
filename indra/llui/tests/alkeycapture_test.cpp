@@ -114,34 +114,27 @@ namespace
     TEST_CASE_METHOD(alkeycapture_data, "alkeycapture: a two-key capture takes every key first and Return gives the two pressed", "[alkeycapture]")
     {
         ALKeyCapture* capture = show(true);
-        {
-            INFO("shown, and waiting");
-            REQUIRE(capture != nullptr);
-            CHECK(ALKeyChords::waiting());
-        }
-        UNSCOPED_INFO("nothing yet");
+        REQUIRE(capture != nullptr);
+        CHECK(ALKeyChords::waiting());
         CHECK(text(capture, "keys") == std::string("(nothing yet)"));
         UNSCOPED_INFO("Control-S, which the viewer's menus would take");
         CHECK(ALKeyChords::takeKey('S', MASK_CONTROL));
-        UNSCOPED_INFO("pressed");
         CHECK(capture->pressed() == (ALKeyChord{ 'S', MASK_CONTROL }));
-        UNSCOPED_INFO("said");
         CHECK(text(capture, "said") == "said of " + ALKeyChord{ 'S', MASK_CONTROL }.describe());
-        UNSCOPED_INFO("waiting still");
+        UNSCOPED_INFO("still waiting for the second");
         CHECK(ALKeyChords::waiting());
         {
             INFO("a modifier alone is nothing yet");
             CHECK_FALSE(ALKeyChords::takeKey(KEY_SHIFT, MASK_SHIFT));
             CHECK(capture->pressed() == (ALKeyChord{ 'S', MASK_CONTROL }));
         }
-        UNSCOPED_INFO("then a plain K");
+        UNSCOPED_INFO("then a plain K, which a text would take");
         CHECK(ALKeyChords::takeKey('K', MASK_NONE));
         UNSCOPED_INFO("its character not typed");
         CHECK(ALKeyChords::takeChar('k'));
         const ALKeyChord two{ 'K', MASK_NONE, 'S', MASK_CONTROL };
         UNSCOPED_INFO("two in turn");
         CHECK(capture->pressed() == two);
-        UNSCOPED_INFO("shown");
         CHECK(text(capture, "keys") == two.describe());
         {
             INFO("a third starts again");
@@ -156,7 +149,6 @@ namespace
             REQUIRE(chosen.size() == 1);
             CHECK(chosen[0] == (ALKeyChord{ 'D', MASK_CONTROL, KEY_F5, MASK_NONE }));
         }
-        UNSCOPED_INFO("and the wait over");
         CHECK_FALSE(ALKeyChords::waiting());
     }
 
@@ -164,9 +156,9 @@ namespace
     {
         ALKeyCapture* capture = show(false);
         {
-            INFO("Return with nothing");
+            INFO("Return with nothing pressed gives nothing");
             CHECK(ALKeyChords::takeKey(KEY_RETURN, MASK_NONE));
-            REQUIRE(chosen.empty());
+            CHECK(chosen.empty());
             CHECK(ALKeyChords::waiting());
         }
         ALKeyChords::takeKey('K', MASK_CONTROL);
@@ -175,10 +167,8 @@ namespace
         CHECK(capture->pressed() == (ALKeyChord{ 'S', MASK_NONE }));
         ALKeyChords::takeChar('s');
         ALPopover* up = capture->popover();
-        UNSCOPED_INFO("Escape");
         CHECK(ALKeyChords::takeKey(KEY_ESCAPE, MASK_NONE));
-        UNSCOPED_INFO("nothing given");
-        REQUIRE(chosen.empty());
+        CHECK(chosen.empty());
         {
             INFO("gone, escaped");
             CHECK(up->escaped());

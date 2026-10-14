@@ -62,7 +62,6 @@ namespace
             CHECK(drag.dx() == 1);
             CHECK(drag.dy() == 2);
         }
-        UNSCOPED_INFO("as it goes");
         CHECK(drag.commitsAsItGoes());
         UNSCOPED_INFO("let go, having been pressed");
         CHECK(drag.release());
@@ -124,7 +123,6 @@ namespace
         CHECK(drag.moved(95, 10));
     }
 
-    // The farther of the two axes: either past it is a drag.
     TEST_CASE("aldraggesture: an either-axis zone is left past it on either axis", "[aldraggesture]")
     {
         ALDragGesture drag(2, ALDragGesture::Zone::EitherAxis);

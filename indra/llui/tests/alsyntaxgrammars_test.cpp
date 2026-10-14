@@ -67,10 +67,10 @@ namespace
             return out;
         }
 
-        std::string lexed(const char* grammar_name, std::string_view line, ALSyntaxState& state, const ALSyntaxWords& words)
+        std::string require_lexed(const char* grammar_name, std::string_view line, ALSyntaxState& state, const ALSyntaxWords& words)
         {
             std::shared_ptr<const ALSyntaxGrammar> grammar = library.find(grammar_name);
-            UNSCOPED_INFO(std::string("grammar ") + grammar_name);
+            CAPTURE(grammar_name);
             REQUIRE(grammar != nullptr);
             if (state.frames.empty())
             {
@@ -84,17 +84,11 @@ namespace
 
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: the six grammars load and answer to their extensions", "[alsyntaxgrammars]")
     {
-        UNSCOPED_INFO("six");
         REQUIRE(library.names().size() == size_t(6));
-        UNSCOPED_INFO("lsl by extension");
         CHECK(library.forExtension(".lsl")->name() == std::string("lsl"));
-        UNSCOPED_INFO("luau by extension");
         CHECK(library.forExtension("luau")->name() == std::string("slua"));
-        UNSCOPED_INFO("xui is xml");
         CHECK(library.forExtension("xui")->name() == std::string("xml"));
-        UNSCOPED_INFO("ini is config");
         CHECK(library.forExtension("ini")->name() == std::string("config"));
-        UNSCOPED_INFO("nothing for nothing");
         REQUIRE_FALSE(library.forExtension("exe"));
     }
 
@@ -104,40 +98,33 @@ namespace
         words.set("function", { "llSay" });
         words.set("event", { "state_entry" });
         ALSyntaxState state;
-        UNSCOPED_INFO("comment");
-        CHECK(lexed("lsl", "// hello", state, words) == std::string("comment:// hello"));
-        UNSCOPED_INFO("declaration");
-        CHECK(lexed("lsl", "integer count = 0x1F;", state, words) ==
+        CHECK(require_lexed("lsl", "// hello", state, words) == std::string("comment:// hello"));
+        CHECK(require_lexed("lsl", "integer count = 0x1F;", state, words) ==
                       std::string("type:integer|text: count |operator:=|text: |number:0x1F|punctuation:;"));
-        UNSCOPED_INFO("a state");
-        CHECK(lexed("lsl", "default { state_entry() { llSay(0, \"hi \\\"there\\\"\"); @loop; jump loop; } }", state, words) ==
+        CHECK(require_lexed("lsl", "default { state_entry() { llSay(0, \"hi \\\"there\\\"\"); @loop; jump loop; } }", state, words) ==
                       std::string("control:default|text: |punctuation:{|text: |event:state_entry|punctuation:()|text: |punctuation:{|text: "
                                   "|function:llSay|punctuation:(|number:0|punctuation:,|text: |string:\"hi |escape:\\\"|string:there|escape:\\\"|string:\""
                                   "|punctuation:);|text: |label:@loop|punctuation:;|text: |control:jump|text: loop|punctuation:;|text: |punctuation:}|text: |punctuation:}"));
-        UNSCOPED_INFO("a directive and a float");
-        CHECK(lexed("lsl", "#define X 1.5e3", state, words) == std::string("preprocessor:#define X 1.5e3"));
-        UNSCOPED_INFO("a comment after a directive is a comment");
-        CHECK(lexed("lsl", "#define X 1 // the x", state, words) ==
+        CHECK(require_lexed("lsl", "#define X 1.5e3", state, words) == std::string("preprocessor:#define X 1.5e3"));
+        CHECK(require_lexed("lsl", "#define X 1 // the x", state, words) ==
                       std::string("preprocessor:#define X 1 |comment:// the x"));
-        UNSCOPED_INFO("an include's name is a path");
-        CHECK(lexed("lsl", "#include \"lib.lsl\"", state, words) ==
+        CHECK(require_lexed("lsl", "#include \"lib.lsl\"", state, words) ==
                       std::string("preprocessor:#include |path:\"lib.lsl\""));
-        UNSCOPED_INFO("in brackets too, and a comment after it");
-        CHECK(lexed("lsl", "#  include <lib.lsl> // the lib", state, words) ==
+        CHECK(require_lexed("lsl", "#  include <lib.lsl> // the lib", state, words) ==
                       std::string("preprocessor:#  include |path:<lib.lsl>|preprocessor: |comment:// the lib"));
-        UNSCOPED_INFO("a macro's string is a string");
-        CHECK(lexed("lsl", "#define GREETING \"hello\"", state, words) ==
+        CHECK(require_lexed("lsl", "#define GREETING \"hello\"", state, words) ==
                       std::string("preprocessor:#define GREETING |string:\"hello\""));
-        UNSCOPED_INFO("a directive continued");
-        CHECK(lexed("lsl", "#define TWICE(a) \\", state, words) == std::string("preprocessor:#define TWICE(a) \\"));
-        UNSCOPED_INFO("goes on onto the next line");
-        CHECK(lexed("lsl", "    ((a) * 2)", state, words) == std::string("preprocessor:    ((a) * 2)"));
-        UNSCOPED_INFO("and ends with it");
-        CHECK(lexed("lsl", "integer y;", state, words) == std::string("type:integer|text: y|punctuation:;"));
-        UNSCOPED_INFO("a block comment opens");
-        CHECK(lexed("lsl", "x /* y", state, words) == std::string("text:x |comment:/* y"));
-        UNSCOPED_INFO("and closes");
-        CHECK(lexed("lsl", "z */ 2.", state, words) == std::string("comment:z */|text: |number:2."));
+        {
+            INFO("a directive continued onto the next line, and ending with it");
+            CHECK(require_lexed("lsl", "#define TWICE(a) \\", state, words) == std::string("preprocessor:#define TWICE(a) \\"));
+            CHECK(require_lexed("lsl", "    ((a) * 2)", state, words) == std::string("preprocessor:    ((a) * 2)"));
+            CHECK(require_lexed("lsl", "integer y;", state, words) == std::string("type:integer|text: y|punctuation:;"));
+        }
+        {
+            INFO("a block comment opened on one line and closed on the next");
+            CHECK(require_lexed("lsl", "x /* y", state, words) == std::string("text:x |comment:/* y"));
+            CHECK(require_lexed("lsl", "z */ 2.", state, words) == std::string("comment:z */|text: |number:2."));
+        }
     }
 
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: SLua's comments and strings and directives lex into their kinds", "[alsyntaxgrammars]")
@@ -146,66 +133,60 @@ namespace
         words.set("function", { "ll.Say" });
         words.set("type", { "number" });
         ALSyntaxState state;
-        UNSCOPED_INFO("comment");
-        CHECK(lexed("slua", "-- comment", state, words) == std::string("comment:-- comment"));
-        UNSCOPED_INFO("a local and a block comment");
-        CHECK(lexed("slua", "local n: number = 0x10 --[[ block", state, words) ==
-                      std::string("control:local|text: n|punctuation::|text: |type:number|text: |operator:=|text: |number:0x10|text: |comment:--[[ block"));
-        UNSCOPED_INFO("closed");
-        CHECK(lexed("slua", "still ]] + 1", state, words) == std::string("comment:still ]]|text: |operator:+|text: |number:1"));
-        UNSCOPED_INFO("a call with an interpolated string");
-        CHECK(lexed("slua", "ll.Say(0, `hi {n}`)", state, words) ==
+        CHECK(require_lexed("slua", "-- comment", state, words) == std::string("comment:-- comment"));
+        {
+            INFO("a long comment opened on one line and closed on the next");
+            CHECK(require_lexed("slua", "local n: number = 0x10 --[[ block", state, words) ==
+                          std::string("control:local|text: n|punctuation::|text: |type:number|text: |operator:=|text: |number:0x10|text: |comment:--[[ block"));
+            CHECK(require_lexed("slua", "still ]] + 1", state, words) == std::string("comment:still ]]|text: |operator:+|text: |number:1"));
+        }
+        CHECK(require_lexed("slua", "ll.Say(0, `hi {n}`)", state, words) ==
                       std::string("text:ll|punctuation:.|function:Say|punctuation:(|number:0|punctuation:,|text: |string:`hi |punctuation:{|text:n|punctuation:}|string:`|punctuation:)"));
-        UNSCOPED_INFO("a long string with a level");
-        CHECK(lexed("slua", "s = [==[ a ]] b ]==] .. 'c'", state, words) ==
+        CHECK(require_lexed("slua", "s = [==[ a ]] b ]==] .. 'c'", state, words) ==
                       std::string("text:s |operator:=|text: |string:[==[ a ]] b ]==]|text: |punctuation:..|text: |string:'c'"));
-        UNSCOPED_INFO("an attribute and constants");
-        CHECK(lexed("slua", "@native true nil", state, words) ==
+        CHECK(require_lexed("slua", "@native true nil", state, words) ==
                       std::string("attribute:@native|text: |constant:true|text: |constant:nil"));
-        UNSCOPED_INFO("a directive, written as a comment to Luau");
-        CHECK(lexed("slua", "--#define X 1.5 -- the x", state, words) ==
-                      std::string("preprocessor:--#define X 1.5 |comment:-- the x"));
-        UNSCOPED_INFO("an include's name is a path");
-        CHECK(lexed("slua", "--#include \"lib.luau\"", state, words) ==
+        {
+            INFO("a directive, written as a comment to Luau");
+            CHECK(require_lexed("slua", "--#define X 1.5 -- the x", state, words) ==
+                          std::string("preprocessor:--#define X 1.5 |comment:-- the x"));
+        }
+        CHECK(require_lexed("slua", "--#include \"lib.luau\"", state, words) ==
                       std::string("preprocessor:--#include |path:\"lib.luau\""));
-        UNSCOPED_INFO("selene's file-wide word is a comment");
-        CHECK(lexed("slua", "--# selene: allow(unused_variable)", state, words) ==
-                      std::string("comment:--# selene: allow(unused_variable)"));
-        UNSCOPED_INFO("and so is a rule of #s");
-        CHECK(lexed("slua", "--##########", state, words) == std::string("comment:--##########"));
+        {
+            INFO("--# that is no directive is a comment: selene's word, a rule of #s");
+            CHECK(require_lexed("slua", "--# selene: allow(unused_variable)", state, words) ==
+                          std::string("comment:--# selene: allow(unused_variable)"));
+            CHECK(require_lexed("slua", "--##########", state, words) == std::string("comment:--##########"));
+        }
     }
 
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: XML's declarations and elements and tags across lines lex into kinds", "[alsyntaxgrammars]")
     {
         ALSyntaxWords words;
         ALSyntaxState state;
-        UNSCOPED_INFO("declaration");
-        CHECK(lexed("xml", "<?xml version=\"1.0\"?>", state, words) == std::string("preprocessor:<?xml version=\"1.0\"?>"));
-        UNSCOPED_INFO("comment");
-        CHECK(lexed("xml", "<!-- note -->", state, words) == std::string("comment:<!-- note -->"));
-        UNSCOPED_INFO("an element");
-        CHECK(lexed("xml", "<panel name=\"x\" width='2'>&amp;text</panel>", state, words) ==
+        CHECK(require_lexed("xml", "<?xml version=\"1.0\"?>", state, words) == std::string("preprocessor:<?xml version=\"1.0\"?>"));
+        CHECK(require_lexed("xml", "<!-- note -->", state, words) == std::string("comment:<!-- note -->"));
+        CHECK(require_lexed("xml", "<panel name=\"x\" width='2'>&amp;text</panel>", state, words) ==
                       std::string("tag:<panel|text: |attribute:name|operator:=|attribute_value:\"x\"|text: |attribute:width|operator:=|attribute_value:'2'"
                                   "|punctuation:>|entity:&amp;|text:text|tag:</panel|punctuation:>"));
-        UNSCOPED_INFO("a tag across lines opens");
-        CHECK(lexed("xml", "<button", state, words) == std::string("tag:<button"));
-        UNSCOPED_INFO("and closes");
-        CHECK(lexed("xml", "  label=\"Go\" />", state, words) == std::string("text:  |attribute:label|operator:=|attribute_value:\"Go\"|text: |punctuation:/>"));
-        UNSCOPED_INFO("cdata");
-        CHECK(lexed("xml", "<![CDATA[ <x> ]]>", state, words) == std::string("string:<![CDATA[ <x> ]]>"));
+        {
+            INFO("a tag across lines, opened and closed");
+            CHECK(require_lexed("xml", "<button", state, words) == std::string("tag:<button"));
+            CHECK(require_lexed("xml", "  label=\"Go\" />", state, words) == std::string("text:  |attribute:label|operator:=|attribute_value:\"Go\"|text: |punctuation:/>"));
+        }
+        CHECK(require_lexed("xml", "<![CDATA[ <x> ]]>", state, words) == std::string("string:<![CDATA[ <x> ]]>"));
     }
 
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: JSON lexes into its kinds and plain text into one token", "[alsyntaxgrammars]")
     {
         ALSyntaxWords words;
         ALSyntaxState state;
-        UNSCOPED_INFO("json");
-        CHECK(lexed("json", "{\"a\": [1, true, null, \"s\\n\"]}", state, words) ==
+        CHECK(require_lexed("json", "{\"a\": [1, true, null, \"s\\n\"]}", state, words) ==
                       std::string("punctuation:{|property:\"a\"|punctuation::|text: |punctuation:[|number:1|punctuation:,|text: |constant:true|punctuation:,|text: "
                                   "|constant:null|punctuation:,|text: |string:\"s|escape:\\n|string:\"|punctuation:]}"));
         ALSyntaxState plain;
-        UNSCOPED_INFO("text");
-        CHECK(lexed("text", "hello // world", plain, words) == std::string("text:hello // world"));
+        CHECK(require_lexed("text", "hello // world", plain, words) == std::string("text:hello // world"));
     }
 
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: SLua's ll.Say is found as Say after ll. and not as Say alone", "[alsyntaxgrammars]")
@@ -213,16 +194,12 @@ namespace
         ALSyntaxWords words;
         words.set("function", { "ll.Say", "print" });
         ALSyntaxState state;
-        UNSCOPED_INFO("a member call");
-        CHECK(lexed("slua", "ll.Say(0, x)", state, words) ==
+        CHECK(require_lexed("slua", "ll.Say(0, x)", state, words) ==
                       std::string("text:ll|punctuation:.|function:Say|punctuation:(|number:0|punctuation:,|text: x|punctuation:)"));
-        UNSCOPED_INFO("the same name alone is not the function");
-        CHECK(lexed("slua", "Say(1)", state, words) ==
+        CHECK(require_lexed("slua", "Say(1)", state, words) ==
                       std::string("text:Say|punctuation:(|number:1|punctuation:)"));
-        UNSCOPED_INFO("another head is another name");
-        CHECK(lexed("slua", "t.Say", state, words) == std::string("text:t|punctuation:.|text:Say"));
-        UNSCOPED_INFO("a plain function still is");
-        CHECK(lexed("slua", "print(t)", state, words) == std::string("function:print|punctuation:(|text:t|punctuation:)"));
+        CHECK(require_lexed("slua", "t.Say", state, words) == std::string("text:t|punctuation:.|text:Say"));
+        CHECK(require_lexed("slua", "print(t)", state, words) == std::string("function:print|punctuation:(|text:t|punctuation:)"));
     }
 
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: Luau's own keywords where they are statements and its templates", "[alsyntaxgrammars]")
@@ -231,42 +208,40 @@ namespace
         words.set("function", { "type", "print" });
         words.set("type", { "number" });
         ALSyntaxState state;
-        UNSCOPED_INFO("const");
-        CHECK(lexed("slua", "const n = 1", state, words) == std::string("control:const|text: n |operator:=|text: |number:1"));
-        UNSCOPED_INFO("export const");
-        CHECK(lexed("slua", "export const f", state, words) == std::string("control:export|text: |control:const|text: f"));
-        UNSCOPED_INFO("export function");
-        CHECK(lexed("slua", "export function f()", state, words) ==
+        CHECK(require_lexed("slua", "const n = 1", state, words) == std::string("control:const|text: n |operator:=|text: |number:1"));
+        CHECK(require_lexed("slua", "export const f", state, words) == std::string("control:export|text: |control:const|text: f"));
+        CHECK(require_lexed("slua", "export function f()", state, words) ==
                       std::string("control:export|text: |control:function|text: f|punctuation:()"));
-        UNSCOPED_INFO("a type alias");
-        CHECK(lexed("slua", "type Pair = {}", state, words) == std::string("control:type|text: Pair |operator:=|text: |punctuation:{}"));
-        UNSCOPED_INFO("an exported generic alias");
-        CHECK(lexed("slua", "export type Box<T> = T", state, words) ==
+        CHECK(require_lexed("slua", "type Pair = {}", state, words) == std::string("control:type|text: Pair |operator:=|text: |punctuation:{}"));
+        CHECK(require_lexed("slua", "export type Box<T> = T", state, words) ==
                       std::string("control:export|text: |control:type|text: Box|operator:<|text:T|operator:>|text: |operator:=|text: T"));
-        UNSCOPED_INFO("type the function is still the function");
-        CHECK(lexed("slua", "local t = type(x)", state, words) ==
-                      std::string("control:local|text: t |operator:=|text: |function:type|punctuation:(|text:x|punctuation:)"));
-        UNSCOPED_INFO("a field called type is no statement");
-        REQUIRE(lexed("slua", "t.type = 1", state, words).find("control:type") == std::string::npos);
-        UNSCOPED_INFO("a local called const is a local");
-        CHECK(lexed("slua", "const = 2", state, words) == std::string("text:const |operator:=|text: |number:2"));
-        UNSCOPED_INFO("an interpolated string");
-        CHECK(lexed("slua", "print(`n is {n + 1} and {x}!`)", state, words) ==
+        {
+            INFO("type called as a function is still the function");
+            CHECK(require_lexed("slua", "local t = type(x)", state, words) ==
+                          std::string("control:local|text: t |operator:=|text: |function:type|punctuation:(|text:x|punctuation:)"));
+        }
+        {
+            INFO("a field called type is no statement");
+            REQUIRE(require_lexed("slua", "t.type = 1", state, words).find("control:type") == std::string::npos);
+        }
+        {
+            INFO("a local called const is a local");
+            CHECK(require_lexed("slua", "const = 2", state, words) == std::string("text:const |operator:=|text: |number:2"));
+        }
+        CHECK(require_lexed("slua", "print(`n is {n + 1} and {x}!`)", state, words) ==
                       std::string("function:print|punctuation:(|string:`n is |punctuation:{|text:n |operator:+|text: |number:1|punctuation:}|string: and "
                                   "|punctuation:{|text:x|punctuation:}|string:!`|punctuation:)"));
         UNSCOPED_INFO("back in the main state");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("an escape inside it");
-        CHECK(lexed("slua", "`a\\{b`", state, words) == std::string("string:`a|escape:\\{|string:b`"));
-        UNSCOPED_INFO("one left open ends with its line");
-        CHECK(lexed("slua", "`open {x", state, words) == std::string("string:`open |punctuation:{|text:x"));
-        UNSCOPED_INFO("and the next line is code again");
-        CHECK(lexed("slua", "y = 1", state, words) == std::string("text:y |operator:=|text: |number:1"));
-        UNSCOPED_INFO("a number with separators, and floor division");
-        CHECK(lexed("slua", "1_000 // 3", state, words) ==
+        CHECK(require_lexed("slua", "`a\\{b`", state, words) == std::string("string:`a|escape:\\{|string:b`"));
+        {
+            INFO("a template left open ends with its line, and the next line is code again");
+            CHECK(require_lexed("slua", "`open {x", state, words) == std::string("string:`open |punctuation:{|text:x"));
+            CHECK(require_lexed("slua", "y = 1", state, words) == std::string("text:y |operator:=|text: |number:1"));
+        }
+        CHECK(require_lexed("slua", "1_000 // 3", state, words) ==
                       std::string("number:1_000|text: |operator://|text: |number:3"));
-        UNSCOPED_INFO("compound assignment and concatenation");
-        CHECK(lexed("slua", "s ..= \"x\"", state, words) ==
+        CHECK(require_lexed("slua", "s ..= \"x\"", state, words) ==
                       std::string("text:s |punctuation:..|operator:=|text: |string:\"x\""));
     }
 
@@ -308,7 +283,6 @@ namespace
         // Brackets opened past reason: the states go so deep and no deeper.
         state = grammar.initialState();
         grammar.lexLine(std::string(500, '('), state, tokens, words);
-        UNSCOPED_INFO("no deeper than the depth");
         REQUIRE(state.frames.size() <= ALSyntaxGrammar::MAX_DEPTH);
         grammar.lexLine(std::string(10, ')'), state, tokens, words);
         UNSCOPED_INFO("and out again");
@@ -320,6 +294,7 @@ namespace
         {
             state = grammar.initialState();
             grammar.lexLine("<<w" + std::to_string(i) + " x w" + std::to_string(i), state, tokens, words);
+            CAPTURE(i);
             UNSCOPED_INFO("each closes");
             REQUIRE(state.frames.size() == 1);
         }
@@ -341,7 +316,6 @@ namespace
         regex_grammar.lexLine("still ab42 out", state, tokens, words);
         UNSCOPED_INFO("closed by the capture and digits");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("the span to there, and text after");
         CHECK(said("still ab42 out", tokens) == std::string("string:still ab42|text: out"));
     }
 
@@ -353,23 +327,18 @@ namespace
             REQUIRE(slua);
             CHECK(slua->indents());
         }
-        UNSCOPED_INFO("then");
         CHECK(slua->opensBlock("if x then"));
-        UNSCOPED_INFO("a brace");
         CHECK(slua->opensBlock("local t = {"));
-        UNSCOPED_INFO("a function left open");
         CHECK(slua->opensBlock("foo(function(x)"));
-        UNSCOPED_INFO("one with its return type");
         CHECK(slua->opensBlock("local function f(a: number): string"));
-        UNSCOPED_INFO("not one that ends on the line");
         CHECK_FALSE(slua->opensBlock("foo(function() return 1 end)"));
         UNSCOPED_INFO("the last of two, open");
         CHECK(slua->opensBlock("f(function() end, function(x)"));
         UNSCOPED_INFO("do after a function closed on the line");
         CHECK(slua->opensBlock("x = function() end; for i = 1, 3 do"));
-        UNSCOPED_INFO("not one with end in a comment after it");
+        UNSCOPED_INFO("an end in a comment after it still counts");
         CHECK_FALSE(slua->opensBlock("function f() -- the end"));
-        UNSCOPED_INFO("nor a name that holds end");
+        UNSCOPED_INFO("a name that holds end does not");
         CHECK(slua->opensBlock("function f(endpoint)"));
 
         std::shared_ptr<const ALSyntaxGrammar> xml = library.find("xml");
@@ -378,19 +347,13 @@ namespace
             REQUIRE(xml);
             CHECK(xml->indents());
         }
-        UNSCOPED_INFO("a tag");
         CHECK(xml->opensBlock("<a>"));
-        UNSCOPED_INFO("one with attributes");
         CHECK(xml->opensBlock("<panel name=\"x\" follows=\"all\">"));
-        UNSCOPED_INFO("a blank inside");
         CHECK(xml->opensBlock("<a >"));
-        UNSCOPED_INFO("not one that closes itself");
         CHECK_FALSE(xml->opensBlock("<a/>"));
-        UNSCOPED_INFO("nor with attributes");
         CHECK_FALSE(xml->opensBlock("<a b=\"c\"/>"));
         UNSCOPED_INFO("the last tag, open");
         CHECK(xml->opensBlock("<a/> <b>"));
-        UNSCOPED_INFO("not a closing tag's line");
         CHECK_FALSE(xml->opensBlock("</a>"));
     }
 
@@ -399,18 +362,17 @@ namespace
         ALSyntaxWords words;
         words.set("function", { "require", "print" });
         ALSyntaxState state;
-        UNSCOPED_INFO("a module's path");
-        CHECK(lexed("slua", "local util = require(\"./util\")", state, words) ==
+        CHECK(require_lexed("slua", "local util = require(\"./util\")", state, words) ==
                       std::string("control:local|text: util |operator:=|text: |function:require|punctuation:(|path:\"./util\"|punctuation:)"));
-        UNSCOPED_INFO("in single quotes, spaced");
-        CHECK(lexed("slua", "require( 'lib' ).greet()", state, words) ==
+        CHECK(require_lexed("slua", "require( 'lib' ).greet()", state, words) ==
                       std::string("function:require|punctuation:(|text: |path:'lib'|text: |punctuation:).|text:greet|punctuation:()"));
-        UNSCOPED_INFO("another call's string is a string");
-        CHECK(lexed("slua", "print(\"see ./util\")", state, words) ==
+        CHECK(require_lexed("slua", "print(\"see ./util\")", state, words) ==
                       std::string("function:print|punctuation:(|string:\"see ./util\"|punctuation:)"));
-        UNSCOPED_INFO("and after a require, the line goes on as before");
-        CHECK(lexed("slua", "print(\"hi\")", state, words) ==
-                      std::string("function:print|punctuation:(|string:\"hi\"|punctuation:)"));
+        {
+            INFO("and after a require, the line goes on as before");
+            CHECK(require_lexed("slua", "print(\"hi\")", state, words) ==
+                          std::string("function:print|punctuation:(|string:\"hi\"|punctuation:)"));
+        }
     }
 
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: a one-word string with a dot or a slash is a path but a sentence is not", "[alsyntaxgrammars]")
@@ -418,30 +380,29 @@ namespace
         ALSyntaxWords words;
         words.set("function", { "llHTTPRequest", "llOwnerSay", "print" });
         ALSyntaxState state;
-        UNSCOPED_INFO("an address");
-        CHECK(lexed("lsl", "llHTTPRequest(\"https://example.com/api\", [], \"\");", state, words) ==
+        CHECK(require_lexed("lsl", "llHTTPRequest(\"https://example.com/api\", [], \"\");", state, words) ==
                       std::string("function:llHTTPRequest|punctuation:(|path:\"https://example.com/api\"|punctuation:,|text: |punctuation:[],|text: "
                                   "|string:\"\"|punctuation:);"));
-        UNSCOPED_INFO("a file's name");
-        CHECK(lexed("lsl", "llOwnerSay(\"texture.png\");", state, words) ==
+        CHECK(require_lexed("lsl", "llOwnerSay(\"texture.png\");", state, words) ==
                       std::string("function:llOwnerSay|punctuation:(|path:\"texture.png\"|punctuation:);"));
-        UNSCOPED_INFO("a sentence");
-        CHECK(lexed("lsl", "llOwnerSay(\"Loaded the texture.png file.\");", state, words) ==
+        CHECK(require_lexed("lsl", "llOwnerSay(\"Loaded the texture.png file.\");", state, words) ==
                       std::string("function:llOwnerSay|punctuation:(|string:\"Loaded the texture.png file.\"|punctuation:);"));
-        UNSCOPED_INFO("an escape is no slash");
-        CHECK(lexed("lsl", "llOwnerSay(\"a\\nb\");", state, words) ==
-                      std::string("function:llOwnerSay|punctuation:(|string:\"a|escape:\\n|string:b\"|punctuation:);"));
-        UNSCOPED_INFO("in a directive");
-        CHECK(lexed("lsl", "#define URL \"http://example.com\"", state, words) ==
+        {
+            INFO("an escape is no slash");
+            CHECK(require_lexed("lsl", "llOwnerSay(\"a\\nb\");", state, words) ==
+                          std::string("function:llOwnerSay|punctuation:(|string:\"a|escape:\\n|string:b\"|punctuation:);"));
+        }
+        CHECK(require_lexed("lsl", "#define URL \"http://example.com\"", state, words) ==
                       std::string("preprocessor:#define URL |path:\"http://example.com\""));
         ALSyntaxState json;
-        UNSCOPED_INFO("JSON, a value but not a key");
-        CHECK(lexed("json", "{\"lib\": \"./lib\", \"mode\": \"strict\"}", json, words) ==
-                      std::string("punctuation:{|property:\"lib\"|punctuation::|text: |path:\"./lib\"|punctuation:,|text: |property:\"mode\"|punctuation::|text: "
-                                  "|string:\"strict\"|punctuation:}"));
+        {
+            INFO("JSON, a value but not a key");
+            CHECK(require_lexed("json", "{\"lib\": \"./lib\", \"mode\": \"strict\"}", json, words) ==
+                          std::string("punctuation:{|property:\"lib\"|punctuation::|text: |path:\"./lib\"|punctuation:,|text: |property:\"mode\"|punctuation::|text: "
+                                      "|string:\"strict\"|punctuation:}"));
+        }
         ALSyntaxState slua;
-        UNSCOPED_INFO("SLua, either quote");
-        CHECK(lexed("slua", "print('lib.lua', \"a/b\")", slua, words) ==
+        CHECK(require_lexed("slua", "print('lib.lua', \"a/b\")", slua, words) ==
                       std::string("function:print|punctuation:(|path:'lib.lua'|punctuation:,|text: |path:\"a/b\"|punctuation:)"));
     }
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: the quick lexer gives the plain one's tokens and states line for line", "[alsyntaxgrammars]")
@@ -454,9 +415,9 @@ namespace
         words.set("deprecated", { "llSound" });
         const std::string mixed = "x = \"a\\\"b\\n\" -- c\n[[long\nstring]] --[=[ lvl\n ]] ]=] y\n"
                                   "/* block\n * more */ z = \"open\n`s {n} \\{ t` q\n<a href=\"x\">&amp;</a> {\"k\": [1, 2]}\n";
-        const auto compare = [&](const char* grammar_name, const std::string& text) {
+        const auto require_lexed_alike = [&](const char* grammar_name, const std::string& text) {
             std::shared_ptr<const ALSyntaxGrammar> grammar = library.find(grammar_name);
-            UNSCOPED_INFO(std::string("grammar ") + grammar_name);
+            CAPTURE(grammar_name);
             REQUIRE(grammar != nullptr);
             ALSyntaxState              quick = grammar->initialState();
             ALSyntaxState              plain = grammar->initialState();
@@ -471,11 +432,11 @@ namespace
                 grammar->lexLine(one, plain, plain_tokens, words);
                 ALSyntaxGrammar::sPlainLexing = false;
                 grammar->lexLine(one, quick, quick_tokens, words);
-                const std::string where = std::string(grammar_name) + " line " + std::to_string(line);
-                UNSCOPED_INFO(where + ": the same tokens: " + alsyntaxgrammars_data::said(one, plain_tokens) + " against " +
-                           alsyntaxgrammars_data::said(one, quick_tokens));
+                CAPTURE(line);
+                UNSCOPED_INFO("plain " << alsyntaxgrammars_data::said(one, plain_tokens) << " against quick "
+                                       << alsyntaxgrammars_data::said(one, quick_tokens));
                 REQUIRE(quick_tokens == plain_tokens);
-                UNSCOPED_INFO(where + ": the same state after");
+                UNSCOPED_INFO("the same state after");
                 REQUIRE(quick == plain);
                 if (next == std::string::npos)
                 {
@@ -487,15 +448,15 @@ namespace
         };
         for (const char* grammar_name : { "lsl", "slua", "xml", "json", "text", "config" })
         {
-            compare(grammar_name, mixed);
+            require_lexed_alike(grammar_name, mixed);
         }
         const std::string lsl  = ll_test::bigLSL(3000);
         const std::string slua = ll_test::bigSLua(3000);
-        compare("lsl", lsl);
-        compare("lsl", "/*\n" + lsl + "\n*/");
-        compare("slua", slua);
-        compare("slua", "--[==[\n" + slua + "\n]==]");
-        compare("slua", "x = [[\n" + slua + "\n]]");
+        require_lexed_alike("lsl", lsl);
+        require_lexed_alike("lsl", "/*\n" + lsl + "\n*/");
+        require_lexed_alike("slua", slua);
+        require_lexed_alike("slua", "--[==[\n" + slua + "\n]==]");
+        require_lexed_alike("slua", "x = [[\n" + slua + "\n]]");
 
         // One long line of many strings, as a minified file is: some with an
         // escaped quote, which is where their end is first found, and one
@@ -513,7 +474,7 @@ namespace
         minified += std::string(300, 'x') + "\"]";
         for (const char* grammar_name : { "json", "lsl", "slua", "config" })
         {
-            compare(grammar_name, minified);
+            require_lexed_alike(grammar_name, minified);
         }
     }
 
@@ -521,48 +482,43 @@ namespace
     {
         ALSyntaxWords words;
         ALSyntaxState state;
-        UNSCOPED_INFO("a comment");
-        CHECK(lexed("config", "# the door", state, words) == std::string("comment:# the door"));
-        UNSCOPED_INFO("a section");
-        CHECK(lexed("config", "[Door]", state, words) == std::string("type:[Door]"));
-        UNSCOPED_INFO("a number");
-        CHECK(lexed("config", "speed = 2.5", state, words) == std::string("property:speed|punctuation: =|text: |number:2.5"));
-        UNSCOPED_INFO("a key and true");
-        CHECK(lexed("config", "owner: 01234567-89ab-cdef-0123-456789abcdef, true", state, words) ==
+        CHECK(require_lexed("config", "# the door", state, words) == std::string("comment:# the door"));
+        CHECK(require_lexed("config", "[Door]", state, words) == std::string("type:[Door]"));
+        CHECK(require_lexed("config", "speed = 2.5", state, words) == std::string("property:speed|punctuation: =|text: |number:2.5"));
+        CHECK(require_lexed("config", "owner: 01234567-89ab-cdef-0123-456789abcdef, true", state, words) ==
                       std::string("property:owner|punctuation::|text: |constant:01234567-89ab-cdef-0123-456789abcdef|punctuation:,|text: |constant:true"));
-        UNSCOPED_INFO("a string, and a colon in it left as text");
-        CHECK(lexed("config", "url = \"http://x\" at 10:30", state, words) ==
+        CHECK(require_lexed("config", "url = \"http://x\" at 10:30", state, words) ==
                       std::string("property:url|punctuation: =|text: |string:\"http://x\"|text: at |number:10|text::|number:30"));
-        UNSCOPED_INFO("the next line a key again");
-        CHECK(lexed("config", "name = Door", state, words) == std::string("property:name|punctuation: =|text: Door"));
-        UNSCOPED_INFO("a line with no key, text");
-        CHECK(lexed("config", "just words here", state, words) == std::string("text:just words here"));
-        UNSCOPED_INFO("and after it, a key again");
-        CHECK(lexed("config", "name = Door", state, words) == std::string("property:name|punctuation: =|text: Door"));
-        UNSCOPED_INFO("a comment after words with no key");
-        CHECK(lexed("config", "just words # here", state, words) ==
+        {
+            INFO("the next line a key again");
+            CHECK(require_lexed("config", "name = Door", state, words) == std::string("property:name|punctuation: =|text: Door"));
+        }
+        CHECK(require_lexed("config", "just words here", state, words) == std::string("text:just words here"));
+        {
+            INFO("after a line with no key, a key again");
+            CHECK(require_lexed("config", "name = Door", state, words) == std::string("property:name|punctuation: =|text: Door"));
+        }
+        CHECK(require_lexed("config", "just words # here", state, words) ==
                       std::string("text:just words|comment: # here"));
-        UNSCOPED_INFO("a section and a comment after it");
-        CHECK(lexed("config", "[Door] ; the door", state, words) ==
+        CHECK(require_lexed("config", "[Door] ; the door", state, words) ==
                       std::string("type:[Door]|comment: ; the door"));
-        UNSCOPED_INFO("a key after a section");
-        CHECK(lexed("config", "[Door] name = x", state, words) ==
+        CHECK(require_lexed("config", "[Door] name = x", state, words) ==
                       std::string("type:[Door]|text: |property:name|punctuation: =|text: x"));
     }
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: SLua's i-suffixed integers are one number but a fraction takes no i", "[alsyntaxgrammars]")
     {
         ALSyntaxWords words;
         ALSyntaxState state;
-        UNSCOPED_INFO("each");
-        CHECK(lexed("slua", "local n = 5i + 0x1Fi + 0b101i + 1_000i", state, words) ==
+        CHECK(require_lexed("slua", "local n = 5i + 0x1Fi + 0b101i + 1_000i", state, words) ==
                       std::string("control:local|text: n |operator:=|text: |number:5i|text: |operator:+|text: |number:0x1Fi|text: "
                                   "|operator:+|text: |number:0b101i|text: |operator:+|text: |number:1_000i"));
-        UNSCOPED_INFO("in a template");
-        CHECK(lexed("slua", "print(`{5i}`)", state, words) ==
+        CHECK(require_lexed("slua", "print(`{5i}`)", state, words) ==
                       std::string("text:print|punctuation:(|string:`|punctuation:{|number:5i|punctuation:}|string:`|punctuation:)"));
-        UNSCOPED_INFO("not a fraction's, which Luau calls malformed");
-        CHECK(lexed("slua", "x = 1.5i", state, words) ==
-                      std::string("text:x |operator:=|text: |number:1.5|text:i"));
+        {
+            INFO("not a fraction's, which Luau calls malformed");
+            CHECK(require_lexed("slua", "x = 1.5i", state, words) ==
+                          std::string("text:x |operator:=|text: |number:1.5|text:i"));
+        }
     }
 
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: SLua: two dots before a number concatenate and .5 is still a number", "[alsyntaxgrammars]")
@@ -570,56 +526,54 @@ namespace
         ALSyntaxWords words;
         words.set("function", { "print" });
         ALSyntaxState state;
-        UNSCOPED_INFO("a concatenation, then a number");
-        CHECK(lexed("slua", "print(\"n=\"..5)", state, words) ==
+        CHECK(require_lexed("slua", "print(\"n=\"..5)", state, words) ==
                       std::string("function:print|punctuation:(|string:\"n=\"|punctuation:..|number:5|punctuation:)"));
-        UNSCOPED_INFO("a concatenation of a fraction");
-        CHECK(lexed("slua", "s = s.. .5", state, words) ==
+        CHECK(require_lexed("slua", "s = s.. .5", state, words) ==
                       std::string("text:s |operator:=|text: s|punctuation:..|text: |number:.5"));
-        UNSCOPED_INFO("a number that begins with its point");
-        CHECK(lexed("slua", "x = .5 + 1.", state, words) ==
+        CHECK(require_lexed("slua", "x = .5 + 1.", state, words) ==
                       std::string("text:x |operator:=|text: |number:.5|text: |operator:+|text: |number:1."));
-        UNSCOPED_INFO("the varargs");
-        CHECK(lexed("slua", "f(...)", state, words) == std::string("text:f|punctuation:(...)"));
+        CHECK(require_lexed("slua", "f(...)", state, words) == std::string("text:f|punctuation:(...)"));
     }
 
     TEST_CASE_METHOD(alsyntaxgrammars_data, "alsyntaxgrammars: SLua: a line-ending backslash carries a string on but an escaped one not", "[alsyntaxgrammars]")
     {
         ALSyntaxWords words;
         ALSyntaxState state;
-        UNSCOPED_INFO("a backslash at the end");
-        CHECK(lexed("slua", "local s = \"one\\", state, words) ==
+        CHECK(require_lexed("slua", "local s = \"one\\", state, words) ==
                       std::string("control:local|text: s |operator:=|text: |string:\"one|escape:\\"));
         UNSCOPED_INFO("still in the string");
         REQUIRE(state.frames.size() == 2);
-        UNSCOPED_INFO("which the next line closes");
-        CHECK(lexed("slua", "two\" .. x", state, words) == std::string("string:two\"|text: |punctuation:..|text: x"));
+        {
+            INFO("the next line closes it");
+            CHECK(require_lexed("slua", "two\" .. x", state, words) == std::string("string:two\"|text: |punctuation:..|text: x"));
+        }
         UNSCOPED_INFO("and code after it");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("in single quotes");
-        CHECK(lexed("slua", "s = 'one\\", state, words) == std::string("text:s |operator:=|text: |string:'one|escape:\\"));
-        UNSCOPED_INFO("goes on too");
-        CHECK(lexed("slua", "two'", state, words) == std::string("string:two'"));
-        UNSCOPED_INFO("an escaped backslash");
-        CHECK(lexed("slua", "s = 'a\\\\", state, words) == std::string("text:s |operator:=|text: |string:'a|escape:\\\\"));
-        UNSCOPED_INFO("ends with its line");
+        CHECK(require_lexed("slua", "s = 'one\\", state, words) == std::string("text:s |operator:=|text: |string:'one|escape:\\"));
+        {
+            INFO("a single-quoted one goes on too");
+            CHECK(require_lexed("slua", "two'", state, words) == std::string("string:two'"));
+        }
+        CHECK(require_lexed("slua", "s = 'a\\\\", state, words) == std::string("text:s |operator:=|text: |string:'a|escape:\\\\"));
+        UNSCOPED_INFO("an escaped backslash ends the string with its line");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("so the next is code");
-        CHECK(lexed("slua", "y = 1", state, words) == std::string("text:y |operator:=|text: |number:1"));
-        UNSCOPED_INFO("and so does an escape of a blank");
-        CHECK(lexed("slua", "s = 'a\\ ", state, words) == std::string("text:s |operator:=|text: |string:'a|escape:\\ "));
-        UNSCOPED_INFO("ended");
+        {
+            INFO("so the next is code");
+            CHECK(require_lexed("slua", "y = 1", state, words) == std::string("text:y |operator:=|text: |number:1"));
+        }
+        CHECK(require_lexed("slua", "s = 'a\\ ", state, words) == std::string("text:s |operator:=|text: |string:'a|escape:\\ "));
+        UNSCOPED_INFO("an escaped blank ends the string with its line too");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("an interpolated string with a backslash at the end");
-        CHECK(lexed("slua", "s = `one\\", state, words) ==
+        CHECK(require_lexed("slua", "s = `one\\", state, words) ==
                       std::string("text:s |operator:=|text: |string:`one\\"));
-        UNSCOPED_INFO("goes on");
-        CHECK(lexed("slua", "two` y", state, words) == std::string("string:two`|text: y"));
-        UNSCOPED_INFO("and ends");
+        {
+            INFO("an interpolated one goes on too");
+            CHECK(require_lexed("slua", "two` y", state, words) == std::string("string:two`|text: y"));
+        }
+        UNSCOPED_INFO("and ends on that line");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("one with an escaped backslash");
-        CHECK(lexed("slua", "s = `a\\\\", state, words) == std::string("text:s |operator:=|text: |string:`a|escape:\\\\"));
-        UNSCOPED_INFO("ends with its line");
+        CHECK(require_lexed("slua", "s = `a\\\\", state, words) == std::string("text:s |operator:=|text: |string:`a|escape:\\\\"));
+        UNSCOPED_INFO("an escaped backslash ends the template with its line");
         REQUIRE(state.frames.size() == 1);
     }
 
@@ -627,41 +581,45 @@ namespace
     {
         ALSyntaxWords words;
         ALSyntaxState state;
-        UNSCOPED_INFO("LSL, a bracket left open");
-        CHECK(lexed("lsl", "#include <lib", state, words) == std::string("preprocessor:#include |path:<lib"));
-        UNSCOPED_INFO("ends with its line");
+        CHECK(require_lexed("lsl", "#include <lib", state, words) == std::string("preprocessor:#include |path:<lib"));
+        UNSCOPED_INFO("a bracket left open ends with its line");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("so the next line is code");
-        CHECK(lexed("lsl", "integer x;", state, words) == std::string("type:integer|text: x|punctuation:;"));
-        UNSCOPED_INFO("a quote left open");
-        CHECK(lexed("lsl", "#include \"lib", state, words) == std::string("preprocessor:#include |path:\"lib"));
-        UNSCOPED_INFO("ends with its line too");
+        {
+            INFO("so the next line is code");
+            CHECK(require_lexed("lsl", "integer x;", state, words) == std::string("type:integer|text: x|punctuation:;"));
+        }
+        CHECK(require_lexed("lsl", "#include \"lib", state, words) == std::string("preprocessor:#include |path:\"lib"));
+        UNSCOPED_INFO("a quote left open ends with its line too");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("and the next line is code");
-        CHECK(lexed("lsl", "x = \"a\";", state, words) == std::string("text:x |operator:=|text: |string:\"a\"|punctuation:;"));
-        UNSCOPED_INFO("a macro's string left open");
-        CHECK(lexed("lsl", "#define X \"abc", state, words) == std::string("preprocessor:#define X |string:\"abc"));
+        {
+            INFO("and the next line is code");
+            CHECK(require_lexed("lsl", "x = \"a\";", state, words) == std::string("text:x |operator:=|text: |string:\"a\"|punctuation:;"));
+        }
+        CHECK(require_lexed("lsl", "#define X \"abc", state, words) == std::string("preprocessor:#define X |string:\"abc"));
         UNSCOPED_INFO("ends with its line, and the directive with it");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("code below it");
-        CHECK(lexed("lsl", "integer y;", state, words) == std::string("type:integer|text: y|punctuation:;"));
-        UNSCOPED_INFO("a macro's string continued");
-        CHECK(lexed("lsl", "#define GREETING \"hello \\", state, words) ==
+        {
+            INFO("code below it");
+            CHECK(require_lexed("lsl", "integer y;", state, words) == std::string("type:integer|text: y|punctuation:;"));
+        }
+        CHECK(require_lexed("lsl", "#define GREETING \"hello \\", state, words) ==
                       std::string("preprocessor:#define GREETING |string:\"hello |escape:\\"));
-        UNSCOPED_INFO("goes on onto the next line");
-        CHECK(lexed("lsl", "world\"", state, words) == std::string("string:world\""));
+        {
+            INFO("a macro's string continued goes on onto the next line");
+            CHECK(require_lexed("lsl", "world\"", state, words) == std::string("string:world\""));
+        }
         UNSCOPED_INFO("and the directive ends with that line");
         REQUIRE(state.frames.size() == 1);
         ALSyntaxState slua;
-        UNSCOPED_INFO("SLua, a quote left open");
-        CHECK(lexed("slua", "--#include \"lib", slua, words) == std::string("preprocessor:--#include |path:\"lib"));
-        UNSCOPED_INFO("ends with its line");
+        CHECK(require_lexed("slua", "--#include \"lib", slua, words) == std::string("preprocessor:--#include |path:\"lib"));
+        UNSCOPED_INFO("SLua: a quote left open ends with its line");
         REQUIRE(slua.frames.size() == 1);
-        UNSCOPED_INFO("so the next line is code");
-        CHECK(lexed("slua", "local x = 1", slua, words) == std::string("control:local|text: x |operator:=|text: |number:1"));
-        UNSCOPED_INFO("a macro's string left open");
-        CHECK(lexed("slua", "--#define X \"abc", slua, words) == std::string("preprocessor:--#define X |string:\"abc"));
-        UNSCOPED_INFO("ends with its line");
+        {
+            INFO("so the next line is code");
+            CHECK(require_lexed("slua", "local x = 1", slua, words) == std::string("control:local|text: x |operator:=|text: |number:1"));
+        }
+        CHECK(require_lexed("slua", "--#define X \"abc", slua, words) == std::string("preprocessor:--#define X |string:\"abc"));
+        UNSCOPED_INFO("SLua: a macro's string left open ends with its line");
         REQUIRE(slua.frames.size() == 1);
     }
 
@@ -670,18 +628,16 @@ namespace
         ALSyntaxWords words;
         words.set("function", { "type", "next", "print", "ll.Say" });
         ALSyntaxState state;
-        UNSCOPED_INFO("a field called type");
-        CHECK(lexed("slua", "if item.type == x then", state, words) ==
+        CHECK(require_lexed("slua", "if item.type == x then", state, words) ==
                       std::string("control:if|text: item|punctuation:.|text:type |operator:==|text: x |control:then"));
-        UNSCOPED_INFO("one called next");
-        CHECK(lexed("slua", "node = node.next", state, words) == std::string("text:node |operator:=|text: node|punctuation:.|text:next"));
-        UNSCOPED_INFO("the global itself");
-        CHECK(lexed("slua", "next(t)", state, words) == std::string("function:next|punctuation:(|text:t|punctuation:)"));
-        UNSCOPED_INFO("after a concatenation, the global still");
-        CHECK(lexed("slua", "s = s..type(x)", state, words) ==
-                      std::string("text:s |operator:=|text: s|punctuation:..|function:type|punctuation:(|text:x|punctuation:)"));
-        UNSCOPED_INFO("a member its head names");
-        CHECK(lexed("slua", "ll.Say(0)", state, words) ==
+        CHECK(require_lexed("slua", "node = node.next", state, words) == std::string("text:node |operator:=|text: node|punctuation:.|text:next"));
+        CHECK(require_lexed("slua", "next(t)", state, words) == std::string("function:next|punctuation:(|text:t|punctuation:)"));
+        {
+            INFO("after a concatenation, the global still");
+            CHECK(require_lexed("slua", "s = s..type(x)", state, words) ==
+                          std::string("text:s |operator:=|text: s|punctuation:..|function:type|punctuation:(|text:x|punctuation:)"));
+        }
+        CHECK(require_lexed("slua", "ll.Say(0)", state, words) ==
                       std::string("text:ll|punctuation:.|function:Say|punctuation:(|number:0|punctuation:)"));
     }
 
@@ -692,22 +648,17 @@ namespace
         {
             const ALSyntaxKind kind = static_cast<ALSyntaxKind>(i);
             const std::string  name = alSyntaxKindName(kind);
-            UNSCOPED_INFO("named once: " + name);
+            CAPTURE(name);
+            UNSCOPED_INFO("named once");
             REQUIRE(names.insert(name).second);
-            UNSCOPED_INFO("and named back: " + name);
             REQUIRE(alSyntaxKindFromName(name) == kind);
-            UNSCOPED_INFO("a colour named, but for text's: " + name);
+            UNSCOPED_INFO("a colour named, but for text's");
             REQUIRE(ALTextView::kindColorName("Script", kind).empty() == (kind == ALSyntaxKind::Text));
         }
-        UNSCOPED_INFO("a comment's colour");
         CHECK(ALTextView::kindColorName("Script", ALSyntaxKind::Comment) == std::string("ScriptComment"));
-        UNSCOPED_INFO("a doc comment's");
         CHECK(ALTextView::kindColorName("Syntax", ALSyntaxKind::DocComment) == std::string("SyntaxDocComment"));
-        UNSCOPED_INFO("an attribute value's");
         CHECK(ALTextView::kindColorName("Syntax", ALSyntaxKind::AttributeValue) == std::string("SyntaxAttributeValue"));
-        UNSCOPED_INFO("a global variable's");
         CHECK(ALTextView::kindColorName("Script", ALSyntaxKind::GlobalVariable) == std::string("ScriptGlobalVariable"));
-        UNSCOPED_INFO("a path's");
         CHECK(ALTextView::kindColorName("Script", ALSyntaxKind::Path) == std::string("ScriptPath"));
     }
 
@@ -715,24 +666,24 @@ namespace
     {
         ALSyntaxWords words;
         ALSyntaxState state;
-        UNSCOPED_INFO("LSL, a block comment");
-        CHECK(lexed("lsl", "x = y +/* note */ 1;", state, words) ==
+        CHECK(require_lexed("lsl", "x = y +/* note */ 1;", state, words) ==
                       std::string("text:x |operator:=|text: y |operator:+|comment:/* note */|text: |number:1|punctuation:;"));
         UNSCOPED_INFO("closed on its line");
         REQUIRE(state.frames.size() == 1);
-        UNSCOPED_INFO("a line comment");
-        CHECK(lexed("lsl", "x =// the x", state, words) == std::string("text:x |operator:=|comment:// the x"));
-        UNSCOPED_INFO("operators together");
-        CHECK(lexed("lsl", "x += y != z", state, words) ==
-                      std::string("text:x |operator:+=|text: y |operator:!=|text: z"));
+        CHECK(require_lexed("lsl", "x =// the x", state, words) == std::string("text:x |operator:=|comment:// the x"));
+        {
+            INFO("operators side by side are still one");
+            CHECK(require_lexed("lsl", "x += y != z", state, words) ==
+                          std::string("text:x |operator:+=|text: y |operator:!=|text: z"));
+        }
         ALSyntaxState slua;
-        UNSCOPED_INFO("SLua, a long comment");
-        CHECK(lexed("slua", "local n = 1 +--[[ off ]] 2", slua, words) ==
+        CHECK(require_lexed("slua", "local n = 1 +--[[ off ]] 2", slua, words) ==
                       std::string("control:local|text: n |operator:=|text: |number:1|text: |operator:+|comment:--[[ off ]]|text: |number:2"));
-        UNSCOPED_INFO("a line comment");
-        CHECK(lexed("slua", "n = n *-- twice", slua, words) == std::string("text:n |operator:=|text: n |operator:*|comment:-- twice"));
-        UNSCOPED_INFO("operators together");
-        CHECK(lexed("slua", "n //= 2 ~= 3", slua, words) ==
-                      std::string("text:n |operator://=|text: |number:2|text: |operator:~=|text: |number:3"));
+        CHECK(require_lexed("slua", "n = n *-- twice", slua, words) == std::string("text:n |operator:=|text: n |operator:*|comment:-- twice"));
+        {
+            INFO("operators side by side are still one");
+            CHECK(require_lexed("slua", "n //= 2 ~= 3", slua, words) ==
+                          std::string("text:n |operator://=|text: |number:2|text: |operator:~=|text: |number:3"));
+        }
     }
 }

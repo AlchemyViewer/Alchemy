@@ -70,25 +70,18 @@ namespace
     {
         ALXUIFindings store;
         UNSCOPED_INFO("nothing yet");
-        REQUIRE(store.size() == 0u);
+        CHECK(store.size() == 0u);
         fill(store);
 
-        UNSCOPED_INFO("everything");
-        REQUIRE(store.size() == 4u);
-        UNSCOPED_INFO("errors");
-        REQUIRE(store.count(ALXUILint::Severity::Error) == 1);
-        UNSCOPED_INFO("warnings");
-        REQUIRE(store.count(ALXUILint::Severity::Warning) == 2);
-        UNSCOPED_INFO("notes");
-        REQUIRE(store.count(ALXUILint::Severity::Note) == 1);
-        UNSCOPED_INFO("in one of them");
+        CHECK(store.size() == 4u);
+        CHECK(store.count(ALXUILint::Severity::Error) == 1);
+        CHECK(store.count(ALXUILint::Severity::Warning) == 2);
+        CHECK(store.count(ALXUILint::Severity::Note) == 1);
         CHECK(store.countIn("one.xml") == 3);
-        UNSCOPED_INFO("and in the other");
         CHECK(store.countIn("two.xml") == 1);
         UNSCOPED_INFO("the ones that offer a fix");
         CHECK(store.countFixable() == 3);
-        UNSCOPED_INFO("two files");
-        REQUIRE(store.files().size() == 2u);
+        CHECK(store.files().size() == 2u);
 
         // A file with nothing to say is still a file that was looked at, and
         // that is not the same answer as one nobody has checked.
@@ -100,7 +93,7 @@ namespace
         UNSCOPED_INFO("with nothing in it");
         CHECK(store.countIn("three.xml") == 0);
         UNSCOPED_INFO("and nothing added to the whole");
-        REQUIRE(store.size() == 4u);
+        CHECK(store.size() == 4u);
     }
 
     // Checking a file again replaces what it said before and nothing else,
@@ -119,29 +112,24 @@ namespace
         UNSCOPED_INFO("the other file is untouched");
         CHECK(store.countIn("two.xml") == 1);
         UNSCOPED_INFO("and the whole is the two of them");
-        REQUIRE(store.size() == 2u);
+        CHECK(store.size() == 2u);
         UNSCOPED_INFO("the error went with the file that said it");
-        REQUIRE(store.count(ALXUILint::Severity::Error) == 0);
+        CHECK(store.count(ALXUILint::Severity::Error) == 0);
         UNSCOPED_INFO("as did the fix it offered");
         CHECK(store.countFixable() == 1);
         UNSCOPED_INFO("and it is still one of two files");
-        REQUIRE(store.files().size() == 2u);
+        CHECK(store.files().size() == 2u);
 
         store.forget("one.xml");
-        UNSCOPED_INFO("gone");
         CHECK_FALSE(store.checked("one.xml"));
-        UNSCOPED_INFO("one file left");
-        REQUIRE(store.files().size() == 1u);
-        UNSCOPED_INFO("and one finding");
-        REQUIRE(store.size() == 1u);
+        CHECK(store.files().size() == 1u);
+        CHECK(store.size() == 1u);
 
         store.clear();
-        UNSCOPED_INFO("nothing at all");
-        REQUIRE(store.size() == 0u);
-        UNSCOPED_INFO("no files");
-        REQUIRE(store.files().size() == 0u);
+        CHECK(store.size() == 0u);
+        CHECK(store.files().size() == 0u);
         UNSCOPED_INFO("and no count of anything");
-        REQUIRE(store.count(ALXUILint::Severity::Warning) == 0);
+        CHECK(store.count(ALXUILint::Severity::Warning) == 0);
     }
 
     // Every field of a query widens rather than narrows, so one nobody
@@ -153,17 +141,16 @@ namespace
 
         ALXUIFindings::Query all;
         UNSCOPED_INFO("a query nobody filled in");
-        REQUIRE(store.select(all).found.size() == 4u);
+        CHECK(store.select(all).found.size() == 4u);
 
         ALXUIFindings::Query here;
         here.file = "one.xml";
-        UNSCOPED_INFO("one file");
-        REQUIRE(store.select(here).found.size() == 3u);
+        CHECK(store.select(here).found.size() == 3u);
 
         ALXUIFindings::Query loud;
         loud.notes = false;
         UNSCOPED_INFO("without the quiet ones");
-        REQUIRE(store.select(loud).found.size() == 3u);
+        CHECK(store.select(loud).found.size() == 3u);
 
         ALXUIFindings::Query broken;
         broken.warnings = false;
@@ -175,30 +162,29 @@ namespace
 
         ALXUIFindings::Query named;
         named.rule = ALXUILint::ruleName(ALXUILint::Rule::UnknownAttribute);
-        UNSCOPED_INFO("by rule");
-        REQUIRE(store.select(named).found.size() == 2u);
+        CHECK(store.select(named).found.size() == 2u);
 
         ALXUIFindings::Query mendable;
         mendable.fixable = true;
         UNSCOPED_INFO("only the ones that offer something");
-        REQUIRE(store.select(mendable).found.size() == 3u);
+        CHECK(store.select(mendable).found.size() == 3u);
 
         // The filter reads the message, the name at fault, the element and
         // the file, because any of the four is what somebody has in mind.
         ALXUIFindings::Query word;
         word.text = "DYNAMIC";
         UNSCOPED_INFO("a word, whatever case it is typed in");
-        REQUIRE(store.select(word).found.size() == 1u);
+        CHECK(store.select(word).found.size() == 1u);
         word.text = "two";
         UNSCOPED_INFO("or the file it is in");
-        REQUIRE(store.select(word).found.size() == 1u);
+        CHECK(store.select(word).found.size() == 1u);
 
         // Narrowed to nothing is an answer too.
         ALXUIFindings::Query none;
         none.file = "two.xml";
         none.rule = ALXUILint::ruleName(ALXUILint::Rule::FileMissing);
         UNSCOPED_INFO("and nothing is what it says");
-        REQUIRE(store.select(none).found.size() == 0u);
+        CHECK(store.select(none).found.size() == 0u);
     }
 
     // A tree's worth of findings is more rows than any list can hold, so a
@@ -213,7 +199,7 @@ namespace
         capped.limit = 2;
         const ALXUIFindings::Selected selected = store.select(capped);
         UNSCOPED_INFO("as many as were asked for");
-        REQUIRE(selected.found.size() == 2u);
+        CHECK(selected.found.size() == 2u);
         UNSCOPED_INFO("out of how many there are");
         CHECK(selected.total == 4u);
     }
@@ -258,7 +244,6 @@ namespace
         UNSCOPED_INFO("still first of the files");
         CHECK(store.files() == std::vector<std::string>({ "one.xml", "two.xml", "three.xml" }));
         const auto selected = store.select(ALXUIFindings::Query());
-        UNSCOPED_INFO("three findings");
         REQUIRE(selected.found.size() == size_t(3));
         UNSCOPED_INFO("its own first");
         CHECK(selected.found.front()->what == std::string("a"));
@@ -269,6 +254,6 @@ namespace
         UNSCOPED_INFO("at the end");
         CHECK(store.files() == std::vector<std::string>({ "two.xml", "three.xml", "one.xml" }));
         UNSCOPED_INFO("counted once");
-        REQUIRE(store.files().size() == size_t(3));
+        CHECK(store.files().size() == size_t(3));
     }
 }

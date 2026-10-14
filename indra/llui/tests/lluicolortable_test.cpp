@@ -99,7 +99,6 @@ namespace
     // default declares by reference to a name the skin overrides.
     TEST_CASE_METHOD(lluicolortable_data, "lluicolortable: a second skin overrides a name and a reference follows it", "[lluicolortable]")
     {
-        UNSCOPED_INFO("loads");
         CHECK(load({
             "<color name=\"T1Base\" value=\"1 0 0 1\"/>\n"
             "<color name=\"T1Inherited\" value=\"0 1 0 1\"/>\n"
@@ -107,30 +106,19 @@ namespace
             "<color name=\"T1Base\" value=\"0 0 1 1\"/>\n" }));
         const LLUIColorTable& table = LLUIColorTable::instance();
 
-        UNSCOPED_INFO("inherited");
         CHECK(is("T1Inherited", 0, 1, 0));
-        UNSCOPED_INFO("overridden");
         CHECK(is("T1Base", 0, 0, 1));
         UNSCOPED_INFO("the default's reference follows the skin");
         CHECK(is("T1Follows", 0, 0, 1));
-        {
-            INFO("all three exist");
-            CHECK(table.colorExists("T1Base"));
-            CHECK(table.colorExists("T1Inherited"));
-            CHECK(table.colorExists("T1Follows"));
-        }
-        {
-            INFO("and are default");
-            CHECK(table.isDefault("T1Base"));
-            CHECK(table.isDefault("T1Follows"));
-        }
-        UNSCOPED_INFO("an unknown name is the caller's default");
+        CHECK(table.colorExists("T1Base"));
+        CHECK(table.colorExists("T1Inherited"));
+        CHECK(table.colorExists("T1Follows"));
+        CHECK(table.isDefault("T1Base"));
+        CHECK(table.isDefault("T1Follows"));
         CHECK(table.getColor("T1Nope", LLColor4::yellow).get() == LLColor4::yellow);
-        UNSCOPED_INFO("and does not exist");
         CHECK_FALSE(table.colorExists("T1Nope"));
-        UNSCOPED_INFO("the sheet knows both files");
-        REQUIRE(table.getLoadedSheet().files().size() == 2u);
-        UNSCOPED_INFO("and where T1Base came from");
+        CHECK(table.getLoadedSheet().files().size() == 2u);
+        UNSCOPED_INFO("T1Base was last declared in the second file");
         CHECK(table.getLoadedSheet().declarationOf("T1Base")->file == 1);
     }
 
@@ -148,15 +136,11 @@ namespace
             CHECK(a.isReference());
             CHECK(gone.isReference());
         }
-        UNSCOPED_INFO("and reads the first load");
         CHECK(a.get() == LLColor4(1, 0, 0, 1));
 
         load({ "<color name=\"T2A\" value=\"0 0 1 1\"/>\n" });
-        UNSCOPED_INFO("the handle reads the second");
         CHECK(a.get() == LLColor4(0, 0, 1, 1));
-        UNSCOPED_INFO("the dropped name is magenta");
         CHECK(gone.get() == LLColor4::magenta);
-        UNSCOPED_INFO("and still exists");
         CHECK(LLUIColorTable::instance().colorExists("T2Gone"));
     }
 
@@ -174,31 +158,20 @@ namespace
         LLUIColorTable& table = LLUIColorTable::instance();
 
         const LLUIColor a = table.getColor("T3A");
-        UNSCOPED_INFO("the user's colour");
         CHECK(a.get() == LLColor4(0, 0, 1, 1));
-        UNSCOPED_INFO("is not default");
         CHECK_FALSE(table.isDefault("T3A"));
         UNSCOPED_INFO("a user reference to a user colour");
         CHECK(is("T3B", 0, 0, 1));
         UNSCOPED_INFO("a user reference to a loaded colour");
         CHECK(is("T3C", 0, 1, 0));
-        {
-            INFO("both in the user table");
-            CHECK(has(table.getUserColors(), "T3B"));
-            CHECK(has(table.getUserColors(), "T3C"));
-        }
-        {
-            INFO("neither in the loaded one");
-            CHECK_FALSE(has(table.getLoadedColors(), "T3B"));
-            CHECK_FALSE(has(table.getLoadedColors(), "T3C"));
-        }
-        UNSCOPED_INFO("the user sheet says nothing");
-        REQUIRE(table.getUserSheet().diagnostics().empty());
+        CHECK(has(table.getUserColors(), "T3B"));
+        CHECK(has(table.getUserColors(), "T3C"));
+        CHECK_FALSE(has(table.getLoadedColors(), "T3B"));
+        CHECK_FALSE(has(table.getLoadedColors(), "T3C"));
+        CHECK(table.getUserSheet().diagnostics().empty());
 
         table.resetToDefault("T3A");
-        UNSCOPED_INFO("reset to the loaded colour");
         CHECK(a.get() == LLColor4(1, 0, 0, 1));
-        UNSCOPED_INFO("which is default again");
         CHECK(table.isDefault("T3A"));
     }
 
@@ -217,15 +190,11 @@ namespace
         const LLUIColor a = table.getColor("T4A");
         table.setColor("T4A", LLColor4(0.5f, 0.25f, 0.f, 1.f));
         table.setColor("ColorPaletteEntry99", LLColor4(1, 1, 1, 1));
-        UNSCOPED_INFO("the handle reads the user's colour");
         CHECK(a.get() == LLColor4(0.5f, 0.25f, 0.f, 1.f));
-        UNSCOPED_INFO("which is not default");
         CHECK_FALSE(table.isDefault("T4A"));
-        UNSCOPED_INFO("the loaded colour is kept aside");
         CHECK(table.getLoadedColors().find("T4A")->second.get() == LLColor4(1, 0, 0, 1));
 
         const std::string text = written();
-        UNSCOPED_INFO("the changed colour is written");
         CHECK_THAT(text, Catch::Matchers::ContainsSubstring("name=\"T4A\""));
         UNSCOPED_INFO("as the old writer wrote it");
         CHECK_THAT(text, Catch::Matchers::ContainsSubstring("value=\"0.5 0.25 0 1\""));
@@ -233,20 +202,18 @@ namespace
         CHECK_THAT(text, !Catch::Matchers::ContainsSubstring("T4Same"));
         UNSCOPED_INFO("scrub keeps the palette");
         CHECK_THAT(written(true), Catch::Matchers::ContainsSubstring("ColorPaletteEntry99"));
-        UNSCOPED_INFO("and nothing else");
+        UNSCOPED_INFO("scrub drops the rest");
         CHECK_THAT(written(true), !Catch::Matchers::ContainsSubstring("T4A"));
 
         LLXMLNodePtr round_trip;
-        UNSCOPED_INFO("what was written parses");
         REQUIRE(LLXMLNode::parseBuffer(text.data(), text.size(), round_trip));
         load({ "<color name=\"T4A\" value=\"1 0 0 1\"/>\n" });
         UNSCOPED_INFO("a reload without the user document keeps the runtime colour");
         CHECK(a.get() == LLColor4(0.5f, 0.25f, 0.f, 1.f));
         std::vector<LLUIColorTable::document_t> documents = { { parse("<color name=\"T4A\" value=\"1 0 0 1\"/>\n"), "skin0.xml" } };
         table.load(documents, round_trip, "user.xml");
-        UNSCOPED_INFO("and the written document reproduces it");
+        UNSCOPED_INFO("the written document reproduces it");
         CHECK(a.get() == LLColor4(0.5f, 0.25f, 0.f, 1.f));
-        UNSCOPED_INFO("in the user table");
         CHECK(table.getUserColors().find("T4A")->second.get() == LLColor4(0.5f, 0.25f, 0.f, 1.f));
     }
 
@@ -265,15 +232,14 @@ namespace
 
         UNSCOPED_INFO("one good file is a load");
         CHECK(table.load(documents, nullptr, "user.xml"));
-        UNSCOPED_INFO("its colours are in");
         CHECK(is("T5A", 1, 0, 0));
-        UNSCOPED_INFO("and its fault is on record");
-        REQUIRE(table.getLoadedSheet().diagnostics().size() == 1u);
-        UNSCOPED_INFO("one file was read");
-        REQUIRE(table.getLoadedSheet().files().size() == 1u);
+        UNSCOPED_INFO("T5Bad's value is on record");
+        CHECK(table.getLoadedSheet().diagnostics().size() == 1u);
+        UNSCOPED_INFO("the wrong file was not read");
+        CHECK(table.getLoadedSheet().files().size() == 1u);
 
         documents.erase(documents.begin());
-        UNSCOPED_INFO("no good file is not");
+        UNSCOPED_INFO("no good file is not a load");
         CHECK_FALSE(table.load(documents, nullptr, "user.xml"));
     }
 
@@ -283,42 +249,30 @@ namespace
     // away with it, its handles reading magenta until it is set again.
     TEST_CASE_METHOD(lluicolortable_data, "lluicolortable: resetToDefault removes the user's entry and every handle follows", "[lluicolortable]")
     {
-        UNSCOPED_INFO("loads");
         CHECK(load({ "<color name=\"T6Base\" value=\"1 0 0 1\"/>" }));
         auto& table = LLUIColorTable::instance();
         const LLUIColor before = table.getColor("T6Base");
         table.setColor("T6Base", LLColor4::blue);
         const LLUIColor during = table.getColor("T6Base");
         table.resetToDefault("T6Base");
-        UNSCOPED_INFO("reset removes the override");
         CHECK_FALSE(has(table.getUserColors(), "T6Base"));
-        {
-            INFO("old handles read the default");
-            CHECK(before.get() == LLColor4::red);
-            CHECK(during.get() == LLColor4::red);
-        }
+        CHECK(before.get() == LLColor4::red);
+        CHECK(during.get() == LLColor4::red);
         table.setColor("T6Base", LLColor4::green);
-        {
-            INFO("both handles follow another edit");
-            CHECK(before.get() == LLColor4::green);
-            CHECK(during.get() == LLColor4::green);
-        }
+        CHECK(before.get() == LLColor4::green);
+        CHECK(during.get() == LLColor4::green);
         table.resetToDefault("T6Base");
         table.setColor("T6New", LLColor4::blue);
         const LLUIColor added = table.getColor("T6New");
         table.resetToDefault("T6New");
-        UNSCOPED_INFO("reset removes a new user colour too");
         CHECK_FALSE(has(table.getUserColors(), "T6New"));
         UNSCOPED_INFO("the removed colour's handle stays valid");
         CHECK(added.get() == LLColor4::magenta);
-        UNSCOPED_INFO("the removed name no longer exists");
         CHECK_FALSE(table.colorExists("T6New"));
-        UNSCOPED_INFO("fresh lookups use the supplied fallback");
         CHECK(table.getColor("T6New", LLColor4::yellow).get() == LLColor4::yellow);
-        UNSCOPED_INFO("the removed colour is not saved");
         CHECK_THAT(written(), !Catch::Matchers::ContainsSubstring("T6New"));
         table.setColor("T6New", LLColor4::green);
-        UNSCOPED_INFO("redo updates the existing handle");
+        UNSCOPED_INFO("set again, the old handle reads it");
         CHECK(added.get() == LLColor4::green);
     }
 
@@ -327,7 +281,6 @@ namespace
     // goes back with it; a colour the user set for itself does not.
     TEST_CASE_METHOD(lluicolortable_data, "lluicolortable: a skin reference follows its target as the user sets and resets it", "[lluicolortable]")
     {
-        UNSCOPED_INFO("loads");
         CHECK(load({ "<color name=\"T7Accent\" value=\"1 0 0 1\"/>\n"
                                "<color name=\"T7Link\" reference=\"T7Accent\"/>\n"
                                "<color name=\"T7Chain\" reference=\"T7Link\"/>\n"
@@ -338,18 +291,13 @@ namespace
 
         table.setColor("T7Own", LLColor4::green);
         table.setColor("T7Accent", LLColor4::blue);
-        UNSCOPED_INFO("a reference follows the accent it names");
         CHECK(link.get() == LLColor4::blue);
-        UNSCOPED_INFO("and a reference to that reference");
         CHECK(chain.get() == LLColor4::blue);
         UNSCOPED_INFO("a colour the user set keeps it");
         CHECK(is("T7Own", 0, 1, 0));
-        {
-            INFO("the references stay default");
-            CHECK(table.isDefault("T7Link"));
-            CHECK(table.isDefault("T7Chain"));
-        }
-        UNSCOPED_INFO("and are not written as the user's");
+        CHECK(table.isDefault("T7Link"));
+        CHECK(table.isDefault("T7Chain"));
+        UNSCOPED_INFO("references are not written as the user's");
         CHECK_THAT(written(), !Catch::Matchers::ContainsSubstring("T7Link"));
 
         table.setColor("T7Link", LLColor4::yellow);
@@ -359,13 +307,9 @@ namespace
         UNSCOPED_INFO("and follows the accent again once that is reset");
         CHECK(chain.get() == LLColor4::blue);
         table.resetToDefault("T7Accent");
-        {
-            INFO("resetting the accent takes its references back");
-            CHECK(link.get() == LLColor4::red);
-            CHECK(chain.get() == LLColor4::red);
-        }
+        CHECK(link.get() == LLColor4::red);
+        CHECK(chain.get() == LLColor4::red);
 
-        UNSCOPED_INFO("loads with a user accent");
         CHECK(load({ "<color name=\"T7Accent\" value=\"1 0 0 1\"/>\n"
                                                    "<color name=\"T7Link\" reference=\"T7Accent\"/>\n" },
                                                  "<color name=\"T7Accent\" value=\"0 0 1 1\"/>\n"));
@@ -376,7 +320,6 @@ namespace
     // The generation moves with every change and not otherwise.
     TEST_CASE_METHOD(lluicolortable_data, "lluicolortable: the generation moves with every change and not otherwise", "[lluicolortable]")
     {
-        UNSCOPED_INFO("loads");
         CHECK(load({ "<color name=\"T8Base\" value=\"1 0 0 1\"/>" }));
         auto& table = LLUIColorTable::instance();
         const U32 loaded = table.generation();
@@ -384,11 +327,9 @@ namespace
         UNSCOPED_INFO("putting back what was never set moves nothing");
         CHECK(table.generation() == loaded);
         table.setColor("T8Base", LLColor4::blue);
-        UNSCOPED_INFO("a change moves it");
         CHECK(table.generation() > loaded);
         const U32 set = table.generation();
         table.resetToDefault("T8Base");
-        UNSCOPED_INFO("and so does putting it back");
         CHECK(table.generation() > set);
     }
 }

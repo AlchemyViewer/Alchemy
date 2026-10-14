@@ -64,16 +64,12 @@ namespace
         table_t          table = numbered(6);
         const std::string* data = &table[0];
         const auto       done  = table.apply(2, 3, 2, 6, "x");
-        UNSCOPED_INFO("in place");
         CHECK(joined(table) == std::string("0,1,x,x,4,5"));
-        UNSCOPED_INFO("nothing moved");
+        UNSCOPED_INFO("the rows' storage did not move");
         CHECK(&table[0] == data);
-        {
-            INFO("said");
-            CHECK(done.first == 2);
-            REQUIRE(done.count == 2);
-            CHECK(done.made == 2);
-        }
+        CHECK(done.first == 2);
+        CHECK(done.count == 2);
+        CHECK(done.made == 2);
         table.apply(4, 4, 1, 6, "t");
         UNSCOPED_INFO("a line typed in");
         CHECK(joined(table) == std::string("0,1,x,x,t,5"));
@@ -122,6 +118,8 @@ namespace
         CHECK(joined(table) == std::string("z,c,3"));
     }
 
+    // A line broken or joined where the last one was moves no row below it;
+    // one further down moves only the rows between.
     TEST_CASE_METHOD(allinetable_data, "allinetable: a line broken or joined where the last one was moves no row below", "[allinetable]")
     {
         table_t table = numbered(1000);
@@ -142,8 +140,7 @@ namespace
         CHECK(table[600] == std::string("599"));
         UNSCOPED_INFO("and those after");
         CHECK(table[702] == std::string("700"));
-        UNSCOPED_INFO("the count");
-        REQUIRE(table.size() == size_t(1002));
+        CHECK(table.size() == size_t(1002));
     }
 
     TEST_CASE_METHOD(allinetable_data, "allinetable: random edits of every size leave the rows a plain vector would hold", "[allinetable]")
@@ -223,11 +220,11 @@ namespace
                 table.push_back(fill);
                 plain.push_back(fill);
             }
-            UNSCOPED_INFO("as many");
+            CAPTURE(step);
             REQUIRE(table.size() == plain.size());
             if (std::vector<std::string>(table.begin(), table.end()) != plain)
             {
-                UNSCOPED_INFO(("the same at step " + std::to_string(step)).c_str());
+                UNSCOPED_INFO("the rows differ from the plain vector's");
                 REQUIRE(false);
             }
         }

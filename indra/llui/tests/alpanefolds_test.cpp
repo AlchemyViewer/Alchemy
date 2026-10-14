@@ -131,11 +131,9 @@ namespace
         UNSCOPED_INFO("the side is open");
         CHECK_FALSE(folds.collapsed("side"));
         folds.toggle("side");
-        UNSCOPED_INFO("and folds");
         CHECK(folds.collapsed("side"));
-        UNSCOPED_INFO("and its button says so");
+        UNSCOPED_INFO("its button says it is folded");
         CHECK_FALSE(w.fold->getToggleState());
-        UNSCOPED_INFO("it has a size");
         CHECK(folds.dim("side") == 200);
 
         UNSCOPED_INFO("the page is never folded");
@@ -143,7 +141,6 @@ namespace
         folds.toggle("page");
         UNSCOPED_INFO("nor can it be");
         CHECK_FALSE(folds.collapsed("page"));
-        UNSCOPED_INFO("and has no size");
         CHECK(folds.dim("page") == 0);
         w.floater->die();
     }
@@ -163,10 +160,9 @@ namespace
         {
             INFO("home to start");
             CHECK_FALSE(folds.out("page"));
-            REQUIRE(folds.window("page") == nullptr);
+            CHECK(folds.window("page") == nullptr);
         }
         folds.toggleOut("page");
-        UNSCOPED_INFO("out");
         CHECK(folds.out("page"));
         LLFloater* window = folds.window("page");
         {
@@ -213,17 +209,17 @@ namespace
             window->setRect(LLRect(700, 500, 1000, 300));
             folds.save(state);
             UNSCOPED_INFO("the side's fold is written");
-            REQUIRE(state.has("fold_side"));
+            CHECK(state.has("fold_side"));
             UNSCOPED_INFO("and its size");
-            REQUIRE(state.has("dim_side"));
+            CHECK(state.has("dim_side"));
             UNSCOPED_INFO("the page has no fold to write");
-            REQUIRE_FALSE(state.has("fold_page"));
+            CHECK_FALSE(state.has("fold_page"));
             UNSCOPED_INFO("nor a size");
-            REQUIRE_FALSE(state.has("dim_page"));
+            CHECK_FALSE(state.has("dim_page"));
             UNSCOPED_INFO("but it is written as out");
             CHECK(state["out_page"].asBoolean());
             UNSCOPED_INFO("with its window's rect");
-            REQUIRE(state.has("rect_page"));
+            CHECK(state.has("rect_page"));
             w.floater->die();
         }
         {
@@ -234,7 +230,6 @@ namespace
             UNSCOPED_INFO("read back, the page is out again");
             CHECK(folds.out("page"));
             LLFloater* window = folds.window("page");
-            UNSCOPED_INFO("in a window");
             REQUIRE(window != nullptr);
             UNSCOPED_INFO("as wide as it was");
             CHECK(window->getRect().getWidth() == 300);
@@ -258,7 +253,6 @@ namespace
         folds.bind(w.floater, panes());
 
         folds.toggleOut("side");
-        UNSCOPED_INFO("out");
         CHECK(folds.out("side"));
         UNSCOPED_INFO("the room it left is folded");
         CHECK(w.side->isCollapsed());
@@ -311,10 +305,8 @@ namespace
 
         folds.toggleOut("page");
         LLFloater* window = folds.window("page");
-        UNSCOPED_INFO("in a window");
         REQUIRE(window != nullptr);
         window->closeFloater(true);
-        UNSCOPED_INFO("home");
         CHECK_FALSE(folds.out("page"));
 
         LLSD state;
@@ -355,11 +347,8 @@ namespace
         gFloaterView->addChild(w.floater);
         w.floater->setVisible(true);
 
-        UNSCOPED_INFO("nothing is not");
         CHECK_FALSE(ALPaneFolds::inSight(nullptr));
-        UNSCOPED_INFO("in the page");
         CHECK(ALPaneFolds::inSight(w.in_page));
-        UNSCOPED_INFO("in the side");
         CHECK(ALPaneFolds::inSight(in_side));
         folds.toggle("side");
         {
@@ -380,7 +369,6 @@ namespace
         UNSCOPED_INFO("folded at home: not");
         CHECK_FALSE(ALPaneFolds::inSight(in_side));
         folds.setCollapsed("side", false);
-        UNSCOPED_INFO("unfolded");
         CHECK(ALPaneFolds::inSight(in_side));
 
         w.page->setVisible(false);
@@ -394,7 +382,6 @@ namespace
             CHECK_FALSE(ALPaneFolds::inSight(in_side));
         }
         w.floater->setMinimized(false);
-        UNSCOPED_INFO("restored");
         CHECK(ALPaneFolds::inSight(w.in_page));
         w.floater->setVisible(false);
         UNSCOPED_INFO("the window hidden: not");
@@ -414,12 +401,10 @@ namespace
         ALPaneFolds folds;
         folds.bind(w.floater, panes());
         const std::vector<S32> was = folds.dims();
-        UNSCOPED_INFO("the sizes they are");
         CHECK(folds.dimsAre(was));
         folds.setDim("side", 240);
         UNSCOPED_INFO("not after one changes");
         CHECK_FALSE(folds.dimsAre(was));
-        UNSCOPED_INFO("the sizes they are now");
         CHECK(folds.dimsAre(folds.dims()));
         UNSCOPED_INFO("nor fewer sizes than regions");
         CHECK_FALSE(folds.dimsAre({}));
