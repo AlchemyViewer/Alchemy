@@ -9283,8 +9283,23 @@ class LLToolsShowHiddenSelection : public view_listener_t
     }
 };
 
+// Whether the selection's outlines or its wireframe are drawn: the options they share apply only then.
+static bool selection_lines_shown()
+{
+    return gSavedSettings.getBOOL("RenderHighlightSelections") || gSavedSettings.getBOOL("AlchemySelectionWireframe");
+}
+
+class LLToolsEnableSelectionOutlineOptions : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return selection_lines_shown();
+    }
+};
+
 // Outline Whole Faces: checked where whole faces are outlined, which Highlight Transparent makes them; enabled where
-// the setting decides it, which RLVa's Highlight Transparent restriction and Highlight Transparent itself take away.
+// the setting decides it, which RLVa's Highlight Transparent restriction and Highlight Transparent itself take away,
+// and while there are lines for it to shape.
 class LLToolsCheckOutlineWholeFaces : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -9298,11 +9313,12 @@ class LLToolsEnableOutlineWholeFaces : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        return !LLDrawPoolAlpha::sShowDebugAlpha && RlvActions::canHighlightTransparent();
+        return !LLDrawPoolAlpha::sShowDebugAlpha && RlvActions::canHighlightTransparent() && selection_lines_shown();
     }
 };
 
-// The Selection Outline menu's widths: the contour's, with the narrower one beside the wireframe that goes with it.
+// The Selection Outline Options menu's widths: the contour's, with the narrower one beside the wireframe that goes
+// with it.
 class LLToolsSelectionOutlineWidth : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -9323,7 +9339,7 @@ class LLToolsCheckSelectionOutlineWidth : public view_listener_t
     }
 };
 
-// The Selection Outline menu's contrast (ALSelectionOutline::EContrast).
+// The Selection Outline Options menu's contrast (ALSelectionOutline::EContrast).
 class LLToolsSelectionOutlineContrast : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -9341,7 +9357,7 @@ class LLToolsCheckSelectionOutlineContrast : public view_listener_t
     }
 };
 
-// The Selection Outline menu's wireframe widths.
+// The Selection Outline Options menu's wireframe widths.
 class LLToolsSelectionWireframeWidth : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -10692,6 +10708,7 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToolsShowHiddenSelection(), "Tools.ShowHiddenSelection");
     view_listener_t::addMenu(new LLToolsCheckOutlineWholeFaces(), "Tools.CheckOutlineWholeFaces");
     view_listener_t::addMenu(new LLToolsEnableOutlineWholeFaces(), "Tools.EnableOutlineWholeFaces");
+    view_listener_t::addMenu(new LLToolsEnableSelectionOutlineOptions(), "Tools.EnableSelectionOutlineOptions");
     view_listener_t::addMenu(new LLToolsSelectionOutlineWidth(), "Tools.SelectionOutlineWidth");
     view_listener_t::addMenu(new LLToolsCheckSelectionOutlineWidth(), "Tools.CheckSelectionOutlineWidth");
     view_listener_t::addMenu(new LLToolsSelectionOutlineContrast(), "Tools.SelectionOutlineContrast");
