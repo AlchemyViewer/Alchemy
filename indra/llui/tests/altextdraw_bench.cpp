@@ -25,75 +25,64 @@
 // What the script studio's editor costs to draw, a frame at a time, over a
 // script of 50,000 lines, LSL and SLua side by side: the code editor as the
 // studio makes it, drawn into llrender's hidden window with the viewer's GL.
-// A number is the CPU's milliseconds per frame: the median of five samples,
-// each as many frames as fit in fifty milliseconds. What is counted of a
-// frame is the editor's draw and the batch flushed, which is everything
-// the viewer's thread does for it, the driver's work on each draw call
-// included; the GPU is waited for between frames, off the clock, so that
-// nothing queues up across them and what it takes to draw is not counted.
+// Each benchmark is one frame, named for its language, and its time is the
+// CPU's; Catch2 reports the mean of its samples and the interval around it.
+// What is counted of a frame is the editor's draw and the batch flushed,
+// which is everything the viewer's thread does for it, the driver's work on
+// each draw call included; the GPU is waited for between frames, off the
+// clock, so that nothing queues up across them and what it takes to draw is
+// not counted.
 //
 // Nothing here changes between frames, so every row is an idle frame: what
 // the editor spends redrawing what it drew the frame before. The output is a
 // table, read against the same row from another build on the same quiet
-// machine. An unoptimised build, or one with no GL, exits 125, which CTest
-// reads as skipped.
+// machine.
 
 #include "linden_common.h"
 
 #include "llglheaders.h"
 
-#include "../../llrender/tests/llheadlessgl_fixture.h"
+#include "aluigl_fixture.h"
 
 #include "alcodeeditor.h"
 
 #include "alheadlessui_fixture.h"
 #include "albigscript.h"
+#include "altestbenchmark.h"
 
 #include "../lluictrlfactory.h"
 
-#include <algorithm>
-#include <chrono>
 #include <cstdio>
-#include <functional>
 #include <list>
-#include <memory>
 #include <string>
+#include <vector>
 
-#if defined(LL_RELEASE)
 namespace
 {
-    using clock = std::chrono::steady_clock;
-
     constexpr int LINES = 50000;
 
-    // Milliseconds per call of `frame`, which says how long its own part
-    // took.
-    double ms_per_frame(const std::function<double()>& frame)
+    // The scripts, made once for every case of a run.
+    struct Scripts
     {
-        frame();
-        double samples[5];
-        for (double& sample : samples)
-        {
-            size_t     frames  = 0;
-            double     counted = 0.0;
-            const auto start   = clock::now();
-            do
-            {
-                counted += frame();
-                ++frames;
-            } while (clock::now() - start < std::chrono::milliseconds(50));
-            sample = counted / double(frames);
-        }
-        std::sort(samples, samples + 5);
-        return samples[2];
+        std::string lsl  = ll_test::bigLSL(LINES);
+        std::string slua = ll_test::bigSLua(LINES);
+    };
+
+    const Scripts& scripts()
+    {
+        static const Scripts made;
+        return made;
     }
 
     struct Subject
     {
-        const char*   name;
-        const char*   syntax;
-        std::string   text;
-        ALCodeEditor* editor = nullptr;
+        const char*        name;
+        const char*        syntax;
+        // The column its numbers were read under, which ends each
+        // benchmark's name.
+        const char*        language;
+        const std::string& text;
+        ALCodeEditor*      editor = nullptr;
     };
 
     ALCodeEditor* makeEditor(const Subject& s)
@@ -109,21 +98,62 @@ namespace
         return editor;
     }
 
-    // The draw and the batch handed over, on the clock; then the GPU
-    // waited for.
-    double drawFrame(ALCodeEditor& e)
+    // Both languages' editors, made for a case in the binary's shared
+    // context, whose UI puts the fonts' glyphs in its textures, and dying
+    // when the case ends however it ends.
+    struct Editors
     {
-        const auto start = clock::now();
-        e.draw();
-        gGL.flush();
-        const double ms = std::chrono::duration<double, std::milli>(clock::now() - start).count();
-        glFinish();
-        return ms;
-    }
+        Subject subjects[2] = {
+            { "lsl", "lsl", "LSL", scripts().lsl },
+            { "slua", "slua", "SLua", scripts().slua },
+        };
 
-    void row(const char* name, double lsl, double slua)
+        Editors()
+        {
+            ll_test::uiGL();
+            ll_test::installWhiteTexture();
+            if (!ll_test::HeadlessUI::get(/*gl_textures=*/true).ok())
+            {
+                SKIP("no UI, since LLUI_TEST_APP_DIR does not point at the source tree");
+            }
+            for (Subject& s : subjects)
+            {
+                s.editor = makeEditor(s);
+            }
+        }
+
+        ~Editors()
+        {
+            for (Subject& s : subjects)
+            {
+                s.editor->die();
+            }
+        }
+
+        Subject* begin() { return subjects; }
+        Subject* end() { return subjects + 2; }
+    };
+
+    // A frame of each language's editor, once `setup` has made it what the
+    // row draws: the draw and the batch handed over, on the clock; then the
+    // GPU waited for. A frame is one run of a sample, so the wait is between
+    // every two.
+    template <class Setup>
+    void both(const char* name, Editors& editors, Setup&& setup)
     {
-        std::printf("  %-52s %10.3f %10.3f\n", name, lsl, slua);
+        for (Subject& s : editors)
+        {
+            ALCodeEditor& e = *s.editor;
+            setup(e);
+            BENCHMARK_ADVANCED(std::string(name) + ", " + s.language)(Catch::Benchmark::Chronometer meter)
+            {
+                meter.measure([&] {
+                    e.draw();
+                    gGL.flush();
+                });
+                glFinish();
+            };
+        }
     }
 
     // How many draw calls a frame makes: each flush of the batch the
@@ -139,30 +169,23 @@ namespace
         return capture.size();
     }
 
+    // A table of counts, under its heading and the languages' columns.
+    void countHeading(const char* heading)
+    {
+        std::printf("\n%s\n  %-52s %10s %10s\n", heading, "", "LSL", "SLua");
+    }
+
     template <class Setup>
-    void countBoth(const char* name, Subject (&subjects)[2], Setup&& setup)
+    void countBoth(const char* name, Editors& editors, Setup&& setup)
     {
         size_t counts[2];
         for (int i = 0; i < 2; ++i)
         {
-            ALCodeEditor& e = *subjects[i].editor;
+            ALCodeEditor& e = *editors.subjects[i].editor;
             setup(e);
             counts[i] = drawCalls(e);
         }
         std::printf("  %-52s %10zu %10zu\n", name, counts[0], counts[1]);
-    }
-
-    template <class Setup>
-    void both(const char* name, Subject (&subjects)[2], Setup&& setup)
-    {
-        double ms[2];
-        for (int i = 0; i < 2; ++i)
-        {
-            ALCodeEditor& e = *subjects[i].editor;
-            setup(e);
-            ms[i] = ms_per_frame([&] { return drawFrame(e); });
-        }
-        row(name, ms[0], ms[1]);
     }
 
     // Every place a word is written, as a whole word or not.
@@ -202,105 +225,67 @@ namespace
         }
         return out;
     }
-}
-#endif // LL_RELEASE
 
-int main(int, char**)
-{
-#if !defined(LL_RELEASE)
-    std::printf("Skipped: an unoptimised build has no numbers worth reading\n");
-    return 125;
-#else
-    // The context first: the fonts put their glyphs in its textures.
-    std::unique_ptr<ll_test::HeadlessGL> gl;
-    try
+    TEST_CASE("altextdraw_bench: an idle frame at the top", "[altextdraw_bench][!benchmark]")
     {
-        gl = std::make_unique<ll_test::HeadlessGL>(true, true, true, /*needs_render=*/true);
-        ll_test::installWhiteTexture();
-    }
-    catch (const std::exception& e)
-    {
-        std::printf("Skipped: no GL (%s)\n", e.what());
-        return 125;
-    }
-    ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
-    if (!ui.ok())
-    {
-        std::printf("Skipped: no UI, since LLUI_TEST_APP_DIR does not point at the source tree\n");
-        return 125;
-    }
-
-    Subject subjects[2] = {
-        { "lsl", "lsl", ll_test::bigLSL(LINES), nullptr },
-        { "slua", "slua", ll_test::bigSLua(LINES), nullptr },
-    };
-    for (Subject& s : subjects)
-    {
-        s.editor = makeEditor(s);
-    }
-
-    std::printf("altextdraw_bench: the code editor drawn, 1000 x 800, over generated scripts (ms per frame)\n");
-    std::printf("\n  %-52s %10s %10s\n", "", "LSL", "SLua");
-
-    std::printf("\nAn idle frame at the top\n");
-    both("plain", subjects, [](ALCodeEditor&) {});
-    both("a squiggle under every line", subjects, [](ALCodeEditor& e) { e.setDecorations(squiggleEveryLine(e)); });
-    both("  and every \"total\" lit", subjects, [](ALCodeEditor& e) { e.setHighlights(ALCodeEditor::Highlight::Search, placesOf(e, "total")); });
-    for (Subject& s : subjects)
-    {
-        s.editor->setDecorations({});
-        s.editor->clearHighlights();
-    }
-    both("with the map beside the text", subjects, [](ALCodeEditor& e) { e.setScrollMap(true); });
-    for (Subject& s : subjects)
-    {
-        s.editor->setScrollMap(false);
+        ll_test::skipUnlessOptimised();
+        Editors editors;
+        both("plain", editors, [](ALCodeEditor&) {});
+        both("a squiggle under every line", editors, [](ALCodeEditor& e) { e.setDecorations(squiggleEveryLine(e)); });
+        both("a squiggle under every line and every \"total\" lit", editors,
+             [](ALCodeEditor& e) { e.setHighlights(ALCodeEditor::Highlight::Search, placesOf(e, "total")); });
+        for (Subject& s : editors)
+        {
+            s.editor->setDecorations({});
+            s.editor->clearHighlights();
+        }
+        both("with the map beside the text", editors, [](ALCodeEditor& e) { e.setScrollMap(true); });
     }
 
     // A line of 20,000 characters near the top, as generated code or a list
     // written out at length has: scrolled across to its middle, then
     // wrapped, which makes it every row in sight.
-    std::printf("\nA line of 20,000 characters near the top\n");
+    TEST_CASE("altextdraw_bench: a line of twenty thousand characters near the top", "[altextdraw_bench][!benchmark]")
     {
+        ll_test::skipUnlessOptimised();
+        Editors     editors;
         std::string long_line;
         while (long_line.size() < 20000)
         {
             long_line += "value = f(x, [y, z]) + ";
         }
-        for (Subject& s : subjects)
+        for (Subject& s : editors)
         {
             s.editor->setCaret(ALTextPos(2, 0));
             s.editor->insertText(long_line + "\n");
         }
-        both("scrolled across to its middle", subjects, [](ALCodeEditor& e) { e.setScrollX(e.layout().line(2).width * 0.5f); });
-        both("wrapped", subjects, [](ALCodeEditor& e) {
+        both("scrolled across to its middle", editors, [](ALCodeEditor& e) { e.setScrollX(e.layout().line(2).width * 0.5f); });
+        both("wrapped", editors, [](ALCodeEditor& e) {
             e.setScrollX(0.f);
             e.setWordWrap(true);
         });
-        countBoth("  draw calls", subjects, [](ALCodeEditor&) {});
-        for (Subject& s : subjects)
+
+        countHeading("A line of 20,000 characters near the top");
+        countBoth("draw calls, wrapped", editors, [](ALCodeEditor&) {});
+        std::fflush(stdout);
+    }
+
+    // Each after a frame drawn plain, as an editor in sight has been.
+    TEST_CASE("altextdraw_bench: draw calls a frame", "[altextdraw_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        Editors editors;
+        for (Subject& s : editors)
         {
-            s.editor->setWordWrap(false);
-            s.editor->deleteRange(ALTextRange(ALTextPos(2, 0), ALTextPos(3, 0)));
+            drawCalls(*s.editor);
         }
+        countHeading("Draw calls a frame");
+        countBoth("plain", editors, [](ALCodeEditor&) {});
+        countBoth("a squiggle under every line", editors, [](ALCodeEditor& e) { e.setDecorations(squiggleEveryLine(e)); });
+        countBoth("the map beside the text", editors, [](ALCodeEditor& e) {
+            e.setDecorations({});
+            e.setScrollMap(true);
+        });
+        std::fflush(stdout);
     }
-
-    std::printf("\nDraw calls a frame\n");
-    countBoth("plain", subjects, [](ALCodeEditor&) {});
-    countBoth("a squiggle under every line", subjects, [](ALCodeEditor& e) { e.setDecorations(squiggleEveryLine(e)); });
-    countBoth("the map beside the text", subjects, [](ALCodeEditor& e) {
-        e.setDecorations({});
-        e.setScrollMap(true);
-    });
-    for (Subject& s : subjects)
-    {
-        s.editor->setScrollMap(false);
-    }
-
-    for (Subject& s : subjects)
-    {
-        delete s.editor;
-    }
-    return 0;
-#endif
 }
