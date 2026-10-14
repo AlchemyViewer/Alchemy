@@ -67,7 +67,7 @@
 #define INVALID_DATE_DAY                            "2003-04-35T22:59:59Z"
 #endif
 
-namespace tut
+namespace
 {
     // Compile-time verification that LLDate's default ctor, accessors, and
     // comparison operators are constexpr.

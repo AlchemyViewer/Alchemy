@@ -554,9 +554,9 @@ private:
 } // anonymous namespace
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct llprocess_data
     {
@@ -2086,4 +2086,4 @@ namespace tut
         // its own and overwritten the file with 'bad'.
         CHECK(readfile(out.getPath()) == "ok");
     }
-} // namespace tut
+} // anonymous namespace

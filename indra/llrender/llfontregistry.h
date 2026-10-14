@@ -43,10 +43,10 @@ class LLFontGL;
 class LLFontFreetype;
 
 // Forward-declare the test fixtures so LLFontRegistry's friend declarations
-// can reference them. Defined inside namespace tut by
-// indra/llrender/tests/llfontregistry_test.cpp.
-namespace tut { struct llfontregistry_data; }
-namespace tut { struct llfontregistry_gl_data; }
+// can reference them. Defined in namespace ll_test by
+// indra/llrender/tests/llfontregistry_test.cpp and llfontregistry_gl_test.cpp.
+namespace ll_test { struct llfontregistry_data; }
+namespace ll_test { struct llfontregistry_gl_data; }
 
 typedef std::vector<std::string> string_vec_t;
 
@@ -183,13 +183,12 @@ public:
     // Test fixture in indra/llrender/tests/llfontregistry_test.cpp drives
     // resolveFontReferences / applyFamilyOverrides directly so the resolver
     // unit tests don't have to set up gDirUtilp + a temp skin tree just to
-    // reach parseFontInfo. Lives in `namespace tut`, where TUT requires
-    // the fixture struct.
-    friend struct ::tut::llfontregistry_data;
+    // reach parseFontInfo.
+    friend struct ::ll_test::llfontregistry_data;
     // GL-fixture sibling: needs the same private-member access to drive
     // simulateReload-style state wipes in tests that exercise actual
     // freetype loading + size-change reloads.
-    friend struct ::tut::llfontregistry_gl_data;
+    friend struct ::ll_test::llfontregistry_gl_data;
     // create_gl_textures - set to false for test apps with no OpenGL window,
     // such as llui_libtest
     LLFontRegistry(bool create_gl_textures);

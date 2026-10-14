@@ -850,7 +850,7 @@ namespace
 }
 
 /*
-namespace tut
+namespace
 {
     struct double_construct
     {

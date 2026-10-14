@@ -56,7 +56,7 @@
 typedef std::function<void(const LLSD& data, std::ostream& str)> FormatterFunction;
 typedef std::function<bool(std::istream& istr, LLSD& data, llssize max_bytes)> ParserFunction;
 
-namespace tut
+namespace
 {
     // helper for TestPythonCompatible
     static std::string import_llsd("import os.path\n"

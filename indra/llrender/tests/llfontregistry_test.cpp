@@ -50,7 +50,7 @@
 // gDirUtilp + a temp skin tree just to reach parseFontInfo.
 bool init_from_xml(LLFontRegistry* registry, LLPointer<LLXMLNode> node);
 
-namespace tut
+namespace ll_test
 {
     // No FreeType/GL needed for any test in this file; the registry's only
     // construction-time side-effect is caching LLWindow's dynamic fallback
