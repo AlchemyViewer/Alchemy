@@ -26,14 +26,16 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 #include "../alterrainsurfacemaps.h"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alterrainsurfacemaps_data
     {
@@ -54,148 +56,186 @@ namespace tut
         }
     };
 
-    typedef test_group<alterrainsurfacemaps_data> alterrainsurfacemaps_test;
-    typedef alterrainsurfacemaps_test::object     alterrainsurfacemaps_object;
-    tut::alterrainsurfacemaps_test alterrainsurfacemaps_testcase("ALTerrainSurfaceMaps");
-
     // fill() visits every grid coordinate from -APRON to gpe + APRON - 1 on
     // both axes, once, rows along y, and lands each at (gx + APRON, gy + APRON).
-    template<> template<>
-    void alterrainsurfacemaps_object::test<1>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: fill() lays the grid out APRON in with rows along y", "[ALTerrainSurfaceMaps]")
     {
         std::vector<F32> out;
-        ALTerrainSurfaceMaps::fill(out, GPE, 1, [](S32 gx, S32 gy, F32* t) { t[0] = (F32)(gx * 100 + gy); });
-        ensure_equals("size", out.size(), static_cast<size_t>(SIZE) * SIZE);
-        ensure_equals("first texel is the south-west apron corner", out[texel(-APRON, -APRON)], (F32)(-APRON * 100 - APRON));
-        ensure_equals("grid origin sits APRON in", out[texel(0, 0)], 0.f);
-        ensure_equals("buffer column", out[texel(GPE - 1, 3)], (F32)((GPE - 1) * 100 + 3));
-        ensure_equals("last texel is the north-east apron corner",
-                      out[texel(GPE + APRON - 1, GPE + APRON - 1)], (F32)((GPE + APRON - 1) * 100 + GPE + APRON - 1));
-        ensure_equals("row stride is the map width", out[texel(0, 1)] - out[texel(0, 0)], 1.f);
-        ensure_equals("column stride is one texel", out[texel(1, 0)] - out[texel(0, 0)], 100.f);
+        // How many times each coordinate on the map is visited, and how many
+        // visits are off it.
+        std::vector<S32> visits(static_cast<size_t>(SIZE) * SIZE, 0);
+        S32              off_map = 0;
+        ALTerrainSurfaceMaps::fill(out, GPE, 1, [&visits, &off_map](S32 gx, S32 gy, F32* t) {
+            t[0] = (F32)(gx * 100 + gy);
+            if (gx < -APRON || gx >= GPE + APRON || gy < -APRON || gy >= GPE + APRON)
+            {
+                ++off_map;
+                return;
+            }
+            ++visits[texel(gx, gy)];
+        });
+        REQUIRE(out.size() == static_cast<size_t>(SIZE) * SIZE);
+        {
+            INFO("every coordinate visited once, and none off the map");
+            CHECK(off_map == 0);
+            CHECK(std::count_if(visits.begin(), visits.end(), [](S32 n) { return n != 1; }) == 0);
+        }
+        UNSCOPED_INFO("first texel is the south-west apron corner");
+        CHECK(out[texel(-APRON, -APRON)] == (F32)(-APRON * 100 - APRON));
+        UNSCOPED_INFO("grid origin sits APRON in");
+        CHECK(out[texel(0, 0)] == 0.f);
+        UNSCOPED_INFO("buffer column");
+        CHECK(out[texel(GPE - 1, 3)] == (F32)((GPE - 1) * 100 + 3));
+        UNSCOPED_INFO("last texel is the north-east apron corner");
+        CHECK(out[texel(GPE + APRON - 1, GPE + APRON - 1)] == (F32)((GPE + APRON - 1) * 100 + GPE + APRON - 1));
+        UNSCOPED_INFO("row stride is the map width");
+        CHECK(out[texel(0, 1)] - out[texel(0, 0)] == 1.f);
+        UNSCOPED_INFO("column stride is one texel");
+        CHECK(out[texel(1, 0)] - out[texel(0, 0)] == 100.f);
     }
 
     // Two channels interleave, and a second fill of a buffer already the
     // right size keeps the channel the sampler does not write.
-    template<> template<>
-    void alterrainsurfacemaps_object::test<2>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: two channels interleave and a refill keeps the channel it does not write", "[ALTerrainSurfaceMaps]")
     {
         std::vector<F32> out;
         ALTerrainSurfaceMaps::fill(out, GPE, 2, [](S32 gx, S32 gy, F32* t) { t[0] = (F32)gx; t[1] = (F32)gy; });
-        ensure_equals("size", out.size(), static_cast<size_t>(SIZE) * SIZE * 2);
-        ensure_equals("channel 0", out[texel(3, 5, 2)], 3.f);
-        ensure_equals("channel 1", out[texel(3, 5, 2) + 1], 5.f);
+        REQUIRE(out.size() == static_cast<size_t>(SIZE) * SIZE * 2);
+        UNSCOPED_INFO("channel 0");
+        CHECK(out[texel(3, 5, 2)] == 3.f);
+        UNSCOPED_INFO("channel 1");
+        CHECK(out[texel(3, 5, 2) + 1] == 5.f);
 
         ALTerrainSurfaceMaps::fill(out, GPE, 2, [](S32 gx, S32, F32* t) { t[0] = (F32)(gx + 1000); });
-        ensure_equals("channel 0 rewritten", out[texel(3, 5, 2)], 1003.f);
-        ensure_equals("channel 1 kept", out[texel(3, 5, 2) + 1], 5.f);
+        UNSCOPED_INFO("channel 0 rewritten");
+        CHECK(out[texel(3, 5, 2)] == 1003.f);
+        UNSCOPED_INFO("channel 1 kept");
+        CHECK(out[texel(3, 5, 2) + 1] == 5.f);
     }
 
-    // Inside the region nothing moves.
-    template<> template<>
-    void alterrainsurfacemaps_object::test<3>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: resolve moves nothing inside the region", "[ALTerrainSurfaceMaps]")
     {
         bool has[8];
         allSet(true, has);
         S32 gx = 4, gy = GPE - 1;
-        ensure_equals("interior is this surface", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), MIDDLE);
-        ensure_equals("gx unchanged", gx, 4);
-        ensure_equals("gy unchanged, the buffer row is ours", gy, GPE - 1);
+        UNSCOPED_INFO("interior is this surface");
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == MIDDLE);
+        CHECK(gx == 4);
+        UNSCOPED_INFO("gy unchanged, the buffer row is ours");
+        CHECK(gy == GPE - 1);
     }
 
     // One axis out, neighbour present: the neighbour's grid 0 is our last
     // column, so our -1 is their gpe - 2 and our gpe is their 1.
-    template<> template<>
-    void alterrainsurfacemaps_object::test<4>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: one axis out resolves to that neighbour's grid", "[ALTerrainSurfaceMaps]")
     {
         bool has[8];
         allSet(true, has);
         S32 gx = -1, gy = 3;
-        ensure_equals("west", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), WEST);
-        ensure_equals("west gx", gx, GPE - 2);
-        ensure_equals("west gy", gy, 3);
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == WEST);
+        UNSCOPED_INFO("west gx");
+        CHECK(gx == GPE - 2);
+        UNSCOPED_INFO("west gy");
+        CHECK(gy == 3);
 
         gx = -APRON; gy = 3;
         ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has);
-        ensure_equals("west, two out", gx, GPE - 3);
+        UNSCOPED_INFO("west, two out");
+        CHECK(gx == GPE - 3);
 
         gx = GPE; gy = 3;
-        ensure_equals("east", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), EAST);
-        ensure_equals("east gx", gx, 1);
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == EAST);
+        UNSCOPED_INFO("east gx");
+        CHECK(gx == 1);
 
         gx = GPE + 1; gy = 3;
         ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has);
-        ensure_equals("east, two out", gx, 2);
+        UNSCOPED_INFO("east, two out");
+        CHECK(gx == 2);
 
         gx = 3; gy = -1;
-        ensure_equals("south", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), SOUTH);
-        ensure_equals("south gy", gy, GPE - 2);
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == SOUTH);
+        UNSCOPED_INFO("south gy");
+        CHECK(gy == GPE - 2);
 
         gx = 3; gy = GPE + 1;
-        ensure_equals("north", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), NORTH);
-        ensure_equals("north gy", gy, 2);
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == NORTH);
+        UNSCOPED_INFO("north gy");
+        CHECK(gy == 2);
     }
 
-    // Both axes out: the diagonal neighbour when it is there.
-    template<> template<>
-    void alterrainsurfacemaps_object::test<5>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: both axes out resolve to the diagonal neighbour when it is there", "[ALTerrainSurfaceMaps]")
     {
         bool has[8];
         allSet(true, has);
         S32 gx = -1, gy = -APRON;
-        ensure_equals("south-west", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), SOUTHWEST);
-        ensure_equals("south-west gx", gx, GPE - 2);
-        ensure_equals("south-west gy", gy, GPE - 3);
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == SOUTHWEST);
+        UNSCOPED_INFO("south-west gx");
+        CHECK(gx == GPE - 2);
+        UNSCOPED_INFO("south-west gy");
+        CHECK(gy == GPE - 3);
 
         gx = GPE + 1; gy = GPE;
-        ensure_equals("north-east", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), NORTHEAST);
-        ensure_equals("north-east gx", gx, 2);
-        ensure_equals("north-east gy", gy, 1);
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == NORTHEAST);
+        UNSCOPED_INFO("north-east gx");
+        CHECK(gx == 2);
+        UNSCOPED_INFO("north-east gy");
+        CHECK(gy == 1);
     }
 
     // A missing neighbour clamps the axis that needed it and keeps the rest of
     // the walk: no west means gx clamps to 0 and y still resolves north.
-    template<> template<>
-    void alterrainsurfacemaps_object::test<6>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: a missing neighbour clamps its axis and the other still resolves", "[ALTerrainSurfaceMaps]")
     {
         bool has[8];
         allSet(true, has);
         has[WEST] = false;
         S32 gx = -1, gy = 3;
-        ensure_equals("no west: this surface", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), MIDDLE);
-        ensure_equals("no west: gx clamped", gx, 0);
+        UNSCOPED_INFO("no west: this surface");
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == MIDDLE);
+        UNSCOPED_INFO("no west: gx clamped");
+        CHECK(gx == 0);
 
         gx = -1; gy = GPE;
-        ensure_equals("no west, north present: north", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), NORTH);
-        ensure_equals("north with gx clamped", gx, 0);
-        ensure_equals("north gy", gy, 1);
+        UNSCOPED_INFO("no west, north present: north");
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == NORTH);
+        UNSCOPED_INFO("north with gx clamped");
+        CHECK(gx == 0);
+        UNSCOPED_INFO("north gy");
+        CHECK(gy == 1);
 
         allSet(true, has);
         has[NORTHWEST] = false;
         gx = -1; gy = GPE;
-        ensure_equals("west present, north-west missing: west", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), WEST);
-        ensure_equals("west gx", gx, GPE - 2);
-        ensure_equals("west gy clamped to its last row", gy, GPE - 1);
+        UNSCOPED_INFO("west present, north-west missing: west");
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == WEST);
+        UNSCOPED_INFO("west gx");
+        CHECK(gx == GPE - 2);
+        UNSCOPED_INFO("west gy clamped to its last row");
+        CHECK(gy == GPE - 1);
 
         allSet(false, has);
         gx = GPE + 1; gy = -1;
-        ensure_equals("no neighbours: this surface", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), MIDDLE);
-        ensure_equals("gx clamped to the buffer column", gx, GPE - 1);
-        ensure_equals("gy clamped to 0", gy, 0);
+        UNSCOPED_INFO("no neighbours: this surface");
+        CHECK(ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) == MIDDLE);
+        UNSCOPED_INFO("gx clamped to the buffer column");
+        CHECK(gx == GPE - 1);
+        UNSCOPED_INFO("gy clamped to 0");
+        CHECK(gy == 0);
     }
 
     // The smooth surface passes through every sample: at an integer grid point the
     // value is the sample, whatever the neighbours do.
-    template<> template<>
-    void alterrainsurfacemaps_object::test<7>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: smoothHeight passes through every sample", "[ALTerrainSurfaceMaps]")
     {
         auto field = [](S32 gx, S32 gy) { return (F32)(gx * gx - 3 * gy + (gx * gy) % 5); };
         for (S32 gy = 0; gy < 6; ++gy)
         {
             for (S32 gx = 0; gx < 6; ++gx)
             {
+                CAPTURE(gx, gy);
                 const F32 h = ALTerrainSurfaceMaps::smoothHeight((F32)gx, (F32)gy, field, nullptr, nullptr);
-                ensure_equals("value at a sample is the sample", h, field(gx, gy));
+                REQUIRE(h == field(gx, gy));
             }
         }
     }
@@ -205,30 +245,41 @@ namespace tut
     // drop inside the cell's range; a Catmull-Rom would put metres of bump
     // above the crease. And a monotone run stays monotone, so a ramp is a
     // ramp with no ripple ahead of or behind the step.
-    template<> template<>
-    void alterrainsurfacemaps_object::test<8>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: smoothHeight grows no lip at a step and stays monotone down it", "[ALTerrainSurfaceMaps]")
     {
         auto cliff = [](S32 gx, S32) { return gx <= 2 ? 30.f : 0.f; };
         for (F32 x = 0.f; x < 2.f; x += 0.125f)
         {
+            CAPTURE(x);
             F32 dzdx = 1.f, dzdy = 1.f;
-            ensure_approximately_equals("level up to the edge", ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, &dzdx, &dzdy), 30.f, 12);
+            UNSCOPED_INFO("level up to the edge");
+            REQUIRE_THAT(ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, &dzdx, &dzdy), ll_test::WithinBits(30.f, 12));
             // The tangent at the crease sample is zeroed, not averaged with the drop: the
             // level run has no slope at all, so it does not lean toward the edge.
-            ensure_approximately_equals("no slope on the level run", dzdx, 0.f, 12);
+            UNSCOPED_INFO("no slope on the level run");
+            REQUIRE_THAT(dzdx, ll_test::WithinBits(0.f, 12));
         }
         F32 previous = 30.f;
         for (F32 x = 2.f; x <= 3.f; x += 0.0625f)
         {
+            CAPTURE(x);
             const F32 h = ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, nullptr, nullptr);
-            ensure("inside the cell's range", h <= 30.f && h >= 0.f);
-            ensure("monotone down the face", h <= previous);
+            {
+                INFO("inside the cell's range");
+                REQUIRE(h <= 30.f);
+                REQUIRE(h >= 0.f);
+            }
+            UNSCOPED_INFO("monotone down the face");
+            REQUIRE(h <= previous);
             previous = h;
         }
-        ensure_approximately_equals("mid-cell is the midpoint of the step", ALTerrainSurfaceMaps::smoothHeight(2.5f, 3.f, cliff, nullptr, nullptr), 15.f, 12);
+        UNSCOPED_INFO("mid-cell is the midpoint of the step");
+        CHECK_THAT(ALTerrainSurfaceMaps::smoothHeight(2.5f, 3.f, cliff, nullptr, nullptr), ll_test::WithinBits(15.f, 12));
         for (F32 x = 3.f; x < 5.f; x += 0.125f)
         {
-            ensure_approximately_equals("level past the foot", ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, nullptr, nullptr), 0.f, 12);
+            CAPTURE(x);
+            UNSCOPED_INFO("level past the foot");
+            REQUIRE_THAT(ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, nullptr, nullptr), ll_test::WithinBits(0.f, 12));
         }
 
         // Off the axis too: a corner of the plateau, evaluated across the
@@ -238,28 +289,29 @@ namespace tut
         {
             for (F32 x = 2.f; x <= 3.f; x += 0.25f)
             {
+                CAPTURE(x, y);
                 const F32 h = ALTerrainSurfaceMaps::smoothHeight(x, y, corner, nullptr, nullptr);
-                ensure("plateau corner within its cell's range", h >= 0.f && h <= 30.f);
+                INFO("plateau corner within its cell's range");
+                REQUIRE(h >= 0.f);
+                REQUIRE(h <= 30.f);
             }
         }
     }
 
-    // A field symmetric in x and y gives a surface symmetric in x and y.
-    template<> template<>
-    void alterrainsurfacemaps_object::test<9>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: a field symmetric in x and y gives a surface symmetric in x and y", "[ALTerrainSurfaceMaps]")
     {
         auto field = [](S32 gx, S32 gy) { return (F32)(gx * gx + gy * gy) * 0.1f + (F32)((gx + gy) % 3); };
         for (F32 v = 0.f; v < 4.f; v += 0.37f)
         {
+            CAPTURE(v);
             const F32 a = ALTerrainSurfaceMaps::smoothHeight(1.2f, v, field, nullptr, nullptr);
             const F32 b = ALTerrainSurfaceMaps::smoothHeight(v, 1.2f, field, nullptr, nullptr);
-            ensure_approximately_equals("h(x, y) == h(y, x)", a, b, 5);
+            REQUIRE_THAT(a, ll_test::WithinBits(b, 5));
         }
     }
 
     // The analytic gradient is the derivative of the value.
-    template<> template<>
-    void alterrainsurfacemaps_object::test<10>()
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: the analytic gradient matches a central difference of the value", "[ALTerrainSurfaceMaps]")
     {
         auto field = [](S32 gx, S32 gy) { return sinf(0.7f * gx) * 2.f + cosf(0.4f * gy) + 0.1f * gx * gy; };
         const F32 eps = 1e-2f;
@@ -267,14 +319,15 @@ namespace tut
         {
             for (F32 x = 0.6f; x < 4.f; x += 0.9f)
             {
+                CAPTURE(x, y);
                 F32 dzdx, dzdy;
                 ALTerrainSurfaceMaps::smoothHeight(x, y, field, &dzdx, &dzdy);
                 const F32 fdx = (ALTerrainSurfaceMaps::smoothHeight(x + eps, y, field, nullptr, nullptr)
                                - ALTerrainSurfaceMaps::smoothHeight(x - eps, y, field, nullptr, nullptr)) / (2.f * eps);
                 const F32 fdy = (ALTerrainSurfaceMaps::smoothHeight(x, y + eps, field, nullptr, nullptr)
                                - ALTerrainSurfaceMaps::smoothHeight(x, y - eps, field, nullptr, nullptr)) / (2.f * eps);
-                ensure_approximately_equals("dz/dx", dzdx, fdx, 8);
-                ensure_approximately_equals("dz/dy", dzdy, fdy, 8);
+                REQUIRE_THAT(dzdx, ll_test::WithinBits(fdx, 8));
+                REQUIRE_THAT(dzdy, ll_test::WithinBits(fdy, 8));
             }
         }
     }

@@ -33,7 +33,7 @@
 #include <boost/unordered_map.hpp>
 #include <mutex>
 #include "lluuid.h"
-#include "llfasttimer.h"
+#include "lltimer.h"
 #include "llapp.h"
 #include "llprofiler.h"
 #include "pipeline.h"
@@ -60,7 +60,7 @@ namespace LLPerfStats
     static constexpr U32 TUNE_SCENE_AND_AVATARS{1};
     static constexpr U32 TUNE_SCENE_ONLY{2};
 
-    extern F64 cpu_hertz;
+    extern F64 clock_hertz;
 
     extern std::atomic<int64_t> tunedAvatars;
     extern std::atomic<U64> renderAvatarMaxART_ns;
@@ -312,7 +312,7 @@ namespace LLPerfStats
         StatsRecord stat;
 
         RecordTime( const LLUUID& av, const LLUUID& id, StatType_t type, bool isRiggedAtt=false, bool isHUDAtt=false):
-                    start{LLTrace::BlockTimer::getCPUClockCount64()},
+                    start{get_clock_count()},
                     stat{type, ObjTypeDiscriminator, std::move(av), std::move(id), 0, isRiggedAtt, isHUDAtt}
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
@@ -332,19 +332,19 @@ namespace LLPerfStats
                 return;
             }
 
-            stat.time = LLTrace::BlockTimer::getCPUClockCount64() - start;
+            stat.time = get_clock_count() - start;
             StatsRecorder::send(std::move(stat));
         };
     };
 
 
-    inline double raw_to_ns(U64 raw)    { return (static_cast<double>(raw) * 1000000000.0) / LLPerfStats::cpu_hertz; };
-    inline double raw_to_us(U64 raw)    { return (static_cast<double>(raw) *    1000000.0) / LLPerfStats::cpu_hertz; };
-    inline double raw_to_ms(U64 raw)    { return (static_cast<double>(raw) *       1000.0) / LLPerfStats::cpu_hertz; };
+    inline double raw_to_ns(U64 raw)    { return (static_cast<double>(raw) * 1000000000.0) / LLPerfStats::clock_hertz; };
+    inline double raw_to_us(U64 raw)    { return (static_cast<double>(raw) *    1000000.0) / LLPerfStats::clock_hertz; };
+    inline double raw_to_ms(U64 raw)    { return (static_cast<double>(raw) *       1000.0) / LLPerfStats::clock_hertz; };
 
-    inline U64 ns_to_raw(double ns)     { return (U64)(LLPerfStats::cpu_hertz * (ns / 1000000000.0)); }
-    inline U64 us_to_raw(double us)     { return (U64)(LLPerfStats::cpu_hertz * (us / 1000000.0)); }
-    inline U64 ms_to_raw(double ms)     { return (U64)(LLPerfStats::cpu_hertz * (ms / 1000.0));
+    inline U64 ns_to_raw(double ns)     { return (U64)(LLPerfStats::clock_hertz * (ns / 1000000000.0)); }
+    inline U64 us_to_raw(double us)     { return (U64)(LLPerfStats::clock_hertz * (us / 1000000.0)); }
+    inline U64 ms_to_raw(double ms)     { return (U64)(LLPerfStats::clock_hertz * (ms / 1000.0));
 
     }
 

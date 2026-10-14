@@ -35,9 +35,9 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alscopebar_data
     {
@@ -93,79 +93,79 @@ namespace tut
         }
     };
 
-    typedef test_group<alscopebar_data> alscopebar_test;
-    typedef alscopebar_test::object     alscopebar_object;
-    tut::alscopebar_test alscopebar_testgroup("alscopebar");
-
-    // The whole of it, read back by the names its parts were given. A word
-    // chooses nothing and is not in the query.
-    template<> template<>
-    void alscopebar_object::test<1>()
+    TEST_CASE_METHOD(alscopebar_data, "alscopebar: query reads back each choosing part by name and leaves words out", "[alscopebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALScopeBar* bar = make();
         bar->setSentence(sentence());
 
         const LLSD said = bar->query();
-        ensure_equals("four parts choose something", said.size(), 4);
-        ensure_equals("the first option of each, unless told otherwise",
-                      said["field"].asString(), std::string("any"));
-        ensure_equals("and so on", said["how"].asString(), std::string("containing"));
-        ensure_equals("and so on", said["scope"].asString(), std::string("all"));
-        ensure("the field starts empty", said["query"].asString().empty());
-        ensure("and a word is not in it", !said.has("Find"));
+        UNSCOPED_INFO("four parts choose something");
+        REQUIRE(said.size() == 4);
+        {
+            INFO("each choice starts at its first option");
+            CHECK(said["field"].asString() == std::string("any"));
+            CHECK(said["how"].asString() == std::string("containing"));
+            CHECK(said["scope"].asString() == std::string("all"));
+        }
+        CHECK(said["query"].asString().empty());
+        CHECK_FALSE(said.has("Find"));
 
         bar->setValue("query", "close");
         bar->setValue("scope", "skin");
-        ensure_equals("what was typed", bar->valueOf("query"), std::string("close"));
-        ensure_equals("and what was chosen", bar->valueOf("scope"), std::string("skin"));
+        CHECK(bar->valueOf("query") == std::string("close"));
+        CHECK(bar->valueOf("scope") == std::string("skin"));
         delete bar;
     }
 
     // Every part as wide as what is in it, and the field with whatever is
     // left: that is the difference between a sentence and a row of columns.
-    template<> template<>
-    void alscopebar_object::test<2>()
+    TEST_CASE_METHOD(alscopebar_data, "alscopebar: each part is as wide as its content and the field takes the rest", "[alscopebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALScopeBar* bar = make(500);
         bar->setSentence(sentence());
 
         const LLLineEditor* field = bar->getChild<LLLineEditor>("query");
         const LLComboBox* scope = bar->getChild<LLComboBox>("scope");
-        ensure("the field is there", field != nullptr);
-        ensure("and so is the last part", scope != nullptr);
+        REQUIRE(field != nullptr);
+        REQUIRE(scope != nullptr);
 
         // In the order the sentence reads, left to right, none overlapping.
-        ensure("the field comes before the last choice",
-               field->getRect().mRight <= scope->getRect().mLeft);
-        ensure("and the field is the wide one",
-               field->getRect().getWidth() > scope->getRect().getWidth());
-        ensure("everything fits", scope->getRect().mRight <= 500);
+        CHECK(field->getRect().mRight <= scope->getRect().mLeft);
+        CHECK(field->getRect().getWidth() > scope->getRect().getWidth());
+        UNSCOPED_INFO("everything fits in the bar");
+        CHECK(scope->getRect().mRight <= 500);
 
-        // Narrower, and the field is what gives up the room.
+        // Narrower, and the field is what gives up the room: the choices keep
+        // theirs.
+        const LLComboBox* what = bar->getChild<LLComboBox>("field");
+        const LLComboBox* how = bar->getChild<LLComboBox>("how");
         const S32 was = field->getRect().getWidth();
+        const S32 what_was = what->getRect().getWidth();
+        const S32 how_was = how->getRect().getWidth();
+        const S32 scope_was = scope->getRect().getWidth();
         bar->reshape(360, 30);
-        ensure("the field gave up the room", field->getRect().getWidth() < was);
-        ensure("and the parts that are words did not",
-               scope->getRect().getWidth() > 0);
+        CHECK(field->getRect().getWidth() < was);
+        CHECK(what->getRect().getWidth() == what_was);
+        CHECK(how->getRect().getWidth() == how_was);
+        CHECK(scope->getRect().getWidth() == scope_was);
         delete bar;
     }
 
     // A caller may rewrite the sentence as one answer changes; what is
     // already chosen in the parts that are still there stays chosen.
-    template<> template<>
-    void alscopebar_object::test<3>()
+    TEST_CASE_METHOD(alscopebar_data, "alscopebar: a rewritten sentence keeps what its remaining parts hold", "[alscopebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALScopeBar* bar = make();
         bar->setSentence(sentence());
@@ -176,19 +176,19 @@ namespace tut
         shorter.pop_back();     // the scope goes
         bar->setSentence(shorter);
 
-        ensure_equals("what was typed is still there", bar->valueOf("query"), std::string("close"));
-        ensure("and the part that went says nothing", bar->valueOf("scope").empty());
+        CHECK(bar->valueOf("query") == std::string("close"));
+        UNSCOPED_INFO("and the part that went says nothing");
+        CHECK(bar->valueOf("scope").empty());
         delete bar;
     }
 
     // Chosen or typed is one thing; committed is another, because a caller
     // that searches every file cannot do it on every keystroke.
-    template<> template<>
-    void alscopebar_object::test<4>()
+    TEST_CASE_METHOD(alscopebar_data, "alscopebar: a choice is a change and only committing the field runs", "[alscopebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALScopeBar* bar = make();
         bar->setSentence(sentence());
@@ -200,22 +200,21 @@ namespace tut
 
         bar->getChild<LLComboBox>("scope")->setSelectedByValue(LLSD("skin"), true);
         bar->getChild<LLComboBox>("scope")->onCommit();
-        ensure_equals("choosing is a change", changed, 1);
-        ensure_equals("and is not a run", ran, 0);
+        CHECK(changed == 1);
+        CHECK(ran == 0);
 
         bar->getChild<LLLineEditor>("query")->onCommit();
-        ensure_equals("committing the field runs it", ran, 1);
+        CHECK(ran == 1);
         delete bar;
     }
 
     // The slot at the right end, for whatever the caller wants beside the
     // sentence: it keeps its width and the field gives up the room.
-    template<> template<>
-    void alscopebar_object::test<5>()
+    TEST_CASE_METHOD(alscopebar_data, "alscopebar: the adornment sits at the right end at its own width", "[alscopebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALScopeBar* bar = make(500);
         bar->setSentence(sentence());
@@ -228,11 +227,10 @@ namespace tut
         bar->setAdornment(LLUICtrlFactory::create<LLTextBox>(p));
 
         const LLView* count = bar->getChild<LLView>("count");
-        ensure("the slot is filled", count != nullptr);
-        ensure_equals("at the right end", count->getRect().mRight, 500);
-        ensure_equals("keeping its width", count->getRect().getWidth(), 90);
-        ensure("and the field gave up the room",
-               bar->getChild<LLLineEditor>("query")->getRect().getWidth() < was);
+        REQUIRE(count != nullptr);
+        CHECK(count->getRect().mRight == 500);
+        CHECK(count->getRect().getWidth() == 90);
+        CHECK(bar->getChild<LLLineEditor>("query")->getRect().getWidth() < was);
         delete bar;
     }
 
@@ -240,12 +238,11 @@ namespace tut
     // inside that part's own callback. The part is still on the stack, so
     // the sentence is built again once it has finished, and until then the
     // old parts go on answering for the old sentence.
-    template<> template<>
-    void alscopebar_object::test<6>()
+    TEST_CASE_METHOD(alscopebar_data, "alscopebar: a sentence rewritten from a part's own callback waits for idle", "[alscopebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALScopeBar* bar = make(500);
         bar->setSentence(sentence());
@@ -265,17 +262,23 @@ namespace tut
         LLComboBox* how = bar->getChild<LLComboBox>("how");
         how->setValue("starting");
         how->onCommit();
-        ensure_equals("the change was heard", changed, 1);
-        ensure("the part that was pressed is still there", bar->findChild<LLComboBox>("how") == how);
-        ensure("and so is the one the new sentence drops", bar->findChild<LLComboBox>("scope") != nullptr);
-        ensure_equals("and the query still answers", bar->valueOf("query"), std::string("close"));
+        CHECK(changed == 1);
+        UNSCOPED_INFO("the part that was pressed is still there");
+        CHECK(bar->findChild<LLComboBox>("how") == how);
+        UNSCOPED_INFO("and so is the one the new sentence drops");
+        CHECK(bar->findChild<LLComboBox>("scope") != nullptr);
+        UNSCOPED_INFO("and the query still answers");
+        CHECK(bar->valueOf("query") == std::string("close"));
 
         gIdleCallbacks.callFunctions();
-        ensure("once the part has finished, the sentence is the new one",
-               bar->findChild<LLComboBox>("scope") == nullptr);
-        ensure_equals("with what was chosen kept", bar->valueOf("how"), std::string("starting"));
-        ensure_equals("and what was typed", bar->valueOf("query"), std::string("close"));
-        ensure_equals("and nothing heard twice", changed, 1);
+        UNSCOPED_INFO("once the part has finished, the sentence is the new one");
+        CHECK(bar->findChild<LLComboBox>("scope") == nullptr);
+        UNSCOPED_INFO("with what was chosen kept");
+        CHECK(bar->valueOf("how") == std::string("starting"));
+        UNSCOPED_INFO("and what was typed");
+        CHECK(bar->valueOf("query") == std::string("close"));
+        UNSCOPED_INFO("and nothing heard twice");
+        CHECK(changed == 1);
         delete bar;
     }
 }

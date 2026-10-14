@@ -47,8 +47,14 @@
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <string>
 #include <thread>
 #include <vector>
+
+#if LL_WINDOWS
+#include "llwin32headers.h"
+#include <direct.h>
+#endif
 
 namespace
 {
@@ -220,6 +226,23 @@ TEST_CASE("a test case whose fixture sets a variable and says so", "[.guard-acce
     ll_test::StateGuard::accept("the environment");
     SUCCEED();
 }
+
+#if LL_WINDOWS
+// The CRT's change of directory leaves the hidden =C:=C:\dir variable for the
+// drive it went to, as a font or GL driver lookup on the system drive does in
+// a tree on another one.
+TEST_CASE("a test case that changes directory on another drive and back", "[.drive-visit]")
+{
+    wchar_t system[MAX_PATH];
+    REQUIRE(GetSystemDirectoryW(system, MAX_PATH) != 0);
+    wchar_t* current = _wgetcwd(nullptr, 0);
+    REQUIRE(current);
+    const std::wstring back(current);
+    std::free(current);
+    CHECK(_wchdir(system) == 0);
+    CHECK(_wchdir(back.c_str()) == 0);
+}
+#endif
 
 TEST_CASE("a test case whose fixture's end fails", "[.teardown-fails]")
 {

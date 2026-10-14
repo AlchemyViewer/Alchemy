@@ -35,7 +35,6 @@
 #include "llflexibleobject.h"
 #include "llviewercontrol.h"
 #include "lldatapacker.h"
-#include "llfasttimer.h"
 #include "llfloaterreg.h"
 #include "llfontgl.h"
 #include "llframetimer.h"

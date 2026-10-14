@@ -35,11 +35,11 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct llradiogroup_data
     {
@@ -76,37 +76,33 @@ namespace tut
         }
     };
 
-    typedef test_group<llradiogroup_data> llradiogroup_test;
-    typedef llradiogroup_test::object     llradiogroup_object;
-    tut::llradiogroup_test llradiogroup_testgroup("llradiogroup");
-
     // Items whose values are "1" and "0" stand for yes and no, whichever
     // order they come in: a yes picks the "1" item, a no the "0".
-    template<> template<>
-    void llradiogroup_object::test<1>()
+    TEST_CASE_METHOD(llradiogroup_data, "llradiogroup: items valued 1 and 0 stand for yes and no whichever comes first", "[llradiogroup]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLRadioGroup* group = choice("starts_chat", "moves", "1", "0");
         group->setValue(LLSD(true));
-        ensure_equals("yes picks the item that says 1", group->getSelectedIndex(), 0);
+        UNSCOPED_INFO("yes picks the item that says 1");
+        CHECK(group->getSelectedIndex() == 0);
         group->setValue(LLSD(false));
-        ensure_equals("no picks the item that says 0", group->getSelectedIndex(), 1);
-        ensure_equals("and the group can say so", group->getIndexForBool(true), 0);
+        UNSCOPED_INFO("no picks the item that says 0");
+        CHECK(group->getSelectedIndex() == 1);
+        CHECK(group->getIndexForBool(true) == 0);
         group->die();
     }
 
     // Items with nothing to say for themselves, bound to a setting that is
     // a yes or no: the first is no and the second is yes, both ways.
-    template<> template<>
-    void llradiogroup_object::test<2>()
+    TEST_CASE_METHOD(llradiogroup_data, "llradiogroup: unvalued items bound to a yes or no setting are no then yes", "[llradiogroup]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         // Back to its default when the test ends: declared again, a setting
@@ -116,27 +112,31 @@ namespace tut
         LLControlVariable* setting = settings.keep(config().declareBOOL("RadioGroupTestChoice", false, std::string("A yes or no")));
         LLRadioGroup* group = choice("stay", "open");
         group->setControlName("RadioGroupTestChoice");
-        ensure_equals("no is the first item", group->getSelectedIndex(), 0);
+        UNSCOPED_INFO("no is the first item");
+        CHECK(group->getSelectedIndex() == 0);
 
         group->setSelectedIndex(1);
-        ensure("the second item writes yes", config().getBOOL("RadioGroupTestChoice"));
-        ensure("as a yes, not as a name", setting->getValue().isBoolean());
+        UNSCOPED_INFO("the second item writes yes");
+        CHECK(config().getBOOL("RadioGroupTestChoice"));
+        UNSCOPED_INFO("as a yes, not as a name");
+        CHECK(setting->getValue().isBoolean());
 
         setting->set(false);
-        ensure_equals("a no from the setting picks the first", group->getSelectedIndex(), 0);
+        UNSCOPED_INFO("a no from the setting picks the first");
+        CHECK(group->getSelectedIndex() == 0);
         setting->set(true);
-        ensure_equals("a yes the second", group->getSelectedIndex(), 1);
+        UNSCOPED_INFO("a yes the second");
+        CHECK(group->getSelectedIndex() == 1);
         group->die();
     }
 
     // Items named for what they stand for, the way the inventory settings
     // write them, keep working: the names are read as the words they are.
-    template<> template<>
-    void llradiogroup_object::test<3>()
+    TEST_CASE_METHOD(llradiogroup_data, "llradiogroup: items named false and true read as no and yes", "[llradiogroup]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         // Back to its default when the test ends: declared again, a setting
@@ -146,25 +146,27 @@ namespace tut
         LLControlVariable* setting = settings.keep(config().declareBOOL("RadioGroupTestNamed", true, std::string("A yes or no")));
         LLRadioGroup* group = choice("false", "true");
         group->setControlName("RadioGroupTestNamed");
-        ensure_equals("yes is the item named true", group->getSelectedIndex(), 1);
+        UNSCOPED_INFO("yes is the item named true");
+        CHECK(group->getSelectedIndex() == 1);
         group->setSelectedIndex(0);
-        ensure("the item named false writes no", !config().getBOOL("RadioGroupTestNamed"));
-        ensure("as a no", setting->getValue().isBoolean());
+        UNSCOPED_INFO("the item named false writes no");
+        CHECK_FALSE(config().getBOOL("RadioGroupTestNamed"));
+        UNSCOPED_INFO("as a no, not as a name");
+        CHECK(setting->getValue().isBoolean());
         group->die();
     }
 
     // A group asked to draw a border holds one that fills it and follows
     // it as it is reshaped; one that is not asked holds none.
-    template<> template<>
-    void llradiogroup_object::test<4>()
+    TEST_CASE_METHOD(llradiogroup_data, "llradiogroup: a group asked to draw a border holds one that follows its size", "[llradiogroup]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLRadioGroup* plain = choice("a", "b");
-        ensure("no border unless asked", plain->findChild<LLViewBorder>("radio group border", false) == nullptr);
+        CHECK(plain->findChild<LLViewBorder>("radio group border", false) == nullptr);
         plain->die();
 
         LLRadioGroup::Params p(LLUICtrlFactory::getDefaultParams<LLRadioGroup>());
@@ -178,10 +180,11 @@ namespace tut
         LLRadioGroup* bordered = LLUICtrlFactory::create<LLRadioGroup>(p);
 
         LLViewBorder* border = bordered->findChild<LLViewBorder>("radio group border", false);
-        ensure("asked for, a border is held", border != nullptr);
-        ensure_equals("around the whole group", border->getRect(), bordered->getLocalRect());
+        REQUIRE(border != nullptr);
+        CHECK(border->getRect() == bordered->getLocalRect());
         bordered->reshape(300, 60);
-        ensure_equals("and around it still once it has grown", border->getRect(), bordered->getLocalRect());
+        UNSCOPED_INFO("once it has grown");
+        CHECK(border->getRect() == bordered->getLocalRect());
         bordered->die();
     }
 }

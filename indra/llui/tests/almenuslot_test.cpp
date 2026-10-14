@@ -35,9 +35,9 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct almenuslot_data
     {
@@ -74,7 +74,7 @@ namespace tut
         {
             if (!ui.ok())
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
             LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
@@ -84,51 +84,64 @@ namespace tut
         }
     };
 
-    typedef test_group<almenuslot_data> almenuslot_group;
-    typedef almenuslot_group::object     almenuslot_object;
-    tut::almenuslot_group                almenuslot_test_group("ALMenuSlot");
-
-    template<> template<>
-    void almenuslot_object::test<1>()
+    TEST_CASE_METHOD(almenuslot_data, "ALMenuSlot: a menu made is the slot's in the holder and another made replaces it", "[ALMenuSlot]")
     {
-        set_test_name("a menu made is the slot's, in the holder; another made lets go of the first");
         ALMenuSlot     slot;
         LLContextMenu* first = make(slot);
-        ensure("made", first && slot.get() == first && first->getParent() == holder);
-        ensure("alive", !first->isDead());
+        REQUIRE(first);
+        CHECK(slot.get() == first);
+        CHECK(first->getParent() == holder);
+        CHECK_FALSE(first->isDead());
         LLContextMenu* second = make(slot);
-        ensure("the second is the slot's", second && second != first && slot.get() == second);
-        ensure("the first let go of", first->isDead() && !second->isDead());
+        {
+            INFO("the second is the slot's");
+            REQUIRE(second);
+            CHECK(second != first);
+            CHECK(slot.get() == second);
+        }
+        {
+            INFO("the first let go of");
+            CHECK(first->isDead());
+            CHECK_FALSE(second->isDead());
+        }
     }
 
-    template<> template<>
-    void almenuslot_object::test<2>()
+    TEST_CASE_METHOD(almenuslot_data, "ALMenuSlot: closing hides and kills the menu and so does the slot going", "[ALMenuSlot]")
     {
-        set_test_name("closed, the menu is out of sight and gone; a slot going takes its open menu with it");
         LLContextMenu* open = nullptr;
         {
             ALMenuSlot slot;
             LLContextMenu* menu = make(slot);
+            REQUIRE(menu);
             menu->setVisible(true);
             slot.close();
-            ensure("closed: hidden and gone", !menu->getVisible() && menu->isDead() && slot.get() == nullptr);
+            {
+                INFO("closed: hidden and gone");
+                CHECK_FALSE(menu->getVisible());
+                CHECK(menu->isDead());
+                CHECK(slot.get() == nullptr);
+            }
             open = make(slot);
+            REQUIRE(open);
             open->setVisible(true);
         }
-        ensure("the slot gone, its menu is too", !open->getVisible() && open->isDead());
+        {
+            INFO("the slot gone, its menu is too");
+            CHECK_FALSE(open->getVisible());
+            CHECK(open->isDead());
+        }
     }
 
-    template<> template<>
-    void almenuslot_object::test<3>()
+    TEST_CASE_METHOD(almenuslot_data, "ALMenuSlot: without a menu holder nothing is made", "[ALMenuSlot]")
     {
-        set_test_name("without a menu holder, nothing is made");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLMenuGL::sMenuContainer = nullptr;
         ALMenuSlot slot;
-        ensure("nothing", slot.make("menu_pane_list.xml") == nullptr && slot.get() == nullptr);
+        CHECK(slot.make("menu_pane_list.xml") == nullptr);
+        CHECK(slot.get() == nullptr);
         LLMenuGL::sMenuContainer = holder;
     }
 }

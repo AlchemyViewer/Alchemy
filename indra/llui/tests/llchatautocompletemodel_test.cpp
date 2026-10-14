@@ -15,11 +15,11 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../llchatautocompletemodel.h"
 
-namespace tut
+namespace
 {
 struct chat_autocomplete_model_data
 {
@@ -27,51 +27,37 @@ struct chat_autocomplete_model_data
     using Candidate = LLChatAutocompleteModel::Candidate;
 };
 
-typedef test_group<chat_autocomplete_model_data> chat_autocomplete_model_group;
-typedef chat_autocomplete_model_group::object chat_autocomplete_model_object;
-chat_autocomplete_model_group chat_autocomplete_model_tests("LLChatAutocompleteModel");
-
-template<> template<>
-void chat_autocomplete_model_object::test<1>()
+TEST_CASE_METHOD(chat_autocomplete_model_data, "LLChatAutocompleteModel: return submits a whole gesture and completes a partial one", "[LLChatAutocompleteModel]")
 {
     Candidate gesture{ "/internet", "/internet", "internet yamero full ver.", false };
 
-    ensure(
-        "return submits a fully prefilled gesture",
-        LLChatAutocompleteModel::getCommitAction(true, "/internet", gesture) == Action::SUBMIT);
-    ensure(
-        "gesture comparison ignores typed capitalization",
-        LLChatAutocompleteModel::getCommitAction(true, "/INTERNET", gesture) == Action::SUBMIT);
-    ensure(
-        "return completes a partial gesture",
-        LLChatAutocompleteModel::getCommitAction(true, "/inter", gesture) == Action::COMPLETE);
+    UNSCOPED_INFO("return submits a fully prefilled gesture");
+    CHECK(LLChatAutocompleteModel::getCommitAction(true, "/internet", gesture) == Action::SUBMIT);
+    UNSCOPED_INFO("gesture comparison ignores typed capitalization");
+    CHECK(LLChatAutocompleteModel::getCommitAction(true, "/INTERNET", gesture) == Action::SUBMIT);
+    UNSCOPED_INFO("return completes a partial gesture");
+    CHECK(LLChatAutocompleteModel::getCommitAction(true, "/inter", gesture) == Action::COMPLETE);
 }
 
-template<> template<>
-void chat_autocomplete_model_object::test<2>()
+TEST_CASE_METHOD(chat_autocomplete_model_data, "LLChatAutocompleteModel: return completes a command with arguments and submits one without", "[LLChatAutocompleteModel]")
 {
     Candidate command{ "/plat", "/plat", "Rez a platform", true };
     Candidate immediate_command{ "/home", "/home", "Teleport home", false };
 
-    ensure(
-        "return leaves room for supported command arguments",
-        LLChatAutocompleteModel::getCommitAction(true, "/plat", command) == Action::COMPLETE);
-    ensure(
-        "return submits a complete command without arguments",
-        LLChatAutocompleteModel::getCommitAction(true, "/home", immediate_command) == Action::SUBMIT);
+    UNSCOPED_INFO("return leaves room for supported command arguments");
+    CHECK(LLChatAutocompleteModel::getCommitAction(true, "/plat", command) == Action::COMPLETE);
+    UNSCOPED_INFO("return submits a complete command without arguments");
+    CHECK(LLChatAutocompleteModel::getCommitAction(true, "/home", immediate_command) == Action::SUBMIT);
 }
 
-template<> template<>
-void chat_autocomplete_model_object::test<3>()
+TEST_CASE_METHOD(chat_autocomplete_model_data, "LLChatAutocompleteModel: tab always completes a gesture or a command", "[LLChatAutocompleteModel]")
 {
     Candidate gesture{ "/internet", "/internet", "internet yamero full ver.", false };
     Candidate command{ "/home", "/home", "Teleport home", false };
 
-    ensure(
-        "tab always completes a gesture",
-        LLChatAutocompleteModel::getCommitAction(false, "/internet", gesture) == Action::COMPLETE);
-    ensure(
-        "tab always completes a command",
-        LLChatAutocompleteModel::getCommitAction(false, "/home", command) == Action::COMPLETE);
+    UNSCOPED_INFO("tab always completes a gesture");
+    CHECK(LLChatAutocompleteModel::getCommitAction(false, "/internet", gesture) == Action::COMPLETE);
+    UNSCOPED_INFO("tab always completes a command");
+    CHECK(LLChatAutocompleteModel::getCommitAction(false, "/home", command) == Action::COMPLETE);
 }
 }

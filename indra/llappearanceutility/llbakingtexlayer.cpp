@@ -31,7 +31,6 @@
 #include "llavatarappearance.h"
 #include "llbakingtexlayer.h"
 #include "llbakingwearable.h"
-#include "llfasttimer.h"
 #include "lllocaltextureobject.h"
 #include "llimagej2c.h"
 #include "llwearabledata.h"

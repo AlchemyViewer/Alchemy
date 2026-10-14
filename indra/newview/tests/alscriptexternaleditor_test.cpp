@@ -32,7 +32,7 @@
 
 #include "fsyspath.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -88,7 +88,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alscriptexternaleditor_data
     {
@@ -117,7 +117,7 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             files = std::make_unique<al_studio_test::StudioFiles>(services);
             unit  = std::make_unique<ALScriptExternalEditor>(services, studio, studio, files->unit, studio);
@@ -154,81 +154,99 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptexternaleditor_data> alscriptexternaleditor_group;
-    typedef alscriptexternaleditor_group::object    alscriptexternaleditor_object;
-    alscriptexternaleditor_group                    alscriptexternaleditor_instance("alscriptexternaleditor");
-
-    template<> template<>
-    void alscriptexternaleditor_object::test<1>()
+    TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: the copy is named for the tab and the bridge in the temp folder", "[alscriptexternaleditor]")
     {
-        set_test_name("the copy's name: the tab's without what a file system refuses, the bridge's id, the language's extension, in the temp folder");
         ALScriptExternalEditor& unit = make();
         Doc&                    a    = tab("a", "x");
         a.name                       = "my<scr>ipt:?";
         const std::string temp       = LLFile::tmpdir();
-        ensure_equals("LSL", unit.fileName(a), temp + "sl_script_myscript_" + studio.bridge + ".lsl");
+        UNSCOPED_INFO("LSL");
+        CHECK(unit.fileName(a) == temp + "sl_script_myscript_" + studio.bridge + ".lsl");
         a.language.lua = true;
         a.name         = "<>";
-        ensure_equals("SLua, and a name of nothing but those", unit.fileName(a), temp + "sl_script_" + studio.bridge + ".luau");
+        UNSCOPED_INFO("SLua, and a name of nothing but those");
+        CHECK(unit.fileName(a) == temp + "sl_script_" + studio.bridge + ".luau");
     }
 
-    template<> template<>
-    void alscriptexternaleditor_object::test<2>()
+    TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: Edit Externally writes and watches a copy and starts the editor", "[alscriptexternaleditor]")
     {
-        set_test_name("Edit Externally writes the copy and watches it, tells the bridge and starts the editor; a file on disk as it is; a notecard not");
         ALScriptExternalEditor& unit = make();
         studio.bridgeThere           = true;
         Doc&              a          = tab("a", "default {}");
         unit.edit(a);
         const std::string file = unit.fileName(a);
-        ensure_equals("the copy", contents(file), std::string("default {}"));
-        ensure("watched", a.watch && a.watch->path() == file);
-        ensure("the log beside it", a.external->log && a.external->log->path() == file + ".log");
-        ensure("the bridge told", studio.subscribed == Names{ "a" } && a.external->subscribed);
-        ensure("the editor started on it", studio.started == Names{ file });
-        ensure_equals("what it holds, known", a.external->written, std::string("default {}"));
+        CHECK(contents(file) == std::string("default {}"));
+        REQUIRE(a.watch);
+        CHECK(a.watch->path() == file);
+        REQUIRE(a.external->log);
+        CHECK(a.external->log->path() == file + ".log");
+        CHECK(studio.subscribed == Names{ "a" });
+        CHECK(a.external->subscribed);
+        REQUIRE(studio.started == Names{ file });
+        UNSCOPED_INFO("what it holds, known");
+        CHECK(a.external->written == std::string("default {}"));
 
         Doc& e = tab("e", "");
         unit.edit(e);
-        ensure_equals("an empty script is one space", contents(unit.fileName(e)), std::string(" "));
+        UNSCOPED_INFO("an empty script is one space");
+        CHECK(contents(unit.fileName(e)) == std::string(" "));
 
         Doc& d = tab("d", "x");
         d.file = "/somewhere/d.lsl";
         unit.edit(d);
-        ensure("a file on disk watched where it is",
-               d.watch && d.watch->path() == "/somewhere/d.lsl" && studio.started.back() == "/somewhere/d.lsl on disk");
-        ensure("with no log, and nothing for the bridge", !d.external->log && studio.subscribed.size() == 2);
+        {
+            INFO("a file on disk watched where it is");
+            REQUIRE(d.watch);
+            CHECK(d.watch->path() == "/somewhere/d.lsl");
+            CHECK(studio.started.back() == "/somewhere/d.lsl on disk");
+        }
+        {
+            INFO("with no log, and nothing for the bridge");
+            CHECK_FALSE(d.external->log);
+            CHECK(studio.subscribed.size() == 2);
+        }
 
         Doc& n    = tab("n", "x");
         n.notecard = true;
         unit.edit(n);
-        ensure("a notecard not", studio.started.size() == 3 && !n.watch);
+        {
+            INFO("a notecard not");
+            CHECK(studio.started.size() == 3);
+            CHECK_FALSE(n.watch);
+        }
     }
 
-    template<> template<>
-    void alscriptexternaleditor_object::test<3>()
+    TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: a save outside over an unchanged tab is taken and saved from here", "[alscriptexternaleditor]")
     {
-        set_test_name("a save outside over nothing changed here is taken, as one step, and saved from here");
         ALScriptExternalEditor& unit = make();
         Doc&                    a    = tab("a", "one");
         unit.edit(a);
         write(unit.fileName(a), "two");
         unit.changed("a", unit.fileName(a));
-        ensure("taken", studio.taken == Names{ "two" } && a.editor->text() == "two");
-        ensure("saved from here, as the editor's", studio.saved == Names{ "a" } && a.save.external());
-        ensure_equals("what the copy holds, known", a.external->written, std::string("two"));
-        ensure("nothing asked", !asked());
+        CHECK(studio.taken == Names{ "two" });
+        CHECK(a.editor->text() == "two");
+        {
+            INFO("saved from here, as the editor's");
+            CHECK(studio.saved == Names{ "a" });
+            CHECK(a.save.external());
+        }
+        UNSCOPED_INFO("what the copy holds, known");
+        CHECK(a.external->written == std::string("two"));
+        CHECK_FALSE(asked());
         a.editor->resetDirty();
         unit.changed("a", unit.fileName(a));
-        ensure("the same again, with the tab saved: nothing to take or save", studio.taken.size() == 1 && studio.saved.size() == 1);
+        {
+            INFO("the same again, with the tab saved: nothing to take or save");
+            CHECK(studio.taken.size() == 1);
+            CHECK(studio.saved.size() == 1);
+        }
         unit.changed("nobody", unit.fileName(a));
-        ensure("a tab gone: nothing", studio.taken.size() == 1);
+        UNSCOPED_INFO("a tab gone: nothing");
+        CHECK(studio.taken.size() == 1);
     }
 
-    template<> template<>
-    void alscriptexternaleditor_object::test<4>()
+    TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: a save outside over changes here is held until the author takes it", "[alscriptexternaleditor]")
     {
-        set_test_name("a save outside over changes made here is held and asked about; taken when the author says so");
         ALScriptExternalEditor& unit = make();
         Doc&                    a    = tab("a", "one");
         unit.edit(a);
@@ -236,76 +254,94 @@ namespace tut
         a.editor->insertText(" here");
         write(unit.fileName(a), "two");
         unit.changed("a", unit.fileName(a));
-        ensure("not taken", studio.taken.empty() && a.editor->text() == "one here");
-        ensure("held", a.external->waiting && *a.external->waiting == "two");
-        ensure("and asked about", asked() && services.reports.back().failure && services.reports.back().doc == "a");
+        CHECK(studio.taken.empty());
+        CHECK(a.editor->text() == "one here");
+        REQUIRE(a.external->waiting);
+        CHECK(*a.external->waiting == "two");
+        REQUIRE(asked());
+        CHECK(services.reports.back().failure);
+        CHECK(services.reports.back().doc == "a");
         unit.take(a, *a.external->waiting);
-        ensure("taken once said", studio.taken == Names{ "two" } && !a.external->waiting && studio.saved == Names{ "a" });
+        {
+            INFO("taken once said");
+            CHECK(studio.taken == Names{ "two" });
+            CHECK_FALSE(a.external->waiting);
+            CHECK(studio.saved == Names{ "a" });
+        }
     }
 
-    template<> template<>
-    void alscriptexternaleditor_object::test<5>()
+    TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: a save with CRLF endings after one taken is taken without asking", "[alscriptexternaleditor]")
     {
-        set_test_name("a save with CRLF endings after one taken is taken, not asked about");
         ALScriptExternalEditor& unit = make();
         Doc&                    a    = tab("a", "one");
         unit.edit(a);
         write(unit.fileName(a), "a\r\nb");
         unit.changed("a", unit.fileName(a));
-        ensure("the first, its endings as the editor keeps them", studio.taken == Names{ "a\nb" });
+        UNSCOPED_INFO("the first, its endings as the editor keeps them");
+        CHECK(studio.taken == Names{ "a\nb" });
         write(unit.fileName(a), "a\r\nb\r\nc");
         unit.changed("a", unit.fileName(a));
-        ensure("the second taken too", studio.taken == Names{ "a\nb", "a\nb\nc" } && !asked());
+        CHECK(studio.taken == Names{ "a\nb", "a\nb\nc" });
+        CHECK_FALSE(asked());
     }
 
-    template<> template<>
-    void alscriptexternaleditor_object::test<6>()
+    TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: an emptied copy is taken only if still empty a moment later", "[alscriptexternaleditor]")
     {
-        set_test_name("an emptied copy waits a moment; looked at again, taken if still empty, and left where the editor's second step came");
         ALScriptExternalEditor& unit = make();
         Doc&                    a    = tab("a", "one");
         unit.edit(a);
         write(unit.fileName(a), "");
         unit.changed("a", unit.fileName(a));
-        ensure("not taken at once", studio.taken.empty());
+        UNSCOPED_INFO("not taken at once");
+        CHECK(studio.taken.empty());
         unit.changed("a", unit.fileName(a), true);
-        ensure("still empty a moment later: taken", studio.taken == Names{ "" });
+        UNSCOPED_INFO("still empty a moment later: taken");
+        CHECK(studio.taken == Names{ "" });
         write(unit.fileName(a), "two");
         unit.changed("a", unit.fileName(a));
         unit.changed("a", unit.fileName(a), true);
-        ensure("the second step heard first: the look after takes nothing more",
-               studio.taken == Names{ "", "two" } && studio.saved.size() == 2);
+        {
+            INFO("the second step heard first: the look after takes nothing more");
+            CHECK(studio.taken == Names{ "", "two" });
+            CHECK(studio.saved.size() == 2);
+        }
     }
 
-    template<> template<>
-    void alscriptexternaleditor_object::test<7>()
+    TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: a sync rewrites a changed copy and the compiler's words go in the log", "[alscriptexternaleditor]")
     {
-        set_test_name("after a save from here the copy is written again where it holds something else; the compiler's words go in the log");
         ALScriptExternalEditor& unit = make();
         Doc&                    a    = tab("a", "one");
         unit.edit(a);
         a.editor->setCaret(a.editor->document().end());
         a.editor->insertText(" two");
         unit.sync(a);
-        ensure_equals("written again", contents(unit.fileName(a)), std::string("one two"));
-        ensure_equals("and known", a.external->written, std::string("one two"));
+        CHECK(contents(unit.fileName(a)) == std::string("one two"));
+        UNSCOPED_INFO("what it holds, known");
+        CHECK(a.external->written == std::string("one two"));
         ALScriptCompileResult result;
         result.messages = { "(1, 2) : ERROR : Syntax error\x07" };
         unit.log(a, result);
+        REQUIRE(a.external->log);
         const std::string log = contents(a.external->log->path());
-        ensure("the log: when, then the words, what cannot be printed dropped",
-               log.find("// [when]") == 0 && log.find("Syntax error\n") != std::string::npos && log.find('\x07') == std::string::npos);
+        {
+            INFO("the log: when, then the words, what cannot be printed dropped");
+            CHECK(log.find("// [when]") == 0);
+            CHECK(log.find("Syntax error\n") != std::string::npos);
+            CHECK(log.find('\x07') == std::string::npos);
+        }
         Doc& d = tab("d", "x");
         d.file = "/somewhere/d.lsl";
         unit.log(d, result);
         unit.sync(d);
-        ensure("a tab not held outside: nothing", !d.external->log && !d.watch);
+        {
+            INFO("a tab not held outside: nothing");
+            CHECK_FALSE(d.external->log);
+            CHECK_FALSE(d.watch);
+        }
     }
 
-    template<> template<>
-    void alscriptexternaleditor_object::test<8>()
+    TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: letting go tells the bridge and removes the watch and copy and log", "[alscriptexternaleditor]")
     {
-        set_test_name("letting go tells the bridge, and the watch, the copy and the log go");
         ALScriptExternalEditor& unit = make();
         studio.bridgeThere           = true;
         Doc& a                       = tab("a", "one");
@@ -313,20 +349,27 @@ namespace tut
         ALScriptCompileResult result;
         unit.log(a, result);
         const std::string file = unit.fileName(a);
+        REQUIRE(a.external->log);
         const std::string log  = a.external->log->path();
-        ensure("both there", exists(file) && exists(log));
+        CHECK(exists(file));
+        CHECK(exists(log));
         a.save.fromExternal(1);
         unit.stop(a);
-        ensure("the bridge told", studio.unsubscribed == Names{ "a" } && !a.external->subscribed);
-        ensure("the watch gone, and the studio's copy with it", !a.watch && !exists(file));
-        ensure("the log gone", !exists(log) && !a.external->log);
-        ensure("a save under way is no longer the editor's", !a.save.external());
+        CHECK(studio.unsubscribed == Names{ "a" });
+        CHECK_FALSE(a.external->subscribed);
+        {
+            INFO("the watch gone, and the studio's copy with it");
+            CHECK_FALSE(a.watch);
+            CHECK_FALSE(exists(file));
+        }
+        CHECK_FALSE(exists(log));
+        CHECK_FALSE(a.external->log);
+        UNSCOPED_INFO("a save under way is no longer the editor's");
+        CHECK_FALSE(a.save.external());
     }
 
-    template<> template<>
-    void alscriptexternaleditor_object::test<9>()
+    TEST_CASE_METHOD(alscriptexternaleditor_data, "alscriptexternaleditor: keeping the tab's text over a held save lets it go and says so", "[alscriptexternaleditor]")
     {
-        set_test_name("a save outside held over changes made here, kept from when the author says so: let go, the tab's text standing, and said");
         ALScriptExternalEditor& unit = make();
         Doc&                    a    = tab("a", "one");
         unit.edit(a);
@@ -334,9 +377,13 @@ namespace tut
         a.editor->insertText(" here");
         write(unit.fileName(a), "two");
         unit.changed("a", unit.fileName(a));
-        ensure("held", a.external->waiting && *a.external->waiting == "two");
+        REQUIRE(a.external->waiting);
+        CHECK(*a.external->waiting == "two");
         unit.keep(a);
-        ensure("let go, the tab's text standing", !a.external->waiting && studio.taken.empty() && a.editor->text() == "one here");
-        ensure("said", !services.statuses.empty() && services.statuses.back().find("ExternalKept") == 0);
+        CHECK_FALSE(a.external->waiting);
+        CHECK(studio.taken.empty());
+        CHECK(a.editor->text() == "one here");
+        REQUIRE_FALSE(services.statuses.empty());
+        CHECK(services.statuses.back().find("ExternalKept") == 0);
     }
 }

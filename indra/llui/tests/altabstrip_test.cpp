@@ -35,9 +35,9 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct altabstrip_data
     {
@@ -71,57 +71,60 @@ namespace tut
         }
     };
 
-    typedef test_group<altabstrip_data> altabstrip_test;
-    typedef altabstrip_test::object     altabstrip_object;
-    tut::altabstrip_test altabstrip_testgroup("altabstrip");
-
     // The tabs run left to right in the order they were given, each inside
     // the strip and none over another, and the chosen one is the one asked.
-    template<> template<>
-    void altabstrip_object::test<1>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: tabs run left to right in their order and inside the strip", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         strip->setTabs(three(), "b");
-        ensure_equals("three tabs", strip->tabs().size(), 3u);
-        ensure_equals("the chosen one", strip->chosen(), std::string("b"));
+        REQUIRE(strip->tabs().size() == 3u);
+        CHECK(strip->chosen() == std::string("b"));
 
         S32 right = -1;
         for (size_t i = 0; i < 3; ++i)
         {
             const LLRect r = strip->rectOf(i);
-            ensure("tab " + std::to_string(i) + " starts after the one before: "
-                       + std::to_string(r.mLeft) + " > " + std::to_string(right),
-                   r.mLeft > right);
-            ensure("and ends inside the strip: " + std::to_string(r.mRight), r.mRight <= WIDTH);
-            ensure("and is as tall as it", r.mTop == HEIGHT && r.mBottom == 0);
-            ensure("and wide enough to read: " + std::to_string(r.getWidth()), r.getWidth() >= 64);
+            CAPTURE(i);
+            UNSCOPED_INFO("starts after the one before");
+            REQUIRE(r.mLeft > right);
+            UNSCOPED_INFO("and ends inside the strip");
+            REQUIRE(r.mRight <= WIDTH);
+            {
+                INFO("and is as tall as it");
+                REQUIRE(r.mTop == HEIGHT);
+                REQUIRE(r.mBottom == 0);
+            }
+            UNSCOPED_INFO("and wide enough to read");
+            REQUIRE(r.getWidth() >= 64);
             right = r.mRight;
         }
         // A point in each tab answers that tab.
         for (size_t i = 0; i < 3; ++i)
         {
             const LLRect r = strip->rectOf(i);
-            ensure_equals("the tab under its own middle", strip->at(r.getCenterX(), r.getCenterY()), (S32)i);
+            CAPTURE(i);
+            UNSCOPED_INFO("the tab under its own middle");
+            REQUIRE(strip->at(r.getCenterX(), r.getCenterY()) == (S32)i);
         }
         // Past the last tab, with room to be past it, nothing.
         strip->reshape(WIDTH * 2, HEIGHT);
-        ensure_equals("and nothing past the last", strip->at(WIDTH * 2 - 1, HEIGHT / 2), -1);
+        UNSCOPED_INFO("and nothing past the last");
+        CHECK(strip->at(WIDTH * 2 - 1, HEIGHT / 2) == -1);
         strip->die();
     }
 
     // A press on a tab chooses it and says so; a press on the way out says
     // that instead, and chooses nothing. The way out is at the right end of
     // the tab the pointer is over.
-    template<> template<>
-    void altabstrip_object::test<2>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a press chooses a tab; one on its way out asks for it to close", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         strip->setTabs(three(), "a");
@@ -133,54 +136,64 @@ namespace tut
 
         const LLRect second = strip->rectOf(1);
         strip->handleHover(second.getCenterX(), second.getCenterY(), MASK_NONE);
-        ensure("a press on a tab is handled",
-               strip->handleMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE));
-        ensure_equals("and chooses it", strip->chosen(), std::string("b"));
-        ensure_equals("saying so once", chosen.size(), 1u);
-        ensure_equals("by value", chosen.front(), std::string("b"));
-        ensure("and closes nothing", closed.empty());
+        UNSCOPED_INFO("a press on a tab is handled");
+        CHECK(strip->handleMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE));
+        UNSCOPED_INFO("and chooses it");
+        CHECK(strip->chosen() == std::string("b"));
+        UNSCOPED_INFO("saying so once");
+        REQUIRE(chosen.size() == 1u);
+        CHECK(chosen.front() == std::string("b"));
+        UNSCOPED_INFO("and closes nothing");
+        REQUIRE(closed.empty());
 
         // Pressing the tab already chosen says nothing new.
         strip->handleMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE);
-        ensure_equals("chosen once is chosen", chosen.size(), 1u);
+        UNSCOPED_INFO("chosen once is chosen");
+        REQUIRE(chosen.size() == 1u);
 
         // The way out of the first, which is inside the first tab and at
         // its right end.
         const LLRect out = strip->closeRectOf(0);
-        ensure("the way out is inside its tab", strip->rectOf(0).contains(out));
-        ensure("at the right end", out.mRight > strip->rectOf(0).getCenterX());
+        UNSCOPED_INFO("the way out is inside its tab");
+        CHECK(strip->rectOf(0).contains(out));
+        UNSCOPED_INFO("at the right end");
+        CHECK(out.mRight > strip->rectOf(0).getCenterX());
         strip->handleHover(out.getCenterX(), out.getCenterY(), MASK_NONE);
-        ensure("a press on it is handled",
-               strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE));
-        ensure("which asks nothing until it is let go of", closed.empty());
+        UNSCOPED_INFO("a press on it is handled");
+        CHECK(strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE));
+        UNSCOPED_INFO("which asks nothing until it is let go of");
+        REQUIRE(closed.empty());
         // Slid off before letting go: taken back.
         strip->handleHover(out.mLeft - 20, out.getCenterY(), MASK_NONE);
         strip->handleMouseUp(out.mLeft - 20, out.getCenterY(), MASK_NONE);
-        ensure("a press slid off closes nothing", closed.empty());
+        UNSCOPED_INFO("a press slid off closes nothing");
+        REQUIRE(closed.empty());
         strip->handleHover(out.getCenterX(), out.getCenterY(), MASK_NONE);
         strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
         strip->handleMouseUp(out.getCenterX(), out.getCenterY(), MASK_NONE);
-        ensure_equals("let go of over it, it asks for it to go", closed.size(), 1u);
-        ensure_equals("by value", closed.front(), std::string("a"));
-        ensure_equals("without choosing it", strip->chosen(), std::string("b"));
+        UNSCOPED_INFO("let go of over it, it asks for it to go");
+        REQUIRE(closed.size() == 1u);
+        CHECK(closed.front() == std::string("a"));
+        UNSCOPED_INFO("without choosing it");
+        CHECK(strip->chosen() == std::string("b"));
 
         // The middle button anywhere on a tab asks the same.
         const LLRect third = strip->rectOf(2);
         strip->handleMiddleMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
-        ensure_equals("the middle button closes", closed.size(), 2u);
-        ensure_equals("that tab", closed.back(), std::string("c"));
+        UNSCOPED_INFO("the middle button closes");
+        REQUIRE(closed.size() == 2u);
+        CHECK(closed.back() == std::string("c"));
         strip->die();
     }
 
     // Many tabs share the strip: they shrink together rather than run off
     // it, down to the least a tab may be, and their names are cut rather
     // than their neighbours covered.
-    template<> template<>
-    void altabstrip_object::test<3>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: many tabs shrink together to a least width and names are cut to fit", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make(400);
         std::vector<ALTabStrip::Tab> many;
@@ -195,21 +208,28 @@ namespace tut
         for (size_t i = 0; i < 5; ++i)
         {
             const LLRect r = strip->rectOf(i);
-            ensure_equals("tab " + std::to_string(i) + " is as wide as the first", r.getWidth(), first);
-            ensure("and inside the strip: " + std::to_string(r.mRight), r.mRight <= 400);
-            ensure("and no narrower than the least: " + std::to_string(r.getWidth()), r.getWidth() >= 64);
+            CAPTURE(i);
+            UNSCOPED_INFO("as wide as the first");
+            REQUIRE(r.getWidth() == first);
+            UNSCOPED_INFO("and inside the strip");
+            REQUIRE(r.mRight <= 400);
+            UNSCOPED_INFO("and no narrower than the least");
+            REQUIRE(r.getWidth() >= 64);
         }
-        ensure("and the share is less than a name wants", first < 220);
+        UNSCOPED_INFO("and the share is less than a name wants");
+        CHECK(first < 220);
 
         // Narrower still, the least holds: the tabs run past the edge
         // rather than become slivers nobody can press.
         strip->reshape(200, HEIGHT);
         for (size_t i = 0; i < 5; ++i)
         {
-            ensure("at the least: " + std::to_string(strip->rectOf(i).getWidth()),
-                   strip->rectOf(i).getWidth() == 64);
+            CAPTURE(i);
+            UNSCOPED_INFO("at the least");
+            REQUIRE(strip->rectOf(i).getWidth() == 64);
         }
-        ensure("and the last runs past the edge", strip->rectOf(4).mRight > 200);
+        UNSCOPED_INFO("and the last runs past the edge");
+        CHECK(strip->rectOf(4).mRight > 200);
 
         // Given the room, each takes what it wants and no more -- the
         // whole of its words, even a little past the usual most.
@@ -217,7 +237,10 @@ namespace tut
         for (size_t i = 0; i < 5; ++i)
         {
             const S32 w = strip->rectOf(i).getWidth();
-            ensure("wants its words: " + std::to_string(w), w > 64 && w < 300);
+            CAPTURE(i);
+            INFO("wants its words");
+            REQUIRE(w > 64);
+            REQUIRE(w < 300);
         }
 
         // A short name beside a long one: the short keeps its words, the
@@ -225,16 +248,29 @@ namespace tut
         strip->setTabs({ tab("a.lsl", "a"), tab("a_very_long_name_that_wants_a_great_deal_of_room.lsl", "b") }, "a");
         strip->reshape(200, HEIGHT);
         const S32 words = LLFontGL::getFontSansSerifSmall()->getWidth("a.lsl");
-        ensure("the short one keeps what it wants: " + std::to_string(strip->rectOf(0).getWidth()), strip->rectOf(0).getWidth() < 200 / 2 && strip->rectOf(0).getWidth() >= words);
-        ensure("the long one takes the rest: " + std::to_string(strip->rectOf(1).mRight), strip->rectOf(1).mRight <= 200 && strip->rectOf(1).getWidth() > strip->rectOf(0).getWidth());
+        {
+            INFO("the short one keeps what it wants");
+            REQUIRE(strip->rectOf(0).getWidth() < 200 / 2);
+            CHECK(strip->rectOf(0).getWidth() >= words);
+        }
+        {
+            INFO("the long one takes the rest");
+            REQUIRE(strip->rectOf(1).mRight <= 200);
+            CHECK(strip->rectOf(1).getWidth() > strip->rectOf(0).getWidth());
+        }
 
         // A name past the usual most shows whole while the strip has the
         // room, up to half the strip.
         strip->reshape(2000, HEIGHT);
         const S32 long_words = LLFontGL::getFontSansSerifSmall()->getWidth("a_very_long_name_that_wants_a_great_deal_of_room.lsl");
-        ensure("the long name runs on past the usual most: " + std::to_string(strip->rectOf(1).getWidth()), strip->rectOf(1).getWidth() > 220 && strip->rectOf(1).getWidth() > long_words);
+        {
+            INFO("the long name runs on past the usual most");
+            REQUIRE(strip->rectOf(1).getWidth() > 220);
+            CHECK(strip->rectOf(1).getWidth() > long_words);
+        }
         strip->reshape(500, HEIGHT);
-        ensure("but to half the strip: " + std::to_string(strip->rectOf(1).getWidth()), strip->rectOf(1).getWidth() <= 250);
+        UNSCOPED_INFO("but to half the strip");
+        CHECK(strip->rectOf(1).getWidth() <= 250);
         strip->die();
 
         // One short name alone in a wide strip is shown whole: the tab is
@@ -246,7 +282,8 @@ namespace tut
             const S32 words = LLFontGL::getFontSansSerifSmall()->getWidth("New Script");
             const S32 width = strip->rectOf(0).getWidth();
             // PAD 8 + MARK 10 + words + PAD/2 4 + CLOSE 12 + PAD 8
-            ensure_equals("the tab is the drawing's sum", width, llmax(64, words + 42));
+            UNSCOPED_INFO("the tab is the drawing's sum");
+            CHECK(width == llmax(64, words + 42));
         }
         strip->die();
 
@@ -254,23 +291,34 @@ namespace tut
         // it, with an ellipsis in the middle.
         const LLFontGL*   font = LLFontGL::getFontSansSerifSmall();
         const std::string name = "a_very_long_name_that_wants_a_great_deal_of_room.lsl";
-        ensure_equals("a name that fits is itself", ALTabStrip::shortened(font, name, 10000), name);
+        UNSCOPED_INFO("a name that fits is itself");
+        CHECK(ALTabStrip::shortened(font, name, 10000) == name);
         const std::string cut = ALTabStrip::shortened(font, name, font->getWidth(name) / 2);
-        ensure("shorter: " + cut, cut.size() < name.size() && font->getWidth(cut) <= font->getWidth(name) / 2);
-        ensure("the end kept: " + cut, cut.size() >= 7 && cut.compare(cut.size() - 7, 7, "oom.lsl") == 0);
-        ensure("the start kept: " + cut, cut.compare(0, 2, "a_") == 0);
-        ensure("an ellipsis between: " + cut, cut.find("\xE2\x80\xA6") != std::string::npos);
-        ensure_equals("no room for even the end: the whole, for the renderer to cut", ALTabStrip::shortened(font, name, 4), name);
+        {
+            INFO("shorter: " << cut);
+            REQUIRE(cut.size() < name.size());
+            CHECK(font->getWidth(cut) <= font->getWidth(name) / 2);
+        }
+        {
+            INFO("the end kept: " << cut);
+            REQUIRE(cut.size() >= 7);
+            REQUIRE(cut.compare(cut.size() - 7, 7, "oom.lsl") == 0);
+        }
+        UNSCOPED_INFO("the start kept: " << cut);
+        CHECK(cut.compare(0, 2, "a_") == 0);
+        UNSCOPED_INFO("an ellipsis between: " << cut);
+        REQUIRE(cut.find("\xE2\x80\xA6") != std::string::npos);
+        UNSCOPED_INFO("no room for even the end: the whole, for the renderer to cut");
+        CHECK(ALTabStrip::shortened(font, name, 4) == name);
     }
 
     // A preview tab closes as any tab does: by its way out, let go of over
     // it, and by the middle button.
-    template<> template<>
-    void altabstrip_object::test<4>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a preview tab closes by its way out or the middle button", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         std::vector<ALTabStrip::Tab> tabs = three();
@@ -282,46 +330,57 @@ namespace tut
         const LLRect out = strip->closeRectOf(2);
         strip->handleHover(out.getCenterX(), out.getCenterY(), MASK_NONE);
         strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
-        ensure("not on the press", closed.empty());
+        UNSCOPED_INFO("not on the press");
+        REQUIRE(closed.empty());
         strip->handleMouseUp(out.getCenterX(), out.getCenterY(), MASK_NONE);
-        ensure("the way out asks the preview to go", closed.size() == 1 && closed.back() == "c");
+        {
+            INFO("the way out asks the preview to go");
+            REQUIRE(closed.size() == 1);
+            CHECK(closed.back() == "c");
+        }
         strip->handleMiddleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
-        ensure("and so does the middle button", closed.size() == 2 && closed.back() == "c");
+        {
+            INFO("and so does the middle button");
+            REQUIRE(closed.size() == 2);
+            CHECK(closed.back() == "c");
+        }
         strip->die();
     }
 
     // A preview is set in italic, and italic is a face and not a slant put
     // on the upright one: asked for the style, the upright font hands it to
     // the face the registry has for it, which carries the style itself.
-    template<> template<>
-    void altabstrip_object::test<5>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a preview's italic is a face of its own and not a slanted upright", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const LLFontGL* upright = LLFontGL::getFontSansSerifSmall();
-        ensure("the upright face is upright",
-               !(upright->getFontFreetype()->getStyle() & LLFontGL::ITALIC));
-        ensure("and asked for nothing, answers itself", upright->faceFor(LLFontGL::NORMAL) == upright);
+        UNSCOPED_INFO("the upright face is upright");
+        CHECK_FALSE(upright->getFontFreetype()->getStyle() & LLFontGL::ITALIC);
+        UNSCOPED_INFO("and asked for nothing, answers itself");
+        CHECK(upright->faceFor(LLFontGL::NORMAL) == upright);
 
         const LLFontGL* italic = upright->faceFor(LLFontGL::ITALIC);
-        ensure("asked for italic, it hands over to another face", italic != upright);
-        ensure("which carries the style itself",
-               (italic->getFontFreetype()->getStyle() & LLFontGL::ITALIC) != 0);
-        ensure("and has nothing further to hand over to", italic->faceFor(LLFontGL::ITALIC) == italic);
-        ensure("asked twice, the answer is the same face", upright->faceFor(LLFontGL::ITALIC) == italic);
+        UNSCOPED_INFO("asked for italic, it hands over to another face");
+        CHECK(italic != upright);
+        UNSCOPED_INFO("which carries the style itself");
+        CHECK((italic->getFontFreetype()->getStyle() & LLFontGL::ITALIC) != 0);
+        UNSCOPED_INFO("and has nothing further to hand over to");
+        CHECK(italic->faceFor(LLFontGL::ITALIC) == italic);
+        UNSCOPED_INFO("asked twice, the answer is the same face");
+        CHECK(upright->faceFor(LLFontGL::ITALIC) == italic);
     }
 
     // More tabs than the strip holds at their least: it scrolls to keep the
     // chosen one in sight, the wheel moves along them, and a button at the
     // right end asks for the whole list.
-    template<> template<>
-    void altabstrip_object::test<6>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: more tabs than fit scroll to the chosen one and offer a list", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make(200);
         std::vector<ALTabStrip::Tab> many;
@@ -330,41 +389,60 @@ namespace tut
             many.push_back(tab("script_" + std::to_string(i) + ".lsl", std::to_string(i)));
         }
         strip->setTabs(many, "0");
-        ensure("overflowing", strip->overflowing());
+        CHECK(strip->overflowing());
         const LLRect list = strip->listRect();
-        ensure("a list button at the right end", list.notEmpty() && list.mRight == 200);
-        ensure_equals("no tab under it", strip->at(list.getCenterX(), list.getCenterY()), -1);
+        {
+            INFO("a list button at the right end");
+            CHECK(list.notEmpty());
+            CHECK(list.mRight == 200);
+        }
+        UNSCOPED_INFO("no tab under it");
+        CHECK(strip->at(list.getCenterX(), list.getCenterY()) == -1);
 
         strip->choose("5");
         const LLRect last = strip->rectOf(5);
-        ensure("the chosen tab brought into sight: " + std::to_string(last.mLeft) + ".." + std::to_string(last.mRight),
-               last.mLeft >= 0 && last.mRight <= list.mLeft);
-        ensure_equals("and pressable where it is drawn", strip->at(last.getCenterX(), last.getCenterY()), 5);
+        {
+            INFO("the chosen tab brought into sight");
+            CHECK(last.mLeft >= 0);
+            CHECK(last.mRight <= list.mLeft);
+        }
+        UNSCOPED_INFO("and pressable where it is drawn");
+        CHECK(strip->at(last.getCenterX(), last.getCenterY()) == 5);
 
         strip->handleScrollWheel(10, HEIGHT / 2, LLScrollDelta(-10, -10.f));
-        ensure_equals("the wheel back to the start", strip->rectOf(0).mLeft, 0);
+        UNSCOPED_INFO("the wheel back to the start");
+        CHECK(strip->rectOf(0).mLeft == 0);
         strip->handleScrollWheel(10, HEIGHT / 2, LLScrollDelta(100, 100.f));
-        ensure("and no further than the end", strip->rectOf(5).mRight <= list.mLeft && strip->rectOf(5).mRight > list.mLeft - 8);
+        {
+            INFO("and no further than the end");
+            REQUIRE(strip->rectOf(5).mRight <= list.mLeft);
+            CHECK(strip->rectOf(5).mRight > list.mLeft - 8);
+        }
 
         S32 asked = 0;
         strip->onListAsked([&asked]() { ++asked; });
         strip->handleMouseDown(list.getCenterX(), list.getCenterY(), MASK_NONE);
-        ensure_equals("the button asks for the list", asked, 1);
+        UNSCOPED_INFO("the button asks for the list");
+        CHECK(asked == 1);
 
         strip->reshape(2000, HEIGHT);
-        ensure("with room, nothing to list", !strip->overflowing() && strip->listRect().isEmpty());
-        ensure_equals("and nothing scrolled", strip->rectOf(0).mLeft, 0);
+        {
+            INFO("with room, nothing to list");
+            REQUIRE_FALSE(strip->overflowing());
+            CHECK(strip->listRect().isEmpty());
+        }
+        UNSCOPED_INFO("and nothing scrolled");
+        CHECK(strip->rectOf(0).mLeft == 0);
         strip->die();
     }
 
     // A preview is held by a double-click on it, as a preview is anywhere:
     // the strip says which, and the caller says it is a preview no longer.
-    template<> template<>
-    void altabstrip_object::test<7>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a double-click on a preview tab holds it", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip*                  strip = make();
         std::vector<ALTabStrip::Tab> tabs  = three();
@@ -373,22 +451,25 @@ namespace tut
         std::vector<std::string> held;
         strip->onHeld([&held](const std::string& value) { held.push_back(value); });
         const LLRect preview = strip->rectOf(2);
-        ensure("a double-click on a tab is taken", strip->handleDoubleClick(preview.getCenterX(), preview.getCenterY(), MASK_NONE));
-        ensure_equals("said once", held.size(), 1u);
-        ensure_equals("of the tab under it", held.back(), std::string("c"));
-        ensure("nowhere, nothing", !strip->handleDoubleClick(2000, 2000, MASK_NONE) || held.size() == 1u);
+        UNSCOPED_INFO("a double-click on a tab is taken");
+        CHECK(strip->handleDoubleClick(preview.getCenterX(), preview.getCenterY(), MASK_NONE));
+        UNSCOPED_INFO("said once");
+        REQUIRE(held.size() == 1u);
+        UNSCOPED_INFO("of the tab under it");
+        CHECK(held.back() == std::string("c"));
+        UNSCOPED_INFO("nowhere, nothing");
+        REQUIRE((!strip->handleDoubleClick(2000, 2000, MASK_NONE) || held.size() == 1u));
         strip->die();
     }
     // A tab dragged past its neighbour's middle moves, and the host hears
     // the new order when it is let go of -- told before letting go forgets
     // the drag, which it did before this was said, the host never hearing
     // and filling the strip back in the old order on the next keystroke.
-    template<> template<>
-    void altabstrip_object::test<8>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a tab dragged past its neighbour moves; the new order told on release", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         strip->setTabs(three(), "a");
@@ -399,17 +480,23 @@ namespace tut
         const LLRect second = strip->rectOf(1);
         strip->handleMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
         strip->handleHover(second.getCenterX() + 4, second.getCenterY(), MASK_NONE);
-        ensure("dragged past its neighbour, it moved", strip->tabs()[1].value == "a");
-        ensure("nothing said while it is held", orders.empty());
+        REQUIRE(strip->tabs().size() == 3u);
+        UNSCOPED_INFO("dragged past its neighbour, it moved");
+        CHECK(strip->tabs()[1].value == "a");
+        UNSCOPED_INFO("nothing said while it is held");
+        REQUIRE(orders.empty());
         strip->handleMouseUp(second.getCenterX() + 4, second.getCenterY(), MASK_NONE);
-        ensure_equals("let go of, the order is told", orders.size(), (size_t)1);
-        ensure("as it now is", orders.back() == std::vector<std::string>({ "b", "a", "c" }));
+        UNSCOPED_INFO("let go of, the order is told");
+        REQUIRE(orders.size() == (size_t)1);
+        UNSCOPED_INFO("as it now is");
+        CHECK(orders.back() == std::vector<std::string>({ "b", "a", "c" }));
 
         // A press that never travelled is a press, and says no order.
         const LLRect third = strip->rectOf(2);
         strip->handleMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
         strip->handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
-        ensure_equals("a press is not a drag", orders.size(), (size_t)1);
+        UNSCOPED_INFO("a press is not a drag");
+        REQUIRE(orders.size() == (size_t)1);
 
         // Taken away mid-drag, the tabs are where the drag left them, and
         // the host is told so.
@@ -417,8 +504,10 @@ namespace tut
         strip->handleMouseDown(strip->rectOf(0).getCenterX(), HEIGHT / 2, MASK_NONE);
         strip->handleHover(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
         gFocusMgr.setMouseCapture(nullptr);
-        ensure_equals("a drag cut short is told", orders.size(), (size_t)2);
-        ensure("where it got to", orders.back() == std::vector<std::string>({ "b", "a", "c" }));
+        UNSCOPED_INFO("a drag cut short is told");
+        REQUIRE(orders.size() == (size_t)2);
+        UNSCOPED_INFO("where it got to");
+        CHECK(orders.back() == std::vector<std::string>({ "b", "a", "c" }));
         strip->die();
     }
 
@@ -427,12 +516,11 @@ namespace tut
     // place. A drag goes on with the tab it began with; a way out pressed
     // closes the tab it was pressed on or nothing; and a press whose tab
     // has gone is let go of.
-    template<> template<>
-    void altabstrip_object::test<9>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a press held while the host refills the strip follows its tab", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         std::vector<std::vector<std::string>> orders;
@@ -450,9 +538,10 @@ namespace tut
         strip->setTabs(refill, "a");
         strip->handleHover(strip->rectOf(2).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
         strip->handleMouseUp(strip->rectOf(2).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
-        ensure_equals("told once", orders.size(), (size_t)1);
-        ensure("the tab dragged is the one pressed, to the end",
-               orders.back() == std::vector<std::string>({ "b", "c", "a" }));
+        UNSCOPED_INFO("told once");
+        REQUIRE(orders.size() == (size_t)1);
+        UNSCOPED_INFO("the tab dragged is the one pressed, to the end");
+        CHECK(orders.back() == std::vector<std::string>({ "b", "c", "a" }));
 
         // The way out of "b" pressed, then "a" gone from the strip: "c" now
         // sits where "b" was. Let go of there, nothing closes -- the press
@@ -463,13 +552,18 @@ namespace tut
         strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
         strip->setTabs({ tab("floater_b.xml", "b"), tab("panel_c.xml", "c") }, "b");
         strip->handleMouseUp(out.getCenterX(), out.getCenterY(), MASK_NONE);
-        ensure("not the tab that came to sit there", closed.empty());
+        UNSCOPED_INFO("not the tab that came to sit there");
+        REQUIRE(closed.empty());
         const LLRect moved = strip->closeRectOf(0);
         strip->handleHover(moved.getCenterX(), moved.getCenterY(), MASK_NONE);
         strip->handleMouseDown(moved.getCenterX(), moved.getCenterY(), MASK_NONE);
         strip->setTabs({ tab("floater_b.xml", "b"), tab("panel_c.xml", "c") }, "b");
         strip->handleMouseUp(moved.getCenterX(), moved.getCenterY(), MASK_NONE);
-        ensure("the tab pressed, followed", closed.size() == 1 && closed.back() == "b");
+        {
+            INFO("the tab pressed, followed");
+            REQUIRE(closed.size() == 1);
+            CHECK(closed.back() == "b");
+        }
 
         // A drag whose tab goes: let go of, nothing moves after, nothing
         // is told.
@@ -478,23 +572,29 @@ namespace tut
         strip->handleHover(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
         orders.clear();
         strip->setTabs({ tab("floater_b.xml", "b"), tab("panel_c.xml", "c") }, "b");
-        ensure("the press let go of", !strip->hasMouseCapture());
+        UNSCOPED_INFO("the press let go of");
+        CHECK_FALSE(strip->hasMouseCapture());
         strip->handleHover(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
         strip->handleMouseUp(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
-        ensure("nothing moved", strip->tabs()[0].value == "b" && strip->tabs()[1].value == "c");
-        ensure("nothing told", orders.empty());
+        {
+            INFO("nothing moved");
+            REQUIRE(strip->tabs().size() == 2u);
+            REQUIRE(strip->tabs()[0].value == "b");
+            CHECK(strip->tabs()[1].value == "c");
+        }
+        UNSCOPED_INFO("nothing told");
+        REQUIRE(orders.empty());
         strip->die();
     }
 
     // Whoever hears of a choice fills the strip afresh, as the studio does:
     // the value it heard stays the value, and the menu asked for by the
     // right button is about the tab pressed.
-    template<> template<>
-    void altabstrip_object::test<10>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a host that refills the strip on a choice keeps the value it heard", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         strip->setTabs(three(), "a");
@@ -509,24 +609,36 @@ namespace tut
         const LLRect second = strip->rectOf(1);
         strip->handleMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE);
         strip->handleMouseUp(second.getCenterX(), second.getCenterY(), MASK_NONE);
-        ensure("heard as it was chosen", heard.size() == 1 && heard.back() == "b");
-        ensure_equals("and chosen", strip->chosen(), std::string("b"));
+        {
+            INFO("heard as it was chosen");
+            REQUIRE(heard.size() == 1);
+            CHECK(heard.back() == "b");
+        }
+        UNSCOPED_INFO("and chosen");
+        CHECK(strip->chosen() == std::string("b"));
 
         const LLRect third = strip->rectOf(2);
         strip->handleRightMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
-        ensure("the right button chooses", heard.size() == 2 && heard.back() == "c");
-        ensure("and asks for a menu about it", menus.size() == 1 && menus.back() == "c");
+        {
+            INFO("the right button chooses");
+            REQUIRE(heard.size() == 2);
+            CHECK(heard.back() == "c");
+        }
+        {
+            INFO("and asks for a menu about it");
+            REQUIRE(menus.size() == 1);
+            CHECK(menus.back() == "c");
+        }
         strip->die();
     }
     // With the keyboard: the arrows walk the tabs and the strip keeps the
     // keyboard while they do, Shift with an arrow moves the chosen one,
     // and what else the mouse does has a key.
-    template<> template<>
-    void altabstrip_object::test<11>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: the arrows walk the tabs and what the mouse does has a key", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         // A host that keeps its own order, fills the strip on every choice,
@@ -561,34 +673,68 @@ namespace tut
         strip->onMenu([&](const std::string& value, S32, S32) { menus.push_back(value); });
         strip->onListAsked([&]() { ++lists; });
 
-        ensure("reached by Tab", strip->hasTabStop());
-        ensure("the right arrow is taken", strip->handleKeyHere(KEY_RIGHT, MASK_NONE));
-        ensure("and chooses the next", chosen.size() == 1 && chosen.back() == "b" && strip->chosen() == "b");
-        ensure("and the strip keeps the keyboard", strip->hasFocus());
+        UNSCOPED_INFO("reached by Tab");
+        CHECK(strip->hasTabStop());
+        UNSCOPED_INFO("the right arrow is taken");
+        CHECK(strip->handleKeyHere(KEY_RIGHT, MASK_NONE));
+        {
+            INFO("and chooses the next");
+            REQUIRE(chosen.size() == 1);
+            CHECK(chosen.back() == "b");
+            CHECK(strip->chosen() == "b");
+        }
+        UNSCOPED_INFO("and the strip keeps the keyboard");
+        CHECK(strip->hasFocus());
         strip->handleKeyHere(KEY_END, MASK_NONE);
-        ensure_equals("End, the last", strip->chosen(), std::string("c"));
+        UNSCOPED_INFO("End, the last");
+        CHECK(strip->chosen() == std::string("c"));
         strip->handleKeyHere(KEY_RIGHT, MASK_NONE);
-        ensure("past the last, nothing more", chosen.size() == 2 && strip->chosen() == "c");
+        {
+            INFO("past the last, nothing more");
+            REQUIRE(chosen.size() == 2);
+            CHECK(strip->chosen() == "c");
+        }
         strip->handleKeyHere(KEY_HOME, MASK_NONE);
-        ensure_equals("Home, the first", strip->chosen(), std::string("a"));
+        UNSCOPED_INFO("Home, the first");
+        CHECK(strip->chosen() == std::string("a"));
 
-        ensure("Shift and right is taken", strip->handleKeyHere(KEY_RIGHT, MASK_SHIFT));
-        ensure("and moves the chosen tab along, told", orders.size() == 1 && orders.back() == std::vector<std::string>({ "b", "a", "c" }));
-        ensure("which is still chosen, where it went", strip->chosen() == "a" && strip->tabs()[1].value == "a");
+        UNSCOPED_INFO("Shift and right is taken");
+        CHECK(strip->handleKeyHere(KEY_RIGHT, MASK_SHIFT));
+        {
+            INFO("and moves the chosen tab along, told");
+            REQUIRE(orders.size() == 1);
+            CHECK(orders.back() == std::vector<std::string>({ "b", "a", "c" }));
+        }
+        {
+            INFO("which is still chosen, where it went");
+            REQUIRE(strip->chosen() == "a");
+            REQUIRE(strip->tabs().size() == 3u);
+            CHECK(strip->tabs()[1].value == "a");
+        }
         strip->handleKeyHere(KEY_LEFT, MASK_SHIFT);
         strip->handleKeyHere(KEY_LEFT, MASK_SHIFT);
-        ensure("back, and no further than the first", orders.size() == 2 && strip->tabs()[0].value == "a");
+        {
+            INFO("back, and no further than the first");
+            REQUIRE(orders.size() == 2);
+            REQUIRE(strip->tabs().size() == 3u);
+            CHECK(strip->tabs()[0].value == "a");
+        }
 
         strip->handleKeyHere(KEY_DELETE, MASK_NONE);
-        ensure("Delete closes the chosen", closed == std::vector<std::string>({ "a" }));
+        UNSCOPED_INFO("Delete closes the chosen");
+        CHECK(closed == std::vector<std::string>({ "a" }));
         strip->handleKeyHere(KEY_RETURN, MASK_NONE);
         strip->handleKeyHere(' ', MASK_NONE);
-        ensure("Return and Space hold it", held == std::vector<std::string>({ "a", "a" }));
+        UNSCOPED_INFO("Return and Space hold it");
+        CHECK(held == std::vector<std::string>({ "a", "a" }));
         strip->handleKeyHere(KEY_F10, MASK_SHIFT);
-        ensure("Shift-F10 asks for its menu", menus == std::vector<std::string>({ "a" }));
+        UNSCOPED_INFO("Shift-F10 asks for its menu");
+        CHECK(menus == std::vector<std::string>({ "a" }));
         strip->handleKeyHere(KEY_DOWN, MASK_NONE);
-        ensure_equals("the down arrow for the list", lists, 1);
-        ensure("anything else is not the strip's", !strip->handleKeyHere('Q', MASK_NONE));
+        UNSCOPED_INFO("the down arrow for the list");
+        CHECK(lists == 1);
+        UNSCOPED_INFO("anything else is not the strip's");
+        CHECK_FALSE(strip->handleKeyHere('Q', MASK_NONE));
         gFocusMgr.setKeyboardFocus(nullptr);
         strip->die();
     }
@@ -596,12 +742,11 @@ namespace tut
     // A tab pulled well off the strip and let go of is torn out: said by
     // its value and where on the screen, and the order left as it was; let
     // go of on the strip, it is not.
-    template<> template<>
-    void altabstrip_object::test<12>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a tab pulled well off the strip and let go of is torn out", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         strip->setTabs(three(), "a");
@@ -616,59 +761,77 @@ namespace tut
         const LLRect second = strip->rectOf(1);
         strip->handleMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE);
         strip->handleHover(second.getCenterX(), second.getCenterY() - 10, MASK_NONE);
-        ensure("a little off the strip is still along it", !strip->tearing());
+        UNSCOPED_INFO("a little off the strip is still along it");
+        CHECK_FALSE(strip->tearing());
         strip->handleHover(second.getCenterX() + 5, -120, MASK_NONE);
-        ensure("well off it, torn", strip->tearing());
+        UNSCOPED_INFO("well off it, torn");
+        CHECK(strip->tearing());
         strip->handleMouseUp(second.getCenterX() + 5, -120, MASK_NONE);
-        ensure_equals("said once", torn.size(), size_t(1));
-        ensure_equals("which", torn.front(), std::string("b"));
+        UNSCOPED_INFO("said once");
+        REQUIRE(torn.size() == size_t(1));
+        CHECK(torn.front() == std::string("b"));
         S32 screen_x = 0, screen_y = 0;
         strip->localPointToScreen(second.getCenterX() + 5, -120, &screen_x, &screen_y);
-        ensure("where, on the screen", where.front() == std::make_pair(screen_x, screen_y));
-        ensure("no longer tearing", !strip->tearing());
-        ensure("and the order as it was", orders.empty() || orders.back() == std::vector<std::string>({ "a", "b", "c" }));
+        REQUIRE(where.size() == size_t(1));
+        UNSCOPED_INFO("where, on the screen");
+        CHECK(where.front() == std::make_pair(screen_x, screen_y));
+        UNSCOPED_INFO("no longer tearing");
+        CHECK_FALSE(strip->tearing());
+        UNSCOPED_INFO("and the order as it was");
+        REQUIRE((orders.empty() || orders.back() == std::vector<std::string>({ "a", "b", "c" })));
 
         // Pulled off and brought back: moved along the strip, not torn.
         strip->handleMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE);
         strip->handleHover(second.getCenterX(), -120, MASK_NONE);
         strip->handleHover(strip->rectOf(2).getCenterX() + 10, second.getCenterY(), MASK_NONE);
-        ensure("back on the strip", !strip->tearing());
+        UNSCOPED_INFO("back on the strip");
+        CHECK_FALSE(strip->tearing());
         strip->handleMouseUp(strip->rectOf(2).getCenterX() + 10, second.getCenterY(), MASK_NONE);
-        ensure_equals("not torn", torn.size(), size_t(1));
-        ensure("moved along instead", !orders.empty() && orders.back() == std::vector<std::string>({ "a", "c", "b" }));
+        UNSCOPED_INFO("not torn");
+        REQUIRE(torn.size() == size_t(1));
+        {
+            INFO("moved along instead");
+            REQUIRE_FALSE(orders.empty());
+            CHECK(orders.back() == std::vector<std::string>({ "a", "c", "b" }));
+        }
         strip->die();
     }
 
     // With no tab at all, an arrow walks nowhere and is still the strip's:
     // passed on, it would walk the avatar.
-    template<> template<>
-    void altabstrip_object::test<13>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: with no tabs an arrow key is still the strip's", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         strip->setTabs({}, "");
         for (KEY key : { KEY_LEFT, KEY_RIGHT, KEY_HOME, KEY_END })
         {
-            ensure("kept", strip->handleKeyHere(key, MASK_NONE));
+            CAPTURE(key);
+            UNSCOPED_INFO("kept");
+            REQUIRE(strip->handleKeyHere(key, MASK_NONE));
         }
-        ensure("another key not", !strip->handleKeyHere('X', MASK_NONE));
+        UNSCOPED_INFO("another key not");
+        CHECK_FALSE(strip->handleKeyHere('X', MASK_NONE));
         strip->setTabs(three(), "");
-        ensure("with tabs, the walk starts", strip->handleKeyHere(KEY_RIGHT, MASK_NONE) && strip->chosen() == "a");
+        {
+            INFO("with tabs, the walk starts");
+            REQUIRE(strip->handleKeyHere(KEY_RIGHT, MASK_NONE));
+            CHECK(strip->chosen() == "a");
+        }
         strip->die();
     }
 
     // One tab made again by its value: its dot and its tip change where it
     // is, and nothing moves; a longer name lays the tabs out again. A value
     // no tab has changes nothing.
-    template<> template<>
-    void altabstrip_object::test<14>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: setTab changes one tab in place by its value", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make(WIDTH * 2);
         strip->setTabs(three(), "b");
@@ -677,26 +840,45 @@ namespace tut
         dirty.dirty            = true;
         dirty.toolTip          = "unsaved";
         dirty.badge            = LLColor4::red;
-        ensure("found", strip->setTab(dirty));
-        ensure("changed in place", strip->tabs()[1].dirty && strip->tabs()[1].toolTip == "unsaved" && strip->tabs()[1].badge == LLColor4::red);
-        ensure("the others as they were", strip->tabs()[0].label == "floater_a.xml" && !strip->tabs()[2].dirty);
-        ensure("nothing moved", strip->rectOf(2) == before && strip->chosen() == "b");
+        UNSCOPED_INFO("found");
+        CHECK(strip->setTab(dirty));
+        REQUIRE(strip->tabs().size() == 3u);
+        {
+            INFO("changed in place");
+            REQUIRE(strip->tabs()[1].dirty);
+            REQUIRE(strip->tabs()[1].toolTip == "unsaved");
+            CHECK(strip->tabs()[1].badge == LLColor4::red);
+        }
+        {
+            INFO("the others as they were");
+            REQUIRE(strip->tabs()[0].label == "floater_a.xml");
+            CHECK_FALSE(strip->tabs()[2].dirty);
+        }
+        {
+            INFO("nothing moved");
+            REQUIRE(strip->rectOf(2) == before);
+            CHECK(strip->chosen() == "b");
+        }
 
-        ensure("a longer name", strip->setTab(tab("floater_b_with_a_much_longer_name.xml", "b")));
-        ensure("the tabs after it moved along: " + std::to_string(strip->rectOf(2).mLeft) + " > " + std::to_string(before.mLeft),
-               strip->rectOf(2).mLeft > before.mLeft);
-        ensure("no such tab", !strip->setTab(tab("gone.xml", "z")) && strip->tabs().size() == 3);
+        UNSCOPED_INFO("a longer name");
+        CHECK(strip->setTab(tab("floater_b_with_a_much_longer_name.xml", "b")));
+        UNSCOPED_INFO("the tabs after it moved along");
+        CHECK(strip->rectOf(2).mLeft > before.mLeft);
+        {
+            INFO("no such tab");
+            REQUIRE_FALSE(strip->setTab(tab("gone.xml", "z")));
+            REQUIRE(strip->tabs().size() == 3);
+        }
         strip->die();
     }
     // Where each tab starts is summed once as they are laid out: forty tabs
     // of every width run edge to edge a gap apart, each found under its own
     // middle, scrolled or not, and again once their names change.
-    template<> template<>
-    void altabstrip_object::test<15>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: forty tabs lie a gap apart and each is found under its middle", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip* strip = make();
         const auto  many  = [](const char* stem) {
@@ -707,61 +889,72 @@ namespace tut
             }
             return tabs;
         };
-        const auto check = [&](const std::string& what) {
+        const auto require_laid_out = [&](const std::string& what) {
+            INFO(what);
             const S32 gap = strip->rectOf(1).mLeft - strip->rectOf(0).mRight;
             for (size_t i = 0; i + 1 < 40; ++i)
             {
-                ensure_equals(what + ": tab " + std::to_string(i + 1) + " a gap after the one before", strip->rectOf(i + 1).mLeft - strip->rectOf(i).mRight, gap);
+                CAPTURE(i + 1);
+                UNSCOPED_INFO("a gap after the one before");
+                REQUIRE(strip->rectOf(i + 1).mLeft - strip->rectOf(i).mRight == gap);
             }
             for (size_t i = 0; i < 40; ++i)
             {
                 const LLRect r = strip->rectOf(i);
                 if (r.getCenterX() >= 0 && r.getCenterX() < strip->getRect().getWidth() - 40)
                 {
-                    ensure_equals(what + ": the tab under its own middle", strip->at(r.getCenterX(), r.getCenterY()), (S32)i);
+                    CAPTURE(i);
+                    UNSCOPED_INFO("the tab under its own middle");
+                    REQUIRE(strip->at(r.getCenterX(), r.getCenterY()) == (S32)i);
                 }
             }
         };
         strip->setTabs(many("panel_"), "0");
-        check("from the start");
+        require_laid_out("from the start");
         strip->choose("39");
-        ensure("scrolled to the last", strip->rectOf(0).mLeft < 0);
-        check("scrolled");
+        UNSCOPED_INFO("scrolled to the last");
+        CHECK(strip->rectOf(0).mLeft < 0);
+        require_laid_out("scrolled");
         strip->setTabs(many("a_much_longer_name_"), "39");
-        check("renamed");
+        require_laid_out("renamed");
         strip->die();
     }
 
     // A name cut to fit is cut between characters as a reader sees them: a
     // letter kept before the extension keeps the mark on it, and the
     // ellipsis goes before the two rather than between them.
-    template<> template<>
-    void altabstrip_object::test<16>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a name cut to fit is cut between characters as a reader sees them", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const LLFontGL*   font = LLFontGL::getFontSansSerifSmall();
         // An e with a combining dot below and a combining acute, two
         // letters before .lsl.
         const std::string name = "a_very_long_name_that_wants_a_great_deal_of_room_xe\xCC\xA3\xCC\x81yz.lsl";
         const std::string cut  = ALTabStrip::shortened(font, name, font->getWidth(name) / 2);
-        ensure("cut, with an ellipsis: " + cut, cut.size() < name.size() && cut.find("\xE2\x80\xA6") != std::string::npos);
-        ensure("the extension kept: " + cut, cut.compare(cut.size() - 4, 4, ".lsl") == 0);
-        ensure("no mark after the ellipsis, parted from its e: " + cut, cut.find("\xE2\x80\xA6\xCC") == std::string::npos);
-        ensure("the e kept with both its marks: " + cut, cut.find("e\xCC\xA3\xCC\x81") != std::string::npos);
+        {
+            INFO("cut, with an ellipsis: " << cut);
+            REQUIRE(cut.size() < name.size());
+            REQUIRE(cut.find("\xE2\x80\xA6") != std::string::npos);
+        }
+        UNSCOPED_INFO("the extension kept: " << cut);
+        REQUIRE(cut.ends_with(".lsl"));
+        UNSCOPED_INFO("no mark after the ellipsis, parted from its e: " << cut);
+        REQUIRE(cut.find("\xE2\x80\xA6\xCC") == std::string::npos);
+        UNSCOPED_INFO("the e kept with both its marks: " << cut);
+        REQUIRE(cut.find("e\xCC\xA3\xCC\x81") != std::string::npos);
     }
 
     // What a cut name keeps after its ellipsis: the extension and three
     // letters before it, or, where there is no extension, its last four
     // letters.
-    template<> template<>
-    void altabstrip_object::test<17>()
+    TEST_CASE_METHOD(altabstrip_data, "altabstrip: a cut name keeps its extension or last letters after the ellipsis", "[altabstrip]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const LLFontGL*   font     = LLFontGL::getFontSansSerifSmall();
         const std::string ellipsis = "\xE2\x80\xA6";
@@ -770,7 +963,9 @@ namespace tut
             const size_t      at  = cut.rfind(ellipsis);
             return at == std::string::npos ? std::string() : cut.substr(at + ellipsis.size());
         };
-        ensure_equals("three letters and the extension", kept("a_very_long_name_that_wants_a_great_deal_of_room.lsl"), std::string("oom.lsl"));
-        ensure_equals("four letters, with no extension", kept("a_very_long_name_that_wants_a_great_deal_of_room"), std::string("room"));
+        UNSCOPED_INFO("three letters and the extension");
+        CHECK(kept("a_very_long_name_that_wants_a_great_deal_of_room.lsl") == std::string("oom.lsl"));
+        UNSCOPED_INFO("four letters, with no extension");
+        CHECK(kept("a_very_long_name_that_wants_a_great_deal_of_room") == std::string("room"));
     }
 }

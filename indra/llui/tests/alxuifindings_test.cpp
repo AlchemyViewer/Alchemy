@@ -26,9 +26,9 @@
 
 #include "alxuifindings.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alxuifindings_data
     {
@@ -65,41 +65,41 @@ namespace tut
         }
     };
 
-    typedef test_group<alxuifindings_data> alxuifindings_test;
-    typedef alxuifindings_test::object     alxuifindings_object;
-    tut::alxuifindings_test alxuifindings_testgroup("alxuifindings");
-
     // The questions a report cannot be asked: how many, of what, and where.
-    template<> template<>
-    void alxuifindings_object::test<1>()
+    TEST_CASE_METHOD(alxuifindings_data, "alxuifindings: the store counts findings by severity and by file and by fix", "[alxuifindings]")
     {
         ALXUIFindings store;
-        ensure_equals("nothing yet", store.size(), 0u);
+        UNSCOPED_INFO("nothing yet");
+        CHECK(store.size() == 0u);
         fill(store);
 
-        ensure_equals("everything", store.size(), 4u);
-        ensure_equals("errors", store.count(ALXUILint::Severity::Error), 1);
-        ensure_equals("warnings", store.count(ALXUILint::Severity::Warning), 2);
-        ensure_equals("notes", store.count(ALXUILint::Severity::Note), 1);
-        ensure_equals("in one of them", store.countIn("one.xml"), 3);
-        ensure_equals("and in the other", store.countIn("two.xml"), 1);
-        ensure_equals("the ones that offer a fix", store.countFixable(), 3);
-        ensure_equals("two files", store.files().size(), 2u);
+        CHECK(store.size() == 4u);
+        CHECK(store.count(ALXUILint::Severity::Error) == 1);
+        CHECK(store.count(ALXUILint::Severity::Warning) == 2);
+        CHECK(store.count(ALXUILint::Severity::Note) == 1);
+        CHECK(store.countIn("one.xml") == 3);
+        CHECK(store.countIn("two.xml") == 1);
+        UNSCOPED_INFO("the ones that offer a fix");
+        CHECK(store.countFixable() == 3);
+        CHECK(store.files().size() == 2u);
 
         // A file with nothing to say is still a file that was looked at, and
         // that is not the same answer as one nobody has checked.
-        ensure("one nobody checked", !store.checked("three.xml"));
+        UNSCOPED_INFO("one nobody checked");
+        CHECK_FALSE(store.checked("three.xml"));
         store.replace("three.xml", std::vector<ALXUILint::Finding>());
-        ensure("one that was", store.checked("three.xml"));
-        ensure_equals("with nothing in it", store.countIn("three.xml"), 0);
-        ensure_equals("and nothing added to the whole", store.size(), 4u);
+        UNSCOPED_INFO("one that was");
+        CHECK(store.checked("three.xml"));
+        UNSCOPED_INFO("with nothing in it");
+        CHECK(store.countIn("three.xml") == 0);
+        UNSCOPED_INFO("and nothing added to the whole");
+        CHECK(store.size() == 4u);
     }
 
     // Checking a file again replaces what it said before and nothing else,
     // which is what lets the file in front of somebody be re-checked on every
     // rebuild while a pass over the rest of the tree fills in around it.
-    template<> template<>
-    void alxuifindings_object::test<2>()
+    TEST_CASE_METHOD(alxuifindings_data, "alxuifindings: checking a file again replaces only what it said before", "[alxuifindings]")
     {
         ALXUIFindings store;
         fill(store);
@@ -107,80 +107,90 @@ namespace tut
         store.replace("one.xml", {
             one(ALXUILint::Rule::Overlap, ALXUILint::Severity::Warning, "a", "overlaps b") });
 
-        ensure_equals("its own are gone", store.countIn("one.xml"), 1);
-        ensure_equals("the other file is untouched", store.countIn("two.xml"), 1);
-        ensure_equals("and the whole is the two of them", store.size(), 2u);
-        ensure_equals("the error went with the file that said it",
-                      store.count(ALXUILint::Severity::Error), 0);
-        ensure_equals("as did the fix it offered", store.countFixable(), 1);
-        ensure_equals("and it is still one of two files", store.files().size(), 2u);
+        UNSCOPED_INFO("its own are gone");
+        CHECK(store.countIn("one.xml") == 1);
+        UNSCOPED_INFO("the other file is untouched");
+        CHECK(store.countIn("two.xml") == 1);
+        UNSCOPED_INFO("and the whole is the two of them");
+        CHECK(store.size() == 2u);
+        UNSCOPED_INFO("the error went with the file that said it");
+        CHECK(store.count(ALXUILint::Severity::Error) == 0);
+        UNSCOPED_INFO("as did the fix it offered");
+        CHECK(store.countFixable() == 1);
+        UNSCOPED_INFO("and it is still one of two files");
+        CHECK(store.files().size() == 2u);
 
         store.forget("one.xml");
-        ensure("gone", !store.checked("one.xml"));
-        ensure_equals("one file left", store.files().size(), 1u);
-        ensure_equals("and one finding", store.size(), 1u);
+        CHECK_FALSE(store.checked("one.xml"));
+        CHECK(store.files().size() == 1u);
+        CHECK(store.size() == 1u);
 
         store.clear();
-        ensure_equals("nothing at all", store.size(), 0u);
-        ensure_equals("no files", store.files().size(), 0u);
-        ensure_equals("and no count of anything", store.count(ALXUILint::Severity::Warning), 0);
+        CHECK(store.size() == 0u);
+        CHECK(store.files().size() == 0u);
+        UNSCOPED_INFO("and no count of anything");
+        CHECK(store.count(ALXUILint::Severity::Warning) == 0);
     }
 
     // Every field of a query widens rather than narrows, so one nobody
     // filled in selects the lot -- and each field named takes a slice.
-    template<> template<>
-    void alxuifindings_object::test<3>()
+    TEST_CASE_METHOD(alxuifindings_data, "alxuifindings: an empty query selects everything and each field named takes a slice", "[alxuifindings]")
     {
         ALXUIFindings store;
         fill(store);
 
         ALXUIFindings::Query all;
-        ensure_equals("a query nobody filled in", store.select(all).found.size(), 4u);
+        UNSCOPED_INFO("a query nobody filled in");
+        CHECK(store.select(all).found.size() == 4u);
 
         ALXUIFindings::Query here;
         here.file = "one.xml";
-        ensure_equals("one file", store.select(here).found.size(), 3u);
+        CHECK(store.select(here).found.size() == 3u);
 
         ALXUIFindings::Query loud;
         loud.notes = false;
-        ensure_equals("without the quiet ones", store.select(loud).found.size(), 3u);
+        UNSCOPED_INFO("without the quiet ones");
+        CHECK(store.select(loud).found.size() == 3u);
 
         ALXUIFindings::Query broken;
         broken.warnings = false;
         broken.notes = false;
-        ensure_equals("only what does not work", store.select(broken).found.size(), 1u);
-        ensure_equals("which is the one that names a file",
-                      store.select(broken).found.front()->what, std::string("filename"));
+        UNSCOPED_INFO("only what does not work");
+        REQUIRE(store.select(broken).found.size() == 1u);
+        UNSCOPED_INFO("which is the one that names a file");
+        CHECK(store.select(broken).found.front()->what == std::string("filename"));
 
         ALXUIFindings::Query named;
         named.rule = ALXUILint::ruleName(ALXUILint::Rule::UnknownAttribute);
-        ensure_equals("by rule", store.select(named).found.size(), 2u);
+        CHECK(store.select(named).found.size() == 2u);
 
         ALXUIFindings::Query mendable;
         mendable.fixable = true;
-        ensure_equals("only the ones that offer something", store.select(mendable).found.size(), 3u);
+        UNSCOPED_INFO("only the ones that offer something");
+        CHECK(store.select(mendable).found.size() == 3u);
 
         // The filter reads the message, the name at fault, the element and
         // the file, because any of the four is what somebody has in mind.
         ALXUIFindings::Query word;
         word.text = "DYNAMIC";
-        ensure_equals("a word, whatever case it is typed in",
-                      store.select(word).found.size(), 1u);
+        UNSCOPED_INFO("a word, whatever case it is typed in");
+        CHECK(store.select(word).found.size() == 1u);
         word.text = "two";
-        ensure_equals("or the file it is in", store.select(word).found.size(), 1u);
+        UNSCOPED_INFO("or the file it is in");
+        CHECK(store.select(word).found.size() == 1u);
 
         // Narrowed to nothing is an answer too.
         ALXUIFindings::Query none;
         none.file = "two.xml";
         none.rule = ALXUILint::ruleName(ALXUILint::Rule::FileMissing);
-        ensure_equals("and nothing is what it says", store.select(none).found.size(), 0u);
+        UNSCOPED_INFO("and nothing is what it says");
+        CHECK(store.select(none).found.size() == 0u);
     }
 
     // A tree's worth of findings is more rows than any list can hold, so a
     // query says how many it will take -- and answers how many there were,
     // since a list showing the first of something has to say so.
-    template<> template<>
-    void alxuifindings_object::test<4>()
+    TEST_CASE_METHOD(alxuifindings_data, "alxuifindings: a query's limit caps the rows it returns but not the total", "[alxuifindings]")
     {
         ALXUIFindings store;
         fill(store);
@@ -188,37 +198,41 @@ namespace tut
         ALXUIFindings::Query capped;
         capped.limit = 2;
         const ALXUIFindings::Selected selected = store.select(capped);
-        ensure_equals("as many as were asked for", selected.found.size(), 2u);
-        ensure_equals("out of how many there are", selected.total, 4u);
+        UNSCOPED_INFO("as many as were asked for");
+        CHECK(selected.found.size() == 2u);
+        UNSCOPED_INFO("out of how many there are");
+        CHECK(selected.total == 4u);
     }
 
     // Which rules the findings in hand are of, and how many of each: what a
     // filter offering them has to be built from, most first so that the
     // biggest heap is the first thing offered.
-    template<> template<>
-    void alxuifindings_object::test<5>()
+    TEST_CASE_METHOD(alxuifindings_data, "alxuifindings: byRule counts the findings of each rule with the most first", "[alxuifindings]")
     {
         ALXUIFindings store;
         fill(store);
 
         const std::vector<std::pair<std::string, S32> > rules = store.byRule();
-        ensure_equals("three rules said something", rules.size(), 3u);
-        ensure_equals("the most said first", rules.front().first,
+        UNSCOPED_INFO("three rules said something");
+        REQUIRE(rules.size() == 3u);
+        UNSCOPED_INFO("the most said first");
+        CHECK(rules.front().first ==
                       std::string(ALXUILint::ruleName(ALXUILint::Rule::UnknownAttribute)));
-        ensure_equals("twice", rules.front().second, 2);
+        UNSCOPED_INFO("twice");
+        CHECK(rules.front().second == 2);
 
         S32 total = 0;
         for (const auto& [rule, count] : rules)
         {
             total += count;
         }
-        ensure_equals("and they add up to what is held", total, 4);
+        UNSCOPED_INFO("and they add up to what is held");
+        CHECK(total == 4);
     }
     // Checked again, a file keeps its place among the files, and its
     // findings theirs among everyone's: the file in front is re-checked on
     // every rebuild, and its rows do not jump to the end of the list.
-    template<> template<>
-    void alxuifindings_object::test<6>()
+    TEST_CASE_METHOD(alxuifindings_data, "alxuifindings: a file checked again keeps its place and so do its findings", "[alxuifindings]")
     {
         ALXUIFindings store;
         fill(store);
@@ -227,15 +241,19 @@ namespace tut
 
         store.replace("one.xml", {
             one(ALXUILint::Rule::Overlap, ALXUILint::Severity::Warning, "a", "overlaps b") });
-        ensure("still first of the files", store.files() == std::vector<std::string>({ "one.xml", "two.xml", "three.xml" }));
+        UNSCOPED_INFO("still first of the files");
+        CHECK(store.files() == std::vector<std::string>({ "one.xml", "two.xml", "three.xml" }));
         const auto selected = store.select(ALXUIFindings::Query());
-        ensure_equals("three findings", selected.found.size(), size_t(3));
-        ensure_equals("its own first", selected.found.front()->what, std::string("a"));
+        REQUIRE(selected.found.size() == size_t(3));
+        UNSCOPED_INFO("its own first");
+        CHECK(selected.found.front()->what == std::string("a"));
 
         // Let go of and checked again, it is a file checked anew, at the end.
         store.forget("one.xml");
         store.replace("one.xml", std::vector<ALXUILint::Finding>());
-        ensure("at the end", store.files() == std::vector<std::string>({ "two.xml", "three.xml", "one.xml" }));
-        ensure_equals("counted once", store.files().size(), size_t(3));
+        UNSCOPED_INFO("at the end");
+        CHECK(store.files() == std::vector<std::string>({ "two.xml", "three.xml", "one.xml" }));
+        UNSCOPED_INFO("counted once");
+        CHECK(store.files().size() == size_t(3));
     }
 }

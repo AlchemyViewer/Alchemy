@@ -42,7 +42,6 @@
 #include "llerror.h"
 #include "llfocusmgr.h"
 #include "llviewercontrol.h"
-#include "llfasttimer.h"
 #include "llfontgl.h"
 #include "llfonttextcache.h"
 #include "llnamevalue.h"
@@ -3110,7 +3109,7 @@ void LLPipeline::updateReverseZ()
 
 void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE; //LL_RECORD_BLOCK_TIME(FTM_CULL);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("updateCull"); // should always be zero GPU time, but drop a timer to flush stuff out
 
     bool water_clip = isWaterClip();
@@ -3852,7 +3851,7 @@ void LLPipeline::stateSort(LLCamera& camera, LLCullResult &result)
     }
 
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWABLE("stateSort"); // LL_RECORD_BLOCK_TIME(FTM_STATESORT_DRAWABLE);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWABLE("stateSort");
         for (LLCullResult::drawable_iterator iter = sCull->beginVisibleList();
              iter != sCull->endVisibleList(); ++iter)
         {
@@ -4450,7 +4449,7 @@ void LLPipeline::postSort(LLCamera &camera)
 
 void render_hud_elements()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI; //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     gPipeline.disableLights();
 
     LLGLSUIDefault gls_ui;
@@ -4602,7 +4601,7 @@ U32 LLPipeline::sCurRenderPoolType = 0 ;
 void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
 {
     LLAppViewer::instance()->pingMainloopTimeout("Pipeline:RenderGeomDeferred");
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_GEOMETRY);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LL_PROFILE_GPU_ZONE("renderGeomDeferred");
 
     llassert(!sRenderingHUDs);
@@ -12068,7 +12067,7 @@ inline float sgn(float a)
 
 void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_RENDER);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("renderShadow");
 
     LLPipeline::sShadowRender = true;
@@ -12152,7 +12151,7 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
             gGL.setColorMask(false, false);
         }
 
-        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow simple"); //LL_RECORD_BLOCK_TIME(FTM_SHADOW_SIMPLE);
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("shadow simple");
         LL_PROFILE_GPU_ZONE("shadow simple");
         gGL.getTextureSlot(0)->unbind();
 
@@ -12592,7 +12591,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         return;
     }
 
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE; //LL_RECORD_BLOCK_TIME(FTM_GEN_SUN_SHADOW);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("generateSunShadow");
 
     LLDisableOcclusionCulling no_occlusion;

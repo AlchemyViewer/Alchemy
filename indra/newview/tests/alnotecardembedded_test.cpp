@@ -40,7 +40,7 @@
 
 #include "../../llui/tests/alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <functional>
 #include <memory>
@@ -99,7 +99,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alnotecardembedded_data
     {
@@ -125,7 +125,7 @@ namespace tut
         {
             if (!ll_test::HeadlessUI::get().ok())
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             notecard.object.generate();
             notecard.item.generate();
@@ -183,123 +183,168 @@ namespace tut
             return accept;
         }
     };
-    typedef test_group<alnotecardembedded_data> alnotecardembedded_group;
-    typedef alnotecardembedded_group::object    alnotecardembedded_object;
-    alnotecardembedded_group                    alnotecardembedded_instance("ALNotecardEmbedded");
 
-    template<> template<>
-    void alnotecardembedded_object::test<1>()
+    TEST_CASE_METHOD(alnotecardembedded_data, "ALNotecardEmbedded: a save sends only the items the text stands and renumbers them in order", "[ALNotecardEmbedded]")
     {
-        set_test_name("a save sends only the items the text still stands, numbered afresh in the order it stands them");
         const auto a = item("A"), b = item("B"), c = item("C");
         ALNotecardEmbedded& card = make("one " + at(2) + " two " + at(0) + "\n", { a, b, c });
-        ensure("a button over each item the text stands", view->atomAt(ALTextPos(0, 4)) != nullptr);
+        {
+            INFO("a button over each item the text stands");
+            CHECK(view->atomAt(ALTextPos(0, 4)) != nullptr);
+            CHECK(view->atomAt(ALTextPos(0, 13)) != nullptr);
+        }
         std::string                  text;
         ALNotecardEmbedded::items_t items;
         card.forSave(text, items);
-        ensure_equals("renumbered", text, "one " + at(0) + " two " + at(1) + "\n");
-        ensure("C, then A; B left behind", items.size() == 2 && items[0] == c && items[1] == a);
-        ensure_equals("the editor's own text as it was", view->text(), "one " + at(2) + " two " + at(0) + "\n");
+        UNSCOPED_INFO("renumbered");
+        CHECK(text == "one " + at(0) + " two " + at(1) + "\n");
+        {
+            INFO("C, then A; B left behind");
+            REQUIRE(items.size() == 2);
+            CHECK(items[0] == c);
+            CHECK(items[1] == a);
+        }
+        UNSCOPED_INFO("the editor's own text as it was");
+        CHECK(view->text() == "one " + at(2) + " two " + at(0) + "\n");
     }
 
-    template<> template<>
-    void alnotecardembedded_object::test<2>()
+    TEST_CASE_METHOD(alnotecardembedded_data, "ALNotecardEmbedded: items dropped together land in a row and a later drop at the pointer", "[ALNotecardEmbedded]")
     {
-        set_test_name("several items dropped together land one after another; a later drop lands at the pointer");
         const auto a = item("A"), b = item("B"), c = item("C");
         make("text\n");
         const LLRect    rect  = view->textRect();
         const ALTextPos where = view->posAtLocal(rect.mLeft + 1, rect.mTop - 2, true);
-        ensure("taken", drop(a, true) == ACCEPT_YES_COPY_MULTI);
-        ensure("taken", drop(b, true) == ACCEPT_YES_COPY_MULTI);
+        CHECK(drop(a, true) == ACCEPT_YES_COPY_MULTI);
+        CHECK(drop(b, true) == ACCEPT_YES_COPY_MULTI);
         const std::string line = view->document().line(where.line);
-        ensure_equals("A, then B after it", line.substr(where.column, 8), at(0) + at(1));
-        ensure("each with its button", view->atomAt(ALTextPos(where.line, where.column)) && view->atomAt(ALTextPos(where.line, where.column + 4)));
+        UNSCOPED_INFO("A, then B after it");
+        CHECK(line.substr(where.column, 8) == at(0) + at(1));
+        {
+            INFO("each with its button");
+            REQUIRE(view->atomAt(ALTextPos(where.line, where.column)));
+            REQUIRE(view->atomAt(ALTextPos(where.line, where.column + 4)));
+        }
         world.frameNow = 2;
         drop(c, true);
-        ensure_equals("a new frame's drop lands where the pointer is", view->document().line(where.line).substr(where.column, 4), at(2));
-        ensure_equals("three carried", tab->items().size(), size_t(3));
-        ensure("one undo takes the last away", view->undoJournal().canUndo());
+        UNSCOPED_INFO("a new frame's drop lands where the pointer is");
+        CHECK(view->document().line(where.line).substr(where.column, 4) == at(2));
+        REQUIRE(tab->items().size() == size_t(3));
+        view->undo();
+        UNSCOPED_INFO("one undo takes the last away");
+        CHECK(view->document().line(where.line).substr(where.column, 8) == at(0) + at(1));
     }
 
-    template<> template<>
-    void alnotecardembedded_object::test<3>()
+    TEST_CASE_METHOD(alnotecardembedded_data, "ALNotecardEmbedded: a drop of what a notecard may not carry is refused and says why", "[ALNotecardEmbedded]")
     {
-        set_test_name("a drop is refused, and says why, for what a notecard may not carry");
         make("text\n");
         std::string tip;
-        ensure("not whole to the next owner", drop(item("A", false), false, &tip) == ACCEPT_NO && !tip.empty());
+        {
+            INFO("not whole to the next owner");
+            CHECK(drop(item("A", false), false, &tip) == ACCEPT_NO);
+            REQUIRE_FALSE(tip.empty());
+        }
         world.copyable = false;
-        ensure("not the agent's to copy", drop(item("B"), false, &tip) == ACCEPT_NO);
-        ensure("said so", !tip.empty());
+        UNSCOPED_INFO("not the agent's to copy");
+        CHECK(drop(item("B"), false, &tip) == ACCEPT_NO);
+        UNSCOPED_INFO("said so");
+        REQUIRE_FALSE(tip.empty());
         world.copyable = true;
         world.settings = false;
-        ensure("settings where the grid has none", drop(item("C"), false, &tip, DAD_SETTINGS) == ACCEPT_NO);
+        UNSCOPED_INFO("settings where the grid has none");
+        CHECK(drop(item("C"), false, &tip, DAD_SETTINGS) == ACCEPT_NO);
         world.fromNotecard = true;
         EAcceptance accept = ACCEPT_YES_COPY_MULTI;
         std::string ignored;
-        ensure("out of another notecard: left to someone else", !tab->drop(1, 1, false, DAD_NOTECARD, item("D").get(), &accept, ignored));
+        UNSCOPED_INFO("out of another notecard: left to someone else");
+        CHECK_FALSE(tab->drop(1, 1, false, DAD_NOTECARD, item("D").get(), &accept, ignored));
         world.fromNotecard = false;
         changeable         = false;
-        ensure("a notecard that may not be changed", drop(item("E"), false, &tip) == ACCEPT_NO);
-        ensure("said so", !tip.empty());
-        ensure("nothing taken", tab->items().empty());
+        UNSCOPED_INFO("a notecard that may not be changed");
+        CHECK(drop(item("E"), false, &tip) == ACCEPT_NO);
+        UNSCOPED_INFO("said so");
+        REQUIRE_FALSE(tip.empty());
+        UNSCOPED_INFO("nothing taken");
+        REQUIRE(tab->items().empty());
     }
 
-    template<> template<>
-    void alnotecardembedded_object::test<4>()
+    TEST_CASE_METHOD(alnotecardembedded_data, "ALNotecardEmbedded: only the saved asset's items copy out and a late answer does nothing", "[ALNotecardEmbedded]")
     {
-        set_test_name("only what the saved asset carries is copied out; a save changes what that is; an answer after the tab has gone does nothing");
         const auto saved = item("Saved"), dropped = item("Dropped");
         ALNotecardEmbedded& card = make(at(0) + "\n", { saved });
         drop(dropped, true);
 
-        ensure("a drop not saved: refused", !card.copy(dropped, LLUUID::null));
-        ensure("said so, as an error", !said.empty() && said.back().second && said.back().first.find("Dropped") != std::string::npos);
-        ensure("nothing asked of the region", world.copies.empty());
-        ensure("one saved: asked", card.copy(saved, LLUUID::null) && world.copies.size() == 1 && world.copies.back() == saved->getUUID());
+        UNSCOPED_INFO("a drop not saved: refused");
+        CHECK_FALSE(card.copy(dropped, LLUUID::null));
+        {
+            INFO("said so, as an error");
+            REQUIRE_FALSE(said.empty());
+            CHECK(said.back().second);
+            REQUIRE(said.back().first.find("Dropped") != std::string::npos);
+        }
+        UNSCOPED_INFO("nothing asked of the region");
+        REQUIRE(world.copies.empty());
+        {
+            INFO("one saved: asked");
+            CHECK(card.copy(saved, LLUUID::null));
+            REQUIRE(world.copies.size() == 1);
+            CHECK(world.copies.back() == saved->getUUID());
+        }
         world.refused("no such item");
-        ensure("the region's no, said", said.back().second && said.back().first.find("Saved") != std::string::npos &&
-                                            said.back().first.find("no such item") != std::string::npos);
+        {
+            INFO("the region's no, said");
+            CHECK(said.back().second);
+            REQUIRE(said.back().first.find("Saved") != std::string::npos);
+            REQUIRE(said.back().first.find("no such item") != std::string::npos);
+        }
 
         // Saved with only the drop in it.
         card.saved({ dropped->getUUID() });
-        ensure("the drop now", card.copy(dropped, LLUUID::null));
-        ensure("the old one no longer", !card.copy(saved, LLUUID::null));
+        UNSCOPED_INFO("the drop now");
+        CHECK(card.copy(dropped, LLUUID::null));
+        UNSCOPED_INFO("the old one no longer");
+        CHECK_FALSE(card.copy(saved, LLUUID::null));
 
         // Pressed: offered, where the world does not take it all.
         card.open(dropped);
-        ensure("asked whether to copy", world.confirms.size() == 1);
+        UNSCOPED_INFO("asked whether to copy");
+        REQUIRE(world.confirms.size() == 1);
         world.confirms.back()();
-        ensure("and copied on yes", world.copies.back() == dropped->getUUID());
+        UNSCOPED_INFO("and copied on yes");
+        CHECK(world.copies.back() == dropped->getUUID());
         const size_t copies = world.copies.size();
         card.open(saved);
-        ensure("not offered for what cannot be copied", world.confirms.size() == 1);
+        UNSCOPED_INFO("not offered for what cannot be copied");
+        REQUIRE(world.confirms.size() == 1);
 
         // The tab gone before the answers: nothing happens.
         card.open(dropped);
         const std::function<void()> late = world.confirms.back();
         tab.reset();
         late();
-        ensure("no copy asked for a tab that has gone", world.copies.size() == copies);
+        UNSCOPED_INFO("no copy asked for a tab that has gone");
+        REQUIRE(world.copies.size() == copies);
     }
 
-    template<> template<>
-    void alnotecardembedded_object::test<5>()
+    TEST_CASE_METHOD(alnotecardembedded_data, "ALNotecardEmbedded: asLLSD and fromLLSD keep each item in its place and a gap as a gap", "[ALNotecardEmbedded]")
     {
-        set_test_name("items kept and read back in their places");
         const auto a = item("A"), b = item("B");
         const LLSD                        kept = ALNotecardEmbedded::asLLSD({ a, LLPointer<LLInventoryItem>(), b });
         const ALNotecardEmbedded::items_t back = ALNotecardEmbedded::fromLLSD(kept);
-        ensure_equals("each in its place", back.size(), size_t(3));
-        ensure("a missing one stays missing", back[1].isNull());
-        ensure("the rest as they were", back[0]->getUUID() == a->getUUID() && back[2]->getName() == "B");
+        UNSCOPED_INFO("each in its place");
+        REQUIRE(back.size() == size_t(3));
+        UNSCOPED_INFO("a missing one stays missing");
+        REQUIRE(back[1].isNull());
+        {
+            INFO("the rest as they were");
+            REQUIRE(back[0].notNull());
+            CHECK(back[0]->getUUID() == a->getUUID());
+            REQUIRE(back[2].notNull());
+            CHECK(back[2]->getName() == "B");
+        }
     }
 
-    template<> template<>
-    void alnotecardembedded_object::test<6>()
+    TEST_CASE_METHOD(alnotecardembedded_data, "ALNotecardEmbedded: an item button dragged far drags a saved item out but not an unsaved one", "[ALNotecardEmbedded]")
     {
-        set_test_name("an item's button dragged far enough drags the item out of the notecard; one not saved yet is said to need a save");
         const auto saved = item("Saved"), dropped = item("Dropped");
         make(at(0) + "\n", { saved });
         drop(dropped, true);
@@ -316,41 +361,66 @@ namespace tut
             return nullptr;
         };
         LLButton* button = buttonOf(0);
-        ensure("a button over the saved item", button != nullptr);
+        UNSCOPED_INFO("a button over the saved item");
+        REQUIRE(button != nullptr);
         button->handleMouseDown(2, 2, MASK_NONE);
-        ensure("the press measured from", world.pressed);
+        UNSCOPED_INFO("the press measured from");
+        CHECK(world.pressed);
         button->handleHover(3, 3, MASK_NONE);
-        ensure("not far enough: no drag", world.dragged.empty());
+        UNSCOPED_INFO("not far enough: no drag");
+        REQUIRE(world.dragged.empty());
         world.past = true;
         button->handleHover(20, 3, MASK_NONE);
-        ensure("far enough: dragged out", world.dragged.size() == 1 && world.dragged.back() == saved->getUUID());
-        ensure("out of this notecard", world.draggedFrom.item == notecard.item && world.draggedFrom.object == notecard.object);
+        {
+            INFO("far enough: dragged out");
+            REQUIRE(world.dragged.size() == 1);
+            CHECK(world.dragged.back() == saved->getUUID());
+        }
+        {
+            INFO("out of this notecard");
+            CHECK(world.draggedFrom.item == notecard.item);
+            CHECK(world.draggedFrom.object == notecard.object);
+        }
         button->handleMouseUp(20, 3, MASK_NONE);
 
         LLButton* unsaved = buttonOf(1);
-        ensure("a button over the drop", unsaved != nullptr);
+        UNSCOPED_INFO("a button over the drop");
+        REQUIRE(unsaved != nullptr);
         said.clear();
         unsaved->handleMouseDown(2, 2, MASK_NONE);
         unsaved->handleHover(20, 3, MASK_NONE);
-        ensure("a drop not saved is not dragged out", world.dragged.size() == 1);
-        ensure("and a save is said to be needed", !said.empty() && said.back().second && said.back().first.find("Dropped") != std::string::npos);
+        UNSCOPED_INFO("a drop not saved is not dragged out");
+        REQUIRE(world.dragged.size() == 1);
+        {
+            INFO("and a save is said to be needed");
+            REQUIRE_FALSE(said.empty());
+            CHECK(said.back().second);
+            REQUIRE(said.back().first.find("Dropped") != std::string::npos);
+        }
         unsaved->handleMouseUp(20, 3, MASK_NONE);
     }
 
-    template<> template<>
-    void alnotecardembedded_object::test<7>()
+    TEST_CASE_METHOD(alnotecardembedded_data, "ALNotecardEmbedded: a line holding an item grows to fit its icon and its neighbours do not", "[ALNotecardEmbedded]")
     {
-        set_test_name("a line holding an item is tall enough for its icon inside the chip's frame; the lines around it keep the text's height");
         ALNotecardEmbedded& card = make("above\nhere " + at(0) + " it is\nbelow\n", { item("A") });
         (void)card;
         const S32 text_h = view->layout().rowHeight();
-        ensure("a row an inventory icon is taller than: " + std::to_string(text_h), text_h < 16 + 4);
+        UNSCOPED_INFO("a row an inventory icon is taller than: " << text_h);
+        CHECK(text_h < 16 + 4);
         view->placeAtomViews();
-        ensure_equals("the item's line: the icon, a pixel either side, and a pixel off the rows", view->layout().lineHeight(1), 16 + 4);
-        ensure_equals("the line above as it was", view->layout().lineHeight(0), text_h);
-        ensure_equals("and the line below", view->layout().lineHeight(2), text_h);
+        UNSCOPED_INFO("the item's line: the icon, a pixel either side, and a pixel off the rows");
+        CHECK(view->layout().lineHeight(1) == 16 + 4);
+        UNSCOPED_INFO("the line above as it was");
+        CHECK(view->layout().lineHeight(0) == text_h);
+        UNSCOPED_INFO("and the line below");
+        CHECK(view->layout().lineHeight(2) == text_h);
         const ALTextView::Atom* atom = view->atomAt(ALTextPos(1, 5));
-        ensure("the item's button", atom && atom->view);
-        ensure_equals("as tall as its line", atom->view->getRect().getHeight(), 16 + 4);
+        {
+            INFO("the item's button");
+            REQUIRE(atom);
+            REQUIRE(atom->view);
+        }
+        UNSCOPED_INFO("as tall as its line");
+        CHECK(atom->view->getRect().getHeight() == 16 + 4);
     }
 }

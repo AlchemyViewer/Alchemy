@@ -35,18 +35,14 @@
 
 #include "llxmlnode.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct llaccordionctrltab_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
     };
-
-    typedef test_group<llaccordionctrltab_data> llaccordionctrltab_test;
-    typedef llaccordionctrltab_test::object     llaccordionctrltab_object;
-    tut::llaccordionctrltab_test llaccordionctrltab_testgroup("llaccordionctrltab");
 
     // The block calls it display_children and a file calls it `expanded`.
     // Both reach it now, so a file that guessed the other name is no longer
@@ -56,44 +52,45 @@ namespace tut
     // Only the reading is tested here: building a tab measures the text of
     // its header, and text measurement is the one thing this fixture has no
     // fonts for.
-    template<> template<>
-    void llaccordionctrltab_object::test<1>()
+    TEST_CASE_METHOD(llaccordionctrltab_data, "llaccordionctrltab: both expanded and display_children say whether a tab is open", "[llaccordionctrltab]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
-        const auto reads = [](const std::string& attribute)
+        const auto require_read = [](const std::string& attribute)
         {
+            CAPTURE(attribute);
             const std::string source =
                 "<accordion_tab name=\"tab\" title=\"Tab\" " + attribute + "=\"false\"/>\n";
             LLXMLNodePtr node;
-            ensure("parses", LLXMLNode::parseBuffer(source.data(), source.size(), node));
+            REQUIRE(LLXMLNode::parseBuffer(source.data(), source.size(), node));
 
             LLAccordionCtrlTab::Params params;
             LLXUIParser parser;
             parser.readXUI(node, params, "accordion_test.xml");
-            ensure(attribute + " was read", params.display_children.isProvided());
-            ensure(attribute + " says what it says", !params.display_children());
+            REQUIRE(params.display_children.isProvided());
+            REQUIRE_FALSE(params.display_children());
         };
 
-        reads("expanded");
-        reads("display_children");
+        require_read("expanded");
+        require_read("display_children");
     }
 
     // And left out, a tab is open: a section that says nothing about itself
     // is one nobody has folded.
-    template<> template<>
-    void llaccordionctrltab_object::test<2>()
+    TEST_CASE_METHOD(llaccordionctrltab_data, "llaccordionctrltab: a tab is open when a file leaves display_children out", "[llaccordionctrltab]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLAccordionCtrlTab::Params params;
-        ensure("open unless a file says otherwise", params.display_children());
-        ensure("and nothing wrote it", !params.display_children.isProvided());
+        UNSCOPED_INFO("open unless a file says otherwise");
+        CHECK(params.display_children());
+        UNSCOPED_INFO("and nothing wrote it");
+        CHECK_FALSE(params.display_children.isProvided());
     }
 
     // A tab carries the panel it holds: resize the tab and the panel takes
@@ -101,12 +98,11 @@ namespace tut
     // because `hideScrollbar` returns early once the scrollbar is away and
     // that looks, reading it, exactly like a tab that stops placing its panel
     // -- twice now. It places it anyway, and this is what says so.
-    template<> template<>
-    void llaccordionctrltab_object::test<3>()
+    TEST_CASE_METHOD(llaccordionctrltab_data, "llaccordionctrltab: a tab's panel takes the tab's width less padding as it resizes", "[llaccordionctrltab]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
@@ -128,14 +124,17 @@ namespace tut
 
         tab->reshape(300, 200);
         const S32 wide = rows->getRect().getWidth();
-        ensure_equals("the panel is as wide as the tab lets it be", wide,
+        UNSCOPED_INFO("the panel is as wide as the tab lets it be");
+        CHECK(wide ==
                       300 - tab->getPaddingLeft() - tab->getPaddingRight());
 
         tab->reshape(200, 200);
-        ensure_equals("and follows the tab in", rows->getRect().getWidth(), wide - 100);
+        UNSCOPED_INFO("and follows the tab in");
+        CHECK(rows->getRect().getWidth() == wide - 100);
 
         tab->reshape(300, 200);
-        ensure_equals("and back out", rows->getRect().getWidth(), wide);
+        UNSCOPED_INFO("and back out");
+        CHECK(rows->getRect().getWidth() == wide);
 
         tab->die();
     }
@@ -146,12 +145,11 @@ namespace tut
     // asked for, what follows the panel's top stays where it was against it,
     // and a tab that is shut opens to the new height when it next opens.
     // The Lightbox sizes every one of its sections this way.
-    template<> template<>
-    void llaccordionctrltab_object::test<4>()
+    TEST_CASE_METHOD(llaccordionctrltab_data, "llaccordionctrltab: a fitted panel's asked-for height sizes its tab even while shut", "[llaccordionctrltab]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
@@ -178,17 +176,20 @@ namespace tut
         const S32 below_top = rows->getRect().getHeight() - row->getRect().mTop;
 
         rows->notifyParent(LLSD().with("action", "size_changes").with("height", 120));
-        ensure_equals("the tab is the height asked for and its chrome", tab->getRect().getHeight(), 120 + chrome);
-        ensure_equals("the panel is the height it asked for", rows->getRect().getHeight(), 120);
-        ensure_equals("and the row is as far below its top as it was",
-                      rows->getRect().getHeight() - row->getRect().mTop, below_top);
+        UNSCOPED_INFO("the tab is the height asked for and its chrome");
+        CHECK(tab->getRect().getHeight() == 120 + chrome);
+        UNSCOPED_INFO("the panel is the height it asked for");
+        CHECK(rows->getRect().getHeight() == 120);
+        UNSCOPED_INFO("and the row is as far below its top as it was");
+        CHECK(rows->getRect().getHeight() - row->getRect().mTop == below_top);
 
         tab->setDisplayChildren(false);
         rows->notifyParent(LLSD().with("action", "size_changes").with("height", 150));
-        ensure("shut, the tab stays shut", tab->getRect().getHeight() < 150);
+        UNSCOPED_INFO("shut, the tab stays shut");
+        CHECK(tab->getRect().getHeight() < 150);
         tab->setDisplayChildren(true);
-        ensure_equals("and opens to the height asked for while it was shut",
-                      tab->getRect().getHeight(), 150 + chrome);
+        UNSCOPED_INFO("and opens to the height asked for while it was shut");
+        CHECK(tab->getRect().getHeight() == 150 + chrome);
 
         tab->die();
     }
@@ -199,12 +200,11 @@ namespace tut
     // hiding, so a caller that hides a tab arranges afterwards. The Lightbox
     // hides whichever of its bloom and legacy glow sections the renderer is
     // not running this way.
-    template<> template<>
-    void llaccordionctrltab_object::test<5>()
+    TEST_CASE_METHOD(llaccordionctrltab_data, "llaccordionctrltab: a hidden tab takes no room once its accordion is arranged", "[llaccordionctrltab]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLAccordionCtrl::Params ap(LLUICtrlFactory::getDefaultParams<LLAccordionCtrl>());
@@ -235,17 +235,22 @@ namespace tut
         LLAccordionCtrlTab* middle = add_tab("middle", 60);
         LLAccordionCtrlTab* below = add_tab("below", 70);
         accordion->arrange();
-        ensure_equals("the middle tab is under the first", middle->getRect().mTop, above->getRect().mBottom);
-        ensure_equals("and the last under it", below->getRect().mTop, middle->getRect().mBottom);
+        UNSCOPED_INFO("the middle tab is under the first");
+        CHECK(middle->getRect().mTop == above->getRect().mBottom);
+        UNSCOPED_INFO("and the last under it");
+        CHECK(below->getRect().mTop == middle->getRect().mBottom);
 
         middle->setVisible(false);
         accordion->arrange();
-        ensure_equals("hidden, it leaves no gap", below->getRect().mTop, above->getRect().mBottom);
+        UNSCOPED_INFO("hidden, it leaves no gap");
+        CHECK(below->getRect().mTop == above->getRect().mBottom);
 
         middle->setVisible(true);
         accordion->arrange();
-        ensure_equals("shown, it is back under the first", middle->getRect().mTop, above->getRect().mBottom);
-        ensure_equals("and the last is under it again", below->getRect().mTop, middle->getRect().mBottom);
+        UNSCOPED_INFO("shown, it is back under the first");
+        CHECK(middle->getRect().mTop == above->getRect().mBottom);
+        UNSCOPED_INFO("and the last is under it again");
+        CHECK(below->getRect().mTop == middle->getRect().mBottom);
 
         accordion->die();
     }
@@ -255,22 +260,22 @@ namespace tut
     // its children's and would pop up over everything in the panel. A title
     // the header cuts short is said in full ahead of it. The Lightbox gives
     // every one of its sections one.
-    template<> template<>
-    void llaccordionctrltab_object::test<6>()
+    TEST_CASE_METHOD(llaccordionctrltab_data, "llaccordionctrltab: a section's tool tip is on its header with a cut title ahead of it", "[llaccordionctrltab]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         const std::string source =
             "<accordion_tab name=\"tab\" title=\"Tab\" header_tool_tip=\"What it does\"/>\n";
         LLXMLNodePtr node;
-        ensure("parses", LLXMLNode::parseBuffer(source.data(), source.size(), node));
+        REQUIRE(LLXMLNode::parseBuffer(source.data(), source.size(), node));
         LLAccordionCtrlTab::Params read;
         LLXUIParser parser;
         parser.readXUI(node, read, "accordion_test.xml");
-        ensure_equals("a file can say it", read.header_tool_tip(), std::string("What it does"));
+        UNSCOPED_INFO("a file can say it");
+        CHECK(read.header_tool_tip() == std::string("What it does"));
 
         const auto build = [](const std::string& title, const std::string& tip)
         {
@@ -284,34 +289,51 @@ namespace tut
             tp.rect = LLRect(0, 100, 300, 0);
             return LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
         };
-        const auto header = [](LLAccordionCtrlTab* tab)
+        const auto require_header = [](LLAccordionCtrlTab* tab)
         {
             LLView* found = tab->findChild<LLView>("dd_header", false);
-            ensure("the tab has its header", found != nullptr);
+            INFO("the tab has its header");
+            REQUIRE(found != nullptr);
             return found;
         };
 
         LLAccordionCtrlTab* tab = build("Tab", "What it does");
         tab->reshape(300, 100);
-        ensure_equals("the header says it", header(tab)->getToolTip(), std::string("What it does"));
-        ensure("and the tab does not", tab->getToolTip().empty());
+        {
+            INFO("the header says it");
+            CHECK(require_header(tab)->getToolTip() == std::string("What it does"));
+        }
+        UNSCOPED_INFO("and the tab does not");
+        CHECK(tab->getToolTip().empty());
 
         const std::string title = "A title far too long for the header it is in";
         tab->setTitle(title);
         tab->reshape(60, 100);
-        ensure_equals("cut short, the title comes first", header(tab)->getToolTip(),
-                      title + "\nWhat it does");
+        {
+            INFO("cut short, the title comes first");
+            CHECK(require_header(tab)->getToolTip() ==
+                          title + "\nWhat it does");
+        }
         tab->setTitle("Tab");
         tab->reshape(300, 100);
-        ensure_equals("and goes once it fits", header(tab)->getToolTip(), std::string("What it does"));
+        {
+            INFO("and goes once it fits");
+            CHECK(require_header(tab)->getToolTip() == std::string("What it does"));
+        }
         tab->die();
 
         LLAccordionCtrlTab* plain = build("Tab", "");
         plain->reshape(300, 100);
-        ensure("without one, a title that fits says nothing", header(plain)->getToolTip().empty());
+        {
+            INFO("without one, a title that fits says nothing");
+            CHECK(require_header(plain)->getToolTip().empty());
+        }
         plain->setTitle(title);
         plain->reshape(60, 100);
-        ensure_equals("and one cut short says itself", header(plain)->getToolTip(), title);
+        {
+            INFO("and one cut short says itself");
+            CHECK(require_header(plain)->getToolTip() == title);
+        }
         plain->die();
     }
 
@@ -319,12 +341,11 @@ namespace tut
     // the header half a header more than it is tall, which is the gap under
     // it and the top of the first row: with every Lightbox section saying
     // what it is for, that band said so over the controls instead of them.
-    template<> template<>
-    void llaccordionctrltab_object::test<7>()
+    TEST_CASE_METHOD(llaccordionctrltab_data, "llaccordionctrltab: a header's tool tip covers the header and no further", "[llaccordionctrltab]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
@@ -342,10 +363,10 @@ namespace tut
         tab->reshape(300, 200);
 
         const S32 header_bottom = 200 - tab->getHeaderHeight();
-        ensure("over the header, the header answers",
-               tab->handleToolTip(10, header_bottom + 4, MASK_NONE));
-        ensure("just under it, nothing does",
-               !tab->handleToolTip(10, header_bottom - 4, MASK_NONE));
+        UNSCOPED_INFO("over the header, the header answers");
+        CHECK(tab->handleToolTip(10, header_bottom + 4, MASK_NONE));
+        UNSCOPED_INFO("just under it, nothing does");
+        CHECK_FALSE(tab->handleToolTip(10, header_bottom - 4, MASK_NONE));
 
         tab->die();
     }

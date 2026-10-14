@@ -44,12 +44,10 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         struct TestView : public LLView
         {
             TestView(const LLView::Params& p) : LLView(p) {}
@@ -80,7 +78,6 @@ namespace tut
                 LLView::removeChild(child);
             }
         };
-    }
 
     struct alviewtype_data
     {
@@ -136,68 +133,64 @@ namespace tut
         }
     };
 
-    typedef test_group<alviewtype_data> alviewtype_test;
-    typedef alviewtype_test::object     alviewtype_object;
-    tut::alviewtype_test alviewtype_testgroup("alviewtype");
-
     // Each class answers for itself and every base that is a kind, and for
-    // nothing else. A type with no kind is still answered, the slow way.
-    template<> template<>
-    void alviewtype_object::test<1>()
+    // nothing else; a class a test declares answers as the library's do.
+    TEST_CASE_METHOD(alviewtype_data, "alviewtype: as<> finds a view's own class and each base kind but no other", "[alviewtype]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
         ll_test::FloaterViewScope floater_view(fv.get());
         TestFloater* f = floater();     // parents itself into gFloaterView
 
-        ensure("a floater is a floater", f->as<LLFloater>() == f);
-        ensure("a floater is a panel", f->as<LLPanel>() == f);
-        ensure("a floater is a control", f->as<LLUICtrl>() == f);
-        ensure("a floater is a view", f->as<LLView>() == f);
-        ensure("a floater is not a floater view", f->as<LLFloaterView>() == nullptr);
+        CHECK(f->as<LLFloater>() == f);
+        CHECK(f->as<LLPanel>() == f);
+        CHECK(f->as<LLUICtrl>() == f);
+        CHECK(f->as<LLView>() == f);
+        CHECK(f->as<LLFloaterView>() == nullptr);
 
-        ensure("a floater view is a floater view", fv->as<LLFloaterView>() == fv.get());
-        ensure("a floater view is a control", fv->as<LLUICtrl>() == fv.get());
-        ensure("a floater view is not a panel", fv->as<LLPanel>() == nullptr);
-        ensure("a floater view is not a floater", fv->as<LLFloater>() == nullptr);
+        CHECK(fv->as<LLFloaterView>() == fv.get());
+        CHECK(fv->as<LLUICtrl>() == fv.get());
+        CHECK(fv->as<LLPanel>() == nullptr);
+        CHECK(fv->as<LLFloater>() == nullptr);
 
         std::unique_ptr<TestCtrl> c(ctrl("ctrl"));
-        ensure("a control is a control", c->as<LLUICtrl>() == c.get());
-        ensure("a control is not a panel", c->as<LLPanel>() == nullptr);
-        ensure("a class declared in a test is found like any other", c->as<TestCtrl>() == c.get());
+        CHECK(c->as<LLUICtrl>() == c.get());
+        CHECK(c->as<LLPanel>() == nullptr);
+        UNSCOPED_INFO("a class declared in a test is found like any other");
+        CHECK(c->as<TestCtrl>() == c.get());
 
         std::unique_ptr<TestView> v(view("plain"));
-        ensure("a plain view is a view", v->as<LLView>() == v.get());
-        ensure("a plain view is not a control", v->as<LLUICtrl>() == nullptr);
-        ensure("nor the test's own class", v->as<TestCtrl>() == nullptr);
+        CHECK(v->as<LLView>() == v.get());
+        CHECK(v->as<LLUICtrl>() == nullptr);
+        CHECK(v->as<TestCtrl>() == nullptr);
 
         const LLView* cf = f;
-        ensure("a const view answers the same", cf->as<LLFloater>() == f);
+        UNSCOPED_INFO("a const view answers the same");
+        CHECK(cf->as<LLFloater>() == f);
 
         std::unique_ptr<LLLayoutStack> s(stack());
         LLLayoutPanel* lp = panel();
         s->addPanel(lp);
-        ensure("a layout stack is a layout stack", s->as<LLLayoutStack>() == s.get());
-        ensure("a layout stack is not a control", s->as<LLUICtrl>() == nullptr);
-        ensure("a layout panel is a layout panel", lp->as<LLLayoutPanel>() == lp);
-        ensure("a layout panel is a panel", lp->as<LLPanel>() == lp);
-        ensure("a layout panel is not a layout stack", lp->as<LLLayoutStack>() == nullptr);
-        ensure("its parent is its stack", lp->getParentAs<LLLayoutStack>() == s.get());
+        CHECK(s->as<LLLayoutStack>() == s.get());
+        CHECK(s->as<LLUICtrl>() == nullptr);
+        CHECK(lp->as<LLLayoutPanel>() == lp);
+        CHECK(lp->as<LLPanel>() == lp);
+        CHECK(lp->as<LLLayoutStack>() == nullptr);
+        CHECK(lp->getParentAs<LLLayoutStack>() == s.get());
 
         fv.reset();
     }
 
     // The parent as a kind, and the nearest ancestor of a kind.
-    template<> template<>
-    void alviewtype_object::test<2>()
+    TEST_CASE_METHOD(alviewtype_data, "alviewtype: getParentAs and getParentByType find a parent or ancestor by kind", "[alviewtype]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
@@ -206,13 +199,16 @@ namespace tut
         TestView* inner = view("inner");
         f->addChild(inner);
 
-        ensure("the floater's parent is the floater view", f->getParentAs<LLFloaterView>() == fv.get());
-        ensure("the floater view has no parent", fv->getParentAs<LLFloater>() == nullptr);
-        ensure("the inner view's parent is not a floater view", inner->getParentAs<LLFloaterView>() == nullptr);
-        ensure("the inner view's parent is the floater", inner->getParentAs<LLFloater>() == f);
-        ensure("the nearest floater above the inner view", inner->getParentByType<LLFloater>() == f);
-        ensure("the nearest floater view above it, through the floater", inner->getParentByType<LLFloaterView>() == fv.get());
-        ensure("no ancestor is a type with no kind", inner->getParentByType<TestCtrl>() == nullptr);
+        CHECK(f->getParentAs<LLFloaterView>() == fv.get());
+        UNSCOPED_INFO("the floater view has no parent");
+        CHECK(fv->getParentAs<LLFloater>() == nullptr);
+        CHECK(inner->getParentAs<LLFloaterView>() == nullptr);
+        CHECK(inner->getParentAs<LLFloater>() == f);
+        CHECK(inner->getParentByType<LLFloater>() == f);
+        UNSCOPED_INFO("the nearest floater view above it, through the floater");
+        CHECK(inner->getParentByType<LLFloaterView>() == fv.get());
+        UNSCOPED_INFO("its ancestors are controls, but none a TestCtrl");
+        CHECK(inner->getParentByType<TestCtrl>() == nullptr);
 
         fv.reset();
     }
@@ -220,12 +216,11 @@ namespace tut
     // A view being destroyed answers for the base that is left, as
     // dynamic_cast does: by the time ~LLView takes it out of its parent, a
     // control is no longer one. A member bit would still say it was.
-    template<> template<>
-    void alviewtype_object::test<3>()
+    TEST_CASE_METHOD(alviewtype_data, "alviewtype: a control being destroyed no longer answers as a control", "[alviewtype]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLView::Params p;
@@ -236,21 +231,22 @@ namespace tut
         TestCtrl* c = ctrl("ctrl");
         parent->addChild(c);
         parent->removeChild(c);
-        ensure("a live control leaving is a control", parent->mLeaverWasCtrl);
+        UNSCOPED_INFO("a live control leaving is a control");
+        CHECK(parent->mLeaverWasCtrl);
 
         parent->addChild(c);
         delete c;
-        ensure("a dying control leaving is not", !parent->mLeaverWasCtrl);
+        UNSCOPED_INFO("a dying control leaving is not");
+        CHECK_FALSE(parent->mLeaverWasCtrl);
     }
 
     // The menu kinds: a bar and a context menu are menus, a separator is an
     // item, and a menu's parent item is held as one.
-    template<> template<>
-    void alviewtype_object::test<4>()
+    TEST_CASE_METHOD(alviewtype_data, "alviewtype: bars and context menus are menus and a separator is an item", "[alviewtype]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLMenuGL::Params mp;
@@ -269,25 +265,27 @@ namespace tut
         sp.name = "separator";
         std::unique_ptr<LLMenuItemSeparatorGL> separator(LLUICtrlFactory::create<LLMenuItemSeparatorGL>(sp));
 
-        ensure("a menu is a menu", menu->as<LLMenuGL>() == menu.get());
-        ensure("a menu is not a bar", menu->as<LLMenuBarGL>() == nullptr);
-        ensure("a menu is not a context menu", menu->as<LLContextMenu>() == nullptr);
-        ensure("a menu is not an item", menu->as<LLMenuItemGL>() == nullptr);
-        ensure("a bar is a menu", bar->as<LLMenuGL>() == bar.get());
-        ensure("a bar is a bar", bar->as<LLMenuBarGL>() == bar.get());
-        ensure("a context menu is a menu", context->as<LLMenuGL>() == context.get());
-        ensure("a context menu is a context menu", context->as<LLContextMenu>() == context.get());
-        ensure("a context menu is not a bar", context->as<LLMenuBarGL>() == nullptr);
-        ensure("an item is an item", item->as<LLMenuItemGL>() == item);
-        ensure("an item is not a separator", item->as<LLMenuItemSeparatorGL>() == nullptr);
-        ensure("an item is not a menu", item->as<LLMenuGL>() == nullptr);
-        ensure("a separator is an item", separator->as<LLMenuItemGL>() == separator.get());
-        ensure("a separator is a separator", separator->as<LLMenuItemSeparatorGL>() == separator.get());
+        CHECK(menu->as<LLMenuGL>() == menu.get());
+        CHECK(menu->as<LLMenuBarGL>() == nullptr);
+        CHECK(menu->as<LLContextMenu>() == nullptr);
+        CHECK(menu->as<LLMenuItemGL>() == nullptr);
+        CHECK(bar->as<LLMenuGL>() == bar.get());
+        CHECK(bar->as<LLMenuBarGL>() == bar.get());
+        CHECK(context->as<LLMenuGL>() == context.get());
+        CHECK(context->as<LLContextMenu>() == context.get());
+        CHECK(context->as<LLMenuBarGL>() == nullptr);
+        CHECK(item->as<LLMenuItemGL>() == item);
+        CHECK(item->as<LLMenuItemSeparatorGL>() == nullptr);
+        CHECK(item->as<LLMenuGL>() == nullptr);
+        CHECK(separator->as<LLMenuItemGL>() == separator.get());
+        CHECK(separator->as<LLMenuItemSeparatorGL>() == separator.get());
 
         menu->setParentMenuItem(item);
-        ensure("the parent item is held as one", menu->getParentMenuItem() == item);
+        UNSCOPED_INFO("the parent item is held as one");
+        CHECK(menu->getParentMenuItem() == item);
         delete item;
-        ensure("and let go when it dies", menu->getParentMenuItem() == nullptr);
+        UNSCOPED_INFO("and let go when it dies");
+        CHECK(menu->getParentMenuItem() == nullptr);
     }
 
     // Each class's place in the hierarchy is fixed at compile time, and a
@@ -317,12 +315,11 @@ namespace tut
     // list measure text as they are built, which the fixture's fonts cannot
     // answer without GL textures, so those three are not built here; each
     // of their overrides names LLUICtrl as its immediate base.
-    template<> template<>
-    void alviewtype_object::test<5>()
+    TEST_CASE_METHOD(alviewtype_data, "alviewtype: the common widget types are themselves and controls and not each other", "[alviewtype]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLButton::Params bp;         bp.name = "button";
@@ -337,31 +334,37 @@ namespace tut
         std::unique_ptr<LLSpinCtrl>       spin(LLUICtrlFactory::create<LLSpinCtrl>(spp));
         std::unique_ptr<LLTabContainer>   tabs(LLUICtrlFactory::create<LLTabContainer>(tcp));
 
-        ensure("a button is a button", button->as<LLButton>() == button.get());
-        ensure("a text box is a text box", text->as<LLTextBox>() == text.get());
-        ensure("a line editor is a line editor", line->as<LLLineEditor>() == line.get());
-        ensure("a spin control is a spin control", spin->as<LLSpinCtrl>() == spin.get());
-        ensure("a tab container is a tab container", tabs->as<LLTabContainer>() == tabs.get());
+        CHECK(button->as<LLButton>() == button.get());
+        CHECK(text->as<LLTextBox>() == text.get());
+        CHECK(line->as<LLLineEditor>() == line.get());
+        CHECK(spin->as<LLSpinCtrl>() == spin.get());
+        CHECK(tabs->as<LLTabContainer>() == tabs.get());
 
-        ensure("a button is a control", button->as<LLUICtrl>() == button.get());
-        ensure("a spin control is a control, through its float base", spin->as<LLUICtrl>() == spin.get());
-        ensure("a tab container is a panel", tabs->as<LLPanel>() == tabs.get());
-        ensure("a text box is a text base", text->as<LLTextBase>() == text.get());
+        CHECK(button->as<LLUICtrl>() == button.get());
+        UNSCOPED_INFO("a spin control is a control, through its float base");
+        CHECK(spin->as<LLUICtrl>() == spin.get());
+        CHECK(tabs->as<LLPanel>() == tabs.get());
+        CHECK(text->as<LLTextBase>() == text.get());
 
-        ensure("a button is not a text box", button->as<LLTextBox>() == nullptr);
-        ensure("a text box is not a line editor", text->as<LLLineEditor>() == nullptr);
-        ensure("a line editor is not a spin control", line->as<LLSpinCtrl>() == nullptr);
-        ensure("a spin control is not a tab container", spin->as<LLTabContainer>() == nullptr);
-        ensure("a tab container is not a button", tabs->as<LLButton>() == nullptr);
-        ensure("a button is not a panel", button->as<LLPanel>() == nullptr);
-        ensure("none of them is a check box", button->as<LLCheckBoxCtrl>() == nullptr && line->as<LLCheckBoxCtrl>() == nullptr);
-        ensure("none of them is a combo box or a scroll list", spin->as<LLComboBox>() == nullptr && tabs->as<LLScrollListCtrl>() == nullptr);
+        CHECK(button->as<LLTextBox>() == nullptr);
+        CHECK(text->as<LLLineEditor>() == nullptr);
+        CHECK(line->as<LLSpinCtrl>() == nullptr);
+        CHECK(spin->as<LLTabContainer>() == nullptr);
+        CHECK(tabs->as<LLButton>() == nullptr);
+        CHECK(button->as<LLPanel>() == nullptr);
+        CHECK(button->as<LLCheckBoxCtrl>() == nullptr);
+        CHECK(line->as<LLCheckBoxCtrl>() == nullptr);
+        CHECK(spin->as<LLComboBox>() == nullptr);
+        CHECK(tabs->as<LLScrollListCtrl>() == nullptr);
     }
 
-    template<> template<>
-    void alviewtype_object::test<6>()
+    // Bound by on_check, a binding the item's own params do not name.
+    TEST_CASE_METHOD(alviewtype_data, "alviewtype: a check item bound by on_check stays bound and shows the setting", "[alviewtype]")
     {
-        set_test_name("a check item bound to a setting by its on_check keeps the binding its own params do not name, and shows the setting as it changes");
+        if (!ui.ok())
+        {
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
         LLControlGroup* config = LLUI::getInstance()->mSettingGroups["config"];
         if (!config->controlExists("ViewTypeCheck"))
         {
@@ -373,14 +376,17 @@ namespace tut
         cp.label                 = "Check";
         cp.on_check.control_name = "ViewTypeCheck";
         std::unique_ptr<LLMenuItemCheckGL> item(LLUICtrlFactory::create<LLMenuItemCheckGL>(cp));
-        ensure("bound to the setting", item->getControlVariable() != nullptr);
+        REQUIRE(item->getControlVariable() != nullptr);
         item->buildDrawLabel();
-        ensure("checked while it is on", item->getValue().asBoolean());
+        UNSCOPED_INFO("checked while it is on");
+        CHECK(item->getValue().asBoolean());
         config->setBOOL("ViewTypeCheck", false);
         item->buildDrawLabel();
-        ensure("not checked once it is off", !item->getValue().asBoolean());
+        UNSCOPED_INFO("not checked once it is off");
+        CHECK_FALSE(item->getValue().asBoolean());
         config->setBOOL("ViewTypeCheck", true);
         item->buildDrawLabel();
-        ensure("and checked again", item->getValue().asBoolean());
+        UNSCOPED_INFO("and checked again");
+        CHECK(item->getValue().asBoolean());
     }
 }

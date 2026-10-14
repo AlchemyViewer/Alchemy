@@ -33,11 +33,11 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct aloffsetpad_data
     {
@@ -59,85 +59,84 @@ namespace tut
         }
     };
 
-    typedef test_group<aloffsetpad_data> aloffsetpad_test;
-    typedef aloffsetpad_test::object     aloffsetpad_object;
-    tut::aloffsetpad_test aloffsetpad_testgroup("aloffsetpad");
-
-    // A press puts the dot under the pointer, a drag moves it, and the
-    // release commits once.
-    template<> template<>
-    void aloffsetpad_object::test<1>()
+    TEST_CASE_METHOD(aloffsetpad_data, "aloffsetpad: a press places the dot and a drag moves it; the release commits once", "[aloffsetpad]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALOffsetPad* p = pad();
         S32 commits = 0;
         p->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
 
         p->handleMouseDown(35, 35, MASK_NONE);
-        ensure_equals("pressed at the centre, no offset", p->getValue().asString(), std::string("0 0"));
-        ensure("and holds the mouse", p->hasMouseCapture());
+        UNSCOPED_INFO("pressed at the centre, no offset");
+        CHECK(p->getValue().asString() == std::string("0 0"));
+        CHECK(p->hasMouseCapture());
         p->handleHover(35 + 33, 35, MASK_NONE);
-        ensure_equals("dragged to the right edge, the whole reach", p->getValue().asString(), std::string("32 0"));
-        ensure_equals("nothing committed yet", commits, 0);
+        UNSCOPED_INFO("dragged to the right edge, the whole reach");
+        CHECK(p->getValue().asString() == std::string("32 0"));
+        UNSCOPED_INFO("nothing committed while dragging");
+        CHECK(commits == 0);
         p->handleMouseUp(35 + 33, 35, MASK_NONE);
-        ensure_equals("the release commits once", commits, 1);
-        ensure("and lets the mouse go", !p->hasMouseCapture());
+        CHECK(commits == 1);
+        CHECK_FALSE(p->hasMouseCapture());
         p->die();
     }
 
     // The mouse taken away mid-drag ends the drag: the pointer passing over
     // the pad afterwards, no button held, moves nothing.
-    template<> template<>
-    void aloffsetpad_object::test<2>()
+    TEST_CASE_METHOD(aloffsetpad_data, "aloffsetpad: the mouse capture taken away mid-drag ends the drag", "[aloffsetpad]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALOffsetPad* p = pad();
         p->handleMouseDown(35, 35, MASK_NONE);
         gFocusMgr.setMouseCapture(nullptr);
         p->handleHover(35 + 33, 35, MASK_NONE);
-        ensure_equals("a hover after the loss moves nothing", p->getValue().asString(), std::string("0 0"));
+        CHECK(p->getValue().asString() == std::string("0 0"));
         p->die();
     }
 
-    template<> template<>
-    void aloffsetpad_object::test<3>()
+    TEST_CASE_METHOD(aloffsetpad_data, "aloffsetpad: a number typed in a box commits once; a reset commits only if it moved", "[aloffsetpad]")
     {
-        set_test_name("a number typed in a box is the value, committed once; a reset goes back to the default, committed where it moved");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALOffsetPad* p       = pad();
         S32          commits = 0;
         p->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         p->setValue("1 2");
-        ensure_equals("the boxes show it", p->getChild<LLSpinCtrl>("y")->getValue().asReal(), 2.0);
+        UNSCOPED_INFO("the boxes show it");
+        CHECK(p->getChild<LLSpinCtrl>("y")->getValue().asReal() == 2.0);
         LLSpinCtrl* x = p->getChild<LLSpinCtrl>("x");
         x->setValue(LLSD(5.0));
         x->onCommit();
-        ensure_equals("typed", p->getValue().asString(), std::string("5 2"));
-        ensure_equals("committed once", commits, 1);
+        CHECK(p->getValue().asString() == std::string("5 2"));
+        CHECK(commits == 1);
         LLSpinCtrl* y = p->getChild<LLSpinCtrl>("y");
         y->setValue(LLSD(-1.0));
         y->onCommit();
-        ensure_equals("either box", p->getValue().asString(), std::string("5 -1"));
-        ensure_equals("committed again", commits, 2);
+        UNSCOPED_INFO("either box");
+        CHECK(p->getValue().asString() == std::string("5 -1"));
+        CHECK(commits == 2);
 
-        ensure("no default, no reset", !p->resetToDefault());
-        ensure_equals("and nothing committed", commits, 2);
+        UNSCOPED_INFO("no default, no reset");
+        CHECK_FALSE(p->resetToDefault());
+        CHECK(commits == 2);
         p->setDefault("-3 4");
-        ensure("reset", p->resetToDefault());
-        ensure_equals("to the default", p->getValue().asString(), std::string("-3 4"));
-        ensure_equals("shown", x->getValue().asReal(), -3.0);
-        ensure_equals("committed", commits, 3);
-        ensure("reset again", p->resetToDefault());
-        ensure_equals("where nothing moved, not committed", commits, 3);
+        CHECK(p->resetToDefault());
+        CHECK(p->getValue().asString() == std::string("-3 4"));
+        UNSCOPED_INFO("the box shows the default");
+        CHECK(x->getValue().asReal() == -3.0);
+        CHECK(commits == 3);
+        UNSCOPED_INFO("reset again");
+        CHECK(p->resetToDefault());
+        UNSCOPED_INFO("where nothing moved, not committed");
+        CHECK(commits == 3);
         p->die();
     }
 }

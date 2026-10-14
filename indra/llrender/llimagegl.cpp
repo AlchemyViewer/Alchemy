@@ -35,7 +35,6 @@
 #include "llimagegl.h"
 
 #include "llerror.h"
-#include "llfasttimer.h"
 #include "llimage.h"
 
 #include "llmath.h"

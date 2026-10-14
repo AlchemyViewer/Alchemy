@@ -37,11 +37,11 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 
-namespace tut
+namespace
 {
     struct alxuiservice_data
     {
@@ -75,17 +75,11 @@ namespace tut
         }
     };
 
-    typedef test_group<alxuiservice_data> alxuiservice_group;
-    typedef alxuiservice_group::object    alxuiservice_object;
-    alxuiservice_group                    alxuiservice_group_instance("alxuiservice");
-
-    template<> template<>
-    void alxuiservice_object::test<1>()
+    TEST_CASE_METHOD(alxuiservice_data, "alxuiservice: contextAt tells which part of the markup a position is in", "[alxuiservice]")
     {
-        set_test_name("the context of a position: text, a tag being typed, its attributes, a value, a closing tag, a comment");
         if (!ui.ok())
         {
-            skip("no UI");
+            SKIP("no UI");
         }
         ALTextDocument doc(
             "<?xml version=\"1.0\"?>\n"
@@ -98,32 +92,40 @@ namespace tut
             "</floater>\n");
         typedef ALXUIService::Context::Where Where;
         ALXUIService::Context c = ALXUIService::contextAt(doc, ALTextPos(4, 35));  // after fol
-        ensure("an attribute's name", c.where == Where::AttributeName);
-        ensure_equals("of the button", c.tag, std::string("button"));
-        ensure_equals("with name and label carried already", c.present.size(), size_t(2));
-        ensure("under the panel under the floater", c.parents.size() == 2 && c.parents[1] == "panel");
-        ensure(llformat("the word starts at fol (not %d)", c.wordStart.column), c.wordStart == ALTextPos(4, 32));
+        CHECK(c.where == Where::AttributeName);
+        CHECK(c.tag == std::string("button"));
+        UNSCOPED_INFO("with name and label carried already");
+        CHECK(c.present.size() == size_t(2));
+        {
+            INFO("under the panel under the floater");
+            REQUIRE(c.parents.size() == 2);
+            CHECK(c.parents[1] == "panel");
+        }
+        UNSCOPED_INFO("the word starts at fol, not column " << c.wordStart.column);
+        CHECK(c.wordStart == ALTextPos(4, 32));
         c = ALXUIService::contextAt(doc, ALTextPos(4, 29));  // inside "Go
-        ensure("a value", c.where == Where::AttributeValue);
-        ensure_equals("of label", c.attribute, std::string("label"));
+        CHECK(c.where == Where::AttributeValue);
+        CHECK(c.attribute == std::string("label"));
         c = ALXUIService::contextAt(doc, ALTextPos(5, 7));  // <bu
-        ensure("a tag being typed", c.where == Where::TagName);
-        ensure("under the panel (the button above was left open, as typing leaves it)", !c.parents.empty());
+        CHECK(c.where == Where::TagName);
+        {
+            INFO("under the panel (the button above was left open, as typing leaves it)");
+            REQUIRE(c.parents.size() == 2);
+            CHECK(c.parents[1] == "panel");
+        }
         c = ALXUIService::contextAt(doc, ALTextPos(6, 6));  // </pa
-        ensure("a closing tag", c.where == Where::ClosingTag);
+        CHECK(c.where == Where::ClosingTag);
         c = ALXUIService::contextAt(doc, ALTextPos(2, 8));
-        ensure("a comment", c.where == Where::Comment);
+        CHECK(c.where == Where::Comment);
         c = ALXUIService::contextAt(doc, ALTextPos(3, 0));
-        ensure("text between elements", c.where == Where::Text);
+        CHECK(c.where == Where::Text);
     }
 
-    template<> template<>
-    void alxuiservice_object::test<2>()
+    TEST_CASE_METHOD(alxuiservice_data, "alxuiservice: completion offers the tags and attributes and values that fit the place", "[alxuiservice]")
     {
-        set_test_name("completion: tags under a parent, attributes a tag takes and lacks, an enumeration's values, true and false, the closing tag");
         if (!ui.ok())
         {
-            skip("no UI");
+            SKIP("no UI");
         }
         ALTextDocument doc(
             "<floater name=\"f\">\n"
@@ -132,67 +134,109 @@ namespace tut
             "  </fl\n");
         std::vector<ALCodeEditor::Completion> out;
         ALXUIService::complete(doc, ALTextPos(1, 19), "", out);
-        ensure("label offered: " + names(out), offers(out, "label"));
-        ensure("name, carried already, is not", !offers(out, "name"));
+        UNSCOPED_INFO("label offered: " + names(out));
+        REQUIRE(offers(out, "label"));
+        UNSCOPED_INFO("name, carried already, is not");
+        CHECK_FALSE(offers(out, "name"));
         const auto label = std::find_if(out.begin(), out.end(), [](const ALCodeEditor::Completion& c) { return c.text == "label"; });
-        ensure("as a snippet with the quotes", label->snippet == "label=\"${1}\"");
+        UNSCOPED_INFO("as a snippet with the quotes");
+        CHECK(label->snippet == "label=\"${1}\"");
         out.clear();
         ALXUIService::complete(doc, ALTextPos(1, 19), "lab", out);
-        ensure("narrowed to the prefix: " + names(out), offers(out, "label") && !offers(out, "width"));
+        {
+            INFO("narrowed to the prefix: " + names(out));
+            CHECK(offers(out, "label"));
+            CHECK_FALSE(offers(out, "width"));
+        }
         out.clear();
         ALXUIService::complete(doc, ALTextPos(2, 5), "bu", out);
-        ensure("a tag under the floater: " + names(out), offers(out, "button"));
+        UNSCOPED_INFO("a tag under the floater: " + names(out));
+        CHECK(offers(out, "button"));
         out.clear();
         ALXUIService::complete(doc, ALTextPos(3, 6), "fl", out);
-        ensure("the closing tag is the open one: " + names(out), offers(out, "floater"));
+        UNSCOPED_INFO("the closing tag is the open one: " + names(out));
+        CHECK(offers(out, "floater"));
         // Values, each in a text of its own, since an open quote runs on.
         ALTextDocument halign("<floater name=\"f\">\n  <button name=\"c\" halign=\"");
         out.clear();
         ALXUIService::complete(halign, ALTextPos(1, 27), "", out);
-        ensure("halign's values: " + names(out), offers(out, "center"));
+        UNSCOPED_INFO("halign's values: " + names(out));
+        CHECK(offers(out, "center"));
         ALTextDocument enabled("<floater name=\"f\">\n  <button name=\"d\" enabled=\"");
         out.clear();
         ALXUIService::complete(enabled, ALTextPos(1, 28), "", out);
-        ensure("true and false for a boolean: " + names(out), offers(out, "true") && offers(out, "false"));
+        {
+            INFO("true and false for a boolean: " + names(out));
+            CHECK(offers(out, "true"));
+            CHECK(offers(out, "false"));
+        }
     }
 
-    template<> template<>
-    void alxuiservice_object::test<3>()
+    TEST_CASE_METHOD(alxuiservice_data, "alxuiservice: hover describes a tag or attribute and parses says where it fails", "[alxuiservice]")
     {
-        set_test_name("hover says what a tag or an attribute is; parsing says where it stops");
         if (!ui.ok())
         {
-            skip("no UI");
+            SKIP("no UI");
         }
         ALTextDocument doc("<floater name=\"f\">\n  <button name=\"b\" label=\"Go\" />\n</floater>\n");
         const std::string on_button = ALXUIService::hover(doc, ALTextPos(1, 4));
-        ensure("the tag: " + on_button, on_button.rfind("button", 0) == 0);
+        UNSCOPED_INFO("the tag: " + on_button);
+        CHECK(on_button.rfind("button", 0) == 0);
         const std::string on_label = ALXUIService::hover(doc, ALTextPos(1, 20));
-        ensure("the attribute with its type: " + on_label, on_label.rfind("button label:", 0) == 0);
+        UNSCOPED_INFO("the attribute with its type: " + on_label);
+        CHECK(on_label.rfind("button label:", 0) == 0);
         const std::string on_value = ALXUIService::hover(doc, ALTextPos(1, 27));
-        ensure("a value says its attribute: " + on_value, on_value.rfind("button label:", 0) == 0);
-        ensure("nothing between elements", ALXUIService::hover(doc, ALTextPos(2, 0)).empty() || true);
+        UNSCOPED_INFO("a value says its attribute: " + on_value);
+        CHECK(on_value.rfind("button label:", 0) == 0);
+        UNSCOPED_INFO("nothing between elements");
+        CHECK(ALXUIService::hover(doc, ALTextPos(2, 0)).empty());
         ALTextPos   where;
         std::string message;
-        ensure("whole parses", ALXUIService::parses(doc.text(), where, message));
-        ensure("broken does not", !ALXUIService::parses("<floater name=\"f\">\n  <button name=\"b\"\n</floater>\n", where, message));
-        ensure("with a message and a place: " + message, !message.empty() && where.line >= 1);
+        CHECK(ALXUIService::parses(doc.text(), where, message));
+        CHECK_FALSE(ALXUIService::parses("<floater name=\"f\">\n  <button name=\"b\"\n</floater>\n", where, message));
+        {
+            INFO("with a message and a place: " + message);
+            CHECK_FALSE(message.empty());
+            CHECK(where.line >= 1);
+        }
     }
 
-    template<> template<>
-    void alxuiservice_object::test<4>()
+    TEST_CASE_METHOD(alxuiservice_data, "alxuiservice: a whole source is set as one undo step and a line finds its element", "[alxuiservice]")
     {
-        set_test_name("a document takes its whole source as one step, and finds the element at a line");
         ALXUIEdit edit;
-        ensure("loads", edit.loadBuffer("<floater name=\"f\">\n  <panel name=\"p\">\n    <button name=\"b\" />\n    <button name=\"b\" />\n  </panel>\n</floater>\n"));
+        REQUIRE(edit.loadBuffer("<floater name=\"f\">\n  <panel name=\"p\">\n    <button name=\"b\" />\n    <button name=\"b\" />\n  </panel>\n</floater>\n"));
         ALXUIEdit::path_t path;
-        ensure("the second button at its line", edit.elementAtLine(4, path));
-        ensure_equals("named with its ordinal", ALXUISelection::toString(path), ALXUISelection::toString({ "p", ALXUISelection::step("b", 1) }));
-        ensure("the panel from a line inside it, before the buttons", edit.elementAtLine(2, path) && path.size() == 1 && path[0] == "p");
-        ensure("set as a whole", edit.setSource("<floater name=\"f\">\n  <panel name=\"q\" />\n</floater>\n"));
-        ensure("one step", edit.canUndo() && edit.undoDepth() == 1);
-        ensure("and the tree is the new text's", edit.resolve({ "q" }) && !edit.resolve({ "p" }));
-        ensure("broken text is held but says so", !edit.setSource("<floater name=\"f\">\n  <panel") && !edit.error().empty());
-        ensure("undo brings the whole back", edit.undo() && edit.resolve({ "q" }));
+        UNSCOPED_INFO("the second button at its line");
+        REQUIRE(edit.elementAtLine(4, path));
+        UNSCOPED_INFO("named with its ordinal");
+        CHECK(ALXUISelection::toString(path) == ALXUISelection::toString({ "p", ALXUISelection::step("b", 1) }));
+        {
+            INFO("the panel from a line inside it, before the buttons");
+            CHECK(edit.elementAtLine(2, path));
+            REQUIRE(path.size() == 1);
+            CHECK(path[0] == "p");
+        }
+        UNSCOPED_INFO("set as a whole");
+        CHECK(edit.setSource("<floater name=\"f\">\n  <panel name=\"q\" />\n</floater>\n"));
+        {
+            INFO("one step");
+            CHECK(edit.canUndo());
+            CHECK(edit.undoDepth() == 1);
+        }
+        {
+            INFO("and the tree is the new text's");
+            CHECK(edit.resolve({ "q" }));
+            CHECK_FALSE(edit.resolve({ "p" }));
+        }
+        {
+            INFO("broken text is held but says so");
+            CHECK_FALSE(edit.setSource("<floater name=\"f\">\n  <panel"));
+            CHECK_FALSE(edit.error().empty());
+        }
+        {
+            INFO("undo brings the whole back");
+            CHECK(edit.undo());
+            CHECK(edit.resolve({ "q" }));
+        }
     }
 }

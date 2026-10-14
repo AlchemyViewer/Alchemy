@@ -36,11 +36,11 @@
 #include "lldir.h"
 #include "llfile.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <fstream>
 
-namespace tut
+namespace
 {
     // A skin tree of two skins and two languages: one floater in every
     // layer but "other/de", a panel and a template in default/en only, one
@@ -114,86 +114,100 @@ namespace tut
         }
     };
 
-    typedef test_group<alxuicatalog_data> alxuicatalog_test;
-    typedef alxuicatalog_test::object     alxuicatalog_object;
-    tut::alxuicatalog_test alxuicatalog_testgroup("alxuicatalog");
-
     // Every file appears once with every layer that exists, its kind from
     // the root tag, and the skins and languages in the order the tool
     // offers them.
-    template<> template<>
-    void alxuicatalog_object::test<1>()
+    TEST_CASE_METHOD(alxuicatalog_data, "alxuicatalog: scan lists each file once with its layers and its kind from the root tag", "[alxuicatalog]")
     {
         ALXUICatalog catalog;
         catalog.scan(mSkins);
 
-        ensure_equals("skins", catalog.skins().size(), 2u);
-        ensure_equals("default first", catalog.skins()[0], std::string("default"));
-        ensure_equals("languages", catalog.languages().size(), 2u);
-        ensure_equals("en first", catalog.languages()[0], std::string("en"));
-        ensure_equals("entries", catalog.entries().size(), 5u);
+        REQUIRE(catalog.skins().size() == 2u);
+        CHECK(catalog.skins()[0] == std::string("default"));
+        REQUIRE(catalog.languages().size() == 2u);
+        CHECK(catalog.languages()[0] == std::string("en"));
+        CHECK(catalog.entries().size() == 5u);
 
         const ALXUICatalog::Entry* a = catalog.find("floater_a.xml");
-        ensure("floater_a.xml catalogued", a != nullptr);
-        ensure_equals("floater kind", (int)a->kind, (int)ALXUICatalog::Kind::Floater);
-        ensure_equals("floater title", a->title, std::string("Floater A"));
-        ensure_equals("floater layers", a->layers.size(), 3u);
-        ensure("default/en", a->layer("default", "en") != nullptr);
-        ensure("default/de", a->layer("default", "de") != nullptr);
-        ensure("other/en", a->layer("other", "en") != nullptr);
-        ensure("no other/de", a->layer("other", "de") == nullptr);
+        REQUIRE(a != nullptr);
+        CHECK((int)a->kind == (int)ALXUICatalog::Kind::Floater);
+        CHECK(a->title == std::string("Floater A"));
+        CHECK(a->layers.size() == 3u);
+        CHECK(a->layer("default", "en") != nullptr);
+        CHECK(a->layer("default", "de") != nullptr);
+        CHECK(a->layer("other", "en") != nullptr);
+        CHECK(a->layer("other", "de") == nullptr);
 
-        ensure_equals("panel kind", (int)catalog.find("panel_b.xml")->kind, (int)ALXUICatalog::Kind::Panel);
-        ensure_equals("menu kind", (int)catalog.find("menu_c.xml")->kind, (int)ALXUICatalog::Kind::Menu);
+        const ALXUICatalog::Entry* panel = catalog.find("panel_b.xml");
+        REQUIRE(panel != nullptr);
+        CHECK((int)panel->kind == (int)ALXUICatalog::Kind::Panel);
+        const ALXUICatalog::Entry* menu = catalog.find("menu_c.xml");
+        REQUIRE(menu != nullptr);
+        CHECK((int)menu->kind == (int)ALXUICatalog::Kind::Menu);
         const ALXUICatalog::Entry* tmpl = catalog.find("widgets/button.xml");
-        ensure("template catalogued under its subdirectory", tmpl != nullptr);
-        ensure_equals("template kind", (int)tmpl->kind, (int)ALXUICatalog::Kind::Template);
+        UNSCOPED_INFO("template catalogued under its subdirectory");
+        REQUIRE(tmpl != nullptr);
+        CHECK((int)tmpl->kind == (int)ALXUICatalog::Kind::Template);
 
         const ALXUICatalog::Entry* broken = catalog.find("broken.xml");
-        ensure("a file that does not parse is still catalogued", broken != nullptr);
-        ensure("with no document", broken->layers[0].doc == nullptr);
-        ensure("and the reason", !broken->layers[0].error.empty());
-        ensure("on its line", broken->layers[0].errorLine >= 2);
+        UNSCOPED_INFO("a file that does not parse is still catalogued");
+        REQUIRE(broken != nullptr);
+        REQUIRE(broken->layers.size() == 1u);
+        CHECK(broken->layers[0].doc == nullptr);
+        UNSCOPED_INFO("and the reason");
+        CHECK_FALSE(broken->layers[0].error.empty());
+        UNSCOPED_INFO("on its line");
+        CHECK(broken->layers[0].errorLine >= 2);
     }
 
     // The files a build reads, in the order the merge reads them: a skin's
     // base-language file replaces default's, and the language file comes
     // from whichever skin has it.
-    template<> template<>
-    void alxuicatalog_object::test<2>()
+    TEST_CASE_METHOD(alxuicatalog_data, "alxuicatalog: layersFor gives the files a build reads in the order the merge reads them", "[alxuicatalog]")
     {
         ALXUICatalog catalog;
         catalog.scan(mSkins);
-        const ALXUICatalog::Entry& a = *catalog.find("floater_a.xml");
+        const ALXUICatalog::Entry* found = catalog.find("floater_a.xml");
+        REQUIRE(found != nullptr);
+        const ALXUICatalog::Entry& a = *found;
 
         std::vector<const ALXUICatalog::Layer*> layers = catalog.layersFor(a, "default", "en");
-        ensure_equals("default/en: one file", layers.size(), 1u);
-        ensure_equals("which is default's", layers[0]->skin, std::string("default"));
+        UNSCOPED_INFO("default/en: one file");
+        REQUIRE(layers.size() == 1u);
+        CHECK(layers[0]->skin == std::string("default"));
 
         layers = catalog.layersFor(a, "default", "de");
-        ensure_equals("default/de: two files", layers.size(), 2u);
-        ensure_equals("base first", layers[0]->language, std::string("en"));
-        ensure_equals("then the language", layers[1]->language, std::string("de"));
+        UNSCOPED_INFO("default/de: two files");
+        REQUIRE(layers.size() == 2u);
+        UNSCOPED_INFO("base first");
+        CHECK(layers[0]->language == std::string("en"));
+        UNSCOPED_INFO("then the language");
+        CHECK(layers[1]->language == std::string("de"));
 
         layers = catalog.layersFor(a, "other", "de");
-        ensure_equals("other/de: two files", layers.size(), 2u);
-        ensure_equals("the skin's own base", layers[0]->skin, std::string("other"));
-        ensure_equals("default's language file", layers[1]->skin, std::string("default"));
+        UNSCOPED_INFO("other/de: two files");
+        REQUIRE(layers.size() == 2u);
+        UNSCOPED_INFO("the skin's own base");
+        CHECK(layers[0]->skin == std::string("other"));
+        UNSCOPED_INFO("default's language file");
+        CHECK(layers[1]->skin == std::string("default"));
 
-        layers = catalog.layersFor(*catalog.find("panel_b.xml"), "other", "de");
-        ensure_equals("a file the skin lacks falls back to default", layers.size(), 1u);
-        ensure_equals("default/en", layers[0]->skin, std::string("default"));
+        const ALXUICatalog::Entry* b = catalog.find("panel_b.xml");
+        REQUIRE(b != nullptr);
+        layers = catalog.layersFor(*b, "other", "de");
+        UNSCOPED_INFO("a file the skin lacks falls back to default");
+        REQUIRE(layers.size() == 1u);
+        CHECK(layers[0]->skin == std::string("default"));
     }
 
     // Find answers by tag, by attribute name, by attribute value, by name
     // and by text, with the file and line of each hit; and a name path
     // resolves back to the element, ordinals included.
-    template<> template<>
-    void alxuicatalog_object::test<3>()
+    TEST_CASE_METHOD(alxuicatalog_data, "alxuicatalog: find searches each field and a name path resolves back to its element", "[alxuicatalog]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         // The path rules count widget siblings, which asks the registries;
         // naming the widgets' parameter blocks links their registrations.
@@ -204,52 +218,62 @@ namespace tut
         catalog.scan(mSkins);
 
         std::vector<ALXUICatalog::Hit> hits = catalog.find("button", ALXUICatalog::Field::Tag);
-        ensure_equals("buttons by tag: two in en, one in de, the template", hits.size(), 4u);
-        ensure_equals("in floater_a", hitsIn(hits, "floater_a.xml"), 3u);
+        UNSCOPED_INFO("buttons by tag: two in en, one in de, the template");
+        REQUIRE(hits.size() == 4u);
+        CHECK(hitsIn(hits, "floater_a.xml") == 3u);
 
         hits = catalog.find("button", ALXUICatalog::Field::Tag, ALXUICatalog::Match::Containing, "default", "en");
-        ensure_equals("scoped to a skin and language", hits.size(), 3u);
+        UNSCOPED_INFO("scoped to a skin and language");
+        CHECK(hits.size() == 3u);
 
         hits = catalog.find("title", ALXUICatalog::Field::Attribute);
-        ensure_equals("title attributes: one per floater layer", hits.size(), 3u);
+        UNSCOPED_INFO("title attributes: one per floater layer");
+        CHECK(hits.size() == 3u);
 
         hits = catalog.find("also ok", ALXUICatalog::Field::Value);
-        ensure_equals("a value, case folded", hits.size(), 1u);
-        ensure_equals("on its line", hits[0].line, 5);
-        ensure_equals("with its path", hits[0].path, std::string("body/ok#1"));
-        ensure_equals("as it reads", hits[0].snippet, std::string("label=\"Also OK\""));
+        UNSCOPED_INFO("a value, case folded");
+        REQUIRE(hits.size() == 1u);
+        CHECK(hits[0].line == 5);
+        CHECK(hits[0].path == std::string("body/ok#1"));
+        CHECK(hits[0].snippet == std::string("label=\"Also OK\""));
 
         hits = catalog.find("greeting", ALXUICatalog::Field::Name);
-        ensure_equals("by name", hits.size(), 1u);
-        ensure_equals("on the string's line", hits[0].line, 2);
+        REQUIRE(hits.size() == 1u);
+        UNSCOPED_INFO("on the string's line");
+        CHECK(hits[0].line == 2);
 
         hits = catalog.find("hello", ALXUICatalog::Field::Text);
-        ensure_equals("by text", hits.size(), 1u);
-        ensure_equals("the text itself", hits[0].snippet, std::string("Hello"));
+        REQUIRE(hits.size() == 1u);
+        CHECK(hits[0].snippet == std::string("Hello"));
 
         hits = catalog.find("Fenster", ALXUICatalog::Field::Any);
-        ensure_equals("any field", hits.size(), 1u);
-        ensure_equals("in the German layer", hits[0].layer->language, std::string("de"));
+        REQUIRE(hits.size() == 1u);
+        UNSCOPED_INFO("in the German layer");
+        CHECK(hits[0].layer->language == std::string("de"));
 
-        const ALXUICatalog::Layer* en = catalog.find("floater_a.xml")->layer("default", "en");
+        const ALXUICatalog::Entry* floater = catalog.find("floater_a.xml");
+        REQUIRE(floater != nullptr);
+        const ALXUICatalog::Layer* en = floater->layer("default", "en");
+        REQUIRE(en != nullptr);
         pugi::xml_node second = ALXUICatalog::resolve(en->root(), ALXUISelection::fromString("body/ok#1"));
-        ensure("the second button resolves", second);
-        ensure_equals("to the right one", std::string(second.attribute("label").value()), std::string("Also OK"));
-        ensure("a path nothing has resolves to nothing",
-               !ALXUICatalog::resolve(en->root(), ALXUISelection::fromString("body/ok#2")));
-        ensure_equals("and back again", ALXUISelection::toString(ALXUICatalog::namePath(second)), std::string("body/ok#1"));
+        UNSCOPED_INFO("the second button resolves");
+        REQUIRE(second);
+        CHECK(std::string(second.attribute("label").value()) == std::string("Also OK"));
+        UNSCOPED_INFO("a path nothing has resolves to nothing");
+        CHECK_FALSE(ALXUICatalog::resolve(en->root(), ALXUISelection::fromString("body/ok#2")));
+        UNSCOPED_INFO("and back again");
+        CHECK(ALXUISelection::toString(ALXUICatalog::namePath(second)) == std::string("body/ok#1"));
     }
 
     // A file element with no name is known by its value in the file's
     // vocabulary, as the merge knows a combo box's items, and by "unnamed"
     // in a view's, which is what the widget built from it is called. Both
     // reach it: a path taken from a view finds the element the merge would.
-    template<> template<>
-    void alxuicatalog_object::test<4>()
+    TEST_CASE_METHOD(alxuicatalog_data, "alxuicatalog: an element with no name is known by its value in the file's vocabulary", "[alxuicatalog]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLUICtrlFactory::getDefaultParams<LLPanel>();
 
@@ -264,52 +288,62 @@ namespace tut
             "  <panel value=\"y\" width=\"2\"/>\n"
             "</panel>\n";
         pugi::xml_document doc;
-        ensure("parses", doc.load_string(xml.c_str()));
+        REQUIRE(doc.load_string(xml.c_str()));
         const pugi::xml_node root = doc.document_element();
         const pugi::xml_node two = root.child("combo_box").child("item").next_sibling("item");
         const pugi::xml_node three = two.next_sibling("item");
         const pugi::xml_node y = root.last_child();
 
-        ensure_equals("an item is known by its value", ALXUISelection::toString(ALXUICatalog::namePath(two, true)),
+        UNSCOPED_INFO("an item is known by its value");
+        CHECK(ALXUISelection::toString(ALXUICatalog::namePath(two, true)) ==
                       std::string("c/v2"));
         // One with neither is unnamed, and counted among every sibling with
         // no name, since that is what a step of "unnamed" counts.
-        ensure_equals("and one with neither is unnamed", ALXUISelection::toString(ALXUICatalog::namePath(three, true)),
+        UNSCOPED_INFO("and one with neither is unnamed");
+        CHECK(ALXUISelection::toString(ALXUICatalog::namePath(three, true)) ==
                       std::string("c/unnamed#2"));
-        ensure("the value resolves", ALXUICatalog::resolve(root, ALXUISelection::fromString("c/v2"), true) == two);
-        ensure("and unnamed, counted among the ones with no name, reaches the third",
-               ALXUICatalog::resolve(root, ALXUISelection::fromString("c/unnamed#2"), true) == three);
-        ensure("a value the file lacks resolves to nothing",
-               !ALXUICatalog::resolve(root, ALXUISelection::fromString("c/v3"), true));
+        UNSCOPED_INFO("the value resolves");
+        CHECK(ALXUICatalog::resolve(root, ALXUISelection::fromString("c/v2"), true) == two);
+        UNSCOPED_INFO("and unnamed, counted among the ones with no name, reaches the third");
+        CHECK(ALXUICatalog::resolve(root, ALXUISelection::fromString("c/unnamed#2"), true) == three);
+        UNSCOPED_INFO("a value the file lacks resolves to nothing");
+        CHECK_FALSE(ALXUICatalog::resolve(root, ALXUISelection::fromString("c/v3"), true));
 
         // A widget with a value and no name: the view is "unnamed", and a
         // path taken from the view reaches the file's element all the same.
-        ensure_equals("a widget's path says unnamed", ALXUISelection::toString(ALXUICatalog::namePath(y)),
+        UNSCOPED_INFO("a widget's path says unnamed");
+        CHECK(ALXUISelection::toString(ALXUICatalog::namePath(y)) ==
                       std::string("unnamed#1"));
-        ensure_equals("the file's says its value", ALXUISelection::toString(ALXUICatalog::namePath(y, true)),
+        UNSCOPED_INFO("the file's says its value");
+        CHECK(ALXUISelection::toString(ALXUICatalog::namePath(y, true)) ==
                       std::string("y"));
-        ensure("the view's path reaches it in the file's vocabulary",
-               ALXUICatalog::resolve(root, ALXUISelection::fromString("unnamed#1"), true) == y);
-        ensure("and so does the file's", ALXUICatalog::resolve(root, ALXUISelection::fromString("y"), true) == y);
+        UNSCOPED_INFO("the view's path reaches it in the file's vocabulary");
+        CHECK(ALXUICatalog::resolve(root, ALXUISelection::fromString("unnamed#1"), true) == y);
+        UNSCOPED_INFO("and so does the file's");
+        CHECK(ALXUICatalog::resolve(root, ALXUISelection::fromString("y"), true) == y);
     }
 
-    template<> template<>
-    void alxuicatalog_object::test<5>()
+    TEST_CASE_METHOD(alxuicatalog_data, "alxuicatalog: isCoreWidgetTag tells the library's tags and isBuilt the built kinds", "[alxuicatalog]")
     {
-        set_test_name("the UI library's own tags are told from the viewer's, and the kinds built from the rest");
-        ensure("a button is the library's", ALXUICatalog::isCoreWidgetTag("button"));
-        ensure("so is a layout stack", ALXUICatalog::isCoreWidgetTag("layout_stack"));
-        ensure("a chat history is the viewer's", !ALXUICatalog::isCoreWidgetTag("chat_history"));
-        ensure("no tag is nobody's", !ALXUICatalog::isCoreWidgetTag(""));
+        UNSCOPED_INFO("a button is the library's");
+        CHECK(ALXUICatalog::isCoreWidgetTag("button"));
+        UNSCOPED_INFO("so is a layout stack");
+        CHECK(ALXUICatalog::isCoreWidgetTag("layout_stack"));
+        UNSCOPED_INFO("a chat history is the viewer's");
+        CHECK_FALSE(ALXUICatalog::isCoreWidgetTag("chat_history"));
+        UNSCOPED_INFO("no tag is nobody's");
+        CHECK_FALSE(ALXUICatalog::isCoreWidgetTag(""));
 
         using Kind = ALXUICatalog::Kind;
         for (Kind kind : { Kind::Floater, Kind::Panel, Kind::Menu, Kind::Widget, Kind::Template })
         {
-            ensure(std::string("built: ") + ALXUICatalog::kindName(kind), ALXUICatalog::isBuilt(kind));
+            INFO("built: " << ALXUICatalog::kindName(kind));
+            REQUIRE(ALXUICatalog::isBuilt(kind));
         }
         for (Kind kind : { Kind::Notifications, Kind::Strings, Kind::Other })
         {
-            ensure(std::string("not built: ") + ALXUICatalog::kindName(kind), !ALXUICatalog::isBuilt(kind));
+            INFO("not built: " << ALXUICatalog::kindName(kind));
+            REQUIRE_FALSE(ALXUICatalog::isBuilt(kind));
         }
     }
 }

@@ -18,6 +18,7 @@ target_sources(
   llcommon
   PRIVATE
     alfilewrite.cpp
+    almainloop.cpp
     alserialworker.cpp
     alparamtype.cpp
     alrecoverystore.cpp
@@ -54,7 +55,6 @@ target_sources(
     llevents.cpp
     lleventtimer.cpp
     llexception.cpp
-    llfasttimer.cpp
     llfile.cpp
     llfindlocale.cpp
     llfixedbuffer.cpp
@@ -122,6 +122,7 @@ target_sources(
       FILES
         alfilewrite.h
         allinebreaks.h
+        almainloop.h
         alserialworker.h
         alparamtype.h
         alrandmap.h
@@ -174,7 +175,6 @@ target_sources(
         llevents.h
         lleventemitter.h
         llexception.h
-        llfasttimer.h
         llfile.h
         llfindlocale.h
         llfixedbuffer.h
@@ -272,11 +272,6 @@ if(DARWIN)
   set_source_files_properties(llsys_objc.mm PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 endif()
 
-if(AL_USE_TRACY)
-  # Skip precompiled headers on these files due to special compilation needs
-  set_source_files_properties(llfasttimer.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
-endif()
-
 target_link_libraries(
   llcommon
   PRIVATE al::flags
@@ -362,6 +357,9 @@ if(AL_BUILD_TESTS)
       tests/threadsafeschedule_test.cpp
       tests/tuple_test.cpp
       tests/workqueue_test.cpp
+    # The viewer's own patterns under Boost.Regex and under RE2, side by
+    # side, over the text each is run on.
+    BENCH_SOURCES tests/alregex_bench.cpp
     SUPPORT llcommon_test_checks
     LIBRARIES llcommon
   )
@@ -453,8 +451,4 @@ if(AL_BUILD_TESTS)
       PROPERTIES COMPILE_OPTIONS -Wno-uninitialized
     )
   endif()
-
-  # The viewer's own patterns under Boost.Regex and under RE2, side by side,
-  # over the text each is run on.
-  al_add_bench(alregex PROJECT llcommon LIBRARIES llcommon)
 endif()
