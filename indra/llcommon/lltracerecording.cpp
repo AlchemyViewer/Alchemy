@@ -117,6 +117,17 @@ void Recording::handleReset()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_STATS;
 #if LL_TRACE_ENABLED
+    // A running recording that is the newest on its thread gathers in a
+    // buffer of its own, which update() leaves where it is, and every read
+    // adds in. Brought up to date first -- what it holds handed down to the
+    // recordings beneath this one, and into this one's own, which the reset
+    // then clears -- or a reset while running would keep it.
+    if (isStarted() && mActiveBuffers && LLTrace::get_thread_recorder())
+    {
+        AccumulatorBufferGroup* buffers = mBuffers.write();
+        LLTrace::get_thread_recorder()->deactivate(buffers);
+        mActiveBuffers = LLTrace::get_thread_recorder()->activate(buffers);
+    }
     mBuffers.write()->reset();
 
     mElapsedSeconds = F64Seconds(0.0);
