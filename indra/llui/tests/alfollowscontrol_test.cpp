@@ -45,8 +45,12 @@ namespace
 
         // Wide enough for the picture and both thumbnails, so the picture is
         // a square of SIDE at the left of it.
-        static ALFollowsControl* build(S32 width = SIDE * 3 + 16, S32 height = SIDE)
+        ALFollowsControl* build(S32 width = SIDE * 3 + 16, S32 height = SIDE)
         {
+            if (!ui.ok())
+            {
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            }
             ALFollowsControl::Params p(LLUICtrlFactory::getDefaultParams<ALFollowsControl>());
             p.name = "follows";
             p.rect = LLRect(0, height, width, 0);

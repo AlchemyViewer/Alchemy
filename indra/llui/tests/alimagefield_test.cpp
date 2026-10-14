@@ -175,7 +175,9 @@ namespace
         ALSpecimenList* gallery = open();
         REQUIRE(gallery != nullptr);
         gallery->choose("Icon_Close");
-        gallery->getParentByType<ALPopover>()->escape();
+        ALPopover* popover = gallery->getParentByType<ALPopover>();
+        REQUIRE(popover != nullptr);
+        popover->escape();
         {
             INFO("escaped: no change, no commit");
             CHECK(commits == 0);
@@ -183,8 +185,11 @@ namespace
         }
 
         gallery = open();
+        REQUIRE(gallery != nullptr);
         gallery->choose("Icon_Close");
-        gallery->getParentByType<ALPopover>()->settle();
+        popover = gallery->getParentByType<ALPopover>();
+        REQUIRE(popover != nullptr);
+        popover->settle();
         {
             INFO("settled: the one chosen, committed");
             CHECK(commits == 1);
@@ -193,6 +198,7 @@ namespace
 
         elsewhere->setFocus(true);
         gallery = open();
+        REQUIRE(gallery != nullptr);
         UNSCOPED_INFO("the popover has the keyboard");
         CHECK(gFocusMgr.getKeyboardFocus() != elsewhere);
         gallery->choose("PushButton_Over");

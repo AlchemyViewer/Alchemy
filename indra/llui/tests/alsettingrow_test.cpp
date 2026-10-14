@@ -465,9 +465,12 @@ namespace
 
         ALSettingRow* large = row(std::string(), 0.f, 10.f, 3);
         LLSliderCtrl* plain_large = slider_like(10.f);
+        LLLineEditor* large_box = valueBoxOf(large->getSlider());
+        LLLineEditor* plain_large_box = valueBoxOf(plain_large);
+        REQUIRE(large_box);
+        REQUIRE(plain_large_box);
         UNSCOPED_INFO("over 1, exactly a slider's");
-        CHECK(valueBoxOf(large->getSlider())->getRect().getWidth() ==
-                      valueBoxOf(plain_large)->getRect().getWidth());
+        CHECK(large_box->getRect().getWidth() == plain_large_box->getRect().getWidth());
 
         small->die();
         plain_small->die();
@@ -593,14 +596,20 @@ namespace
 
         ALSettingRow* r = LLUICtrlFactory::create<ALSettingRow>(p);
         gFloaterView->addChild(r);
-        LLSlider* bar = nullptr;
-        for (LLView* child : *r->getSlider()->getChildList())
+        // The track a row's slider presses on.
+        const auto barOf = [](ALSettingRow* of)
         {
-            if (LLSlider* candidate = ALViewType::as<LLSlider>(child))
+            LLSlider* bar = nullptr;
+            for (LLView* child : *of->getSlider()->getChildList())
             {
-                bar = candidate;
+                if (LLSlider* candidate = ALViewType::as<LLSlider>(child))
+                {
+                    bar = candidate;
+                }
             }
-        }
+            return bar;
+        };
+        LLSlider* bar = barOf(r);
         REQUIRE(bar != nullptr);
 
         // On the track and off the thumb, which sits at the middle for 0.5:
@@ -615,9 +624,19 @@ namespace
         CHECK(released == 1);
         CHECK(pressed == 1);
 
-        // A row that names neither is a row like every other.
+        // A row that names neither is a row like every other: a press and a
+        // release on its track are heard by neither callback.
         ALSettingRow* plain = row("SettingRowTestHeld");
-        CHECK_FALSE(params("SettingRowTestHeld").mouse_down_callback.isProvided());
+        gFloaterView->addChild(plain);
+        LLSlider* plain_bar = barOf(plain);
+        REQUIRE(plain_bar != nullptr);
+        plain_bar->handleMouseDown(x, plain_bar->getRect().getHeight() / 2, MASK_NONE);
+        plain_bar->handleMouseUp(x, plain_bar->getRect().getHeight() / 2, MASK_NONE);
+        {
+            INFO("the plain row's ends are not heard");
+            CHECK(pressed == 1);
+            CHECK(released == 1);
+        }
         plain->die();
         r->die();
     }
@@ -717,8 +736,10 @@ namespace
         p.components                 = "X Y";
         p.letter_width               = 18;
         ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
+        const LLSpinCtrl* x_box      = r->findChild<LLSpinCtrl>("centre.X");
+        REQUIRE(x_box != nullptr);
         const LLTextBox* letter      = nullptr;
-        for (LLView* child : *r->findChild<LLSpinCtrl>("centre.X")->getChildList())
+        for (LLView* child : *x_box->getChildList())
         {
             letter = letter ? letter : ALViewType::as<LLTextBox>(child);
         }
@@ -746,8 +767,10 @@ namespace
         r->getResetButton()->onCommit();
         UNSCOPED_INFO("the whole setting back");
         CHECK(sameParts(control->getValue(), 0.0, 0.0, 0.0));
+        const LLSpinCtrl* y_box = r->findChild<LLSpinCtrl>("centre.Y");
+        REQUIRE(y_box != nullptr);
         UNSCOPED_INFO("the boxes show it");
-        CHECK(closeTo(r->findChild<LLSpinCtrl>("centre.Y")->getValue().asReal(), 0.0));
+        CHECK(closeTo(y_box->getValue().asReal(), 0.0));
         r->die();
     }
 
