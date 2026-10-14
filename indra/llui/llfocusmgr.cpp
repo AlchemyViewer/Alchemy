@@ -246,6 +246,13 @@ void LLFocusMgr::setKeyboardFocus(LLFocusableElement* new_focus, bool lock, bool
         mKeyboardFocus = new_focus;
         mKeyboardFocusView = new_focus_view;
 
+        // A view that died with focus, or under it, can tell nothing, and its
+        // dead handle would stay at the chain's root end, where the ancestors
+        // the old focus shares with the new are looked for: none would be
+        // found, and every view above the old focus would be told it lost a
+        // focus it still has.
+        mImpl->mCachedKeyboardFocusList.remove_if([](const LLHandle<LLView>& handle) { return handle.isDead(); });
+
         // list of the focus and it's ancestors
         view_handle_list_t old_focus_list = mImpl->mCachedKeyboardFocusList;
         view_handle_list_t new_focus_list;
@@ -375,6 +382,14 @@ void LLFocusMgr::removeKeyboardFocusWithoutCallback( const LLFocusableElement* f
     {
         mKeyboardFocus = nullptr;
         mKeyboardFocusView = nullptr;
+        // Nothing is told it lost focus, so nothing is left as having it: the
+        // next change of focus starts from no chain. Left, the chain's views
+        // die (this is called from destructors) and their dead handles stay
+        // at its root end for good, where every later change looks for the
+        // ancestors it shares with the old focus -- so it would find none,
+        // and tell every view above the old focus that it lost focus,
+        // whatever still had it.
+        mImpl->mCachedKeyboardFocusList.clear();
     }
 }
 

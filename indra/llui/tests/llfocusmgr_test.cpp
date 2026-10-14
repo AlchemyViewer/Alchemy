@@ -145,4 +145,59 @@ namespace
         CHECK(gFocusMgr.getMouseCapture() == nullptr);
         CHECK(gFocusMgr.getMouseCaptureView() == nullptr);
     }
+
+    // A view that counts what it is told of its focus.
+    struct CountingView : public TestView
+    {
+        explicit CountingView(const LLView::Params& p) : TestView(p) {}
+        void onFocusLost() override { ++lost; TestView::onFocusLost(); }
+        S32 lost = 0;
+
+        static CountingView* make(const std::string& name)
+        {
+            LLView::Params p;
+            p.name = name;
+            p.rect = LLRect(0, 10, 10, 0);
+            return new CountingView(p);
+        }
+    };
+
+    // Focus taken without callbacks leaves nothing as having it: a view whose
+    // focus was taken so is not told later that it lost it, nor are the views
+    // above it, when focus goes somewhere else.
+    TEST_CASE_METHOD(llfocusmgr_data, "llfocusmgr: focus taken without callbacks tells no one later that they lost it", "[llfocusmgr]")
+    {
+        std::unique_ptr<CountingView> parent(CountingView::make("parent"));
+        CountingView* child = CountingView::make("child");
+        parent->addChild(child);
+        std::unique_ptr<TestView> other(view("other"));
+
+        gFocusMgr.setKeyboardFocus(child);
+        gFocusMgr.removeKeyboardFocusWithoutCallback(child);
+        gFocusMgr.setKeyboardFocus(other.get());
+        CHECK(child->lost == 0);
+        CHECK(parent->lost == 0);
+    }
+
+    // A view that died with focus leaves no trace in what the next change
+    // compares: focus moving between two children of one parent leaves the
+    // parent holding it, and the parent is not told it lost it.
+    TEST_CASE_METHOD(llfocusmgr_data, "llfocusmgr: after a view dies holding focus a parent keeps focus its children pass", "[llfocusmgr]")
+    {
+        {
+            std::unique_ptr<TestView> gone(view("gone"));
+            gFocusMgr.setKeyboardFocus(gone.get());
+        }
+
+        std::unique_ptr<CountingView> parent(CountingView::make("parent"));
+        TestView* first = view("first");
+        TestView* second = view("second");
+        parent->addChild(first);
+        parent->addChild(second);
+
+        gFocusMgr.setKeyboardFocus(first);
+        gFocusMgr.setKeyboardFocus(second);
+        CHECK(parent->lost == 0);
+        CHECK(gFocusMgr.childHasKeyboardFocus(parent.get()));
+    }
 }
