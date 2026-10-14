@@ -32,10 +32,10 @@
 #include "altextruler.h"
 #include "altextview.h"
 #include "../llui.h"
-#include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -43,6 +43,7 @@
 #include <cmath>
 #include <functional>
 #include <list>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -76,6 +77,49 @@ namespace
             out[i] = rgba[i * 4];
         }
         return out;
+    }
+
+    // Where two frames, or two strips of them, part: how many pixels differ
+    // and the first of them, so that a failure names a place rather than
+    // printing both whole. A row is width pixels of channels bytes, bottom
+    // row first; frames of different sizes differ by what the longer has
+    // over the shorter.
+    struct FrameDiff
+    {
+        size_t pixels = 0;
+        S32    x      = -1;
+        S32    y      = -1;
+
+        bool operator==(const FrameDiff&) const = default;
+    };
+
+    std::ostream& operator<<(std::ostream& out, const FrameDiff& d)
+    {
+        if (d.pixels == 0)
+        {
+            return out << "no pixel";
+        }
+        return out << d.pixels << " pixels, the first at (" << d.x << ", " << d.y << ")";
+    }
+
+    FrameDiff frameDiff(const std::vector<U8>& a, const std::vector<U8>& b, S32 width = W, S32 channels = 4)
+    {
+        FrameDiff    d;
+        const size_t step   = static_cast<size_t>(channels);
+        const size_t common = std::min(a.size(), b.size());
+        for (size_t i = 0; i + step <= common; i += step)
+        {
+            if (!std::equal(a.begin() + i, a.begin() + i + step, b.begin() + i))
+            {
+                if (d.pixels++ == 0)
+                {
+                    d.x = static_cast<S32>((i / step) % static_cast<size_t>(width));
+                    d.y = static_cast<S32>((i / step) / static_cast<size_t>(width));
+                }
+            }
+        }
+        d.pixels += (std::max(a.size(), b.size()) - common + step - 1) / step;
+        return d;
     }
 
     // A keymap that is always typing the same line, and counts how often
@@ -143,10 +187,31 @@ namespace
 {
     struct altextview_gl_data
     {
+        // Focus as the case found it, whatever it leaves it on.
+        ll_test::FocusScope  focus;
+        // The views a case made, dying when it ends however it ends: a
+        // failed REQUIRE skips whatever comes after it.
+        std::vector<LLView*> views;
+
         altextview_gl_data()
         {
             ll_test::uiGL();
             ll_test::installWhiteTexture();
+        }
+
+        ~altextview_gl_data()
+        {
+            for (LLView* view : views)
+            {
+                view->die();
+            }
+        }
+
+        template <class T>
+        T* keep(T* view)
+        {
+            views.push_back(view);
+            return view;
         }
 
         // What a squiggle from x0 at height y covers of a pixel, worked out
@@ -217,8 +282,8 @@ namespace
         const Difference       d   = differ(was, now, 40, 140);
         {
             CAPTURE(d.most, d.covered, d.compared);
-            UNSCOPED_INFO("the wave covers something");
-            CHECK(d.covered > 0);
+            UNSCOPED_INFO("the squiggle covers something");
+            CHECK(d.compared > 0);
             UNSCOPED_INFO("no pixel far from the wave's");
             CHECK(d.most <= 6);
             UNSCOPED_INFO("as much covered as the wave");
@@ -290,8 +355,8 @@ namespace
         scale = was_scale;
         const Difference d = differ(was, now, 20, 220);
         CAPTURE(d.most, d.covered, d.compared);
-        UNSCOPED_INFO("the wave covers something");
-        CHECK(d.covered > 0);
+        UNSCOPED_INFO("the squiggle covers something");
+        CHECK(d.compared > 0);
         UNSCOPED_INFO("no pixel far from the wave's");
         CHECK(d.most <= 6);
         UNSCOPED_INFO("as much covered as the wave");
@@ -316,7 +381,7 @@ namespace
         p.name         = "view";
         p.rect         = LLRect(0, H, W, 0);
         p.default_text = text;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setScrollMap(true);
         // The map's columns, at the right of the view.
@@ -342,14 +407,13 @@ namespace
         UNSCOPED_INFO("the map draws its lines");
         REQUIRE(std::adjacent_find(first.begin(), first.end(), std::not_equal_to<U8>()) != first.end());
         UNSCOPED_INFO("the same map when nothing changed");
-        CHECK(map_of() == first);
+        CHECK(frameDiff(map_of(), first, W - map_left) == FrameDiff());
         view->document().replace(ALTextRange(ALTextPos(3, 4), ALTextPos(3, 5)), "\t");
         const std::vector<U8> tabbed = map_of();
         UNSCOPED_INFO("a space made a tab changes the map");
-        CHECK(tabbed != first);
+        CHECK(frameDiff(tabbed, first, W - map_left).pixels > 0);
         UNSCOPED_INFO("and it stays as it now is");
-        CHECK(map_of() == tabbed);
-        view->die();
+        CHECK(frameDiff(map_of(), tabbed, W - map_left) == FrameDiff());
     }
     // The code editor draws its rows in passes -- what is behind the text,
     // every row's glyphs in one call, then what is over it -- and each
@@ -374,7 +438,7 @@ namespace
         p.rect         = LLRect(0, H, W, 0);
         p.default_text = text;
         p.syntax       = "lsl";
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         // With the keyboard, so that a selection is drawn as the one being
         // worked in; read-only, so that no caret blinks between frames.
@@ -422,13 +486,13 @@ namespace
 
         const std::vector<U8> plain = frame();
         UNSCOPED_INFO("the same frame again");
-        CHECK(frame() == plain);
+        CHECK(frameDiff(frame(), plain) == FrameDiff());
 
         editor->setSelection(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 20)));
         require_only_on("a selection", plain, frame(), 2);
         editor->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
         UNSCOPED_INFO("the selection gone");
-        CHECK(frame() == plain);
+        CHECK(frameDiff(frame(), plain) == FrameDiff());
 
         // A colour of its own over part of a line: each row's glyphs carry
         // their own colours into the one call.
@@ -439,7 +503,7 @@ namespace
         require_only_on("a colour of its own", plain, frame(), 5);
         editor->clearStyles();
         UNSCOPED_INFO("the colour gone");
-        CHECK(frame() == plain);
+        CHECK(frameDiff(frame(), plain) == FrameDiff());
 
         ALCodeEditor::Decoration d;
         d.range = ALTextRange(ALTextPos(7, 8), ALTextPos(7, 13));
@@ -459,8 +523,6 @@ namespace
         glFinish();
         UNSCOPED_INFO("the frame is a handful of draws");
         CHECK(capture.size() <= 25);
-        gFocusMgr.setKeyboardFocus(nullptr);
-        editor->die();
     }
 
     // The preview of the lines under the mouse on the map is drawn over the
@@ -482,13 +544,14 @@ namespace
         p.name           = "view";
         p.rect           = LLRect(0, H, W, 0);
         p.default_text   = text;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setScrollMap(true);
         view->setScrollMapWidth(60);
         view->setBackgroundColor(LLColor4(0.1f, 0.1f, 0.12f, 1.f));
         view->setTextColor(LLColor4(0.9f, 0.9f, 0.9f, 1.f));
         ALTextRuler* map = view->findChild<ALTextRuler>("ruler");
+        REQUIRE(map != nullptr);
         // Every pixel of the view, as it draws.
         const auto drawn = [&]() {
             ll_test::uiGL().clearFramebuffer();
@@ -525,7 +588,6 @@ namespace
             UNSCOPED_INFO("the preview over the text, the map on the " << (left ? "left" : "right"));
             REQUIRE(changed(plain, shown, text_from, text_to) > 1000);
         }
-        view->die();
     }
 
     // A row's squiggle is under its text: nothing at or above the baseline,
@@ -585,7 +647,7 @@ namespace
         p.default_text = text;
         // The skin's colours are not loaded here: the caret's is given.
         p.cursor_color = LLUIColor(LLColor4::white);
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setSelectionColor(LLUIColor(LLColor4(0.2f, 0.4f, 0.9f, 0.6f)));
         // Shown, and still from frame to frame.
@@ -636,7 +698,7 @@ namespace
         require_only_on("another caret", one, two, 2);
         view->setSelections(at(2, 5), { at(4, 0) });
         UNSCOPED_INFO("the two the other way round, the same frame");
-        CHECK(frame() == two);
+        CHECK(frameDiff(frame(), two) == FrameDiff());
 
         const ALTextRange      span(ALTextPos(7, 2), ALTextPos(7, 10));
         view->setSelections(at(4, 0), { span });
@@ -644,7 +706,7 @@ namespace
         require_only_on("another selection, its caret at its end", one, other_span, 7);
         view->setSelections(span, { at(4, 0) });
         UNSCOPED_INFO("the same as the main selection");
-        CHECK(frame() == other_span);
+        CHECK(frameDiff(frame(), other_span) == FrameDiff());
 
         // A caret on every line: the carets are one draw, not one each.
         std::vector<ALTextRange> many;
@@ -669,8 +731,6 @@ namespace
         glFinish();
         UNSCOPED_INFO("twelve carets cost what one does");
         CHECK(with_many == capture.size());
-        gFocusMgr.setKeyboardFocus(nullptr);
-        view->die();
     }
     // A gap: its tint across the text and nothing else in it, the line
     // under it drawn as far down as the gap is tall, and the rows below
@@ -690,7 +750,7 @@ namespace
         // black.
         p.text_color   = LLUIColor(LLColor4::white);
         p.bg_visible   = false;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         const auto frame = [&]() {
             ll_test::uiGL().clearFramebuffer();
@@ -745,7 +805,6 @@ namespace
             CHECK(lit(after, 5, 1, 1, 200) >= width * (row_h - 2));
             CHECK(lit(after, 6, 1, 1, 200) == 0);
         }
-        view->die();
     }
 
     // What goes by row is cut at the text's edge: a code editor scrolled
@@ -769,7 +828,7 @@ namespace
         {
             text += "MMMM " + std::to_string(n) + "\n";
         }
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         editor->setText(text);
         const S32 row_h = editor->layout().rowHeight();
@@ -800,7 +859,6 @@ namespace
         // A clip takes in the row its top edge names, as a rect is drawn.
         UNSCOPED_INFO("nothing of it above the text");
         CHECK(drawnIn(with_atom, x0, x0 + 40, editor->getRect().mBottom + area.mTop + 1, H) == 0);
-        editor->die();
     }
 
     // The ruler's marks cost what one does, however many lines have one: a
@@ -821,7 +879,7 @@ namespace
         p.name           = "view";
         p.rect           = LLRect(0, H, W, 0);
         p.default_text   = text;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         ALTextRuler* ruler = view->findChild<ALTextRuler>("ruler");
         // A frame's draws, the ruler put in its place by a frame before it.
@@ -857,7 +915,6 @@ namespace
         const size_t every = draws();
         UNSCOPED_INFO("two hundred marks and a gap's cost what one does");
         CHECK(every == one);
-        view->die();
     }
 
     // A tint behind every line in sight and every gap costs what one does,
@@ -880,7 +937,7 @@ namespace
         p.name           = "view";
         p.rect           = LLRect(0, H, W, 0);
         p.default_text   = text;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         // A frame's draws, laid out by a frame before it.
         const auto draws = [&]() {
@@ -942,7 +999,6 @@ namespace
         const size_t every_line = draws();
         UNSCOPED_INFO("underlines on every line cost what one line's do");
         CHECK(every_line == one_line);
-        view->die();
     }
 
     // The blocks the gutter draws its markers by are found again once the
@@ -967,7 +1023,7 @@ namespace
         p.rect              = LLRect(0, H, W, 0);
         p.syntax            = "lsl";
         p.show_fold_markers = true;
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         editor->setText(text);
         const S32  last  = editor->document().lineCount() - 1;
@@ -990,7 +1046,6 @@ namespace
         frame();
         UNSCOPED_INFO("lexed to its end: the block gone");
         CHECK(editor->foldRegions().empty());
-        editor->die();
     }
 
     // What is being composed is underlined under its own text on each row
@@ -1016,7 +1071,7 @@ namespace
         // black.
         p.text_color   = LLUIColor(LLColor4::white);
         p.bg_visible   = false;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setWordWrap(true);
         const auto frame = [&]() {
@@ -1095,7 +1150,6 @@ namespace
         CHECK(changed_in(second, 0, second_from) == 0);
         UNSCOPED_INFO("nothing on the second row past where it ends");
         CHECK(changed_in(second, second_to, W) == 0);
-        view->die();
     }
 
     // The preview of the lines under the mouse on the map numbers them as
@@ -1117,7 +1171,7 @@ namespace
         p.name               = "editor";
         p.rect               = LLRect(0, H, W, 0);
         p.default_text       = text;
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         // No gutter, so that only the preview says a line's number; read
         // only, so that no caret blinks between frames.
@@ -1164,7 +1218,6 @@ namespace
         editor->setLineNumberBase(0);
         UNSCOPED_INFO("and from one again as before");
         CHECK(changed(from_one, drawn()) == 0);
-        editor->die();
     }
 
     // A gap put between the lines moves the map's rows below it down, each
@@ -1193,7 +1246,7 @@ namespace
             p.name           = "view";
             p.rect           = LLRect(0, H, W, 0);
             p.default_text   = text;
-            ALTextView* made = LLUICtrlFactory::create<ALTextView>(p);
+            ALTextView* made = keep(LLUICtrlFactory::create<ALTextView>(p));
             made->setFont(LLFontGL::getFontMonospace());
             made->setScrollMap(true);
             made->setScrollMapWidth(60);
@@ -1232,13 +1285,11 @@ namespace
         drawn_first->setLineAnnotations(gapped);
         const std::vector<U8> after = map_of(drawn_first);
         UNSCOPED_INFO("the gap moved the map");
-        CHECK(after != before);
+        CHECK(frameDiff(after, before, 60, 3).pixels > 0);
         ALTextView* gapped_first = make();
         gapped_first->setLineAnnotations(gapped);
         UNSCOPED_INFO("as a view with the gap from the start draws it");
-        CHECK(after == map_of(gapped_first));
-        drawn_first->die();
-        gapped_first->die();
+        CHECK(frameDiff(after, map_of(gapped_first), 60, 3) == FrameDiff());
     }
 
     // The code editor's words beside the text -- an inlay's in its pill, a
@@ -1256,7 +1307,7 @@ namespace
         p.name   = "editor";
         p.rect   = LLRect(0, H, W, 0);
         p.syntax = "lsl";
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         // Read-only, so that no caret blinks between frames.
         editor->setReadOnly(true);
@@ -1306,7 +1357,6 @@ namespace
         const size_t every = draws();
         UNSCOPED_INFO("hints, notes and tabs on every line cost what one line's do");
         CHECK(every == one);
-        editor->die();
     }
 
     // A selection that goes on past a line's end is drawn a little past the
@@ -1327,7 +1377,7 @@ namespace
         // black.
         p.text_color   = LLUIColor(LLColor4::white);
         p.bg_visible   = false;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setSelectionColor(LLUIColor(LLColor4(0.f, 0.f, 1.f, 1.f)));
         // The first line in from the edge, as a log's are.
@@ -1359,7 +1409,6 @@ namespace
         CHECK(past > 0);
         UNSCOPED_INFO("a little, not as far again as the first line is in");
         CHECK(past <= 10);
-        view->die();
     }
 
     // The band a modal keymap has under the text is read and measured once
@@ -1377,7 +1426,7 @@ namespace
         p.name           = "view";
         p.rect           = LLRect(0, H, W, 0);
         p.default_text   = "text";
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         S32  asked  = 0;
         auto keymap = std::make_unique<TypingKeymap>();
@@ -1396,11 +1445,16 @@ namespace
         frame();
         UNSCOPED_INFO("not again while nothing moved");
         CHECK(asked == once);
-        // What a font reload does: the faces swapped under the same font.
+        // What a font reload does: the faces swapped under the same font;
+        // put back however the case ends, for the views of the cases after.
+        struct Generation
+        {
+            const S32 was = LLFontGL::sResolutionGeneration;
+            ~Generation() { LLFontGL::sResolutionGeneration = was; }
+        } generation;
         ++LLFontGL::sResolutionGeneration;
         frame();
         UNSCOPED_INFO("read again once the fonts were loaded again");
         CHECK(asked > once);
-        view->die();
     }
 }

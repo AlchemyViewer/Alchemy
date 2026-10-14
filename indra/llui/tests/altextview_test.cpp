@@ -100,6 +100,14 @@ namespace
             }
         }
 
+        // Where a line's first row ends.
+        S32 firstRowEnd(S32 line)
+        {
+            const ALTextLayout::Line& laid = view->layout().line(line);
+            REQUIRE_FALSE(laid.rows.empty());
+            return laid.rows[0].end;
+        }
+
         // The local point of a column on a line, in the middle of its row.
         void pointOf(S32 line, S32 column, S32& x, S32& y)
         {
@@ -652,7 +660,7 @@ namespace
         CHECK(v.caret() == ALTextPos(0, 4));
         // A click on the label follows the link once let go of.
         std::string followed;
-        v.onLinkClicked([&followed](const ALTextView::Substitution& s) { followed = s.value.asString(); });
+        boost::signals2::scoped_connection heard = v.onLinkClicked([&followed](const ALTextView::Substitution& s) { followed = s.value.asString(); });
         S32 x, y;
         pointOf(0, 4, x, y);
         x += 4;
@@ -681,9 +689,11 @@ namespace
         // An edit above slides it; one through it drops it.
         v.setReadOnly(false);
         v.document().insert(ALTextPos(0, 0), "1\n");
+        REQUIRE(v.substitutions().size() == size_t(1));
         UNSCOPED_INFO("slid down a line");
         CHECK(v.substitutions().front().range.begin == ALTextPos(1, 4));
         v.document().insert(ALTextPos(1, 0), "ab");
+        REQUIRE(v.substitutions().size() == size_t(1));
         UNSCOPED_INFO("slid along");
         CHECK(v.substitutions().front().range == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 34)));
         v.document().remove(ALTextRange(ALTextPos(1, 10), ALTextPos(1, 12)));
@@ -728,7 +738,7 @@ namespace
         UNSCOPED_INFO("a click inside lands at a side");
         CHECK((v.posAtLocal(x, y, true) == ALTextPos(0, 2) || v.posAtLocal(x, y, true) == ALTextPos(0, 5)));
         S32 clicked = 0;
-        v.onAtomClicked([&clicked](const ALTextView::Atom& a) { clicked = a.value.asInteger(); });
+        boost::signals2::scoped_connection heard = v.onAtomClicked([&clicked](const ALTextView::Atom& a) { clicked = a.value.asInteger(); });
         v.handleMouseDown(x, y, MASK_NONE);
         v.handleMouseUp(x, y, MASK_NONE);
         UNSCOPED_INFO("clicked");
@@ -889,6 +899,7 @@ namespace
         v.document().insert(ALTextPos(0, 0), "\n");
         {
             INFO("slid down a line");
+            REQUIRE(v.styles().size() == size_t(2));
             CHECK(v.styles()[0].range.begin == ALTextPos(1, 0));
             CHECK(v.styles()[1].range.begin == ALTextPos(2, 5));
         }
@@ -1100,8 +1111,12 @@ namespace
         // An edited text keeps Tab for itself; F6 goes into the views.
         v.setReadOnly(false);
         v.setCaret(ALTextPos(0, 0));
-        UNSCOPED_INFO("Tab is a tab now");
-        CHECK((!v.handleKeyHere(KEY_TAB, MASK_NONE) || !v.atomViewFocused()));
+        {
+            INFO("Tab is a tab now: soft, to the first stop, the keyboard kept");
+            CHECK(v.handleKeyHere(KEY_TAB, MASK_NONE));
+            CHECK_FALSE(v.atomViewFocused());
+            CHECK(v.document().line(0) == "    line " + ALTextView::atomPlaceholder() + " 1");
+        }
         require_key(KEY_F6);
         UNSCOPED_INFO("F6 goes into the first view");
         CHECK(second->hasFocus());
@@ -1292,8 +1307,10 @@ namespace
                 REQUIRE(found->value.asInteger() == 2);
                 REQUIRE(found->at.column == glyph.cluster);
             }
+            const size_t laid_as = static_cast<size_t>(glyph.substitution - (1 << 30));
+            REQUIRE(laid_as < v.atoms().size());
             UNSCOPED_INFO("where the number it was laid out with is another's now");
-            REQUIRE(v.atoms()[static_cast<size_t>(glyph.substitution - (1 << 30))].value.asInteger() != 2);
+            REQUIRE(v.atoms()[laid_as].value.asInteger() != 2);
         }
         UNSCOPED_INFO("a box on the line");
         CHECK(seen);
@@ -2454,6 +2471,7 @@ namespace
         v.setScrollMap(true);
         v.setScrollMapWidth(80);
         ALTextRuler* ruler = v.findChild<ALTextRuler>("ruler");
+        REQUIRE(ruler);
         UNSCOPED_INFO("the press is taken");
         CHECK(v.handleMouseDown(360, 100, MASK_NONE));
         {
@@ -3344,7 +3362,7 @@ namespace
         lines[5].gapStop = true;
         v.setLineAnnotations(lines);
         S32 moved = 0;
-        v.onCaretMoved([&moved]() { ++moved; });
+        boost::signals2::scoped_connection heard = v.onCaretMoved([&moved]() { ++moved; });
 
         v.setCaret(ALTextPos(1, 2));
         moved = 0;
@@ -3436,7 +3454,7 @@ namespace
         }
         ALTextView& v = make(many.c_str());
         S32 told = 0;
-        v.onScrolled([&told]() { ++told; });
+        boost::signals2::scoped_connection heard = v.onScrolled([&told]() { ++told; });
         v.setScrollY(60);
         UNSCOPED_INFO("scrolled");
         CHECK(told == 1);
@@ -3485,7 +3503,7 @@ namespace
         v.setLineAnnotations(lines);
         v.setCaret(ALTextPos(4, 2));
         U32 told = 0;
-        v.onTextChanged([&told]() { ++told; });
+        boost::signals2::scoped_connection heard = v.onTextChanged([&told]() { ++told; });
         // Lines one and two, one line now.
         v.replaceText(ALTextRange(ALTextPos(1, 0), ALTextPos(2, 3)), "ONE");
         CHECK(v.text() == std::string("xzero\nONE\nthree\nfour"));
@@ -3714,7 +3732,7 @@ namespace
         v.setCaret(ALTextPos(1, 2));
         S32 told = 0;
         S32 seen = -2;
-        v.onCaretMoved([&]() {
+        boost::signals2::scoped_connection heard = v.onCaretMoved([&]() {
             ++told;
             seen = v.caretGap();
         });
@@ -3769,7 +3787,7 @@ namespace
         // How many letters a row holds: a word too long for one breaks
         // where it overflows.
         v.setText(std::string(200, 'a'));
-        const S32 fits = v.layout().line(0).rows[0].end;
+        const S32 fits = firstRowEnd(0);
         UNSCOPED_INFO("a row holds a few letters");
         CHECK(fits > 4);
         // Rows of 'a..a ', 'bb ' -- the word after it does not fit beside
@@ -3806,7 +3824,7 @@ namespace
         ALTextView& v = make("");
         v.setWordWrap(true);
         v.setText(std::string(200, 'a'));
-        const S32 fits = v.layout().line(0).rows[0].end;
+        const S32 fits = firstRowEnd(0);
         UNSCOPED_INFO("a row holds a few letters");
         CHECK(fits > 6);
         // A word too long for a row, shown as it is: all of the first two
@@ -3822,7 +3840,7 @@ namespace
         UNSCOPED_INFO("three rows");
         CHECK(v.layout().rowCount(0) == 3);
         std::string followed;
-        v.onLinkClicked([&followed](const ALTextView::Substitution& s) { followed = s.value.asString(); });
+        boost::signals2::scoped_connection heard = v.onLinkClicked([&followed](const ALTextView::Substitution& s) { followed = s.value.asString(); });
         const auto click = [&](S32 column) {
             S32 x = 0, y = 0;
             pointOf(0, column, x, y);
@@ -3861,7 +3879,7 @@ namespace
             CHECK(v.layout().line(0).rows[0].end == 5);
         }
         S32 clicked = 0;
-        v.onAtomClicked([&clicked](const ALTextView::Atom& a) { clicked = a.value.asInteger(); });
+        boost::signals2::scoped_connection heard = v.onAtomClicked([&clicked](const ALTextView::Atom& a) { clicked = a.value.asInteger(); });
         S32 x, y;
         pointOf(0, 2, x, y);
         x += picture.width / 2;
@@ -4264,8 +4282,9 @@ namespace
         v.setScrollMap(true);
         v.setScrollMapWidth(80);
         ALTextRuler* ruler = v.findChild<ALTextRuler>("ruler");
-        S32          top   = 0;
-        S32          bottom = 0;
+        REQUIRE(ruler);
+        S32 top    = 0;
+        S32 bottom = 0;
         ll_test::TextViewProbe::mapWindow(*ruler, top, bottom);
         {
             INFO("the window at the map's top");

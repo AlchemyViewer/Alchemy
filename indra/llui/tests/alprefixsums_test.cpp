@@ -35,16 +35,7 @@ namespace
 {
     struct alprefixsums_data
     {
-        // What the sums should say, added up the long way.
-        static S32 before(const std::vector<S32>& values, size_t index)
-        {
-            S32 sum = 0;
-            for (size_t i = 0; i < index && i < values.size(); ++i)
-            {
-                sum += values[i];
-            }
-            return sum;
-        }
+        // The place a sum reaches, found the long way.
         static size_t reach(const std::vector<S32>& values, S32 sum)
         {
             size_t at  = 0;

@@ -133,8 +133,10 @@ namespace
         CHECK(doc.version() == before);
         UNSCOPED_INFO("nobody told");
         CHECK(heard.empty());
-        UNSCOPED_INFO("clamped past the end");
-        CHECK(doc.insert(ALTextPos(7, 7), "").nothing());
+        const ALTextDocument::Edit past = doc.insert(ALTextPos(7, 7), "");
+        CHECK(past.nothing());
+        UNSCOPED_INFO("answered where it was asked for, clamped to the end");
+        CHECK(past.range == ALTextRange(ALTextPos(0, 3), ALTextPos(0, 3)));
     }
 
     TEST_CASE_METHOD(altextdocument_data, "altextdocument: offsets and positions agree and the whole text kept follows edits", "[altextdocument]")
