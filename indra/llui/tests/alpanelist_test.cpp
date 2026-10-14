@@ -103,8 +103,11 @@ namespace
             return value["group"].asString() + (folded ? (*folded ? " shut" : " open") : " turned");
         };
         l.setFocus(true);
+        // With no fold to ask, left on the row chosen goes on to the list,
+        // which takes it as any list does.
+        l.selectFirstItem();
         UNSCOPED_INFO("no fold: left is the list's");
-        CHECK((!l.handleKeyHere(KEY_LEFT, MASK_NONE) || asked.empty()));
+        CHECK(l.handleKeyHere(KEY_LEFT, MASK_NONE));
         l.setFold([&](const LLSD& value, std::optional<bool> folded) { asked.push_back(said(value, folded)); },
                   [](const LLScrollListItem*, S32 x) { return x < 20; });
         l.deselectAllItems();
@@ -115,6 +118,7 @@ namespace
         {
             INFO("left shuts");
             CHECK(l.handleKeyHere(KEY_LEFT, MASK_NONE));
+            REQUIRE_FALSE(asked.empty());
             CHECK(asked.back() == "0 shut");
         }
         {
@@ -126,17 +130,22 @@ namespace
         UNSCOPED_INFO("with a key held, the list's");
         REQUIRE(asked.size() == size_t(2));
         l.handleKeyHere(KEY_DOWN, MASK_NONE);
-        UNSCOPED_INFO("another key is the list's: it moved on");
-        CHECK(l.getFirstSelected()->getColumn(0)->getValue().asString() ==
-                      std::string("two"));
+        {
+            INFO("another key is the list's: it moved on");
+            REQUIRE(l.getFirstSelected());
+            CHECK(l.getFirstSelected()->getColumn(0)->getValue().asString() == std::string("two"));
+        }
         const LLRect first = l.getCellRect(0, 0);
         {
             INFO("a press on the arrow turns its row");
             CHECK(l.handleMouseDown(first.mLeft + 5, first.getCenterY(), MASK_NONE));
             CHECK(asked.back() == "0 turned");
         }
-        UNSCOPED_INFO("and chooses nothing");
-        CHECK(l.getFirstSelected()->getColumn(0)->getValue().asString() == std::string("two"));
+        {
+            INFO("and chooses nothing");
+            REQUIRE(l.getFirstSelected());
+            CHECK(l.getFirstSelected()->getColumn(0)->getValue().asString() == std::string("two"));
+        }
         l.handleMouseDown(first.mLeft + 40, first.getCenterY(), MASK_NONE);
         l.handleMouseUp(first.mLeft + 40, first.getCenterY(), MASK_NONE);
         {
@@ -168,8 +177,9 @@ namespace
         l.sortByColumnIndex(0, false);
         UNSCOPED_INFO("down, within each group, the groups as they were");
         CHECK(order() == std::string("Zed b2 b1 Alpha a2 a1"));
-        // The rows' own comparison, where the owner gives one: by length,
-        // then by words.
+        // The rows' own comparison, where the owner gives one: here the
+        // words the other way round, so that a sort up comes out within
+        // each group as the words' own order would down.
         l.setComparison([](S32, const LLScrollListItem* a, const LLScrollListItem* b) {
             const std::string x = a->getColumn(0)->getValue().asString();
             const std::string y = b->getColumn(0)->getValue().asString();
@@ -417,6 +427,7 @@ namespace
             value["columns"][3]["column"] = "empty";
             value["columns"][3]["value"]  = "";
             LLScrollListItem* item        = l.addElement(value);
+            REQUIRE(item);
             item->setEnabled(enabled);
         };
         row("A heading", "", false);
@@ -598,9 +609,12 @@ namespace
         };
         l.setRows({ row("a", "alpha"), row("b", "beta"), row("c", "gamma") });
         CHECK(order() == std::string("alpha beta gamma"));
-        LLScrollListItem* b      = l.rowWithKey("b");
+        LLScrollListItem* b = l.rowWithKey("b");
+        LLScrollListItem* c = l.rowWithKey("c");
+        REQUIRE(b);
+        REQUIRE(c);
         LLScrollListCell* b_cell = b->getColumn(0);
-        LLScrollListCell* c_cell = l.rowWithKey("c")->getColumn(0);
+        LLScrollListCell* c_cell = c->getColumn(0);
         l.selectNthItem(1);
         l.setRows({ row("a", "alpha"), row("b", "beta"), row("c", "gamma 2") });
         {
@@ -610,7 +624,9 @@ namespace
         }
         {
             INFO("the changed cell made again");
-            CHECK(l.rowWithKey("c")->getColumn(0) != c_cell);
+            const LLScrollListItem* c_now = l.rowWithKey("c");
+            REQUIRE(c_now);
+            CHECK(c_now->getColumn(0) != c_cell);
             CHECK(order() == "alpha beta gamma 2");
         }
         UNSCOPED_INFO("still chosen");

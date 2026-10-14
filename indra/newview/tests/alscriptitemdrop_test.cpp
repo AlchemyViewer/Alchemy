@@ -34,11 +34,11 @@
 
 #include "alscriptstudio_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct alscriptitemdrop_data
     {
@@ -53,7 +53,7 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             LLUUID object, item;
             object.generate();
@@ -103,47 +103,58 @@ namespace tut
             return accept;
         }
     };
-    typedef test_group<alscriptitemdrop_data> alscriptitemdrop_group;
-    typedef alscriptitemdrop_group::object    alscriptitemdrop_object;
-    alscriptitemdrop_group                    alscriptitemdrop_instance("ALScriptItemDrop");
 
-    template<> template<>
-    void alscriptitemdrop_object::test<1>()
+    TEST_CASE_METHOD(alscriptitemdrop_data, "ALScriptItemDrop: a dropped item's name goes in escaped and with Shift its key if seen", "[ALScriptItemDrop]")
     {
-        set_test_name("its name goes in where it lands, as a string, its quotes escaped; with Shift its key, where it may be seen");
-        ensure_equals("quoted and escaped", ALScriptItemDrop::literal("a \"b\" \\ c"), std::string("\"a \\\"b\\\" \\\\ c\""));
+        UNSCOPED_INFO("quoted and escaped");
+        CHECK(ALScriptItemDrop::literal("a \"b\" \\ c") == std::string("\"a \\\"b\\\" \\\\ c\""));
         make("x;");
         const auto wood = item("Wood \"oak\"");
         std::string tip;
-        ensure("offered", drop(wood, false, MASK_NONE, &tip) == ACCEPT_YES_SINGLE);
-        ensure("the tip says what goes in", tip.find("\"Wood \\\"oak\\\"\"") != std::string::npos);
-        ensure("nothing yet", doc->editor->text() == "x;");
+        UNSCOPED_INFO("offered");
+        CHECK(drop(wood, false, MASK_NONE, &tip) == ACCEPT_YES_SINGLE);
+        UNSCOPED_INFO("the tip says what goes in");
+        CHECK(tip.find("\"Wood \\\"oak\\\"\"") != std::string::npos);
+        UNSCOPED_INFO("a drag over changes nothing");
+        CHECK(doc->editor->text() == "x;");
         drop(wood, true);
-        ensure_equals("in where it lands", doc->editor->text(), std::string("\"Wood \\\"oak\\\"\"x;"));
-        ensure("the caret after it", doc->editor->caret() == ALTextPos(0, 14));
+        UNSCOPED_INFO("in where it lands");
+        CHECK(doc->editor->text() == std::string("\"Wood \\\"oak\\\"\"x;"));
+        UNSCOPED_INFO("the caret after it");
+        CHECK(doc->editor->caret() == ALTextPos(0, 14));
 
         doc->editor->setText("x;");
-        ensure("its key not to be seen: refused", drop(wood, false, MASK_SHIFT, &tip) == ACCEPT_NO && !tip.empty());
+        {
+            INFO("its key not to be seen: refused");
+            CHECK(drop(wood, false, MASK_SHIFT, &tip) == ACCEPT_NO);
+            CHECK_FALSE(tip.empty());
+        }
         shown.generate();
         drop(wood, true, MASK_SHIFT);
-        ensure_equals("its key", doc->editor->text(), "\"" + shown.asString() + "\"x;");
+        UNSCOPED_INFO("its key");
+        CHECK(doc->editor->text() == "\"" + shown.asString() + "\"x;");
     }
 
-    template<> template<>
-    void alscriptitemdrop_object::test<2>()
+    TEST_CASE_METHOD(alscriptitemdrop_data, "ALScriptItemDrop: a read-only script refuses a drop and folders and notecards go elsewhere", "[ALScriptItemDrop]")
     {
-        set_test_name("a script that may not be changed refuses it; a folder, and a notecard, are left to someone else");
         make("x;");
         const auto wood = item("Wood");
         doc->modifiable = false;
         std::string tip;
-        ensure("refused, and said why", drop(wood, true, MASK_NONE, &tip) == ACCEPT_NO && !tip.empty() && doc->editor->text() == "x;");
+        {
+            INFO("refused, and said why");
+            CHECK(drop(wood, true, MASK_NONE, &tip) == ACCEPT_NO);
+            CHECK_FALSE(tip.empty());
+            CHECK(doc->editor->text() == "x;");
+        }
         doc->modifiable = true;
         bool taken = true;
         drop(wood, false, MASK_NONE, nullptr, DAD_CATEGORY, &taken);
-        ensure("a folder: not taken", !taken);
+        UNSCOPED_INFO("a folder: not taken");
+        CHECK_FALSE(taken);
         doc->notecard = true;
         drop(wood, false, MASK_NONE, nullptr, DAD_TEXTURE, &taken);
-        ensure("a notecard: not taken", !taken);
+        UNSCOPED_INFO("a notecard: not taken");
+        CHECK_FALSE(taken);
     }
 }

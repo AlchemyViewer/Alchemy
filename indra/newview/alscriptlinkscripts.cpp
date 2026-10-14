@@ -26,6 +26,7 @@
 
 #include "alscriptlinkscripts.h"
 
+#include "almainloop.h"
 #include "almastermatch.h"
 #include "alscriptcontentsindex.h"
 #include "alscriptdiskmasters.h"
@@ -394,7 +395,7 @@ void ALScriptLinkScripts::findFiles()
     // a drive that may be slow. Where there is no main loop to hand what it
     // found back to -- a test -- looked at here.
     const U32                  generation = mGeneration;
-    const LL::WorkQueue::ptr_t main_loop  = LL::WorkQueue::getInstance("mainloop");
+    const LL::WorkQueue::ptr_t main_loop  = ALMainLoop::queue();
     if (!main_loop)
     {
         found(generation, match(asks, lsl, lua, {}));

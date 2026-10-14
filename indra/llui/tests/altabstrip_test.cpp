@@ -480,6 +480,7 @@ namespace
         const LLRect second = strip->rectOf(1);
         strip->handleMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
         strip->handleHover(second.getCenterX() + 4, second.getCenterY(), MASK_NONE);
+        REQUIRE(strip->tabs().size() == 3u);
         UNSCOPED_INFO("dragged past its neighbour, it moved");
         CHECK(strip->tabs()[1].value == "a");
         UNSCOPED_INFO("nothing said while it is held");
@@ -577,6 +578,7 @@ namespace
         strip->handleMouseUp(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
         {
             INFO("nothing moved");
+            REQUIRE(strip->tabs().size() == 2u);
             REQUIRE(strip->tabs()[0].value == "b");
             CHECK(strip->tabs()[1].value == "c");
         }
@@ -706,6 +708,7 @@ namespace
         {
             INFO("which is still chosen, where it went");
             REQUIRE(strip->chosen() == "a");
+            REQUIRE(strip->tabs().size() == 3u);
             CHECK(strip->tabs()[1].value == "a");
         }
         strip->handleKeyHere(KEY_LEFT, MASK_SHIFT);
@@ -713,6 +716,7 @@ namespace
         {
             INFO("back, and no further than the first");
             REQUIRE(orders.size() == 2);
+            REQUIRE(strip->tabs().size() == 3u);
             CHECK(strip->tabs()[0].value == "a");
         }
 
@@ -768,6 +772,7 @@ namespace
         CHECK(torn.front() == std::string("b"));
         S32 screen_x = 0, screen_y = 0;
         strip->localPointToScreen(second.getCenterX() + 5, -120, &screen_x, &screen_y);
+        REQUIRE(where.size() == size_t(1));
         UNSCOPED_INFO("where, on the screen");
         CHECK(where.front() == std::make_pair(screen_x, screen_y));
         UNSCOPED_INFO("no longer tearing");
@@ -837,6 +842,7 @@ namespace
         dirty.badge            = LLColor4::red;
         UNSCOPED_INFO("found");
         CHECK(strip->setTab(dirty));
+        REQUIRE(strip->tabs().size() == 3u);
         {
             INFO("changed in place");
             REQUIRE(strip->tabs()[1].dirty);
@@ -934,7 +940,7 @@ namespace
             REQUIRE(cut.find("\xE2\x80\xA6") != std::string::npos);
         }
         UNSCOPED_INFO("the extension kept: " << cut);
-        REQUIRE(cut.compare(cut.size() - 4, 4, ".lsl") == 0);
+        REQUIRE(cut.ends_with(".lsl"));
         UNSCOPED_INFO("no mark after the ellipsis, parted from its e: " << cut);
         REQUIRE(cut.find("\xE2\x80\xA6\xCC") == std::string::npos);
         UNSCOPED_INFO("the e kept with both its marks: " << cut);

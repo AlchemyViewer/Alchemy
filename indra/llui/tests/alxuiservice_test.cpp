@@ -108,8 +108,11 @@ namespace
         CHECK(c.attribute == std::string("label"));
         c = ALXUIService::contextAt(doc, ALTextPos(5, 7));  // <bu
         CHECK(c.where == Where::TagName);
-        UNSCOPED_INFO("under the panel (the button above was left open, as typing leaves it)");
-        CHECK_FALSE(c.parents.empty());
+        {
+            INFO("under the panel (the button above was left open, as typing leaves it)");
+            REQUIRE(c.parents.size() == 2);
+            CHECK(c.parents[1] == "panel");
+        }
         c = ALXUIService::contextAt(doc, ALTextPos(6, 6));  // </pa
         CHECK(c.where == Where::ClosingTag);
         c = ALXUIService::contextAt(doc, ALTextPos(2, 8));
@@ -186,7 +189,7 @@ namespace
         UNSCOPED_INFO("a value says its attribute: " + on_value);
         CHECK(on_value.rfind("button label:", 0) == 0);
         UNSCOPED_INFO("nothing between elements");
-        REQUIRE((ALXUIService::hover(doc, ALTextPos(2, 0)).empty() || true));
+        CHECK(ALXUIService::hover(doc, ALTextPos(2, 0)).empty());
         ALTextPos   where;
         std::string message;
         CHECK(ALXUIService::parses(doc.text(), where, message));

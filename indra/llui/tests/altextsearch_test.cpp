@@ -89,6 +89,7 @@ namespace
         UNSCOPED_INFO("and says why");
         CHECK_FALSE(error.empty());
         const std::vector<ALTextRange> found = ALTextSearch::matches(doc, "([a-z])(\\d+)", options);
+        REQUIRE(found.size() == size_t(3));
         UNSCOPED_INFO("groups filled");
         CHECK(ALTextSearch::replacement(doc, found[1], "([a-z])(\\d+)", options, "$2$1") == std::string("22b"));
         options.regex = false;
@@ -131,6 +132,7 @@ namespace
         UNSCOPED_INFO("mixed, as typed");
         CHECK(ALTextSearch::replacement(doc, found[3], "hello", options, "wORld") == std::string("wORld"));
         const std::vector<ALTextRange> digits = ALTextSearch::matches(doc, "123", options);
+        REQUIRE(digits.size() == size_t(1));
         UNSCOPED_INFO("no letters, as typed");
         CHECK(ALTextSearch::replacement(doc, digits[0], "123", options, "Abc") == std::string("Abc"));
         options.preserveCase = false;
@@ -335,12 +337,18 @@ namespace
         std::thread other([&]() {
             for (int round = 0; round < 200; ++round)
             {
-                wrong = wrong || ALTextSearch::matches(doc, "be\\w+", regex).size() != 3;
+                if (ALTextSearch::matches(doc, "be\\w+", regex).size() != 3)
+                {
+                    wrong = true;
+                }
             }
         });
         for (int round = 0; round < 200; ++round)
         {
-            wrong = wrong || ALTextSearch::matches(doc, "al\\w+|ga\\w+", regex).size() != 3;
+            if (ALTextSearch::matches(doc, "al\\w+|ga\\w+", regex).size() != 3)
+            {
+                wrong = true;
+            }
         }
         other.join();
         UNSCOPED_INFO("each thread its own answers");

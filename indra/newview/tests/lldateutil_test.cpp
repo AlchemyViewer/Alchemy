@@ -25,7 +25,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../lldateutil.h"
 
@@ -75,7 +75,7 @@ std::string LLUI::getLanguage()
     return "en";
 }
 
-namespace tut
+namespace
 {
     struct dateutil
     {
@@ -109,87 +109,57 @@ namespace tut
         LLDate mNow;
     };
 
-    typedef test_group<dateutil> dateutil_t;
-    typedef dateutil_t::object dateutil_object_t;
-    tut::dateutil_t tut_dateutil("LLDateUtil");
-
-    template<> template<>
-    void dateutil_object_t::test<1>()
+    TEST_CASE_METHOD(dateutil, "LLDateUtil: an age of a year or more reads in years and whole months", "[LLDateUtil]")
     {
-        set_test_name("Years");
-        ensure_equals("years + months",
-            LLDateUtil::ageFromDate("10/30/2007", mNow),
-            "2 years 2 months old" );
-        ensure_equals("years",
-            LLDateUtil::ageFromDate("12/31/2007", mNow),
-            "2 years old" );
-        ensure_equals("years",
-            LLDateUtil::ageFromDate("1/1/2008", mNow),
-            "1 year 11 months old" );
-        ensure_equals("single year + one month",
-            LLDateUtil::ageFromDate("11/30/2008", mNow),
-            "1 year 1 month old" );
-        ensure_equals("single year + a bit",
-            LLDateUtil::ageFromDate("12/12/2008", mNow),
-            "1 year old" );
-        ensure_equals("single year",
-            LLDateUtil::ageFromDate("12/31/2008", mNow),
-            "1 year old" );
+        CHECK(LLDateUtil::ageFromDate("10/30/2007", mNow) ==
+            "2 years 2 months old");
+        CHECK(LLDateUtil::ageFromDate("12/31/2007", mNow) ==
+            "2 years old");
+        CHECK(LLDateUtil::ageFromDate("1/1/2008", mNow) ==
+            "1 year 11 months old");
+        CHECK(LLDateUtil::ageFromDate("11/30/2008", mNow) ==
+            "1 year 1 month old");
+        CHECK(LLDateUtil::ageFromDate("12/12/2008", mNow) ==
+            "1 year old");
+        CHECK(LLDateUtil::ageFromDate("12/31/2008", mNow) ==
+            "1 year old");
     }
 
-    template<> template<>
-    void dateutil_object_t::test<2>()
+    TEST_CASE_METHOD(dateutil, "LLDateUtil: an age of a month to a year reads in whole months", "[LLDateUtil]")
     {
-        set_test_name("Months");
-        ensure_equals("months",
-            LLDateUtil::ageFromDate("10/30/2009", mNow),
-            "2 months old" );
-        ensure_equals("months 2",
-            LLDateUtil::ageFromDate("10/31/2009", mNow),
-            "2 months old" );
-        ensure_equals("single month",
-            LLDateUtil::ageFromDate("11/30/2009", mNow),
-            "1 month old" );
+        CHECK(LLDateUtil::ageFromDate("10/30/2009", mNow) ==
+            "2 months old");
+        CHECK(LLDateUtil::ageFromDate("10/31/2009", mNow) ==
+            "2 months old");
+        CHECK(LLDateUtil::ageFromDate("11/30/2009", mNow) ==
+            "1 month old");
     }
 
-    template<> template<>
-    void dateutil_object_t::test<3>()
+    TEST_CASE_METHOD(dateutil, "LLDateUtil: an age under a month reads in whole weeks", "[LLDateUtil]")
     {
-        set_test_name("Weeks");
-        ensure_equals("4 weeks",
-            LLDateUtil::ageFromDate("12/1/2009", mNow),
-            "4 weeks old" );
-        ensure_equals("weeks",
-            LLDateUtil::ageFromDate("12/17/2009", mNow),
-            "2 weeks old" );
-        ensure_equals("single week",
-            LLDateUtil::ageFromDate("12/24/2009", mNow),
-            "1 week old" );
+        CHECK(LLDateUtil::ageFromDate("12/1/2009", mNow) ==
+            "4 weeks old");
+        CHECK(LLDateUtil::ageFromDate("12/17/2009", mNow) ==
+            "2 weeks old");
+        CHECK(LLDateUtil::ageFromDate("12/24/2009", mNow) ==
+            "1 week old");
     }
 
-    template<> template<>
-    void dateutil_object_t::test<4>()
+    TEST_CASE_METHOD(dateutil, "LLDateUtil: an age under a week reads in days or as joined today", "[LLDateUtil]")
     {
-        set_test_name("Days");
-        ensure_equals("days",
-            LLDateUtil::ageFromDate("12/29/2009", mNow),
-            "2 days old" );
-        ensure_equals("single day",
-            LLDateUtil::ageFromDate("12/30/2009", mNow),
-            "1 day old" );
-        ensure_equals("today",
-            LLDateUtil::ageFromDate("12/31/2009", mNow),
-            "Joined today" );
+        CHECK(LLDateUtil::ageFromDate("12/29/2009", mNow) ==
+            "2 days old");
+        CHECK(LLDateUtil::ageFromDate("12/30/2009", mNow) ==
+            "1 day old");
+        CHECK(LLDateUtil::ageFromDate("12/31/2009", mNow) ==
+            "Joined today");
     }
 
-    template<> template<>
-    void dateutil_object_t::test<5>()
+    TEST_CASE_METHOD(dateutil, "LLDateUtil: an age that spans the new year still reads in weeks", "[LLDateUtil]")
     {
-        set_test_name("2010 rollover");
         LLDate now(std::string("2010-01-04T12:00:00Z"));
-        ensure_equals("days",
-            LLDateUtil::ageFromDate("12/13/2009", now),
-            "3 weeks old" );
+        CHECK(LLDateUtil::ageFromDate("12/13/2009", now) ==
+            "3 weeks old");
     }
 
     //template<> template<>

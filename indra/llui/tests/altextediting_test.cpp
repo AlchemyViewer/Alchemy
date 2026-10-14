@@ -160,10 +160,14 @@ namespace
         CHECK(applied(text, *j) == std::string("call(a, b)\n\nend"));
         UNSCOPED_INFO("the caret where the first join is");
         CHECK(j->caret == ALTextPos(0, 7));
+        const std::optional<Change> blank = joinLines(doc, 2, 4, false);
+        REQUIRE(blank.has_value());
         UNSCOPED_INFO("a blank line takes no space");
-        CHECK(applied(text, *joinLines(doc, 2, 4, false)) == std::string("call(a,\n    b\n    ) end"));
+        CHECK(applied(text, *blank) == std::string("call(a,\n    b\n    ) end"));
+        const std::optional<Change> kept = joinLines(doc, 0, 1, true);
+        REQUIRE(kept.has_value());
         UNSCOPED_INFO("the blanks kept");
-        CHECK(applied(text, *joinLines(doc, 0, 1, true)) == std::string("call(a,    b\n    )\n\nend"));
+        CHECK(applied(text, *kept) == std::string("call(a,    b\n    )\n\nend"));
         {
             INFO("one line is nothing to join");
             CHECK_FALSE(joinLines(doc, 4, 4, false));
@@ -188,18 +192,22 @@ namespace
         CHECK(down->caret == ALTextPos(3, 0));
 
         const std::optional<Change> up = moveLinesTo(doc, 3, 4, 0);
+        REQUIRE(up.has_value());
         UNSCOPED_INFO("under a");
         CHECK(applied(text, *up) == std::string("a\nd\ne\nb\nc"));
         UNSCOPED_INFO("the caret on e");
         CHECK(up->caret == ALTextPos(2, 0));
 
         const std::optional<Change> top = moveLinesTo(doc, 2, 2, -1);
+        REQUIRE(top.has_value());
         UNSCOPED_INFO("to the top");
         CHECK(applied(text, *top) == std::string("c\na\nb\nd\ne"));
         UNSCOPED_INFO("the caret on c");
         CHECK(top->caret == ALTextPos(0, 0));
+        const std::optional<Change> end = moveLinesTo(doc, 0, 0, 4);
+        REQUIRE(end.has_value());
         UNSCOPED_INFO("to the end");
-        CHECK(applied(text, *moveLinesTo(doc, 0, 0, 4)) == std::string("b\nc\nd\ne\na"));
+        CHECK(applied(text, *end) == std::string("b\nc\nd\ne\na"));
 
         UNSCOPED_INFO("into themselves, nothing");
         CHECK_FALSE(moveLinesTo(doc, 1, 3, 2));
@@ -340,14 +348,21 @@ namespace
     {
         const std::string    text = "a  \nb\n\nc\t\n  d\n\n\ne";
         const ALTextDocument doc(text);
+        const std::optional<Change> trailing = joinLines(doc, 0, 1, false);
+        REQUIRE(trailing.has_value());
         UNSCOPED_INFO("a line's trailing blanks stand for the space");
-        CHECK(applied(text, *joinLines(doc, 0, 1, false)) == std::string("a  b\n\nc\t\n  d\n\n\ne"));
+        CHECK(applied(text, *trailing) == std::string("a  b\n\nc\t\n  d\n\n\ne"));
+        const std::optional<Change> tab = joinLines(doc, 3, 4, false);
+        REQUIRE(tab.has_value());
         UNSCOPED_INFO("a tab as well");
-        CHECK(applied(text, *joinLines(doc, 3, 4, false)) == std::string("a  \nb\n\nc\td\n\n\ne"));
+        CHECK(applied(text, *tab) == std::string("a  \nb\n\nc\td\n\n\ne"));
+        const std::optional<Change> onto_empty = joinLines(doc, 5, 7, false);
+        REQUIRE(onto_empty.has_value());
         UNSCOPED_INFO("nothing joined onto yet takes no space");
-        CHECK(applied(text, *joinLines(doc, 5, 7, false)) == std::string("a  \nb\n\nc\t\n  d\ne"));
+        CHECK(applied(text, *onto_empty) == std::string("a  \nb\n\nc\t\n  d\ne"));
+        const std::optional<Change> across_empty = joinLines(doc, 1, 3, false);
+        REQUIRE(across_empty.has_value());
         UNSCOPED_INFO("an empty line between joins what comes after it with a space");
-        CHECK(applied(text, *joinLines(doc, 1, 3, false)) ==
-                      std::string("a  \nb c\t\n  d\n\n\ne"));
+        CHECK(applied(text, *across_empty) == std::string("a  \nb c\t\n  d\n\n\ne"));
     }
 }

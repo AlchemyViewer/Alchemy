@@ -39,7 +39,7 @@
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <limits>
@@ -47,10 +47,8 @@
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         constexpr S32 W = 64;
         constexpr S32 H = 64;
         constexpr F32 FOV = 1.f;
@@ -148,11 +146,6 @@ namespace tut
             return reverse;
         }
 
-        static std::string named(bool reverse, const std::string& what)
-        {
-            return what + (reverse ? " (reverse-Z)" : " (forward)");
-        }
-
         void setConvention(bool reverse)
         {
             LLRender::sReverseZ = reverse;
@@ -171,17 +164,17 @@ namespace tut
         void setUp(bool reverse)
         {
             tearDown();
-            mReverse = reverse;
             setConvention(reverse);
 
             std::map<std::string, std::string> defines;
             for (const char* object : { "deferred/textureUtilV.glsl", "objects/nonindexedTextureV.glsl" })
             {
+                CAPTURE(object);
                 S32 level = 1;
-                ensure(std::string("compiled ") + object, mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines) != 0);
+                REQUIRE(mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines) != 0);
             }
             S32 level = 1;
-            ensure("compiled deferred/globalF.glsl", mShaders.loadShaderFile("deferred/globalF.glsl", level, GL_FRAGMENT_SHADER, &defines) != 0);
+            REQUIRE(mShaders.loadShaderFile("deferred/globalF.glsl", level, GL_FRAGMENT_SHADER, &defines) != 0);
 
             mBlitProgram.mName = "Copy Depth Blit";
             mBlitProgram.mShaderFiles.clear();
@@ -190,7 +183,7 @@ namespace tut
             mBlitProgram.clearPermutations();
             mBlitProgram.addPermutation("COPY_DEPTH", "1");
             mBlitProgram.mShaderLevel = 1;
-            ensure("blit copy builds", mBlitProgram.createShader());
+            REQUIRE(mBlitProgram.createShader());
 
             mCopyDepthProgram.mName = "Copy Depth Shader";
             mCopyDepthProgram.mShaderFiles.clear();
@@ -200,11 +193,15 @@ namespace tut
             mCopyDepthProgram.addPermutation("COPY_DEPTH", "1");
             mCopyDepthProgram.addPermutation("DEPTH_ONLY", "1");
             mCopyDepthProgram.mShaderLevel = 1;
-            ensure("depth copy builds", mCopyDepthProgram.createShader());
+            REQUIRE(mCopyDepthProgram.createShader());
 
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kQuadVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kQuadFragment);
-            ensure("quad shaders compile", vs && fs);
+            {
+                INFO("quad shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
             mQuadProgram = glCreateProgram();
             glAttachShader(mQuadProgram, vs);
             glAttachShader(mQuadProgram, fs);
@@ -213,17 +210,18 @@ namespace tut
             glDeleteShader(fs);
             GLint linked = GL_FALSE;
             glGetProgramiv(mQuadProgram, GL_LINK_STATUS, &linked);
-            ensure("quad program links", linked == GL_TRUE);
+            UNSCOPED_INFO("quad program links");
+            REQUIRE(linked == GL_TRUE);
             glGenVertexArrays(1, &mVAO);
             glGenBuffers(1, &mVBO);
 
-            ensure("window", mWindow.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
+            REQUIRE(mWindow.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
                                               LLRenderTarget::DEPTH_FMT_24));
-            ensure("scene", mScene.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
+            REQUIRE(mScene.allocate(W, H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
                                             reverse ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24));
 
             mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
-            ensure("triangle", mTriangle->allocateBuffer(3, 0));
+            REQUIRE(mTriangle->allocateBuffer(3, 0));
             LLStrider<LLVector3> vert;
             mTriangle->getVertexStrider(vert);
             vert[0].set(-1.f, 1.f, 0.f);
@@ -397,20 +395,15 @@ namespace tut
         LLMatrix4a mSceneProjection;
         LLMatrix4a mHUDProjection;
         std::vector<LLRect> mRects;
-        bool mReverse = false;
     };
 
-    typedef test_group<alhuddepth_data> alhuddepth_t;
-    typedef alhuddepth_t::object alhuddepth_object_t;
-    tut::alhuddepth_t alhuddepth_testcase("ALHUDDepth");
-    }
 
     // The final blit's copy fills the window's depth with the scene's, as the window's 24 bits hold it.
-    template<> template<>
-    void alhuddepth_object_t::test<1>()
+    TEST_CASE_METHOD(alhuddepth_data, "ALHUDDepth: the final blit fills the window's depth with the scene's", "[ALHUDDepth]")
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             blit();
             const std::vector<F32> scene = depths(mScene);
@@ -420,43 +413,50 @@ namespace tut
             {
                 worst = llmax(worst, std::fabs(scene[i] - window[i]));
             }
-            ensure(named(reverse, "the window holds the scene's depth"), worst < 1e-6f);
-            ensure(named(reverse, "and its colour"), colourAt(40, 24) == unorm(MID_COLOUR));
+            UNSCOPED_INFO("the window holds the scene's depth");
+            REQUIRE(worst < 1e-6f);
+            UNSCOPED_INFO("and its colour");
+            REQUIRE(colourAt(40, 24) == unorm(MID_COLOUR));
             const F32 cleared = reverse ? 0.f : 1.f;
-            ensure_equals(named(reverse, "sky is the cleared depth"), window[(size_t)40 * W + 40], cleared);
-            ensure(named(reverse, "the near surface is nearer than the mid one"),
-                   reverse ? window[(size_t)24 * W + 24] > window[(size_t)24 * W + 40] : window[(size_t)24 * W + 24] < window[(size_t)24 * W + 40]);
+            UNSCOPED_INFO("sky is the cleared depth");
+            REQUIRE(window[(size_t)40 * W + 40] == cleared);
+            UNSCOPED_INFO("the near surface is nearer than the mid one");
+            REQUIRE((reverse ? window[(size_t)24 * W + 24] > window[(size_t)24 * W + 40] : window[(size_t)24 * W + 24] < window[(size_t)24 * W + 40]));
         }
     }
 
     // The reported clipping: against the scene's depth the HUD loses to a world surface at the near plane. With the
     // depth under it cleared, it draws over it.
-    template<> template<>
-    void alhuddepth_object_t::test<2>()
+    TEST_CASE_METHOD(alhuddepth_data, "ALHUDDepth: with the depth under it cleared the HUD draws over the near world", "[ALHUDDepth]")
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             blit();
             drawHUD();
-            ensure(named(reverse, "uncleared, the near world hides the HUD"), colourAt(24, 24) == unorm(NEAR_COLOUR));
-            ensure(named(reverse, "where there is sky, the HUD shows anyway"), colourAt(24, 40) == unorm(HUD_COLOUR));
+            UNSCOPED_INFO("uncleared, the near world hides the HUD");
+            REQUIRE(colourAt(24, 24) == unorm(NEAR_COLOUR));
+            UNSCOPED_INFO("where there is sky, the HUD shows anyway");
+            REQUIRE(colourAt(24, 40) == unorm(HUD_COLOUR));
 
             blit();
             clearUnderHUD();
             drawHUD();
-            ensure(named(reverse, "cleared, the HUD shows over the near world"), colourAt(24, 24) == unorm(HUD_COLOUR));
-            ensure(named(reverse, "and over the sky"), colourAt(24, 40) == unorm(HUD_COLOUR));
+            UNSCOPED_INFO("cleared, the HUD shows over the near world");
+            REQUIRE(colourAt(24, 24) == unorm(HUD_COLOUR));
+            UNSCOPED_INFO("and over the sky");
+            REQUIRE(colourAt(24, 40) == unorm(HUD_COLOUR));
         }
     }
 
     // After the scene's depth is written back, the 3D UI under the HUD's rect is hidden by the world as before, and
     // by the HUD where the HUD is in front. Without it, what the world hides shows through.
-    template<> template<>
-    void alhuddepth_object_t::test<3>()
+    TEST_CASE_METHOD(alhuddepth_data, "ALHUDDepth: the restored depth hides 3D UI behind the world under the HUD", "[ALHUDDepth]")
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             blit();
             clearUnderHUD();
@@ -466,30 +466,40 @@ namespace tut
             overlay(44, 20, 3.f);
             overlay(24, 40, 3.f);
             overlay(40, 40, 3.f);
-            ensure(named(reverse, "behind the world, off the HUD: hidden"), colourAt(40, 24) == unorm(MID_COLOUR));
-            ensure(named(reverse, "in front of the world, off the HUD: shown"), colourAt(44, 20) == unorm(OVERLAY_COLOUR));
-            ensure(named(reverse, "on the HUD: hidden behind it"), colourAt(24, 40) == unorm(HUD_COLOUR));
-            ensure(named(reverse, "over sky, off the HUD: shown"), colourAt(40, 40) == unorm(OVERLAY_COLOUR));
+            UNSCOPED_INFO("behind the world, off the HUD: hidden");
+            REQUIRE(colourAt(40, 24) == unorm(MID_COLOUR));
+            UNSCOPED_INFO("in front of the world, off the HUD: shown");
+            REQUIRE(colourAt(44, 20) == unorm(OVERLAY_COLOUR));
+            UNSCOPED_INFO("on the HUD: hidden behind it");
+            REQUIRE(colourAt(24, 40) == unorm(HUD_COLOUR));
+            UNSCOPED_INFO("over sky, off the HUD: shown");
+            REQUIRE(colourAt(40, 40) == unorm(OVERLAY_COLOUR));
 
             blit();
             clearUnderHUD();
             drawHUD();
             overlay(40, 24, 8.f);
-            ensure(named(reverse, "unrestored, what the world hides shows through"), colourAt(40, 24) == unorm(OVERLAY_COLOUR));
+            UNSCOPED_INFO("unrestored, what the world hides shows through");
+            REQUIRE(colourAt(40, 24) == unorm(OVERLAY_COLOUR));
         }
     }
 
     // Outside every rect nothing changes: the clear empties the rects alone, and with nothing drawn between, the
     // restore gives back exactly the depth the blit wrote.
-    template<> template<>
-    void alhuddepth_object_t::test<4>()
+    TEST_CASE_METHOD(alhuddepth_data, "ALHUDDepth: clear and restore change nothing outside the rects", "[ALHUDDepth]")
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
-            ensure_equals(named(reverse, "one rect"), mRects.size(), size_t(1));
-            ensure(named(reverse, "the rect is inside the window and not all of it"),
-                   mRects[0].mLeft > 0 && mRects[0].mRight < W && mRects[0].mBottom > 0 && mRects[0].mTop < H);
+            REQUIRE(mRects.size() == size_t(1));
+            {
+                INFO("the rect is inside the window and not all of it");
+                REQUIRE(mRects[0].mLeft > 0);
+                REQUIRE(mRects[0].mRight < W);
+                REQUIRE(mRects[0].mBottom > 0);
+                REQUIRE(mRects[0].mTop < H);
+            }
 
             blit();
             const std::vector<F32> before = depths(mWindow);
@@ -513,8 +523,10 @@ namespace tut
                     }
                 }
             }
-            ensure_equals(named(reverse, "the clear leaves the outside alone"), changed_outside, size_t(0));
-            ensure_equals(named(reverse, "and empties the inside"), uncleared_inside, size_t(0));
+            UNSCOPED_INFO("the clear leaves the outside alone");
+            REQUIRE(changed_outside == size_t(0));
+            UNSCOPED_INFO("and empties the inside");
+            REQUIRE(uncleared_inside == size_t(0));
 
             restoreUnderHUD();
             const std::vector<F32> restored = depths(mWindow);
@@ -523,68 +535,97 @@ namespace tut
             {
                 differing += restored[i] != before[i] ? 1 : 0;
             }
-            ensure_equals(named(reverse, "the restore gives back the blit's depth"), differing, size_t(0));
+            UNSCOPED_INFO("the restore gives back the blit's depth");
+            REQUIRE(differing == size_t(0));
         }
     }
 
     // boxRect: the pixels a box covers through an orthographic projection, grown a pixel each way, clipped to the
     // viewport, empty off it.
-    template<> template<>
-    void alhuddepth_object_t::test<5>()
+    TEST_CASE_METHOD(alhuddepth_data, "ALHUDDepth: boxRect covers a box's pixels grown by one and clipped to the viewport", "[ALHUDDepth]")
     {
         const LLMatrix4a ortho = LLMatrix4a::ortho(-0.5f, 0.5f, -0.5f, 0.5f, 0.f, HUD_DEPTH);
 
         LLRect rect = ALHUDDepth::boxRect(ortho, LLVector3(-0.25f, -0.25f, -2.f), LLVector3(0.25f, 0.25f, 0.f), W, H);
-        ensure("pixels 16 to 48 grown to 15 to 49", rect == LLRect(15, 49, 49, 15));
+        UNSCOPED_INFO("pixels 16 to 48 grown to 15 to 49");
+        CHECK(rect == LLRect(15, 49, 49, 15));
 
         // x from -0.1 to 0.13: pixels 25.6 to 40.32; y from 0 to 0.2: pixels 32 to 44.8.
         rect = ALHUDDepth::boxRect(ortho, LLVector3(-0.1f, 0.f, -1.f), LLVector3(0.13f, 0.2f, -1.f), W, H);
-        ensure("fractional edges floored and ceiled before the growth", rect == LLRect(24, 46, 42, 31));
+        UNSCOPED_INFO("fractional edges floored and ceiled before the growth");
+        CHECK(rect == LLRect(24, 46, 42, 31));
 
         // x from 0.4 to 0.8: pixels 57.6 to 83.2.
         rect = ALHUDDepth::boxRect(ortho, LLVector3(0.4f, -0.1f, -1.f), LLVector3(0.8f, 0.1f, -1.f), W, H);
-        ensure("clipped to the viewport", rect == LLRect(56, 40, 64, 24));
+        UNSCOPED_INFO("clipped to the viewport");
+        CHECK(rect == LLRect(56, 40, 64, 24));
 
         rect = ALHUDDepth::boxRect(ortho, LLVector3(0.6f, -0.1f, -1.f), LLVector3(0.9f, 0.1f, -1.f), W, H);
-        ensure("off the viewport, empty", rect.isEmpty());
+        UNSCOPED_INFO("off the viewport, empty");
+        CHECK(rect.isEmpty());
     }
 
     // mergeRect: overlapping rects fold into one, disjoint ones are kept, and a rect bridging two folds them all.
-    template<> template<>
-    void alhuddepth_object_t::test<6>()
+    TEST_CASE_METHOD(alhuddepth_data, "ALHUDDepth: mergeRect folds overlapping rects and keeps disjoint ones apart", "[ALHUDDepth]")
     {
         std::vector<LLRect> rects;
         ALHUDDepth::mergeRect(rects, LLRect(0, 10, 10, 0));
         ALHUDDepth::mergeRect(rects, LLRect(5, 15, 15, 5));
-        ensure_equals("overlapping, one", rects.size(), size_t(1));
-        ensure("their union", rects[0] == LLRect(0, 15, 15, 0));
+        UNSCOPED_INFO("overlapping, one");
+        REQUIRE(rects.size() == size_t(1));
+        UNSCOPED_INFO("their union");
+        CHECK(rects[0] == LLRect(0, 15, 15, 0));
 
         ALHUDDepth::mergeRect(rects, LLRect(30, 40, 40, 30));
-        ensure_equals("disjoint, kept apart", rects.size(), size_t(2));
+        UNSCOPED_INFO("disjoint, kept apart");
+        REQUIRE(rects.size() == size_t(2));
 
         ALHUDDepth::mergeRect(rects, LLRect(14, 31, 31, 14));
-        ensure_equals("bridged, one", rects.size(), size_t(1));
-        ensure("around all three", rects[0] == LLRect(0, 40, 40, 0));
+        UNSCOPED_INFO("bridged, one");
+        REQUIRE(rects.size() == size_t(1));
+        UNSCOPED_INFO("around all three");
+        CHECK(rects[0] == LLRect(0, 40, 40, 0));
     }
 
     // Without the copy program to put the scene's depth back, the depth under the HUD is not cleared: the HUD tests
     // against the scene's as before, and what the world hides from the 3D UI after it stays hidden.
-    template<> template<>
-    void alhuddepth_object_t::test<7>()
+    TEST_CASE_METHOD(alhuddepth_data, "ALHUDDepth: without the copy program the depth under the HUD is not cleared", "[ALHUDDepth]")
     {
         for (bool reverse : conventions())
         {
+            CAPTURE(reverse);
             setUp(reverse);
             LLGLSLShader unloaded;
             blit();
             const std::vector<F32> before = depths(mWindow);
             clearUnderHUD(&unloaded);
-            ensure(named(reverse, "nothing cleared"), depths(mWindow) == before);
+            const std::vector<F32> after = depths(mWindow);
+            // Counted, and the first that differs placed, rather than every depth printed.
+            size_t differing = 0;
+            S32 first_x = -1;
+            S32 first_y = -1;
+            for (size_t i = 0; i < after.size(); ++i)
+            {
+                if (after[i] != before[i])
+                {
+                    if (differing == 0)
+                    {
+                        first_x = (S32)(i % W);
+                        first_y = (S32)(i / W);
+                    }
+                    ++differing;
+                }
+            }
+            CAPTURE(first_x, first_y);
+            UNSCOPED_INFO("nothing cleared");
+            REQUIRE(differing == size_t(0));
             drawHUD();
             restoreUnderHUD(&unloaded);
             overlay(40, 24, 8.f);
-            ensure(named(reverse, "behind the world under the HUD's rect: hidden"), colourAt(40, 24) == unorm(MID_COLOUR));
-            ensure(named(reverse, "the near world still hides the HUD"), colourAt(24, 24) == unorm(NEAR_COLOUR));
+            UNSCOPED_INFO("behind the world under the HUD's rect: hidden");
+            REQUIRE(colourAt(40, 24) == unorm(MID_COLOUR));
+            UNSCOPED_INFO("the near world still hides the HUD");
+            REQUIRE(colourAt(24, 24) == unorm(NEAR_COLOUR));
         }
     }
 }

@@ -334,6 +334,7 @@ namespace
             CHECK(m.changeStep(Column::Left, 1, true) == -1);
             CHECK(m.changeStep(Column::Left, 1, false) == -1);
         }
+        REQUIRE(m.changeCount() == 1);
         UNSCOPED_INFO("the caret for its row: under its gap");
         CHECK(m.caretLineOfRow(Column::Left, m.changeFirst(Layout::Sides, 0)) == 1);
     }
@@ -489,6 +490,7 @@ namespace
         UNSCOPED_INFO("the gap now the right's");
         CHECK(paddingOf(Column::Right) == std::vector<S32>{ 0, 0, 0, 1 });
         CHECK(static_cast<S32>(m.rightColumn()) == static_cast<S32>(Column::Left));
+        REQUIRE(m.changeCount() == 2);
         const ALDiffModel::ChangeLines& last = m.changeLines(1);
         {
             INFO("the line put in still the right's");
@@ -509,6 +511,7 @@ namespace
 
         m.setSwapped(false);
         m.setTexts(lines(30).c_str(), lines(30, { { 2, "line two" }, { 27, "line 27 changed" } }).c_str());
+        REQUIRE(m.foldCount() == 1);
         m.setFoldOpen(0, true);
         m.setSwapped(true);
         {
@@ -573,6 +576,7 @@ namespace
     {
         const std::string right = lines(30, { { 2, "line two" }, { 27, "line 27 changed" } });
         m.setTexts(lines(30).c_str(), right.c_str());
+        REQUIRE(m.foldCount() == 1);
         m.setFoldOpen(0, true);
         const ALDiffModel::LineMap map = m.setRightText("inserted\n" + right);
         {
@@ -695,6 +699,7 @@ namespace
         CHECK(beside(5, 5));
         UNSCOPED_INFO("two rows of nothing over it on the left, beside the if's own");
         CHECK(m.line(Column::Left, 5).padding == 2);
+        REQUIRE(m.ranges().size() == 5);
         // The state's first line beside nothing, the handler having the
         // SLua's first; the call in the if on the if's own line, which is
         // beside the if's head: neither lined up, so the if is bracketed,
@@ -728,6 +733,7 @@ namespace
         m.setRightText(std::string("-- a line more\n") + slua);
         {
             INFO("carried with the right's lines");
+            REQUIRE(m.ranges().size() == 5);
             CHECK(m.ranges()[2].rightFirst == 3);
             CHECK(m.ranges()[2].rightLast == 5);
             CHECK(beside(4, 3));
@@ -1136,6 +1142,7 @@ namespace
         // SLua's then and end, with the blanks beside them.
         {
             INFO("the if: the LSL's brackets");
+            REQUIRE_FALSE(m.line(Column::Left, 1).words.empty());
             CHECK(marked(Column::Left, 1) <= 3);
             CHECK(m.line(Column::Left, 1).words.front() == std::make_pair(3, 4));
         }
@@ -1840,6 +1847,7 @@ namespace
 
         // Lines put in above on the right, then on the left: carried.
         m.setRightText("-- a note\n" + right);
+        REQUIRE(m.pairs().size() == 2);
         UNSCOPED_INFO("the right's lines moved along");
         CHECK(m.pairs()[0].rightFirst == 6);
         {
@@ -1848,6 +1856,7 @@ namespace
             CHECK(beside(4, 9));
         }
         m.setLeftText("-- a note\n" + left);
+        REQUIRE(m.pairs().size() == 2);
         UNSCOPED_INFO("the left's too");
         CHECK(m.pairs()[0].leftFirst == 1);
         CHECK(beside(1, 6));
@@ -2016,6 +2025,7 @@ namespace
         m.setAlgorithm(ALTextDiff::Algorithm::Histogram);
         {
             INFO("and the other way about");
+            REQUIRE(m.foldCount() == 2);
             CHECK(m.foldOpen(0));
             CHECK_FALSE(m.foldOpen(1));
         }

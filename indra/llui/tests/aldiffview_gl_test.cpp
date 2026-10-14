@@ -24,6 +24,7 @@
 
 #include "linden_common.h"
 
+#include "llfonttextcache.h"
 #include "llglheaders.h"
 
 #include "aluigl_fixture.h"
@@ -39,6 +40,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -104,9 +106,27 @@ namespace
             }
         }
 
-        // Forty lines, the third changed and the thirty-first, a line put
-        // in after the fifth: the run between folded. The sides in colours
-        // of their own, which the headless colour table has none of.
+        // Forty lines, the third changed and the thirty-first -- or the one
+        // asked for -- and a line put in after the fifth: the run between
+        // folded.
+        static std::pair<std::string, std::string> texts(S32 changed = 30)
+        {
+            std::string left;
+            std::string right;
+            for (S32 i = 0; i < 40; ++i)
+            {
+                left += "line " + std::to_string(i) + "\n";
+                right += (i == 2 ? std::string("two") : i == changed ? std::string("thirty") : "line " + std::to_string(i)) + "\n";
+                if (i == 4)
+                {
+                    right += "added\n";
+                }
+            }
+            return { left, right };
+        }
+
+        // The texts above, the sides in colours of their own, which the
+        // headless colour table has none of.
         ALDiffView& make()
         {
             // The fonts' glyphs in textures, once there is a context.
@@ -114,17 +134,7 @@ namespace
             {
                 SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            std::string left;
-            std::string right;
-            for (S32 i = 0; i < 40; ++i)
-            {
-                left += "line " + std::to_string(i) + "\n";
-                right += (i == 2 ? std::string("two") : i == 30 ? std::string("thirty") : "line " + std::to_string(i)) + "\n";
-                if (i == 4)
-                {
-                    right += "added\n";
-                }
-            }
+            const auto [left, right] = texts();
             ALCodeEditor::Params side(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
             const LLColor4       ink(0.85f, 0.85f, 0.85f, 1.f);
             const LLColor4       ground(0.12f, 0.12f, 0.14f, 1.f);
@@ -198,7 +208,7 @@ namespace
         CHECK(count(plain, b.left + 4, b.right - 4, b.top - 2, b.top + 1, yellow) < (b.right - b.left) / 4);
     }
 
-    TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: a folded run's gap row is written over and goes once the run opens", "[aldiffview_gl]")
+    TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: a folded run's gap row says how many lines it stands for and goes once the run opens", "[aldiffview_gl]")
     {
         ALDiffView& d = make();
         CHECK(d.foldedCount() == 1);
@@ -218,6 +228,43 @@ namespace
         const std::vector<U8> folded = drawn(d);
         UNSCOPED_INFO("words over it");
         CHECK(count(folded, b.left, b.right, b.bottom + 1, b.top - 1, inked) > 20);
+
+        // The run a line longer, its row the gap above the line after it:
+        // the words over that row say another count, so they differ.
+        const S32 lower = under + 1;
+        {
+            const auto [left, right] = texts(31);
+            d.setTexts(left, right);
+        }
+        CHECK(layout.gapRows(lower) == 1);
+        Band c   = band(d.right(), lower, lower);
+        c.bottom = c.top;
+        c.top    = c.top + layout.gapHeight(lower);
+        const std::vector<U8> longer = drawn(d);
+        // Pixel for pixel up the two rows from their bottoms.
+        S32 differing = 0;
+        for (S32 up = 1; up < b.top - b.bottom; ++up)
+        {
+            const S32 was = b.bottom + up;
+            const S32 now = c.bottom + up;
+            if (was < 0 || was >= H || now < 0 || now >= H)
+            {
+                continue;
+            }
+            for (S32 x = llmax(0, b.left); x < llmin(W, b.right); ++x)
+            {
+                const size_t i = (static_cast<size_t>(was) * W + x) * 4;
+                const size_t j = (static_cast<size_t>(now) * W + x) * 4;
+                differing += folded[i] != longer[j] || folded[i + 1] != longer[j + 1] || folded[i + 2] != longer[j + 2] ? 1 : 0;
+            }
+        }
+        UNSCOPED_INFO("another count over a run a line longer");
+        CHECK(differing > 0);
+        {
+            const auto [left, right] = texts();
+            d.setTexts(left, right);
+        }
+
         d.right()->goTo(ALTextPos(12, 0));
         UNSCOPED_INFO("opened");
         CHECK(d.foldedCount() == 0);
@@ -313,7 +360,8 @@ namespace
 
     TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: range bands draw in the same number of batches however many there are", "[aldiffview_gl]")
     {
-        ALDiffView& d = make();
+        ALDiffView& d      = make();
+        const S32   narrow = d.right()->getRect().mLeft - d.left()->getRect().mRight;
         // Eight lines the same on each side, ranges of two lines each, level:
         // a band each, which line up nothing the lines would not, so the
         // sides are drawn alike whatever bands there are.
@@ -322,20 +370,57 @@ namespace
         {
             text += (n ? "\n" : "") + ("same " + std::to_string(n));
         }
-        // How many draws the comparison makes, drawn once already: what is
-        // put in a texture the first time it is drawn, put in.
-        const auto draws = [&](const ALTextDiff::ranges_t& ranges) {
-            d.setTexts(text, text, ranges);
-            drawn(d);
+        // How many draws a frame of the comparison makes, and what it drew.
+        std::vector<U8> shown;
+        const auto      frame = [&]() {
             gGL.pushUIMatrix();
             const U32 before = LLRender::sUICalls;
-            drawn(d);
-            const U32 made = LLRender::sUICalls - before;
+            shown            = drawn(d);
+            const U32 made   = LLRender::sUICalls - before;
             gGL.popUIMatrix();
             return made;
         };
-        const U32 two  = draws({ { 0, 1, 0, 1 }, { 4, 5, 4, 5 } });
-        const U32 four = draws({ { 0, 1, 0, 1 }, { 2, 3, 2, 3 }, { 4, 5, 4, 5 }, { 6, 7, 6, 7 } });
+        // How many a frame makes once no text in it is put together anew:
+        // drawn until a frame rebuilds none, at most eight times. A frame
+        // that adds glyphs to the font's cache moves it under every text
+        // drawn before them, and each of those is rebuilt on the next frame,
+        // so a frame can make as many draws as the one before and still not
+        // be the frame that settles.
+        const auto draws = [&](const ALTextDiff::ranges_t& ranges) {
+            d.setTexts(text, text, ranges);
+            for (S32 tries = 0; tries < 8; ++tries)
+            {
+                const U64 rebuilt = LLFontTextCache::regenCount();
+                const U32 made    = frame();
+                if (LLFontTextCache::regenCount() == rebuilt)
+                {
+                    return made;
+                }
+            }
+            FAIL("no frame drew without rebuilding a text");
+            return 0U;
+        };
+        // The bands drawn in the frame counted: the gap widened for them, and
+        // its columns lit beside each band's rows.
+        const auto lit    = [](U8 r, U8 g, U8 b) { return r > 8 || g > 8 || b > 8; };
+        const auto banded = [&](const ALTextDiff::ranges_t& ranges) {
+            UNSCOPED_INFO("the gap widened for the bands");
+            CHECK(d.right()->getRect().mLeft - d.left()->getRect().mRight > narrow);
+            const S32 from = d.left()->getRect().mRight + 1;
+            const S32 to   = d.right()->getRect().mLeft - 1;
+            for (const ALTextDiff::Range& range : ranges)
+            {
+                const Band rows = band(d.right(), range.rightFirst, range.rightLast);
+                UNSCOPED_INFO("a band beside the right's lines from " << range.rightFirst);
+                CHECK(count(shown, from, to, rows.bottom + 2, rows.top - 2, lit) > (to - from) * 4);
+            }
+        };
+        const ALTextDiff::ranges_t two_bands  = { { 0, 1, 0, 1 }, { 4, 5, 4, 5 } };
+        const ALTextDiff::ranges_t four_bands = { { 0, 1, 0, 1 }, { 2, 3, 2, 3 }, { 4, 5, 4, 5 }, { 6, 7, 6, 7 } };
+        const U32                  two        = draws(two_bands);
+        banded(two_bands);
+        const U32 four = draws(four_bands);
+        banded(four_bands);
         CHECK(two > 0);
         UNSCOPED_INFO("as many draws for four bands as for two");
         CHECK(four == two);

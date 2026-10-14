@@ -26,6 +26,7 @@
 
 #include "alcolortablepanel.h"
 
+#include "alcolorfield.h"
 #include "alpropertygrid.h"
 #include "llcallbacklist.h"
 #include "../llfloater.h"
@@ -163,9 +164,15 @@ namespace
         panel->die();
     }
 
-    // What a value is written as, and read back from.
-    TEST_CASE_METHOD(alcolortablepanel_data, "alcolortablepanel: valueText writes four numbers with commas", "[alcolortablepanel]")
+    // What a value is written as, and read back from: a row's commit reads
+    // it as a colour field reads its text.
+    TEST_CASE_METHOD(alcolortablepanel_data, "alcolortablepanel: valueText writes four numbers with commas that read back as the colour", "[alcolortablepanel]")
     {
-        CHECK(ALColorTablePanel::valueText(LLColor4(1.f, 0.5f, 0.f, 1.f)) == std::string("1, 0.5, 0, 1"));
+        const LLColor4    colour(1.f, 0.5f, 0.f, 1.f);
+        const std::string text = ALColorTablePanel::valueText(colour);
+        CHECK(text == std::string("1, 0.5, 0, 1"));
+        LLColor4 back;
+        CHECK(ALColorField::textToColor(text, back));
+        CHECK(back == colour);
     }
 }

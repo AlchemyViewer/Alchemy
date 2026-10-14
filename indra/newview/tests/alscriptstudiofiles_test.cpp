@@ -33,7 +33,7 @@
 
 #include "fsyspath.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -111,7 +111,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudiofiles_data
     {
@@ -136,7 +136,7 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             const std::string name = "alscriptstudiofiles_" + LLUUID::generateNewID().asString();
             const fsyspath    made = std::filesystem::temp_directory_path() / fsyspath(name);
@@ -189,67 +189,96 @@ namespace tut
         const al_studio_test::FakeServices::Said& said() const { return services.reports.back(); }
     };
 
-    typedef test_group<alscriptstudiofiles_data> alscriptstudiofiles_group;
-    typedef alscriptstudiofiles_group::object    alscriptstudiofiles_object;
-    alscriptstudiofiles_group                    alscriptstudiofiles_instance("alscriptstudiofiles");
-
-    template<> template<>
-    void alscriptstudiofiles_object::test<1>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: what a file's name says it holds", "[alscriptstudiofiles]")
     {
-        set_test_name("what a file's name says it holds");
         typedef ALScriptStudioFiles F;
-        ensure("LSL", F::languageOf("/a/b.lsl", false).script && !F::languageOf("/a/b.lsl", true).lua);
-        ensure("SLua by .luau and .lua, whatever the case", F::languageOf("/a/b.LUAU", false).lua && F::languageOf("/a/b.lua", false).lua);
-        ensure("text", !F::languageOf("/a/b.txt", false).script && F::languageOf("/a/b.txt", false).said);
-        ensure("no extension: what it was asked for as", F::languageOf("/a/b", true).script && F::languageOf("/a/b", true).lua &&
-                                                             !F::languageOf("/a/b", true).said);
+        {
+            INFO("LSL");
+            CHECK(F::languageOf("/a/b.lsl", false).script);
+            CHECK_FALSE(F::languageOf("/a/b.lsl", true).lua);
+        }
+        {
+            INFO("SLua by .luau and .lua, whatever the case");
+            CHECK(F::languageOf("/a/b.LUAU", false).lua);
+            CHECK(F::languageOf("/a/b.lua", false).lua);
+        }
+        {
+            INFO("text");
+            CHECK_FALSE(F::languageOf("/a/b.txt", false).script);
+            CHECK(F::languageOf("/a/b.txt", false).said);
+        }
+        {
+            INFO("no extension: what it was asked for as");
+            CHECK(F::languageOf("/a/b", true).script);
+            CHECK(F::languageOf("/a/b", true).lua);
+            CHECK_FALSE(F::languageOf("/a/b", true).said);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiofiles_object::test<2>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: the recent lists keep ten newest first each once and survive the state", "[alscriptstudiofiles]")
     {
-        set_test_name("the recent lists: newest first, each once, ten at most; a file tab not a script; cleared; kept with the state");
         ALScriptStudioFiles& unit = make();
         for (int i = 0; i < 12; ++i)
         {
             unit.noteFile("/f" + std::to_string(i));
         }
         unit.noteFile("/f5");
-        ensure_equals("ten", unit.recentFiles().size(), size_t(10));
+        REQUIRE(unit.recentFiles().size() == size_t(10));
         const Names& files = unit.recentFiles();
-        ensure("newest first, the one noted again moved up",
-               files[0] == "/f5" && files[1] == "/f11" && std::count(files.begin(), files.end(), "/f5") == 1);
+        {
+            INFO("newest first, the one noted again moved up");
+            CHECK(files[0] == "/f5");
+            CHECK(files[1] == "/f11");
+            CHECK(std::count(files.begin(), files.end(), "/f5") == 1);
+        }
         Doc& a = scriptTab("a", "x");
         Doc& b = scriptTab("b", "y");
         unit.noteScript(a);
         unit.noteScript(b);
         unit.noteScript(a);
-        ensure("scripts each once, newest first", unit.recentScripts().size() == 2 && unit.recentScripts()[0].ref == a.ref);
+        {
+            INFO("scripts each once, newest first");
+            REQUIRE(unit.recentScripts().size() == 2);
+            CHECK(unit.recentScripts()[0].ref == a.ref);
+        }
         Doc& f = fileTab("f.lsl", "z");
         unit.noteScript(f);
-        ensure("a file's tab is no script", unit.recentScripts().size() == 2);
-        ensure_equals("the window told each time", studio.recentTold, 16);
+        UNSCOPED_INFO("a file's tab is no script");
+        CHECK(unit.recentScripts().size() == 2);
+        UNSCOPED_INFO("the window told each time");
+        CHECK(studio.recentTold == 16);
 
         LLSD state;
         unit.writeState(state);
         ALScriptStudioFiles again(services, studio, studio, studio, studio);
         again.readState(state);
-        ensure("read back as written", again.recentFiles() == unit.recentFiles() && again.recentScripts().size() == 2 &&
-                                           again.recentScripts()[1].ref == b.ref && again.recentScripts()[1].name == "b");
+        {
+            INFO("read back as written");
+            CHECK(again.recentFiles() == unit.recentFiles());
+            REQUIRE(again.recentScripts().size() == 2);
+            CHECK(again.recentScripts()[1].ref == b.ref);
+            CHECK(again.recentScripts()[1].name == "b");
+        }
         unit.clearRecent();
-        ensure("cleared", unit.recentFiles().empty() && unit.recentScripts().empty() && studio.recentTold == 17);
+        {
+            INFO("cleared");
+            CHECK(unit.recentFiles().empty());
+            CHECK(unit.recentScripts().empty());
+            CHECK(studio.recentTold == 17);
+        }
         LLSD odd;
         odd["recent_files"] = LLSD().with(0, "/x").with(1, "").with(2, "/x").with(3, "/y");
         odd["recent_scripts"] = LLSD().with(0, LLSD().with("object", LLUUID::null).with("item", LLUUID::null).with("name", "none"));
         again.readState(odd);
-        ensure("read back: each once, none empty, no script without what holds it",
-               again.recentFiles() == Names{ "/x", "/y" } && again.recentScripts().empty());
+        {
+            INFO("read back: each once, none empty, no script without what holds it");
+            CHECK(again.recentFiles() == Names{ "/x", "/y" });
+            CHECK(again.recentScripts().empty());
+        }
     }
 
-    template<> template<>
-    void alscriptstudiofiles_object::test<3>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: Open Recent lists scripts then files and a folder where names clash", "[alscriptstudiofiles]")
     {
-        set_test_name("Open Recent filled: scripts then files under their headings, a folder where two share a name; nothing to say so");
         ALScriptStudioFiles& unit = make();
         LLMenuGL::Params     p;
         p.name      = "open_recent";
@@ -258,175 +287,273 @@ namespace tut
         // menus, which there are none of here.
         studio.menu->setVisible(false);
         unit.fillMenu();
-        ensure("nothing", studio.menu->findChild<LLView>("no_recent") != nullptr);
+        CHECK(studio.menu->findChild<LLView>("no_recent") != nullptr);
         unit.noteFile("/one/same.lsl");
         unit.noteFile("/two/same.lsl");
         unit.noteFile("/two/other.lsl");
-        ensure("files alone: no heading", studio.menu->findChild<LLView>("recent_heading_RecentFiles") == nullptr &&
-                                            studio.menu->findChild<LLView>("recent_/two/other.lsl") != nullptr);
+        {
+            INFO("files alone: no heading");
+            CHECK(studio.menu->findChild<LLView>("recent_heading_RecentFiles") == nullptr);
+            CHECK(studio.menu->findChild<LLView>("recent_/two/other.lsl") != nullptr);
+        }
         Doc& a = scriptTab("a", "x");
         unit.noteScript(a);
-        ensure("both: headings", studio.menu->findChild<LLView>("recent_heading_RecentScripts") != nullptr &&
-                                   studio.menu->findChild<LLView>("recent_heading_RecentFiles") != nullptr);
+        {
+            INFO("both: headings");
+            CHECK(studio.menu->findChild<LLView>("recent_heading_RecentScripts") != nullptr);
+            CHECK(studio.menu->findChild<LLView>("recent_heading_RecentFiles") != nullptr);
+        }
         LLMenuItemCallGL* same = studio.menu->findChild<LLMenuItemCallGL>("recent_/one/same.lsl");
-        ensure("a folder after a name two share", same && same->getLabel().find("(/one)") != std::string::npos);
+        {
+            INFO("a folder after a name two share");
+            REQUIRE(same);
+            CHECK(same->getLabel().find("(/one)") != std::string::npos);
+        }
         LLMenuItemCallGL* other = studio.menu->findChild<LLMenuItemCallGL>("recent_/two/other.lsl");
-        ensure("one alone, by its name", other && other->getLabel() == "other.lsl");
+        {
+            INFO("one alone, by its name");
+            REQUIRE(other);
+            CHECK(other->getLabel() == "other.lsl");
+        }
         other->onCommit();
-        ensure("picked: opened", studio.opened == Names{ "/two/other.lsl" });
+        UNSCOPED_INFO("picked: opened");
+        CHECK(studio.opened == Names{ "/two/other.lsl" });
         LLMenuItemCallGL* script = studio.menu->findChild<LLMenuItemCallGL>("recent_" + a.ref.id());
-        ensure("a script by its name", script && script->getLabel() == "a");
+        {
+            INFO("a script by its name");
+            REQUIRE(script);
+            CHECK(script->getLabel() == "a");
+        }
         script->onCommit();
-        ensure("picked: opened as a script", !services.opened.empty() && services.opened.back().ref == a.ref);
-        studio.menu->findChild<LLMenuItemCallGL>("clear_recent")->onCommit();
-        ensure("the clear item clears", unit.recentFiles().empty() && studio.menu->findChild<LLView>("no_recent") != nullptr);
+        {
+            INFO("picked: opened as a script");
+            REQUIRE_FALSE(services.opened.empty());
+            CHECK(services.opened.back().ref == a.ref);
+        }
+        LLMenuItemCallGL* clear = studio.menu->findChild<LLMenuItemCallGL>("clear_recent");
+        REQUIRE(clear != nullptr);
+        clear->onCommit();
+        {
+            INFO("the clear item clears");
+            CHECK(unit.recentFiles().empty());
+            CHECK(studio.menu->findChild<LLView>("no_recent") != nullptr);
+        }
         studio.menu->die();
         studio.menu = nullptr;
     }
 
-    template<> template<>
-    void alscriptstudiofiles_object::test<4>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: writing a tab's file settles it and a failed write stops the save", "[alscriptstudiofiles]")
     {
-        set_test_name("a tab's file written: said, settled and told of; one that will not go said, and the save stopped");
         ALScriptStudioFiles& unit = make();
         Doc&                 f    = fileTab("f.lsl", "old");
         unit.watch(f);
         f.editor->setText("new");
         unit.write(f);
-        ensure_equals("written", contents(f.file), std::string("new"));
-        ensure("its own write is no change to the watch", !f.watch->check() && !f.watch->check());
-        ensure("said, settled, told of", !said().failure && studio.settled == Names{ f.id } && studio.written == Names{ f.file });
+        CHECK(contents(f.file) == std::string("new"));
+        {
+            INFO("its own write is no change to the watch");
+            REQUIRE(f.watch);
+            CHECK_FALSE(f.watch->check());
+            CHECK_FALSE(f.watch->check());
+        }
+        {
+            INFO("said, settled, told of");
+            CHECK_FALSE(said().failure);
+            CHECK(studio.settled == Names{ f.id });
+            CHECK(studio.written == Names{ f.file });
+        }
         Doc& g = fileTab("g.lsl", "x");
         g.file = in("no/such/folder/g.lsl");
         unit.write(g);
-        ensure("will not go: said and stopped, not settled",
-               said().failure && studio.stops == Names{ g.id } && studio.settled.size() == 1);
+        {
+            INFO("will not go: said and stopped, not settled");
+            CHECK(said().failure);
+            CHECK(studio.stops == Names{ g.id });
+            CHECK(studio.settled.size() == 1);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiofiles_object::test<5>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: an outside change is taken into a clean tab and asked about otherwise", "[alscriptstudiofiles]")
     {
-        set_test_name("a file changed outside is taken where the tab is clean; asked about once where it is not, and read again if so answered");
         ALScriptStudioFiles& unit = make();
         Doc&                 f    = fileTab("f.lsl", "one");
         unit.watch(f);
-        ensure("watched", f.watch && f.watch->path() == f.file);
+        {
+            INFO("watched");
+            REQUIRE(f.watch);
+            CHECK(f.watch->path() == f.file);
+        }
         write(f.file, "two");
         unit.changedOutside(f.id, f.file);
-        ensure("clean: taken, settled, said", studio.taken == Names{ "two" } && studio.settled == Names{ f.id } && !said().failure);
+        {
+            INFO("clean: taken, settled, said");
+            CHECK(studio.taken == Names{ "two" });
+            CHECK(studio.settled == Names{ f.id });
+            CHECK_FALSE(said().failure);
+        }
         // Read in, not written: what it masters is the masters' watch's to
         // send, not the tab's.
-        ensure("not taken for a write of the studio's", studio.written.empty());
+        UNSCOPED_INFO("not taken for a write of the studio's");
+        CHECK(studio.written.empty());
         unit.changedOutside(f.id, f.file);
-        ensure("the same again: nothing", studio.taken.size() == 1);
+        UNSCOPED_INFO("the same again: nothing");
+        CHECK(studio.taken.size() == 1);
 
         f.editor->setCaret(f.editor->document().end());
         f.editor->insertText(" typed");
         write(f.file, "three");
         unit.changedOutside(f.id, f.file);
-        ensure("not clean: said and asked, not taken", said().failure && studio.asked == Names{ f.id } && studio.taken.size() == 1);
+        {
+            INFO("not clean: said and asked, not taken");
+            CHECK(said().failure);
+            CHECK(studio.asked == Names{ f.id });
+            CHECK(studio.taken.size() == 1);
+        }
         unit.changedOutside(f.id, f.file);
-        ensure("asked once while the question is up", studio.asked.size() == 1);
+        UNSCOPED_INFO("asked once while the question is up");
+        CHECK(studio.asked.size() == 1);
         studio.answer(false);
-        ensure("kept: nothing read", studio.reverted.empty() && !f.askingReload);
+        {
+            INFO("kept: nothing read");
+            CHECK(studio.reverted.empty());
+            CHECK_FALSE(f.askingReload);
+        }
         unit.changedOutside(f.id, f.file);
         studio.answer(true);
-        ensure("read again", studio.reverted == Names{ f.id });
+        UNSCOPED_INFO("read again");
+        CHECK(studio.reverted == Names{ f.id });
         unit.changedOutside("nobody", f.file);
         const S32 before = studio.reachChanges;
         std::filesystem::remove(fsyspath(f.file));
         unit.changedOutside(f.id, f.file);
-        ensure("gone or unknown: nothing", studio.asked.size() == 2);
-        ensure("but what is in reach looked at again", studio.reachChanges == before + 1);
+        UNSCOPED_INFO("gone or unknown: nothing");
+        CHECK(studio.asked.size() == 2);
+        UNSCOPED_INFO("but what is in reach looked at again");
+        CHECK(studio.reachChanges == before + 1);
     }
 
-    template<> template<>
-    void alscriptstudiofiles_object::test<6>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: Open picks several and Load and Insert one for the tab asked from", "[alscriptstudiofiles]")
     {
-        set_test_name("the pickers: Open several, Load and Insert one for the tab asked from, whatever is in front when the answer comes");
         ALScriptStudioFiles& unit = make();
         unit.openFromDisk();
-        ensure("several", studio.pickedSeveral);
+        CHECK(studio.pickedSeveral);
         studio.toOpen({ "/a.lsl", "/b.luau" });
-        ensure("each opened", studio.opened == Names{ "/a.lsl", "/b.luau" });
+        UNSCOPED_INFO("each opened");
+        CHECK(studio.opened == Names{ "/a.lsl", "/b.luau" });
 
         Doc& a = scriptTab("a", "first");
         write(in("load.txt"), "loaded");
         unit.load(false);
-        ensure("one", !studio.pickedSeveral);
+        CHECK_FALSE(studio.pickedSeveral);
         Doc& b = scriptTab("b", "other");
         services.front = 1;
         studio.toOpen({ in("load.txt") });
-        ensure("the tab asked from, brought forward, its text replaced", a.editor->text() == "loaded" && b.editor->text() == "other" &&
-                                                                             studio.activated == Names{ "a" });
+        {
+            INFO("the tab asked from, brought forward, its text replaced");
+            CHECK(a.editor->text() == "loaded");
+            CHECK(b.editor->text() == "other");
+            CHECK(studio.activated == Names{ "a" });
+        }
         services.front = 1;
         b.editor->setCaret(ALTextPos(0, 2));
         unit.load(true);
         studio.toOpen({ in("load.txt") });
-        ensure_equals("inserted at the caret", b.editor->text(), std::string("otloadedher"));
+        UNSCOPED_INFO("inserted at the caret");
+        CHECK(b.editor->text() == std::string("otloadedher"));
         unit.chosenToLoad("b", { in("nothing.txt") }, false);
-        ensure("unreadable: said", !services.statuses.empty() && b.editor->text() == "otloadedher");
+        {
+            INFO("unreadable: said");
+            CHECK_FALSE(services.statuses.empty());
+            CHECK(b.editor->text() == "otloadedher");
+        }
         b.modifiable = false;
         unit.chosenToLoad("b", { in("load.txt") }, false);
-        ensure("unchangeable: left", b.editor->text() == "otloadedher");
+        UNSCOPED_INFO("unchangeable: left");
+        CHECK(b.editor->text() == "otloadedher");
     }
 
-    template<> template<>
-    void alscriptstudiofiles_object::test<7>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: Save to File writes a copy and Save As makes the tab the new file", "[alscriptstudiofiles]")
     {
-        set_test_name("Save to File writes a copy; Save As makes the tab the new file, watched there and noted; the same file is a save");
         ALScriptStudioFiles& unit = make();
-        Doc&                 s    = scriptTab("s", "script text");
-        services.front            = 0;
+        scriptTab("s", "script text");
+        services.front = 0;
         unit.saveCopy();
-        ensure_equals("named after the tab", studio.savedAs, std::string("s"));
+        UNSCOPED_INFO("named after the tab");
+        CHECK(studio.savedAs == std::string("s"));
         studio.toSave({ in("copy.lsl") });
-        ensure("a copy written, said", contents(in("copy.lsl")) == "script text" && !said().failure);
+        {
+            INFO("a copy written, said");
+            CHECK(contents(in("copy.lsl")) == "script text");
+            CHECK_FALSE(said().failure);
+        }
 
         Doc& f         = fileTab("f.lsl", "file text");
         services.front = 1;
         unit.watch(f);
         unit.saveAs();
         studio.toSave({ in("g.luau") });
-        ensure_equals("written there", contents(in("g.luau")), std::string("file text"));
-        ensure("the tab that file now", studio.became == Names{ in("g.luau") } && f.file == in("g.luau"));
-        ensure("watched there", f.watch && f.watch->path() == in("g.luau"));
-        ensure("noted, settled, checked", unit.recentFiles().front() == in("g.luau") && studio.settled.back() == f.id &&
-                                               studio.checked.back() == f.id + " now");
-        ensure("told of as written", studio.written == Names{ in("g.luau") });
+        UNSCOPED_INFO("written there");
+        CHECK(contents(in("g.luau")) == std::string("file text"));
+        {
+            INFO("the tab that file now");
+            CHECK(studio.became == Names{ in("g.luau") });
+            CHECK(f.file == in("g.luau"));
+        }
+        {
+            INFO("watched there");
+            REQUIRE(f.watch);
+            CHECK(f.watch->path() == in("g.luau"));
+        }
+        {
+            INFO("noted, settled, checked");
+            REQUIRE_FALSE(unit.recentFiles().empty());
+            CHECK(unit.recentFiles().front() == in("g.luau"));
+            REQUIRE_FALSE(studio.settled.empty());
+            CHECK(studio.settled.back() == f.id);
+            REQUIRE_FALSE(studio.checked.empty());
+            CHECK(studio.checked.back() == f.id + " now");
+        }
+        UNSCOPED_INFO("told of as written");
+        CHECK(studio.written == Names{ in("g.luau") });
         f.editor->setText("changed");
         unit.chosenToSaveAs(f.id, { f.file });
-        ensure("its own file again: a save", contents(f.file) == "changed" && studio.became.size() == 1);
+        {
+            INFO("its own file again: a save");
+            CHECK(contents(f.file) == "changed");
+            CHECK(studio.became.size() == 1);
+        }
         Doc& other = fileTab("other.lsl", "o");
         unit.chosenToSaveAs(f.id, { other.file });
-        ensure("a file another tab has: said, and nothing written", !services.statuses.empty() &&
-                                                                        services.statuses.back().find("FileOpenElsewhere") == 0 &&
-                                                                        contents(other.file) == "o" && studio.became.size() == 1);
+        {
+            INFO("a file another tab has: said, and nothing written");
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(services.statuses.back().find("FileOpenElsewhere") == 0);
+            CHECK(contents(other.file) == "o");
+            CHECK(studio.became.size() == 1);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiofiles_object::test<8>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: a file with a non-ASCII path is written and read back with LF endings", "[alscriptstudiofiles]")
     {
-        set_test_name("a file whose name and folder go past ASCII is written and read back, its line endings as an editor keeps them");
         make();
         // A user's folder and a script's name as a German speaker might
         // have them: on Windows, read in the ANSI code page, no such file.
         const fsyspath    folder_path = fsyspath(in("J\xC3\xBCrgen"));
         std::filesystem::create_directories(folder_path);
         const std::string path = fsyspath(folder_path / fsyspath("\xC3\x9C" "berpr\xC3\xBC" "fung.lsl")).string();
-        ensure("written", ALFileWrite::temp(path, "default\r\n{\r\n}\r\n"));
+        CHECK(ALFileWrite::temp(path, "default\r\n{\r\n}\r\n"));
         std::string text;
-        ensure("read back", ALScriptFileIO::readWholeFile(path, text));
-        ensure_equals("as an editor keeps it", text, std::string("default\n{\n}\n"));
-        ensure("and where it was asked to be", std::filesystem::exists(fsyspath(path)));
+        REQUIRE(ALScriptFileIO::readWholeFile(path, text));
+        UNSCOPED_INFO("as an editor keeps it");
+        CHECK(text == std::string("default\n{\n}\n"));
+        UNSCOPED_INFO("and where it was asked to be");
+        CHECK(std::filesystem::exists(fsyspath(path)));
     }
 
-    template<> template<>
-    void alscriptstudiofiles_object::test<9>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: pruneRecent drops scripts said gone and files no longer on disk", "[alscriptstudiofiles]")
     {
-        set_test_name("what was opened lately and cannot be had any more is let go of: a script said gone, a file no longer on disk");
         ALScriptStudioFiles& unit = make();
-        ensure("written", ALFileWrite::temp(in("here.lsl"), "x"));
+        CHECK(ALFileWrite::temp(in("here.lsl"), "x"));
         unit.noteFile(in("here.lsl"));
         unit.noteFile(in("gone.lsl"));
         Doc& a = scriptTab("a", "x");
@@ -434,33 +561,49 @@ namespace tut
         unit.noteScript(a);
         unit.noteScript(b);
         const S32 told = studio.recentTold;
-        ensure("the file no longer there let go of", unit.pruneRecent([](const ALScriptRef&) { return false; }) &&
-                                                          unit.recentFiles() == Names{ in("here.lsl") } && unit.recentScripts().size() == 2 &&
-                                                          studio.recentTold == told + 1);
-        ensure("nothing more gone, nothing done", !unit.pruneRecent([](const ALScriptRef&) { return false; }) && studio.recentTold == told + 1);
+        {
+            INFO("the file no longer there let go of");
+            CHECK(unit.pruneRecent([](const ALScriptRef&) { return false; }));
+            CHECK(unit.recentFiles() == Names{ in("here.lsl") });
+            CHECK(unit.recentScripts().size() == 2);
+            CHECK(studio.recentTold == told + 1);
+        }
+        {
+            INFO("nothing more gone, nothing done");
+            CHECK_FALSE(unit.pruneRecent([](const ALScriptRef&) { return false; }));
+            CHECK(studio.recentTold == told + 1);
+        }
         const ALScriptRef lost = b.ref;
-        ensure("pruned", unit.pruneRecent([lost](const ALScriptRef& ref) { return ref == lost; }));
-        ensure("the gone script let go of", unit.recentScripts().size() == 1 && unit.recentScripts()[0].ref == a.ref);
-        ensure("the file still there kept", unit.recentFiles() == Names{ in("here.lsl") });
+        CHECK(unit.pruneRecent([lost](const ALScriptRef& ref) { return ref == lost; }));
+        {
+            INFO("the gone script let go of");
+            REQUIRE(unit.recentScripts().size() == 1);
+            CHECK(unit.recentScripts()[0].ref == a.ref);
+        }
+        UNSCOPED_INFO("the file still there kept");
+        CHECK(unit.recentFiles() == Names{ in("here.lsl") });
     }
 
-    template<> template<>
-    void alscriptstudiofiles_object::test<10>()
+    TEST_CASE_METHOD(alscriptstudiofiles_data, "alscriptstudiofiles: textSyntaxOf picks a grammar by extension in any case or else text", "[alscriptstudiofiles]")
     {
-        set_test_name("a file that is no script is coloured by the grammar whose file names its extension, whatever its case, and as text where none does");
         // The grammars are the source tree's, which the UI is pointed at.
         if (!ll_test::HeadlessUI::get().ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         typedef ALScriptStudioFiles F;
-        ensure_equals("XML", F::textSyntaxOf("/a/s.XML"), std::string("xml"));
-        ensure_equals("a skin's file", F::textSyntaxOf("/a/s.xui"), std::string("xml"));
-        ensure_equals("JSON", F::textSyntaxOf("/a/s.json"), std::string("json"));
-        ensure_equals("a notecard of settings", F::textSyntaxOf("/a/door.ini"), std::string("config"));
-        ensure_equals("and another way of naming one", F::textSyntaxOf("/a/door.CFG"), std::string("config"));
-        ensure_equals("text", F::textSyntaxOf("/a/s.txt"), std::string("text"));
-        ensure_equals("a name no grammar knows", F::textSyntaxOf("/a/s.dat"), std::string("text"));
-        ensure_equals("and none", F::textSyntaxOf("/a/s"), std::string("text"));
+        CHECK(F::textSyntaxOf("/a/s.XML") == std::string("xml"));
+        UNSCOPED_INFO("a skin's file");
+        CHECK(F::textSyntaxOf("/a/s.xui") == std::string("xml"));
+        CHECK(F::textSyntaxOf("/a/s.json") == std::string("json"));
+        UNSCOPED_INFO("a notecard of settings");
+        CHECK(F::textSyntaxOf("/a/door.ini") == std::string("config"));
+        UNSCOPED_INFO("and another way of naming one");
+        CHECK(F::textSyntaxOf("/a/door.CFG") == std::string("config"));
+        CHECK(F::textSyntaxOf("/a/s.txt") == std::string("text"));
+        UNSCOPED_INFO("a name no grammar knows");
+        CHECK(F::textSyntaxOf("/a/s.dat") == std::string("text"));
+        UNSCOPED_INFO("and none");
+        CHECK(F::textSyntaxOf("/a/s") == std::string("text"));
     }
 }

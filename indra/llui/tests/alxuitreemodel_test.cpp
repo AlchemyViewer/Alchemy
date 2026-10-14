@@ -283,8 +283,10 @@ namespace
         CHECK(hidden->isShown());
         UNSCOPED_INFO("the authored state is remembered");
         CHECK_FALSE(hidden->isAuthoredVisible());
+        const ALXUISourceMap::Origin* hidden_origin = map.find(hidden->getView());
+        REQUIRE(hidden_origin != nullptr);
         std::string authored;
-        map.find(hidden->getView())->node->getAttributeString("visible", authored);
+        hidden_origin->node->getAttributeString("visible", authored);
         UNSCOPED_INFO("and the document still says what it said");
         CHECK(authored == std::string("false"));
         hidden->toggleShown();
@@ -303,6 +305,7 @@ namespace
         delete floater;
         LLXMLNodePtr root2;
         LLFloater* floater2 = build(fv.get(), root2);
+        REQUIRE(floater2 != nullptr);
         map.build(floater2, root2);
         model.build(floater2, map);
         ALXUITreeItem* outer2 = model.itemFor(ALXUISelection::fromString("outer"));
@@ -483,6 +486,8 @@ namespace
         std::vector<LLFolderViewModelItem*> items { inner->getViewModelItem() };
         UNSCOPED_INFO("and starting a drag says which");
         CHECK(model.startDrag(items));
+        UNSCOPED_INFO("to the starter, once");
+        REQUIRE(picked.size() == 1u);
         UNSCOPED_INFO("by path");
         CHECK(ALXUISelection::toString(picked.front()) == std::string("outer/inner"));
 
@@ -588,10 +593,13 @@ namespace
         ll_test::FloaterViewScope floater_view(fv.get());
         LLXMLNodePtr root;
         LLFloater*   floater = build(fv.get(), root);
+        REQUIRE(floater != nullptr);
         ALXUISourceMap map;
         map.build(floater, root);
         // A label with a capital, which the words find all the same.
-        floater->findChild<LLView>("inner", true)->setName("Inner");
+        LLView* first_inner = floater->findChild<LLView>("inner", true);
+        REQUIRE(first_inner != nullptr);
+        first_inner->setName("Inner");
         ALXUITreeModel model;
         model.build(floater, map);
         ALXUITreeItem* top   = model.rootItem();

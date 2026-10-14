@@ -25,7 +25,7 @@
  */
 
 #include "linden_common.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../llagentaccess.h"
 
@@ -34,18 +34,9 @@
 
 #include <iostream>
 
-namespace tut
+namespace
 {
-    struct agentaccess
-    {
-    };
-
-    typedef test_group<agentaccess> agentaccess_t;
-    typedef agentaccess_t::object agentaccess_object_t;
-    tut::agentaccess_t tut_agentaccess("LLAgentAccess");
-
-    template<> template<>
-    void agentaccess_object_t::test<1>()
+    TEST_CASE("LLAgentAccess: the prefers queries follow the PreferredMaturity setting", "[LLAgentAccess]")
     {
         LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
@@ -53,28 +44,27 @@ namespace tut
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_PG);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 prefersPG",     aa.prefersPG());
-        ensure("1 prefersMature", !aa.prefersMature());
-        ensure("1 prefersAdult",  !aa.prefersAdult());
+        CHECK(aa.prefersPG());
+        CHECK_FALSE(aa.prefersMature());
+        CHECK_FALSE(aa.prefersAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_MATURE);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("2 prefersPG",     !aa.prefersPG());
-        ensure("2 prefersMature", aa.prefersMature());
-        ensure("2 prefersAdult",  !aa.prefersAdult());
+        CHECK_FALSE(aa.prefersPG());
+        CHECK(aa.prefersMature());
+        CHECK_FALSE(aa.prefersAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("3 prefersPG",     !aa.prefersPG());
-        ensure("3 prefersMature", aa.prefersMature());
-        ensure("3 prefersAdult",  aa.prefersAdult());
+        CHECK_FALSE(aa.prefersPG());
+        CHECK(aa.prefersMature());
+        CHECK(aa.prefersAdult());
 #endif // HACKED_GODLIKE_VIEWER
     }
 
-    template<> template<>
-    void agentaccess_object_t::test<2>()
+    TEST_CASE("LLAgentAccess: maturity starts PG and setMaturity takes the P M and A letters", "[LLAgentAccess]")
     {
         LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
@@ -82,162 +72,196 @@ namespace tut
 
         // make sure default is PG
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 isTeen",     aa.isTeen());
-        ensure("1 isMature",   !aa.isMature());
-        ensure("1 isAdult",    !aa.isAdult());
+        CHECK(aa.isTeen());
+        CHECK_FALSE(aa.isMature());
+        CHECK_FALSE(aa.isAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         // check the conversion routine
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure_equals("1 conversion", SIM_ACCESS_PG, aa.convertTextToMaturity('P'));
-        ensure_equals("2 conversion", SIM_ACCESS_MATURE, aa.convertTextToMaturity('M'));
-        ensure_equals("3 conversion", SIM_ACCESS_ADULT, aa.convertTextToMaturity('A'));
-        ensure_equals("4 conversion", SIM_ACCESS_MIN, aa.convertTextToMaturity('Q'));
+        CHECK(SIM_ACCESS_PG == aa.convertTextToMaturity('P'));
+        CHECK(SIM_ACCESS_MATURE == aa.convertTextToMaturity('M'));
+        CHECK(SIM_ACCESS_ADULT == aa.convertTextToMaturity('A'));
+        CHECK(SIM_ACCESS_MIN == aa.convertTextToMaturity('Q'));
 #endif // HACKED_GODLIKE_VIEWER
 
         // now try the other method of setting it - PG
         aa.setMaturity('P');
-        ensure("2 isTeen",     aa.isTeen());
+        CHECK(aa.isTeen());
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("2 isMature",   !aa.isMature());
-        ensure("2 isAdult",    !aa.isAdult());
+        CHECK_FALSE(aa.isMature());
+        CHECK_FALSE(aa.isAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         // Mature
         aa.setMaturity('M');
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("3 isTeen",     !aa.isTeen());
-        ensure("3 isMature",   aa.isMature());
-        ensure("3 isAdult",    !aa.isAdult());
+        CHECK_FALSE(aa.isTeen());
+        CHECK(aa.isMature());
+        CHECK_FALSE(aa.isAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
         // Adult
         aa.setMaturity('A');
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("4 isTeen",     !aa.isTeen());
-        ensure("4 isMature",   aa.isMature());
-        ensure("4 isAdult",    aa.isAdult());
+        CHECK_FALSE(aa.isTeen());
+        CHECK(aa.isMature());
+        CHECK(aa.isAdult());
 #endif // HACKED_GODLIKE_VIEWER
 
     }
 
-    template<> template<>
-    void agentaccess_object_t::test<3>()
+    TEST_CASE("LLAgentAccess: isGodlike follows the god level and the admin override", "[LLAgentAccess]")
     {
         LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
         LLAgentAccess aa(cgr);
 
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("starts normal", !aa.isGodlike());
+        UNSCOPED_INFO("starts normal");
+        CHECK_FALSE(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
         aa.setGodLevel(GOD_NOT);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("stays normal", !aa.isGodlike());
+        UNSCOPED_INFO("stays normal");
+        CHECK_FALSE(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
         aa.setGodLevel(GOD_FULL);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("sets full", aa.isGodlike());
+        UNSCOPED_INFO("sets full");
+        CHECK(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
         aa.setGodLevel(GOD_NOT);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("resets normal", !aa.isGodlike());
+        UNSCOPED_INFO("resets normal");
+        CHECK_FALSE(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
         aa.setAdminOverride(true);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("admin true", aa.getAdminOverride());
-        ensure("overrides 1", aa.isGodlike());
+        CHECK(aa.getAdminOverride());
+        UNSCOPED_INFO("the admin override alone");
+        CHECK(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
         aa.setGodLevel(GOD_FULL);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("overrides 2", aa.isGodlike());
+        UNSCOPED_INFO("the admin override and full god level");
+        CHECK(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
         aa.setAdminOverride(false);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("admin false", !aa.getAdminOverride());
-        ensure("overrides 3", aa.isGodlike());
+        CHECK_FALSE(aa.getAdminOverride());
+        UNSCOPED_INFO("full god level alone");
+        CHECK(aa.isGodlike());
 #endif // HACKED_GODLIKE_VIEWER
     }
 
-    template<> template<>
-    void agentaccess_object_t::test<4>()
+    TEST_CASE("LLAgentAccess: access needs both rating and preference unless god or admin", "[LLAgentAccess]")
     {
         LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
         LLAgentAccess aa(cgr);
 
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 pg to start", aa.wantsPGOnly());
-        ensure("2 pg to start", !aa.canAccessMature());
-        ensure("3 pg to start", !aa.canAccessAdult());
+        {
+            INFO("pg to start");
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setGodLevel(GOD_FULL);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 full god", !aa.wantsPGOnly());
-        ensure("2 full god", aa.canAccessMature());
-        ensure("3 full god", aa.canAccessAdult());
+        {
+            INFO("full god");
+            CHECK_FALSE(aa.wantsPGOnly());
+            CHECK(aa.canAccessMature());
+            CHECK(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setGodLevel(GOD_NOT);
         aa.setAdminOverride(true);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 admin mode", !aa.wantsPGOnly());
-        ensure("2 admin mode", aa.canAccessMature());
-        ensure("3 admin mode", aa.canAccessAdult());
+        {
+            INFO("admin mode");
+            CHECK_FALSE(aa.wantsPGOnly());
+            CHECK(aa.canAccessMature());
+            CHECK(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setAdminOverride(false);
         aa.setMaturity('M');
         // preferred is still pg by default
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 mature pref pg", aa.wantsPGOnly());
-        ensure("2 mature pref pg", !aa.canAccessMature());
-        ensure("3 mature pref pg", !aa.canAccessAdult());
+        {
+            INFO("mature pref pg");
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_MATURE);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 mature", !aa.wantsPGOnly());
-        ensure("2 mature", aa.canAccessMature());
-        ensure("3 mature", !aa.canAccessAdult());
+        {
+            INFO("mature");
+            CHECK_FALSE(aa.wantsPGOnly());
+            CHECK(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_PG);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 mature pref pg", aa.wantsPGOnly());
-        ensure("2 mature pref pg", !aa.canAccessMature());
-        ensure("3 mature pref pg", !aa.canAccessAdult());
+        {
+            INFO("mature pref pg");
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setMaturity('A');
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 adult pref pg", aa.wantsPGOnly());
-        ensure("2 adult pref pg", !aa.canAccessMature());
-        ensure("3 adult pref pg", !aa.canAccessAdult());
+        {
+            INFO("adult pref pg");
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 adult", !aa.wantsPGOnly());
-        ensure("2 adult", aa.canAccessMature());
-        ensure("3 adult", aa.canAccessAdult());
+        {
+            INFO("adult");
+            CHECK_FALSE(aa.wantsPGOnly());
+            CHECK(aa.canAccessMature());
+            CHECK(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
         // make sure that even if pref is high, if access is low we block access
-        // this shouldn't occur in real life but we want to be safe
-        cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
+        // this shouldn't occur in real life but we want to be safe. The
+        // preference goes after the rating, which setMaturity would pull it
+        // down to.
         aa.setMaturity('P');
+        cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 pref adult, actual pg", aa.wantsPGOnly());
-        ensure("2 pref adult, actual pg", !aa.canAccessMature());
-        ensure("3 pref adult, actual pg", !aa.canAccessAdult());
+        {
+            INFO("pref adult, actual pg");
+            CHECK(aa.prefersAdult());
+            CHECK(aa.wantsPGOnly());
+            CHECK_FALSE(aa.canAccessMature());
+            CHECK_FALSE(aa.canAccessAdult());
+        }
 #endif // HACKED_GODLIKE_VIEWER
 
     }
 
-    template<> template<>
-    void agentaccess_object_t::test<5>()
+    TEST_CASE("LLAgentAccess: setMaturity lowers a higher preferred maturity to match", "[LLAgentAccess]")
     {
         LLControlGroup cgr("llagentaccess");
         cgr.declareU32("PreferredMaturity", SIM_ACCESS_PG, "declared_for_test", LLControlVariable::PERSIST_NO);
@@ -246,12 +270,12 @@ namespace tut
         cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
         aa.setMaturity('M');
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 preferred maturity pegged to M when maturity is M", cgr.getU32("PreferredMaturity") == SIM_ACCESS_MATURE);
+        CHECK(cgr.getU32("PreferredMaturity") == SIM_ACCESS_MATURE);
 #endif // HACKED_GODLIKE_VIEWER
 
         aa.setMaturity('P');
 #ifndef HACKED_GODLIKE_VIEWER
-        ensure("1 preferred maturity pegged to P when maturity is P", cgr.getU32("PreferredMaturity") == SIM_ACCESS_PG);
+        CHECK(cgr.getU32("PreferredMaturity") == SIM_ACCESS_PG);
 #endif // HACKED_GODLIKE_VIEWER
     }
 }

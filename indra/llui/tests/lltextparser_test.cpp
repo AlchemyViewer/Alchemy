@@ -129,6 +129,7 @@ namespace
         entry->mPattern = "carol";
         CHECK(pieces("carol and alice") == std::string("[carol:carol]| and alice|"));
         entry = parser.getHighlightById(id);
+        REQUIRE(entry != nullptr);
         entry->mCaseSensitive = true;
         CHECK(pieces("Carol and carol") == std::string("Carol and |[carol:carol]||"));
         parser.removeHighlight(id);

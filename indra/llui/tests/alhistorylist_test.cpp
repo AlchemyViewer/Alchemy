@@ -62,9 +62,13 @@ namespace
                      { "label on title", "floater_a.xml" } };
         }
 
-        static LLScrollListCtrl* listOf(ALHistoryList* history)
+        // The history's list. Found, not got: getChild makes a stand-in for
+        // a list the history lacks, which reads as an empty list.
+        static LLScrollListCtrl* require_list(ALHistoryList* history)
         {
-            return history->getChild<LLScrollListCtrl>("steps");
+            LLScrollListCtrl* list = history->findChild<LLScrollListCtrl>("steps");
+            REQUIRE(list != nullptr);
+            return list;
         }
     };
 
@@ -82,8 +86,7 @@ namespace
         CHECK(history->count() == 3u);
         CHECK(history->inForce() == 3u);
 
-        LLScrollListCtrl* list = listOf(history);
-        REQUIRE(list != nullptr);
+        LLScrollListCtrl* list = require_list(history);
         REQUIRE(list->getItemCount() == 3);
         UNSCOPED_INFO("newest first");
         CHECK(list->getFirstData()->getValue().asInteger() == 2);
@@ -105,7 +108,7 @@ namespace
         UNSCOPED_INFO("all three are still listed");
         CHECK(history->count() == 3u);
         CHECK(history->inForce() == 1u);
-        CHECK(listOf(history)->getItemCount() == 3);
+        CHECK(require_list(history)->getItemCount() == 3);
 
         // More in force than there are steps is not a thing a stack can be.
         history->setSteps(three(), 99);
@@ -129,7 +132,7 @@ namespace
         std::vector<size_t> asked;
         history->onGoTo([&asked](size_t want) { asked.push_back(want); });
 
-        LLScrollListCtrl* list = listOf(history);
+        LLScrollListCtrl* list = require_list(history);
         list->setSelectedByValue(LLSD(0), true);        // the oldest step
         history->goToSelected();
         REQUIRE(asked.size() == 1u);
@@ -159,7 +162,7 @@ namespace
 
         // Selecting is what says it: the list commits on a change of
         // selection, since a row chosen is the whole of the gesture.
-        listOf(history)->setSelectedByValue(LLSD(1), true);
+        require_list(history)->setSelectedByValue(LLSD(1), true);
         REQUIRE(chosen.size() == 1u);
         CHECK(chosen.front() == 1u);
         delete history;
@@ -175,7 +178,7 @@ namespace
         }
         ALHistoryList* history = make();
         history->setSteps({}, 0);
-        CHECK(listOf(history)->getItemCount() == 0);
+        CHECK(require_list(history)->getItemCount() == 0);
         ALPaneList* pane = history->getChild<ALPaneList>("steps");
         CHECK(pane->saysEmpty());
 
@@ -190,16 +193,16 @@ namespace
             CHECK(asked == std::vector<size_t>{ 1 });
         }
 
-        LLScrollListCtrl* list = listOf(history);
+        LLScrollListCtrl* list = require_list(history);
         list->setSelectedByValue(LLSD(1), true);
 
         std::vector<ALHistoryList::Step> more = three();
         more.push_back({ "name on title", "floater_a.xml" });
         history->setSteps(more, 4);
-        CHECK(listOf(history)->getItemCount() == 4);
+        CHECK(list->getItemCount() == 4);
         UNSCOPED_INFO("the row a person was on is still the row they are on");
-        REQUIRE(listOf(history)->getFirstSelected() != nullptr);
-        CHECK(listOf(history)->getFirstSelected()->getValue().asInteger() == 1);
+        REQUIRE(list->getFirstSelected() != nullptr);
+        CHECK(list->getFirstSelected()->getValue().asInteger() == 1);
         delete history;
     }
 
@@ -217,15 +220,18 @@ namespace
         std::vector<size_t> chosen;
         history->onStepChosen([&chosen](size_t at) { chosen.push_back(at); });
 
-        listOf(history)->setSelectedByValue(LLSD(1), true);
+        require_list(history)->setSelectedByValue(LLSD(1), true);
         UNSCOPED_INFO("choosing a row says so");
         REQUIRE(chosen.size() == 1u);
 
         std::vector<ALHistoryList::Step> more = three();
         more.push_back({ "name on title", "floater_a.xml" });
         history->setSteps(more, 4);
-        UNSCOPED_INFO("the row is kept");
-        CHECK(listOf(history)->getFirstSelected()->getValue().asInteger() == 1);
+        {
+            INFO("the row is kept");
+            REQUIRE(require_list(history)->getFirstSelected() != nullptr);
+            CHECK(require_list(history)->getFirstSelected()->getValue().asInteger() == 1);
+        }
         UNSCOPED_INFO("and not said again");
         CHECK(chosen.size() == 1u);
         delete history;
@@ -239,7 +245,7 @@ namespace
         }
         ALHistoryList* history = make();
         history->setSteps({ { "width on close_btn", "" }, { "height on close_btn", "" } }, 2);
-        LLScrollListColumn* where = listOf(history)->getColumn("where");
+        LLScrollListColumn* where = require_list(history)->getColumn("where");
         REQUIRE(where != nullptr);
         UNSCOPED_INFO("no room when nothing names a document");
         CHECK(where->getWidth() == 0);
@@ -262,7 +268,7 @@ namespace
         }
         ALHistoryList* history = make("As the files were opened");
         history->setSteps(three(), 2);
-        LLScrollListCtrl* list = listOf(history);
+        LLScrollListCtrl* list = require_list(history);
         UNSCOPED_INFO("a row a step, and the start");
         REQUIRE(list->getItemCount() == 4);
         UNSCOPED_INFO("still three steps");
@@ -274,9 +280,10 @@ namespace
         history->onStepChosen([&pointed](size_t index) { pointed.push_back(index); });
 
         const std::vector<LLScrollListItem*> rows = list->getAllData();
+        const LLScrollListCell*              words = rows.back()->getColumn(1);
+        REQUIRE(words != nullptr);
         UNSCOPED_INFO("at the bottom, under the oldest");
-        CHECK(rows.back()->getColumn(1)->getValue().asString() ==
-                      std::string("As the files were opened"));
+        CHECK(words->getValue().asString() == std::string("As the files were opened"));
         list->selectNthItem(3);
         UNSCOPED_INFO("pointed at, it tells nobody of a step");
         CHECK(pointed.empty());
@@ -292,8 +299,12 @@ namespace
         history->setSteps(three(), 0);
         UNSCOPED_INFO("still chosen after a refill");
         CHECK(list->getFirstSelectedIndex() == 3);
+        const std::vector<LLScrollListItem*> refilled = list->getAllData();
+        REQUIRE_FALSE(refilled.empty());
+        const LLScrollListCell* mark = refilled.back()->getColumn(0);
+        REQUIRE(mark != nullptr);
         UNSCOPED_INFO("the present is the start");
-        CHECK_FALSE(list->getAllData().back()->getColumn(0)->getValue().asString().empty());
+        CHECK_FALSE(mark->getValue().asString().empty());
         history->goToSelected();
         CHECK(asked.size() == 1u);
 
@@ -304,8 +315,9 @@ namespace
 
         history = make();
         history->setSteps(three(), 3);
+        list = require_list(history);
         UNSCOPED_INFO("no words, no start");
-        CHECK(listOf(history)->getItemCount() == 3);
+        CHECK(list->getItemCount() == 3);
         delete history;
     }
 }

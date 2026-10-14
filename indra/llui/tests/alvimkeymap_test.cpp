@@ -571,14 +571,15 @@ namespace
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: macros: q records keys as text; @ and @@ play them; qA adds", "[alvimkeymap]")
     {
         ALCodeEditor& e = make("one\ntwo\nthree\nfour\n");
-        keys("qaA;<Esc>jq");
+        keys("qaA;<Esc>j");
+        UNSCOPED_INFO("recording says so while it runs");
+        CHECK(vim->recording());
+        keys("q");
         CHECK_FALSE(vim->recording());
         UNSCOPED_INFO("the register holds the keys as text");
         CHECK(vim->registerText('a') == std::string("A;<Esc>j"));
         UNSCOPED_INFO("the recording ran as it was typed");
         CHECK(flat(e.text()) == std::string("one;|two|three|four|"));
-        UNSCOPED_INFO("recording says so while it runs");
-        CHECK(true);
         keys("@a");
         UNSCOPED_INFO("played once");
         CHECK(flat(e.text()) == std::string("one;|two;|three|four|"));
@@ -2003,6 +2004,7 @@ namespace
         keys(":di a<CR>");
         {
             INFO("only those named");
+            REQUIRE(listed.size() == size_t(2));
             CHECK(listed[1].find("\"0") == std::string::npos);
             CHECK(listed[1].find("\"a") != std::string::npos);
         }
@@ -2012,9 +2014,11 @@ namespace
         listed.pop_back();
 
         keys("mb:marks<CR>");
+        REQUIRE(listed.size() == size_t(3));
         CHECK(listed[2] == std::string("mark line  col file/text\n b      2    0 two three"));
         keys("G");
         keys(":marks<CR>");
+        REQUIRE(listed.size() == size_t(4));
         UNSCOPED_INFO("a jump's");
         CHECK(listed[3].find("\n '      2    0 two three") != std::string::npos);
 
@@ -3011,11 +3015,16 @@ namespace
         keys("q:");
         UNSCOPED_INFO("the window holds the pick");
         REQUIRE(static_cast<bool>(later));
+        // The : history outlives the vim it was typed into: a line run
+        // would be the last on it.
+        const std::shared_ptr<ALVimKeymap::Shared> vim_shared = vim->sharedState();
         e.setModalKeymap(nullptr);
         vim = nullptr;
         later("set nonumber", true);
-        UNSCOPED_INFO("vim gone: nothing");
+        UNSCOPED_INFO("vim gone: nothing put back");
         CHECK_FALSE(e.modalKeymap());
+        UNSCOPED_INFO("and nothing run");
+        CHECK(vim_shared->command == std::vector<std::string>{ "set number" });
 
         auto keymap = std::make_unique<ALVimKeymap>();
         vim         = keymap.get();
@@ -3025,12 +3034,13 @@ namespace
         keys(":set number<CR>q:");
         UNSCOPED_INFO("held again");
         REQUIRE(static_cast<bool>(later));
+        const std::shared_ptr<ALVimKeymap::Shared> tab_shared = vim->sharedState();
         editor->die();
         editor = nullptr;
         LLMortician::updateClass();
         later("set nonumber", true);
-        UNSCOPED_INFO("the tab gone: nothing");
-        CHECK(true);
+        UNSCOPED_INFO("the tab gone: nothing run");
+        CHECK(tab_shared->command == std::vector<std::string>{ "set number" });
     }
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: vim's Control motions ^H ^J ^N ^P ^M and ^L; Tab forward in the jumps", "[alvimkeymap]")
@@ -6630,62 +6640,66 @@ namespace
 
     TEST_CASE_METHOD(alvimkeymap_data, "alvimkeymap: the : commands are taken by any abbreviation vim takes", "[alvimkeymap]")
     {
+        // Each run, and none of them unknown.
+        const auto run = [this](const char* line) {
+            ex(line);
+            INFO(":" << line << " said: " << vim->message());
+            CHECK_FALSE(vim->messageIsError());
+        };
         ALCodeEditor& e = make("a b\nc\n");
-        ex("joi");
+        run("joi");
         UNSCOPED_INFO(":joi joins");
         CHECK(flat(e.text()) == std::string("a b c|"));
         make("a\nb\nc\n");
-        ex("dele");
+        run("dele");
         UNSCOPED_INFO(":dele deletes");
         CHECK(flat(editor->text()) == std::string("b|c|"));
         make("abc\n");
-        ex("norma x");
+        run("norma x");
         UNSCOPED_INFO(":norma plays the keys");
         CHECK(flat(editor->text()) == std::string("bc|"));
         make("  a\n");
-        ex("lef");
+        run("lef");
         UNSCOPED_INFO(":lef to the left");
         CHECK(flat(editor->text()) == std::string("a|"));
         make("a\n");
-        ex("rig 5");
+        run("rig 5");
         UNSCOPED_INFO(":rig to the right");
         CHECK(flat(editor->text()) == std::string("    a|"));
         make("a\nb\nc\n");
-        ex("3mo 0");
+        run("3mo 0");
         UNSCOPED_INFO(":mo moves");
         CHECK(flat(editor->text()) == std::string("c|a|b|"));
         make("a\nb\nc\n");
-        ex("3cop 0");
+        run("3cop 0");
         UNSCOPED_INFO(":cop copies");
         CHECK(flat(editor->text()) == std::string("c|a|b|c|"));
         make("a\nxb\nc\n");
-        ex("gl/x/d");
+        run("gl/x/d");
         CHECK(flat(editor->text()) == std::string("a|c|"));
         make("a\nxb\nc\n");
-        ex("vg/x/d");
+        run("vg/x/d");
         CHECK(flat(editor->text()) == std::string("xb|"));
         make("aa\n");
-        ex("su/a/b/");
+        run("su/a/b/");
         CHECK(flat(editor->text()) == std::string("ba|"));
         make("a\nb\n");
-        ex("ya");
-        ex("pu");
+        run("ya");
+        run("pu");
         UNSCOPED_INFO(":ya then :pu");
         CHECK(flat(editor->text()) == std::string("a|a|b|"));
         make("a\n");
         keys("x");
-        ex("und");
+        run("und");
         UNSCOPED_INFO(":und undoes");
         CHECK(flat(editor->text()) == std::string("a|"));
-        UNSCOPED_INFO("none of them unknown: " << vim->message());
-        CHECK_FALSE(vim->messageIsError());
         make("a\nb\n");
         keys("gg");
-        ex("2mar a");
+        run("2mar a");
         keys("'a");
         UNSCOPED_INFO(":mar sets a mark");
         CHECK(caretText() == std::string("1:0"));
-        ex("setlo ic");
+        run("setlo ic");
         UNSCOPED_INFO(":setlo sets");
         CHECK(vim->shared().ignoreCase);
     }

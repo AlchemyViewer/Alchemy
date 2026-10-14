@@ -26,6 +26,7 @@
 
 #include "almasterwatch.h"
 
+#include "almainloop.h"
 #include "alserialworker.h"
 #include "alwatchedfile.h"
 #include "llsingleton.h"
@@ -74,7 +75,7 @@ namespace
 ALMasterWatch::look_t ALMasterWatch::offThread()
 {
     return [](std::vector<std::string> paths, stamped_t found) {
-        const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
+        const LL::WorkQueue::ptr_t main_loop = ALMainLoop::queue();
         if (!main_loop)
         {
             // No main loop to hand them back to -- a test -- so looked at

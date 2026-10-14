@@ -197,6 +197,7 @@ namespace
         UNSCOPED_INFO("a tab has width");
         CHECK(space > 0.f);
         const ALTextLayout::Line& line = layout.line(0);
+        REQUIRE_FALSE(line.placed.empty());
         UNSCOPED_INFO("the tab draws nothing");
         CHECK(line.placed.front().face == nullptr);
         // 'ab' then a tab to the next stop: twice the first tab's width.
@@ -394,6 +395,7 @@ namespace
         const ALTextLayout::Line& second = layout.line(1);
         UNSCOPED_INFO("'ab', the box, 'cd', the tab, 'z'");
         REQUIRE(second.glyphs.size() == size_t(2 + 1 + 2 + 1 + 1));
+        REQUIRE(second.placed.size() > 2u);
         UNSCOPED_INFO("the box draws nothing");
         CHECK(second.placed[2].face == nullptr);
         UNSCOPED_INFO("the box is as wide as asked");
@@ -441,7 +443,7 @@ namespace
         UNSCOPED_INFO("the label is not broken across rows");
         CHECK(layout.rowOf(0, 4) == layout.rowOf(0, 31));
         UNSCOPED_INFO("but the text after it goes to the next row");
-        CHECK((layout.rowOf(0, 32) > layout.rowOf(0, 4) || layout.rowCount(0) >= 2));
+        CHECK(layout.rowOf(0, 32) > layout.rowOf(0, 4));
     }
 
     TEST_CASE_METHOD(altextlayout_data, "altextlayout: a stretch in a font of its own makes its row as tall as that font", "[altextlayout]")
@@ -469,6 +471,8 @@ namespace
         runs      = { run };
         layout.invalidateLine(0);
         const ALTextLayout::Line& line = layout.line(0);
+        REQUIRE_FALSE(line.rows.empty());
+        REQUIRE(line.placed.size() > 17u);
         UNSCOPED_INFO("the row's text is as tall as the larger font");
         CHECK(line.rows[0].textHeight == big->getLineSpacing());
         UNSCOPED_INFO("and its ascent the larger");
@@ -724,6 +728,7 @@ namespace
         }
         ready(text.c_str());
         const ALTextLayout::Line& line = layout.line(0);
+        REQUIRE_FALSE(line.rows.empty());
         const ALTextLayout::Row&  row  = line.rows[0];
         const ALTextLayout::Row   all  = ALTextLayout::rowWithin(line, row, -100.f, line.width + 100.f);
         {
@@ -756,6 +761,7 @@ namespace
                 REQUIRE(k < seen.glyphEnd);
             }
         }
+        REQUIRE(seen.glyphBegin + 2 <= seen.glyphEnd);
         UNSCOPED_INFO("one more before, no more");
         CHECK(line.glyphs[seen.glyphBegin + 1].pen + line.glyphs[seen.glyphBegin + 1].advance - row.xStart >= from);
         UNSCOPED_INFO("one more after, no more");
@@ -1253,6 +1259,7 @@ namespace
         // A word after the text before 'b', which the caret at b's column
         // stands before.
         const ALTextLayout::Line& line   = layout.line(0);
+        REQUIRE_FALSE(line.rows.empty());
         F32                       b_left = -1.f;
         for (const ALTextLayout::Glyph& glyph : line.glyphs)
         {

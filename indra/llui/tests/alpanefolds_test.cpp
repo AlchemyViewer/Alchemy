@@ -206,6 +206,7 @@ namespace
             folds.bind(w.floater, panes());
             folds.toggleOut("page");
             LLFloater* window = folds.window("page");
+            REQUIRE(window != nullptr);
             window->setRect(LLRect(700, 500, 1000, 300));
             folds.save(state);
             UNSCOPED_INFO("the side's fold is written");

@@ -185,6 +185,7 @@ namespace
             CHECK(e.markAt(2) == ALCodeEditor::Mark::Error);
             CHECK(e.markAt(1) == ALCodeEditor::Mark::None);
         }
+        REQUIRE_FALSE(e.decorations().empty());
         UNSCOPED_INFO("the decoration slid");
         CHECK(e.decorations().front().range.begin.line == 3);
         e.document().replace(ALTextRange(ALTextPos(3, 0), ALTextPos(3, 2)), "TH");
@@ -318,7 +319,7 @@ namespace
         type("u");
         {
             INFO("still open, narrowed");
-            CHECK(e.completionOpen());
+            REQUIRE(e.completionOpen());
             CHECK(e.completions()[0].text == "count");
         }
         key(KEY_RETURN);
@@ -351,7 +352,7 @@ namespace
         type(" cu");
         {
             INFO("the provider's word");
-            CHECK(e.completionOpen());
+            REQUIRE(e.completionOpen());
             CHECK(e.completions()[0].text == "custom");
             CHECK(e.completions()[0].detail == "made up");
         }
@@ -394,7 +395,7 @@ namespace
         type("a");
         {
             INFO("narrowing keeps it");
-            CHECK(e.completionOpen());
+            REQUIRE(e.completionOpen());
             CHECK(e.completions()[0].text == "abacus");
         }
         UNSCOPED_INFO("no new request while narrowing");
@@ -1218,10 +1219,12 @@ namespace
             REQUIRE(e.completions().size() == 4);
             CHECK(e.completions()[0].text == "sayAgain");
         }
+        REQUIRE(e.chosenCompletion() >= 0);
         UNSCOPED_INFO("the choice is still SAY_CHANNEL");
         CHECK(e.completions()[e.chosenCompletion()].text == std::string("SAY_CHANNEL"));
         // More typed starts from the best.
         type("i");
+        REQUIRE(e.chosenCompletion() >= 0);
         UNSCOPED_INFO("narrowed to the best");
         CHECK(e.completions()[e.chosenCompletion()].text == std::string("saying"));
         key(KEY_ESCAPE);
@@ -1242,7 +1245,7 @@ namespace
             }
         });
         type("llOld");
-        CHECK(e.completionOpen());
+        REQUIRE(e.completionOpen());
         CHECK(e.completions()[0].deprecated);
         key(KEY_RETURN);
         UNSCOPED_INFO("with its brackets and its parameter");
@@ -1271,6 +1274,7 @@ namespace
         const S32    y = text.mTop - e.layout().rowHeight() / 2;
         e.handleHover(x, y, MASK_NONE);
         CHECK(e.handleToolTip(x, y, MASK_NONE));
+        REQUIRE(e.cardShown());
         const ALTextView& card = *e.card();
         UNSCOPED_INFO("the problem, a blank, then the word");
         CHECK(card.text() == std::string("Too few arguments\n\ninteger llSay(integer channel, string msg)\nSays something."));
@@ -2188,6 +2192,7 @@ namespace
             CHECK(told.back().first != was);
         }
         e.noteFixes(was, { "stale", "stale" });
+        REQUIRE(e.fixes().size() == 2);
         UNSCOPED_INFO("an old making's dropped");
         CHECK(e.fixes()[0].note.empty());
         e.noteFixes(told.back().first, { "one" });
@@ -2600,7 +2605,9 @@ namespace
         type("\n");
         {
             INFO("each slid");
+            REQUIRE_FALSE(e.highlights(H::References).empty());
             CHECK(e.highlights(H::References)[0].begin == ALTextPos(1, 8));
+            REQUIRE_FALSE(e.highlights(H::Block).empty());
             CHECK(e.highlights(H::Block)[0].begin == ALTextPos(2, 8));
         }
         e.clearHighlights();
@@ -2612,6 +2619,7 @@ namespace
         later.range   = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 13));
         later.message = "later";
         e.setDecorations({ worst, later });
+        REQUIRE(e.decorations().size() == 2);
         UNSCOPED_INFO("as they lie");
         CHECK(e.decorations()[0].message == "later");
         const std::vector<const ALCodeEditor::Decoration*> listed = e.decorationsOn(1);
@@ -2707,6 +2715,7 @@ namespace
         type("nt");
         UNSCOPED_INFO("asked once for the word, narrowed as it grew");
         CHECK(asked == 1);
+        REQUIRE_FALSE(e.completions().empty());
         UNSCOPED_INFO("the word typed out first");
         CHECK(e.completions()[0].text == std::string("count"));
         key(KEY_RETURN);
@@ -3176,11 +3185,13 @@ namespace
         e.setCaret(ALTextPos(0, 2));
         e.showSignature(ALTextPos(0, 2), forms);
         key(KEY_DOWN);
+        REQUIRE(e.signature() != nullptr);
         UNSCOPED_INFO("Down: the next form");
         CHECK(e.signature()->label == std::string("f(string text)"));
         UNSCOPED_INFO("the caret where it was");
         CHECK(e.caret() == ALTextPos(0, 2));
         key(KEY_DOWN);
+        REQUIRE(e.signature() != nullptr);
         UNSCOPED_INFO("round to the first");
         CHECK(e.signature()->label == sig.label);
     }
@@ -3268,6 +3279,7 @@ namespace
         p.bracket_color_2 = LLUIColor(LLColor4::green);
         p.bracket_color_3 = LLUIColor(LLColor4::blue);
         editor            = LLUICtrlFactory::create<ALCodeEditor>(p);
+        made.push_back(editor);
         editor->setFont(LLFontGL::getFontMonospace());
         std::vector<ALCodeEditor::SemanticToken> lit;
         for (size_t at = text.find('x'); at != std::string::npos; at = text.find('x', at + 1))
@@ -3299,7 +3311,10 @@ namespace
             }
         };
 
+        // A colour for each character: the line is ASCII in the monospace
+        // face, one glyph to a character.
         const std::vector<LLColor4U> all = whole_of();
+        REQUIRE(all.size() == text.size());
         // What the line is coloured with: a bracket at each depth, the
         // analyzer's colour in code, and the grammar's in the string.
         const S32 first_open = static_cast<S32>(text.find('('));
@@ -3325,6 +3340,7 @@ namespace
 
         editor->setWordWrap(false);
         const ALTextLayout::Line& one = editor->layout().line(0);
+        REQUIRE_FALSE(one.rows.empty());
         for (F32 from = 0.f; from < one.width; from += 1500.f)
         {
             CAPTURE(from);
@@ -3337,6 +3353,7 @@ namespace
         editor->setCaret(ALTextPos(0, 0));
         editor->insertText("(");
         const std::vector<LLColor4U> deeper = whole_of();
+        REQUIRE(deeper.size() == text.size() + 1);
         UNSCOPED_INFO("the outer bracket one deeper");
         CHECK(deeper[static_cast<size_t>(first_open) + 1] == LLColor4U(LLColor4::green));
         editor->setWordWrap(true);
@@ -3784,7 +3801,7 @@ namespace
         type("--!st");
         {
             INFO("open after --!");
-            CHECK(e.completionOpen());
+            REQUIRE(e.completionOpen());
             CHECK(e.completions()[0].text == "strict");
         }
         key(KEY_TAB);
@@ -3835,6 +3852,7 @@ namespace
             INFO("open at the quote, asked of nothing yet");
             CHECK(e.completionOpen());
             CHECK(e.completions().size() == 3);
+            REQUIRE_FALSE(asked.empty());
             CHECK(asked.back().empty());
         }
         type("li");
@@ -3857,6 +3875,7 @@ namespace
             CHECK(requested.back() == "lib/");
         }
         type("ut");
+        REQUIRE_FALSE(e.completions().empty());
         UNSCOPED_INFO("narrowed in the folder");
         CHECK(e.completions()[0].text == std::string("util"));
         key(KEY_TAB);
@@ -3880,7 +3899,7 @@ namespace
         type("--#include \"m");
         {
             INFO("an include's name too");
-            CHECK(e.completionOpen());
+            REQUIRE(e.completionOpen());
             CHECK(e.completions()[0].text == "main");
         }
         key(KEY_ESCAPE);
@@ -3904,7 +3923,7 @@ namespace
         type("require(\"ma");
         {
             INFO("open in a string not closed");
-            CHECK(e.completionOpen());
+            REQUIRE(e.completionOpen());
             CHECK(e.completions()[0].text == "main");
         }
         key(KEY_TAB);
@@ -3918,7 +3937,7 @@ namespace
         type("\"ma");
         {
             INFO("open before what follows");
-            CHECK(e.completionOpen());
+            REQUIRE(e.completionOpen());
             CHECK(e.completions()[0].text == "main");
         }
         key(KEY_TAB);
@@ -3982,6 +4001,7 @@ namespace
             INFO("open at the quote, asked of nothing yet");
             CHECK(e.completionOpen());
             CHECK(e.completions().size() == 3);
+            REQUIRE_FALSE(asked.empty());
             CHECK(asked.back().empty());
         }
         type("Door ");
@@ -5033,18 +5053,23 @@ namespace
                     }
                 }
             }
+            // The first line the layout hides for the folds where no folded
+            // block does, or shows where one does: one check a step, not one
+            // a line.
             S32 hidden = 0;
+            S32 wrong  = -1;
             for (S32 l = 0; l < lines; ++l)
             {
                 const bool by_folds = e.layout().hiddenBy(l, By::Folds);
                 const bool wanted   = folded[static_cast<size_t>(l)] != 0;
                 hidden += by_folds ? 1 : 0;
-                if (by_folds != wanted)
+                if (by_folds != wanted && wrong < 0)
                 {
-                    CAPTURE(l);
-                    REQUIRE(by_folds == wanted);
+                    wrong = l;
                 }
             }
+            UNSCOPED_INFO("each line hidden for the folds just where a folded block hides it");
+            REQUIRE(wrong == -1);
             UNSCOPED_INFO("as many hidden for the folds as the layout counts");
             REQUIRE(e.layout().hiddenCount(By::Folds) == hidden);
             folded_steps += hidden > 0 ? 1 : 0;

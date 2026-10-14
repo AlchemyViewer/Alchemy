@@ -77,9 +77,10 @@ namespace
         }
         // A command at one selection, as its groups make it: the text left,
         // and where the selection goes, where its group places it.
-        static std::string applied(const std::string& text, const std::vector<ALTextEditing::Group>& groups, std::optional<ALTextRange>& placed)
+        static std::string require_applied(const std::string& text, const std::vector<ALTextEditing::Group>& groups, std::optional<ALTextRange>& placed)
         {
             const ALTextEditing::Combined                    combined = ALTextEditing::combine(groups, 1);
+            REQUIRE(combined.selections.size() == 1);
             ALTextDocument                                   doc(text);
             std::vector<std::pair<ALTextRange, std::string>> edits;
             for (const Replacement& one : combined.replacements)
@@ -127,20 +128,26 @@ namespace
         const std::string text = "a\n\nb\n  c";
         const ALTextDocument doc(text);
         std::optional<ALTextRange> placed;
-        UNSCOPED_INFO("each line with anything on it a level in");
-        CHECK(applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 1), ALTextPos(3, 3)) }, true, spaces), placed) ==
-                      std::string("    a\n\n    b\n      c"));
+        {
+            INFO("each line with anything on it a level in");
+            CHECK(require_applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 1), ALTextPos(3, 3)) }, true, spaces), placed) ==
+                  std::string("    a\n\n    b\n      c"));
+        }
         UNSCOPED_INFO("the anchor moved with its line, and the caret too");
         CHECK(placed == ALTextRange(ALTextPos(0, 5), ALTextPos(3, 7)));
-        UNSCOPED_INFO("a tab where tabs are typed");
-        CHECK(applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)) }, true, tabs), placed) ==
-                      std::string("\ta\n\nb\n  c"));
+        {
+            INFO("a tab where tabs are typed");
+            CHECK(require_applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)) }, true, tabs), placed) ==
+                  std::string("\ta\n\nb\n  c"));
+        }
 
         const std::string   deep = "\tx\n      y\n  z";
         const ALTextDocument deep_doc(deep);
-        UNSCOPED_INFO("a tab, or up to a level of spaces, out");
-        CHECK(applied(deep, indentLines(deep_doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(2, 1)) }, false, spaces), placed) ==
-                      std::string("x\n  y\nz"));
+        {
+            INFO("a tab, or up to a level of spaces, out");
+            CHECK(require_applied(deep, indentLines(deep_doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(2, 1)) }, false, spaces), placed) ==
+                  std::string("x\n  y\nz"));
+        }
         {
             INFO("the caret never before its line's start");
             REQUIRE(placed);
@@ -239,6 +246,7 @@ namespace
             return true;
         };
         const Outdent closed = outdentAsTyped(braces_doc, ALTextPos(2, 9), ALTextPos(2, 9), '}', lsl, matched, AutoOutdent(), spaces);
+        REQUIRE(closed.replacement);
         UNSCOPED_INFO("level with the bracket's line");
         CHECK(applied(braces, *closed.replacement) == std::string("  f() {\n        x;\n  }"));
         UNSCOPED_INFO("a bracket is kept for nothing");
@@ -273,16 +281,20 @@ namespace
     {
         const std::string code = "\tif x\n  \ty\n      z\nw";
         const ALTextDocument indented(code);
+        const std::optional<Change> to_spaces = convertIndentation(indented, 0, 3, true, 4);
+        REQUIRE(to_spaces.has_value());
         UNSCOPED_INFO("to spaces, a tab to its stop");
-        CHECK(applied(code, *convertIndentation(indented, 0, 3, true, 4)) ==
-                      std::string("    if x\n    y\n      z\nw"));
+        CHECK(applied(code, *to_spaces) == std::string("    if x\n    y\n      z\nw"));
+        const std::optional<Change> to_tabs = convertIndentation(indented, 0, 3, false, 4);
+        REQUIRE(to_tabs.has_value());
         UNSCOPED_INFO("to tabs, as far as they go");
-        CHECK(applied(code, *convertIndentation(indented, 0, 3, false, 4)) ==
-                      std::string("\tif x\n\ty\n\t  z\nw"));
+        CHECK(applied(code, *to_tabs) == std::string("\tif x\n\ty\n\t  z\nw"));
         UNSCOPED_INFO("nothing to change is nothing");
         CHECK_FALSE(convertIndentation(ALTextDocument("    a\nb"), 0, 1, true, 4));
+        const std::optional<Change> measured = convertIndentation(ALTextDocument("\ta"), 0, 0, false, 4, 2);
+        REQUIRE(measured.has_value());
         UNSCOPED_INFO("measured as the tabs were: a tab of two, two spaces at four");
-        CHECK(applied("\ta", *convertIndentation(ALTextDocument("\ta"), 0, 0, false, 4, 2)) == std::string("  a"));
+        CHECK(applied("\ta", *measured) == std::string("  a"));
     }
 
     TEST_CASE_METHOD(altextindent_data, "altextindent: detect reads tabs or spaces and the level from the commonest step", "[altextindent]")
@@ -333,8 +345,10 @@ namespace
         CHECK(from(0, 9) == std::string("one"));
         Options wide = spaces;
         wide.tabWidth = 8;
+        const std::optional<ALTextPos> wide_back = backspaceFrom(doc, ALTextPos(0, 8), wide);
+        REQUIRE(wide_back.has_value());
         UNSCOPED_INFO("a level as wide as the tab");
-        CHECK(backspaceFrom(doc, ALTextPos(0, 8), wide)->column == 0);
+        CHECK(wide_back->column == 0);
     }
 
     TEST_CASE_METHOD(altextindent_data, "altextindent: pasted lines go where they belong keeping their depth from the first", "[altextindent]")

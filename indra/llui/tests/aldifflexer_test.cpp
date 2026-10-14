@@ -87,6 +87,8 @@ namespace
 
     TEST_CASE_METHOD(aldifflexer_data, "aldifflexer: an edit is read again only until a line starts as it did", "[aldifflexer]")
     {
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         std::vector<std::string> text;
         for (S32 n = 0; n < 200; ++n)
         {

@@ -706,6 +706,12 @@ if(AL_BUILD_TESTS)
       tests/llurlregistry_test.cpp
       tests/llview_test.cpp
       tests/llxuiparser_test.cpp
+    # The benchmarks: comparing big scripts, by lines and laid out, and what
+    # each comparison says of some edits, which each change to how texts are
+    # compared is measured and judged by; and the code editor over
+    # 50,000-line scripts, which each change to the edit pipeline, the
+    # highlighter, the layout, the folds or find is measured by.
+    BENCH_SOURCES tests/altextdiff_bench.cpp tests/altextengine_bench.cpp
     SUPPORT llui_test_fakes llui_test_checks llrender_test_checks llcommon_test_checks
     LIBRARIES llui ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
@@ -729,42 +735,12 @@ if(AL_BUILD_TESTS)
     llui_gl_tests
     PROJECT llui
     SOURCES tests/aldiffview_gl_test.cpp tests/alsurface_gl_test.cpp tests/altextview_gl_test.cpp
+    # The same editor drawn, a frame at a time, into llrender's hidden
+    # window: what the drawing steps are measured by.
+    BENCH_SOURCES tests/altextdraw_bench.cpp
     SUPPORT llui_test_fakes llui_gl_test_checks llrender_test_checks llcommon_test_checks
     LIBRARIES llui ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
     GL
-  )
-
-  # The benchmarks, still executables of their own, link the fakes with
-  # the library.
-  set(test_libs llui llui_test_fakes ${test_libs})
-
-  # The code editor over 50,000-line scripts: what each change to the edit
-  # pipeline, the highlighter, the layout, the folds or find is measured by.
-  al_add_bench(
-    altextengine
-    PROJECT llui
-    LIBRARIES ${test_libs}
-    INCLUDES ${INDRA_SOURCE_DIR}/test
-    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
-  )
-  # Comparing big scripts, by lines and laid out, and what each comparison
-  # says of some edits: what each change to how texts are compared is
-  # measured and judged by.
-  al_add_bench(
-    altextdiff
-    PROJECT llui
-    LIBRARIES ${test_libs}
-    INCLUDES ${INDRA_SOURCE_DIR}/test
-    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
-  )
-  # The same editor drawn, a frame at a time, into llrender's hidden window:
-  # what the drawing steps are measured by.
-  al_add_bench(
-    altextdraw
-    PROJECT llui
-    LIBRARIES ${test_libs}
-    INCLUDES ${INDRA_SOURCE_DIR}/test
-    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 endif()

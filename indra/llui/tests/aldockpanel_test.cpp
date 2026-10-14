@@ -59,6 +59,10 @@ namespace
         // there.
         ~aldockpanel_data()
         {
+            if (!ui.ok())
+            {
+                return;
+            }
             std::vector<LLHandle<LLFloater>> out;
             for (LLView* child : *gFloaterView->getChildList())
             {
@@ -77,9 +81,6 @@ namespace
             LLMortician::updateClass();
         }
 
-        // A window with a stack of two panes across it, the way a tool is
-        // laid out: a side pane of a fixed width and a middle that takes
-        // whatever is left.
         // A window that says which keys it was asked about, and takes only
         // Control-F.
         struct Home : public LLFloater
@@ -102,8 +103,15 @@ namespace
             LLButton*       inside = nullptr;   // something to look for by name
         };
 
-        static Window build(S32 width = 600, S32 height = 400, S32 side_width = 200)
+        // A window with a stack of two panes across it, the way a tool is
+        // laid out: a side pane of a fixed width and a middle that takes
+        // whatever is left.
+        Window build(S32 width = 600, S32 height = 400, S32 side_width = 200)
         {
+            if (!ui.ok())
+            {
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            }
             Window w;
             LLFloater::Params fp(LLFloater::getDefaultParams());
             fp.name = "tool";
@@ -167,6 +175,7 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        REQUIRE(pane != nullptr);
         const S32 was = w.middle->getRect().getWidth();
 
         pane->popOut();
@@ -191,6 +200,7 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        REQUIRE(pane != nullptr);
         const S32 dim = w.side->getTargetDim();
 
         pane->popOut();
@@ -220,6 +230,7 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        REQUIRE(pane != nullptr);
         pane->popOut();
 
         ALPanelFloater* window = pane->getParentByType<ALPanelFloater>();
@@ -239,6 +250,7 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        REQUIRE(pane != nullptr);
 
         pane->dock();
         UNSCOPED_INFO("still where it was declared");
@@ -259,6 +271,7 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        REQUIRE(pane != nullptr);
         pane->popOut();
 
         ALPanelFloater* window = pane->getParentByType<ALPanelFloater>();
@@ -291,6 +304,7 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        REQUIRE(pane != nullptr);
         const S32 was = pane->getRect().getHeight();
         pane->popOut();
 
@@ -318,9 +332,11 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        REQUIRE(pane != nullptr);
         pane->popOut();
 
         LLFloater* window = pane->getParentByType<ALPanelFloater>();
+        REQUIRE(window != nullptr);
         const LLRect moved(300, 700, 800, 300);
         window->setShape(moved);
         pane->dock();
@@ -328,8 +344,10 @@ namespace
         UNSCOPED_INFO("where it was is remembered");
         CHECK(pane->floatingRect().getWidth() == moved.getWidth());
         pane->popOut();
+        window = pane->getParentByType<ALPanelFloater>();
+        REQUIRE(window != nullptr);
         UNSCOPED_INFO("and it comes back out there");
-        CHECK(pane->getParentByType<ALPanelFloater>()->getRect().getWidth() == moved.getWidth());
+        CHECK(window->getRect().getWidth() == moved.getWidth());
         w.floater->die();
     }
 
@@ -340,6 +358,7 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        REQUIRE(pane != nullptr);
 
         pane->popOut();
         w.stack->updateLayout();
@@ -442,6 +461,7 @@ namespace
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        REQUIRE(pane != nullptr);
         const LLHandle<LLView> held = pane->getHandle();
         pane->popOut();
 
@@ -470,7 +490,9 @@ namespace
             REQUIRE(pane->poppedOut());
             CHECK_FALSE(pane->outAtQuit());
         }
-        pane->getParentByType<ALPanelFloater>()->closeFloater();
+        window = pane->getParentByType<ALPanelFloater>();
+        REQUIRE(window != nullptr);
+        window->closeFloater();
         {
             INFO("closed by hand, it is simply home");
             CHECK_FALSE(pane->poppedOut());

@@ -106,9 +106,11 @@ namespace
             return *view;
         }
 
-        // Go to Line asked over the text, by lines counted as `base` says.
-        void ask(S32 base = 0)
+        // Go to Line asked over the text, by lines counted as `base` says:
+        // its field up, in a popover.
+        void require_asked(S32 base = 0)
         {
+            quick = nullptr;
             ALTextGoToLine::ask(
                 [this](std::function<void(const std::string&)> chose, std::function<void()> escaped, std::function<void()> left) {
                     quick = asker.ask({}, "Line, or line:column", "Go to Line", std::move(chose), view, 420, ALQuickOpen::heightForRows(1),
@@ -122,12 +124,20 @@ namespace
                     return name;
                 },
                 [this](const ALTextPos& was) { went.push_back(was); });
+            INFO("asked");
+            REQUIRE(quick != nullptr);
+            REQUIRE(popover() != nullptr);
         }
 
         ALPopover* popover() const { return quick ? ALViewType::as<ALPopover>(quick->getParentByType<LLFloater>()) : nullptr; }
 
         // Return, as the field gives it.
-        void choose() { quick->findChild<LLLineEditor>("query")->onCommit(); }
+        void require_chosen()
+        {
+            LLLineEditor* field = quick->findChild<LLLineEditor>("query");
+            REQUIRE(field != nullptr);
+            field->onCommit();
+        }
     };
 
     TEST_CASE_METHOD(altextgotoline_data, "altextgotoline: placeTyped reads line or line:column past blanks and a comma or as none", "[altextgotoline]")
@@ -163,12 +173,7 @@ namespace
     {
         ALTextView& v = make("zero\none\ntwo\n\tthree\nfour\n");
         v.setCaret(ALTextPos(1, 2));
-        ask();
-        {
-            INFO("asked");
-            REQUIRE(quick != nullptr);
-            REQUIRE(popover() != nullptr);
-        }
+        require_asked();
         UNSCOPED_INFO("nothing typed: says how many");
         CHECK(word == std::string("GoToLineHint"));
         UNSCOPED_INFO("the first line, counted from one");
@@ -192,7 +197,7 @@ namespace
         UNSCOPED_INFO("nothing typed: back where it was");
         CHECK(v.caret() == ALTextPos(1, 2));
         quick->setQuery("5");
-        choose();
+        require_chosen();
         UNSCOPED_INFO("kept");
         CHECK(v.caret() == ALTextPos(4, 0));
         {
@@ -208,7 +213,7 @@ namespace
     {
         ALTextView& v = make("a\nb\nc\nd\n");
         v.setCaret(ALTextPos(0, 1));
-        ask();
+        require_asked();
         quick->setQuery("3");
         popover()->escape();
         UNSCOPED_INFO("escaped: back");
@@ -216,7 +221,7 @@ namespace
         UNSCOPED_INFO("nothing told");
         CHECK(went.empty());
 
-        ask();
+        require_asked();
         quick->setQuery("4");
         popover()->onFocusLost();
         UNSCOPED_INFO("looked away: it stands");
@@ -231,7 +236,7 @@ namespace
     TEST_CASE_METHOD(altextgotoline_data, "altextgotoline: lines counted from 0 as in a notecard make 0 the first line", "[altextgotoline]")
     {
         ALTextView& v = make("zero\none\ntwo\n");
-        ask(-1);
+        require_asked(-1);
         UNSCOPED_INFO("the first line said as 0");
         CHECK(said["[FIRST]"]() == std::string("0"));
         UNSCOPED_INFO("the last line, counted from 0");
@@ -253,7 +258,7 @@ namespace
     {
         ALTextView& v = make("zero\none\ntwo\n");
         v.setCaret(ALTextPos(2, 1));
-        ask(-1);
+        require_asked(-1);
         for (const char* typed : { "x", ":", "-3" })
         {
             CAPTURE(typed);
@@ -263,7 +268,7 @@ namespace
         }
         UNSCOPED_INFO("said as typed");
         CHECK(said["[LINE]"]() == std::string("-3"));
-        choose();
+        require_chosen();
         UNSCOPED_INFO("Return leaves it there");
         CHECK(v.caret() == ALTextPos(2, 1));
         UNSCOPED_INFO("and tells of no way back");
@@ -274,7 +279,7 @@ namespace
     {
         ALTextView& v = make("zero\none\ntwo\n");
         v.setCaret(ALTextPos(2, 1));
-        ask();
+        require_asked();
         quick->setQuery("4294967298");
         UNSCOPED_INFO("no such line");
         CHECK(word == std::string("GoToLineNone"));
@@ -292,7 +297,7 @@ namespace
 
         // The most a number holds, counted from 0: past the last line, not
         // round past the least.
-        ask(-1);
+        require_asked(-1);
         quick->setQuery("2147483647");
         UNSCOPED_INFO("no such line, from 0");
         CHECK(word == std::string("GoToLineNone"));
@@ -307,7 +312,7 @@ namespace
         ALTextView&       v = make("zero\none\ntwo\nthree\n");
         const ALTextRange block(ALTextPos(0, 1), ALTextPos(1, 2));
         v.setSelections(block, { ALTextRange(ALTextPos(3, 0), ALTextPos(3, 0)) });
-        ask();
+        require_asked();
         UNSCOPED_INFO("opened: the selection as it was");
         CHECK(v.selection() == block);
         UNSCOPED_INFO("and the caret besides it");
@@ -318,7 +323,7 @@ namespace
         UNSCOPED_INFO("and the other caret");
         CHECK(v.otherSelections().size() == size_t(1));
 
-        ask();
+        require_asked();
         quick->setQuery("3");
         UNSCOPED_INFO("gone to the line typed");
         CHECK(v.caret() == ALTextPos(2, 0));

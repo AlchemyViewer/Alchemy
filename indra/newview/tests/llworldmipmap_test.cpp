@@ -32,7 +32,7 @@
 // Class to test
 #include "../llworldmipmap.h"
 // Tut header
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 // -------------------------------------------------------------------------------------------
 // Stubbing: Declarations required to link and run the class being tested
@@ -57,7 +57,7 @@ LLControlGroup gSavedSettings("llworldmipmap");
 // -------------------------------------------------------------------------------------------
 // TUT
 // -------------------------------------------------------------------------------------------
-namespace tut
+namespace
 {
     // Test wrapper declaration
     struct worldmipmap_test
@@ -81,11 +81,6 @@ namespace tut
         }
     };
 
-    // Tut templating thingamagic: test group, object and test instance
-    typedef test_group<worldmipmap_test> worldmipmap_t;
-    typedef worldmipmap_t::object worldmipmap_object_t;
-    tut::worldmipmap_t tut_worldmipmap("LLWorldMipmap");
-
     // ---------------------------------------------------------------------------------------
     // Test functions
     // Notes:
@@ -94,38 +89,33 @@ namespace tut
     // * Remember that you cannot test private methods with tut
     // ---------------------------------------------------------------------------------------
     // Test static methods
-    // Test 1 : scaleToLevel()
-    template<> template<>
-    void worldmipmap_object_t::test<1>()
+    TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: scaleToLevel is MAP_LEVELS at zero and 1 from a tile's size up", "[LLWorldMipmap]")
     {
         S32 level = mMap->scaleToLevel(0.0);
-        ensure("scaleToLevel() test 1 failed", level == LLWorldMipmap::MAP_LEVELS);
+        CHECK(level == LLWorldMipmap::MAP_LEVELS);
         level = mMap->scaleToLevel((F32)LLWorldMipmap::MAP_TILE_SIZE);
-        ensure("scaleToLevel() test 2 failed", level == 1);
+        CHECK(level == 1);
         level = mMap->scaleToLevel(10.f * LLWorldMipmap::MAP_TILE_SIZE);
-        ensure("scaleToLevel() test 3 failed", level == 1);
+        CHECK(level == 1);
     }
-    // Test 2 : globalToMipmap()
-    template<> template<>
-    void worldmipmap_object_t::test<2>()
+    TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: globalToMipmap gives a position's region grid cell", "[LLWorldMipmap]")
     {
         U32 grid_x, grid_y;
         mMap->globalToMipmap(1000.f*REGION_WIDTH_METERS, 1000.f*REGION_WIDTH_METERS, 1, &grid_x, &grid_y);
-        ensure("globalToMipmap() test 1 failed", (grid_x == 1000) && (grid_y == 1000));
+        CHECK(grid_x == 1000);
+        CHECK(grid_y == 1000);
         mMap->globalToMipmap(0.0, 0.0, LLWorldMipmap::MAP_LEVELS, &grid_x, &grid_y);
-        ensure("globalToMipmap() test 2 failed", (grid_x == 0) && (grid_y == 0));
+        CHECK(grid_x == 0);
+        CHECK(grid_y == 0);
     }
-    // Test 3 : getObjectsTile()
-    template<> template<>
-    void worldmipmap_object_t::test<3>()
+    TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: getObjectsTile without loading gives nothing for a tile not loaded", "[LLWorldMipmap]")
     {
-        // Depends on some inline methods in LLViewerImage... Thinking about how to make this work
-        // LLPointer<LLViewerImage> img = mMap->getObjectsTile(0, 0, 1);
-        // ensure("getObjectsTile() test failed", img.isNull());
+        // Loading is not tested: it boosts the texture the texture manager
+        // fetches, and this binary's stub fetches none.
+        LLPointer<LLViewerFetchedTexture> img = mMap->getObjectsTile(0, 0, 1, false);
+        CHECK(img.isNull());
     }
-    // Test 4 : equalizeBoostLevels()
-    template<> template<>
-    void worldmipmap_object_t::test<4>()
+    TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: equalizeBoostLevels does not throw", "[LLWorldMipmap]")
     {
         try
         {
@@ -133,12 +123,10 @@ namespace tut
         }
         catch (...)
         {
-            fail("equalizeBoostLevels() test failed");
+            FAIL("equalizeBoostLevels() threw");
         }
     }
-    // Test 5 : dropBoostLevels()
-    template<> template<>
-    void worldmipmap_object_t::test<5>()
+    TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: dropBoostLevels does not throw", "[LLWorldMipmap]")
     {
         try
         {
@@ -146,12 +134,10 @@ namespace tut
         }
         catch (...)
         {
-            fail("dropBoostLevels() test failed");
+            FAIL("dropBoostLevels() threw");
         }
     }
-    // Test 6 : reset()
-    template<> template<>
-    void worldmipmap_object_t::test<6>()
+    TEST_CASE_METHOD(worldmipmap_test, "LLWorldMipmap: reset does not throw", "[LLWorldMipmap]")
     {
         try
         {
@@ -159,7 +145,7 @@ namespace tut
         }
         catch (...)
         {
-            fail("reset() test failed");
+            FAIL("reset() threw");
         }
     }
 }

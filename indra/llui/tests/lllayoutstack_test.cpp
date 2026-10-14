@@ -432,6 +432,7 @@ namespace
             s->addPanel(grows);
             s->addPanel(dragged);
             s->updateLayout();
+            REQUIRE(grows->getResizeBar() != nullptr);
             UNSCOPED_INFO("the pair can resize, so there is somewhere to drag");
             CHECK(grows->getResizeBar()->getVisible());
             s->die();
@@ -446,6 +447,8 @@ namespace
             s->addPanel(between);
             s->addPanel(dragged);
             s->updateLayout();
+            REQUIRE(between->getResizeBar() != nullptr);
+            REQUIRE(grows->getResizeBar() != nullptr);
             UNSCOPED_INFO("a band that cannot give room has no bar of its own");
             CHECK_FALSE(between->getResizeBar()->getVisible());
             UNSCOPED_INFO("and it takes the bar off the panel behind it too");

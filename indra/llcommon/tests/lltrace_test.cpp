@@ -88,8 +88,14 @@ namespace
         }
     };
 
+    // what drink_coffee() has raised the level to
+    static F32 sCaffeineLevel(0.f);
+
     struct trace
     {
+        // Each case drinks from nothing, whichever ran before it.
+        trace() { sCaffeineLevel = 0.f; }
+
         // before mRecorder, so it is put back after mRecorder is gone
         ThreadRecorderRestore mRestore;
         ThreadRecorder        mRecorder;
@@ -99,7 +105,6 @@ namespace
     static SampleStatHandle<F32Milligrams> sCaffeineLevelStat("caffeinelevel", "Coffee buzz quotient");
     static EventStatHandle<S32Ounces> sOuncesPerCup("cupsize", "Large, huge, or ginormous");
 
-    static F32 sCaffeineLevel(0.f);
     const F32Milligrams sCaffeinePerOz(18.f);
 
     static void drink_coffee(S32 num_cups, S32Ounces cup_size)
@@ -180,6 +185,32 @@ namespace
             CHECK(all_day.getMax(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(3) + (S32Ounces)S32VentiCup(1)).value());
             CHECK(after_3pm.getMax(sCaffeineLevelStat) == sCaffeinePerOz * ((S32Ounces)S32TallCup(1) + (S32Ounces)S32GrandeCup(3) + (S32Ounces)S32VentiCup(1)).value());
         }
+    }
+
+    // The newest recording running on a thread gathers in a buffer of its
+    // own until something brings it up to date. Restarted while it runs, it
+    // starts from nothing all the same, and what it had gathered still
+    // reaches the older recording running beneath it.
+    TEST_CASE_METHOD(trace, "LLTrace: a running recording restarted starts from nothing and the one beneath keeps all", "[LLTrace]")
+    {
+        Recording beneath;
+        Recording newest;
+        beneath.start();
+        newest.start();
+        drink_coffee(2, S32GrandeCup(1));
+        newest.restart();
+        {
+            INFO("nothing counted once restarted");
+            CHECK(newest.getSum(sCupsOfCoffeeConsumed) == 0);
+            CHECK(newest.getSum(sOuncesPerCup) == S32Ounces(0));
+        }
+        drink_coffee(1, S32TallCup(1));
+        UNSCOPED_INFO("only what came after the restart");
+        CHECK(newest.getSum(sCupsOfCoffeeConsumed) == 1);
+        UNSCOPED_INFO("the one beneath kept what came before it too");
+        CHECK(beneath.getSum(sCupsOfCoffeeConsumed) == 3);
+        newest.stop();
+        beneath.stop();
     }
 
 }

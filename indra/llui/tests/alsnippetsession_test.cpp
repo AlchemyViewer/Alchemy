@@ -85,6 +85,7 @@ namespace
         session.slide(doc.replace(range(0, 2, 3), "alpha"));
         {
             INFO("typed over");
+            REQUIRE(session.stops().size() == 2);
             CHECK(doc.text(session.stops()[0]) == "alpha");
             CHECK(doc.text(session.stops()[1]) == "b");
         }
@@ -93,6 +94,7 @@ namespace
         session.slide(doc.replace(range(0, 0, 0), "x"));
         {
             INFO("moved with the text");
+            REQUIRE(session.stops().size() == 2);
             CHECK(doc.text(session.stops()[0]) == "alpha");
             CHECK(doc.text(session.stops()[1]) == "b");
         }
@@ -131,6 +133,7 @@ namespace
         session.setSyncing(false);
         {
             INFO("each brought up whole");
+            REQUIRE(session.mirrors().size() == 2);
             CHECK(doc.text(session.mirrors()[0].range) == "count");
             CHECK(doc.text(session.mirrors()[1].range) == "count");
         }
@@ -202,6 +205,7 @@ namespace
             CHECK(whole.stops[1] == whole.mirrors[0].range);
         }
         session.start(whole.stops, whole.landing.begin, whole.mirrors);
+        REQUIRE(session.stops().size() == 2);
         session.slide(doc.replace(session.stops()[0], "json"));
         sync(doc, 0);
         CHECK(doc.text() == std::string("local json = require(\"json\")"));
@@ -215,6 +219,7 @@ namespace
 
         const ALSnippetSession::Expansion around = ALSnippetSession::expand("${1:x} ${2:the $1 thing}", ALTextPos(0, 0), "");
         ALTextDocument                    text(around.text);
+        REQUIRE(around.stops.size() == 2);
         session.start(around.stops, around.landing.begin, around.mirrors);
         session.slide(text.replace(session.stops()[0], "abc"));
         sync(text, 0);

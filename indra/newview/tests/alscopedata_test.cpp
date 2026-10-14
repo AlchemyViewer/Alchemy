@@ -14,13 +14,15 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
+#include "../alcolorwheelmodel.h"
 #include "../alscopedata.h"
 
 #include <vector>
 
-namespace tut
+namespace
 {
     struct scope_data
     {
@@ -100,55 +102,58 @@ namespace tut
         }
     };
 
-    typedef test_group<scope_data> scope_group;
-    typedef scope_group::object    scope_object;
-    tut::scope_group sg("ALScopeData");
-
     // A fresh object measures nothing and reports nothing.
-    template<> template<>
-    void scope_object::test<1>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: a fresh object measures nothing and reports nothing", "[ALScopeData]")
     {
-        ensure("starts empty", mScope.isEmpty());
-        ensure_equals("no samples", mScope.getSampleCount(), 0);
-        ensure_approximately_equals("no peak", mScope.getPeak(ALScopeData::CH_LUMA), 0.f, 6);
-        ensure_approximately_equals("no bins", binSum(mScope, ALScopeData::CH_RED), 0.f, 6);
+        CHECK(mScope.isEmpty());
+        CHECK(mScope.getSampleCount() == 0);
+        CHECK_THAT(mScope.getPeak(ALScopeData::CH_LUMA), ll_test::WithinBits(0.f, 6));
+        CHECK_THAT(binSum(mScope, ALScopeData::CH_RED), ll_test::WithinBits(0.f, 6));
     }
 
     // A flat image puts everything in one bin per channel.
-    template<> template<>
-    void scope_object::test<2>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: a flat image puts everything in one bin per channel", "[ALScopeData]")
     {
         const std::vector<U8> px = flat(64, 128, 192, 100);
         mScope.accumulate(px.data(), 100, 1);
 
-        ensure_equals("sample count", mScope.getSampleCount(), 100);
-        ensure_approximately_equals("all red in bin 64", mScope.getBin(ALScopeData::CH_RED, 64), 1.f, 5);
-        ensure_approximately_equals("all green in bin 128", mScope.getBin(ALScopeData::CH_GREEN, 128), 1.f, 5);
-        ensure_approximately_equals("all blue in bin 192", mScope.getBin(ALScopeData::CH_BLUE, 192), 1.f, 5);
-        ensure_approximately_equals("nothing anywhere else", mScope.getBin(ALScopeData::CH_RED, 65), 0.f, 6);
+        CHECK(mScope.getSampleCount() == 100);
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 64), ll_test::WithinBits(1.f, 5));
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_GREEN, 128), ll_test::WithinBits(1.f, 5));
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_BLUE, 192), ll_test::WithinBits(1.f, 5));
+
+        // Nothing anywhere else: one bin lit in each channel, luma's too.
+        for (S32 c = 0; c < ALScopeData::CH_COUNT; ++c)
+        {
+            S32 lit = 0;
+            for (S32 i = 0; i < ALScopeData::BIN_COUNT; ++i)
+            {
+                lit += mScope.getBin((ALScopeData::EChannel)c, i) > 0.f ? 1 : 0;
+            }
+            CAPTURE(c);
+            CHECK(lit == 1);
+        }
     }
 
     // Bins are shares of the sample, so they sum to one whatever the size.
-    template<> template<>
-    void scope_object::test<3>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: bins are shares of the sample and sum to one whatever its size", "[ALScopeData]")
     {
         const std::vector<U8> px = ramp();
         mScope.accumulate(px.data(), ALScopeData::BIN_COUNT, 1);
 
         for (S32 c = 0; c < ALScopeData::CH_COUNT; ++c)
         {
-            ensure_approximately_equals("bins sum to 1",
-                                        binSum(mScope, (ALScopeData::EChannel)c), 1.f, 4);
+            CAPTURE(c);
+            REQUIRE_THAT(binSum(mScope, (ALScopeData::EChannel)c), ll_test::WithinBits(1.f, 4));
         }
-        ensure_approximately_equals("a flat ramp peaks at 1/256",
-                                    mScope.getPeak(ALScopeData::CH_RED),
-                                    1.f / (F32)ALScopeData::BIN_COUNT, 5);
+        UNSCOPED_INFO("a flat ramp peaks at 1/256");
+        CHECK_THAT(mScope.getPeak(ALScopeData::CH_RED),
+                                    ll_test::WithinBits(1.f / (F32)ALScopeData::BIN_COUNT, 5));
     }
 
     // Two samples of different sizes but the same content compare equal,
     // which is the property that lets the display ignore the sample size.
-    template<> template<>
-    void scope_object::test<4>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: samples of different sizes but the same content compare equal", "[ALScopeData]")
     {
         ALScopeData small_sample;
         ALScopeData large_sample;
@@ -159,16 +164,15 @@ namespace tut
 
         for (S32 i = 0; i < ALScopeData::BIN_COUNT; ++i)
         {
-            ensure_approximately_equals("size independent",
-                                        small_sample.getBin(ALScopeData::CH_RED, i),
-                                        large_sample.getBin(ALScopeData::CH_RED, i), 5);
+            CAPTURE(i);
+            REQUIRE_THAT(small_sample.getBin(ALScopeData::CH_RED, i),
+                                        ll_test::WithinBits(large_sample.getBin(ALScopeData::CH_RED, i), 5));
         }
     }
 
     // Luma uses Rec.709 on the encoded values. Pure green must land far above
     // pure blue; equal grey must land on itself.
-    template<> template<>
-    void scope_object::test<5>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: luma uses Rec.709 on the encoded values", "[ALScopeData]")
     {
         ALScopeData green;
         ALScopeData blue;
@@ -181,15 +185,15 @@ namespace tut
         grey.accumulate(n.data(), 16, 1);
 
         // 0.7152 * 255 = 182.4; 0.0722 * 255 = 18.4
-        ensure_approximately_equals("green luma", green.getBin(ALScopeData::CH_LUMA, 182), 1.f, 5);
-        ensure_approximately_equals("blue luma", blue.getBin(ALScopeData::CH_LUMA, 18), 1.f, 5);
-        ensure_approximately_equals("grey is its own luma", grey.getBin(ALScopeData::CH_LUMA, 137), 1.f, 5);
+        CHECK_THAT(green.getBin(ALScopeData::CH_LUMA, 182), ll_test::WithinBits(1.f, 5));
+        CHECK_THAT(blue.getBin(ALScopeData::CH_LUMA, 18), ll_test::WithinBits(1.f, 5));
+        UNSCOPED_INFO("grey is its own luma");
+        CHECK_THAT(grey.getBin(ALScopeData::CH_LUMA, 137), ll_test::WithinBits(1.f, 5));
     }
 
     // The weights sum to unity in fixed point, so white cannot overflow the
     // last bin and black cannot underflow the first.
-    template<> template<>
-    void scope_object::test<6>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: white lands in the last luma bin and black in the first", "[ALScopeData]")
     {
         ALScopeData white;
         ALScopeData black;
@@ -198,15 +202,13 @@ namespace tut
         white.accumulate(w.data(), 4, 1);
         black.accumulate(k.data(), 4, 1);
 
-        ensure_approximately_equals("white luma is 255",
-                                    white.getBin(ALScopeData::CH_LUMA, ALScopeData::BIN_COUNT - 1), 1.f, 5);
-        ensure_approximately_equals("black luma is 0",
-                                    black.getBin(ALScopeData::CH_LUMA, 0), 1.f, 5);
+        UNSCOPED_INFO("white luma is 255");
+        CHECK_THAT(white.getBin(ALScopeData::CH_LUMA, ALScopeData::BIN_COUNT - 1), ll_test::WithinBits(1.f, 5));
+        CHECK_THAT(black.getBin(ALScopeData::CH_LUMA, 0), ll_test::WithinBits(1.f, 5));
     }
 
     // Clipping readouts are the extreme bins, reported as a share of sample.
-    template<> template<>
-    void scope_object::test<7>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: clipping readouts are the shares in the extreme bins", "[ALScopeData]")
     {
         std::vector<U8> px;
         // 10 blown, 30 crushed, 60 mid.
@@ -215,80 +217,79 @@ namespace tut
         for (S32 i = 0; i < 60; ++i) { px.insert(px.end(), { 128, 128, 128, 255 }); }
         mScope.accumulate(px.data(), 100, 1);
 
-        ensure_approximately_equals("10% blown",
-                                    mScope.getClippedHigh(ALScopeData::CH_RED), 0.10f, 4);
-        ensure_approximately_equals("30% crushed",
-                                    mScope.getClippedLow(ALScopeData::CH_RED), 0.30f, 4);
-        ensure_approximately_equals("luma agrees on the blown share",
-                                    mScope.getClippedHigh(ALScopeData::CH_LUMA), 0.10f, 4);
+        CHECK_THAT(mScope.getClippedHigh(ALScopeData::CH_RED), ll_test::WithinBits(0.10f, 4));
+        CHECK_THAT(mScope.getClippedLow(ALScopeData::CH_RED), ll_test::WithinBits(0.30f, 4));
+        UNSCOPED_INFO("luma agrees on the blown share");
+        CHECK_THAT(mScope.getClippedHigh(ALScopeData::CH_LUMA), ll_test::WithinBits(0.10f, 4));
     }
 
     // A single blown pixel in a large sample still registers. This is the
     // case a box-filtered downsample would have averaged away, and the reason
     // the capture point-samples.
-    template<> template<>
-    void scope_object::test<8>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: a single blown pixel in a large sample still registers", "[ALScopeData]")
     {
         std::vector<U8> px = flat(100, 100, 100, 10000);
         px[0] = px[1] = px[2] = 255;
         mScope.accumulate(px.data(), 10000, 1);
 
-        ensure("one blown pixel is visible", mScope.getClippedHigh(ALScopeData::CH_RED) > 0.f);
-        ensure_approximately_equals("and it is 1 in 10000",
-                                    mScope.getClippedHigh(ALScopeData::CH_RED), 0.0001f, 6);
+        CHECK(mScope.getClippedHigh(ALScopeData::CH_RED) > 0.f);
+        CHECK_THAT(mScope.getClippedHigh(ALScopeData::CH_RED), ll_test::WithinBits(0.0001f, 6));
     }
 
     // Accumulating replaces rather than adding to the previous measurement.
-    template<> template<>
-    void scope_object::test<9>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: accumulating replaces rather than adds to the previous measurement", "[ALScopeData]")
     {
         const std::vector<U8> a = flat(10, 10, 10, 50);
         const std::vector<U8> b = flat(200, 200, 200, 50);
         mScope.accumulate(a.data(), 50, 1);
         mScope.accumulate(b.data(), 50, 1);
 
-        ensure_approximately_equals("old bin cleared", mScope.getBin(ALScopeData::CH_RED, 10), 0.f, 6);
-        ensure_approximately_equals("new bin full", mScope.getBin(ALScopeData::CH_RED, 200), 1.f, 5);
-        ensure_equals("count is the latest", mScope.getSampleCount(), 50);
+        UNSCOPED_INFO("old bin cleared");
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 10), ll_test::WithinBits(0.f, 6));
+        UNSCOPED_INFO("new bin full");
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 200), ll_test::WithinBits(1.f, 5));
+        UNSCOPED_INFO("count is the latest");
+        CHECK(mScope.getSampleCount() == 50);
     }
 
     // Degenerate input clears rather than reading past the buffer.
-    template<> template<>
-    void scope_object::test<10>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: degenerate input clears rather than reading past the buffer", "[ALScopeData]")
     {
         const std::vector<U8> px = flat(60, 60, 60, 8);
         mScope.accumulate(px.data(), 8, 1);
-        ensure("measured", !mScope.isEmpty());
+        CHECK_FALSE(mScope.isEmpty());
 
         mScope.accumulate(px.data(), 0, 1);
-        ensure("zero count clears", mScope.isEmpty());
+        UNSCOPED_INFO("zero count clears");
+        CHECK(mScope.isEmpty());
 
         mScope.accumulate(px.data(), 8, 1);
         mScope.accumulate(nullptr, 8, 1);
-        ensure("null clears", mScope.isEmpty());
+        UNSCOPED_INFO("null clears");
+        CHECK(mScope.isEmpty());
 
         mScope.accumulate(px.data(), 8, 1);
         mScope.accumulate(px.data(), -5, 1);
-        ensure("negative count clears", mScope.isEmpty());
+        UNSCOPED_INFO("negative count clears");
+        CHECK(mScope.isEmpty());
     }
 
     // The first blend takes the new sample whole; fading up from zero would
     // read as the scope being broken for the first few updates.
-    template<> template<>
-    void scope_object::test<11>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: the first blend takes the new sample whole", "[ALScopeData]")
     {
         ALScopeData fresh;
         const std::vector<U8> px = flat(90, 90, 90, 20);
         fresh.accumulate(px.data(), 20, 1);
 
         mScope.blendToward(fresh, 0.25f);
-        ensure_approximately_equals("taken whole", mScope.getBin(ALScopeData::CH_RED, 90), 1.f, 5);
-        ensure_equals("count carried", mScope.getSampleCount(), 20);
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 90), ll_test::WithinBits(1.f, 5));
+        UNSCOPED_INFO("count carried");
+        CHECK(mScope.getSampleCount() == 20);
     }
 
     // A later blend moves partway and converges on repetition.
-    template<> template<>
-    void scope_object::test<12>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: a later blend moves partway and converges on repetition", "[ALScopeData]")
     {
         ALScopeData first;
         ALScopeData second;
@@ -299,24 +300,23 @@ namespace tut
 
         mScope.blendToward(first, 1.f);
         mScope.blendToward(second, 0.5f);
-        ensure_approximately_equals("halfway out of the old bin",
-                                    mScope.getBin(ALScopeData::CH_RED, 40), 0.5f, 4);
-        ensure_approximately_equals("halfway into the new one",
-                                    mScope.getBin(ALScopeData::CH_RED, 200), 0.5f, 4);
+        UNSCOPED_INFO("halfway out of the old bin");
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 40), ll_test::WithinBits(0.5f, 4));
+        UNSCOPED_INFO("halfway into the new one");
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 200), ll_test::WithinBits(0.5f, 4));
 
         for (S32 i = 0; i < 40; ++i)
         {
             mScope.blendToward(second, 0.5f);
         }
-        ensure_approximately_equals("converges on the new sample",
-                                    mScope.getBin(ALScopeData::CH_RED, 200), 1.f, 4);
-        ensure_approximately_equals("and leaves the old",
-                                    mScope.getBin(ALScopeData::CH_RED, 40), 0.f, 4);
+        UNSCOPED_INFO("converges on the new sample");
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 200), ll_test::WithinBits(1.f, 4));
+        UNSCOPED_INFO("and leaves the old");
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 40), ll_test::WithinBits(0.f, 4));
     }
 
     // Blending never leaves the peak below a bin it will be asked to scale.
-    template<> template<>
-    void scope_object::test<13>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: blending never leaves the peak below a bin it will be asked to scale", "[ALScopeData]")
     {
         ALScopeData first;
         ALScopeData second;
@@ -334,46 +334,41 @@ namespace tut
             const F32 peak = mScope.getPeak(ch);
             for (S32 i = 0; i < ALScopeData::BIN_COUNT; ++i)
             {
-                ensure("no bin exceeds the peak", mScope.getBin(ch, i) <= peak + 1e-6f);
+                CAPTURE(c, i);
+                REQUIRE(mScope.getBin(ch, i) <= peak + 1e-6f);
             }
         }
     }
 
     // Blending toward nothing keeps what is already measured, so closing and
     // reopening the source does not wipe the display.
-    template<> template<>
-    void scope_object::test<14>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: blending toward nothing keeps what is already measured", "[ALScopeData]")
     {
         const std::vector<U8> px = flat(150, 150, 150, 32);
         mScope.accumulate(px.data(), 32, 1);
 
         const ALScopeData nothing;
         mScope.blendToward(nothing, 0.5f);
-        ensure_approximately_equals("unchanged", mScope.getBin(ALScopeData::CH_RED, 150), 1.f, 5);
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, 150), ll_test::WithinBits(1.f, 5));
     }
 
     // Out-of-range queries are answered, not asserted on.
-    template<> template<>
-    void scope_object::test<15>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: out-of-range bin and peak queries answer zero", "[ALScopeData]")
     {
         const std::vector<U8> px = flat(1, 2, 3, 4);
         mScope.accumulate(px.data(), 4, 1);
 
-        ensure_approximately_equals("negative bin", mScope.getBin(ALScopeData::CH_RED, -1), 0.f, 6);
-        ensure_approximately_equals("past the end",
-                                    mScope.getBin(ALScopeData::CH_RED, ALScopeData::BIN_COUNT), 0.f, 6);
-        ensure_approximately_equals("bad channel",
-                                    mScope.getBin((ALScopeData::EChannel)99, 0), 0.f, 6);
-        ensure_approximately_equals("bad channel peak",
-                                    mScope.getPeak((ALScopeData::EChannel)-3), 0.f, 6);
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, -1), ll_test::WithinBits(0.f, 6));
+        CHECK_THAT(mScope.getBin(ALScopeData::CH_RED, ALScopeData::BIN_COUNT), ll_test::WithinBits(0.f, 6));
+        CHECK_THAT(mScope.getBin((ALScopeData::EChannel)99, 0), ll_test::WithinBits(0.f, 6));
+        CHECK_THAT(mScope.getPeak((ALScopeData::EChannel)-3), ll_test::WithinBits(0.f, 6));
     }
     // --- vectorscope ---------------------------------------------------------
 
     // Grey has no chroma, so every neutral sample lands in the middle. That is
     // the reading a colourist checks first: a trace off-centre at the origin
     // means a cast.
-    template<> template<>
-    void scope_object::test<16>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: grey has no chroma so every neutral sample lands in the middle", "[ALScopeData]")
     {
         for (U8 level : { (U8)0, (U8)64, (U8)128, (U8)200, (U8)255 })
         {
@@ -382,105 +377,128 @@ namespace tut
             S32 u = -1, v = -1;
             soleCell(mScope, u, v);
             // Two central cells straddle zero on an even grid; either is right.
-            ensure("grey sits at the centre in u", u == ALScopeData::CHROMA_SIZE / 2 ||
-                                                   u == ALScopeData::CHROMA_SIZE / 2 - 1);
-            ensure("grey sits at the centre in v", v == ALScopeData::CHROMA_SIZE / 2 ||
-                                                   v == ALScopeData::CHROMA_SIZE / 2 - 1);
+            UNSCOPED_INFO("grey sits at the centre in u");
+            REQUIRE((u == ALScopeData::CHROMA_SIZE / 2 ||
+                                                   u == ALScopeData::CHROMA_SIZE / 2 - 1));
+            UNSCOPED_INFO("grey sits at the centre in v");
+            REQUIRE((v == ALScopeData::CHROMA_SIZE / 2 ||
+                                                   v == ALScopeData::CHROMA_SIZE / 2 - 1));
         }
     }
 
     // The primaries land in the directions the wheels put them, so pushing a
     // wheel and watching the trace agree is meaningful. Red at angle 0 means
     // right of centre; green and blue at 120 and 240 degrees.
-    template<> template<>
-    void scope_object::test<17>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: the primaries land in the directions the wheels put them", "[ALScopeData]")
     {
         const S32 mid = ALScopeData::CHROMA_SIZE / 2;
 
         mScope.accumulate(flat(255, 0, 0, 8).data(), 8, 1);
         S32 u = -1, v = -1;
         soleCell(mScope, u, v);
-        ensure("red is right of centre", u > mid);
-        ensure("and level with it", v == mid || v == mid - 1);
+        UNSCOPED_INFO("red is right of centre");
+        CHECK(u > mid);
+        UNSCOPED_INFO("and level with it");
+        CHECK((v == mid || v == mid - 1));
 
         mScope.accumulate(flat(0, 255, 0, 8).data(), 8, 1);
         soleCell(mScope, u, v);
-        ensure("green is left of centre", u < mid);
-        ensure("and above it", v > mid);
+        UNSCOPED_INFO("green is left of centre");
+        CHECK(u < mid);
+        UNSCOPED_INFO("and above it");
+        CHECK(v > mid);
 
         mScope.accumulate(flat(0, 0, 255, 8).data(), 8, 1);
         soleCell(mScope, u, v);
-        ensure("blue is left of centre", u < mid);
-        ensure("and below it", v < mid);
+        UNSCOPED_INFO("blue is left of centre");
+        CHECK(u < mid);
+        UNSCOPED_INFO("and below it");
+        CHECK(v < mid);
     }
 
     // Cells are shares of the sample, like the histogram's bins, so they sum
     // to one and blend the same way.
-    template<> template<>
-    void scope_object::test<18>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: chroma cells are shares that sum to one and blend like bins", "[ALScopeData]")
     {
         mScope.accumulate(ramp().data(), ALScopeData::BIN_COUNT, 1);
-        ensure_approximately_equals("cells sum to one", chromaSum(mScope), 1.f, 4);
-        ensure("peak is a real share", mScope.getChromaPeak() > 0.f &&
-                                       mScope.getChromaPeak() <= 1.f);
+        CHECK_THAT(chromaSum(mScope), ll_test::WithinBits(1.f, 4));
+        CHECK(mScope.getChromaPeak() > 0.f);
+        CHECK(mScope.getChromaPeak() <= 1.f);
 
         // A ramp is entirely neutral, so all of it is in one place.
-        ensure_approximately_equals("a grey ramp is a point", mScope.getChromaPeak(), 1.f, 4);
+        UNSCOPED_INFO("a grey ramp is a point");
+        CHECK_THAT(mScope.getChromaPeak(), ll_test::WithinBits(1.f, 4));
 
         ALScopeData red;
         red.accumulate(flat(255, 0, 0, 8).data(), 8, 1);
         mScope.blendToward(red, 0.5f);
-        ensure_approximately_equals("still sums to one after a blend",
-                                    chromaSum(mScope), 1.f, 4);
-        ensure_approximately_equals("and the peak matches the cells",
-                                    mScope.getChromaPeak(), 0.5f, 4);
+        UNSCOPED_INFO("still sums to one after a blend");
+        CHECK_THAT(chromaSum(mScope), ll_test::WithinBits(1.f, 4));
+        UNSCOPED_INFO("and the peak matches the cells");
+        CHECK_THAT(mScope.getChromaPeak(), ll_test::WithinBits(0.5f, 4));
     }
 
     // Out-of-range cells answer zero rather than assert, and clear() empties
     // the grid along with everything else.
-    template<> template<>
-    void scope_object::test<19>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: out-of-range cells answer zero and clear empties the grid", "[ALScopeData]")
     {
         mScope.accumulate(flat(200, 30, 30, 4).data(), 4, 1);
-        ensure("something was measured", mScope.getChromaPeak() > 0.f);
+        CHECK(mScope.getChromaPeak() > 0.f);
 
-        ensure_approximately_equals("negative u", mScope.getChromaCell(-1, 0), 0.f, 6);
-        ensure_approximately_equals("negative v", mScope.getChromaCell(0, -1), 0.f, 6);
-        ensure_approximately_equals("past the end in u",
-                                    mScope.getChromaCell(ALScopeData::CHROMA_SIZE, 0), 0.f, 6);
-        ensure_approximately_equals("past the end in v",
-                                    mScope.getChromaCell(0, ALScopeData::CHROMA_SIZE), 0.f, 6);
+        CHECK_THAT(mScope.getChromaCell(-1, 0), ll_test::WithinBits(0.f, 6));
+        CHECK_THAT(mScope.getChromaCell(0, -1), ll_test::WithinBits(0.f, 6));
+        CHECK_THAT(mScope.getChromaCell(ALScopeData::CHROMA_SIZE, 0), ll_test::WithinBits(0.f, 6));
+        CHECK_THAT(mScope.getChromaCell(0, ALScopeData::CHROMA_SIZE), ll_test::WithinBits(0.f, 6));
 
         mScope.clear();
-        ensure_approximately_equals("cleared peak", mScope.getChromaPeak(), 0.f, 6);
-        ensure_approximately_equals("cleared cells", chromaSum(mScope), 0.f, 6);
+        CHECK_THAT(mScope.getChromaPeak(), ll_test::WithinBits(0.f, 6));
+        CHECK_THAT(chromaSum(mScope), ll_test::WithinBits(0.f, 6));
     }
 
     // Cell centres run -1 to 1 in units of MAX_CHROMA, and the binning is the
     // inverse of that mapping -- so a plot laid out from chromaCellCentre puts
     // the trace where accumulate() put it, not half a cell away.
-    template<> template<>
-    void scope_object::test<20>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: chroma cell centres rise from -1 to 1 and the binning is their inverse", "[ALScopeData]")
     {
         const S32 last = ALScopeData::CHROMA_SIZE - 1;
-        ensure("first cell is at the low edge", ALScopeData::chromaCellCentre(0) < -0.9f);
-        ensure("last cell is at the high edge", ALScopeData::chromaCellCentre(last) > 0.9f);
-        ensure_approximately_equals("the grid straddles zero",
-                                    ALScopeData::chromaCellCentre(ALScopeData::CHROMA_SIZE / 2) +
+        UNSCOPED_INFO("first cell is at the low edge");
+        CHECK(ALScopeData::chromaCellCentre(0) < -0.9f);
+        UNSCOPED_INFO("last cell is at the high edge");
+        CHECK(ALScopeData::chromaCellCentre(last) > 0.9f);
+        UNSCOPED_INFO("the grid straddles zero");
+        CHECK_THAT(ALScopeData::chromaCellCentre(ALScopeData::CHROMA_SIZE / 2) +
                                     ALScopeData::chromaCellCentre(ALScopeData::CHROMA_SIZE / 2 - 1),
-                                    0.f, 5);
+                                    ll_test::WithinBits(0.f, 5));
         for (S32 i = 1; i < ALScopeData::CHROMA_SIZE; ++i)
         {
-            ensure("centres increase",
-                   ALScopeData::chromaCellCentre(i) > ALScopeData::chromaCellCentre(i - 1));
+            CAPTURE(i);
+            REQUIRE(ALScopeData::chromaCellCentre(i) > ALScopeData::chromaCellCentre(i - 1));
+        }
+
+        // The inverse: a colour lands in the cell whose centre is within half
+        // a cell of its chroma. None of these sits on a cell's edge.
+        struct Colour
+        {
+            S32 r, g, b;
+        };
+        const F32 half_cell = 1.f / (F32)ALScopeData::CHROMA_SIZE;
+        for (const Colour& c : { Colour{ 210, 40, 70 }, Colour{ 30, 160, 90 }, Colour{ 60, 80, 220 }, Colour{ 180, 150, 40 } })
+        {
+            mScope.accumulate(flat((U8)c.r, (U8)c.g, (U8)c.b, 4).data(), 4, 1);
+            S32 u = -1, v = -1;
+            soleCell(mScope, u, v);
+            F32 cu = 0.f, cv = 0.f;
+            ALColorWheelModel::toChroma(LLVector3((F32)c.r / 255.f, (F32)c.g / 255.f, (F32)c.b / 255.f), cu, cv);
+            CAPTURE(c.r, c.g, c.b, u, v);
+            CHECK_THAT(cu / ALColorWheelModel::MAX_CHROMA, ll_test::WithinDistance(ALScopeData::chromaCellCentre(u), half_cell));
+            CHECK_THAT(cv / ALColorWheelModel::MAX_CHROMA, ll_test::WithinDistance(ALScopeData::chromaCellCentre(v), half_cell));
         }
     }
 
     // The whole reason the waveform exists: a histogram cannot tell a blown sky
     // from a blown face, and this must. Left half black, right half white --
     // they have to land in different columns, at opposite ends of the scale.
-    template<> template<>
-    void scope_object::test<21>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: the waveform puts black and white halves in different columns", "[ALScopeData]")
     {
         const S32       W = 64, H = 8;
         std::vector<U8> px((size_t)W * H * 4, 255);
@@ -500,21 +518,20 @@ namespace tut
         const S32 left  = ALScopeData::WAVE_COLUMNS / 4;     // inside the black half
         const S32 right = 3 * ALScopeData::WAVE_COLUMNS / 4; // inside the white half
 
-        ensure_approximately_equals("black column is entirely at the bottom",
-                                    mScope.getWaveCell(ALScopeData::CH_LUMA, left, 0), 1.f, 5);
-        ensure_equals("black column has nothing at the top",
-                      mScope.getWaveCell(ALScopeData::CH_LUMA, left, top), 0.f);
-        ensure_approximately_equals("white column is entirely at the top",
-                                    mScope.getWaveCell(ALScopeData::CH_LUMA, right, top), 1.f, 5);
-        ensure_equals("white column has nothing at the bottom",
-                      mScope.getWaveCell(ALScopeData::CH_LUMA, right, 0), 0.f);
+        UNSCOPED_INFO("black column is entirely at the bottom");
+        CHECK_THAT(mScope.getWaveCell(ALScopeData::CH_LUMA, left, 0), ll_test::WithinBits(1.f, 5));
+        UNSCOPED_INFO("black column has nothing at the top");
+        CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, left, top) == 0.f);
+        UNSCOPED_INFO("white column is entirely at the top");
+        CHECK_THAT(mScope.getWaveCell(ALScopeData::CH_LUMA, right, top), ll_test::WithinBits(1.f, 5));
+        UNSCOPED_INFO("white column has nothing at the bottom");
+        CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, right, 0) == 0.f);
     }
 
     // A left-to-right ramp is the shape everyone recognises: the trace climbs
     // across the frame. If columns and levels were ever transposed, or the
     // column mapping inverted, this is what catches it.
-    template<> template<>
-    void scope_object::test<22>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: a left-to-right ramp draws a trace that climbs across the frame", "[ALScopeData]")
     {
         const S32       W = ALScopeData::WAVE_COLUMNS, H = 4;
         std::vector<U8> px((size_t)W * H * 4, 255);
@@ -540,22 +557,25 @@ namespace tut
             {
                 if (mScope.getWaveCell(ALScopeData::CH_LUMA, column, level) > 0.f)
                 {
-                    ensure_equals("only one level per column", lit, -1);
+                    UNSCOPED_INFO("only one level per column");
+                    REQUIRE(lit == -1);
                     lit = level;
                 }
             }
-            ensure("every column is lit somewhere", lit >= 0);
-            ensure("the trace never descends", lit >= previous);
+            UNSCOPED_INFO("every column is lit somewhere");
+            REQUIRE(lit >= 0);
+            UNSCOPED_INFO("the trace never descends");
+            REQUIRE(lit >= previous);
             previous = lit;
         }
-        ensure("and it does climb", previous > 0);
+        UNSCOPED_INFO("and it does climb");
+        CHECK(previous > 0);
     }
 
     // Shares are per column, not per sample -- that is what lets the plot's
     // intensity mean the same thing whatever the sample's width was. So a flat
     // frame reads 1.0 in every column, not 1/WAVE_COLUMNS.
-    template<> template<>
-    void scope_object::test<23>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: waveform shares are per column so a flat frame reads 1 in each", "[ALScopeData]")
     {
         auto column_total = [&](S32 column)
         {
@@ -575,11 +595,11 @@ namespace tut
         mScope.accumulate(flat(128, 128, 128, W * H).data(), W, H);
         for (S32 column = 0; column < ALScopeData::WAVE_COLUMNS; ++column)
         {
-            ensure_approximately_equals("every column holds one column's worth",
-                                        column_total(column), 1.f, 5);
+            UNSCOPED_INFO("every column holds one column's worth");
+            REQUIRE_THAT(column_total(column), ll_test::WithinBits(1.f, 5));
         }
-        ensure_approximately_equals("peak is a full column",
-                                    mScope.getWavePeak(ALScopeData::CH_LUMA), 1.f, 5);
+        UNSCOPED_INFO("peak is a full column");
+        CHECK_THAT(mScope.getWavePeak(ALScopeData::CH_LUMA), ll_test::WithinBits(1.f, 5));
 
         // Narrower than the grid: some columns have no pixels behind them at
         // all. Those stay empty rather than dividing by zero, and the ones that
@@ -593,16 +613,17 @@ namespace tut
             if (total > 0.f)
             {
                 ++filled;
-                ensure_approximately_equals("a filled column is still whole", total, 1.f, 5);
+                UNSCOPED_INFO("a filled column is still whole");
+                REQUIRE_THAT(total, ll_test::WithinBits(1.f, 5));
             }
         }
-        ensure_equals("one filled column per source column", filled, NARROW);
+        UNSCOPED_INFO("one filled column per source column");
+        CHECK(filled == NARROW);
     }
 
     // Channels are measured separately, which is the whole point of a parade: a
     // cast shows as the three traces sitting at different heights.
-    template<> template<>
-    void scope_object::test<24>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: each channel lands at its own level in the parade", "[ALScopeData]")
     {
         const S32 W = 32, H = 4;
         mScope.accumulate(flat(255, 128, 0, W * H).data(), W, H);
@@ -610,38 +631,31 @@ namespace tut
         const S32 column = ALScopeData::WAVE_COLUMNS / 2;
         const S32 top    = ALScopeData::WAVE_LEVELS - 1;
 
-        ensure_approximately_equals("red is at the top",
-                                    mScope.getWaveCell(ALScopeData::CH_RED, column, top), 1.f, 5);
-        ensure_approximately_equals("blue is at the bottom",
-                                    mScope.getWaveCell(ALScopeData::CH_BLUE, column, 0), 1.f, 5);
-        ensure_equals("red is not also at the bottom",
-                      mScope.getWaveCell(ALScopeData::CH_RED, column, 0), 0.f);
-        ensure("green is at neither end",
-               mScope.getWaveCell(ALScopeData::CH_GREEN, column, 0) == 0.f &&
-               mScope.getWaveCell(ALScopeData::CH_GREEN, column, top) == 0.f);
+        CHECK_THAT(mScope.getWaveCell(ALScopeData::CH_RED, column, top), ll_test::WithinBits(1.f, 5));
+        CHECK_THAT(mScope.getWaveCell(ALScopeData::CH_BLUE, column, 0), ll_test::WithinBits(1.f, 5));
+        CHECK(mScope.getWaveCell(ALScopeData::CH_RED, column, 0) == 0.f);
+        CHECK(mScope.getWaveCell(ALScopeData::CH_GREEN, column, 0) == 0.f);
+        CHECK(mScope.getWaveCell(ALScopeData::CH_GREEN, column, top) == 0.f);
     }
 
     // A plot walks the whole grid without checking, so out-of-range reads and a
     // scope that has never measured anything both have to answer zero rather
     // than index a vector that is deliberately empty until first use.
-    template<> template<>
-    void scope_object::test<25>()
+    TEST_CASE_METHOD(scope_data, "ALScopeData: waveform reads answer zero when unmeasured or cleared or out of range", "[ALScopeData]")
     {
         ALScopeData fresh;
-        ensure_equals("unmeasured reads zero", fresh.getWaveCell(ALScopeData::CH_LUMA, 0, 0), 0.f);
-        ensure_equals("unmeasured has no peak", fresh.getWavePeak(ALScopeData::CH_LUMA), 0.f);
+        CHECK(fresh.getWaveCell(ALScopeData::CH_LUMA, 0, 0) == 0.f);
+        CHECK(fresh.getWavePeak(ALScopeData::CH_LUMA) == 0.f);
 
         mScope.accumulate(flat(200, 200, 200, 16).data(), 16, 1);
-        ensure_equals("negative column", mScope.getWaveCell(ALScopeData::CH_LUMA, -1, 0), 0.f);
-        ensure_equals("column past the end",
-                      mScope.getWaveCell(ALScopeData::CH_LUMA, ALScopeData::WAVE_COLUMNS, 0), 0.f);
-        ensure_equals("level past the end",
-                      mScope.getWaveCell(ALScopeData::CH_LUMA, 0, ALScopeData::WAVE_LEVELS), 0.f);
-        ensure_equals("bad channel", mScope.getWaveCell(ALScopeData::CH_COUNT, 0, 0), 0.f);
+        CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, -1, 0) == 0.f);
+        CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, ALScopeData::WAVE_COLUMNS, 0) == 0.f);
+        CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, 0, ALScopeData::WAVE_LEVELS) == 0.f);
+        CHECK(mScope.getWaveCell(ALScopeData::CH_COUNT, 0, 0) == 0.f);
 
         // And clearing has to let go of the grid again.
         mScope.clear();
-        ensure_equals("cleared reads zero", mScope.getWaveCell(ALScopeData::CH_LUMA, 0, 0), 0.f);
-        ensure_equals("cleared has no peak", mScope.getWavePeak(ALScopeData::CH_LUMA), 0.f);
+        CHECK(mScope.getWaveCell(ALScopeData::CH_LUMA, 0, 0) == 0.f);
+        CHECK(mScope.getWavePeak(ALScopeData::CH_LUMA) == 0.f);
     }
 }

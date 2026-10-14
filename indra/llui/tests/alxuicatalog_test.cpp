@@ -138,8 +138,12 @@ namespace
         CHECK(a->layer("other", "en") != nullptr);
         CHECK(a->layer("other", "de") == nullptr);
 
-        CHECK((int)catalog.find("panel_b.xml")->kind == (int)ALXUICatalog::Kind::Panel);
-        CHECK((int)catalog.find("menu_c.xml")->kind == (int)ALXUICatalog::Kind::Menu);
+        const ALXUICatalog::Entry* panel = catalog.find("panel_b.xml");
+        REQUIRE(panel != nullptr);
+        CHECK((int)panel->kind == (int)ALXUICatalog::Kind::Panel);
+        const ALXUICatalog::Entry* menu = catalog.find("menu_c.xml");
+        REQUIRE(menu != nullptr);
+        CHECK((int)menu->kind == (int)ALXUICatalog::Kind::Menu);
         const ALXUICatalog::Entry* tmpl = catalog.find("widgets/button.xml");
         UNSCOPED_INFO("template catalogued under its subdirectory");
         REQUIRE(tmpl != nullptr);
@@ -148,6 +152,7 @@ namespace
         const ALXUICatalog::Entry* broken = catalog.find("broken.xml");
         UNSCOPED_INFO("a file that does not parse is still catalogued");
         REQUIRE(broken != nullptr);
+        REQUIRE(broken->layers.size() == 1u);
         CHECK(broken->layers[0].doc == nullptr);
         UNSCOPED_INFO("and the reason");
         CHECK_FALSE(broken->layers[0].error.empty());
@@ -162,7 +167,9 @@ namespace
     {
         ALXUICatalog catalog;
         catalog.scan(mSkins);
-        const ALXUICatalog::Entry& a = *catalog.find("floater_a.xml");
+        const ALXUICatalog::Entry* found = catalog.find("floater_a.xml");
+        REQUIRE(found != nullptr);
+        const ALXUICatalog::Entry& a = *found;
 
         std::vector<const ALXUICatalog::Layer*> layers = catalog.layersFor(a, "default", "en");
         UNSCOPED_INFO("default/en: one file");
@@ -185,7 +192,9 @@ namespace
         UNSCOPED_INFO("default's language file");
         CHECK(layers[1]->skin == std::string("default"));
 
-        layers = catalog.layersFor(*catalog.find("panel_b.xml"), "other", "de");
+        const ALXUICatalog::Entry* b = catalog.find("panel_b.xml");
+        REQUIRE(b != nullptr);
+        layers = catalog.layersFor(*b, "other", "de");
         UNSCOPED_INFO("a file the skin lacks falls back to default");
         REQUIRE(layers.size() == 1u);
         CHECK(layers[0]->skin == std::string("default"));
@@ -242,7 +251,10 @@ namespace
         UNSCOPED_INFO("in the German layer");
         CHECK(hits[0].layer->language == std::string("de"));
 
-        const ALXUICatalog::Layer* en = catalog.find("floater_a.xml")->layer("default", "en");
+        const ALXUICatalog::Entry* floater = catalog.find("floater_a.xml");
+        REQUIRE(floater != nullptr);
+        const ALXUICatalog::Layer* en = floater->layer("default", "en");
+        REQUIRE(en != nullptr);
         pugi::xml_node second = ALXUICatalog::resolve(en->root(), ALXUISelection::fromString("body/ok#1"));
         UNSCOPED_INFO("the second button resolves");
         REQUIRE(second);

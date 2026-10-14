@@ -30,7 +30,7 @@
 #include "alscriptstudio_fixture.h"
 #include "llfocusmgr.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <thread>
@@ -79,7 +79,7 @@ namespace
     std::string lines(const std::optional<Place>& place) { return place ? place->doc + ":" + std::to_string(place->at.line) : "none"; }
 }
 
-namespace tut
+namespace
 {
     struct alscriptnavigation_data
     {
@@ -93,7 +93,7 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             unit              = std::make_unique<ALScriptNavigation>(services, studio, studio);
             studio.navigation = unit.get();
@@ -130,23 +130,28 @@ namespace tut
         static void waitToSettle() { std::this_thread::sleep_for(std::chrono::milliseconds(400)); }
     };
 
-    typedef test_group<alscriptnavigation_data> alscriptnavigation_group;
-    typedef alscriptnavigation_group::object    alscriptnavigation_object;
-    alscriptnavigation_group                    alscriptnavigation_instance("alscriptnavigation");
-
-    template<> template<>
-    void alscriptnavigation_object::test<1>()
+    // A view of a line is a place of its own, and a place noted drops the
+    // way forward.
+    TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: the history notes a line once and keeps the fifty latest places", "[alscriptnavigation]")
     {
-        set_test_name("the history: once a line, a view its own place, the fifty latest, and the way forward gone once a place is noted");
         ALNavHistory history;
         const auto   open = [](const std::string&) { return true; };
         history.note(at("a", 1));
         history.note(at("a", 1));
-        ensure("once a line", lines(history.take(false, std::nullopt, open)) == "a:1" && !history.canGo(false));
+        {
+            INFO("once a line");
+            CHECK(lines(history.take(false, std::nullopt, open)) == "a:1");
+            CHECK_FALSE(history.canGo(false));
+        }
         history.note(at("a", 1));
         history.note(at("a", 1, Doc::View::Expanded));
         std::optional<Place> expanded = history.take(false, std::nullopt, open);
-        ensure("the expansion's line its own place", expanded && expanded->view == Doc::View::Expanded && history.canGo(false));
+        {
+            INFO("the expansion's line its own place");
+            REQUIRE(expanded);
+            CHECK(expanded->view == Doc::View::Expanded);
+            CHECK(history.canGo(false));
+        }
         history.take(false, std::nullopt, open);
         for (S32 i = 0; i < 60; ++i)
         {
@@ -159,18 +164,23 @@ namespace tut
             oldest = history.take(false, std::nullopt, open);
             ++count;
         }
-        ensure("fifty, the oldest dropped", count == 50 && lines(oldest) == "a:10");
+        {
+            INFO("fifty, the oldest dropped");
+            CHECK(count == 50);
+            CHECK(lines(oldest) == "a:10");
+        }
         history.note(at("a", 1));
         history.take(false, at("b", 2), open);
-        ensure("where it went from, forward", history.canGo(true));
+        UNSCOPED_INFO("where it went from, forward");
+        CHECK(history.canGo(true));
         history.note(at("c", 3));
-        ensure("a place noted: the way forward gone", !history.canGo(true));
+        UNSCOPED_INFO("a place noted: the way forward gone");
+        CHECK_FALSE(history.canGo(true));
     }
 
-    template<> template<>
-    void alscriptnavigation_object::test<2>()
+    // Where it goes from is put on the other way.
+    TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: back and forward pass closed tabs over and follow renamed ones", "[alscriptnavigation]")
     {
-        set_test_name("back and forward: where it goes from put on the other way, a closed tab passed over, a tab renamed followed");
         ALNavHistory history;
         std::set<std::string> closed;
         const auto            open = [&closed](const std::string& id) { return closed.count(id) == 0; };
@@ -178,96 +188,139 @@ namespace tut
         history.note(at("gone", 2));
         history.note(at("b", 3));
         closed.insert("gone");
-        ensure("back", lines(history.take(false, at("c", 4), open)) == "b:3");
-        ensure("back past the closed one", lines(history.take(false, at("b", 3), open)) == "a:1" && !history.canGo(false));
-        ensure("forward again", lines(history.take(true, at("a", 1), open)) == "b:3");
+        UNSCOPED_INFO("back");
+        CHECK(lines(history.take(false, at("c", 4), open)) == "b:3");
+        {
+            INFO("back past the closed one");
+            CHECK(lines(history.take(false, at("b", 3), open)) == "a:1");
+            CHECK_FALSE(history.canGo(false));
+        }
+        UNSCOPED_INFO("forward again");
+        CHECK(lines(history.take(true, at("a", 1), open)) == "b:3");
         history.rekey("c", "renamed");
-        ensure("followed", lines(history.take(true, std::nullopt, open)) == "renamed:4");
-        ensure("nowhere left", !history.take(true, std::nullopt, open));
+        UNSCOPED_INFO("the renamed tab followed");
+        CHECK(lines(history.take(true, std::nullopt, open)) == "renamed:4");
+        UNSCOPED_INFO("nowhere left");
+        CHECK_FALSE(history.take(true, std::nullopt, open));
     }
 
-    template<> template<>
-    void alscriptnavigation_object::test<3>()
+    TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: a walk is noted as one jump and back and forward are shown by the window", "[alscriptnavigation]")
     {
-        set_test_name("a jump from the tab in front, a walk one jump until it ends; back and forward shown by the window");
         ALScriptNavigation& unit = make();
         Doc&                a    = tab("a", 1);
         services.front           = 0;
         unit.noteJump(true);
         a.editor->setCaret(ALTextPos(3, 0));
         unit.noteJump(true);
-        ensure("a walk: one jump", unit.walking());
+        UNSCOPED_INFO("a walk: one jump");
+        CHECK(unit.walking());
         unit.goBack(false);
-        ensure("back where the walk began", studio.shown == Names{ "a:1" } && !unit.walking() && !unit.canGo(false));
+        {
+            INFO("back where the walk began");
+            CHECK(studio.shown == Names{ "a:1" });
+            CHECK_FALSE(unit.walking());
+            CHECK_FALSE(unit.canGo(false));
+        }
         unit.goBack(true);
-        ensure("and forward to where it was then", studio.shown == Names{ "a:1", "a:3" });
+        UNSCOPED_INFO("and forward to where it was then");
+        CHECK(studio.shown == Names{ "a:1", "a:3" });
         unit.noteJump(true);
         unit.walked();
         a.editor->setCaret(ALTextPos(2, 0));
         unit.noteJump(true);
         unit.goBack(false);
-        ensure("a walk ended: the next is a jump of its own", studio.shown.back() == "a:2");
+        REQUIRE(studio.shown.size() == 3);
+        UNSCOPED_INFO("a walk ended: the next is a jump of its own");
+        CHECK(studio.shown.back() == "a:2");
         a.loaded = false;
         unit.noteJump();
-        ensure("a tab not loaded: nothing noted", !unit.canGo(false) || studio.shown.size() == 3);
+        {
+            // Noting a place drops the way forward, a:2 here.
+            INFO("a tab not loaded: nothing noted");
+            CHECK(unit.places(false) == 1);
+            CHECK(unit.canGo(true));
+        }
     }
 
-    template<> template<>
-    void alscriptnavigation_object::test<4>()
+    TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: a row stayed on opens as a preview unless already open or passed or left", "[alscriptnavigation]")
     {
-        set_test_name("a row stayed on a moment opened as a preview; one open already, walked past, or left, not");
         ALScriptNavigation& unit = make();
         ALPaneList*         l    = list();
         studio.open.insert("open path");
-        ensure("open already: at once", !unit.deferOpen(l, "open path"));
-        ensure("nowhere: at once", !unit.deferOpen(l, ""));
-        ensure("put off", unit.deferOpen(l, "a path"));
+        UNSCOPED_INFO("open already: at once");
+        CHECK_FALSE(unit.deferOpen(l, "open path"));
+        UNSCOPED_INFO("nowhere: at once");
+        CHECK_FALSE(unit.deferOpen(l, ""));
+        UNSCOPED_INFO("put off");
+        CHECK(unit.deferOpen(l, "a path"));
         unit.pumpSettle();
-        ensure("not yet", studio.chosen == 0);
+        UNSCOPED_INFO("not yet");
+        CHECK(studio.chosen == 0);
         waitToSettle();
         unit.pumpSettle();
-        ensure("stayed on: opened, as a preview", studio.chosen == 1 && studio.previewing && !unit.openingPreview());
+        {
+            INFO("stayed on: opened, as a preview");
+            CHECK(studio.chosen == 1);
+            CHECK(studio.previewing);
+            CHECK_FALSE(unit.openingPreview());
+        }
         unit.pumpSettle();
-        ensure("once", studio.chosen == 1);
+        UNSCOPED_INFO("once");
+        CHECK(studio.chosen == 1);
         unit.deferOpen(l, "a path");
         l->selectByValue(LLSD("b"));
         waitToSettle();
         unit.pumpSettle();
-        ensure("walked past: not", studio.chosen == 1);
+        UNSCOPED_INFO("walked past: not");
+        CHECK(studio.chosen == 1);
         unit.deferOpen(l, "a path");
         gFocusMgr.setKeyboardFocus(nullptr);
         waitToSettle();
         unit.pumpSettle();
-        ensure("left: not", studio.chosen == 1);
+        UNSCOPED_INFO("left: not");
+        CHECK(studio.chosen == 1);
     }
 
-    template<> template<>
-    void alscriptnavigation_object::test<5>()
+    TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: the preview is let go of unless typed in or worked from or revealed", "[alscriptnavigation]")
     {
-        set_test_name("the preview let go of for the next, held where anything was done in it or it is worked from; to the editor, held");
         ALScriptNavigation& unit = make();
         Doc&                a    = tab("a");
         a.preview                = true;
         unit.closePreview();
-        ensure("let go of", studio.letGo == Names{ "a" });
+        UNSCOPED_INFO("let go of");
+        CHECK(studio.letGo == Names{ "a" });
         Doc& b    = tab("b");
         b.preview = true;
         b.editor->insertText("typed");
         unit.closePreview();
-        ensure("typed in: held", !b.preview && studio.tabs == 1 && studio.letGo.size() == 1);
+        {
+            INFO("typed in: held");
+            CHECK_FALSE(b.preview);
+            CHECK(studio.tabs == 1);
+            CHECK(studio.letGo.size() == 1);
+        }
         Doc& c        = tab("c");
         c.preview     = true;
         studio.worked = "c";
         unit.closePreview();
-        ensure("worked from: held", !c.preview && studio.letGo.size() == 1);
+        {
+            INFO("worked from: held");
+            CHECK_FALSE(c.preview);
+            CHECK(studio.letGo.size() == 1);
+        }
         Doc& d         = tab("d");
         d.preview      = true;
         services.front = 3;
         unit.revealed(nullptr, true);
-        ensure("taken to the editor: held, and given the keyboard", !d.preview && studio.focused == Names{ "d" });
+        {
+            INFO("taken to the editor: held, and given the keyboard");
+            CHECK_FALSE(d.preview);
+            CHECK(studio.focused == Names{ "d" });
+        }
         ALPaneList* l = list();
         gFocusMgr.setKeyboardFocus(nullptr);
         unit.revealed(l, false);
-        ensure("back to the list", l->hasFocus());
+        UNSCOPED_INFO("back to the list");
+        CHECK(l->hasFocus());
     }
 }

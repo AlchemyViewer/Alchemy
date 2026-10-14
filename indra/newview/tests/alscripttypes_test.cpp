@@ -27,9 +27,9 @@
 #include "../alscripttypes.h"
 #include "alpreprocessor.h"
 #include "alsourcemap.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
 struct alscripttypes_data
 {
@@ -44,17 +44,9 @@ struct alscripttypes_data
         return out;
     }
 };
-typedef test_group<alscripttypes_data> alscripttypes_group;
-typedef alscripttypes_group::object    alscripttypes_object;
-alscripttypes_group                    alscripttypes_test("alscripttypes");
 
-template<>
-template<>
-void alscripttypes_object::test<1>()
+TEST_CASE_METHOD(alscripttypes_data, "alscripttypes: inSource maps diagnostics back through the envelope and the source map", "[alscripttypes]")
 {
-    set_test_name("a compile's diagnostics read back to the source: under the envelope's lines and through the map; an include's and "
-                  "the preprocessor's own at no line, the include named; a client's envelope a line down, without columns; as said "
-                  "with no map");
     ALPreprocessor::Options options;
     options.fileName = "main.lsl";
     options.resolve  = [](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
@@ -63,7 +55,7 @@ void alscripttypes_object::test<1>()
         return ALPreprocessor::Found::Yes;
     };
     const ALPreprocessor::Result expanded = ALPreprocessor::run("#include \"lib.lsl\"\ndefault\n{\nstate_entry() { x; }\n}\n", options);
-    ensure("expanded", expanded.problems.empty());
+    REQUIRE(expanded.problems.empty());
     // The lines of the expansion that hold each, and the column of `x`.
     S32 entry = -1, second = -1, column = -1, line = 0;
     for (size_t at = 0, next; at < expanded.text.size(); at = next + 1, ++line)
@@ -81,7 +73,12 @@ void alscripttypes_object::test<1>()
             break;
         }
     }
-    ensure("found in the expansion", entry >= 0 && second >= 0 && column >= 0);
+    {
+        INFO("found in the expansion");
+        CHECK(entry >= 0);
+        CHECK(second >= 0);
+        CHECK(column >= 0);
+    }
 
     ALScriptCompileResult result;
     result.codeLine  = 7;
@@ -95,20 +92,51 @@ void alscripttypes_object::test<1>()
     result.diagnostics.push_back(unplaced);
 
     const std::vector<ALScriptDiagnostic> source = result.inSource();
-    ensure_equals("four", source.size(), size_t(4));
-    ensure("the script's own line and column", source[0].hasLine && source[0].line == 3 && source[0].hasColumn && source[0].column == 16 &&
-                                                   source[0].message == "undefined x");
-    ensure("the include's at none, named with its line", !source[1].hasLine && source[1].message == "lib.lsl:2: b again");
-    ensure("the preprocessor's own at none", !source[2].hasLine && source[2].message == "somewhere made");
-    ensure("none stays none", !source[3].hasLine && source[3].message == "Math Error");
+    REQUIRE(source.size() == size_t(4));
+    {
+        INFO("the script's own line and column");
+        CHECK(source[0].hasLine);
+        CHECK(source[0].line == 3);
+        CHECK(source[0].hasColumn);
+        CHECK(source[0].column == 16);
+        CHECK(source[0].message == "undefined x");
+    }
+    {
+        INFO("the include's at none, named with its line");
+        CHECK_FALSE(source[1].hasLine);
+        CHECK(source[1].message == "lib.lsl:2: b again");
+    }
+    {
+        INFO("the preprocessor's own at none");
+        CHECK_FALSE(source[2].hasLine);
+        CHECK(source[2].message == "somewhere made");
+    }
+    {
+        INFO("none stays none");
+        CHECK_FALSE(source[3].hasLine);
+        CHECK(source[3].message == "Math Error");
+    }
 
     const std::vector<ALScriptDiagnostic> wrapped = result.inSource(1);
-    ensure("a line down in an envelope, no column", wrapped[0].hasLine && wrapped[0].line == 4 && !wrapped[0].hasColumn);
+    {
+        INFO("a line down in an envelope, no column");
+        REQUIRE(wrapped.size() == size_t(4));
+        CHECK(wrapped[0].hasLine);
+        CHECK(wrapped[0].line == 4);
+        CHECK_FALSE(wrapped[0].hasColumn);
+    }
 
     // Nothing expanded: as the compiler said it, the text having gone as it was.
     ALScriptCompileResult plain;
     plain.diagnostics.push_back(alscripttypes_data::said(4, 2, "as is"));
     const std::vector<ALScriptDiagnostic> as_said = plain.inSource(1);
-    ensure("as said", as_said.size() == 1 && as_said[0].hasLine && as_said[0].line == 4 && as_said[0].hasColumn && as_said[0].column == 2);
+    {
+        INFO("as said");
+        REQUIRE(as_said.size() == 1);
+        CHECK(as_said[0].hasLine);
+        CHECK(as_said[0].line == 4);
+        CHECK(as_said[0].hasColumn);
+        CHECK(as_said[0].column == 2);
+    }
 }
-} // namespace tut
+} // anonymous namespace

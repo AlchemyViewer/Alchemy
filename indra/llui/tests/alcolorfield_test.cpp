@@ -308,8 +308,11 @@ namespace
         });
         field->setValue("$Accent");
         LLColor4 shown;
-        UNSCOPED_INFO("the field resolves its own name");
-        CHECK(field->resolved(shown));
+        {
+            INFO("the field resolves its own name");
+            CHECK(field->resolved(shown));
+            CHECK(shown == LLColor4(0.f, 0.5f, 1.f, 1.f));
+        }
         field->handleMouseDown(4, 10, MASK_NONE);
 
         ALColorPicker* picker = gFloaterView->findChild<ALColorPicker>("picker", true);
@@ -323,13 +326,16 @@ namespace
         // The first swatch is the caller's own name.
         grid->handleMouseDown(5 + 14, grid->getRect().getHeight() - 5 - 14, MASK_NONE);
         LLFloater* popover = grid->getParentByType<LLFloater>();
+        UNSCOPED_INFO("the grid is in the popover");
+        REQUIRE(popover != nullptr);
         UNSCOPED_INFO("the caller's name comes first");
         CHECK(popover->getTitle() == std::string("$Accent"));
         field->die();
     }
 
-    // A name means what the table says now: the swatch follows a colour
-    // changed elsewhere without the text having changed.
+    // A name means what the table says now: what the field resolves it to,
+    // which is what its swatch is drawn in, follows a colour changed
+    // elsewhere without the text having changed.
     TEST_CASE_METHOD(alcolorfield_data, "alcolorfield: a name resolves to its colour as the table has it now", "[alcolorfield]")
     {
         if (!ui.ok())

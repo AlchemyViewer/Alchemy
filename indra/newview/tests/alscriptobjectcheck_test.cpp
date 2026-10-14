@@ -34,7 +34,7 @@
 
 #include "alscriptstudio_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <map>
 #include <set>
@@ -144,7 +144,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alscriptobjectcheck_data
     {
@@ -166,54 +166,84 @@ namespace tut
             window.texts = { { id(11), "default {}\n" }, { id(12), "default {}\n" } };
         }
     };
-    typedef test_group<alscriptobjectcheck_data> alscriptobjectcheck_group;
-    typedef alscriptobjectcheck_group::object    alscriptobjectcheck_object;
-    alscriptobjectcheck_group                    alscriptobjectcheck_instance("alscriptobjectcheck");
 
-    template<> template<>
-    void alscriptobjectcheck_object::test<1>()
+    TEST_CASE_METHOD(alscriptobjectcheck_data, "alscriptobjectcheck: a check reads scripts two at a time and reports open and unread ones", "[alscriptobjectcheck]")
     {
-        set_test_name("an object's scripts checked a few at a time, the open ones left to their tabs; one not read and the prims that did not answer said when done");
         house();
         check.check(root, "House");
-        ensure("listed", window.listedFor == std::vector<LLUUID>{ root });
-        ensure("running", check.running());
-        ensure_equals("two at once", window.asks.size(), size_t(2));
-        ensure("the open one not read", window.reads.size() == 2 && window.reads[0].item == id(11) && window.reads[1].item == id(12));
-        ensure("a check of what was read", window.asks[0].request.kind == ALScriptAnalysis::Kind::Check && *window.asks[0].request.text == "default {}\n");
-        ensure("for its problems alone", !window.asks[0].request.semantics && !window.asks[0].request.hintTypes);
-        ensure("not expanded, the preprocessor off", window.expands.empty());
+        CHECK(window.listedFor == std::vector<LLUUID>{ root });
+        CHECK(check.running());
+        UNSCOPED_INFO("two at once");
+        REQUIRE(window.asks.size() == size_t(2));
+        {
+            INFO("the open one not read");
+            REQUIRE(window.reads.size() == 2);
+            CHECK(window.reads[0].item == id(11));
+            CHECK(window.reads[1].item == id(12));
+        }
+        {
+            INFO("a check of what was read");
+            REQUIRE(window.asks[0].request.kind == ALScriptAnalysis::Kind::Check);
+            REQUIRE(window.asks[0].request.text);
+            CHECK(*window.asks[0].request.text == "default {}\n");
+        }
+        {
+            INFO("for its problems alone");
+            CHECK_FALSE(window.asks[0].request.semantics);
+            CHECK_FALSE(window.asks[0].request.hintTypes);
+        }
+        UNSCOPED_INFO("not expanded, the preprocessor off");
+        REQUIRE(window.expands.empty());
 
         window.asks[0].answered(answer({ problem(0, "wrong"), problem(1, "unwanted", ALScriptProblem::Severity::Warning, "off") }));
-        ensure_equals("B checked", window.checked.size(), size_t(1));
+        UNSCOPED_INFO("B checked");
+        REQUIRE(window.checked.size() == size_t(1));
         const Check::Script& b = window.checked[0];
-        ensure("by its name", b.name == "B" && b.ref.item == id(11));
-        ensure_equals("the lints as chosen applied", b.rows.size(), size_t(1));
-        ensure("said as a tab's row", b.rows[0].message == "wrong" && b.rows[0].level == ALScriptStudioDoc::Level::Error && b.rows[0].line == 0);
-        ensure("the next begun, which could not be read", window.reads.size() == 3 && window.reads[2].item == id(13));
-        ensure("not done while C is out", window.done.empty());
+        CHECK(b.name == "B");
+        CHECK(b.ref.item == id(11));
+        UNSCOPED_INFO("the lints as chosen applied");
+        REQUIRE(b.rows.size() == size_t(1));
+        {
+            INFO("said as a tab's row");
+            CHECK(b.rows[0].message == "wrong");
+            CHECK(b.rows[0].level == ALScriptStudioDoc::Level::Error);
+            CHECK(b.rows[0].line == 0);
+        }
+        {
+            INFO("the next begun, which could not be read");
+            REQUIRE(window.reads.size() == 3);
+            CHECK(window.reads[2].item == id(13));
+        }
+        UNSCOPED_INFO("not done while C is out");
+        REQUIRE(window.done.empty());
 
         window.asks[1].answered(answer({}));
-        ensure_equals("done", window.done.size(), size_t(1));
+        REQUIRE(window.done.size() == size_t(1));
         const Check::Done& done = window.done[0];
-        ensure("of the house", done.root == root && done.name == "House" && done.present);
-        ensure_equals("checked", done.checked, 2);
-        ensure_equals("left to its tab", done.open, 1);
-        ensure_equals("prims that did not answer", done.unlisted, 1);
-        ensure("the one not read, by name", done.unread == std::vector<std::string>{ "D" });
-        ensure("no longer running", !check.running());
+        CHECK(done.root == root);
+        CHECK(done.name == "House");
+        CHECK(done.present);
+        CHECK(done.checked == 2);
+        UNSCOPED_INFO("left to its tab");
+        CHECK(done.open == 1);
+        UNSCOPED_INFO("prims that did not answer");
+        CHECK(done.unlisted == 1);
+        CHECK(done.unread == std::vector<std::string>{ "D" });
+        CHECK_FALSE(check.running());
     }
 
-    template<> template<>
-    void alscriptobjectcheck_object::test<2>()
+    TEST_CASE_METHOD(alscriptobjectcheck_data, "alscriptobjectcheck: a preprocessed script's problems map back to it or its include", "[alscriptobjectcheck]")
     {
-        set_test_name("with the preprocessor on, each script expanded first and its problems read back through the expansion to the script or its include");
         window.preprocess = true;
         window.listing.scripts.push_back({ ALScriptRef(root, id(20)), "Main" });
         window.texts = { { id(20), "#include \"lib\"\ndefault {}\n" } };
         check.check(root, "Shed");
-        ensure_equals("expanded", window.expands.size(), size_t(1));
-        ensure("apart, as a tab's check", window.expands[0].request.apart && window.expands[0].request.sourceText() == "#include \"lib\"\ndefault {}\n");
+        REQUIRE(window.expands.size() == size_t(1));
+        {
+            INFO("apart, as a tab's check");
+            CHECK(window.expands[0].request.apart);
+            CHECK(window.expands[0].request.sourceText() == "#include \"lib\"\ndefault {}\n");
+        }
 
         // The include's line, then the script's own.
         ALPreprocessor::Result result;
@@ -239,37 +269,59 @@ namespace tut
         said.message  = "from the preprocessor";
         result.problems.push_back(said);
         window.expands[0].expanded(result);
-        ensure_equals("asked", window.asks.size(), size_t(1));
-        ensure_equals("about the expansion", *window.asks[0].request.text, std::string("integer x;\ndefault {}\n"));
+        REQUIRE(window.asks.size() == size_t(1));
+        REQUIRE(window.asks[0].request.text);
+        UNSCOPED_INFO("about the expansion");
+        CHECK(*window.asks[0].request.text == std::string("integer x;\ndefault {}\n"));
 
         window.asks[0].answered(answer({ problem(0, "in the library"), problem(1, "in the script") }));
-        ensure_equals("checked", window.checked.size(), size_t(1));
+        REQUIRE(window.checked.size() == size_t(1));
         const std::vector<ALScriptStudioDoc::Shown>& rows = window.checked[0].rows;
-        ensure_equals("the preprocessor's and the analyzers'", rows.size(), size_t(3));
-        ensure("the preprocessor's first", rows[0].message == "from the preprocessor" && rows[0].origin == "OriginPreprocessor");
-        ensure("the include's, under its name", rows[1].file == "disk:/lib.lsl" && rows[1].fileName == "lib" && rows[1].line == 0);
-        ensure("the script's own, at its line", rows[2].file.empty() && rows[2].line == 1);
-        ensure_equals("done", window.done.size(), size_t(1));
+        UNSCOPED_INFO("the preprocessor's and the analyzers'");
+        REQUIRE(rows.size() == size_t(3));
+        {
+            INFO("the preprocessor's first");
+            CHECK(rows[0].message == "from the preprocessor");
+            CHECK(rows[0].origin == "OriginPreprocessor");
+        }
+        {
+            INFO("the include's, under its name");
+            CHECK(rows[1].file == "disk:/lib.lsl");
+            CHECK(rows[1].fileName == "lib");
+            CHECK(rows[1].line == 0);
+        }
+        {
+            INFO("the script's own, at its line");
+            REQUIRE(rows[2].file.empty());
+            CHECK(rows[2].line == 1);
+        }
+        REQUIRE(window.done.size() == size_t(1));
     }
 
-    template<> template<>
-    void alscriptobjectcheck_object::test<3>()
+    TEST_CASE_METHOD(alscriptobjectcheck_data, "alscriptobjectcheck: a restarted check drops stale answers and an absent object ends at once", "[alscriptobjectcheck]")
     {
-        set_test_name("a check begun again lets the last one's answers go; an object out of sight is said so at once");
         house();
         check.check(root, "House");
+        REQUIRE_FALSE(window.asks.empty());
         std::function<void(const ALScriptAnalysis::Result&)> stale = std::move(window.asks[0].answered);
         window.asks.clear();
         window.checked.clear();
         check.check(root, "House");
         stale(answer({ problem(0, "old") }));
-        ensure("the earlier answer dropped", window.checked.empty());
-        ensure_equals("the new one's asked", window.asks.size(), size_t(2));
+        UNSCOPED_INFO("the earlier answer dropped");
+        REQUIRE(window.checked.empty());
+        UNSCOPED_INFO("the new one's asked");
+        REQUIRE(window.asks.size() == size_t(2));
 
         FakeWindow  away;
         away.listing.present = false;
         Check       gone(services, away, away);
         gone.check(id(99), "Gone");
-        ensure("said at once, as not in sight", away.done.size() == 1 && !away.done[0].present && away.done[0].checked == 0);
+        {
+            INFO("said at once, as not in sight");
+            REQUIRE(away.done.size() == 1);
+            CHECK_FALSE(away.done[0].present);
+            CHECK(away.done[0].checked == 0);
+        }
     }
 }

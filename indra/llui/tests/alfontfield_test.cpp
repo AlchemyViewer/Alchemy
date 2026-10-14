@@ -116,9 +116,11 @@ namespace
         CHECK(field->style() == std::string("BOLD"));
         UNSCOPED_INFO("a style does not change the value");
         CHECK(field->getValue().asString() == std::string("SansSerif"));
+        const LLFontGL* styled = field->font();
         UNSCOPED_INFO("a style is a different face");
-        CHECK(field->font() != plain);
-        CHECK((field->font()->getFontDesc().getStyle() & LLFontGL::BOLD) != 0);
+        CHECK(styled != plain);
+        REQUIRE(styled != nullptr);
+        CHECK((styled->getFontDesc().getStyle() & LLFontGL::BOLD) != 0);
 
         field->setSize("Large");
         CHECK(field->size() == std::string("Large"));
@@ -206,9 +208,11 @@ namespace
         UNSCOPED_INFO("opened again");
         REQUIRE(popover != nullptr);
         bold = popover->findChild<LLCheckBoxCtrl>("bold", true);
+        REQUIRE(bold != nullptr);
         bold->setValue(true);
         bold->onCommit();
         LLComboBox* sizes = popover->findChild<LLComboBox>("size", true);
+        REQUIRE(sizes != nullptr);
         sizes->setValue("Large");
         sizes->onCommit();
         CHECK(popover->handleKeyHere(KEY_RETURN, MASK_NONE));
@@ -250,6 +254,7 @@ namespace
             CHECK(gFocusMgr.getKeyboardFocus() != elsewhere);
         }
         LLCheckBoxCtrl* bold = popover->findChild<LLCheckBoxCtrl>("bold", true);
+        REQUIRE(bold != nullptr);
         bold->setValue(true);
         bold->onCommit();
         field->die();

@@ -1147,8 +1147,11 @@ namespace
         UNSCOPED_INFO("and down");
         CHECK(area->getDocPosVertical() == 40);
 
+        // panGesture() is whether a left press pans, which the space bar
+        // held makes it too: asked before the surface says it drags and
+        // after, it shows the saying is what changed it.
         UNSCOPED_INFO("a plain surface does not drag by the left button");
-        CHECK_FALSE(canvas->dragPans());
+        CHECK_FALSE(canvas->panGesture());
         canvas->setDragPans(true);
         UNSCOPED_INFO("until it says so");
         CHECK(canvas->panGesture());
