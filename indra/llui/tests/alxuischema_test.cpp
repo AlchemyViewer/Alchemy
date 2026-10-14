@@ -324,7 +324,9 @@ namespace
         UNSCOPED_INFO("a real is a type of its own");
         CHECK(found);
 
-        const ALXUISchema::Attribute* alpha = find(*schema().tag("panel"), "bg_alpha_color.alpha");
+        const ALXUISchema::Tag* panel = schema().tag("panel");
+        REQUIRE(panel != nullptr);
+        const ALXUISchema::Attribute* alpha = find(*panel, "bg_alpha_color.alpha");
         REQUIRE(alpha != nullptr);
         UNSCOPED_INFO("a colour component is a real");
         CHECK((int)alpha->value == (int)ALParamType::REAL);
@@ -374,8 +376,10 @@ namespace
         CHECK(find(*text, "font") != nullptr);
         UNSCOPED_INFO("and its parts");
         CHECK(find(*text, "font.name") != nullptr);
+        const ALXUISchema::Tag* button = schema().tag("button");
+        REQUIRE(button != nullptr);
         UNSCOPED_INFO("and an image");
-        CHECK(find(*schema().tag("button"), "image_unselected") != nullptr);
+        CHECK(find(*button, "image_unselected") != nullptr);
     }
 
     // A registry knows that a button takes a label and cannot know what a
@@ -577,15 +581,16 @@ namespace
         UNSCOPED_INFO("and nothing said about it");
         CHECK_FALSE(name->deprecated);
 
-        // One sentence per tag, for the Library and for the XSD.
+        // One sentence per tag, for the Library and for the XSD, and it is
+        // the notes' own. A tag nobody has written one for falls back to what
+        // it did before there were sentences: nothing waits on prose. Every
+        // tag this binary registers has one, so the case above asks that of a
+        // name nobody wrote about.
         const ALXUISchema::Tag* button = schema().tag("button");
         REQUIRE(button != nullptr);
         CHECK_FALSE(button->note.empty());
-
-        // A tag nobody has written one for falls back to what it did before
-        // there were sentences: nothing waits on prose.
-        UNSCOPED_INFO("and the notes do not have to be complete");
-        CHECK(ALXUINotes::get().count() > 0);
+        UNSCOPED_INFO("the sentence is the one the notes hold");
+        CHECK(button->note == ALXUINotes::get().note("button"));
     }
 
     // The kind a tag is looked for under, and whether a specimen of it can

@@ -93,9 +93,15 @@ namespace
             return floater;
         }
 
-        // The nth child of a name in creation order.
+        // The nth child of a name in creation order. Under a parent that was
+        // not found there is nothing, so a chain of lookups fails at the
+        // checks of what it found rather than reading through a null.
         static LLView* childNamed(LLView* parent, const char* name, S32 ordinal = 0)
         {
+            if (!parent)
+            {
+                return nullptr;
+            }
             const LLView::child_list_t& children = *parent->getChildList();
             S32 seen = 0;
             for (auto it = children.rbegin(); it != children.rend(); ++it)
@@ -173,16 +179,31 @@ namespace
             REQUIRE(same);
         }
 
-        CHECK(map.find(floater)->line == 1);
-        CHECK(map.find(floater)->tag == std::string("floater"));
-        CHECK(map.find(outer)->line == 3);
-        CHECK(map.find(inner1)->line == 4);
+        const ALXUISourceMap::Origin* from_floater = map.find(floater);
+        const ALXUISourceMap::Origin* from_outer = map.find(outer);
+        const ALXUISourceMap::Origin* from_inner1 = map.find(inner1);
+        const ALXUISourceMap::Origin* from_inner2 = map.find(inner2);
+        const ALXUISourceMap::Origin* from_leaf = map.find(leaf);
+        const ALXUISourceMap::Origin* from_other = map.find(other);
+        {
+            INFO("each of them came from the file");
+            REQUIRE(from_floater);
+            REQUIRE(from_outer);
+            REQUIRE(from_inner1);
+            REQUIRE(from_inner2);
+            REQUIRE(from_leaf);
+            REQUIRE(from_other);
+        }
+        CHECK(from_floater->line == 1);
+        CHECK(from_floater->tag == std::string("floater"));
+        CHECK(from_outer->line == 3);
+        CHECK(from_inner1->line == 4);
         UNSCOPED_INFO("the second inner, not the first again");
-        CHECK(map.find(inner2)->line == 5);
+        CHECK(from_inner2->line == 5);
         UNSCOPED_INFO("the leaf under the second inner");
-        CHECK(map.find(leaf)->line == 7);
+        CHECK(from_leaf->line == 7);
         UNSCOPED_INFO("other, after a parameter element and a subtree");
-        CHECK(map.find(other)->line == 10);
+        CHECK(from_other->line == 10);
 
         REQUIRE(dragHandle(floater) != nullptr);
         UNSCOPED_INFO("which came from no element");

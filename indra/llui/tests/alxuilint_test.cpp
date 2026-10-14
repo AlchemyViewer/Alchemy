@@ -332,6 +332,8 @@ namespace
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"20\">\n"
                 "    <panel.commit_callback function=\"NoSuch.Function\"/>\n"
                 "  </panel>", /*decisive=*/false));
+            UNSCOPED_INFO("callback not registered: " + run.describe());
+            REQUIRE(run.count(ALXUILint::Rule::CallbackNotRegistered) == 1);
             UNSCOPED_INFO("advisory in a shell build");
             CHECK((int)run.first(ALXUILint::Rule::CallbackNotRegistered)->severity ==
                           (int)ALXUILint::Severity::Note);

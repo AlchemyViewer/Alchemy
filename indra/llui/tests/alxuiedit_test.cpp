@@ -684,7 +684,6 @@ namespace
             CHECK(edit.text().find("top=\"40\"") != std::string::npos);
         }
 
-        // A move is a removal and an insertion; one undo is the whole move.
         {
             INFO("undo the redos");
             CHECK(edit.undo());
