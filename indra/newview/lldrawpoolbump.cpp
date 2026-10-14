@@ -563,8 +563,11 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
             continue;
         }
 
-        // Two sweeps: the faces that cannot be discarded under the program without the test, so their depth is
-        // written ahead of shading, then the rest under the one with it. A sweep with no faces binds nothing.
+        // The faces that cannot be discarded first, under the program without the test, so their depth is written
+        // ahead of shading; the rest are set aside as the list is walked, once, and drawn after under the one with it.
+        // A program with no faces to draw is never bound.
+        static std::vector<LLDrawInfo*> masked;
+        masked.clear();
         for (bool alpha_mask : { false, true })
         {
             LLGLSLShader* shader = nullptr;
@@ -581,17 +584,8 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
             LLViewerTexture* lastBumpTex = nullptr;
             F32 lastAlpha = -1.f;
 
-            for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+            const auto draw = [&](LLDrawInfo& params)
             {
-                LLDrawInfo& params = **i;
-
-                LLCullResult::increment_iterator(i, end);
-
-                if (bump_can_discard(params) != alpha_mask)
-                {
-                    continue;
-                }
-
                 if (!shader)
                 {
                     LLGLSLShader& program = alpha_mask ? gDeferredBumpAlphaMaskProgram : gDeferredBumpProgram;
@@ -626,6 +620,30 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
                 else
                 {
                     pushBumpBatch(params, true, false);
+                }
+            };
+
+            if (!alpha_mask)
+            {
+                for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+                {
+                    LLDrawInfo& params = **i;
+
+                    LLCullResult::increment_iterator(i, end);
+
+                    if (bump_can_discard(params))
+                    {
+                        masked.push_back(&params);
+                        continue;
+                    }
+                    draw(params);
+                }
+            }
+            else
+            {
+                for (LLDrawInfo* params : masked)
+                {
+                    draw(*params);
                 }
             }
 
