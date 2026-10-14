@@ -145,6 +145,16 @@ al_expect_from_test_support(
   EXIT 0
   REJECT "State guard"
 )
+# The directory Windows keeps for each drive, in a hidden variable a change of
+# directory there makes, is no variable a test set.
+if(WINDOWS)
+  al_expect_from_test_support(
+    guard_ignores_drive_directories
+    ARGS "[.drive-visit]"
+    EXIT 0
+    REJECT "State guard"
+  )
+endif()
 al_expect_from_test_support(
   replay_on_crash
   ARGS "[.crash-replay]"
