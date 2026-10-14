@@ -1022,8 +1022,10 @@ public:
     // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.
     LLRenderTarget              mSkyBehind;
     U32                         mSkyBehindFrame = 0;
-    // Whether any water was in front of the sky's depth when the sky pool drew: the sky behind is drawn only then.
+    // Whether any water was in front of the sky's depth when the sky pool drew: the sky behind is drawn only then, and
+    // the haze shades the water's pixels only then. Asked in mSkyBehindQueryFrame.
     ALSamplesQuery              mSkyBehindQuery;
+    U32                         mSkyBehindQueryFrame = 0;
 
     // The water's layout around the main camera and its map of cell heights, laid out at the start of each main frame.
     ALWaterSurface              mWaterSurface;

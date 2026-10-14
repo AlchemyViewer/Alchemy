@@ -167,6 +167,7 @@ static bool query_water_in_view()
         gPipeline.mSkyBehindQuery.end();
     }
     field.unbind();
+    gPipeline.mSkyBehindQueryFrame = gFrameCount;
     return true;
 }
 

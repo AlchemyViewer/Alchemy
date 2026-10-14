@@ -29,7 +29,8 @@
 /// A GL_ANY_SAMPLES_PASSED query over the draws between begin() and end(), and the draws a Conditional scope then
 /// holds, which the GPU runs only if any of those samples passed. The CPU reads nothing back and waits for nothing: the
 /// GPU waits for the query where the scope begins. Clears are draws for this purpose; binding targets and setting state
-/// are not.
+/// are not. From GL 4.3 the query is conservative: the GPU may answer from its coarse depth, erring only toward a
+/// sample passed, which runs the scope's draws for nothing and never skips one that was wanted.
 class ALSamplesQuery
 {
 public:
@@ -61,5 +62,6 @@ public:
 
 private:
     U32  mQuery = 0;
+    U32  mTarget = 0;
     bool mActive = false;
 };

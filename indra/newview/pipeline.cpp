@@ -1317,6 +1317,7 @@ void LLPipeline::releaseGLBuffers()
     mWaterSurface.release();
     mDepthPyramid.release();
     mSkyBehindQuery.release();
+    mSkyBehindQueryFrame = 0;
 
     if (mNoiseMap)
     {
@@ -11646,7 +11647,8 @@ void LLPipeline::doAtmospherics()
 
         // Far water converges on the sky drawn behind it when this view's is there: the main view's alone, once the
         // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit). The water
-        // marked its own pixels in the stencil, so the two draws shade each pixel once.
+        // marked its own pixels in the stencil, so the two draws shade each pixel once. The water's draw runs only if
+        // the sky pool's query saw water: its field covers every pixel the water marked, and inland none is.
         const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind.isComplete() && mSkyBehindFrame == gFrameCount;
         if (sky_behind)
         {
@@ -11656,6 +11658,11 @@ void LLPipeline::doAtmospherics()
             }
             {
                 ALWaterStencil::OnWater stencil;
+                std::optional<ALSamplesQuery::Conditional> if_water;
+                if (mSkyBehindQueryFrame == gFrameCount)
+                {
+                    if_water.emplace(mSkyBehindQuery);
+                }
                 apply_haze(*gHazeOnWaterProgram.selectVariant(), true);
             }
         }
