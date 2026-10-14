@@ -1131,6 +1131,7 @@ if(AL_BUILD_VIEWER)
     alterrainsurfacemaps.h
     alwaterfield.h
     alwaterheightbake.h
+    alwaterstencil.h
     alwatersurface.h
     altexturetable.h
     alfloaterscriptstudio.h

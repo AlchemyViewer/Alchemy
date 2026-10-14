@@ -255,7 +255,6 @@ public:
         WATER_FOGDENSITY,                   //  "waterFogDensity"
         WATER_FOGKS,                        //  "waterFogKS"
         WATER_REFSCALE,                     //  "refScale"
-        WATER_WATERHEIGHT,                  //  "waterHeight"
         WATER_WATERPLANE,                   //  "waterPlane"
         WATER_WATERSIGN,                    //  "waterSign"
         WATER_NORM_SCALE,                   //  "normScale"
