@@ -921,7 +921,8 @@ namespace
         // that is no UUID. The event parameters SLua passes as text --
         // link_message's id -- and the key variables given text that is no
         // UUID, or such a parameter, or another such, which SLua holds as
-        // strings.
+        // strings; and a key that may hold any text -- given a string --
+        // given on to one of those.
         void findTextKeys();
         // An expression's type as SLua has it: LSL's, but a key for the
         // constants SLua types a uuid, and a string for those above.
@@ -7529,6 +7530,33 @@ namespace
             }
             return false;
         };
+        // A key variable, as given whole.
+        const auto keyVar = [](LSLExpression* e) -> LSLSymbol* {
+            e = unbracketed(e);
+            if (!e || e->getIType() != LST_KEY || e->getNodeSubType() != NODE_LVALUE_EXPRESSION ||
+                !isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
+            {
+                return nullptr;
+            }
+            LSLSymbol* var = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
+            return var && var->getSubType() != SYM_BUILTIN ? var : nullptr;
+        };
+        // The keys that may hold any text: given a string that is no UUID
+        // written out -- a variable's, a call's -- or given such a key.
+        // Given on to a key held as text, uuid() would have made "" NULL_KEY
+        // on the way, so such a key holds text too.
+        boost::unordered_flat_set<LSLSymbol*> loose;
+        const auto loosely = [&](LSLExpression* e) {
+            e = unbracketed(e);
+            if (e && e->getIType() == LST_STRING)
+            {
+                return !uuidConstant(e) && !(e->getNodeSubType() == NODE_CONSTANT_EXPRESSION &&
+                                             e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT &&
+                                             ALLSLTraits::isUuid(static_cast<LSLStringConstant*>(e->getChild(0))->getValue()));
+            }
+            LSLSymbol* var = keyVar(e);
+            return var && loose.contains(var);
+        };
         for (bool changed = true; changed;)
         {
             changed = false;
@@ -7537,6 +7565,16 @@ namespace
                 if (!mTextKeys.contains(var) && text(e))
                 {
                     mTextKeys.insert(var);
+                    changed = true;
+                }
+                if (!loose.contains(var) && loosely(e))
+                {
+                    loose.insert(var);
+                    changed = true;
+                }
+                if (LSLSymbol* from = keyVar(e); from && mTextKeys.contains(var) && loose.contains(from) && !mTextKeys.contains(from))
+                {
+                    mTextKeys.insert(from);
                     changed = true;
                 }
             }
