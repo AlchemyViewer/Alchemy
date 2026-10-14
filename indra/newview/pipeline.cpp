@@ -11336,6 +11336,8 @@ void LLPipeline::renderDeferredLighting()
 
             LLVertexBuffer::unbind();
 
+            // Each pass binds a deferred program, the G-buffer and the probes: none where it has no light to draw.
+            if (!mNearbyLights.empty())
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - local lights");
                 LL_PROFILE_GPU_ZONE("local lights");
@@ -11522,6 +11524,7 @@ void LLPipeline::renderDeferredLighting()
                 unbindDeferredShader(spot_shader);
             }
 
+            if (!fullscreen_lights.empty() || !fullscreen_spot_lights.empty())
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - fullscreen lights");
                 // On the far plane (multiPointLightV.glsl): only where the world drew something, so no light is
@@ -11578,11 +11581,12 @@ void LLPipeline::renderDeferredLighting()
                 }
 
                 LLGLSLShader& multi_spot_shader = *gDeferredMultiSpotLightProgram.selectVariant();
-                bindDeferredShader(multi_spot_shader);
-
-                multi_spot_shader.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
-
-                mScreenTriangleVB->setBuffer();
+                if (!fullscreen_spot_lights.empty())
+                {
+                    bindDeferredShader(multi_spot_shader);
+                    multi_spot_shader.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+                    mScreenTriangleVB->setBuffer();
+                }
 
                 for (const SpotLight& spot : fullscreen_spot_lights)
                 {
@@ -11612,8 +11616,11 @@ void LLPipeline::renderDeferredLighting()
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 }
 
-                multi_spot_shader.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
-                unbindDeferredShader(multi_spot_shader);
+                if (!fullscreen_spot_lights.empty())
+                {
+                    multi_spot_shader.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+                    unbindDeferredShader(multi_spot_shader);
+                }
             }
 
             // Clear does not free internal vector storage, so this is more efficient than creating new vectors each frame
