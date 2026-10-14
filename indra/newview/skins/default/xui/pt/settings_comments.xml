@@ -37,8 +37,6 @@
   <string>Permite que seu próprio tempo de renderização transforme seu avatar em impostor.</string>
   <key>AllowTapTapHoldRun</key>
   <string>Tocar duas vezes em uma tecla de direção e mantê-la pressionada faz o avatar correr.</string>
-  <key>AnalyzePerformance</key>
-  <string>Solicitar análise de desempenho para uma execução específica do viewer.</string>
   <key>AnimateTextures</key>
   <string>Ativar animação de texturas (depuração).</string>
   <key>AnimatedObjectsAllowLeftClick</key>
@@ -1041,12 +1039,8 @@
   <string>Registrar no chat do sistema sempre que uma oferta de inventário for recusada.</string>
   <key>LogMessages</key>
   <string>Registrar tráfego de rede.</string>
-  <key>LogMetrics</key>
-  <string>Registrar métricas do viewer.</string>
   <key>LogNearbyChat</key>
   <string>Registrar mensagens do Chat Próximo em arquivo. Usado no lugar de LogChat, com valor padrão "1".</string>
-  <key>LogPerformance</key>
-  <string>Registrar análise de desempenho para uma execução específica do viewer.</string>
   <key>LogShowHistory</key>
   <string>Exibir histórico no log.</string>
   <key>LogTextureDownloadsToSimulator</key>
