@@ -77,7 +77,7 @@ namespace
     // back on Cancel.
     const char* const SETTINGS[] = {
         "ALScriptStudioTheme",       "ALScriptStudioFontFamily",   "ALScriptStudioFontSize",
-        "ALScriptStudioFontStyle",   "ALScriptStudioKeymap",       "ALScriptStudioRestoreTabs",
+        "ALScriptStudioFontStyle",   "ALScriptStudioKeymap",       "ALScriptStudioRestoreTabs",   "ALScriptStudioPanesWiden",
         "ALScriptStudioPreflight",   "ALScriptPreprocEnabled",     "ALScriptPreprocSwitch",
         "ALScriptPreprocLazyLists",  "ALScriptPreprocCompress",    "ALScriptPreprocOptimizer",
         "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings",

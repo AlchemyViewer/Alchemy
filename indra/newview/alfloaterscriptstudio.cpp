@@ -721,6 +721,7 @@ void ALFloaterScriptStudio::findPanes()
     mFolds.bind(this, { { "explorer", "explorer_panel", "fold_explorer", getString("PaneExplorer") },
                         { "bottom", "bottom_panel", "fold_bottom", getString("PaneBottom") },
                         { "inspector", "inspector_panel", "fold_inspector", getString("PaneInspector") } });
+    mPaneRoom.bind(this, { "explorer_panel", "inspector_panel" });
     mFolds.onChanged([this]() {
         // Unfolded, by anyone: waiting for something to show is over.
         if (mBottomWaiting && !mFolds.collapsed("bottom"))
@@ -1627,6 +1628,8 @@ void ALFloaterScriptStudio::draw()
         layStrip();
     }
     mExplorerPane->pump();
+    static LLCachedControl<bool> widen(gSavedSettings, "ALScriptStudioPanesWiden", false);
+    mPaneRoom.follow(widen);
     mVim.pump();
     if (mVimMode)
     {

@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alcodeeditor.h"
+#include "alpaneroom.h"
 #include "alscriptexplorerpane.h"
 #include "alscriptlinkpane.h"
 #include "alnotecardembedded.h"
@@ -1062,6 +1063,9 @@ private:
     // panel waits folded for something to show (firstOpen).
     boost::signals2::scoped_connection mQuickModeConnection;
     bool mBottomWaiting = false;
+    // The window widened as the Explorer or the Inspector opens, and
+    // narrowed as it folds, where ALScriptStudioPanesWiden asks.
+    ALPaneRoom mPaneRoom;
     std::vector<std::unique_ptr<Doc>>  mDocs;
     size_t                             mActive = NONE;
     // What the strip and the toolbar last stood for: a keystroke asks
