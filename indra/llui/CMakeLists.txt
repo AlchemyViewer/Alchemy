@@ -569,11 +569,26 @@ if(AL_BUILD_TESTS)
   target_link_libraries(llui_test_fakes PRIVATE al::flags llcommon)
   set_target_properties(llui_test_fakes PROPERTIES FOLDER "Tests/llui")
 
-  # llui's tests with no GL: templates tested whole in their headers; text,
-  # strings, XUI and parsing; a file of llui's each, from the key map to the
-  # URL entries; what comparing two texts is made of, and the merges and
-  # grammars over it; and every widget above LLView, built over one headless
-  # UI on the source tree's skins and fonts.
+  # What llui's test binaries set up for the process, put back after every
+  # case, and give the state guard to check: once for the binary with no GL,
+  # once for the one that draws.
+  add_library(llui_test_checks OBJECT tests/llui_test_checks.cpp)
+  add_library(llui_gl_test_checks OBJECT tests/llui_test_checks.cpp)
+  target_compile_definitions(llui_gl_test_checks PRIVATE LLUI_TEST_GL=1)
+  foreach(checks llui_test_checks llui_gl_test_checks)
+    target_link_libraries(${checks} PRIVATE al::flags al_test_support llui)
+    target_compile_definitions(
+      ${checks}
+      PRIVATE "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+    )
+    set_target_properties(${checks} PROPERTIES FOLDER "Tests/llui")
+  endforeach()
+
+  # llui's tests with no GL but the colour table's: templates tested whole
+  # in their headers; text, strings, XUI and parsing; a file of llui's
+  # each, from the key map to the URL entries; what comparing two texts is
+  # made of, and the merges and grammars over it; and every widget above
+  # LLView, built over one headless UI on the source tree's skins and fonts.
   al_add_test_binary(
     llui_tests
     PROJECT llui
@@ -685,14 +700,24 @@ if(AL_BUILD_TESTS)
       tests/llstatbar_test.cpp
       tests/lltabcontainer_test.cpp
       tests/lltextparser_test.cpp
-      tests/lluicolortable_test.cpp
       tests/lluistring_test.cpp
       tests/llurlentry_test.cpp
       tests/llurlmatch_test.cpp
       tests/llurlregistry_test.cpp
       tests/llview_test.cpp
       tests/llxuiparser_test.cpp
-    SUPPORT llui_test_fakes
+    SUPPORT llui_test_fakes llui_test_checks llrender_test_checks llcommon_test_checks
+    LIBRARIES llui ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # The colour table's own tests, alone: each loads documents of its own,
+  # and a name, once in the table, stays there for every case after it.
+  al_add_test_binary(
+    lluicolortable_test
+    PROJECT llui
+    SOURCES tests/lluicolortable_test.cpp
+    SUPPORT llui_test_fakes llrender_test_checks llcommon_test_checks
     LIBRARIES llui ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
@@ -704,7 +729,7 @@ if(AL_BUILD_TESTS)
     llui_gl_tests
     PROJECT llui
     SOURCES tests/aldiffview_gl_test.cpp tests/alsurface_gl_test.cpp tests/altextview_gl_test.cpp
-    SUPPORT llui_test_fakes
+    SUPPORT llui_test_fakes llui_gl_test_checks llrender_test_checks llcommon_test_checks
     LIBRARIES llui ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
     GL

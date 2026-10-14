@@ -68,11 +68,7 @@ namespace
         // would have.
         alxuilint_data()
         {
-            static bool loaded = false;
-            if (ui.ok() && !loaded)
-            {
-                loaded = LLUIColorTable::instance().loadFromSettings();
-            }
+            ll_test::loadSkinColours(ui);
         }
 
         struct Run
