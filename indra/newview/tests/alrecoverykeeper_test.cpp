@@ -30,6 +30,7 @@
 
 #include "fsyspath.h"
 #include "llfile.h"
+#include "newview_test_fakes.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -53,6 +54,7 @@ namespace
         {
             folder = fsyspath(std::filesystem::temp_directory_path() / fsyspath("alrecoverykeeper_" + LLUUID::generateNewID().asString())).string();
             std::filesystem::create_directories(fsyspath(folder));
+            newview_test::useRecoveryWriter();
             store = std::make_unique<ALRecoveryStore>(folder, "this-session");
             ALRecovery::useStore(store.get());
         }

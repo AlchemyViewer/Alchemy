@@ -25,6 +25,12 @@
 #ifndef AL_NEWVIEW_TEST_FAKES_H
 #define AL_NEWVIEW_TEST_FAKES_H
 
+#if AL_TEST_CATCH2
+#include "alrecoverystore.h"
+#include "alteststateguard.h"
+#include "altestteardown.h"
+#endif
+
 namespace LL
 {
     class WorkQueue;
@@ -39,6 +45,26 @@ namespace newview_test
     // for a test gone finds nobody. Not under the main loop's name, so that
     // its being made chooses nothing for the tests after.
     LL::WorkQueue& mainLoop();
+
+#if AL_TEST_CATCH2
+    // The thread Script Studio's recovery stores write on, ALRecoveryWriter's,
+    // the process's, which the viewer stops in its cleanup: made by the first
+    // fixture that makes a store, before it does, as the store would have
+    // made it when each file had a process of its own, and stopped by the
+    // harness's teardown, so that it then runs is no change a case made.
+    inline void useRecoveryWriter()
+    {
+        static const bool made = []
+        {
+            ALRecoveryWriter::getInstance();
+            ll_test::Teardown::add([] { ALRecoveryWriter::deleteSingleton(); });
+            ll_test::StateGuard::accept("the live thread pools");
+            ll_test::StateGuard::accept("the live work queues");
+            return true;
+        }();
+        (void)made;
+    }
+#endif
 }
 
 #endif // AL_NEWVIEW_TEST_FAKES_H
