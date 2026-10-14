@@ -18,6 +18,7 @@ target_sources(
   llcommon
   PRIVATE
     alfilewrite.cpp
+    almainloop.cpp
     alserialworker.cpp
     alparamtype.cpp
     alrecoverystore.cpp
@@ -122,6 +123,7 @@ target_sources(
       FILES
         alfilewrite.h
         allinebreaks.h
+        almainloop.h
         alserialworker.h
         alparamtype.h
         alrandmap.h

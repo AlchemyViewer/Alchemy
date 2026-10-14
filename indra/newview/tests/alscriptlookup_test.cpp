@@ -30,6 +30,7 @@
 
 #include "../alscriptlookup.h"
 #include "alincludeidentity.h"
+#include "almainloop.h"
 #include "llfile.h"
 #include "workqueue.h"
 
@@ -1075,9 +1076,11 @@ namespace tut
         const std::string B_LUA = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
         llofstream((root / "b.luau").string(), std::ios::binary) << B_LUA;
         studio.disk = { root.string() };
-        // The main loop's queue, as the viewer's is: kept, since a walk
-        // let go of may hand back to it after the test.
-        LL::WorkQueue& main_loop = newview_test::mainLoop();
+        // A main loop's queue, as the viewer's is, chosen for this test
+        // alone: the queue kept, since a walk let go of may hand back to it
+        // after the test.
+        LL::WorkQueue&           main_loop = newview_test::mainLoop();
+        const ALMainLoop::Choice chosen(&main_loop);
         const auto pumped = [&main_loop](const std::function<bool()>& until, std::chrono::milliseconds within) {
             const auto deadline = std::chrono::steady_clock::now() + within;
             while (std::chrono::steady_clock::now() < deadline)

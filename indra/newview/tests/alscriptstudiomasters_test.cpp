@@ -28,6 +28,7 @@
 #include "../alnotecardembedded.h"
 
 #include "alfilewrite.h"
+#include "almainloop.h"
 #include "alscriptstudio_fixture.h"
 #include "alwatchedfile.h"
 #include "fsyspath.h"
@@ -226,6 +227,9 @@ namespace tut
         NoWorld                                world;
         std::string                            folder;
         std::vector<boost::signals2::connection> wired;
+        // A look at the tabs waits for the main loop, so every case here
+        // has one: this file's choice, not whatever a test before it made.
+        const ALMainLoop::Choice               main_loop{ &mainLoop() };
 
         ~alscriptstudiomasters_data()
         {
@@ -242,7 +246,7 @@ namespace tut
             }
         }
 
-        // The main loop's queue, as the viewer's is, which a look at the
+        // The queue standing in for the main loop's, which a look at the
         // tabs waits for: the process's, kept for the rest of the run.
         static LL::WorkQueue& mainLoop() { return newview_test::mainLoop(); }
         // Whatever was waiting for the main loop, done.
@@ -254,7 +258,6 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            mainLoop();
             const fsyspath made = std::filesystem::temp_directory_path() / fsyspath("alscriptstudiomasters_" + LLUUID::generateNewID().asString());
             std::filesystem::create_directories(made);
             folder = made.string();

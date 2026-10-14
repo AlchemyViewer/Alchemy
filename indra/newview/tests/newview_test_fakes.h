@@ -32,10 +32,12 @@ namespace LL
 
 namespace newview_test
 {
-    // The main loop's queue, as the viewer's is: made the first time a test
-    // asks for it, never while the process starts, and kept for the rest of
-    // the run, since what was posted to it for a test gone finds nobody. A
-    // queue's name is its key in a process, so every test shares this one.
+    // A queue for a test to stand in for the main loop's, chosen through
+    // ALMainLoop::Choice for as long as the test wants work handed back to
+    // it: made the first time a test asks for it, never while the process
+    // starts, and kept for the rest of the run, since what was posted to it
+    // for a test gone finds nobody. Not under the main loop's name, so that
+    // its being made chooses nothing for the tests after.
     LL::WorkQueue& mainLoop();
 }
 

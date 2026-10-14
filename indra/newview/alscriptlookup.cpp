@@ -28,6 +28,7 @@
 
 #include "aldiskincludes.h"
 #include "alincludeidentity.h"
+#include "almainloop.h"
 #include "alscriptlexicon.h"
 #include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
@@ -352,7 +353,7 @@ void ALScriptLookup::walkDisk(const std::string& id, U32 generation, std::vector
     // Off the main thread: a walk may look at thousands of entries and
     // read hundreds of files, on a drive that may be slow. Where there is
     // no main loop to hand what it read back to -- a test -- walked here.
-    const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
+    const LL::WorkQueue::ptr_t main_loop = ALMainLoop::queue();
     if (!main_loop)
     {
         walked(id, generation, readDisk(folders, lua, name, listed, {}), nullptr);
