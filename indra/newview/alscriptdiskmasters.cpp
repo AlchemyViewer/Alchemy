@@ -143,6 +143,17 @@ void ALScriptDiskMasters::rewatch()
     static LLCachedControl<bool> enabled(gSavedSettings, "ALScriptMastersEnabled", true);
     static LLCachedControl<F32>  quiet(gSavedSettings, "ALScriptMastersQuiet", 1.f);
     ALMasterIndex*               links_now = mIndex.get();
+    mHolding.clear();
+    if (links_now)
+    {
+        for (const ALMasterLink& one : links_now->all())
+        {
+            if (one.object.notNull())
+            {
+                mHolding.insert(one.object);
+            }
+        }
+    }
     if (!enabled || !links_now || links_now->empty())
     {
         // Nothing to watch: no thread asked to look at anything.
@@ -513,6 +524,12 @@ std::string ALScriptDiskMasters::fileLabel(const std::string& master, const ALDi
         }
     }
     return std::string();
+}
+
+// static
+bool ALScriptDiskMasters::holdsLinked(const LLUUID& prim)
+{
+    return instanceExists() && getInstance()->mHolding.contains(prim);
 }
 
 // static

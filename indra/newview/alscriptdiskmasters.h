@@ -35,6 +35,7 @@
 
 #include <boost/signals2.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <memory>
 #include <optional>
@@ -202,6 +203,10 @@ public:
     // The item a link names, as the world has it now; null where it is out
     // of reach or gone.
     static LLInventoryItem* itemOf(const ALScriptRef& ref);
+    // Whether a prim holds a linked script: kept in the world while it is
+    // out of sight, as a selected one is, so that a save of its file finds
+    // it (LLViewerRegion::killObject). False before the links are read.
+    static bool holdsLinked(const LLUUID& prim);
 
 private:
     // The index of the account in hand: read the first time it is asked
@@ -209,7 +214,8 @@ private:
     ALMasterIndex* links();
     // The index changed: what is watched, and whoever listens told.
     void           changed();
-    // What is watched, as the links stand now.
+    // What is watched, and the prims held (holdsLinked), as the links
+    // stand now.
     void           rewatch();
     // A save of a linked script heard from elsewhere.
     void heardSaved(const ALScriptSaved& saved);
@@ -239,4 +245,5 @@ private:
     std::unique_ptr<ALScriptMasterAdopt>                                      mAdopt;
     std::unique_ptr<ALScriptMasterToasts>                                     mToasts;
     std::vector<Outcome>                                                      mUnheard;
+    boost::unordered_flat_set<LLUUID>                                         mHolding;
 };
