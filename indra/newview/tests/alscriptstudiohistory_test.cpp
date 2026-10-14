@@ -34,7 +34,7 @@
 #include "alscriptstudio_fixture.h"
 #include "fsyspath.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 
@@ -93,7 +93,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudiohistory_data
     {
@@ -140,106 +140,128 @@ namespace tut
         }
 
         // A save of a tab's item, so long ago.
-        void saved(const Doc& doc, const std::string& text, F64 ago, const LLUUID& asset = LLUUID::generateNewID())
+        void require_saved(const Doc& doc, const std::string& text, F64 ago, const LLUUID& asset = LLUUID::generateNewID())
         {
             ALSavedText one;
             one.key   = ALScriptStudioHistory::keyOf(doc);
             one.text  = text;
             one.when  = LLDate(LLDate::now().secondsSinceEpoch() - ago);
             one.asset = asset;
-            ensure("kept", history->keep(one));
+            INFO("kept in the history");
+            REQUIRE(history->keep(one));
         }
     };
 
-    typedef test_group<alscriptstudiohistory_data> alscriptstudiohistory_group;
-    typedef alscriptstudiohistory_group::object    alscriptstudiohistory_object;
-    tut::alscriptstudiohistory_group               alscriptstudiohistory_test("alscriptstudiohistory");
-
-    template<> template<>
-    void alscriptstudiohistory_object::test<1>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: keyOf keys saves by item and object and gives a file no key", "[alscriptstudiohistory]")
     {
-        set_test_name("an item's saves are kept by the item, in its object or not; a file's are not kept here");
         Doc doc;
         doc.ref = ALScriptRef(LLUUID::null, LLUUID::generateNewID());
-        ensure_equals("an inventory item's", ALScriptStudioHistory::keyOf(doc), ALRecoveryStore::keyOf(LLUUID::null, doc.ref.item, std::string()));
+        UNSCOPED_INFO("an inventory item's");
+        CHECK(ALScriptStudioHistory::keyOf(doc) == ALRecoveryStore::keyOf(LLUUID::null, doc.ref.item, std::string()));
         doc.ref = ALScriptRef(LLUUID::generateNewID(), LLUUID::generateNewID());
-        ensure_equals("an object's", ALScriptStudioHistory::keyOf(doc), ALRecoveryStore::keyOf(doc.ref.object, doc.ref.item, std::string()));
+        UNSCOPED_INFO("an object's");
+        CHECK(ALScriptStudioHistory::keyOf(doc) == ALRecoveryStore::keyOf(doc.ref.object, doc.ref.item, std::string()));
         doc.file = "/somewhere/door.lsl";
-        ensure("none for a file", ALScriptStudioHistory::keyOf(doc).empty());
+        UNSCOPED_INFO("none for a file");
+        REQUIRE(ALScriptStudioHistory::keyOf(doc).empty());
     }
 
-    template<> template<>
-    void alscriptstudiohistory_object::test<2>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: a tab's saves list newest first with their sizes or say there are none", "[alscriptstudiohistory]")
     {
-        set_test_name("a tab's saves listed newest first: when, how long, against the one before, and which is saved now; none said so");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc = tab("door", "now");
         unit.show(doc);
-        ensure("nothing to list", studio.candidates.empty() && !services().statuses.empty());
+        {
+            INFO("nothing to list");
+            REQUIRE(studio.candidates.empty());
+            REQUIRE_FALSE(services().statuses.empty());
+        }
         LLStringUtil::format_map_t args;
         args["[NAME]"] = "door";
-        ensure_equals("said so", services().statuses.back(), said("HistoryNone", args));
+        UNSCOPED_INFO("said so");
+        CHECK(services().statuses.back() == said("HistoryNone", args));
 
         const LLUUID current = LLUUID::generateNewID();
-        saved(doc, "12345", 300.0);
-        saved(doc, "1234567", 200.0);
-        saved(doc, "123", 100.0, current);
+        require_saved(doc, "12345", 300.0);
+        require_saved(doc, "1234567", 200.0);
+        require_saved(doc, "123", 100.0, current);
         doc.assetId = current;
         unit.show(doc);
-        ensure_equals("three", studio.candidates.size(), 3U);
-        ensure_equals("titled", studio.picked, said("HistoryTitle", args));
+        REQUIRE(studio.candidates.size() == 3U);
+        CHECK(studio.picked == said("HistoryTitle", args));
         const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
-        ensure_equals("labelled by when", studio.candidates[0].label, ALRecoveryEntry::sayWhen(listed[0].when));
+        REQUIRE(listed.size() == 3U);
+        CHECK(studio.candidates[0].label == ALRecoveryEntry::sayWhen(listed[0].when));
         const std::string& newest = studio.candidates[0].detail;
-        ensure("its length" + newest, newest.find(services().counted("HistoryBytes", 3)) != std::string::npos);
-        ensure("shorter than the one before" + newest, newest.find(services().counted("HistoryShorter", 4)) != std::string::npos);
-        ensure("saved now" + newest, newest.find(said("HistoryCurrent")) != std::string::npos);
+        {
+            CAPTURE(newest);
+            REQUIRE(newest.find(services().counted("HistoryBytes", 3)) != std::string::npos);
+            REQUIRE(newest.find(services().counted("HistoryShorter", 4)) != std::string::npos);
+            REQUIRE(newest.find(said("HistoryCurrent")) != std::string::npos);
+        }
         const std::string& middle = studio.candidates[1].detail;
-        ensure("longer" + middle, middle.find(services().counted("HistoryLonger", 2)) != std::string::npos);
-        ensure("not saved now" + middle, middle.find(said("HistoryCurrent")) == std::string::npos);
-        ensure("the first kept says nothing of one before", studio.candidates[2].detail.find(said("HistorySameLength")) == std::string::npos &&
-                                                               studio.candidates[2].detail.find("longer") == std::string::npos);
+        {
+            CAPTURE(middle);
+            REQUIRE(middle.find(services().counted("HistoryLonger", 2)) != std::string::npos);
+            REQUIRE(middle.find(said("HistoryCurrent")) == std::string::npos);
+        }
+        {
+            INFO("the first kept says nothing of one before");
+            CHECK(studio.candidates[2].detail.find(said("HistorySameLength")) == std::string::npos);
+            CHECK(studio.candidates[2].detail.find("longer") == std::string::npos);
+            CHECK(studio.candidates[2].detail.find("shorter") == std::string::npos);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiohistory_object::test<3>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: a chosen save is compared with the tab now or once the tab has loaded", "[alscriptstudiohistory]")
     {
-        set_test_name("a save chosen is compared with the tab now, and offered back; before the tab has loaded, once it has");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc = tab("door", "the text now");
-        saved(doc, "the text then", 100.0);
+        require_saved(doc, "the text then", 100.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 1U);
         studio.choose(studio.candidates[0].value);
-        ensure_equals("compared", studio.did.size(), 1U);
+        UNSCOPED_INFO("compared");
+        REQUIRE(studio.did.size() == 1U);
         LLStringUtil::format_map_t when;
         when["[WHEN]"] = studio.candidates[0].label;
         when["[NAME]"] = "door";
-        ensure_equals("then beside now", studio.did[0],
+        UNSCOPED_INFO("then beside now");
+        CHECK(studio.did[0] ==
                       "compare door: the text then | the text now (" + said("HistorySavedAt", when) + " | " + said("CompareNow") + ")");
-        ensure("held to offer back", doc.historyShown && doc.historyShown->text == "the text then");
-        ensure("the notice said again", studio.notices == 1);
+        {
+            INFO("held to offer back");
+            REQUIRE(doc.historyShown);
+            CHECK(doc.historyShown->text == "the text then");
+        }
+        UNSCOPED_INFO("the notice said again");
+        CHECK(studio.notices == 1);
 
         Doc& loading = tab("lamp", "", false);
-        saved(loading, "a lamp's text", 50.0);
+        require_saved(loading, "a lamp's text", 50.0);
         unit.show(loading);
+        REQUIRE(studio.candidates.size() == 1U);
         studio.choose(studio.candidates[0].value);
-        ensure_equals("not compared yet", studio.did.size(), 1U);
-        ensure("once it has loaded", loading.pendingCompare && loading.pendingCompare->text == "a lamp's text");
+        UNSCOPED_INFO("not compared yet");
+        REQUIRE(studio.did.size() == 1U);
+        {
+            INFO("once it has loaded");
+            REQUIRE(loading.pendingCompare);
+            CHECK(loading.pendingCompare->text == "a lamp's text");
+        }
     }
 
-    template<> template<>
-    void alscriptstudiohistory_object::test<4>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: the notice offers a save back only where the tab may be changed", "[alscriptstudiohistory]")
     {
-        set_test_name("the notice offers a save back where the tab may be changed; restored as carried text, the comparison ended");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& doc = tab("door", "now");
         ALSavedText shown;
@@ -249,16 +271,16 @@ namespace tut
         LLStringUtil::format_map_t args;
         args["[WHEN]"]                         = ALRecoveryEntry::sayWhen(shown.when);
         const ALScriptNoticeBar::Notice notice = ALScriptStudioOrphans::noticeFor(&doc, services());
-        ensure_equals("said", notice.text, said("NoticeHistory", args));
-        ensure_equals("offered back", notice.buttons[0].first, std::string("restore_saved"));
+        CHECK(notice.text == said("NoticeHistory", args));
+        UNSCOPED_INFO("offered back");
+        CHECK(notice.buttons[0].first == std::string("restore_saved"));
         doc.modifiable = false;
-        ensure("not where it may not be changed", ALScriptStudioOrphans::noticeFor(&doc, services()).buttons[0].first.empty());
+        UNSCOPED_INFO("not where it may not be changed");
+        REQUIRE(ALScriptStudioOrphans::noticeFor(&doc, services()).buttons[0].first.empty());
     }
 
-    template<> template<>
-    void alscriptstudiohistory_object::test<5>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: candidatesOf describes saves with the words and joiner it is given", "[alscriptstudiohistory]")
     {
-        set_test_name("a list of saves in a window's own words: each asked by name, with a count where it has one, and joined as it joins");
         std::vector<ALSavedText> saves(3);
         saves[0].bytes = 10;
         saves[0].asset = LLUUID::generateNewID();
@@ -279,67 +301,95 @@ namespace tut
             return out;
         };
         const std::vector<ALQuickOpen::Candidate> listed = ALScriptStudioHistory::candidatesOf(saves, saves[0].asset, words, joined);
-        ensure_equals("each", listed.size(), 3U);
-        ensure_equals("the newest", listed[0].detail, std::string("HistoryBytes(10) + HistorySameLength + HistoryCurrent"));
-        ensure_equals("shorter than the first", listed[1].detail, std::string("HistoryBytes(10) + HistoryShorter(2)"));
-        ensure_equals("the first says only its length", listed[2].detail, std::string("HistoryBytes(12)"));
-        ensure_equals("by when", listed[2].label, ALRecoveryEntry::sayWhen(saves[2].when));
-        ensure_equals("valued by place", listed[1].value, std::string("1"));
+        REQUIRE(listed.size() == 3U);
+        UNSCOPED_INFO("the newest");
+        CHECK(listed[0].detail == std::string("HistoryBytes(10) + HistorySameLength + HistoryCurrent"));
+        UNSCOPED_INFO("shorter than the first");
+        CHECK(listed[1].detail == std::string("HistoryBytes(10) + HistoryShorter(2)"));
+        UNSCOPED_INFO("the first says only its length");
+        CHECK(listed[2].detail == std::string("HistoryBytes(12)"));
+        CHECK(listed[2].label == ALRecoveryEntry::sayWhen(saves[2].when));
+        UNSCOPED_INFO("valued by place");
+        CHECK(listed[1].value == std::string("1"));
     }
 
-    template<> template<>
-    void alscriptstudiohistory_object::test<6>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: a compared save gets a slider that steps the left through the saves", "[alscriptstudiohistory]")
     {
-        set_test_name("a save compared has a slider over the item's saves, oldest first; stepped, the left is that save, its title and the offer back with it");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         studio.host = window.floater;
         Doc& doc    = tab("door", "now\nsame");
-        saved(doc, "first\nsame", 300.0);
-        saved(doc, "second\nsame", 200.0);
-        saved(doc, "third\nsame", 100.0);
+        require_saved(doc, "first\nsame", 300.0);
+        require_saved(doc, "second\nsame", 200.0);
+        require_saved(doc, "third\nsame", 100.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 3U);
         // Listed newest first: the middle one.
         studio.choose(studio.candidates[1].value);
+        REQUIRE(doc.compareView);
         ALDiffView& view = *doc.compareView;
-        ensure("the slider", view.bar()->getChild<LLView>("versions")->getVisible());
-        ensure_equals("at the middle of three, oldest first", view.bar()->versionShown(), 1);
-        ensure_equals("the second", view.leftText(), std::string("second\nsame"));
+        UNSCOPED_INFO("the slider");
+        CHECK(view.bar()->getChild<LLView>("versions")->getVisible());
+        UNSCOPED_INFO("at the middle of three, oldest first");
+        CHECK(view.bar()->versionShown() == 1);
+        CHECK(view.leftText() == std::string("second\nsame"));
 
         const S32 notices = studio.notices;
         ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("newer"))->press();
-        ensure_equals("the newest on the left", view.leftText(), std::string("third\nsame"));
-        ensure("held to offer back", doc.historyShown && doc.historyShown->text == "third\nsame");
+        UNSCOPED_INFO("the newest on the left");
+        CHECK(view.leftText() == std::string("third\nsame"));
+        {
+            INFO("held to offer back");
+            REQUIRE(doc.historyShown);
+            CHECK(doc.historyShown->text == "third\nsame");
+        }
         const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        REQUIRE(listed.size() == 3U);
         LLStringUtil::format_map_t     when;
         when["[NAME]"] = "door";
         when["[WHEN]"] = ALRecoveryEntry::sayWhen(listed[0].when);
-        ensure_equals("titled by it", doc.compareTitles->theirs, said("HistorySavedAt", when));
-        ensure("said again", !studio.retitled.empty() && studio.retitled.back() == said("HistorySavedAt", when) && studio.notices == notices + 1);
-        ensure_equals("the right still the tab", view.rightText(), std::string("now\nsame"));
+        REQUIRE(doc.compareTitles);
+        UNSCOPED_INFO("titled by it");
+        CHECK(doc.compareTitles->theirs == said("HistorySavedAt", when));
+        {
+            INFO("said again");
+            REQUIRE_FALSE(studio.retitled.empty());
+            CHECK(studio.retitled.back() == said("HistorySavedAt", when));
+            CHECK(studio.notices == notices + 1);
+        }
+        UNSCOPED_INFO("the right still the tab");
+        CHECK(view.rightText() == std::string("now\nsame"));
 
         ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
         ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
-        ensure("the oldest", view.leftText() == "first\nsame" && doc.historyShown->text == "first\nsame" && view.bar()->versionShown() == 0);
+        {
+            INFO("the oldest");
+            CHECK(view.leftText() == "first\nsame");
+            CHECK(doc.historyShown->text == "first\nsame");
+            CHECK(view.bar()->versionShown() == 0);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiohistory_object::test<7>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: a save chosen before load gets its slider when shown and a lone one none", "[alscriptstudiohistory]")
     {
-        set_test_name("a save chosen before its tab has loaded gets its slider once the comparison is shown; one save alone, none");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         studio.host  = window.floater;
         Doc& loading = tab("lamp", "", false);
-        saved(loading, "one", 200.0);
-        saved(loading, "two", 100.0);
+        require_saved(loading, "one", 200.0);
+        require_saved(loading, "two", 100.0);
         unit.show(loading);
+        REQUIRE(studio.candidates.size() == 2U);
         studio.choose(studio.candidates[0].value);
-        ensure("waiting, with something to do once shown", loading.pendingCompare && loading.pendingCompare->shown);
+        {
+            INFO("waiting, with something to do once shown");
+            REQUIRE(loading.pendingCompare);
+            REQUIRE(loading.pendingCompare->shown);
+        }
         // As the window does once the tab has loaded.
         loading.loaded  = true;
         loading.editor->setText("two");
@@ -347,94 +397,129 @@ namespace tut
         loading.pendingCompare.reset();
         studio.compareWithTab(loading, pending.text, pending.theirTitle, pending.ownTitle, pending.ranges);
         pending.shown(loading);
-        ensure("the slider, at the newest", loading.compareView->bar()->getChild<LLView>("versions")->getVisible() &&
-                                                 loading.compareView->bar()->versionShown() == 1);
+        {
+            INFO("the slider, at the newest");
+            CHECK(loading.compareView->bar()->getChild<LLView>("versions")->getVisible());
+            CHECK(loading.compareView->bar()->versionShown() == 1);
+        }
 
         Doc& alone = tab("gate", "now");
-        saved(alone, "only", 100.0);
+        require_saved(alone, "only", 100.0);
         unit.show(alone);
+        REQUIRE(studio.candidates.size() == 1U);
         studio.choose(studio.candidates[0].value);
-        ensure("one save: no slider", alone.compareView && !alone.compareView->bar()->getChild<LLView>("versions")->getVisible());
+        {
+            INFO("one save: no slider");
+            REQUIRE(alone.compareView);
+            CHECK_FALSE(alone.compareView->bar()->getChild<LLView>("versions")->getVisible());
+        }
     }
 
-    template<> template<>
-    void alscriptstudiohistory_object::test<8>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: stepping to an unreadable save says so and puts the slider back", "[alscriptstudiohistory]")
     {
-        set_test_name("a save stepped to that can no longer be read: said, the slider put back, the left as it was");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         studio.host = window.floater;
         Doc& doc    = tab("door", "now");
-        saved(doc, "older", 200.0);
-        saved(doc, "newer", 100.0);
+        require_saved(doc, "older", 200.0);
+        require_saved(doc, "newer", 100.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 2U);
         studio.choose(studio.candidates[0].value);
+        REQUIRE(doc.compareView);
         ALDiffView& view = *doc.compareView;
-        ensure_equals("at the newest", view.bar()->versionShown(), 1);
+        UNSCOPED_INFO("at the newest");
+        CHECK(view.bar()->versionShown() == 1);
         // The older one gone from disk since it was listed.
         const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        REQUIRE(listed.size() == 2U);
         std::error_code                gone;
         std::filesystem::remove(fsyspath(listed[1].path), gone);
         ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
         LLStringUtil::format_map_t args;
         args["[NAME]"] = "door";
         args["[WHEN]"] = ALRecoveryEntry::sayWhen(listed[1].when);
-        ensure_equals("said", services().statuses.back(), said("HistoryUnreadable", args));
-        ensure("the slider put back", view.bar()->versionShown() == 1);
-        ensure("the left as it was", view.leftText() == "newer" && doc.historyShown->text == "newer");
+        REQUIRE_FALSE(services().statuses.empty());
+        CHECK(services().statuses.back() == said("HistoryUnreadable", args));
+        UNSCOPED_INFO("the slider put back");
+        CHECK(view.bar()->versionShown() == 1);
+        {
+            INFO("the left as it was");
+            CHECK(view.leftText() == "newer");
+            REQUIRE(doc.historyShown);
+            CHECK(doc.historyShown->text == "newer");
+        }
     }
 
-    template<> template<>
-    void alscriptstudiohistory_object::test<9>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: a save stepped to is read once and kept after its file is gone", "[alscriptstudiohistory]")
     {
-        set_test_name("a save stepped to is read once and kept: stepped back to after its file is gone, still there");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         studio.host = window.floater;
         Doc& doc    = tab("door", "now");
-        saved(doc, "first", 300.0);
-        saved(doc, "second", 200.0);
-        saved(doc, "third", 100.0);
+        require_saved(doc, "first", 300.0);
+        require_saved(doc, "second", 200.0);
+        require_saved(doc, "third", 100.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 3U);
         studio.choose(studio.candidates[1].value);
+        REQUIRE(doc.compareView);
         ALDiffView&  view  = *doc.compareView;
         const auto   press = [&view](const char* name) { ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>(name))->press(); };
         press("older");
-        ensure_equals("the oldest", view.leftText(), std::string("first"));
+        UNSCOPED_INFO("the oldest");
+        CHECK(view.leftText() == std::string("first"));
         press("newer");
         const std::vector<ALSavedText> listed = history->list(ALScriptStudioHistory::keyOf(doc));
+        REQUIRE(listed.size() == 3U);
         std::error_code                gone;
         std::filesystem::remove(fsyspath(listed[2].path), gone);
         press("older");
-        ensure("the oldest again, as it was read", view.leftText() == "first" && view.bar()->versionShown() == 0 && doc.historyShown->text == "first");
+        {
+            INFO("the oldest again, as it was read");
+            CHECK(view.leftText() == "first");
+            CHECK(view.bar()->versionShown() == 0);
+            REQUIRE(doc.historyShown);
+            CHECK(doc.historyShown->text == "first");
+        }
     }
 
-    template<> template<>
-    void alscriptstudiohistory_object::test<10>()
+    TEST_CASE_METHOD(alscriptstudiohistory_data, "alscriptstudiohistory: letting go of a save as its comparison is left removes its slider", "[alscriptstudiohistory]")
     {
-        set_test_name("a save let go of as its comparison is left takes its slider with it: shown again, nothing steps a left that is no longer the save's");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         studio.host = window.floater;
         Doc& doc    = tab("door", "now");
-        saved(doc, "first", 300.0);
-        saved(doc, "second", 200.0);
+        require_saved(doc, "first", 300.0);
+        require_saved(doc, "second", 200.0);
         unit.show(doc);
+        REQUIRE(studio.candidates.size() == 2U);
         studio.choose(studio.candidates[0].value);
+        REQUIRE(doc.compareView);
         ALDiffView& view = *doc.compareView;
-        ensure("the slider", view.bar()->getChild<LLView>("versions")->getVisible() && view.bar()->versionCount() == 2);
+        {
+            INFO("the slider");
+            CHECK(view.bar()->getChild<LLView>("versions")->getVisible());
+            CHECK(view.bar()->versionCount() == 2);
+        }
         // As leaving the comparison does: Escape, or a keystroke typed into
         // the source.
         ALScriptStudioHistory::letGo(doc);
-        ensure("let go of", !doc.historyShown);
-        ensure("and its slider", view.bar()->versionCount() == 0 && !view.bar()->getChild<LLView>("versions")->getVisible());
+        UNSCOPED_INFO("let go of");
+        REQUIRE_FALSE(doc.historyShown);
+        {
+            INFO("and its slider");
+            REQUIRE(view.bar()->versionCount() == 0);
+            CHECK_FALSE(view.bar()->getChild<LLView>("versions")->getVisible());
+        }
         ALViewType::as<ALFlatButton>(view.bar()->getChild<LLView>("older"))->press();
-        ensure_equals("nothing stepped", view.leftText(), std::string("second"));
+        UNSCOPED_INFO("nothing stepped");
+        CHECK(view.leftText() == std::string("second"));
     }
 }

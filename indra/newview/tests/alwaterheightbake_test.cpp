@@ -25,7 +25,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../alwaterheightbake.h"
 
@@ -36,10 +36,8 @@
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         constexpr F64 TWO_PI = 6.283185307179586476925;
 
         // A term of a test height field T, in repeats: mAmplitude * sin(2 pi (p u + q v) + mPhase), with whole cycles a
@@ -219,23 +217,12 @@ namespace tut
         {
             return std::to_string(width) + "x" + std::to_string(height);
         }
-    }
-
-    struct alwaterheightbake_data
-    {
-    };
-
-    typedef test_group<alwaterheightbake_data> alwaterheightbake_group;
-    typedef alwaterheightbake_group::object    alwaterheightbake_object;
-    tut::alwaterheightbake_group alwaterheightbake_g("alwaterheightbake");
 
     // A sum of sines comes back from its eight-bit normals. Each field is T where its layer's aspect is the map's, and
     // T's projection where they differ, on square, non-square, odd and 16x16 maps, three components a texel or four.
     // The maxima are each field's largest height in metres.
-    template<> template<>
-    void alwaterheightbake_object::test<1>()
+    TEST_CASE("alwaterheightbake: a sum of sines is recovered from its normals", "[alwaterheightbake]")
     {
-        set_test_name("a sum of sines is recovered from its normals");
         struct Map
         {
             S32 mWidth;
@@ -250,63 +237,74 @@ namespace tut
                 const std::vector<U8> pixels = normalMap(map.mWidth, map.mHeight, map.mComponents, aspect);
                 const ALWaterHeightBake::Heights heights =
                     ALWaterHeightBake::bake(pixels.data(), pixels.size(), map.mWidth, map.mHeight, map.mComponents);
-                ensure(what + " bakes", heights.valid());
-                ensure_equals(what + " width", heights.mWidth, map.mWidth);
-                ensure_equals(what + " height", heights.mHeight, map.mHeight);
+                UNSCOPED_INFO(what + " bakes");
+                REQUIRE(heights.valid());
+                UNSCOPED_INFO(what + " width");
+                REQUIRE(heights.mWidth == map.mWidth);
+                UNSCOPED_INFO(what + " height");
+                REQUIRE(heights.mHeight == map.mHeight);
                 const size_t texels = (size_t)map.mWidth * map.mHeight;
-                ensure_equals(what + " H1 has a height a texel", heights.mBig.size(), texels);
-                ensure_equals(what + " H2 has a height a texel", heights.mMid.size(), texels);
+                UNSCOPED_INFO(what + " H1 has a height a texel");
+                REQUIRE(heights.mBig.size() == texels);
+                UNSCOPED_INFO(what + " H2 has a height a texel");
+                REQUIRE(heights.mMid.size() == texels);
 
                 const std::vector<F64> big = expected(map.mWidth, map.mHeight, aspect, 1.0);
                 const std::vector<F64> mid =
                     expected(map.mWidth, map.mHeight, aspect, ALWaterHeightBake::MID_ASPECT);
                 const F64 big_error = relativeError(heights.mBig, big);
                 const F64 mid_error = relativeError(heights.mMid, mid);
-                ensure(what + " H1 within 2 % (" + std::to_string(big_error) + ")", big_error < TOLERANCE);
-                ensure(what + " H2 within 2 % (" + std::to_string(mid_error) + ")", mid_error < TOLERANCE);
+                UNSCOPED_INFO(what + " H1 within 2 % (" + std::to_string(big_error) + ")");
+                REQUIRE(big_error < TOLERANCE);
+                UNSCOPED_INFO(what + " H2 within 2 % (" + std::to_string(mid_error) + ")");
+                REQUIRE(mid_error < TOLERANCE);
 
                 const F32 max_big = ALWaterHeightBake::BIG_METRES * largest(heights.mBig);
                 const F32 max_mid = ALWaterHeightBake::MID_METRES * largest(heights.mMid);
-                ensure(what + " the big maximum is 12.5 |H1|'s",
-                       std::fabs(heights.mMaxBig - max_big) <= 1e-6f * max_big);
-                ensure(what + " the mid maximum is 3 |H2|'s",
-                       std::fabs(heights.mMaxMid - max_mid) <= 1e-6f * max_mid);
+                UNSCOPED_INFO(what + " the big maximum is 12.5 |H1|'s");
+                REQUIRE(std::fabs(heights.mMaxBig - max_big) <= 1e-6f * max_big);
+                UNSCOPED_INFO(what + " the mid maximum is 3 |H2|'s");
+                REQUIRE(std::fabs(heights.mMaxMid - max_mid) <= 1e-6f * max_mid);
                 const F64 want_big = ALWaterHeightBake::BIG_METRES * largest(big);
                 const F64 want_mid = ALWaterHeightBake::MID_METRES * largest(mid);
-                ensure(what + " the big maximum is T's", std::fabs(heights.mMaxBig - want_big) < TOLERANCE * want_big);
-                ensure(what + " the mid maximum is T's", std::fabs(heights.mMaxMid - want_mid) < TOLERANCE * want_mid);
+                UNSCOPED_INFO(what + " the big maximum is T's");
+                REQUIRE(std::fabs(heights.mMaxBig - want_big) < TOLERANCE * want_big);
+                UNSCOPED_INFO(what + " the mid maximum is T's");
+                REQUIRE(std::fabs(heights.mMaxMid - want_mid) < TOLERANCE * want_mid);
             }
         }
     }
 
     // Slopes say nothing of a height's mean: both fields have none, and a constant tilt across the whole map, the
     // slopes' own mean, changes neither.
-    template<> template<>
-    void alwaterheightbake_object::test<2>()
+    TEST_CASE("alwaterheightbake: the heights have no mean", "[alwaterheightbake]")
     {
-        set_test_name("the heights have no mean");
         for (F64 tilt : { 0.0, 1.0 })
         {
             const std::string what = tilt > 0.0 ? "tilted" : "level";
             const std::vector<U8> pixels = normalMap(64, 32, 3, 1.0, 1.0, 0.3 * tilt, -0.2 * tilt);
             const ALWaterHeightBake::Heights heights = ALWaterHeightBake::bake(pixels.data(), pixels.size(), 64, 32, 3);
-            ensure(what + " bakes", heights.valid());
-            ensure(what + " H1 is finite", allFinite(heights.mBig));
-            ensure(what + " H2 is finite", allFinite(heights.mMid));
-            ensure(what + " H1's mean is 0", std::fabs(mean(heights.mBig)) < 1e-5);
-            ensure(what + " H2's mean is 0", std::fabs(mean(heights.mMid)) < 1e-5);
-            ensure(what + " H1 is T", relativeError(heights.mBig, expected(64, 32, 1.0, 1.0)) < TOLERANCE);
-            ensure(what + " H2 is T's projection",
-                   relativeError(heights.mMid, expected(64, 32, 1.0, ALWaterHeightBake::MID_ASPECT)) < TOLERANCE);
+            UNSCOPED_INFO(what + " bakes");
+            REQUIRE(heights.valid());
+            UNSCOPED_INFO(what + " H1 is finite");
+            REQUIRE(allFinite(heights.mBig));
+            UNSCOPED_INFO(what + " H2 is finite");
+            REQUIRE(allFinite(heights.mMid));
+            UNSCOPED_INFO(what + " H1's mean is 0");
+            REQUIRE(std::fabs(mean(heights.mBig)) < 1e-5);
+            UNSCOPED_INFO(what + " H2's mean is 0");
+            REQUIRE(std::fabs(mean(heights.mMid)) < 1e-5);
+            UNSCOPED_INFO(what + " H1 is T");
+            REQUIRE(relativeError(heights.mBig, expected(64, 32, 1.0, 1.0)) < TOLERANCE);
+            UNSCOPED_INFO(what + " H2 is T's projection");
+            REQUIRE(relativeError(heights.mMid, expected(64, 32, 1.0, ALWaterHeightBake::MID_ASPECT)) < TOLERANCE);
         }
     }
 
     // The heights are linear in the slopes: the heights of s a + b are s times a's plus b's, for slope fields that are
     // no gradient, on an odd map. A map of half the slopes bakes half the heights, within what eight bits keep.
-    template<> template<>
-    void alwaterheightbake_object::test<3>()
+    TEST_CASE("alwaterheightbake: the heights are linear in the slopes", "[alwaterheightbake]")
     {
-        set_test_name("the heights are linear in the slopes");
         constexpr S32 W = 37;
         constexpr S32 H = 20;
         constexpr F32 S = 2.5f;
@@ -324,17 +322,21 @@ namespace tut
         }
 
         ALWaterHeightBake::Heights a, b, c;
-        ensure("a integrates", ALWaterHeightBake::integrate(ax, ay, W, H, a));
-        ensure("b integrates", ALWaterHeightBake::integrate(bx, by, W, H, b));
-        ensure("s a + b integrates", ALWaterHeightBake::integrate(cx, cy, W, H, c));
+        UNSCOPED_INFO("a integrates");
+        REQUIRE(ALWaterHeightBake::integrate(ax, ay, W, H, a));
+        UNSCOPED_INFO("b integrates");
+        REQUIRE(ALWaterHeightBake::integrate(bx, by, W, H, b));
+        UNSCOPED_INFO("s a + b integrates");
+        REQUIRE(ALWaterHeightBake::integrate(cx, cy, W, H, c));
         const F32 scale = largest(c.mBig) + largest(c.mMid);
-        ensure("the heights are not all 0", scale > 0.f);
+        UNSCOPED_INFO("the heights are not all 0");
+        CHECK(scale > 0.f);
         for (size_t n = 0; n < c.mBig.size(); ++n)
         {
-            ensure("H1 is linear at " + std::to_string(n),
-                   std::fabs(c.mBig[n] - (S * a.mBig[n] + b.mBig[n])) <= 1e-5f * scale);
-            ensure("H2 is linear at " + std::to_string(n),
-                   std::fabs(c.mMid[n] - (S * a.mMid[n] + b.mMid[n])) <= 1e-5f * scale);
+            UNSCOPED_INFO("H1 is linear at " + std::to_string(n));
+            REQUIRE(std::fabs(c.mBig[n] - (S * a.mBig[n] + b.mBig[n])) <= 1e-5f * scale);
+            UNSCOPED_INFO("H2 is linear at " + std::to_string(n));
+            REQUIRE(std::fabs(c.mMid[n] - (S * a.mMid[n] + b.mMid[n])) <= 1e-5f * scale);
         }
 
         const std::vector<U8> full = normalMap(64, 32, 3, 1.0, 1.0);
@@ -348,18 +350,18 @@ namespace tut
             halved_big[n] = 0.5 * full_heights.mBig[n];
             halved_mid[n] = 0.5 * full_heights.mMid[n];
         }
-        ensure("half the slopes, half of H1", relativeError(half_heights.mBig, halved_big) < TOLERANCE);
-        ensure("half the slopes, half of H2", relativeError(half_heights.mMid, halved_mid) < TOLERANCE);
-        ensure("half the slopes, half the big maximum",
-               std::fabs(half_heights.mMaxBig - 0.5f * full_heights.mMaxBig) < TOLERANCE * full_heights.mMaxBig);
+        UNSCOPED_INFO("half the slopes, half of H1");
+        CHECK(relativeError(half_heights.mBig, halved_big) < TOLERANCE);
+        UNSCOPED_INFO("half the slopes, half of H2");
+        CHECK(relativeError(half_heights.mMid, halved_mid) < TOLERANCE);
+        UNSCOPED_INFO("half the slopes, half the big maximum");
+        CHECK(std::fabs(half_heights.mMaxBig - 0.5f * full_heights.mMaxBig) < TOLERANCE * full_heights.mMaxBig);
     }
 
     // The bake's transforms, an r2c over both axes and a c2r scaled by 1 / (width height), return the field they were
     // given, at even, odd and mixed lengths.
-    template<> template<>
-    void alwaterheightbake_object::test<4>()
+    TEST_CASE("alwaterheightbake: an r2c then a c2r returns its input", "[alwaterheightbake]")
     {
-        set_test_name("an r2c then a c2r returns its input");
         Noise noise{ 6789u };
         const S32 sizes[][2] = { { 16, 16 }, { 64, 32 }, { 37, 20 }, { 45, 27 }, { 5, 4 } };
         for (const auto& size : sizes)
@@ -367,23 +369,24 @@ namespace tut
             const std::string what = sizeName(size[0], size[1]);
             const std::vector<F32> input = noise.field((size_t)size[0] * size[1]);
             std::vector<F32> field = input;
-            ensure(what + " transforms", ALWaterHeightBake::roundTrip(field, size[0], size[1]));
-            ensure_equals(what + " keeps its size", field.size(), input.size());
+            UNSCOPED_INFO(what + " transforms");
+            REQUIRE(ALWaterHeightBake::roundTrip(field, size[0], size[1]));
+            UNSCOPED_INFO(what + " keeps its size");
+            REQUIRE(field.size() == input.size());
             F32 worst = 0.f;
             for (size_t n = 0; n < input.size(); ++n)
             {
                 worst = std::max(worst, std::fabs(field[n] - input[n]));
             }
-            ensure(what + " returns its input (" + std::to_string(worst) + ")", worst < 1e-4f);
+            UNSCOPED_INFO(what + " returns its input (" + std::to_string(worst) + ")");
+            REQUIRE(worst < 1e-4f);
         }
     }
 
     // A map with no texels, too few along an axis, too few components or fewer bytes than texels is skipped: nothing
     // is thrown, nothing is baked and both maxima are 0. The smallest map that bakes is 4x4.
-    template<> template<>
-    void alwaterheightbake_object::test<5>()
+    TEST_CASE("alwaterheightbake: a map too small to bake is skipped, not thrown", "[alwaterheightbake]")
     {
-        set_test_name("a map too small to bake is skipped, not thrown");
         const std::vector<U8> grey(4 * 4 * 4, 128);
         struct Case
         {
@@ -411,31 +414,48 @@ namespace tut
             ALWaterHeightBake::Heights heights;
             heights.mMaxBig = 1.f;
             heights.mMaxMid = 1.f;
-            ensure(std::string(c.mName) + " is not thrown", !throws([&] {
-                       heights = ALWaterHeightBake::bake(c.mPixels, c.mSize, c.mWidth, c.mHeight, c.mComponents);
-                   }));
-            ensure(std::string(c.mName) + " is not baked", !heights.valid());
-            ensure(std::string(c.mName) + " has no H2", heights.mMid.empty());
-            ensure_equals(std::string(c.mName) + " big maximum", heights.mMaxBig, 0.f);
-            ensure_equals(std::string(c.mName) + " mid maximum", heights.mMaxMid, 0.f);
+            UNSCOPED_INFO(std::string(c.mName) + " is not thrown");
+            REQUIRE(!throws([&] {
+                heights = ALWaterHeightBake::bake(c.mPixels, c.mSize, c.mWidth, c.mHeight, c.mComponents);
+            }));
+            UNSCOPED_INFO(std::string(c.mName) + " is not baked");
+            REQUIRE(!heights.valid());
+            UNSCOPED_INFO(std::string(c.mName) + " has no H2");
+            REQUIRE(heights.mMid.empty());
+            UNSCOPED_INFO(std::string(c.mName) + " big maximum");
+            REQUIRE(heights.mMaxBig == 0.f);
+            UNSCOPED_INFO(std::string(c.mName) + " mid maximum");
+            REQUIRE(heights.mMaxMid == 0.f);
         }
 
         const std::vector<F32> none;
         ALWaterHeightBake::Heights out;
         bool integrated = true;
-        ensure("empty slopes are not thrown",
-               !throws([&] { integrated = ALWaterHeightBake::integrate(none, none, 0, 0, out); }));
-        ensure("empty slopes are not integrated", !integrated && !out.valid());
+        UNSCOPED_INFO("empty slopes are not thrown");
+        CHECK(!throws([&] { integrated = ALWaterHeightBake::integrate(none, none, 0, 0, out); }));
+        {
+            INFO("empty slopes are not integrated");
+            CHECK(!integrated);
+            CHECK(!out.valid());
+        }
         const std::vector<F32> short_field(15, 0.f);
-        ensure("slopes short of their size are not thrown",
-               !throws([&] { integrated = ALWaterHeightBake::integrate(short_field, short_field, 4, 4, out); }));
-        ensure("slopes short of their size are not integrated", !integrated && !out.valid());
+        UNSCOPED_INFO("slopes short of their size are not thrown");
+        CHECK(!throws([&] { integrated = ALWaterHeightBake::integrate(short_field, short_field, 4, 4, out); }));
+        {
+            INFO("slopes short of their size are not integrated");
+            CHECK(!integrated);
+            CHECK(!out.valid());
+        }
 
         std::vector<F32> field;
         bool transformed = true;
-        ensure("an empty round trip is not thrown",
-               !throws([&] { transformed = ALWaterHeightBake::roundTrip(field, 0, 0); }));
-        ensure("an empty round trip is not made", !transformed && field.empty());
+        UNSCOPED_INFO("an empty round trip is not thrown");
+        CHECK(!throws([&] { transformed = ALWaterHeightBake::roundTrip(field, 0, 0); }));
+        {
+            INFO("an empty round trip is not made");
+            REQUIRE(!transformed);
+            REQUIRE(field.empty());
+        }
 
         // Every texel the same normal: a constant slope, which is no height at all.
         std::vector<U8> flat(4 * 4 * 4);
@@ -447,9 +467,12 @@ namespace tut
             flat[n + 3] = 255;
         }
         const ALWaterHeightBake::Heights smallest = ALWaterHeightBake::bake(flat.data(), flat.size(), 4, 4, 4);
-        ensure("4x4 bakes", smallest.valid());
-        ensure("a flat map has no big height", smallest.mMaxBig < 1e-5f);
-        ensure("nor a mid one", smallest.mMaxMid < 1e-5f);
+        UNSCOPED_INFO("4x4 bakes");
+        CHECK(smallest.valid());
+        UNSCOPED_INFO("a flat map has no big height");
+        CHECK(smallest.mMaxBig < 1e-5f);
+        UNSCOPED_INFO("nor a mid one");
+        CHECK(smallest.mMaxMid < 1e-5f);
     }
     namespace
     {
@@ -473,29 +496,44 @@ namespace tut
 
     // A float becomes the nearest half, ties to the even one: every float tried against its half's neighbours, whose
     // values are worked here from their bits; the edges named; past the range, infinity; a NaN stays one.
-    template<> template<>
-    void alwaterheightbake_object::test<6>()
+    TEST_CASE("alwaterheightbake: a float as a half", "[alwaterheightbake]")
     {
-        set_test_name("a float as a half");
-        ensure_equals("0", ALWaterHeightBake::halfOf(0.f), (U16)0x0000);
+        UNSCOPED_INFO("0");
+        CHECK(ALWaterHeightBake::halfOf(0.f) == (U16)0x0000);
         // -0 from its bits, read at run time: a build that ignores the sign of zero may make a constant -0 into +0.
         volatile U32 negative_zero = 0x80000000u;
-        ensure_equals("-0", ALWaterHeightBake::halfOf(std::bit_cast<F32>((U32)negative_zero)), (U16)0x8000);
-        ensure_equals("1", ALWaterHeightBake::halfOf(1.f), (U16)0x3c00);
-        ensure_equals("-2", ALWaterHeightBake::halfOf(-2.f), (U16)0xc000);
-        ensure_equals("the largest", ALWaterHeightBake::halfOf(65504.f), (U16)0x7bff);
-        ensure_equals("past it, rounding up to infinity", ALWaterHeightBake::halfOf(65520.f), (U16)0x7c00);
-        ensure_equals("just below that, the largest", ALWaterHeightBake::halfOf(65519.996f), (U16)0x7bff);
-        ensure_equals("far past it", ALWaterHeightBake::halfOf(-1e9f), (U16)0xfc00);
-        ensure_equals("the smallest subnormal", ALWaterHeightBake::halfOf(std::ldexp(1.f, -24)), (U16)0x0001);
-        ensure_equals("half of it, a tie to 0", ALWaterHeightBake::halfOf(std::ldexp(1.f, -25)), (U16)0x0000);
-        ensure_equals("three quarters of it, up", ALWaterHeightBake::halfOf(std::ldexp(3.f, -26)), (U16)0x0001);
-        ensure_equals("a tie above 1 to the even 1", ALWaterHeightBake::halfOf(1.f + std::ldexp(1.f, -11)), (U16)0x3c00);
-        ensure_equals("the next tie to the even above", ALWaterHeightBake::halfOf(1.f + std::ldexp(3.f, -11)), (U16)0x3c02);
-        ensure_equals("the largest subnormal rounding into the smallest normal",
-                      ALWaterHeightBake::halfOf(std::ldexp(1.f, -14) - std::ldexp(1.f, -26)), (U16)0x0400);
+        UNSCOPED_INFO("-0");
+        CHECK(ALWaterHeightBake::halfOf(std::bit_cast<F32>((U32)negative_zero)) == (U16)0x8000);
+        UNSCOPED_INFO("1");
+        CHECK(ALWaterHeightBake::halfOf(1.f) == (U16)0x3c00);
+        UNSCOPED_INFO("-2");
+        CHECK(ALWaterHeightBake::halfOf(-2.f) == (U16)0xc000);
+        UNSCOPED_INFO("the largest");
+        CHECK(ALWaterHeightBake::halfOf(65504.f) == (U16)0x7bff);
+        UNSCOPED_INFO("past it, rounding up to infinity");
+        CHECK(ALWaterHeightBake::halfOf(65520.f) == (U16)0x7c00);
+        UNSCOPED_INFO("just below that, the largest");
+        CHECK(ALWaterHeightBake::halfOf(65519.996f) == (U16)0x7bff);
+        UNSCOPED_INFO("far past it");
+        CHECK(ALWaterHeightBake::halfOf(-1e9f) == (U16)0xfc00);
+        UNSCOPED_INFO("the smallest subnormal");
+        CHECK(ALWaterHeightBake::halfOf(std::ldexp(1.f, -24)) == (U16)0x0001);
+        UNSCOPED_INFO("half of it, a tie to 0");
+        CHECK(ALWaterHeightBake::halfOf(std::ldexp(1.f, -25)) == (U16)0x0000);
+        UNSCOPED_INFO("three quarters of it, up");
+        CHECK(ALWaterHeightBake::halfOf(std::ldexp(3.f, -26)) == (U16)0x0001);
+        UNSCOPED_INFO("a tie above 1 to the even 1");
+        CHECK(ALWaterHeightBake::halfOf(1.f + std::ldexp(1.f, -11)) == (U16)0x3c00);
+        UNSCOPED_INFO("the next tie to the even above");
+        CHECK(ALWaterHeightBake::halfOf(1.f + std::ldexp(3.f, -11)) == (U16)0x3c02);
+        UNSCOPED_INFO("the largest subnormal rounding into the smallest normal");
+        CHECK(ALWaterHeightBake::halfOf(std::ldexp(1.f, -14) - std::ldexp(1.f, -26)) == (U16)0x0400);
         const U16 nan = ALWaterHeightBake::halfOf(std::numeric_limits<F32>::quiet_NaN());
-        ensure("a NaN stays one", (nan & 0x7c00) == 0x7c00 && (nan & 0x3ff) != 0);
+        {
+            INFO("a NaN stays one");
+            CHECK((nan & 0x7c00) == 0x7c00);
+            CHECK((nan & 0x3ff) != 0);
+        }
 
         U32 state = 777u;
         S32 checked = 0;
@@ -507,7 +545,8 @@ namespace tut
             const U16 h = ALWaterHeightBake::halfOf(value);
             if ((h & 0x7c00) == 0x7c00)
             {
-                ensure("infinity only past the range", std::fabs((F64)value) >= 65520.0);
+                UNSCOPED_INFO("infinity only past the range");
+                REQUIRE(std::fabs((F64)value) >= 65520.0);
                 continue;
             }
             const F64 got = halfValue(h);
@@ -520,43 +559,46 @@ namespace tut
                     continue;
                 }
                 const F64 other = std::fabs(halfValue(neighbour) - (F64)value);
-                ensure("no neighbour is nearer", other >= error);
+                UNSCOPED_INFO("no neighbour is nearer");
+                REQUIRE(other >= error);
                 if (other == error)
                 {
-                    ensure("a tie goes to the even one", (h & 1u) == 0);
+                    UNSCOPED_INFO("a tie goes to the even one");
+                    REQUIRE((h & 1u) == 0);
                 }
             }
             ++checked;
         }
-        ensure("most values within the range", checked > 150000);
+        UNSCOPED_INFO("most values within the range");
+        CHECK(checked > 150000);
     }
 
     // The two fields as an RG16F texture takes them, H1 then H2 a texel; none for heights not baked.
-    template<> template<>
-    void alwaterheightbake_object::test<7>()
+    TEST_CASE("alwaterheightbake: the heights as half texels", "[alwaterheightbake]")
     {
-        set_test_name("the heights as half texels");
         ALWaterHeightBake::Heights heights;
-        ensure("nothing for heights not baked", ALWaterHeightBake::halfTexels(heights).empty());
+        UNSCOPED_INFO("nothing for heights not baked");
+        REQUIRE(ALWaterHeightBake::halfTexels(heights).empty());
         heights.mWidth = 2;
         heights.mHeight = 2;
         heights.mBig = { 0.5f, -0.25f, 1.f, 0.125f };
         heights.mMid = { -1.f, 2.f, 0.f, 0.75f };
         const std::vector<U16> texels = ALWaterHeightBake::halfTexels(heights);
-        ensure_equals("two halves a texel", texels.size(), (size_t)8);
+        UNSCOPED_INFO("two halves a texel");
+        REQUIRE(texels.size() == (size_t)8);
         for (size_t n = 0; n < 4; ++n)
         {
-            ensure_equals("H1 first", halfValue(texels[n * 2]), (F64)heights.mBig[n]);
-            ensure_equals("H2 second", halfValue(texels[n * 2 + 1]), (F64)heights.mMid[n]);
+            UNSCOPED_INFO("H1 first");
+            REQUIRE(halfValue(texels[n * 2]) == (F64)heights.mBig[n]);
+            UNSCOPED_INFO("H2 second");
+            REQUIRE(halfValue(texels[n * 2 + 1]) == (F64)heights.mMid[n]);
         }
     }
 
     // A map past the bake's size is halved by boxes of two by two, an odd side's last box three wide, until it fits; a
     // map that fits is copied; nothing comes of no pixels.
-    template<> template<>
-    void alwaterheightbake_object::test<8>()
+    TEST_CASE("alwaterheightbake: a map halved to fit", "[alwaterheightbake]")
     {
-        set_test_name("a map halved to fit");
         // 6 x 5, one component, texel (i, j) = 10 j + i.
         std::vector<U8> pixels(30);
         for (S32 j = 0; j < 5; ++j)
@@ -569,9 +611,12 @@ namespace tut
         std::vector<U8> out;
         S32 width = 0;
         S32 height = 0;
-        ensure("it fits at 4", ALWaterHeightBake::fitToSize(pixels.data(), 6, 5, 1, 4, out, width, height));
-        ensure_equals("6 halved", width, 3);
-        ensure_equals("5 halved, the last box three rows", height, 2);
+        UNSCOPED_INFO("it fits at 4");
+        CHECK(ALWaterHeightBake::fitToSize(pixels.data(), 6, 5, 1, 4, out, width, height));
+        UNSCOPED_INFO("6 halved");
+        CHECK(width == 3);
+        UNSCOPED_INFO("5 halved, the last box three rows");
+        CHECK(height == 2);
         // Row 0 boxes rows 0-1; row 1 boxes rows 2-4. Column i boxes columns 2i, 2i + 1.
         const auto box = [&](S32 i0, S32 i1, S32 j0, S32 j1)
         {
@@ -588,22 +633,48 @@ namespace tut
         };
         for (S32 i = 0; i < 3; ++i)
         {
-            ensure_equals("row 0, box " + std::to_string(i), out[(size_t)i], box(2 * i, 2 * i + 2, 0, 2));
-            ensure_equals("row 1, box " + std::to_string(i), out[(size_t)3 + i], box(2 * i, 2 * i + 2, 2, 5));
+            UNSCOPED_INFO("row 0, box " + std::to_string(i));
+            REQUIRE(out[(size_t)i] == box(2 * i, 2 * i + 2, 0, 2));
+            UNSCOPED_INFO("row 1, box " + std::to_string(i));
+            REQUIRE(out[(size_t)3 + i] == box(2 * i, 2 * i + 2, 2, 5));
         }
 
-        ensure("a map that fits", ALWaterHeightBake::fitToSize(pixels.data(), 6, 5, 1, 8, out, width, height));
-        ensure("is copied", width == 6 && height == 5 && out == pixels);
+        UNSCOPED_INFO("a map that fits");
+        CHECK(ALWaterHeightBake::fitToSize(pixels.data(), 6, 5, 1, 8, out, width, height));
+        {
+            INFO("is copied");
+            CHECK(width == 6);
+            CHECK(height == 5);
+            CHECK(out == pixels);
+        }
 
-        ensure("down to one texel", ALWaterHeightBake::fitToSize(pixels.data(), 6, 5, 1, 1, out, width, height));
-        ensure("one by one", width == 1 && height == 1 && out.size() == 1);
+        UNSCOPED_INFO("down to one texel");
+        CHECK(ALWaterHeightBake::fitToSize(pixels.data(), 6, 5, 1, 1, out, width, height));
+        {
+            INFO("one by one");
+            REQUIRE(width == 1);
+            REQUIRE(height == 1);
+            REQUIRE(out.size() == 1);
+        }
 
         // Three components, each boxed on its own.
         std::vector<U8> rgb = { 0, 100, 200, 10, 110, 210, 20, 120, 220, 30, 130, 230 };
-        ensure("three components", ALWaterHeightBake::fitToSize(rgb.data(), 2, 2, 3, 1, out, width, height));
-        ensure("each channel averaged", out.size() == 3 && out[0] == 15 && out[1] == 115 && out[2] == 215);
+        UNSCOPED_INFO("three components");
+        CHECK(ALWaterHeightBake::fitToSize(rgb.data(), 2, 2, 3, 1, out, width, height));
+        {
+            INFO("each channel averaged");
+            REQUIRE(out.size() == 3);
+            REQUIRE(out[0] == 15);
+            REQUIRE(out[1] == 115);
+            REQUIRE(out[2] == 215);
+        }
 
-        ensure("no pixels", !ALWaterHeightBake::fitToSize(nullptr, 6, 5, 1, 4, out, width, height) && out.empty());
-        ensure("no size", !ALWaterHeightBake::fitToSize(pixels.data(), 0, 5, 1, 4, out, width, height));
+        {
+            INFO("no pixels");
+            REQUIRE(!ALWaterHeightBake::fitToSize(nullptr, 6, 5, 1, 4, out, width, height));
+            REQUIRE(out.empty());
+        }
+        UNSCOPED_INFO("no size");
+        CHECK(!ALWaterHeightBake::fitToSize(pixels.data(), 0, 5, 1, 4, out, width, height));
     }
 }

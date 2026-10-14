@@ -31,7 +31,7 @@
 
 #include "fsyspath.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -160,7 +160,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudiovim_data
     {
@@ -221,7 +221,7 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             for (const char* name : { "save", "close", "save_all", "format", "quick_fix", "fix_all", "back", "forward", "go_to_definition",
                                       "reference", "go_to_symbol", "blanks_all", "blanks_none" })
@@ -333,163 +333,246 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptstudiovim_data> alscriptstudiovim_group;
-    typedef alscriptstudiovim_group::object    alscriptstudiovim_object;
-    alscriptstudiovim_group                    alscriptstudiovim_instance("alscriptstudiovim");
-
-    template<> template<>
-    void alscriptstudiovim_object::test<1>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: each : command reaches the menus' table or the window", "[alscriptstudiovim]")
     {
-        set_test_name("each : command reaches its command: the menus' through the window's table, the rest through the window");
         ALScriptStudioVim& vim = make();
         Doc&               a   = tab("a");
         tab("b");
 
         for (const char* name : { "w", "write", "w!" })
         {
-            ensure(name, ex(a, name));
+            CAPTURE(name);
+            REQUIRE(ex(a, name));
         }
-        ensure("written by the menus' Save", ran == Names{ "save", "save", "save" });
+        UNSCOPED_INFO("written by the menus' Save");
+        CHECK(ran == Names{ "save", "save", "save" });
         ran.clear();
-        ensure("q", ex(a, "q") && ex(a, "wa") && ex(a, "format") && ex(a, "fix") && ex(a, "fixall") && ex(a, "problems"));
-        ensure("each by its menu name", ran == Names{ "close", "save_all", "format", "quick_fix", "fix_all", "problems" });
+        CHECK(ex(a, "q"));
+        CHECK(ex(a, "wa"));
+        CHECK(ex(a, "format"));
+        CHECK(ex(a, "fix"));
+        CHECK(ex(a, "fixall"));
+        CHECK(ex(a, "problems"));
+        UNSCOPED_INFO("each by its menu name");
+        CHECK(ran == Names{ "close", "save_all", "format", "quick_fix", "fix_all", "problems" });
         ran.clear();
-        ensure("one that cannot be done now is taken, and not done", ex(a, "revert") && ran.empty());
+        {
+            INFO("one that cannot be done now is taken, and not done");
+            CHECK(ex(a, "revert"));
+            CHECK(ran.empty());
+        }
 
-        ensure("q! lets it go as it stands", ex(a, "q!") && studio.letGo == Names{ "a" });
-        ensure("wq over nothing unsaved closes it", ex(a, "wq") && studio.asked == Names{ "a" } && studio.savedToClose.empty());
+        {
+            INFO("q! lets it go as it stands");
+            CHECK(ex(a, "q!"));
+            CHECK(studio.letGo == Names{ "a" });
+        }
+        {
+            INFO("wq over nothing unsaved closes it");
+            CHECK(ex(a, "wq"));
+            CHECK(studio.asked == Names{ "a" });
+            CHECK(studio.savedToClose.empty());
+        }
         a.editor->setCaret(a.editor->document().end());
         a.editor->insertText(" ");
-        ensure("wq over something unsaved saves it to close", ex(a, "x") && studio.savedToClose == Names{ "a" });
-        ensure("qa closes them all, asking once", ex(a, "qa") && studio.many == Names{ "a", "b" });
+        {
+            INFO("wq over something unsaved saves it to close");
+            CHECK(ex(a, "wq"));
+            CHECK(studio.savedToClose == Names{ "a" });
+        }
+        studio.savedToClose.clear();
+        {
+            INFO("and x the same");
+            CHECK(ex(a, "x"));
+            CHECK(studio.savedToClose == Names{ "a" });
+        }
+        {
+            INFO("qa closes them all, asking once");
+            CHECK(ex(a, "qa"));
+            CHECK(studio.many == Names{ "a", "b" });
+        }
         studio.letGo.clear();
-        ensure("qa! lets them all go", ex(a, "qa!") && studio.letGo == Names{ "a", "b" });
+        {
+            INFO("qa! lets them all go");
+            CHECK(ex(a, "qa!"));
+            CHECK(studio.letGo == Names{ "a", "b" });
+        }
 
-        ensure("one it does not know is vim's to say", !ex(a, "frobnicate"));
+        UNSCOPED_INFO("one it does not know is vim's to say");
+        CHECK_FALSE(ex(a, "frobnicate"));
         ALCodeEditor* stray = editor("stray", "x");
-        ensure("nor from an editor of no tab", !vim.command(*stray, "w", std::string()) && ran.empty());
+        {
+            INFO("nor from an editor of no tab");
+            CHECK_FALSE(vim.command(*stray, "w", std::string()));
+            CHECK(ran.empty());
+        }
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<2>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: :set toggles number and relativenumber only when they differ", "[alscriptstudiovim]")
     {
-        set_test_name(":set turns number and relativenumber on or off through their toggles, only where they are not so already");
         make();
         Doc& a = tab("a");
-        ensure("on", ex(a, "set", "number") && lineNumbers && ran == Names{ "line_numbers" });
-        ensure("on already: left", ex(a, "set", "nu") && ran.size() == 1);
-        ensure("off", ex(a, "set", "nonu") && !lineNumbers && ran.size() == 2);
-        ensure("relative", ex(a, "set", "rnu") && relativeNumbers);
-        ensure("off already: left", ex(a, "set", "norelativenumber") && !relativeNumbers && ran.size() == 4);
-        ensure("an option it does not know is vim's", !ex(a, "set", "hlsearch"));
+        CHECK(ex(a, "set", "number"));
+        CHECK(lineNumbers);
+        CHECK(ran == Names{ "line_numbers" });
+        {
+            INFO("on already: left");
+            CHECK(ex(a, "set", "nu"));
+            CHECK(ran.size() == 1);
+        }
+        CHECK(ex(a, "set", "nonu"));
+        CHECK_FALSE(lineNumbers);
+        CHECK(ran.size() == 2);
+        CHECK(ex(a, "set", "rnu"));
+        CHECK(relativeNumbers);
+        {
+            INFO("on: turned off");
+            CHECK(ex(a, "set", "norelativenumber"));
+            CHECK_FALSE(relativeNumbers);
+            CHECK(ran.size() == 4);
+        }
+        {
+            INFO("off already: left");
+            CHECK(ex(a, "set", "nornu"));
+            CHECK_FALSE(relativeNumbers);
+            CHECK(ran.size() == 4);
+        }
+        UNSCOPED_INFO("an option it does not know is vim's");
+        CHECK_FALSE(ex(a, "set", "hlsearch"));
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<3>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: :history lists command or search lines or both in Output", "[alscriptstudiovim]")
     {
-        set_test_name(":history lists the lines entered in the Output tab: the : ones, the searches, or both");
         ALScriptStudioVim& vim = make();
         Doc&               a   = tab("a");
         vim.shared().command   = { "w", "set nu" };
         vim.shared().search    = { "foo" };
 
-        ensure("the : ones", ex(a, "history"));
-        ensure_equals("one entry", studio.entries.size(), size_t(1));
-        ensure_equals("numbered", studio.entries[0].text, std::string("cmd history:\n  1  w\n  2  set nu"));
-        ensure_equals("from vim", studio.entries[0].source, std::string("OutputSourceVim"));
-        ensure("the tab in sight", studio.outputShown == 1);
+        UNSCOPED_INFO("the : ones");
+        CHECK(ex(a, "history"));
+        REQUIRE(studio.entries.size() == size_t(1));
+        CHECK(studio.entries[0].text == std::string("cmd history:\n  1  w\n  2  set nu"));
+        CHECK(studio.entries[0].source == std::string("OutputSourceVim"));
+        UNSCOPED_INFO("the tab in sight");
+        CHECK(studio.outputShown == 1);
 
         studio.entries.clear();
-        ensure("the searches", ex(a, "his", "/") && studio.entries.size() == 1 && studio.entries[0].text == "search history:\n  1  foo");
+        {
+            INFO("the searches");
+            CHECK(ex(a, "his", "/"));
+            REQUIRE(studio.entries.size() == 1);
+            CHECK(studio.entries[0].text == "search history:\n  1  foo");
+        }
         studio.entries.clear();
-        ensure("both", ex(a, "history", "all") && studio.entries.size() == 2);
+        CHECK(ex(a, "history", "all"));
+        CHECK(studio.entries.size() == 2);
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<4>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: q: lists lines last first to run or to put back on the line", "[alscriptstudiovim]")
     {
-        set_test_name("q: lists the lines entered, the last first; Return runs one, Shift-Return puts it back on the line");
         ALScriptStudioVim& vim = make();
         Doc&               a   = tab("a");
         std::vector<std::pair<std::string, bool>> chosen;
         vim.historyWindow(*a.editor, ':', { "first", "second", "third" },
                           [&chosen](const std::string& line, bool run) { chosen.emplace_back(line, run); });
-        ensure("the last first", studio.offered == Names{ "third", "second", "first" });
-        ensure_equals("as tall as they are", studio.pickRows, 3);
-        ensure_equals("asking of the kind", studio.asking, std::string("VimHistoryPlaceholder [KIND]=:"));
+        UNSCOPED_INFO("the last first");
+        CHECK(studio.offered == Names{ "third", "second", "first" });
+        UNSCOPED_INFO("as tall as they are");
+        CHECK(studio.pickRows == 3);
+        UNSCOPED_INFO("asking of the kind");
+        CHECK(studio.asking == std::string("VimHistoryPlaceholder [KIND]=:"));
         studio.pick("second");
         studio.shift("first");
-        ensure("run, and put back", chosen == std::vector<std::pair<std::string, bool>>{ { "second", true }, { "first", false } });
-        ensure("none picked is nothing chosen", (studio.cancel(), chosen.size() == 2));
+        UNSCOPED_INFO("run, and put back");
+        CHECK(chosen == std::vector<std::pair<std::string, bool>>{ { "second", true }, { "first", false } });
+        UNSCOPED_INFO("none picked is nothing chosen");
+        CHECK((studio.cancel(), chosen.size() == 2));
 
         vim.historyWindow(*a.editor, '/', Names(20, "x"), [](const std::string&, bool) {});
-        ensure_equals("no taller than eight", studio.pickRows, 8);
+        UNSCOPED_INFO("no taller than eight");
+        CHECK(studio.pickRows == 8);
         vim.historyWindow(*a.editor, '/', Names(), [](const std::string&, bool) {});
-        ensure_equals("nor shorter than one", studio.pickRows, 1);
+        UNSCOPED_INFO("nor shorter than one");
+        CHECK(studio.pickRows == 1);
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<5>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: = formats the given lines of a changeable script's source only", "[alscriptstudiovim]")
     {
-        set_test_name("= formats the lines given of the source; not of the expansion, a notecard or a tab that cannot change");
         ALScriptStudioVim& vim = make();
         Doc&               a   = tab("a", "one\ntwo\nthree\nfour");
         vim.format(*a.editor, 1, 2);
-        ensure("formatted, as a selection", studio.formatted == Names{ "a selection" });
+        UNSCOPED_INFO("formatted, as a selection");
+        CHECK(studio.formatted == Names{ "a selection" });
         const ALTextDocument& text = a.editor->document();
-        ensure("of those lines", a.editor->selection() == ALTextRange(text.lineStart(1), text.lineEnd(2)));
+        UNSCOPED_INFO("of those lines");
+        CHECK(a.editor->selection() == ALTextRange(text.lineStart(1), text.lineEnd(2)));
         vim.format(*a.editor, 2, 99);
-        ensure("to the last there is", a.editor->selection() == ALTextRange(text.lineStart(2), text.lineEnd(3)));
+        UNSCOPED_INFO("to the last there is");
+        CHECK(a.editor->selection() == ALTextRange(text.lineStart(2), text.lineEnd(3)));
 
         a.expandedEditor = editor("expanded_a", "one");
         vim.format(*a.expandedEditor, 0, 0);
-        ensure("not the expansion", studio.formatted.size() == 2);
+        UNSCOPED_INFO("not the expansion");
+        CHECK(studio.formatted.size() == 2);
         Doc& card    = tab("card");
         card.notecard = true;
         vim.format(*card.editor, 0, 0);
         Doc& locked      = tab("locked");
         locked.modifiable = false;
         vim.format(*locked.editor, 0, 0);
-        ensure("nor a notecard, nor one that cannot change", studio.formatted.size() == 2);
-        ensure("the expansion's editor is its tab's", vim.docOf(*a.expandedEditor) == &a);
+        UNSCOPED_INFO("nor a notecard, nor one that cannot change");
+        CHECK(studio.formatted.size() == 2);
+        UNSCOPED_INFO("the expansion's editor is its tab's");
+        CHECK(vim.docOf(*a.expandedEditor) == &a);
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<6>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: a connected keymap shares the window's history and shows the banner", "[alscriptstudiovim]")
     {
-        set_test_name("a keymap connected shares the window's history and asks it; the banner says vim where the tab in front has it");
         ALScriptStudioVim& vim = make();
         Doc&               a   = tab("a");
 
         vim.pump();
-        ensure("no vim, nothing said", vim.banner().empty() && studio.trailers == 0);
+        {
+            INFO("no vim, nothing said");
+            CHECK(vim.banner().empty());
+            CHECK(studio.trailers == 0);
+        }
 
         auto keymap = std::make_unique<ALVimKeymap>();
         vim.connect(*keymap);
         ALVimKeymap& connected = *keymap;
         a.editor->setModalKeymap(std::move(keymap));
-        ensure("its history the window's", connected.sharedState().get() == &vim.shared());
-        ensure("a : command it leaves reaches the table",
-               connected.hooks().command(*a.editor, "w", std::string()) && ran == Names{ "save" });
+        UNSCOPED_INFO("its history the window's");
+        CHECK(connected.sharedState().get() == &vim.shared());
+        {
+            INFO("a : command it leaves reaches the table");
+            CHECK(connected.hooks().command(*a.editor, "w", std::string()));
+            CHECK(ran == Names{ "save" });
+        }
         std::vector<std::string> words;
         connected.hooks().complete(*a.editor, std::string(), std::string(), words);
-        ensure("Tab completes the studio's names", std::find(words.begin(), words.end(), "fixall") != words.end());
+        UNSCOPED_INFO("Tab completes the studio's names");
+        CHECK(std::find(words.begin(), words.end(), "fixall") != words.end());
 
         vim.pump();
-        ensure_equals("vim, said", vim.banner(), std::string("VimNormal"));
-        ensure("the strip told", studio.trailers == 1);
+        CHECK(vim.banner() == std::string("VimNormal"));
+        UNSCOPED_INFO("the strip told");
+        CHECK(studio.trailers == 1);
         vim.pump();
-        ensure("once", studio.trailers == 1);
+        UNSCOPED_INFO("told once");
+        CHECK(studio.trailers == 1);
 
         // Gone, the keymap's hooks do nothing.
         this->vim.reset();
-        ensure("asked of nothing", !connected.hooks().command(*a.editor, "w", std::string()) && ran.size() == 1);
+        {
+            INFO("asked of nothing");
+            CHECK_FALSE(connected.hooks().command(*a.editor, "w", std::string()));
+            CHECK(ran.size() == 1);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<7>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: Tab completes commands and their options and kinds and tab names", "[alscriptstudiovim]")
     {
-        set_test_name("Tab completes the command names, :set's options, :history's kinds and the tabs' names");
         ALScriptStudioVim&       vim = make();
         tab("alpha");
         tab("beta");
@@ -499,84 +582,110 @@ namespace tut
         vim.complete("his", std::string(), kinds);
         vim.complete("bd", std::string(), tabs);
         vim.complete("q", std::string(), none);
-        ensure("vim's own and the menus'", std::find(names.begin(), names.end(), "wall") != names.end() &&
-                                               std::find(names.begin(), names.end(), "go_to_line") != names.end());
-        ensure("the options",
-               options == Names{ "number", "nonumber", "relativenumber", "norelativenumber", "spell", "nospell", "list", "nolist" });
-        ensure("the kinds", kinds == Names{ "all", "cmd", "search" });
-        ensure("the tabs", tabs == Names{ "alpha", "beta" });
-        ensure("nothing after anything else", none.empty());
+        {
+            INFO("vim's own and the menus'");
+            CHECK(std::find(names.begin(), names.end(), "wall") != names.end());
+            CHECK(std::find(names.begin(), names.end(), "go_to_line") != names.end());
+        }
+        CHECK(options == Names{ "number", "nonumber", "relativenumber", "norelativenumber", "spell", "nospell", "list", "nolist" });
+        CHECK(kinds == Names{ "all", "cmd", "search" });
+        CHECK(tabs == Names{ "alpha", "beta" });
+        UNSCOPED_INFO("nothing after anything else");
+        CHECK(none.empty());
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<8>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: :b and :tab commands move between tabs round the strip", "[alscriptstudiovim]")
     {
-        set_test_name("the tabs are vim's buffers and tab pages: :bn and :bp round the strip, :b by number, name or #, first and last");
         make();
         ALVimKeymap* vim = fourTabs();
-        ensure_equals(":bn", go("bn"), std::string("beta"));
-        ensure_equals(":bnext 2", go("bnext", "2"), std::string("delta"));
-        ensure_equals("round past the end", go("bn"), std::string("alpha"));
-        ensure_equals(":bp round past the start", go("bp"), std::string("delta"));
-        ensure_equals(":bN 3", go("bN", "3"), std::string("alpha"));
-        ensure_equals(":b 3", go("b", "3"), std::string("gamma"));
-        ensure_equals(":b # the one before", go("b", "#"), std::string("alpha"));
-        ensure_equals("and back", go("buffer", "#"), std::string("gamma"));
-        ensure_equals(":b by a part of its name, in any case", go("b", "ELT"), std::string("delta"));
-        ensure_equals(":b by its whole name", go("b", "beta"), std::string("beta"));
-        ensure_equals(":bf", go("bf"), std::string("alpha"));
-        ensure_equals(":blast", go("blast"), std::string("delta"));
-        ensure_equals(":tabfirst", go("tabfirst"), std::string("alpha"));
-        ensure_equals(":tabl", go("tabl"), std::string("delta"));
-        ensure_equals(":tabn round past the end", go("tabn"), std::string("alpha"));
-        ensure_equals(":tabn 3 the third", go("tabn", "3"), std::string("gamma"));
-        ensure_equals(":tabn +1", go("tabnext", "+1"), std::string("delta"));
-        ensure_equals(":tabn $", go("tabn", "$"), std::string("delta"));
-        ensure_equals(":tabp 2", go("tabp", "2"), std::string("beta"));
-        ensure_equals(":tabN round past the start", go("tabN", "2"), std::string("delta"));
+        CHECK(go("bn") == std::string("beta"));
+        CHECK(go("bnext", "2") == std::string("delta"));
+        UNSCOPED_INFO("round past the end");
+        CHECK(go("bn") == std::string("alpha"));
+        UNSCOPED_INFO(":bp round past the start");
+        CHECK(go("bp") == std::string("delta"));
+        CHECK(go("bN", "3") == std::string("alpha"));
+        CHECK(go("b", "3") == std::string("gamma"));
+        UNSCOPED_INFO(":b # the one before");
+        CHECK(go("b", "#") == std::string("alpha"));
+        UNSCOPED_INFO("and back");
+        CHECK(go("buffer", "#") == std::string("gamma"));
+        UNSCOPED_INFO(":b by a part of its name, in any case");
+        CHECK(go("b", "ELT") == std::string("delta"));
+        CHECK(go("b", "beta") == std::string("beta"));
+        CHECK(go("bf") == std::string("alpha"));
+        CHECK(go("blast") == std::string("delta"));
+        CHECK(go("tabfirst") == std::string("alpha"));
+        CHECK(go("tabl") == std::string("delta"));
+        UNSCOPED_INFO(":tabn round past the end");
+        CHECK(go("tabn") == std::string("alpha"));
+        CHECK(go("tabn", "3") == std::string("gamma"));
+        CHECK(go("tabnext", "+1") == std::string("delta"));
+        CHECK(go("tabn", "$") == std::string("delta"));
+        CHECK(go("tabp", "2") == std::string("beta"));
+        UNSCOPED_INFO(":tabN round past the start");
+        CHECK(go("tabN", "2") == std::string("delta"));
 
-        ensure_equals(":b a -- in every name", go("b", "a"), std::string("delta"));
-        ensure_equals("said as vim says it", vim->message(), std::string("VimTabsMatch [NAME]=a"));
-        ensure("an error", vim->messageIsError());
+        UNSCOPED_INFO(":b a -- in every name");
+        CHECK(go("b", "a") == std::string("delta"));
+        UNSCOPED_INFO("said as vim says it");
+        CHECK(vim->message() == std::string("VimTabsMatch [NAME]=a"));
+        CHECK(vim->messageIsError());
         go("b", "zeta");
-        ensure_equals("none", vim->message(), std::string("VimNoTabMatch [NAME]=zeta"));
+        CHECK(vim->message() == std::string("VimNoTabMatch [NAME]=zeta"));
         go("b", "9");
-        ensure_equals("no ninth", vim->message(), std::string("VimNoSuchTab [NUMBER]=9"));
+        CHECK(vim->message() == std::string("VimNoSuchTab [NUMBER]=9"));
         go("tabn", "9");
-        ensure_equals("nor to go to", vim->message(), std::string("VimBadArgument"));
-        ensure_equals("still where it was", services.frontDoc()->id, std::string("delta"));
+        UNSCOPED_INFO("nor to go to");
+        CHECK(vim->message() == std::string("VimBadArgument"));
+        REQUIRE(services.frontDoc());
+        UNSCOPED_INFO("still where it was");
+        CHECK(services.frontDoc()->id == std::string("delta"));
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<9>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: :bd and :tabclose and :tabonly close tabs and :tabmove moves one", "[alscriptstudiovim]")
     {
-        set_test_name(":bd and :tabclose close a tab, asked about or with ! let go of; :tabonly the others; :tabmove moves the one in front");
         make();
         ALVimKeymap* vim = fourTabs();
         go("b", "beta");
-        ensure(":bd the one in front, asked about", go("bd") == "beta" && studio.asked == Names{ "beta" });
-        ensure(":bd! let go of", (go("bd!"), studio.letGo == Names{ "beta" }));
-        ensure(":bd by number", (go("bd", "3"), studio.asked == Names{ "beta", "gamma" }));
-        ensure(":tabclose! by number", (go("tabclose!", "4"), studio.letGo == Names{ "beta", "delta" }));
-        ensure(":tabonly asks about the others at once", (go("tabonly"), studio.many == Names{ "alpha", "gamma", "delta" }));
+        {
+            INFO(":bd the one in front, asked about");
+            CHECK(go("bd") == "beta");
+            CHECK(studio.asked == Names{ "beta" });
+        }
+        UNSCOPED_INFO(":bd! let go of");
+        CHECK((go("bd!"), studio.letGo == Names{ "beta" }));
+        UNSCOPED_INFO(":bd by number");
+        CHECK((go("bd", "3"), studio.asked == Names{ "beta", "gamma" }));
+        UNSCOPED_INFO(":tabclose! by number");
+        CHECK((go("tabclose!", "4"), studio.letGo == Names{ "beta", "delta" }));
+        UNSCOPED_INFO(":tabonly asks about the others at once");
+        CHECK((go("tabonly"), studio.many == Names{ "alpha", "gamma", "delta" }));
         studio.letGo.clear();
-        ensure(":tabonly! lets them go", (go("tabo!"), studio.letGo == Names{ "alpha", "gamma", "delta" }));
+        UNSCOPED_INFO(":tabonly! lets them go");
+        CHECK((go("tabo!"), studio.letGo == Names{ "alpha", "gamma", "delta" }));
 
-        ensure_equals(":tabm 0 to the start", (go("tabm", "0"), order()), std::string("beta alpha gamma delta"));
-        ensure_equals(":tabm to the end", (go("tabmove"), order()), std::string("alpha gamma delta beta"));
-        ensure_equals(":tabm 2 after the second", (go("tabm", "2"), order()), std::string("alpha gamma beta delta"));
-        ensure_equals(":tabm -1", (go("tabm", "-1"), order()), std::string("alpha beta gamma delta"));
-        ensure_equals(":tabm 3 after the third, past itself", (go("tabm", "3"), order()), std::string("alpha gamma beta delta"));
-        ensure_equals("still in front", services.frontDoc()->id, std::string("beta"));
+        UNSCOPED_INFO(":tabm 0 to the start");
+        CHECK((go("tabm", "0"), order()) == std::string("beta alpha gamma delta"));
+        UNSCOPED_INFO(":tabm to the end");
+        CHECK((go("tabmove"), order()) == std::string("alpha gamma delta beta"));
+        UNSCOPED_INFO(":tabm 2 after the second");
+        CHECK((go("tabm", "2"), order()) == std::string("alpha gamma beta delta"));
+        CHECK((go("tabm", "-1"), order()) == std::string("alpha beta gamma delta"));
+        UNSCOPED_INFO(":tabm 3 after the third, past itself");
+        CHECK((go("tabm", "3"), order()) == std::string("alpha gamma beta delta"));
+        REQUIRE(services.frontDoc());
+        UNSCOPED_INFO("still in front");
+        CHECK(services.frontDoc()->id == std::string("beta"));
         go("tabm", "+5");
-        ensure_equals("not past the end", vim->message(), std::string("VimBadArgument"));
-        ensure_equals("where it was", order(), std::string("alpha gamma beta delta"));
+        UNSCOPED_INFO("not past the end");
+        CHECK(vim->message() == std::string("VimBadArgument"));
+        UNSCOPED_INFO("where it was");
+        CHECK(order() == std::string("alpha gamma beta delta"));
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<10>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: :ls lists tabs with their flags and lines as vim lists buffers", "[alscriptstudiovim]")
     {
-        set_test_name(":ls lists the tabs as vim lists its buffers: the one in front, the one before, unsaved, unchangeable, and their lines");
         make();
         fourTabs();
         go("b", "gamma");
@@ -585,21 +694,20 @@ namespace tut
         gamma.editor->setCaret(gamma.editor->document().end());
         gamma.editor->insertText("\n\n");
         services.findDoc(std::string_view("delta"))->modifiable = false;
-        ensure("taken", ex(*services.docs[0], "ls"));
-        ensure_equals("one entry", studio.entries.size(), size_t(1));
-        ensure_equals("the tabs", studio.entries[0].text,
-                      std::string("tabs:\n"
-                                  "  1  h   \"alpha\"                        line 1\n"
-                                  "  2 %a   \"beta\"                         line 1\n"
-                                  "  3 #h + \"gamma\"                        line 3\n"
-                                  "  4  h-  \"delta\"                        line 1"));
-        ensure("the tab in sight", studio.outputShown == 1);
+        CHECK(ex(*services.docs[0], "ls"));
+        REQUIRE(studio.entries.size() == size_t(1));
+        CHECK(studio.entries[0].text ==
+              std::string("tabs:\n"
+                          "  1  h   \"alpha\"                        line 1\n"
+                          "  2 %a   \"beta\"                         line 1\n"
+                          "  3 #h + \"gamma\"                        line 3\n"
+                          "  4  h-  \"delta\"                        line 1"));
+        UNSCOPED_INFO("the tab in sight");
+        CHECK(studio.outputShown == 1);
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<11>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: :e opens a file from the tab's folders or goes to a tab or reverts", "[alscriptstudiovim]")
     {
-        set_test_name(":e opens a file where the tab's folders have it, or a tab by its name or file, # the one before; alone, reads the tab again");
         ALScriptStudioVim& vim = make();
         files();
         Doc&         a     = tab("alpha");
@@ -608,95 +716,139 @@ namespace tut
         tab("beta");
         vim.pump();
 
-        ensure("taken", ex(a, "e", "main.lsl"));
-        ensure("an LSL file as LSL", studio.openedFiles.size() == 1 && studio.openedFiles.back() == std::make_pair(in("main.lsl"), false));
+        CHECK(ex(a, "e", "main.lsl"));
+        {
+            INFO("an LSL file as LSL");
+            REQUIRE(studio.openedFiles.size() == 1);
+            CHECK(studio.openedFiles.back() == std::make_pair(in("main.lsl"), false));
+        }
         ex(a, "edit", "lib/util.luau");
-        ensure("in a folder under it, as SLua",
-               studio.openedFiles.size() == 2 && studio.openedFiles.back() == std::make_pair(in("lib/util.luau"), true));
+        {
+            INFO("in a folder under it, as SLua");
+            REQUIRE(studio.openedFiles.size() == 2);
+            CHECK(studio.openedFiles.back() == std::make_pair(in("lib/util.luau"), true));
+        }
         ex(a, "e", "notes.txt");
-        ensure("anything else as the tab it was named from is",
-               studio.openedFiles.size() == 3 && studio.openedFiles.back() == std::make_pair(in("notes.txt"), true));
+        {
+            INFO("anything else as the tab it was named from is");
+            REQUIRE(studio.openedFiles.size() == 3);
+            CHECK(studio.openedFiles.back() == std::make_pair(in("notes.txt"), true));
+        }
         ex(a, "e", in("main.lsl"));
-        ensure("where a whole path says", studio.openedFiles.size() == 4 && studio.openedFiles.back().first == in("main.lsl"));
+        {
+            INFO("where a whole path says");
+            REQUIRE(studio.openedFiles.size() == 4);
+            CHECK(studio.openedFiles.back().first == in("main.lsl"));
+        }
         ex(a, "tabe", "main.lsl");
-        ensure(":tabedit the same", studio.openedFiles.size() == 5);
+        UNSCOPED_INFO(":tabedit the same");
+        CHECK(studio.openedFiles.size() == 5);
         ex(a, "e", "nowhere.lsl");
-        ensure_equals("nowhere: said", said->message(), std::string("VimNoFile [FILE]=nowhere.lsl"));
-        ensure("and nothing opened", studio.openedFiles.size() == 5);
+        UNSCOPED_INFO("nowhere: said");
+        CHECK(said->message() == std::string("VimNoFile [FILE]=nowhere.lsl"));
+        UNSCOPED_INFO("and nothing opened");
+        CHECK(studio.openedFiles.size() == 5);
         ex(a, "tabnew");
-        ensure_equals(":tabnew wants a file", said->message(), std::string("VimArgumentRequired"));
+        UNSCOPED_INFO(":tabnew wants a file");
+        CHECK(said->message() == std::string("VimArgumentRequired"));
 
         ex(a, "e", "beta");
-        ensure_equals("a tab by its name", services.frontDoc()->id, std::string("beta"));
+        REQUIRE(services.frontDoc());
+        UNSCOPED_INFO("a tab by its name");
+        CHECK(services.frontDoc()->id == std::string("beta"));
         vim.pump();
         ex(a, "e", "#");
-        ensure_equals("# the one before", services.frontDoc()->id, std::string("alpha"));
+        REQUIRE(services.frontDoc());
+        UNSCOPED_INFO("# the one before");
+        CHECK(services.frontDoc()->id == std::string("alpha"));
         Doc& main = tab("mainfile");
         main.file = in("main.lsl");
         ex(a, "e", "main.lsl");
-        ensure("a file open already is gone to", services.frontDoc() == &main && studio.openedFiles.size() == 5);
+        {
+            INFO("a file open already is gone to");
+            CHECK(services.frontDoc() == &main);
+            CHECK(studio.openedFiles.size() == 5);
+        }
 
         ex(a, "e");
-        ensure("alone: read again", studio.reverted == Names{ "alpha" });
+        UNSCOPED_INFO("alone: read again");
+        CHECK(studio.reverted == Names{ "alpha" });
         a.editor->setCaret(a.editor->document().end());
         a.editor->insertText(" ");
         ex(a, "e");
-        ensure_equals("not over unsaved work", said->message(), std::string("VimNotSaved"));
-        ensure("left", studio.reverted.size() == 1);
+        UNSCOPED_INFO("not over unsaved work");
+        CHECK(said->message() == std::string("VimNotSaved"));
+        UNSCOPED_INFO("left");
+        CHECK(studio.reverted.size() == 1);
         ex(a, "e!");
-        ensure("but with !", studio.reverted == Names{ "alpha", "alpha" });
+        UNSCOPED_INFO("but with !");
+        CHECK(studio.reverted == Names{ "alpha", "alpha" });
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<12>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: :r reads a file in and :w and :update and :wqa write", "[alscriptstudiovim]")
     {
-        set_test_name(":r puts a file below the caret's line; :w writes the text to one, over one there only with !; :update, :wqa");
         make();
         files();
         Doc&         a    = tab("alpha", "one\ntwo");
         ALVimKeymap* said = vimOver(a);
         ex(a, "r", "lib/util.luau");
-        ensure_equals("below the line, its own last break dropped", a.editor->text(), std::string("one\nlocal x = 1\nreturn x\ntwo"));
-        ensure("the caret on the first line put in", a.editor->caret() == ALTextPos(1, 0));
+        UNSCOPED_INFO("below the line, its own last break dropped");
+        CHECK(a.editor->text() == std::string("one\nlocal x = 1\nreturn x\ntwo"));
+        UNSCOPED_INFO("the caret on the first line put in");
+        CHECK(a.editor->caret() == ALTextPos(1, 0));
         ex(a, "read", "nowhere");
-        ensure_equals("nowhere: said", said->message(), std::string("VimNoFile [FILE]=nowhere"));
+        UNSCOPED_INFO("nowhere: said");
+        CHECK(said->message() == std::string("VimNoFile [FILE]=nowhere"));
         ex(a, "r");
-        ensure_equals("no file of its own", said->message(), std::string("VimNoFileName"));
+        UNSCOPED_INFO("no file of its own");
+        CHECK(said->message() == std::string("VimNoFileName"));
         a.expandedEditor = editor("expanded_alpha", "x");
-        ensure("not into the expansion", vim->command(*a.expandedEditor, "r", "main.lsl") && a.expandedEditor->text() == "x");
+        {
+            INFO("not into the expansion");
+            CHECK(vim->command(*a.expandedEditor, "r", "main.lsl"));
+            CHECK(a.expandedEditor->text() == "x");
+        }
 
         ex(a, "w", "out.lsl");
-        ensure_equals("written", contents(in("out.lsl")), a.editor->text());
+        CHECK(contents(in("out.lsl")) == a.editor->text());
         const std::string written = "VimWritten [BYTES]=" + std::to_string(a.editor->text().size()) + " [FILE]=" + in("out.lsl") + " [LINES]=4 [QUOTED]=\"" + in("out.lsl") + "\"";
-        ensure_equals("and said", said->message(), written);
-        ensure("not as an error", !said->messageIsError());
-        ensure("the tab left as it was", ran.empty());
+        CHECK(said->message() == written);
+        CHECK_FALSE(said->messageIsError());
+        UNSCOPED_INFO("the tab left as it was");
+        CHECK(ran.empty());
         a.editor->setCaret(a.editor->document().end());
         a.editor->insertText("!");
         ex(a, "w", "out.lsl");
-        ensure_equals("not over one there", said->message(), std::string("VimFileExists"));
-        ensure("left", contents(in("out.lsl")) != a.editor->text());
+        UNSCOPED_INFO("not over one there");
+        CHECK(said->message() == std::string("VimFileExists"));
+        UNSCOPED_INFO("left");
+        CHECK(contents(in("out.lsl")) != a.editor->text());
         ex(a, "w!", "out.lsl");
-        ensure_equals("but with !", contents(in("out.lsl")), a.editor->text());
+        UNSCOPED_INFO("but with !");
+        CHECK(contents(in("out.lsl")) == a.editor->text());
         ex(a, "w", "!ls");
-        ensure_equals("no shell", said->message(), std::string("VimBadArgument"));
+        UNSCOPED_INFO("no shell");
+        CHECK(said->message() == std::string("VimBadArgument"));
 
         ex(a, "update");
-        ensure(":update over unsaved work saves", ran == Names{ "save" });
+        UNSCOPED_INFO(":update over unsaved work saves");
+        CHECK(ran == Names{ "save" });
         a.editor->resetDirty();
         ex(a, "up");
-        ensure("over none, nothing", ran.size() == 1);
+        UNSCOPED_INFO("over none, nothing");
+        CHECK(ran.size() == 1);
         tab("beta");
         type(a, "?");
         ex(a, "wqa");
-        ensure(":wqa saves the unsaved to close, and closes the rest",
-               studio.savedToClose == Names{ "alpha" } && studio.asked == Names{ "beta" });
+        {
+            INFO(":wqa saves the unsaved to close, and closes the rest");
+            CHECK(studio.savedToClose == Names{ "alpha" });
+            CHECK(studio.asked == Names{ "beta" });
+        }
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<13>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: Tab after a file command offers files and folders from the tab's folders", "[alscriptstudiovim]")
     {
-        set_test_name("Tab after :e, :r and :w offers the files and folders in the tabs' folders, or where a whole path says; hidden ones where asked");
         ALScriptStudioVim& vim = make();
         files();
         tab("alpha");
@@ -706,64 +858,89 @@ namespace tut
             std::sort(out.begin(), out.end());
             return out;
         };
-        ensure("the folder's", offered("e", std::string()) == Names{ "lib/", "main.lsl", "notes.txt" });
-        ensure("in a folder under it", offered("edit", "lib/u") == Names{ "lib/util.luau" });
-        ensure("by the start of a name", offered("r", "ma") == Names{ "main.lsl" });
-        ensure("after :w", offered("w", "n") == Names{ "notes.txt" });
-        ensure("hidden where a dot is typed", offered("e", ".") == Names{ ".hidden" });
-        ensure("where a whole path says", offered("tabe", folder + "/li") == Names{ folder + "/lib/" });
-        ensure("not after anything else", offered("q", std::string()).empty());
+        UNSCOPED_INFO("the folder's");
+        CHECK(offered("e", std::string()) == Names{ "lib/", "main.lsl", "notes.txt" });
+        UNSCOPED_INFO("in a folder under it");
+        CHECK(offered("edit", "lib/u") == Names{ "lib/util.luau" });
+        UNSCOPED_INFO("by the start of a name");
+        CHECK(offered("r", "ma") == Names{ "main.lsl" });
+        UNSCOPED_INFO("after :w");
+        CHECK(offered("w", "n") == Names{ "notes.txt" });
+        UNSCOPED_INFO("hidden where a dot is typed");
+        CHECK(offered("e", ".") == Names{ ".hidden" });
+        UNSCOPED_INFO("where a whole path says");
+        CHECK(offered("tabe", folder + "/li") == Names{ folder + "/lib/" });
+        UNSCOPED_INFO("not after anything else");
+        CHECK(offered("q", std::string()).empty());
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<14>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: the quickfix and location commands step through the Problems tab", "[alscriptstudiovim]")
     {
-        set_test_name("the Problems tab is vim's quickfix and location lists: :cn and :cp step, :cc by number, :cfirst, :clast, :copen, :cclose");
         make();
         Doc&         a    = tab("a");
         ALVimKeymap* said = vimOver(a);
         ex(a, "cn");
-        ensure_equals("none: said", said->message(), std::string("VimNoErrors"));
-        ensure("nothing run", ran.empty());
+        UNSCOPED_INFO("none: said");
+        CHECK(said->message() == std::string("VimNoErrors"));
+        UNSCOPED_INFO("nothing run");
+        CHECK(ran.empty());
 
         problemsThere = true;
-        ensure(":cn, :cnext 2, :lne", ex(a, "cn") && ex(a, "cnext", "2") && ex(a, "lne"));
-        ensure("each a step", ran == Names(4, "next_problem"));
+        CHECK(ex(a, "cn"));
+        CHECK(ex(a, "cnext", "2"));
+        CHECK(ex(a, "lne"));
+        UNSCOPED_INFO("each a step");
+        CHECK(ran == Names(4, "next_problem"));
         ran.clear();
-        ensure(":cp, :cN, :lprevious 2", ex(a, "cp") && ex(a, "cN") && ex(a, "lprevious", "2"));
-        ensure("each a step back", ran == Names(4, "previous_problem"));
+        CHECK(ex(a, "cp"));
+        CHECK(ex(a, "cN"));
+        CHECK(ex(a, "lprevious", "2"));
+        UNSCOPED_INFO("each a step back");
+        CHECK(ran == Names(4, "previous_problem"));
         ex(a, "cn", "x");
-        ensure_equals("a count that is none", said->message(), std::string("VimBadArgument"));
+        UNSCOPED_INFO("a count that is none");
+        CHECK(said->message() == std::string("VimBadArgument"));
 
         for (const auto& [name, args] : { std::pair{ "cc", "3" }, std::pair{ "cc", "" }, std::pair{ "ll", "2" },
                                           std::pair{ "cfirst", "" }, std::pair{ "cr", "" }, std::pair{ "lfir", "" },
                                           std::pair{ "clast", "" }, std::pair{ "lla", "" } })
         {
-            ensure(name, ex(a, name, args));
+            CAPTURE(name, args);
+            REQUIRE(ex(a, name, args));
         }
-        ensure("by number: 0 at the caret, 1 the first, -1 the last",
-               studio.problemNumbers == std::vector<S32>{ 3, 0, 2, 1, 1, 1, -1, -1 });
+        UNSCOPED_INFO("by number: 0 at the caret, 1 the first, -1 the last");
+        CHECK(studio.problemNumbers == std::vector<S32>{ 3, 0, 2, 1, 1, 1, -1, -1 });
         studio.hasProblems = false;
         ex(a, "cc", "1");
-        ensure_equals("none to go to: said", said->message(), std::string("VimNoErrors"));
+        UNSCOPED_INFO("none to go to: said");
+        CHECK(said->message() == std::string("VimNoErrors"));
 
         ran.clear();
         ex(a, "copen");
-        ensure(":copen shows the tab", ran == Names{ "problems" } && problemsShown);
+        {
+            INFO(":copen shows the tab");
+            CHECK(ran == Names{ "problems" });
+            CHECK(problemsShown);
+        }
         ex(a, "cw");
-        ensure("shown already: left", ran.size() == 1);
+        UNSCOPED_INFO("shown already: left");
+        CHECK(ran.size() == 1);
         ex(a, "ccl");
-        ensure(":cclose folds it", ran.size() == 2 && !problemsShown);
+        {
+            INFO(":cclose folds it");
+            CHECK(ran.size() == 2);
+            CHECK_FALSE(problemsShown);
+        }
         ex(a, "lcl");
-        ensure("folded already: left", ran.size() == 2);
+        UNSCOPED_INFO("folded already: left");
+        CHECK(ran.size() == 2);
         ex(a, "clist");
-        ensure(":clist shows it", problemsShown);
+        UNSCOPED_INFO(":clist shows it");
+        CHECK(problemsShown);
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<15>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: vim's jumps and keys and :file and listings go through the window", "[alscriptstudiovim]")
     {
-        set_test_name("vim's jumps are the window's to go back to; Ctrl-O, Ctrl-I, K, :tag and :pop through the table; :file; lists to Output");
         make();
         Doc&         a    = tab("a", "one\ntwo\nthree\nfour");
         ALVimKeymap* said = vimOver(a);
@@ -773,78 +950,110 @@ namespace tut
         said->hooks().jumped(*a.expandedEditor, ALTextPos(1, 0));
         navigation->unit.goBack(false);
         navigation->unit.goBack(false);
-        ensure("a jump kept where it began, in the view it was in", navigation->shown == Names{ "a expanded 1", "a 2" });
+        UNSCOPED_INFO("a jump kept where it began, in the view it was in");
+        CHECK(navigation->shown == Names{ "a expanded 1", "a 2" });
 
-        ensure("Ctrl-O, Ctrl-I, K", said->hooks().command(*a.editor, "back", std::string()) &&
-                                        said->hooks().command(*a.editor, "forward", std::string()) &&
-                                        said->hooks().command(*a.editor, "reference", std::string()));
-        ensure(":tag, :pop", ex(a, "tag") && ex(a, "po"));
-        ensure("each its command", ran == Names{ "back", "forward", "reference", "go_to_definition", "back" });
+        {
+            INFO("Ctrl-O, Ctrl-I, K");
+            CHECK(said->hooks().command(*a.editor, "back", std::string()));
+            CHECK(said->hooks().command(*a.editor, "forward", std::string()));
+            CHECK(said->hooks().command(*a.editor, "reference", std::string()));
+        }
+        CHECK(ex(a, "tag"));
+        CHECK(ex(a, "po"));
+        UNSCOPED_INFO("each its command");
+        CHECK(ran == Names{ "back", "forward", "reference", "go_to_definition", "back" });
         ex(a, "tag", "llSay");
-        ensure_equals("a name to go to is not taken", said->message(), std::string("VimBadArgument"));
+        UNSCOPED_INFO("a name to go to is not taken");
+        CHECK(said->message() == std::string("VimBadArgument"));
 
         a.editor->setCaret(ALTextPos(1, 0));
         ex(a, "file");
-        ensure_equals(":file", said->message(), std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [QUOTED]=\"a\" [STATE]="));
-        ensure("not as an error", !said->messageIsError());
+        UNSCOPED_INFO(":file");
+        CHECK(said->message() == std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [QUOTED]=\"a\" [STATE]="));
+        CHECK_FALSE(said->messageIsError());
         a.editor->insertText("!");
         ex(a, "f");
-        ensure_equals("unsaved", said->message(), std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [QUOTED]=\"a\" [STATE]=VimStateModified "));
+        UNSCOPED_INFO("unsaved");
+        CHECK(said->message() == std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [QUOTED]=\"a\" [STATE]=VimStateModified "));
 
         said->hooks().listing(*a.editor, "mark line  col file/text");
-        ensure("a listing to Output",
-               studio.entries.size() == 1 && studio.entries[0].text == "mark line  col file/text" && studio.outputShown == 1);
+        {
+            INFO("a listing to Output");
+            REQUIRE(studio.entries.size() == 1);
+            CHECK(studio.entries[0].text == "mark line  col file/text");
+            CHECK(studio.outputShown == 1);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<16>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: :find opens an include or else a file as :e would or says it is nowhere", "[alscriptstudiovim]")
     {
-        set_test_name(":find opens an include or a module the script names, else a file as :e finds one, else says it is nowhere");
         make();
         files();
         Doc&         a    = tab("a");
         ALVimKeymap* said = vimOver(a);
         studio.included   = { "lib/util.lsl" };
-        ensure("taken", ex(a, "find", "lib/util.lsl"));
-        ensure("the include, by the name written", studio.includedAsked == Names{ "lib/util.lsl" } && studio.openedFiles.empty());
+        CHECK(ex(a, "find", "lib/util.lsl"));
+        {
+            INFO("the include, by the name written");
+            CHECK(studio.includedAsked == Names{ "lib/util.lsl" });
+            CHECK(studio.openedFiles.empty());
+        }
         ex(a, "fin", "main.lsl");
-        ensure("not an include: a file where :e would find it",
-               studio.openedFiles.size() == 1 && studio.openedFiles.back().first == in("main.lsl"));
+        {
+            INFO("not an include: a file where :e would find it");
+            REQUIRE(studio.openedFiles.size() == 1);
+            CHECK(studio.openedFiles.back().first == in("main.lsl"));
+        }
         ex(a, "tabfind", "nowhere.lsl");
-        ensure_equals("nowhere", said->message(), std::string("VimNotInPath [NAME]=nowhere.lsl"));
+        CHECK(said->message() == std::string("VimNotInPath [NAME]=nowhere.lsl"));
         ex(a, "find");
-        ensure_equals("a name wanted", said->message(), std::string("VimArgumentRequired"));
+        UNSCOPED_INFO("a name wanted");
+        CHECK(said->message() == std::string("VimArgumentRequired"));
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<17>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: :set spell and :set list and z= and gO go through the window", "[alscriptstudiovim]")
     {
-        set_test_name(":set spell and :set list are the window's; z= picks from a list over the editor; gO the symbols");
         make();
         Doc&         a    = tab("a");
         ALVimKeymap* said = vimOver(a);
-        ensure(":set spell", ex(a, "set", "spell") && spellCheck && ran == Names{ "spell_check" });
-        ensure("on already: left", ex(a, "set", "spell") && ran.size() == 1);
-        ensure(":set nospell", ex(a, "set", "nospell") && !spellCheck);
-        ensure(":set list, :set nolist", ex(a, "set", "list") && ex(a, "set", "nolist"));
-        ensure("the blanks all, then none", ran == Names{ "spell_check", "spell_check", "blanks_all", "blanks_none" });
+        CHECK(ex(a, "set", "spell"));
+        CHECK(spellCheck);
+        CHECK(ran == Names{ "spell_check" });
+        {
+            INFO("on already: left");
+            CHECK(ex(a, "set", "spell"));
+            CHECK(ran.size() == 1);
+        }
+        CHECK(ex(a, "set", "nospell"));
+        CHECK_FALSE(spellCheck);
+        CHECK(ex(a, "set", "list"));
+        CHECK(ex(a, "set", "nolist"));
+        UNSCOPED_INFO("the blanks all, then none");
+        CHECK(ran == Names{ "spell_check", "spell_check", "blanks_all", "blanks_none" });
 
         std::vector<size_t> chose;
         said->hooks().pick(*a.editor, "teh", { "the", "ten" }, [&chose](size_t index) { chose.push_back(index); });
-        ensure("offered, in order", studio.offered == Names{ "0", "1" });
-        ensure_equals("asking of the word", studio.asking, std::string("VimSuggestPlaceholder"));
-        ensure_equals("as tall as they are", studio.pickRows, 2);
+        UNSCOPED_INFO("offered, in order");
+        CHECK(studio.offered == Names{ "0", "1" });
+        UNSCOPED_INFO("asking of the word");
+        CHECK(studio.asking == std::string("VimSuggestPlaceholder"));
+        UNSCOPED_INFO("as tall as they are");
+        CHECK(studio.pickRows == 2);
         studio.pick("1");
-        ensure("the one picked", chose == std::vector<size_t>{ 1 });
+        UNSCOPED_INFO("the one picked");
+        CHECK(chose == std::vector<size_t>{ 1 });
 
         ran.clear();
-        ensure("gO", said->hooks().command(*a.editor, "go_to_symbol", std::string()) && ran == Names{ "go_to_symbol" });
+        {
+            INFO("gO");
+            CHECK(said->hooks().command(*a.editor, "go_to_symbol", std::string()));
+            CHECK(ran == Names{ "go_to_symbol" });
+        }
     }
 
-    template<> template<>
-    void alscriptstudiovim_object::test<18>()
+    TEST_CASE_METHOD(alscriptstudiovim_data, "alscriptstudiovim: the vimrc sets the window's toggles and each editor and reports the rest", "[alscriptstudiovim]")
     {
-        set_test_name("the vimrc read into the window's vim: the window's options through its toggles, each editor's set on it, what it did not take to Output");
         make();
         bool wrapped = false;
         commands.add(
@@ -856,34 +1065,62 @@ namespace tut
             nullptr, [&wrapped]() { return wrapped; });
         Doc& a           = tab("a");
         studio.vimrcText = "set nu wrap ts=2 et\nlet mapleader = ','\ninoremap jk <Esc>\nbogus\n";
-        ensure("not read yet", !vim->sourced());
+        UNSCOPED_INFO("not read yet");
+        CHECK_FALSE(vim->sourced());
         vim->source();
-        ensure("read", vim->sourced() && lineNumbers && wrapped);
-        ensure("the window's editors told", studio.editorsRefreshed == 1);
+        CHECK(vim->sourced());
+        CHECK(lineNumbers);
+        CHECK(wrapped);
+        UNSCOPED_INFO("the window's editors told");
+        CHECK(studio.editorsRefreshed == 1);
         const ALVimMappings& maps = vim->shared().mappings;
-        ensure("its mapping, and its leader", maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full && maps.leader() == ",");
-        ensure("what it did not take in the Output tab, not brought up", !studio.entries.empty() &&
-                                                                        studio.entries.back().text.find("line 4:") != std::string::npos &&
-                                                                        studio.entries.back().text.find("the vimrc") != std::string::npos &&
-                                                                        studio.outputShown == 0);
+        {
+            INFO("its mapping, and its leader");
+            CHECK(maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full);
+            CHECK(maps.leader() == ",");
+        }
+        {
+            INFO("what it did not take in the Output tab, not brought up");
+            REQUIRE_FALSE(studio.entries.empty());
+            CHECK(studio.entries.back().text.find("line 4:") != std::string::npos);
+            CHECK(studio.entries.back().text.find("the vimrc") != std::string::npos);
+            CHECK(studio.outputShown == 0);
+        }
         vim->applyViewOptions(*a.editor);
-        ensure("each editor's own set on it", a.editor->getTabWidth() == 2 && a.editor->getSoftTabs());
+        {
+            INFO("each editor's own set on it");
+            CHECK(a.editor->getTabWidth() == 2);
+            CHECK(a.editor->getSoftTabs());
+        }
 
         // :set's ? shown, and the toggles.
         ALVimKeymap* said = vimOver(a);
-        ensure(":set nu?", ex(a, "set", "nu?") && said->message() == "  number");
-        ensure(":set invwrap", ex(a, "set", "invwrap") && !wrapped);
+        CHECK(ex(a, "set", "nu?"));
+        CHECK(said->message() == "  number");
+        CHECK(ex(a, "set", "invwrap"));
+        CHECK_FALSE(wrapped);
 
         // :source reads it again, or a tab as it; :e $MYVIMRC opens it.
         studio.vimrcText = "nnoremap Q gq\n";
-        ensure(":so", ex(a, "so") && maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true).full &&
-                          !maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full);
+        CHECK(ex(a, "so"));
+        CHECK(maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true).full);
+        CHECK_FALSE(maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full);
         type(a, "\nbad line");
         const bool         read  = ex(a, "source", "%");
         const std::string& entry = studio.entries.back().text;
-        ensure(":so % reads the tab, and brings up what it did not take",
-               read && studio.outputShown == 1 && entry.find("line 2:") != std::string::npos && entry.find("the vimrc") == std::string::npos);
-        ensure(":e $MYVIMRC", ex(a, "e", "$MYVIMRC") && studio.vimrcEdited == 1);
-        ensure(":so of a file that is not there", ex(a, "so", "nowhere.vim") && said->messageIsError());
+        {
+            INFO(":so % reads the tab, and brings up what it did not take");
+            CHECK(read);
+            CHECK(studio.outputShown == 1);
+            CHECK(entry.find("line 2:") != std::string::npos);
+            CHECK(entry.find("the vimrc") == std::string::npos);
+        }
+        CHECK(ex(a, "e", "$MYVIMRC"));
+        CHECK(studio.vimrcEdited == 1);
+        {
+            INFO(":so of a file that is not there");
+            CHECK(ex(a, "so", "nowhere.vim"));
+            CHECK(said->messageIsError());
+        }
     }
 }

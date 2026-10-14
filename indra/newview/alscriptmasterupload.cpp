@@ -27,6 +27,7 @@
 #include "alscriptmasterupload.h"
 
 #include "alfilewrite.h"
+#include "almainloop.h"
 #include "alrecovery.h"
 #include "alrecoverystore.h"
 #include "alsavehistory.h"
@@ -169,7 +170,7 @@ void ALScriptMasterUpload::read()
     // to this send on the main thread, which alone goes on with it. With no
     // main loop to hand it back to -- a test -- or the thread closed as the
     // viewer goes, read here.
-    if (const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop"))
+    if (const LL::WorkQueue::ptr_t main_loop = ALMainLoop::queue())
     {
         std::shared_ptr<ALScriptMasterUpload> self   = shared_from_this();
         const std::string                     master = mLink.master;
@@ -408,7 +409,7 @@ void ALScriptMasterUpload::askHistory()
     // given to keep before this; what it found handed back to the main
     // thread. With no main loop to hand it back to -- a test -- read here;
     // with the thread stopped, as the viewer quits, not read at all.
-    const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
+    const LL::WorkQueue::ptr_t main_loop = ALMainLoop::queue();
     if (!main_loop)
     {
         historyHas(history->holds(key, asset, *text, HISTORY_NEWEST));

@@ -38,7 +38,7 @@
 
 #include "altesttempdir.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -128,23 +128,12 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
-    struct llxuiparser_data
+    TEST_CASE("llxuiparser: attributes of every scalar kind reach the block", "[llxuiparser]")
     {
-    };
-    typedef test_group<llxuiparser_data> llxuiparser_group;
-    typedef llxuiparser_group::object object;
-    llxuiparser_group llxuiparsergrp("llxuiparser");
-
-    template<> template<>
-    void object::test<1>()
-    {
-        set_test_name("attributes of every scalar kind reach the block");
-
         XuiRoot block;
-        ensure("the document parsed",
-               parse("scalars",
+        CHECK(parse("scalars",
                      "<root flag=\"true\""
                      " text=\"hello\""
                      " small=\"200\""
@@ -154,25 +143,22 @@ namespace tut
                      " id=\"a2e76fcd-9360-4f6d-a924-000000000001\"/>",
                      block));
 
-        ensure("flag provided", block.flag.isProvided());
-        ensure_equals("flag", block.flag(), true);
-        ensure_equals("text", block.text(), std::string("hello"));
-        ensure_equals("small", (S32)block.small_number(), 200);
-        ensure_equals("count", block.count(), -17);
-        ensure_equals("ratio", block.ratio(), 0.5f);
-        ensure_equals("tint red", block.tint().mV[VRED], 1.f);
-        ensure_equals("tint green", block.tint().mV[VGREEN], 0.5f);
-        ensure_equals("tint blue", block.tint().mV[VBLUE], 0.f);
-        ensure_equals("tint alpha", block.tint().mV[VALPHA], 1.f);
-        ensure_equals("id", block.id().asString(),
+        CHECK(block.flag.isProvided());
+        CHECK(block.flag());
+        CHECK(block.text() == std::string("hello"));
+        CHECK((S32)block.small_number() == 200);
+        CHECK(block.count() == -17);
+        CHECK(block.ratio() == 0.5f);
+        CHECK(block.tint().mV[VRED] == 1.f);
+        CHECK(block.tint().mV[VGREEN] == 0.5f);
+        CHECK(block.tint().mV[VBLUE] == 0.f);
+        CHECK(block.tint().mV[VALPHA] == 1.f);
+        CHECK(block.id().asString() ==
                       std::string("a2e76fcd-9360-4f6d-a924-000000000001"));
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE("llxuiparser: a value with trailing junk is not a value", "[llxuiparser]")
     {
-        set_test_name("a value with trailing junk is not a value");
-
         // boost::spirit's parse(...).full said the whole attribute had to be
         // consumed. from_chars says the same by its end pointer reaching the
         // end of the text, and this is what tells the two apart from a reader
@@ -180,81 +166,64 @@ namespace tut
         XuiRoot block;
         parse("junk", "<root count=\"12abc\" ratio=\"0.5px\"/>", block, true);
 
-        ensure("a number with a tail is refused", !block.count.isProvided());
-        ensure("a real with a tail is refused", !block.ratio.isProvided());
+        CHECK_FALSE(block.count.isProvided());
+        CHECK_FALSE(block.ratio.isProvided());
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE("llxuiparser: a narrow type refuses a value it cannot hold", "[llxuiparser]")
     {
-        set_test_name("a narrow type refuses a value it cannot hold");
-
         // Assigning into a U8 through spirit's assign_a never range-checked,
         // so 300 landed as 44.
         XuiRoot block;
         parse("narrow", "<root small=\"300\"/>", block, true);
 
-        ensure("out of range is refused", !block.small_number.isProvided());
-        ensure_equals("and the default stands", (S32)block.small_number(), 0);
+        CHECK_FALSE(block.small_number.isProvided());
+        CHECK((S32)block.small_number() == 0);
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE("llxuiparser: a leading plus is still a number", "[llxuiparser]")
     {
-        set_test_name("a leading plus is still a number");
-
         // from_chars rejects it and spirit's int_p and real_p did not, so the
         // sign is stepped over by hand before the conversion.
         XuiRoot block;
         parse("plus", "<root count=\"+5\" ratio=\"+0.25\"/>", block);
 
-        ensure("signed integer accepted", block.count.isProvided());
-        ensure_equals("count", block.count(), 5);
-        ensure("signed real accepted", block.ratio.isProvided());
-        ensure_equals("ratio", block.ratio(), 0.25f);
+        CHECK(block.count.isProvided());
+        CHECK(block.count() == 5);
+        CHECK(block.ratio.isProvided());
+        CHECK(block.ratio() == 0.25f);
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE("llxuiparser: a dotted attribute name descends into nested blocks", "[llxuiparser]")
     {
-        set_test_name("a dotted attribute name descends into nested blocks");
-
         XuiRoot block;
-        ensure("the document parsed",
-               parse("dotted",
+        CHECK(parse("dotted",
                      "<root middle.depth=\"2\" middle.leaf.depth=\"3\""
                      " middle.leaf.label=\"deep\"/>",
                      block));
 
-        ensure("one dot lands", block.middle.depth.isProvided());
-        ensure_equals("one dot", block.middle.depth(), 2);
-        ensure("two dots land", block.middle.leaf.depth.isProvided());
-        ensure_equals("two dots", block.middle.leaf.depth(), 3);
-        ensure_equals("and again", block.middle.leaf.label(), std::string("deep"));
+        CHECK(block.middle.depth.isProvided());
+        CHECK(block.middle.depth() == 2);
+        CHECK(block.middle.leaf.depth.isProvided());
+        CHECK(block.middle.leaf.depth() == 3);
+        CHECK(block.middle.leaf.label() == std::string("deep"));
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE("llxuiparser: a compound child element descends the same way", "[llxuiparser]")
     {
-        set_test_name("a compound child element descends the same way");
-
         // The other spelling of the same thing: an element named for the
         // parent's scope plus the path, carrying the rest as attributes.
         XuiRoot block;
-        ensure("the document parsed",
-               parse("compound",
+        CHECK(parse("compound",
                      "<root><root.middle leaf.depth=\"7\" depth=\"6\"/></root>",
                      block));
 
-        ensure_equals("attribute on the compound element", block.middle.depth(), 6);
-        ensure_equals("dotted attribute under it", block.middle.leaf.depth(), 7);
+        CHECK(block.middle.depth() == 6);
+        CHECK(block.middle.leaf.depth() == 7);
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE("llxuiparser: a name that does not match the enclosing scope is skipped", "[llxuiparser]")
     {
-        set_test_name("a name that does not match the enclosing scope is skipped");
-
         // startElement checks the leading token against the scope it is in, so
         // a compound element addressed to some other block is ignored rather
         // than folded into this one.
@@ -263,20 +232,16 @@ namespace tut
               "<root><other.middle depth=\"4\"/></root>",
               block, true);
 
-        ensure("nothing was taken from it", !block.middle.depth.isProvided());
+        CHECK_FALSE(block.middle.depth.isProvided());
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE("llxuiparser: a missing file is reported and not assumed empty", "[llxuiparser]")
     {
-        set_test_name("a missing file is reported, not assumed empty");
-
         // In a directory of the test's own, not the working one, where a
         // file of that name could be.
         const ll_test::TempDir dir("al_xuiparser");
         XuiRoot block;
         LLSimpleXUIParser parser;
-        ensure("reading a file that is not there fails",
-               !parser.readXUI((dir.path() / "al_xuiparser_no_such_file.xml").string(), block, true));
+        CHECK_FALSE(parser.readXUI((dir.path() / "al_xuiparser_no_such_file.xml").string(), block, true));
     }
 }

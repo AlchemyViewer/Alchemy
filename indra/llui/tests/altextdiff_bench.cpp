@@ -26,9 +26,9 @@
 // What comparing costs over generated LSL scripts of 5,000 and 50,000
 // lines, each against itself edited ten times and a thousand: the lines
 // alone (ALTextDiff), and the comparison laid out as a view shows it --
-// lines, each change's lines paired and their words -- (ALDiffModel). A
-// number is milliseconds per operation: the median of five samples, each
-// as many passes as fit in fifty milliseconds (and at least one).
+// lines, each change's lines paired and their words -- (ALDiffModel). Each
+// benchmark is one operation, named for its text's length; Catch2 reports
+// the mean of its samples and the interval around it.
 //
 // After the times, what each comparison says of some edits a person
 // makes -- a line changed, a block moved, a function reformatted, lines
@@ -37,8 +37,6 @@
 // or worse by being lower; they are read against the same rows from
 // before a change to how texts are compared, to see that it did what it
 // meant to and nothing else.
-//
-// An unoptimised build exits 125, which CTest reads as skipped.
 
 #include "linden_common.h"
 
@@ -47,47 +45,17 @@
 #include "altextdiff.h"
 
 #include "albigscript.h"
+#include "altestbenchmark.h"
 
 #include <algorithm>
-#include <chrono>
 #include <cstdio>
-#include <functional>
+#include <memory>
 #include <random>
 #include <string>
 #include <vector>
 
-#ifndef LLUI_TEST_APP_DIR
-#  define LLUI_TEST_APP_DIR ""
-#endif
-
-#if defined(LL_RELEASE)
 namespace
 {
-    using clock = std::chrono::steady_clock;
-
-    volatile size_t g_sink = 0;
-
-    double ms_per_item(size_t count, const std::function<void()>& pass)
-    {
-        pass();
-        double samples[5];
-        for (double& sample : samples)
-        {
-            size_t          passes = 0;
-            const auto      start  = clock::now();
-            clock::duration elapsed{};
-            do
-            {
-                pass();
-                ++passes;
-                elapsed = clock::now() - start;
-            } while (elapsed < std::chrono::milliseconds(50));
-            sample = std::chrono::duration<double, std::milli>(elapsed).count() / (double(passes) * double(count));
-        }
-        std::sort(samples, samples + 5);
-        return samples[2];
-    }
-
     std::string joined(const std::vector<std::string>& lines)
     {
         std::string out;
@@ -185,11 +153,6 @@ namespace
         return out;
     }
 
-    void row(const char* name, double small, double big)
-    {
-        std::printf("  %-54s %10.3f %10.3f\n", name, small, big);
-    }
-
     // What a comparison says, laid out: its changes, the lines marked on
     // each side, the lines paired as changed, and the words marked in them.
     void says(const char* name, const std::string& left, const std::string& right, const ALTextDiff::Options& options = ALTextDiff::Options())
@@ -216,61 +179,42 @@ namespace
         }
         std::printf("  %-44s %8d %8d %8d %8d %8d %8d\n", name, model.changeCount(), removed, added, paired, marks, moved);
     }
-}
-#endif // LL_RELEASE
 
-int main(int, char**)
-{
-#if !defined(LL_RELEASE)
-    std::printf("Skipped: an unoptimised build has no numbers worth reading\n");
-    return 125;
-#else
-    const std::vector<std::string> small    = ALTextDiff::split(ll_test::bigLSL(5000));
-    const std::vector<std::string> big      = ALTextDiff::split(ll_test::bigLSL(50000));
-    const std::vector<std::string> small10  = edited(small, 10, 1);
-    const std::vector<std::string> small1k  = edited(small, 1000, 2);
-    const std::vector<std::string> big10    = edited(big, 10, 3);
-    const std::vector<std::string> big1k    = edited(big, 1000, 4);
-    const std::string              small_t  = joined(small);
-    const std::string              big_t    = joined(big);
-    const std::string              small10t = joined(small10);
-    const std::string              small1kt = joined(small1k);
-    const std::string              big10t   = joined(big10);
-    const std::string              big1kt   = joined(big1k);
-
-    std::printf("altextdiff_bench: comparing generated LSL scripts (ms per operation)\n");
-    std::printf("\n  %-54s %10s %10s\n", "", "5,000", "50,000");
-
-    std::printf("\nLines (ALTextDiff::lines)\n");
-    const auto lines = [&](const std::vector<std::string>& left, const std::vector<std::string>& right, const ALTextDiff::Options& options) {
-        return ms_per_item(1, [&] { g_sink = g_sink + ALTextDiff::lines(left, right, options).size(); });
-    };
+    // The texts compared, made once for every case of a run: each script,
+    // edited ten times and a thousand, as lines and as text.
+    struct Texts
     {
-        const ALTextDiff::Options histogram;
-        row("histogram, ten edits", lines(small, small10, histogram), lines(big, big10, histogram));
-        row("histogram, a thousand edits", lines(small, small1k, histogram), lines(big, big1k, histogram));
-        ALTextDiff::Options patience;
-        patience.algorithm = ALTextDiff::Algorithm::Patience;
-        row("patience, ten edits", lines(small, small10, patience), lines(big, big10, patience));
-        row("patience, a thousand edits", lines(small, small1k, patience), lines(big, big1k, patience));
-        ALTextDiff::Options minimal;
-        minimal.algorithm = ALTextDiff::Algorithm::Minimal;
-        row("minimal, ten edits", lines(small, small10, minimal), lines(big, big10, minimal));
-        row("minimal, a thousand edits", lines(small, small1k, minimal), lines(big, big1k, minimal));
-        ALTextDiff::Options structural;
-        structural.algorithm = ALTextDiff::Algorithm::Structural;
-        row("structural, ten edits", lines(small, small10, structural), lines(big, big10, structural));
-        row("structural, a thousand edits", lines(small, small1k, structural), lines(big, big1k, structural));
+        std::vector<std::string> small   = ALTextDiff::split(ll_test::bigLSL(5000));
+        std::vector<std::string> big     = ALTextDiff::split(ll_test::bigLSL(50000));
+        std::vector<std::string> small10 = edited(small, 10, 1);
+        std::vector<std::string> small1k = edited(small, 1000, 2);
+        std::vector<std::string> big10   = edited(big, 10, 3);
+        std::vector<std::string> big1k   = edited(big, 1000, 4);
+        std::string              small_t  = joined(small);
+        std::string              big_t    = joined(big);
+        std::string              small10t = joined(small10);
+        std::string              small1kt = joined(small1k);
+        std::string              big10t   = joined(big10);
+        std::string              big1kt   = joined(big1k);
+    };
+
+    const Texts& texts()
+    {
+        static const Texts made;
+        return made;
     }
 
-    std::printf("\nLaid out (ALDiffModel: lines, pairs, words, rows)\n");
     // LSL's grammar, where the source tree has it, for words cut as code.
-    std::string                            error;
-    std::shared_ptr<const ALSyntaxGrammar> lsl = ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
-    const auto lexer = [&lsl]() { return lsl ? ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl)) : ALTextDiff::lexer_t(); };
+    std::shared_ptr<const ALSyntaxGrammar> lslGrammar()
+    {
+        std::string error;
+        return ALSyntaxGrammar::fromFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+    }
+
     // A model's lexer as a view gives it: saying what it read again, and
     // told what an edit knows; and a merge's of its own, likewise.
-    const auto lexing = [&lsl](ALDiffModel& model) {
+    void lexing(ALDiffModel& model, const std::shared_ptr<const ALSyntaxGrammar>& lsl)
+    {
         const std::shared_ptr<ALDiffLexer> compared = lsl ? std::make_shared<ALDiffLexer>(lsl) : nullptr;
         const std::shared_ptr<ALDiffLexer> merging  = lsl ? std::make_shared<ALDiffLexer>(lsl) : nullptr;
         model.setLexer(compared ? ALDiffLexer::lexerOf(compared) : ALTextDiff::lexer_t(), merging ? ALDiffLexer::lexerOf(merging) : ALTextDiff::lexer_t(),
@@ -278,63 +222,51 @@ int main(int, char**)
                        compared ? ALDiffLexer::toldOf(compared) : ALTextDiff::told_t(),
                        merging ? ALDiffLexer::rereadOf(merging) : ALTextDiff::reread_t(),
                        merging ? ALDiffLexer::toldOf(merging) : ALTextDiff::told_t());
+    }
+
+    // A live comparison, the right typed in: a character put in a line near
+    // the middle, and taken out again, each call one keystroke compared
+    // again. Blanks let go of where asked, which a grammar's strings keep,
+    // or comments, which a grammar says where they are.
+    struct Typing
+    {
+        bool                  grammar   = false;
+        ALTextDiff::Algorithm algorithm = ALTextDiff::Algorithm::Histogram;
+        ALTextDiff::ranges_t  ranges;
+        bool                  blanks   = false;
+        bool                  comments = false;
     };
-    const auto laid = [&](const std::string& left, const std::string& right, bool grammar) {
-        return ms_per_item(1, [&] {
-            ALDiffModel model;
-            if (grammar)
-            {
-                lexing(model);
-            }
-            model.setTexts(left, right);
-            g_sink = g_sink + static_cast<size_t>(model.rowCount(ALDiffModel::Layout::Sides));
-        });
-    };
-    row("ten edits", laid(small_t, small10t, false), laid(big_t, big10t, false));
-    row("a thousand edits", laid(small_t, small1kt, false), laid(big_t, big1kt, false));
-    row("ten edits, words by LSL's grammar", laid(small_t, small10t, true), laid(big_t, big10t, true));
-    row("a thousand edits, words by LSL's grammar", laid(small_t, small1kt, true), laid(big_t, big1kt, true));
-    // A live comparison, the right typed in: a character put in a line
-    // near the middle and compared again, then taken out and compared
-    // again; per keystroke. Blanks let go of where asked, which a grammar's
-    // strings keep, or comments, which a grammar says where they are.
-    const auto typed = [&](const std::string& left, const std::string& right, bool grammar = false,
-                           ALTextDiff::Algorithm algorithm = ALTextDiff::Algorithm::Histogram, const ALTextDiff::ranges_t& ranges = {},
-                           bool blanks = false, bool comments = false) {
+
+    void typed(const char* name, const std::string& left, const std::string& right, const Typing& typing = Typing())
+    {
         ALDiffModel model;
-        if (grammar)
+        if (typing.grammar)
         {
-            lexing(model);
+            lexing(model, lslGrammar());
         }
         ALTextDiff::Likeness like;
-        like.ignoreWhitespace = blanks;
-        like.ignoreComments   = comments;
+        like.ignoreWhitespace = typing.blanks;
+        like.ignoreComments   = typing.comments;
         model.setLikeness(like);
-        model.setAlgorithm(algorithm);
-        model.setTexts(left, right, ranges);
+        model.setAlgorithm(typing.algorithm);
+        model.setTexts(left, right, typing.ranges);
         const size_t at   = right.find('\n', right.size() / 2);
         std::string  with = right;
         with.insert(at, "x");
-        return ms_per_item(2, [&] {
-            model.setRightText(with);
-            model.setRightText(right);
-            g_sink = g_sink + static_cast<size_t>(model.changeCount());
-        });
-    };
-    row("a keystroke, ten edits", typed(small_t, small10t), typed(big_t, big10t));
-    row("a keystroke, a thousand edits", typed(small_t, small1kt), typed(big_t, big1kt));
-    row("a keystroke, a thousand edits, LSL's grammar", typed(small_t, small1kt, true), typed(big_t, big1kt, true));
-    row("a keystroke, a thousand edits, LSL's, blanks let go", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Histogram, {}, true),
-        typed(big_t, big1kt, true, ALTextDiff::Algorithm::Histogram, {}, true));
-    row("a keystroke, a thousand edits, LSL's, comments let go", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Histogram, {}, false, true),
-        typed(big_t, big1kt, true, ALTextDiff::Algorithm::Histogram, {}, false, true));
-    row("a keystroke, a thousand edits, by structure", typed(small_t, small1kt, true, ALTextDiff::Algorithm::Structural),
-        typed(big_t, big1kt, true, ALTextDiff::Algorithm::Structural));
+        size_t keystrokes = 0;
+        BENCHMARK(name)
+        {
+            model.setRightText(++keystrokes % 2 ? with : right);
+            return model.changeCount();
+        };
+    }
+
     // The same keystroke in a merge: the text before both versions the
     // base, theirs the left with ten edits, ours the right with a thousand.
-    const auto merged = [&](const std::string& base, const std::string& left, const std::string& right, bool comments) {
+    void merged(const char* name, const std::string& base, const std::string& left, const std::string& right, bool comments)
+    {
         ALDiffModel model;
-        lexing(model);
+        lexing(model, lslGrammar());
         ALTextDiff::Likeness like;
         like.ignoreComments = comments;
         model.setLikeness(like);
@@ -343,87 +275,190 @@ int main(int, char**)
         const size_t at   = right.find('\n', right.size() / 2);
         std::string  with = right;
         with.insert(at, "x");
-        return ms_per_item(2, [&] {
-            model.setRightText(with);
-            model.setRightText(right);
-            g_sink = g_sink + static_cast<size_t>(model.conflictCount());
-        });
-    };
-    row("a keystroke in a merge, LSL's grammar", merged(small_t, small10t, small1kt, false), merged(big_t, big10t, big1kt, false));
-    row("a keystroke in a merge, LSL's, comments let go", merged(small_t, small10t, small1kt, true), merged(big_t, big10t, big1kt, true));
-    {
-        // Another version on the left, as a slider over a script's saves
-        // steps: a line apart from the one before.
-        const auto stepped = [&](const std::string& left, const std::string& right) {
-            ALDiffModel model;
-            model.setTexts(left, right);
-            const size_t at   = left.find('\n', left.size() / 3);
-            std::string  with = left;
-            with.insert(at, " // older");
-            return ms_per_item(2, [&] {
-                model.setLeftText(with);
-                model.setLeftText(left);
-                g_sink = g_sink + static_cast<size_t>(model.changeCount());
-            });
+        size_t keystrokes = 0;
+        BENCHMARK(name)
+        {
+            model.setRightText(++keystrokes % 2 ? with : right);
+            return model.conflictCount();
         };
-        row("another version on the left, ten edits", stepped(small_t, small10t), stepped(big_t, big10t));
     }
+
+    // Another version on the left, as a slider over a script's saves steps:
+    // a line apart from the one before.
+    void stepped(const char* name, const std::string& left, const std::string& right)
     {
-        // A script beside what it was converted to: every line written
-        // otherwise, each anchored to its own, as the converter lines them up.
-        const auto converted = [](const std::vector<std::string>& lines, ALTextDiff::ranges_t& ranges) {
-            std::vector<std::string> out;
-            for (size_t n = 0; n < lines.size(); ++n)
-            {
-                out.push_back(lines[n] + " -- as SLua");
-                ranges.push_back({ static_cast<S32>(n), static_cast<S32>(n), static_cast<S32>(n), static_cast<S32>(n) });
-            }
-            return joined(out);
+        ALDiffModel model;
+        model.setTexts(left, right);
+        const size_t at   = left.find('\n', left.size() / 3);
+        std::string  with = left;
+        with.insert(at, " // older");
+        size_t steps = 0;
+        BENCHMARK(name)
+        {
+            model.setLeftText(++steps % 2 ? with : left);
+            return model.changeCount();
         };
+    }
+
+    // A script beside what it was converted to: every line written
+    // otherwise, each anchored to its own, as the converter lines them up.
+    std::string converted(const std::vector<std::string>& lines, ALTextDiff::ranges_t& ranges)
+    {
+        std::vector<std::string> out;
+        for (size_t n = 0; n < lines.size(); ++n)
+        {
+            out.push_back(lines[n] + " -- as SLua");
+            ranges.push_back({ static_cast<S32>(n), static_cast<S32>(n), static_cast<S32>(n), static_cast<S32>(n) });
+        }
+        return joined(out);
+    }
+
+
+    TEST_CASE("altextdiff_bench: the lines alone by each algorithm", "[altextdiff_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        const Texts& t = texts();
+        const auto lines = [](const char* name, const std::vector<std::string>& left, const std::vector<std::string>& right,
+                              ALTextDiff::Algorithm algorithm) {
+            ALTextDiff::Options options;
+            options.algorithm = algorithm;
+            BENCHMARK(name)
+            {
+                return ALTextDiff::lines(left, right, options).size();
+            };
+        };
+        lines("histogram, ten edits, 5,000 lines", t.small, t.small10, ALTextDiff::Algorithm::Histogram);
+        lines("histogram, ten edits, 50,000 lines", t.big, t.big10, ALTextDiff::Algorithm::Histogram);
+        lines("histogram, a thousand edits, 5,000 lines", t.small, t.small1k, ALTextDiff::Algorithm::Histogram);
+        lines("histogram, a thousand edits, 50,000 lines", t.big, t.big1k, ALTextDiff::Algorithm::Histogram);
+        lines("patience, ten edits, 5,000 lines", t.small, t.small10, ALTextDiff::Algorithm::Patience);
+        lines("patience, ten edits, 50,000 lines", t.big, t.big10, ALTextDiff::Algorithm::Patience);
+        lines("patience, a thousand edits, 5,000 lines", t.small, t.small1k, ALTextDiff::Algorithm::Patience);
+        lines("patience, a thousand edits, 50,000 lines", t.big, t.big1k, ALTextDiff::Algorithm::Patience);
+        lines("minimal, ten edits, 5,000 lines", t.small, t.small10, ALTextDiff::Algorithm::Minimal);
+        lines("minimal, ten edits, 50,000 lines", t.big, t.big10, ALTextDiff::Algorithm::Minimal);
+        lines("minimal, a thousand edits, 5,000 lines", t.small, t.small1k, ALTextDiff::Algorithm::Minimal);
+        lines("minimal, a thousand edits, 50,000 lines", t.big, t.big1k, ALTextDiff::Algorithm::Minimal);
+        lines("structural, ten edits, 5,000 lines", t.small, t.small10, ALTextDiff::Algorithm::Structural);
+        lines("structural, ten edits, 50,000 lines", t.big, t.big10, ALTextDiff::Algorithm::Structural);
+        lines("structural, a thousand edits, 5,000 lines", t.small, t.small1k, ALTextDiff::Algorithm::Structural);
+        lines("structural, a thousand edits, 50,000 lines", t.big, t.big1k, ALTextDiff::Algorithm::Structural);
+    }
+
+    TEST_CASE("altextdiff_bench: laid out and made whole", "[altextdiff_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        const Texts&                                 t   = texts();
+        const std::shared_ptr<const ALSyntaxGrammar> lsl = lslGrammar();
+        const auto laid = [&lsl](const char* name, const std::string& left, const std::string& right, bool grammar) {
+            BENCHMARK(name)
+            {
+                ALDiffModel model;
+                if (grammar)
+                {
+                    lexing(model, lsl);
+                }
+                model.setTexts(left, right);
+                return model.rowCount(ALDiffModel::Layout::Sides);
+            };
+        };
+        laid("ten edits, 5,000 lines", t.small_t, t.small10t, false);
+        laid("ten edits, 50,000 lines", t.big_t, t.big10t, false);
+        laid("a thousand edits, 5,000 lines", t.small_t, t.small1kt, false);
+        laid("a thousand edits, 50,000 lines", t.big_t, t.big1kt, false);
+        laid("ten edits, words by LSL's grammar, 5,000 lines", t.small_t, t.small10t, true);
+        laid("ten edits, words by LSL's grammar, 50,000 lines", t.big_t, t.big10t, true);
+        laid("a thousand edits, words by LSL's grammar, 5,000 lines", t.small_t, t.small1kt, true);
+        laid("a thousand edits, words by LSL's grammar, 50,000 lines", t.big_t, t.big1kt, true);
+    }
+
+    TEST_CASE("altextdiff_bench: laid out with a keystroke compared again", "[altextdiff_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        const Texts& t = texts();
+        typed("a keystroke, ten edits, 5,000 lines", t.small_t, t.small10t);
+        typed("a keystroke, ten edits, 50,000 lines", t.big_t, t.big10t);
+        typed("a keystroke, a thousand edits, 5,000 lines", t.small_t, t.small1kt);
+        typed("a keystroke, a thousand edits, 50,000 lines", t.big_t, t.big1kt);
+        Typing grammar;
+        grammar.grammar = true;
+        typed("a keystroke, a thousand edits, LSL's grammar, 5,000 lines", t.small_t, t.small1kt, grammar);
+        typed("a keystroke, a thousand edits, LSL's grammar, 50,000 lines", t.big_t, t.big1kt, grammar);
+        Typing blanks = grammar;
+        blanks.blanks = true;
+        typed("a keystroke, a thousand edits, LSL's, blanks let go, 5,000 lines", t.small_t, t.small1kt, blanks);
+        typed("a keystroke, a thousand edits, LSL's, blanks let go, 50,000 lines", t.big_t, t.big1kt, blanks);
+        Typing comments   = grammar;
+        comments.comments = true;
+        typed("a keystroke, a thousand edits, LSL's, comments let go, 5,000 lines", t.small_t, t.small1kt, comments);
+        typed("a keystroke, a thousand edits, LSL's, comments let go, 50,000 lines", t.big_t, t.big1kt, comments);
+        Typing structure    = grammar;
+        structure.algorithm = ALTextDiff::Algorithm::Structural;
+        typed("a keystroke, a thousand edits, by structure, 5,000 lines", t.small_t, t.small1kt, structure);
+        typed("a keystroke, a thousand edits, by structure, 50,000 lines", t.big_t, t.big1kt, structure);
+        merged("a keystroke in a merge, LSL's grammar, 5,000 lines", t.small_t, t.small10t, t.small1kt, false);
+        merged("a keystroke in a merge, LSL's grammar, 50,000 lines", t.big_t, t.big10t, t.big1kt, false);
+        merged("a keystroke in a merge, LSL's, comments let go, 5,000 lines", t.small_t, t.small10t, t.small1kt, true);
+        merged("a keystroke in a merge, LSL's, comments let go, 50,000 lines", t.big_t, t.big10t, t.big1kt, true);
+        stepped("another version on the left, ten edits, 5,000 lines", t.small_t, t.small10t);
+        stepped("another version on the left, ten edits, 50,000 lines", t.big_t, t.big10t);
+
         ALTextDiff::ranges_t small_ranges;
         ALTextDiff::ranges_t big_ranges;
-        const std::string    small_c = converted(small, small_ranges);
-        const std::string    big_c   = converted(big, big_ranges);
-        row("a keystroke, every line converted, anchored", typed(small_t, small_c, false, ALTextDiff::Algorithm::Histogram, small_ranges),
-            typed(big_t, big_c, false, ALTextDiff::Algorithm::Histogram, big_ranges));
-        row("a keystroke, converted, LSL's, blanks let go", typed(small_t, small_c, true, ALTextDiff::Algorithm::Histogram, small_ranges, true),
-            typed(big_t, big_c, true, ALTextDiff::Algorithm::Histogram, big_ranges, true));
-        row("a keystroke, converted, LSL's, comments let go",
-            typed(small_t, small_c, true, ALTextDiff::Algorithm::Histogram, small_ranges, false, true),
-            typed(big_t, big_c, true, ALTextDiff::Algorithm::Histogram, big_ranges, false, true));
+        const std::string    small_c = converted(t.small, small_ranges);
+        const std::string    big_c   = converted(t.big, big_ranges);
+        Typing               anchored_small;
+        anchored_small.ranges = small_ranges;
+        Typing anchored_big;
+        anchored_big.ranges = big_ranges;
+        typed("a keystroke, every line converted, anchored, 5,000 lines", t.small_t, small_c, anchored_small);
+        typed("a keystroke, every line converted, anchored, 50,000 lines", t.big_t, big_c, anchored_big);
+        anchored_small.grammar = anchored_big.grammar = true;
+        anchored_small.blanks = anchored_big.blanks = true;
+        typed("a keystroke, converted, LSL's, blanks let go, 5,000 lines", t.small_t, small_c, anchored_small);
+        typed("a keystroke, converted, LSL's, blanks let go, 50,000 lines", t.big_t, big_c, anchored_big);
+        anchored_small.blanks = anchored_big.blanks = false;
+        anchored_small.comments = anchored_big.comments = true;
+        typed("a keystroke, converted, LSL's, comments let go, 5,000 lines", t.small_t, small_c, anchored_small);
+        typed("a keystroke, converted, LSL's, comments let go, 50,000 lines", t.big_t, big_c, anchored_big);
     }
 
-    std::printf("\nWhat it says (5,000 lines)\n");
-    std::printf("  %-44s %8s %8s %8s %8s %8s %8s\n", "", "changes", "out", "in", "paired", "words", "moved");
-    ALTextDiff::Options by_grammar;
-    by_grammar.lexer = lexer();
-    says("ten edits", small_t, small10t);
-    says("a thousand edits", small_t, small1kt);
-    says("a function moved", small_t, joined(moved(small)));
-    says("calls and braces reformatted", small_t, joined(reformatted(small, 200, 200)));
+    TEST_CASE("altextdiff_bench: what each comparison says of some edits", "[altextdiff_bench][!benchmark]")
     {
-        // A line taken out of the middle of lines changed: what pairing by
-        // place gets wrong.
-        std::vector<std::string> right = small;
-        for (size_t i = 300; i < 306; ++i)
+        ll_test::skipUnlessOptimised();
+        const Texts& t = texts();
+        std::printf("\nWhat it says (5,000 lines)\n");
+        std::printf("  %-44s %8s %8s %8s %8s %8s %8s\n", "", "changes", "out", "in", "paired", "words", "moved");
+        ALTextDiff::Options by_grammar;
+        if (const std::shared_ptr<const ALSyntaxGrammar> lsl = lslGrammar())
         {
-            right[i] += " // edited";
+            by_grammar.lexer = ALDiffLexer::lexerOf(std::make_shared<ALDiffLexer>(lsl));
         }
-        right.erase(right.begin() + 302);
-        says("one taken out among six changed", small_t, joined(right));
+        says("ten edits", t.small_t, t.small10t);
+        says("a thousand edits", t.small_t, t.small1kt);
+        says("a function moved", t.small_t, joined(moved(t.small)));
+        says("calls and braces reformatted", t.small_t, joined(reformatted(t.small, 200, 200)));
+        {
+            // A line taken out of the middle of lines changed: what pairing
+            // by place gets wrong.
+            std::vector<std::string> right = t.small;
+            for (size_t i = 300; i < 306; ++i)
+            {
+                right[i] += " // edited";
+            }
+            right.erase(right.begin() + 302);
+            says("one taken out among six changed", t.small_t, joined(right));
+        }
+        says("a thousand edits, LSL's grammar", t.small_t, t.small1kt, by_grammar);
+        for (const auto& [algorithm, name] : { std::make_pair(ALTextDiff::Algorithm::Patience, "patience"), std::make_pair(ALTextDiff::Algorithm::Minimal, "minimal"),
+                                               std::make_pair(ALTextDiff::Algorithm::Structural, "structural") })
+        {
+            ALTextDiff::Options by;
+            by.algorithm = algorithm;
+            says((std::string("a thousand edits, ") + name).c_str(), t.small_t, t.small1kt, by);
+            says((std::string("a function moved, ") + name).c_str(), t.small_t, joined(moved(t.small)), by);
+            says((std::string("calls and braces reformatted, ") + name).c_str(), t.small_t, joined(reformatted(t.small, 200, 200)), by);
+        }
+        std::fflush(stdout);
     }
-    says("a thousand edits, LSL's grammar", small_t, small1kt, by_grammar);
-    for (const auto& [algorithm, name] : { std::make_pair(ALTextDiff::Algorithm::Patience, "patience"), std::make_pair(ALTextDiff::Algorithm::Minimal, "minimal"),
-                                           std::make_pair(ALTextDiff::Algorithm::Structural, "structural") })
-    {
-        ALTextDiff::Options by;
-        by.algorithm = algorithm;
-        says((std::string("a thousand edits, ") + name).c_str(), small_t, small1kt, by);
-        says((std::string("a function moved, ") + name).c_str(), small_t, joined(moved(small)), by);
-        says((std::string("calls and braces reformatted, ") + name).c_str(), small_t, joined(reformatted(small, 200, 200)), by);
-    }
-
-    std::printf("\n(checksum %zu)\n", static_cast<size_t>(g_sink));
-    return 0;
-#endif
 }

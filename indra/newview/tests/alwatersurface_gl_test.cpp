@@ -48,7 +48,7 @@
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <cfloat>
@@ -63,10 +63,8 @@
 #include <tuple>
 #include <vector>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         constexpr S32 W = 16;
         constexpr S32 H = 16;
 
@@ -550,26 +548,34 @@ namespace tut
         {
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kColourVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kColourFragment);
-            ensure("colour shaders compile", vs && fs);
+            {
+                INFO("colour shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
             mColour.mProgramObject = glCreateProgram();
             mColour.mName = "colour (test)";
             mColour.attachObject(vs);
             mColour.attachObject(fs);
-            ensure("colour program links", mColour.mapAttributes());
+            UNSCOPED_INFO("colour program links");
+            REQUIRE(mColour.mapAttributes());
             glDeleteShader(vs);
             glDeleteShader(fs);
-            ensure("colour program maps", mColour.mapUniforms());
+            UNSCOPED_INFO("colour program maps");
+            REQUIRE(mColour.mapUniforms());
 
             std::map<std::string, std::string> defines;
             for (const char* object : { "deferred/textureUtilV.glsl", "objects/nonindexedTextureV.glsl", "environment/waterSurface.glsl" })
             {
                 S32 level = 1;
-                ensure(std::string("compiled ") + object, mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines) != 0);
+                UNSCOPED_INFO(std::string("compiled ") + object);
+                REQUIRE(mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines) != 0);
             }
             for (const char* object : { "deferred/globalF.glsl", "environment/waterSurface.glsl", "deferred/hexLatticeUtil.glsl" })
             {
                 S32 level = 1;
-                ensure(std::string("compiled ") + object, mShaders.loadShaderFile(object, level, GL_FRAGMENT_SHADER, &defines) != 0);
+                UNSCOPED_INFO(std::string("compiled ") + object);
+                REQUIRE(mShaders.loadShaderFile(object, level, GL_FRAGMENT_SHADER, &defines) != 0);
             }
             mExclusion.mName = "Water Exclusion Shader";
             mExclusion.mFeatures.hasWaterSurface = true;
@@ -577,15 +583,18 @@ namespace tut
             mExclusion.mShaderFiles.push_back(std::make_pair("environment/waterExclusionV.glsl", GL_VERTEX_SHADER));
             mExclusion.mShaderFiles.push_back(std::make_pair("environment/waterExclusionF.glsl", GL_FRAGMENT_SHADER));
             mExclusion.mShaderLevel = 1;
-            ensure("exclusion program builds", mExclusion.createShader());
+            UNSCOPED_INFO("exclusion program builds");
+            REQUIRE(mExclusion.createShader());
 
             // The camera over cell (1, 1), the agent region's origin at the global one.
             mLayout = ALWaterField::layout(300.0, 300.0, CELL, 256.f, 256000.0, regions(), 0.0);
             makeCellMap();
 
-            ensure("scene allocates", mScene.allocate(W, H, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
-                                                      LLRenderTarget::MIPS_NONE, format));
-            ensure("the scene has stencil", mScene.hasStencil());
+            UNSCOPED_INFO("scene allocates");
+            REQUIRE(mScene.allocate(W, H, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
+                    LLRenderTarget::MIPS_NONE, format));
+            UNSCOPED_INFO("the scene has stencil");
+            REQUIRE(mScene.hasStencil());
             mScene.bindTarget();
             gGL.setClearColor(LLColor4::black);
             mScene.clear();
@@ -600,7 +609,8 @@ namespace tut
             mCellMap = new LLImageGL(ALWaterField::MAP_SIZE, ALWaterField::MAP_SIZE, 2, false);
             mCellMap->setNeedsAlphaAndPickMask(false);
             mCellMap->setExplicitFormat(GL_RG32F, GL_RG, GL_FLOAT);
-            ensure("cell map", mCellMap->createGLTexture(0, reinterpret_cast<const U8*>(texels.data())));
+            UNSCOPED_INFO("cell map");
+            REQUIRE(mCellMap->createGLTexture(0, reinterpret_cast<const U8*>(texels.data())));
         }
 
         // The camera both programs draw from.
@@ -748,15 +758,19 @@ namespace tut
             mField.mShaderFiles.push_back(std::make_pair("environment/waterFieldV.glsl", GL_VERTEX_SHADER));
             mField.mShaderFiles.push_back(std::make_pair("environment/waterFieldF.glsl", GL_FRAGMENT_SHADER));
             mField.mShaderLevel = 1;
-            ensure("field program builds", mField.createShader());
-            ensure_equals("the field program has no vertex inputs", mField.mAttributeMask, 0U);
+            UNSCOPED_INFO("field program builds");
+            REQUIRE(mField.createShader());
+            UNSCOPED_INFO("the field program has no vertex inputs");
+            REQUIRE(mField.mAttributeMask == 0U);
 
             mLayout = ALWaterField::layout(300.0, 300.0, CELL, 256.f, FIELD_STRETCH, regions(), reach);
             makeCellMap();
-            ensure("the stretch takes two rings", mLayout.mRings == 2);
+            UNSCOPED_INFO("the stretch takes two rings");
+            REQUIRE(mLayout.mRings == 2);
 
-            ensure("field target", mScene.allocate(FIELD_SIZE, FIELD_SIZE, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
-                                                   LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_24));
+            UNSCOPED_INFO("field target");
+            REQUIRE(mScene.allocate(FIELD_SIZE, FIELD_SIZE, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
+                    LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_24));
             mScene.bindTarget();
             gGL.setClearColor(LLColor4::black);
             mScene.clear();
@@ -873,8 +887,10 @@ namespace tut
             mPyramidProgram.mShaderFiles.clear();
             mPyramidProgram.mShaderFiles.push_back(std::make_pair("deferred/depthPyramidC.glsl", GL_COMPUTE_SHADER));
             mPyramidProgram.mShaderLevel = 1;
-            ensure("pyramid program builds", mPyramidProgram.createShader());
-            ensure("the pyramid is built by compute", mPyramidProgram.isCompute());
+            UNSCOPED_INFO("pyramid program builds");
+            REQUIRE(mPyramidProgram.createShader());
+            UNSCOPED_INFO("the pyramid is built by compute");
+            REQUIRE(mPyramidProgram.isCompute());
         }
 
         // The field's program as the viewer links it, capturing each vertex's clip position: agent space, under
@@ -888,17 +904,21 @@ namespace tut
             {
                 S32 level = 1;
                 const GLuint handle = mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines);
-                ensure(std::string("compiled ") + object, handle != 0);
+                UNSCOPED_INFO(std::string("compiled ") + object);
+                REQUIRE(handle != 0);
                 mFieldCapture.attachObject(handle);
             }
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, "#version 400\nout vec4 c;\nvoid main() { c = vec4(1.0); }\n");
-            ensure("fragment compiles", fs != 0);
+            UNSCOPED_INFO("fragment compiles");
+            REQUIRE(fs != 0);
             mFieldCapture.attachObject(fs);
             const char* varyings[] = { "gl_Position" };
             glTransformFeedbackVaryings(mFieldCapture.mProgramObject, 1, varyings, GL_INTERLEAVED_ATTRIBS);
-            ensure("field capture program links", mFieldCapture.mapAttributes());
+            UNSCOPED_INFO("field capture program links");
+            REQUIRE(mFieldCapture.mapAttributes());
             glDeleteShader(fs);
-            ensure("field capture program maps", mFieldCapture.mapUniforms());
+            UNSCOPED_INFO("field capture program maps");
+            REQUIRE(mFieldCapture.mapUniforms());
         }
 
         // The pyramid's box test alone (kProbeVertex), each box's answer captured.
@@ -906,11 +926,16 @@ namespace tut
         {
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kProbeVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kBoxFragment);
-            ensure("probe shaders compile", vs && fs);
+            {
+                INFO("probe shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
             std::map<std::string, std::string> defines;
             S32 level = 1;
             const GLuint util = mShaders.loadShaderFile("deferred/depthPyramidUtil.glsl", level, GL_VERTEX_SHADER, &defines);
-            ensure("the pyramid's box test compiles", util != 0);
+            UNSCOPED_INFO("the pyramid's box test compiles");
+            REQUIRE(util != 0);
             mProbe.mProgramObject = glCreateProgram();
             mProbe.mName = "pyramid probe (test)";
             mProbe.attachObject(vs);
@@ -918,17 +943,23 @@ namespace tut
             mProbe.attachObject(util);
             const char* varyings[] = { "probeVisible" };
             glTransformFeedbackVaryings(mProbe.mProgramObject, 1, varyings, GL_INTERLEAVED_ATTRIBS);
-            ensure("probe program links", mProbe.mapAttributes());
+            UNSCOPED_INFO("probe program links");
+            REQUIRE(mProbe.mapAttributes());
             glDeleteShader(vs);
             glDeleteShader(fs);
-            ensure("probe program maps", mProbe.mapUniforms());
+            UNSCOPED_INFO("probe program maps");
+            REQUIRE(mProbe.mapUniforms());
         }
 
         // Whether depth_pyramid_box_visible keeps each of up to four `boxes`, lo and hi, against mPyramid, taken to clip
         // space by `to_clip`.
         std::vector<bool> probe(const std::vector<std::pair<LLVector3, LLVector3>>& boxes, const LLMatrix4a& to_clip)
         {
-            ensure("a probe takes up to four boxes", !boxes.empty() && boxes.size() <= 4);
+            {
+                INFO("a probe takes up to four boxes");
+                REQUIRE(!boxes.empty());
+                REQUIRE(boxes.size() <= 4);
+            }
             F32 lo[12] = {};
             F32 hi[12] = {};
             for (size_t i = 0; i < boxes.size(); ++i)
@@ -947,7 +978,8 @@ namespace tut
             const std::vector<F32> answers = captureFeedback(GL_POINTS, 1, [&]()
                                                              { gGL.drawArraysInstanced(LLRender::POINTS, 0, (U32)boxes.size(), 1); });
             LLGLSLShader::unbind();
-            ensure_equals("each box answered", answers.size(), boxes.size());
+            UNSCOPED_INFO("each box answered");
+            REQUIRE(answers.size() == boxes.size());
             std::vector<bool> kept;
             for (F32 answer : answers)
             {
@@ -977,17 +1009,21 @@ namespace tut
             {
                 S32 level = 1;
                 const GLuint handle = mShaders.loadShaderFile(object.first, level, object.second, &defines);
-                ensure(std::string("compiled ") + object.first, handle != 0);
+                UNSCOPED_INFO(std::string("compiled ") + object.first);
+                REQUIRE(handle != 0);
                 mWaves.attachObject(handle);
             }
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, "#version 400\nout vec4 c;\nvoid main() { c = vec4(1.0); }\n");
-            ensure("fragment compiles", fs != 0);
+            UNSCOPED_INFO("fragment compiles");
+            REQUIRE(fs != 0);
             mWaves.attachObject(fs);
             const char* varyings[] = { captured };
             glTransformFeedbackVaryings(mWaves.mProgramObject, 1, varyings, GL_INTERLEAVED_ATTRIBS);
-            ensure("waves program links", mWaves.mapAttributes());
+            UNSCOPED_INFO("waves program links");
+            REQUIRE(mWaves.mapAttributes());
             glDeleteShader(fs);
-            ensure("waves program maps", mWaves.mapUniforms());
+            UNSCOPED_INFO("waves program maps");
+            REQUIRE(mWaves.mapUniforms());
         }
 
         // The triangles `draw` emits through the bound program, captured from its one feedback varying of `components`
@@ -1058,12 +1094,14 @@ namespace tut
         {
             mWaves.bind();
             S32 channel = mWaves.enableTexture(LLShaderMgr::WATER_CELL_MAP);
-            ensure("the patches read the cell map", channel > -1);
+            UNSCOPED_INFO("the patches read the cell map");
+            REQUIRE(channel > -1);
             gGL.getTextureSlot(channel)->bindSampled(mCellMap.get(), ALSamplers::PointClamp);
             if (draw.mHeights)
             {
                 channel = mWaves.enableTexture(LLShaderMgr::WATER_HEIGHT_MAP);
-                ensure("the patches read the heights", channel > -1);
+                UNSCOPED_INFO("the patches read the heights");
+                REQUIRE(channel > -1);
                 gGL.getTextureSlot(channel)->bindSampled(draw.mHeights, ALSamplers::BilinearWrap);
             }
             mWaves.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, mSquare.mV);
@@ -1168,16 +1206,23 @@ namespace tut
         {
             const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kBoxVertex);
             const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kBoxFragment);
-            ensure("box shaders compile", vs && fs);
+            {
+                INFO("box shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
             mBoxes.mProgramObject = glCreateProgram();
             mBoxes.mName = "patch boxes (test)";
             mBoxes.attachObject(vs);
             mBoxes.attachObject(fs);
-            ensure("the boxes place patches", mBoxes.attachStageObject(GL_VERTEX_SHADER, "environment/waterSurface.glsl"));
-            ensure("box program links", mBoxes.mapAttributes());
+            UNSCOPED_INFO("the boxes place patches");
+            REQUIRE(mBoxes.attachStageObject(GL_VERTEX_SHADER, "environment/waterSurface.glsl"));
+            UNSCOPED_INFO("box program links");
+            REQUIRE(mBoxes.mapAttributes());
             glDeleteShader(vs);
             glDeleteShader(fs);
-            ensure("box program maps", mBoxes.mapUniforms());
+            UNSCOPED_INFO("box program maps");
+            REQUIRE(mBoxes.mapUniforms());
         }
 
         // The patches of CULL_RECT any of whose box passes the depth test against the bound scene's depth: what a cull
@@ -1186,13 +1231,15 @@ namespace tut
         {
             mBoxes.bind();
             const S32 channel = mBoxes.enableTexture(LLShaderMgr::WATER_CELL_MAP);
-            ensure("the boxes read the cell map", channel > -1);
+            UNSCOPED_INFO("the boxes read the cell map");
+            REQUIRE(channel > -1);
             gGL.getTextureSlot(channel)->bindSampled(mCellMap.get(), ALSamplers::PointClamp);
             mBoxes.uniform4fv(LLShaderMgr::WATER_CELL_SQUARE, 1, mSquare.mV);
             mBoxes.uniform4iv(LLShaderMgr::WATER_PATCH_RECT, 1, CULL_RECT);
             mBoxes.uniform1f(LLShaderMgr::WATER_MAX_DISPLACEMENT, CULL_A);
             const GLint at = glGetUniformLocation(mBoxes.mProgramObject, "boxPatch");
-            ensure("the boxes take a patch", at > -1);
+            UNSCOPED_INFO("the boxes take a patch");
+            REQUIRE(at > -1);
 
             std::set<S32> visible;
             GLuint query = 0;
@@ -1237,9 +1284,12 @@ namespace tut
             constexpr S32 ALIGN = 1 << (ALDepthPyramid::LEVELS - 1);
             S32 lw = ((w + 1) / 2 + ALIGN - 1) / ALIGN * ALIGN;
             S32 lh = ((h + 1) / 2 + ALIGN - 1) / ALIGN * ALIGN;
-            ensure_equals(what + ": the levels built", mPyramid.getLevels(), ALDepthPyramid::LEVELS);
-            ensure_equals(what + ": level 0's width", (S32)mPyramid.getTarget().getWidth(), lw);
-            ensure_equals(what + ": level 0's height", (S32)mPyramid.getTarget().getHeight(), lh);
+            UNSCOPED_INFO(what + ": the levels built");
+            REQUIRE(mPyramid.getLevels() == ALDepthPyramid::LEVELS);
+            UNSCOPED_INFO(what + ": level 0's width");
+            REQUIRE((S32)mPyramid.getTarget().getWidth() == lw);
+            UNSCOPED_INFO(what + ": level 0's height");
+            REQUIRE((S32)mPyramid.getTarget().getHeight() == lh);
 
             std::vector<F32> expected((size_t)lw * lh);
             for (S32 y = 0; y < lh; ++y)
@@ -1287,8 +1337,9 @@ namespace tut
                     const F32 d = fabsf(got[n] - expected[n]);
                     off = std::isnan(d) ? FLT_MAX : llmax(off, d);
                 }
-                ensure(what + ": level " + std::to_string(level) + " holds the farthest depth under each texel, off by "
-                       + std::to_string(off), off <= tolerance);
+                UNSCOPED_INFO(what + ": level " + std::to_string(level) + " holds the farthest depth under each texel, off by "
+                              + std::to_string(off));
+                REQUIRE(off <= tolerance);
             }
             gGL.getTextureSlot(0)->unbind();
         }
@@ -1300,15 +1351,21 @@ namespace tut
             {
                 const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kScreenVertex);
                 const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kNoiseDepthFragment);
-                ensure("noise shaders compile", vs && fs);
+                {
+                    INFO("noise shaders compile");
+                    REQUIRE(vs);
+                    REQUIRE(fs);
+                }
                 mNoiseDepth.mProgramObject = glCreateProgram();
                 mNoiseDepth.mName = "noise depth (test)";
                 mNoiseDepth.attachObject(vs);
                 mNoiseDepth.attachObject(fs);
-                ensure("noise program links", mNoiseDepth.mapAttributes());
+                UNSCOPED_INFO("noise program links");
+                REQUIRE(mNoiseDepth.mapAttributes());
                 glDeleteShader(vs);
                 glDeleteShader(fs);
-                ensure("noise program maps", mNoiseDepth.mapUniforms());
+                UNSCOPED_INFO("noise program maps");
+                REQUIRE(mNoiseDepth.mapUniforms());
             }
             LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
             mNoiseDepth.bind();
@@ -1376,15 +1433,10 @@ namespace tut
         LLGLSLShader           mFieldCapture;
     };
 
-    typedef test_group<alwatersurface_data> alwatersurface_t;
-    typedef alwatersurface_t::object alwatersurface_object_t;
-    tut::alwatersurface_t tut_alwatersurface("alwatersurface_gl");
-    }
 
     // From above, an exclusion prim over the water removes the water behind it; one under the water removes nothing,
     // since the water hides it.
-    template<> template<>
-    void alwatersurface_object_t::test<1>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from above, an exclusion prim over the water removes the water behind it", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1396,17 +1448,19 @@ namespace tut
             waterUnderStencil();
             for (S32 y : { 2, 12 })
             {
-                ensure(named(format, "a prim above the water removes it, row " + std::to_string(y)), !wet(4, y));
+                UNSCOPED_INFO(named(format, "a prim above the water removes it, row " + std::to_string(y)));
+                REQUIRE(!wet(4, y));
             }
-            ensure(named(format, "a prim under the water removes nothing"), wet(12, 12));
-            ensure(named(format, "nor does nothing"), wet(12, 4));
+            UNSCOPED_INFO(named(format, "a prim under the water removes nothing"));
+            REQUIRE(wet(12, 12));
+            UNSCOPED_INFO(named(format, "nor does nothing"));
+            REQUIRE(wet(12, 4));
             tearDownWater();
         }
     }
 
     // From below, the reverse: the prim under the water, on the camera's side, removes it; the one above it does not.
-    template<> template<>
-    void alwatersurface_object_t::test<2>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below, a prim under the water removes it and one above does not", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1418,16 +1472,17 @@ namespace tut
             waterUnderStencil();
             for (S32 y : { 2, 12 })
             {
-                ensure(named(format, "a prim above the water from below removes nothing, row " + std::to_string(y)), wet(4, y));
-                ensure(named(format, "a prim under it does, row " + std::to_string(y)), !wet(12, y));
+                UNSCOPED_INFO(named(format, "a prim above the water from below removes nothing, row " + std::to_string(y)));
+                REQUIRE(wet(4, y));
+                UNSCOPED_INFO(named(format, "a prim under it does, row " + std::to_string(y)));
+                REQUIRE(!wet(12, y));
             }
             tearDownWater();
         }
     }
 
     // A prim behind opaque geometry marks nothing: the pass tests the scene's depth.
-    template<> template<>
-    void alwatersurface_object_t::test<3>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: a prim behind opaque geometry marks nothing", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1438,9 +1493,10 @@ namespace tut
             exclusion(0.f, SPAN, 0.f, SPAN, HIGH + 5.f);
             for (S32 y : { 2, 12 })
             {
-                ensure_equals(named(format, "behind the wall, row " + std::to_string(y)), (U32)stencil(4, y), 0U);
-                ensure_equals(named(format, "in the open, row " + std::to_string(y)), (U32)stencil(12, y),
-                              ALWaterStencil::EXCLUDE_BIT);
+                UNSCOPED_INFO(named(format, "behind the wall, row " + std::to_string(y)));
+                REQUIRE((U32)stencil(4, y) == 0U);
+                UNSCOPED_INFO(named(format, "in the open, row " + std::to_string(y)));
+                REQUIRE((U32)stencil(12, y) == ALWaterStencil::EXCLUDE_BIT);
             }
             tearDownWater();
         }
@@ -1448,8 +1504,7 @@ namespace tut
 
     // A prim over two regions whose water lies at different heights tests each part against its own: at 25 m it is
     // above the west region's 20 m water and under the east one's 30 m.
-    template<> template<>
-    void alwatersurface_object_t::test<4>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: a prim over two regions tests each part against its own region's water", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1458,17 +1513,22 @@ namespace tut
             ground(0.f);
             exclusion(0.f, SPAN, 0.f, 256.f, 25.f);
             waterUnderStencil();
-            ensure(named(format, "over the 20 m water it removes the water"), !wet(4, 4));
-            ensure(named(format, "under the 30 m water it removes nothing"), wet(12, 4));
-            ensure(named(format, "where it is not, the water is"), wet(4, 12) && wet(12, 12));
+            UNSCOPED_INFO(named(format, "over the 20 m water it removes the water"));
+            REQUIRE(!wet(4, 4));
+            UNSCOPED_INFO(named(format, "under the 30 m water it removes nothing"));
+            REQUIRE(wet(12, 4));
+            {
+                INFO(named(format, "where it is not, the water is"));
+                REQUIRE(wet(4, 12));
+                REQUIRE(wet(12, 12));
+            }
             tearDownWater();
         }
     }
 
     // From below, the surface is drawn twice, once where the exclude bit is clear and once where it is set, and each
     // pixel takes exactly one of them.
-    template<> template<>
-    void alwatersurface_object_t::test<5>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below, each pixel takes exactly one of the surface's two draws", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1494,8 +1554,10 @@ namespace tut
                 const LLColor4U c = pixel(x, 6);
                 const bool distorted = c.mV[VRED] == 255;
                 const bool undistorted = c.mV[VGREEN] == 255;
-                ensure(named(format, "column " + std::to_string(x) + " drawn once"), distorted != undistorted);
-                ensure(named(format, "column " + std::to_string(x) + " undistorted where excluded"), undistorted == (x >= 8));
+                UNSCOPED_INFO(named(format, "column " + std::to_string(x) + " drawn once"));
+                REQUIRE(distorted != undistorted);
+                UNSCOPED_INFO(named(format, "column " + std::to_string(x) + " undistorted where excluded"));
+                REQUIRE(undistorted == (x >= 8));
             }
             tearDownWater();
         }
@@ -1503,8 +1565,7 @@ namespace tut
 
     // The next frame's clear empties what the pass marked: the stencil states hand the write mask back whole, and a
     // clear writes stencil only through it.
-    template<> template<>
-    void alwatersurface_object_t::test<6>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the next frame's clear empties what the pass marked", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1513,11 +1574,15 @@ namespace tut
             ground(0.f);
             exclusion(0.f, SPAN, 0.f, 256.f, HIGH + 5.f);
             waterUnderStencil();
-            ensure_equals(named(format, "excluded"), (U32)stencil(8, 4), ALWaterStencil::EXCLUDE_BIT);
-            ensure_equals(named(format, "water"), (U32)stencil(8, 12), ALWaterStencil::SURFACE_BIT);
+            UNSCOPED_INFO(named(format, "excluded"));
+            REQUIRE((U32)stencil(8, 4) == ALWaterStencil::EXCLUDE_BIT);
+            UNSCOPED_INFO(named(format, "water"));
+            REQUIRE((U32)stencil(8, 12) == ALWaterStencil::SURFACE_BIT);
             mScene.clear();
-            ensure_equals(named(format, "excluded, cleared"), (U32)stencil(8, 4), 0U);
-            ensure_equals(named(format, "water, cleared"), (U32)stencil(8, 12), 0U);
+            UNSCOPED_INFO(named(format, "excluded, cleared"));
+            REQUIRE((U32)stencil(8, 4) == 0U);
+            UNSCOPED_INFO(named(format, "water, cleared"));
+            REQUIRE((U32)stencil(8, 12) == 0U);
             tearDownWater();
         }
     }
@@ -1525,8 +1590,7 @@ namespace tut
     // The water marks the pixels it shades and no others: a crest a metre and a half above the plane is marked, a box
     // whose top lies two centimetres above it is not, and nor is a pixel an exclusion prim removed the water from. A
     // test of the depth against the plane would take the box for water and the crest for not.
-    template<> template<>
-    void alwatersurface_object_t::test<7>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the water marks the pixels it shades and no others", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1541,8 +1605,10 @@ namespace tut
             {
                 const U32 bits = stencil(x, 12);
                 const std::string column = named(format, "column " + std::to_string(x));
-                ensure_equals(column + " marked as water", (bits & ALWaterStencil::SURFACE_BIT) != 0, x >= 8);
-                ensure_equals(column + " excluded", (bits & ALWaterStencil::EXCLUDE_BIT) != 0, x >= 4 && x < 8);
+                UNSCOPED_INFO(column + " marked as water");
+                REQUIRE(((bits & ALWaterStencil::SURFACE_BIT) != 0) == (x >= 8));
+                UNSCOPED_INFO(column + " excluded");
+                REQUIRE(((bits & ALWaterStencil::EXCLUDE_BIT) != 0) == (x >= 4 && x < 8));
             }
             tearDownWater();
         }
@@ -1550,8 +1616,7 @@ namespace tut
 
     // The haze pass's two draws, one where the surface bit is clear and one where it is set, shade every pixel once,
     // the second exactly where the water is.
-    template<> template<>
-    void alwatersurface_object_t::test<8>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the haze's two draws shade every pixel once, the converging one exactly on the water", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1580,8 +1645,10 @@ namespace tut
                 const bool plain = c.mV[VRED] == 255;
                 const bool on_water = c.mV[VGREEN] == 255;
                 const std::string column = named(format, "column " + std::to_string(x));
-                ensure(column + " hazed once", plain != on_water);
-                ensure_equals(column + " converged where the water is", on_water, x >= 8);
+                UNSCOPED_INFO(column + " hazed once");
+                REQUIRE(plain != on_water);
+                UNSCOPED_INFO(column + " converged where the water is");
+                REQUIRE(on_water == (x >= 8));
             }
             tearDownWater();
         }
@@ -1589,8 +1656,7 @@ namespace tut
 
     // The vertex stage lays the cells and rings out as ALWaterField does, without a crack or an overlap: every pixel
     // inside the rim takes one fragment, and none past it.
-    template<> template<>
-    void alwatersurface_object_t::test<9>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the field covers every pixel inside the rim once and none past it", "[alwatersurface_gl]")
     {
         setUpField();
         {
@@ -1606,15 +1672,14 @@ namespace tut
                 const F32 px = fieldX(x);
                 const F32 py = fieldX(y);
                 const bool within = fabsf(px) < rim && fabsf(py) < rim;
-                ensure_equals("pixel " + std::to_string(x) + ", " + std::to_string(y) + " covered once inside the rim",
-                              (U32)stencil(x, y), within ? 1U : 0U);
+                UNSCOPED_INFO("pixel " + std::to_string(x) + ", " + std::to_string(y) + " covered once inside the rim");
+                REQUIRE((U32)stencil(x, y) == (within ? 1U : 0U));
             }
         }
     }
 
     // With the void hidden only the cells a region holds are drawn: none of the square's empty cells, and no ring.
-    template<> template<>
-    void alwatersurface_object_t::test<10>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: with the void hidden only the cells a region holds are drawn", "[alwatersurface_gl]")
     {
         setUpField();
         {
@@ -1631,15 +1696,14 @@ namespace tut
                 const F64 gx = cx + fieldX(x);
                 const F64 gy = cy + fieldX(y);
                 const bool region = gx >= 0.0 && gx < 2.0 * CELL && gy >= 0.0 && gy < 2.0 * CELL;
-                ensure_equals("pixel " + std::to_string(x) + ", " + std::to_string(y) + " drawn only over a region",
-                              (U32)stencil(x, y), region ? 1U : 0U);
+                UNSCOPED_INFO("pixel " + std::to_string(x) + ", " + std::to_string(y) + " drawn only over a region");
+                REQUIRE((U32)stencil(x, y) == (region ? 1U : 0U));
             }
         }
     }
 
     // Each cell lies at its own region's water height, and the rings at the agent region's.
-    template<> template<>
-    void alwatersurface_object_t::test<11>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: each cell lies at its own region's water height, and the rings at the agent region's", "[alwatersurface_gl]")
     {
         setUpField();
         {
@@ -1654,22 +1718,25 @@ namespace tut
                                   (S32)((gy - cy + FIELD_VIEW) / (2.0 * FIELD_VIEW) * FIELD_SIZE));
         };
         const auto [hx, hy] = pixel_of(1.5 * CELL, 0.5 * CELL);
-        ensure("the 30 m region", fabsf(heightAt(hx, hy) - HIGH) < 0.05f);
+        UNSCOPED_INFO("the 30 m region");
+        CHECK(fabsf(heightAt(hx, hy) - HIGH) < 0.05f);
         const auto [lx, ly] = pixel_of(0.5 * CELL, 1.5 * CELL);
-        ensure("a 20 m region", fabsf(heightAt(lx, ly) - LOW) < 0.05f);
+        UNSCOPED_INFO("a 20 m region");
+        CHECK(fabsf(heightAt(lx, ly) - LOW) < 0.05f);
         const auto [rx, ry] = pixel_of(cx + 1800.0, cy);
-        ensure("a ring", fabsf(heightAt(rx, ry) - LOW) < 0.05f);
+        UNSCOPED_INFO("a ring");
+        CHECK(fabsf(heightAt(rx, ry) - LOW) < 0.05f);
     }
 
     // The sky behind: the field's samples against the world's depth decide whether the target is cleared and drawn,
     // on the GPU. Behind an occluder everywhere, it is left as it was; through one gap, it is cleared.
-    template<> template<>
-    void alwatersurface_object_t::test<12>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the sky behind is cleared only where the field shows past the world", "[alwatersurface_gl]")
     {
         for (bool gap : { false, true })
         {
             setUpField();
-            ensure("behind target", mBehind.allocate(4, 4, GL_RGBA8));
+            UNSCOPED_INFO("behind target");
+            REQUIRE(mBehind.allocate(4, 4, GL_RGBA8));
 
             // The world, above the water everywhere in view, or but for one column of pixels over the square's middle.
             {
@@ -1688,8 +1755,8 @@ namespace tut
                 mQuery.end();
             }
 
-            ensure_equals(gap ? "water through the gap clears the sky behind" : "water all hidden leaves it",
-                          conditionalClearRan(), gap);
+            UNSCOPED_INFO((gap ? "water through the gap clears the sky behind" : "water all hidden leaves it"));
+            REQUIRE(conditionalClearRan() == gap);
             mBehind.release();
             tearDownWater();
             mField.unload();
@@ -1700,36 +1767,47 @@ namespace tut
     // Anti-repeat: the big layer hex-tiled through the viewer's own reads breaks its repeat and keeps what the author
     // set. One repeat over, its slopes no longer match themselves, where the plain read matches exactly; their mean,
     // variance, and principal axis and spread are the plain read's; and most of the sea is one cell's sample, unblended.
-    template<> template<>
-    void alwatersurface_object_t::test<13>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: hex tiling breaks the big layer's repeat and keeps what the author set", "[alwatersurface_gl]")
     {
         const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kScreenVertex);
         const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kTilingFragment);
-        ensure("tiling shaders compile", vs && fs);
+        {
+            INFO("tiling shaders compile");
+            CHECK(vs);
+            CHECK(fs);
+        }
         std::map<std::string, std::string> defines;
         S32 level = 1;
         const GLuint surface = mShaders.loadShaderFile("environment/waterSurface.glsl", level, GL_FRAGMENT_SHADER, &defines);
         level = 1;
         const GLuint lattice = mShaders.loadShaderFile("deferred/hexLatticeUtil.glsl", level, GL_FRAGMENT_SHADER, &defines);
-        ensure("the viewer's reads compile", surface != 0 && lattice != 0);
+        {
+            INFO("the viewer's reads compile");
+            CHECK(surface != 0);
+            CHECK(lattice != 0);
+        }
         mTiling.mProgramObject = glCreateProgram();
         mTiling.mName = "anti-repeat (test)";
         mTiling.attachObject(vs);
         mTiling.attachObject(fs);
         mTiling.attachObject(surface);
         mTiling.attachObject(lattice);
-        ensure("tiling program links", mTiling.mapAttributes());
+        UNSCOPED_INFO("tiling program links");
+        CHECK(mTiling.mapAttributes());
         glDeleteShader(vs);
         glDeleteShader(fs);
-        ensure("tiling program maps", mTiling.mapUniforms());
+        UNSCOPED_INFO("tiling program maps");
+        CHECK(mTiling.mapUniforms());
 
         const std::vector<U8> rgba = noiseMap();
         mNoise = new LLImageGL(TILE_TEXELS, TILE_TEXELS, 4, false);
         mNoise->setExplicitFormat(GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
-        ensure("noise map", mNoise->createGLTexture(0, rgba.data()));
+        UNSCOPED_INFO("noise map");
+        REQUIRE(mNoise->createGLTexture(0, rgba.data()));
         const LLVector2 mean = ALWaterField::meanNormal(rgba.data(), TILE_TEXELS, TILE_TEXELS, 4);
 
-        ensure("slopes target", mSlopes.allocate(TILING_SIZE, TILING_SIZE, GL_RGBA32F));
+        UNSCOPED_INFO("slopes target");
+        REQUIRE(mSlopes.allocate(TILING_SIZE, TILING_SIZE, GL_RGBA32F));
         const ALWaterField::LatticePlaces places = ALWaterField::latticePlaces(1234.5, 6789.1);
 
         const auto render = [&](S32 mode)
@@ -1764,25 +1842,35 @@ namespace tut
         const SlopeField plain = render(0);
         const SlopeField tiled = render(1);
 
-        ensure("the plain read repeats", correlation(plain, TILE_TEXELS, 0) > 0.99 && correlation(plain, 0, TILE_TEXELS) > 0.99);
+        {
+            INFO("the plain read repeats");
+            CHECK(correlation(plain, TILE_TEXELS, 0) > 0.99);
+            CHECK(correlation(plain, 0, TILE_TEXELS) > 0.99);
+        }
         const F64 across = correlation(tiled, TILE_TEXELS, 0);
         const F64 along = correlation(tiled, 0, TILE_TEXELS);
-        ensure("hex-tiled, a repeat across matches no more than by chance", std::fabs(across) <= 0.2);
-        ensure("nor a repeat along", std::fabs(along) <= 0.2);
+        UNSCOPED_INFO("hex-tiled, a repeat across matches no more than by chance");
+        CHECK(std::fabs(across) <= 0.2);
+        UNSCOPED_INFO("nor a repeat along");
+        CHECK(std::fabs(along) <= 0.2);
 
         const SlopeStats p = slopeStats(plain);
         const SlopeStats t = slopeStats(tiled);
         for (S32 c = 0; c < 2; ++c)
         {
             const F64 shift = (t.mean[c] - p.mean[c]) / std::sqrt(p.var[c]);
-            ensure("the slopes' mean, off by " + std::to_string(shift) + " sigma", std::fabs(shift) <= 0.05);
+            UNSCOPED_INFO("the slopes' mean, off by " + std::to_string(shift) + " sigma");
+            REQUIRE(std::fabs(shift) <= 0.05);
             const F64 ratio = t.var[c] / p.var[c];
-            ensure("their variance, at " + std::to_string(ratio) + " of the plain read's", std::fabs(ratio - 1.0) <= 0.05);
+            UNSCOPED_INFO("their variance, at " + std::to_string(ratio) + " of the plain read's");
+            REQUIRE(std::fabs(ratio - 1.0) <= 0.05);
         }
         const F64 turned = (t.axis() - p.axis()) * RAD_TO_DEG;
-        ensure("the slopes' principal axis, turned " + std::to_string(turned) + " degrees", std::fabs(turned) <= 2.0);
+        UNSCOPED_INFO("the slopes' principal axis, turned " + std::to_string(turned) + " degrees");
+        CHECK(std::fabs(turned) <= 2.0);
         const F64 spread = (t.major() / t.minor()) / (p.major() / p.minor());
-        ensure("their spread along and across it, at " + std::to_string(spread), std::fabs(spread - 1.0) <= 0.05);
+        UNSCOPED_INFO("their spread along and across it, at " + std::to_string(spread));
+        CHECK(std::fabs(spread - 1.0) <= 0.05);
 
         // Where cells blend, the same: the bands lie where the lattice says, whatever the map shows there, so the plain
         // read's statistics are theirs too. A weighting that favours one sample over another shows only here.
@@ -1790,9 +1878,11 @@ namespace tut
         for (S32 c = 0; c < 2; ++c)
         {
             const F64 shift = (b.mean[c] - p.mean[c]) / std::sqrt(p.var[c]);
-            ensure("the bands' mean, off by " + std::to_string(shift) + " sigma", std::fabs(shift) <= 0.01);
+            UNSCOPED_INFO("the bands' mean, off by " + std::to_string(shift) + " sigma");
+            REQUIRE(std::fabs(shift) <= 0.01);
             const F64 ratio = b.var[c] / p.var[c];
-            ensure("the bands' variance, at " + std::to_string(ratio) + " of the plain read's", std::fabs(ratio - 1.0) <= 0.1);
+            UNSCOPED_INFO("the bands' variance, at " + std::to_string(ratio) + " of the plain read's");
+            REQUIRE(std::fabs(ratio - 1.0) <= 0.1);
         }
 
         S32 single = 0;
@@ -1803,37 +1893,48 @@ namespace tut
                 single += tiled.weight(i, j) > 0.999f ? 1 : 0;
             }
         }
-        ensure("most of the sea is one cell's sample", single > TILING_SIZE * TILING_SIZE / 2);
+        UNSCOPED_INFO("most of the sea is one cell's sample");
+        CHECK(single > TILING_SIZE * TILING_SIZE / 2);
     }
 
     // The lattice stays in the world: every point of the sea shows the same cell of the big layer's lattice from two
     // cameras several cells apart, their places on it reaching the shader through the program's uniforms as the
     // water's do. A place whose floor never arrives shifts every cell by the camera's moves across the lattice.
-    template<> template<>
-    void alwatersurface_object_t::test<14>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the lattice stays in the world", "[alwatersurface_gl]")
     {
         constexpr S32 SIZE = 256;
         constexpr F32 REPEAT = 16.f;
         const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kScreenVertex);
         const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kLatticeFragment);
-        ensure("lattice shaders compile", vs && fs);
+        {
+            INFO("lattice shaders compile");
+            CHECK(vs);
+            CHECK(fs);
+        }
         std::map<std::string, std::string> defines;
         S32 level = 1;
         const GLuint surface = mShaders.loadShaderFile("environment/waterSurface.glsl", level, GL_FRAGMENT_SHADER, &defines);
         level = 1;
         const GLuint lattice = mShaders.loadShaderFile("deferred/hexLatticeUtil.glsl", level, GL_FRAGMENT_SHADER, &defines);
-        ensure("the viewer's reads compile", surface != 0 && lattice != 0);
+        {
+            INFO("the viewer's reads compile");
+            CHECK(surface != 0);
+            CHECK(lattice != 0);
+        }
         mTiling.mProgramObject = glCreateProgram();
         mTiling.mName = "lattice (test)";
         mTiling.attachObject(vs);
         mTiling.attachObject(fs);
         mTiling.attachObject(surface);
         mTiling.attachObject(lattice);
-        ensure("lattice program links", mTiling.mapAttributes());
+        UNSCOPED_INFO("lattice program links");
+        CHECK(mTiling.mapAttributes());
         glDeleteShader(vs);
         glDeleteShader(fs);
-        ensure("lattice program maps", mTiling.mapUniforms());
-        ensure("cells target", mSlopes.allocate(SIZE, SIZE, GL_RGBA32F));
+        UNSCOPED_INFO("lattice program maps");
+        CHECK(mTiling.mapUniforms());
+        UNSCOPED_INFO("cells target");
+        REQUIRE(mSlopes.allocate(SIZE, SIZE, GL_RGBA32F));
 
         // The target's corner and the two cameras, in repeats of the big layer, well out on the grid.
         const F64 corner[2] = { 1000.37, 2000.61 };
@@ -1874,21 +1975,23 @@ namespace tut
                 moved += (a[0] != b[0] || a[1] != b[1]) ? 1 : 0;
             }
         }
-        ensure("most points lie inside a cell", compared > SIZE * SIZE / 2);
-        ensure_equals("no point of the sea changes cell as the camera moves", moved, 0);
+        UNSCOPED_INFO("most points lie inside a cell");
+        CHECK(compared > SIZE * SIZE / 2);
+        UNSCOPED_INFO("no point of the sea changes cell as the camera moves");
+        CHECK(moved == 0);
     }
 
     // The waves' patches over one cell, as the evaluation stage emits them (transform feedback of `view`, the point
     // less the camera), at fractional levels over a big layer of sines: every point two patches share has one height,
     // and every point inside the cell is surrounded by triangles, so no edge holds a point only one side has. A patch
     // outside the frustum emits nothing, and under a camera within A of the plane the surface stays flat.
-    template<> template<>
-    void alwatersurface_object_t::test<15>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the waves' patches give a shared point one height and leave no gap", "[alwatersurface_gl]")
     {
         setUpWater(LLRenderTarget::DEPTH_FMT_24);
         mScene.flush();
         setUpWavesCapture();
-        ensure_equals("the waves' program has no vertex inputs", mWaves.mAttributeMask, 0U);
+        UNSCOPED_INFO("the waves' program has no vertex inputs");
+        CHECK(mWaves.mAttributeMask == 0U);
 
         // A big layer of sines in repeats, 0.05 tall, and a mid layer of 0.03: 0.7 m of waves at a height of 1.
         constexpr S32 MAP = 64;
@@ -1906,7 +2009,8 @@ namespace tut
         mHeights = new LLImageGL(MAP, MAP, 2, false);
         mHeights->setNeedsAlphaAndPickMask(false);
         mHeights->setExplicitFormat(GL_RG32F, GL_RG, GL_FLOAT);
-        ensure("heights", mHeights->createGLTexture(0, reinterpret_cast<const U8*>(heights.data())));
+        UNSCOPED_INFO("heights");
+        REQUIRE(mHeights->createGLTexture(0, reinterpret_cast<const U8*>(heights.data())));
 
         // The patches over the camera's cell, texel (2, 2) of the map: global cell (1, 1), at LOW.
         constexpr F32 A = 2.f;
@@ -1935,7 +2039,8 @@ namespace tut
         const LLVector3 high(484.f, 534.f, LOW + 200.f);
         const std::vector<F32> points = capture(high, true);
         const size_t triangles = points.size() / 9;
-        ensure("the cell's patches tessellate past one quad each", triangles > (size_t)PATCHES * 2);
+        UNSCOPED_INFO("the cell's patches tessellate past one quad each");
+        CHECK(triangles > (size_t)PATCHES * 2);
 
         struct Seen
         {
@@ -1979,7 +2084,8 @@ namespace tut
                 tallest = llmax(tallest, fabsf(p[2] + high.mV[VZ] - LOW));
             }
         }
-        ensure("the waves move the surface", tallest > 0.1f);
+        UNSCOPED_INFO("the waves move the surface");
+        CHECK(tallest > 0.1f);
         S32 split = 0;
         S32 open = 0;
         for (const auto& [key, s] : seen)
@@ -1992,10 +2098,13 @@ namespace tut
             const bool surrounded = s.mLeft < xy[0] && s.mRight > xy[0] && s.mBelow < xy[1] && s.mAbove > xy[1];
             open += (rim || surrounded) ? 0 : 1;
         }
-        ensure_equals("a point two patches share has one height", split, 0);
-        ensure_equals("no point inside the cell lies on an edge only one side has", open, 0);
+        UNSCOPED_INFO("a point two patches share has one height");
+        CHECK(split == 0);
+        UNSCOPED_INFO("no point inside the cell lies on an edge only one side has");
+        CHECK(open == 0);
 
-        ensure_equals("a patch outside the frustum emits nothing", capture(high, false).size(), (size_t)0);
+        UNSCOPED_INFO("a patch outside the frustum emits nothing");
+        REQUIRE(capture(high, false).size() == (size_t)0);
 
         // On a deck in waves: within A of the plane, over a corner the patches share.
         const LLVector3 deck(384.f, 384.f, LOW + 0.5f * A);
@@ -2009,29 +2118,32 @@ namespace tut
             if (p[0] == 0.f && p[1] == 0.f)
             {
                 under = true;
-                ensure("the surface under the camera is the plane", fabsf(rise) < 1e-4f);
+                UNSCOPED_INFO("the surface under the camera is the plane");
+                REQUIRE(fabsf(rise) < 1e-4f);
             }
             if (p[0] * p[0] + p[1] * p[1] > 16.f * A * A)
             {
                 off = llmax(off, fabsf(rise));
             }
         }
-        ensure("a point lies under the camera", under);
-        ensure("the waves stand away from it", off > 0.1f);
+        UNSCOPED_INFO("a point lies under the camera");
+        CHECK(under);
+        UNSCOPED_INFO("the waves stand away from it");
+        CHECK(off > 0.1f);
     }
 
     // The sky behind's query with waves: the field raised by A counts a crest over a wall the flat field misses, and
     // the flat field counts the water under a camera between the plane and A above it, which the raised field, above
     // the camera, misses.
-    template<> template<>
-    void alwatersurface_object_t::test<16>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the sky behind's query counts both the raised and the flat field", "[alwatersurface_gl]")
     {
         setUpField();
         mScene.flush();
         constexpr F32 A = 3.f;
         const F32 cx = (F32)mLayout.centreX();
         const F32 cy = (F32)mLayout.centreY();
-        ensure("behind target", mBehind.allocate(4, 4, GL_RGBA8));
+        UNSCOPED_INFO("behind target");
+        REQUIRE(mBehind.allocate(4, 4, GL_RGBA8));
 
         // Whether the query over `raises` lets the conditional clear run, from a camera at `camera_z`, behind a wall at
         // `wall_z` over the whole view where `wall`.
@@ -2064,10 +2176,14 @@ namespace tut
         };
 
         // The wall stands half A above the highest water, the south-east region's.
-        ensure("a wall over all the water hides the flat field", !counted(FIELD_CAMERA_Z, true, HIGH + 0.5f * A, { 0.f }));
-        ensure("the field raised by A shows over it", counted(FIELD_CAMERA_Z, true, HIGH + 0.5f * A, { 0.f, A }));
-        ensure("from a deck within A of the plane, the raised field alone is missed", !counted(LOW + 0.5f * A, false, 0.f, { A }));
-        ensure("and the flat field counts the water", counted(LOW + 0.5f * A, false, 0.f, { 0.f, A }));
+        UNSCOPED_INFO("a wall over all the water hides the flat field");
+        CHECK(!counted(FIELD_CAMERA_Z, true, HIGH + 0.5f * A, { 0.f }));
+        UNSCOPED_INFO("the field raised by A shows over it");
+        CHECK(counted(FIELD_CAMERA_Z, true, HIGH + 0.5f * A, { 0.f, A }));
+        UNSCOPED_INFO("from a deck within A of the plane, the raised field alone is missed");
+        CHECK(!counted(LOW + 0.5f * A, false, 0.f, { A }));
+        UNSCOPED_INFO("and the flat field counts the water");
+        CHECK(counted(LOW + 0.5f * A, false, 0.f, { 0.f, A }));
 
         mBehind.release();
         // tearDownWater flushes the scene, which setUpField left bound.
@@ -2080,12 +2196,12 @@ namespace tut
     // Whatever order the waves' patches are drawn in, each is drawn once and in the same place, and the order a view
     // asks for runs from its near end: every order the flags give tessellates the same triangles, and the slow axis run
     // from its high end draws the patches there first.
-    template<> template<>
-    void alwatersurface_object_t::test<17>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: every patch order draws the same triangles, starting from the view's near end", "[alwatersurface_gl]")
     {
         setUpWater(LLRenderTarget::DEPTH_FMT_24);
         mScene.flush();
-        ensure("the square holds the patches' cells", mLayout.side() >= CULL_RECT[2]);
+        UNSCOPED_INFO("the square holds the patches' cells");
+        CHECK(mLayout.side() >= CULL_RECT[2]);
         setUpWavesCapture();
 
         // Every point inside each plane.
@@ -2106,15 +2222,16 @@ namespace tut
             const S32 order[4] = { flags & 1, (flags >> 1) & 1, (flags >> 2) & 1, 0 };
             std::vector<LLVector2> drawn = tessellatedCentroids(planes, eye, nullptr, order);
             const std::string what = "order " + std::to_string(flags);
-            ensure(what + ": the patches tessellate", drawn.size() > (size_t)CULL_PATCHES);
+            UNSCOPED_INFO(what + ": the patches tessellate");
+            REQUIRE(drawn.size() > (size_t)CULL_PATCHES);
 
             // The first triangle drawn lies on the slow axis's starting end, the last on its other.
             const S32 slow = order[0] ? VX : VY;
             const bool from_high = order[1] != 0;
             const F32 first = drawn.front().mV[slow];
             const F32 last = drawn.back().mV[slow];
-            ensure(what + ": the slow axis runs from its " + (from_high ? "high" : "low") + " end",
-                   from_high ? first > last : first < last);
+            UNSCOPED_INFO(what + ": the slow axis runs from its " + (from_high ? "high" : "low") + " end");
+            REQUIRE((from_high ? first > last : first < last));
 
             std::sort(drawn.begin(), drawn.end(), before);
             if (flags == 0)
@@ -2123,7 +2240,8 @@ namespace tut
             }
             else
             {
-                ensure(what + ": the same triangles as the first order", drawn == first_order);
+                UNSCOPED_INFO(what + ": the same triangles as the first order");
+                REQUIRE(drawn == first_order);
             }
         }
 
@@ -2135,12 +2253,11 @@ namespace tut
     // odd-sized depth: every level of the pyramid is the farthest depth under its texels, exactly; and the control
     // stage, given it, tessellates every patch any of whose box shows past the scene and drops some it hides -- seen
     // from above a wall, through only the last column of a roof's view, and over ground within A of the water.
-    template<> template<>
-    void alwatersurface_object_t::test<18>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the depth pyramid holds the farthest depth and the patches it hides are culled", "[alwatersurface_gl]")
     {
         if (!gGLManager.mHasCompute)
         {
-            skip("no compute");
+            SKIP("no compute");
         }
         LLRender::sCompute = true;
 
@@ -2156,18 +2273,21 @@ namespace tut
             setUpWater(LLRenderTarget::DEPTH_FMT_32F);
             mScene.flush();
             mScene.release();
-            ensure("the square holds the patches' cells", mLayout.side() >= CULL_RECT[2]);
+            UNSCOPED_INFO("the square holds the patches' cells");
+            REQUIRE(mLayout.side() >= CULL_RECT[2]);
             setUpPyramid();
             setUpWavesCapture();
             setUpBoxes();
-            ensure("odd scene allocates", mScene.allocate(PYRAMID_W, PYRAMID_H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
-                                                          LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_32F));
+            UNSCOPED_INFO("odd scene allocates");
+            REQUIRE(mScene.allocate(PYRAMID_W, PYRAMID_H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
+                    LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_32F));
 
             // A depth of its own at every pixel, so each texel of every level answers for all four of its own.
             mScene.bindTarget();
             mScene.clear();
             noiseDepth();
-            ensure(convention + ", noise: the pyramid builds", mPyramid.build(mPyramidProgram, mScene));
+            UNSCOPED_INFO(convention + ", noise: the pyramid builds");
+            REQUIRE(mPyramid.build(mPyramidProgram, mScene));
             checkPyramid(convention + ", noise");
             mScene.flush();
 
@@ -2182,8 +2302,10 @@ namespace tut
                 gGL.loadMatrix(view_matrix);
                 occluders();
 
-                ensure(what + ": the pyramid builds", mPyramid.build(mPyramidProgram, mScene));
-                ensure_equals(what + ": from the depth's size", mPyramid.getDepthWidth(), (U32)PYRAMID_W);
+                UNSCOPED_INFO(what + ": the pyramid builds");
+                REQUIRE(mPyramid.build(mPyramidProgram, mScene));
+                UNSCOPED_INFO(what + ": from the depth's size");
+                REQUIRE(mPyramid.getDepthWidth() == (U32)PYRAMID_W);
                 checkPyramid(what);
 
                 F32 planes[20];
@@ -2193,12 +2315,16 @@ namespace tut
                 const std::set<S32> visible = visibleBoxes();
                 mScene.flush();
 
-                ensure(what + ": some patches show", !visible.empty());
-                ensure(what + ": the depth culls only patches in view", std::includes(in_view.begin(), in_view.end(), kept.begin(), kept.end()));
-                ensure(what + ": every patch whose box shows is kept (" + std::to_string(visible.size()) + " shown, "
-                       + std::to_string(kept.size()) + " kept)", std::includes(kept.begin(), kept.end(), visible.begin(), visible.end()));
-                ensure(what + ": the depth hides some of the patches in view (" + std::to_string(in_view.size()) + " in view, "
-                       + std::to_string(kept.size()) + " kept)", kept.size() + 64 <= in_view.size());
+                UNSCOPED_INFO(what + ": some patches show");
+                REQUIRE(!visible.empty());
+                UNSCOPED_INFO(what + ": the depth culls only patches in view");
+                REQUIRE(std::includes(in_view.begin(), in_view.end(), kept.begin(), kept.end()));
+                UNSCOPED_INFO(what + ": every patch whose box shows is kept (" + std::to_string(visible.size()) + " shown, "
+                              + std::to_string(kept.size()) + " kept)");
+                REQUIRE(std::includes(kept.begin(), kept.end(), visible.begin(), visible.end()));
+                UNSCOPED_INFO(what + ": the depth hides some of the patches in view (" + std::to_string(in_view.size()) + " in view, "
+                              + std::to_string(kept.size()) + " kept)");
+                REQUIRE(kept.size() + 64 <= in_view.size());
             };
 
             // From above and behind a wall: the near half of the water hidden, the sightline over the wall's top
@@ -2240,12 +2366,12 @@ namespace tut
     // With waves the field leaves the patches' cells to them and fans the cells beside them onto their corners: drawn
     // alone, it covers every pixel inside the rim once but those over the patches' cells, which it leaves; with the
     // patches drawn too, flat, every pixel inside the rim is covered once.
-    template<> template<>
-    void alwatersurface_object_t::test<19>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: with waves, the field and the patches cover every pixel inside the rim once", "[alwatersurface_gl]")
     {
         setUpField(REACH);
         const ALWaterField::PatchRect rect = ALWaterField::patchRect(mLayout);
-        ensure("the reach takes patches", rect == ALWaterField::PatchRect{ 2, 2, 5, 5 });
+        UNSCOPED_INFO("the reach takes patches");
+        CHECK(rect == ALWaterField::PatchRect{ 2, 2, 5, 5 });
         // The patches' cells, global metres: cells 0 to 2 each way.
         const F64 cx = mLayout.centreX();
         const F64 cy = mLayout.centreY();
@@ -2267,8 +2393,8 @@ namespace tut
         {
             for (S32 x = 0; x < FIELD_SIZE; ++x)
             {
-                ensure_equals("pixel " + std::to_string(x) + ", " + std::to_string(y) + " covered by the field but over the patches",
-                              (U32)stencil(x, y), within(x, y) && !patched(x, y) ? 1U : 0U);
+                UNSCOPED_INFO("pixel " + std::to_string(x) + ", " + std::to_string(y) + " covered by the field but over the patches");
+                REQUIRE((U32)stencil(x, y) == (within(x, y) && !patched(x, y) ? 1U : 0U));
             }
         }
 
@@ -2291,8 +2417,8 @@ namespace tut
         {
             for (S32 x = 0; x < FIELD_SIZE; ++x)
             {
-                ensure_equals("pixel " + std::to_string(x) + ", " + std::to_string(y) + " covered once with the patches",
-                              (U32)stencil(x, y), within(x, y) ? 1U : 0U);
+                UNSCOPED_INFO("pixel " + std::to_string(x) + ", " + std::to_string(y) + " covered once with the patches");
+                REQUIRE((U32)stencil(x, y) == (within(x, y) ? 1U : 0U));
             }
         }
     }
@@ -2301,13 +2427,13 @@ namespace tut
     // of either but at its ends, so no crack can open along one. Captured in agent space, the field from its vertex
     // stage and the patches from their evaluation stage, flat, at the levels a camera over them gives, the edges along
     // the rectangle past the reach whole. Water at two heights, where regions meet, shares no edge to crack along.
-    template<> template<>
-    void alwatersurface_object_t::test<20>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the field and the waves' patches meet without a T-junction", "[alwatersurface_gl]")
     {
         setUpField(REACH);
         mScene.flush();
         const ALWaterField::PatchRect rect = ALWaterField::patchRect(mLayout);
-        ensure("the reach takes patches", !rect.empty());
+        UNSCOPED_INFO("the reach takes patches");
+        REQUIRE(!rect.empty());
         setUpFieldCapture();
         setUpWavesCapture("vary_position");
         // Clip space, and eye space, are agent space.
@@ -2347,7 +2473,8 @@ namespace tut
         bindField(mFieldCapture, true, 0.f, rect);
         const std::vector<F32> field = captureTriangles(4, [&]() { drawFieldParts(mFieldCapture, rect); });
         LLGLSLShader::unbind();
-        ensure("the field is drawn", add(field, 4) > 0);
+        UNSCOPED_INFO("the field is drawn");
+        CHECK(add(field, 4) > 0);
 
         WaveDraw draw;
         const S32 patches[4] = { rect.mMinX, rect.mMinY, rect.mEndX, rect.mEndY };
@@ -2357,7 +2484,8 @@ namespace tut
         draw.mReach = (F32)mLayout.mReach;
         draw.mDensity = 32.f;
         const size_t tessellated = add(tessellate(draw), 3);
-        ensure("the patches tessellate past one quad each", tessellated > (size_t)draw.patches() * 2);
+        UNSCOPED_INFO("the patches tessellate past one quad each");
+        CHECK(tessellated > (size_t)draw.patches() * 2);
 
         // Every vertex, bucketed by where it is.
         constexpr F64 TOLERANCE = 1e-3;
@@ -2422,15 +2550,15 @@ namespace tut
                 }
             }
         }
-        ensure_equals("no vertex lies inside an edge" + first, junctions, 0);
+        UNSCOPED_INFO("no vertex lies inside an edge" + first);
+        CHECK(junctions == 0);
     }
 
     // The waves' heights are the field the normal map's slopes integrate to, read where the shading reads the map: a map
     // of known heights, encoded as normals, baked and uploaded as the viewer bakes and uploads it, displaces the patches
     // by BIG_METRES times its big layer's field at the big layer's coordinates and MID_METRES times its mid layer's at
     // the little map's zw read, the heights' sign and axes those the normals tilt by.
-    template<> template<>
-    void alwatersurface_object_t::test<21>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the waves' heights are the field the normal map's slopes integrate to", "[alwatersurface_gl]")
     {
         setUpWater(LLRenderTarget::DEPTH_FMT_24);
         mScene.flush();
@@ -2472,12 +2600,14 @@ namespace tut
             }
         }
         const ALWaterHeightBake::Heights heights = ALWaterHeightBake::bake(rgb.data(), rgb.size(), MAP, MAP, 3);
-        ensure("the map bakes", heights.valid());
+        UNSCOPED_INFO("the map bakes");
+        CHECK(heights.valid());
         const std::vector<U16> texels = ALWaterHeightBake::halfTexels(heights);
         mHeights = new LLImageGL(MAP, MAP, 2, false);
         mHeights->setNeedsAlphaAndPickMask(false);
         mHeights->setExplicitFormat(GL_RG16F, GL_RG, GL_HALF_FLOAT);
-        ensure("heights", mHeights->createGLTexture(0, reinterpret_cast<const U8*>(texels.data())));
+        UNSCOPED_INFO("heights");
+        REQUIRE(mHeights->createGLTexture(0, reinterpret_cast<const U8*>(texels.data())));
 
         // The field a layer recovers at map coordinate (u, v): the big layer's the heights themselves; the mid layer's
         // each term times (p^2 + a q^2) / (p^2 + a^2 q^2), a = MID_ASPECT. GL samples texel i at its centre,
@@ -2509,7 +2639,8 @@ namespace tut
         draw.mA = 1.f;
         draw.mDensity = 64.f;
         const std::vector<F32> points = tessellate(draw);
-        ensure("the cell's patches tessellate", points.size() > (size_t)draw.patches() * 18);
+        UNSCOPED_INFO("the cell's patches tessellate");
+        REQUIRE(points.size() > (size_t)draw.patches() * 18);
 
         F64 worst = 0.0;
         F64 tallest = 0.0;
@@ -2528,8 +2659,10 @@ namespace tut
             worst = llmax(worst, std::fabs(got - want));
             tallest = llmax(tallest, std::fabs(want));
         }
-        ensure("the waves stand", tallest > 0.3);
-        ensure("each point's height is the map's field there, off by up to " + std::to_string(worst) + " m", worst <= 0.01);
+        UNSCOPED_INFO("the waves stand");
+        CHECK(tallest > 0.3);
+        UNSCOPED_INFO("each point's height is the map's field there, off by up to " + std::to_string(worst) + " m");
+        CHECK(worst <= 0.01);
         mScene.bindTarget();
         tearDownWater();
     }
@@ -2537,8 +2670,7 @@ namespace tut
     // The waves' program links with a fragment stage that reads the atmospherics' varyings, as the water's does: the
     // waves' features attach atmosphericsVarsV to the evaluation stage, the stage before the fragment one, where it
     // declares them.
-    template<> template<>
-    void alwatersurface_object_t::test<22>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the waves' program links with a fragment stage reading the atmospherics' varyings", "[alwatersurface_gl]")
     {
         std::map<std::string, std::string> defines = { { "WATER_HEXTILE", "1" } };
         // The objects the features attach, at the stages the viewer loads them for.
@@ -2558,7 +2690,8 @@ namespace tut
         for (const auto& object : shared)
         {
             S32 level = 1;
-            ensure(std::string("compiled ") + object.first, mShaders.loadShaderFile(object.first, level, object.second, &defines) != 0);
+            UNSCOPED_INFO(std::string("compiled ") + object.first);
+            REQUIRE(mShaders.loadShaderFile(object.first, level, object.second, &defines) != 0);
         }
 
         // The program's own stages as gWaterWavesProgram names them, but a fragment stage of the test's that reads the
@@ -2577,20 +2710,24 @@ namespace tut
         {
             S32 level = 1;
             const GLuint handle = mShaders.loadShaderFile(object.first, level, object.second, &defines);
-            ensure(std::string("compiled ") + object.first, handle != 0);
+            UNSCOPED_INFO(std::string("compiled ") + object.first);
+            REQUIRE(handle != 0);
             mWaves.attachObject(handle);
         }
-        ensure("the waves' features attach", mShaders.attachShaderFeatures(&mWaves));
-        ensure("and the atmospherics' reads", mWaves.attachStageObject(GL_FRAGMENT_SHADER, "windlight/atmosphericsVarsF.glsl"));
+        UNSCOPED_INFO("the waves' features attach");
+        CHECK(mShaders.attachShaderFeatures(&mWaves));
+        UNSCOPED_INFO("and the atmospherics' reads");
+        CHECK(mWaves.attachStageObject(GL_FRAGMENT_SHADER, "windlight/atmosphericsVarsF.glsl"));
 
         const auto& evaluation = mShaders.mShaderObjects[LLShaderMgr::STAGE_TESS_EVALUATION];
         const auto vars = evaluation.find("windlight/atmosphericsVarsV.glsl");
-        ensure("atmosphericsVarsV is compiled for the evaluation stage", vars != evaluation.end());
+        UNSCOPED_INFO("atmosphericsVarsV is compiled for the evaluation stage");
+        CHECK(vars != evaluation.end());
         GLuint attached[32] = { 0 };
         GLsizei count = 0;
         glGetAttachedShaders(mWaves.mProgramObject, 32, &count, attached);
-        ensure("the features attach it to the program",
-               std::find(attached, attached + llmax(count, 0), vars->second) != attached + llmax(count, 0));
+        UNSCOPED_INFO("the features attach it to the program");
+        CHECK(std::find(attached, attached + llmax(count, 0), vars->second) != attached + llmax(count, 0));
 
         const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER,
                                                      "#version 400\n"
@@ -2599,20 +2736,21 @@ namespace tut
                                                      "vec3 getAdditiveColor();\n"
                                                      "vec3 getAtmosAttenuation();\n"
                                                      "void main() { frag_color = vec4(getAdditiveColor() + getAtmosAttenuation() + view, 1.0); }\n");
-        ensure("fragment compiles", fs != 0);
+        UNSCOPED_INFO("fragment compiles");
+        CHECK(fs != 0);
         mWaves.attachObject(fs);
-        ensure("the waves' program links", mWaves.mapAttributes());
+        UNSCOPED_INFO("the waves' program links");
+        CHECK(mWaves.mapAttributes());
         glDeleteShader(fs);
     }
 
     // The pyramid builds from a depth that carries stencil, as the screen's does where the water keeps its bits, under
     // both conventions: 24-bit depth with 8 of stencil, and 32-bit float depth with 8 of stencil.
-    template<> template<>
-    void alwatersurface_object_t::test<23>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the pyramid builds from a depth that carries stencil", "[alwatersurface_gl]")
     {
         if (!gGLManager.mHasCompute)
         {
-            skip("no compute");
+            SKIP("no compute");
         }
         LLRender::sCompute = true;
 
@@ -2628,13 +2766,16 @@ namespace tut
             for (LLRenderTarget::eDepthFormat format : formats())
             {
                 const std::string what = named(format, reverse ? "reverse-Z" : "forward-Z");
-                ensure(what + ": the scene allocates", mScene.allocate(PYRAMID_W, PYRAMID_H, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
-                                                                       LLRenderTarget::MIPS_NONE, format));
-                ensure(what + ": with stencil", mScene.hasStencil());
+                UNSCOPED_INFO(what + ": the scene allocates");
+                REQUIRE(mScene.allocate(PYRAMID_W, PYRAMID_H, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE,
+                        LLRenderTarget::MIPS_NONE, format));
+                UNSCOPED_INFO(what + ": with stencil");
+                REQUIRE(mScene.hasStencil());
                 mScene.bindTarget();
                 mScene.clear();
                 noiseDepth();
-                ensure(what + ": the pyramid builds", mPyramid.build(mPyramidProgram, mScene));
+                UNSCOPED_INFO(what + ": the pyramid builds");
+                REQUIRE(mPyramid.build(mPyramidProgram, mScene));
                 // A 24-bit depth's unit, near enough: a sampler and a read may each round its conversion to float.
                 checkPyramid(what, format == LLRenderTarget::DEPTH_FMT_24 ? 2.f / 16777215.f : 0.f);
                 mScene.flush();
@@ -2651,12 +2792,11 @@ namespace tut
     // The pyramid's box test keeps what it cannot see behind, under both conventions: a box behind a wall is hidden and
     // one before it kept; a box reaching the eye's plane is kept, whatever its image; and a box under more of the
     // coarsest level's texels than are read is kept unread, while one under as many as are read is read, and hidden.
-    template<> template<>
-    void alwatersurface_object_t::test<24>()
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the pyramid's box test keeps what it cannot see behind", "[alwatersurface_gl]")
     {
         if (!gGLManager.mHasCompute)
         {
-            skip("no compute");
+            SKIP("no compute");
         }
         LLRender::sCompute = true;
 
@@ -2676,8 +2816,9 @@ namespace tut
             setUpProbe();
 
             // Looking along y from 50 m up, a wall 10 m off over the whole view.
-            ensure("the scene allocates", mScene.allocate(PYRAMID_W, PYRAMID_H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
-                                                          LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_32F));
+            UNSCOPED_INFO("the scene allocates");
+            REQUIRE(mScene.allocate(PYRAMID_W, PYRAMID_H, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
+                    LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_32F));
             const F32 far_plane = reverse ? std::numeric_limits<F32>::infinity() : 4000.f;
             const LLMatrix4a proj = al_perspective(60.f * DEG_TO_RAD, (F32)PYRAMID_W / (F32)PYRAMID_H, 1.f, far_plane);
             const LLMatrix4a along = lookAt(LLVector3(0.f, 0.f, 50.f), LLVector3(0.f, 100.f, 50.f));
@@ -2688,7 +2829,8 @@ namespace tut
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.loadMatrix(along);
             wall(-1000.f, 1000.f, 10.f, -1000.f, 1000.f);
-            ensure(convention + ": the pyramid builds", mPyramid.build(mPyramidProgram, mScene));
+            UNSCOPED_INFO(convention + ": the pyramid builds");
+            REQUIRE(mPyramid.build(mPyramidProgram, mScene));
             // The third box runs from behind the camera to past the wall, off to the side: the part of it in view lies
             // behind the wall.
             const std::vector<bool> walled = probe({ { LLVector3(-1.f, 100.f, 49.f), LLVector3(1.f, 102.f, 51.f) },
@@ -2697,14 +2839,18 @@ namespace tut
                                                    product(proj, along));
             mScene.flush();
             mScene.release();
-            ensure(convention + ": a box behind the wall is hidden", !walled[0]);
-            ensure(convention + ": one before it is kept", walled[1]);
-            ensure(convention + ": one reaching the eye's plane is kept", walled[2]);
+            UNSCOPED_INFO(convention + ": a box behind the wall is hidden");
+            REQUIRE(!walled[0]);
+            UNSCOPED_INFO(convention + ": one before it is kept");
+            REQUIRE(walled[1]);
+            UNSCOPED_INFO(convention + ": one reaching the eye's plane is kept");
+            REQUIRE(walled[2]);
 
             // Straight down on a roof over a view 1280 pixels wide, a metre a pixel: the coarsest level's texels are 256
             // pixels, five across it.
-            ensure("the wide scene allocates", mScene.allocate(1280, 16, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
-                                                               LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_32F));
+            UNSCOPED_INFO("the wide scene allocates");
+            REQUIRE(mScene.allocate(1280, 16, GL_RGBA8, true, false, ALTextureSlot::TT_TEXTURE,
+                    LLRenderTarget::MIPS_NONE, LLRenderTarget::DEPTH_FMT_32F));
             const LLMatrix4a wide = al_ortho(0.f, 1280.f, 0.f, 16.f, 1.f, 200.f);
             const LLMatrix4a down = view(LOW + 100.f, false);
             mScene.bindTarget();
@@ -2714,16 +2860,20 @@ namespace tut
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.loadMatrix(down);
             opaque(-10.f, 1290.f, -10.f, 26.f, LOW + 50.f);
-            ensure(convention + ": the wide pyramid builds", mPyramid.build(mPyramidProgram, mScene));
+            UNSCOPED_INFO(convention + ": the wide pyramid builds");
+            REQUIRE(mPyramid.build(mPyramidProgram, mScene));
             const std::vector<bool> roofed = probe({ { LLVector3(0.5f, 4.f, LOW - 1.f), LLVector3(1279.5f, 12.f, LOW + 1.f) },
                                                      { LLVector3(0.5f, 4.f, LOW - 1.f), LLVector3(959.5f, 12.f, LOW + 1.f) },
                                                      { LLVector3(0.5f, 4.f, LOW + 60.f), LLVector3(959.5f, 12.f, LOW + 62.f) } },
                                                    product(wide, down));
             mScene.flush();
             mScene.release();
-            ensure(convention + ": a box under five of the coarsest texels is kept unread", roofed[0]);
-            ensure(convention + ": one under four is read, and hidden under the roof", !roofed[1]);
-            ensure(convention + ": and above the roof, kept", roofed[2]);
+            UNSCOPED_INFO(convention + ": a box under five of the coarsest texels is kept unread");
+            REQUIRE(roofed[0]);
+            UNSCOPED_INFO(convention + ": one under four is read, and hidden under the roof");
+            REQUIRE(!roofed[1]);
+            UNSCOPED_INFO(convention + ": and above the roof, kept");
+            REQUIRE(roofed[2]);
 
             mPyramid.release();
             mPyramidProgram.unload();

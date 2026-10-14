@@ -25,7 +25,9 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+
+#include "altestmatchers.h"
 
 #include "../alwaterfield.h"
 
@@ -35,10 +37,8 @@
 #include <utility>
 #include <vector>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         constexpr F64 WIDTH = 256.0;
         constexpr F64 INFINITE_STRETCH = 256000.0;
         constexpr F64 FINITE_STRETCH = 2048.0;
@@ -115,22 +115,11 @@ namespace tut
                        frac(x * 0.45 + WAVE2.mV[0] * t * 0.13), frac(py * 0.9 + WAVE2.mV[1] * t * 0.13),
                        frac(x * 0.1 + WAVE1.mV[0] * t * 0.1), frac(py * 0.2 + WAVE1.mV[1] * t * 0.1) } };
         }
-    }
-
-    struct alwaterfield_data
-    {
-    };
-
-    typedef test_group<alwaterfield_data> alwaterfield_group;
-    typedef alwaterfield_group::object    alwaterfield_object;
-    tut::alwaterfield_group alwaterfield_g("alwaterfield");
 
     // The cells and rings cover every point inside the rim exactly once and nothing outside it, sampled at the scale of
     // the cells, of the inner rings and of the rim, for squares from the smallest to the largest and both stretches.
-    template<> template<>
-    void alwaterfield_object::test<1>()
+    TEST_CASE("alwaterfield: cells and rings tile the plane to the rim", "[alwaterfield]")
     {
-        set_test_name("cells and rings tile the plane to the rim");
         for (F64 stretch : { INFINITE_STRETCH, FINITE_STRETCH })
         {
             for (F32 draw_distance : { 64.f, 256.f, 1024.f, 2048.f, 3584.f })
@@ -149,8 +138,8 @@ namespace tut
                             const F64 x = -extent + (i + 0.4142135) * 2.0 * extent / STEPS;
                             const F64 y = -extent + (j + 0.7320508) * 2.0 * extent / STEPS;
                             const bool within = std::fabs(x) < layout.mRim && std::fabs(y) < layout.mRim;
-                            ensure_equals(what + " covers once inside the rim, never outside", coverage(layout, x, y),
-                                          within ? 1 : 0);
+                            UNSCOPED_INFO(what + " covers once inside the rim, never outside");
+                            REQUIRE(coverage(layout, x, y) == (within ? 1 : 0));
                         }
                     }
                 }
@@ -159,7 +148,11 @@ namespace tut
                     for (S32 quad = 0; quad < ALWaterField::RING_QUADS; ++quad)
                     {
                         const ALWaterField::Rect r = ALWaterField::ringQuad(layout, ring, quad);
-                        ensure(what + " no ring quad is empty", r.mMinX < r.mMaxX && r.mMinY < r.mMaxY);
+                        {
+                            INFO(what + " no ring quad is empty");
+                            REQUIRE(r.mMinX < r.mMaxX);
+                            REQUIRE(r.mMinY < r.mMaxY);
+                        }
                     }
                 }
             }
@@ -167,65 +160,72 @@ namespace tut
     }
 
     // The rim is the square's half-size plus the stretch, and the rings stop at the first that reaches it.
-    template<> template<>
-    void alwaterfield_object::test<2>()
+    TEST_CASE("alwaterfield: rim and ring count", "[alwaterfield]")
     {
-        set_test_name("rim and ring count");
         for (F64 stretch : { INFINITE_STRETCH, FINITE_STRETCH, 100.0 })
         {
             for (F32 draw_distance : { 64.f, 512.f, 2048.f })
             {
                 const ALWaterField::Layout layout =
                     ALWaterField::layout(EYE_X, EYE_Y, WIDTH, draw_distance, stretch, {}, 0.0);
-                ensure_equals("half-size", layout.mHalf, (layout.mCells + 0.5) * WIDTH);
-                ensure_equals("rim", layout.mRim, layout.mHalf + stretch);
-                ensure("the last ring reaches the rim", std::ldexp(layout.mHalf, layout.mRings) >= layout.mRim);
-                ensure("the one before it does not",
-                       layout.mRings == 1 || std::ldexp(layout.mHalf, layout.mRings - 1) < layout.mRim);
+                UNSCOPED_INFO("half-size");
+                REQUIRE(layout.mHalf == (layout.mCells + 0.5) * WIDTH);
+                UNSCOPED_INFO("rim");
+                REQUIRE(layout.mRim == layout.mHalf + stretch);
+                UNSCOPED_INFO("the last ring reaches the rim");
+                REQUIRE(std::ldexp(layout.mHalf, layout.mRings) >= layout.mRim);
+                UNSCOPED_INFO("the one before it does not");
+                REQUIRE((layout.mRings == 1 || std::ldexp(layout.mHalf, layout.mRings - 1) < layout.mRim));
             }
         }
         const ALWaterField::Layout seven = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 2048.f, INFINITE_STRETCH, {}, 0.0);
-        ensure_equals("2048 m takes nine cells each side of the centre", seven.mCells, 9);
-        ensure_equals("a square nineteen across", seven.side(), 19);
-        ensure_equals("and seven rings to the horizon", seven.mRings, 7);
+        UNSCOPED_INFO("2048 m takes nine cells each side of the centre");
+        CHECK(seven.mCells == 9);
+        UNSCOPED_INFO("a square nineteen across");
+        CHECK(seven.side() == 19);
+        UNSCOPED_INFO("and seven rings to the horizon");
+        CHECK(seven.mRings == 7);
     }
 
     // The square is centred on the camera's cell and takes in the draw distance and every loaded region, a
     // variable-sized one by all its cells, until it reaches MAX_CELLS.
-    template<> template<>
-    void alwaterfield_object::test<3>()
+    TEST_CASE("alwaterfield: the square holds the draw distance and the loaded regions", "[alwaterfield]")
     {
-        set_test_name("the square holds the draw distance and the loaded regions");
         const S32 cx = ALWaterField::cellOf(EYE_X, WIDTH);
         const S32 cy = ALWaterField::cellOf(EYE_Y, WIDTH);
 
         ALWaterField::Layout layout = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 256.f, INFINITE_STRETCH, {}, 0.0);
-        ensure_equals("centre x", layout.mCentreX, cx);
-        ensure_equals("centre y", layout.mCentreY, cy);
-        ensure_equals("256 m and a cell", layout.mCells, 2);
-        ensure_equals("a short draw distance keeps the smallest", ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 32.f,
-                      INFINITE_STRETCH, {}, 0.0).mCells, ALWaterField::MIN_CELLS);
-        ensure_equals("257 m reaches a third", ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 257.f, INFINITE_STRETCH, {},
-                      0.0).mCells, 3);
+        UNSCOPED_INFO("centre x");
+        CHECK(layout.mCentreX == cx);
+        UNSCOPED_INFO("centre y");
+        CHECK(layout.mCentreY == cy);
+        UNSCOPED_INFO("256 m and a cell");
+        CHECK(layout.mCells == 2);
+        UNSCOPED_INFO("a short draw distance keeps the smallest");
+        CHECK(ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 32.f,
+              INFINITE_STRETCH, {}, 0.0).mCells == ALWaterField::MIN_CELLS);
+        UNSCOPED_INFO("257 m reaches a third");
+        CHECK(ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 257.f, INFINITE_STRETCH, {}, 0.0).mCells == 3);
 
         // A 512 m region whose far corner is five cells east and four north.
         const std::vector<ALWaterField::Region> regions = { { cx + 4, cy + 3, 2, 21.f }, { cx - 1, cy, 1, 20.f } };
         layout = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 256.f, INFINITE_STRETCH, regions, 0.0);
-        ensure_equals("the far region's last cell", layout.mCells, 5);
+        UNSCOPED_INFO("the far region's last cell");
+        CHECK(layout.mCells == 5);
 
         const std::vector<ALWaterField::Region> distant = { { cx - 40, cy, 1, 20.f } };
         layout = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 256.f, INFINITE_STRETCH, distant, 0.0);
-        ensure_equals("held to MAX_CELLS", layout.mCells, ALWaterField::MAX_CELLS);
-        ensure("the square fits the cell map", layout.side() <= ALWaterField::MAP_SIZE);
+        UNSCOPED_INFO("held to MAX_CELLS");
+        CHECK(layout.mCells == ALWaterField::MAX_CELLS);
+        UNSCOPED_INFO("the square fits the cell map");
+        CHECK(layout.side() <= ALWaterField::MAP_SIZE);
     }
 
     // With waves on, the patches are whole cells of the square, every cell whose nearest point is within the reach
     // along both axes and no other, and the reach ends before the square's edge, for every density, draw distance and
     // place in the centre cell.
-    template<> template<>
-    void alwaterfield_object::test<4>()
+    TEST_CASE("alwaterfield: the patches and their reach stay inside the square", "[alwaterfield]")
     {
-        set_test_name("the patches and their reach stay inside the square");
         const F64 base_x = 1000.0 * WIDTH;
         const F64 base_y = 1031.0 * WIDTH;
         for (F32 density : { 8.f, 32.f, 64.f, 128.f, 256.f, 400.f })
@@ -242,35 +242,39 @@ namespace tut
                             eye_x, eye_y, WIDTH, draw_distance, INFINITE_STRETCH, {}, ALWaterField::tessReach(density));
                         const std::string what = "density " + std::to_string(density) + " draw " +
                                                  std::to_string(draw_distance);
-                        ensure(what + " has a reach", layout.mReach > 0.0);
-                        ensure(what + " patches inside the square",
-                               layout.mPatchMinX >= layout.mCentreX - layout.mCells &&
-                                   layout.mPatchMaxX <= layout.mCentreX + layout.mCells &&
-                                   layout.mPatchMinY >= layout.mCentreY - layout.mCells &&
-                                   layout.mPatchMaxY <= layout.mCentreY + layout.mCells);
+                        UNSCOPED_INFO(what + " has a reach");
+                        REQUIRE(layout.mReach > 0.0);
+                        {
+                            INFO(what + " patches inside the square");
+                            REQUIRE(layout.mPatchMinX >= layout.mCentreX - layout.mCells);
+                            REQUIRE(layout.mPatchMaxX <= layout.mCentreX + layout.mCells);
+                            REQUIRE(layout.mPatchMinY >= layout.mCentreY - layout.mCells);
+                            REQUIRE(layout.mPatchMaxY <= layout.mCentreY + layout.mCells);
+                        }
 
                         // The nearest point of the square's edge to the camera.
                         const F64 sx = layout.centreX() - eye_x;
                         const F64 sy = layout.centreY() - eye_y;
                         const F64 edge = llmin(llmin(layout.mHalf - sx, layout.mHalf + sx),
                                                llmin(layout.mHalf - sy, layout.mHalf + sy));
-                        ensure(what + " the reach's fade is 0 before the edge", layout.mReach < edge);
+                        UNSCOPED_INFO(what + " the reach's fade is 0 before the edge");
+                        REQUIRE(layout.mReach < edge);
 
                         for (S32 c = layout.mCentreX - layout.mCells; c <= layout.mCentreX + layout.mCells; ++c)
                         {
                             const F64 lo = c * WIDTH;
                             const F64 nearest = llmax(0.0, llmax(lo - eye_x, eye_x - (lo + WIDTH)));
                             const bool patched = c >= layout.mPatchMinX && c <= layout.mPatchMaxX;
-                            ensure_equals(what + " column patched by its nearest point", patched,
-                                          nearest < layout.mReach);
+                            UNSCOPED_INFO(what + " column patched by its nearest point");
+                            REQUIRE(patched == (nearest < layout.mReach));
                         }
                         for (S32 r = layout.mCentreY - layout.mCells; r <= layout.mCentreY + layout.mCells; ++r)
                         {
                             const F64 lo = r * WIDTH;
                             const F64 nearest = llmax(0.0, llmax(lo - eye_y, eye_y - (lo + WIDTH)));
                             const bool patched = r >= layout.mPatchMinY && r <= layout.mPatchMaxY;
-                            ensure_equals(what + " row patched by its nearest point", patched,
-                                          nearest < layout.mReach);
+                            UNSCOPED_INFO(what + " row patched by its nearest point");
+                            REQUIRE(patched == (nearest < layout.mReach));
                         }
                     }
                 }
@@ -279,31 +283,30 @@ namespace tut
     }
 
     // A denser tessellation reaches no less far.
-    template<> template<>
-    void alwaterfield_object::test<5>()
+    TEST_CASE("alwaterfield: the reach grows with the density", "[alwaterfield]")
     {
-        set_test_name("the reach grows with the density");
         F64 last = 0.0;
         F64 last_held = 0.0;
         for (F32 density = 1.f; density <= 512.f; density *= 1.25f)
         {
             const F64 reach = ALWaterField::tessReach(density);
-            ensure("tessReach is monotone", reach >= last);
+            UNSCOPED_INFO("tessReach is monotone");
+            REQUIRE(reach >= last);
             const F64 held =
                 ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, reach).mReach;
-            ensure("the held reach is monotone", held >= last_held);
+            UNSCOPED_INFO("the held reach is monotone");
+            REQUIRE(held >= last_held);
             last = reach;
             last_held = held;
         }
-        ensure_equals("half the big layer's 25 m at density 64", ALWaterField::tessReach(64.f), 800.0);
+        UNSCOPED_INFO("half the big layer's 25 m at density 64");
+        CHECK(ALWaterField::tessReach(64.f) == 800.0);
     }
 
     // The coordinates the shaders work from a camera-relative position and the phases are the point's own, worked in
     // double from its global position, for cameras across a large grid and points out to the wave clamp.
-    template<> template<>
-    void alwaterfield_object::test<6>()
+    TEST_CASE("alwaterfield: phases equal the direct evaluation", "[alwaterfield]")
     {
-        set_test_name("phases equal the direct evaluation");
         const F64 tolerance[6] = { 1e-4, 1e-4, 2e-3, 2e-3, 5e-4, 5e-4 };
         for (F64 eye_x : { 97.3, EYE_X, 4000.0 * WIDTH + 31.7 })
         {
@@ -319,9 +322,9 @@ namespace tut
                         const Coordinates b = direct(eye_x + rx, eye_y + ry);
                         for (S32 k = 0; k < 6; ++k)
                         {
-                            ensure("layer coordinate " + std::to_string(k) + " at " + std::to_string(rx) + ", " +
-                                       std::to_string(ry),
-                                   wrapped(a.v[k], b.v[k]) < tolerance[k]);
+                            UNSCOPED_INFO("layer coordinate " + std::to_string(k) + " at " + std::to_string(rx) + ", " +
+                                          std::to_string(ry));
+                            REQUIRE(wrapped(a.v[k], b.v[k]) < tolerance[k]);
                         }
                     }
                 }
@@ -338,16 +341,15 @@ namespace tut
                              scrolls.mLittle.mV[2], scrolls.mLittle.mV[3] };
         for (S32 k = 0; k < 6; ++k)
         {
-            ensure("scroll " + std::to_string(k), wrapped(got[k], expected[k]) < 1e-6);
+            UNSCOPED_INFO("scroll " + std::to_string(k));
+            REQUIRE(wrapped(got[k], expected[k]) < 1e-6);
         }
     }
 
     // A fixed point keeps its coordinates as the camera moves a kilometre, the phases taken from the camera's global
     // position.
-    template<> template<>
-    void alwaterfield_object::test<7>()
+    TEST_CASE("alwaterfield: a point keeps its coordinates across a region crossing", "[alwaterfield]")
     {
-        set_test_name("a point keeps its coordinates across a region crossing");
         const F64 px = EYE_X + 140.0;
         const F64 py = EYE_Y - 60.0;
         const ALWaterField::WavePhases here = ALWaterField::wavePhases(EYE_X, EYE_Y, UPTIME, WAVE1, WAVE2);
@@ -357,16 +359,15 @@ namespace tut
         const Coordinates b = shaded(there, (F32)(px - EYE_X - 1000.0), (F32)(py - EYE_Y));
         for (S32 k = 0; k < 6; ++k)
         {
-            ensure("layer " + std::to_string(k) + " unchanged as the camera moves", wrapped(a.v[k], b.v[k]) < 2e-3);
+            UNSCOPED_INFO("layer " + std::to_string(k) + " unchanged as the camera moves");
+            REQUIRE(wrapped(a.v[k], b.v[k]) < 2e-3);
         }
     }
 
     // The cell map holds each cell's region height with its flag, a variable-sized region in every cell it covers, and
     // the agent region's height with no flag where no region is; the camera's cell is texel (n, n).
-    template<> template<>
-    void alwaterfield_object::test<8>()
+    TEST_CASE("alwaterfield: the cell map", "[alwaterfield]")
     {
-        set_test_name("the cell map");
         const S32 cx = ALWaterField::cellOf(EYE_X, WIDTH);
         const S32 cy = ALWaterField::cellOf(EYE_Y, WIDTH);
         const std::vector<ALWaterField::Region> regions = { { cx, cy, 1, 21.5f }, { cx + 1, cy - 2, 2, 30.f } };
@@ -374,8 +375,8 @@ namespace tut
             ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 256.f, INFINITE_STRETCH, regions, 0.0);
         std::vector<F32> texels;
         ALWaterField::fillCells(layout, regions, 19.f, texels);
-        ensure_equals("one texel of two channels a cell of the map", texels.size(),
-                      (size_t)ALWaterField::MAP_SIZE * ALWaterField::MAP_SIZE * 2);
+        UNSCOPED_INFO("one texel of two channels a cell of the map");
+        REQUIRE(texels.size() == (size_t)ALWaterField::MAP_SIZE * ALWaterField::MAP_SIZE * 2);
 
         const auto at = [&](S32 dx, S32 dy)
         {
@@ -384,19 +385,26 @@ namespace tut
             const F32* t = texels.data() + ((size_t)j * ALWaterField::MAP_SIZE + i) * 2;
             return std::make_pair(t[0], t[1]);
         };
-        ensure_equals("the camera's cell's height", at(0, 0).first, 21.5f);
-        ensure_equals("the camera's cell is a region", at(0, 0).second, 1.f);
+        UNSCOPED_INFO("the camera's cell's height");
+        CHECK(at(0, 0).first == 21.5f);
+        UNSCOPED_INFO("the camera's cell is a region");
+        CHECK(at(0, 0).second == 1.f);
         for (S32 dx : { 1, 2 })
         {
             for (S32 dy : { -2, -1 })
             {
-                ensure_equals("the 512 m region covers its four cells", at(dx, dy).first, 30.f);
-                ensure_equals("each flagged", at(dx, dy).second, 1.f);
+                UNSCOPED_INFO("the 512 m region covers its four cells");
+                REQUIRE(at(dx, dy).first == 30.f);
+                UNSCOPED_INFO("each flagged");
+                REQUIRE(at(dx, dy).second == 1.f);
             }
         }
-        ensure_equals("a cell with no region takes the agent's height", at(-1, 1).first, 19.f);
-        ensure_equals("and no flag", at(-1, 1).second, 0.f);
-        ensure_equals("past the 512 m region", at(3, -2).first, 19.f);
+        UNSCOPED_INFO("a cell with no region takes the agent's height");
+        CHECK(at(-1, 1).first == 19.f);
+        UNSCOPED_INFO("and no flag");
+        CHECK(at(-1, 1).second == 0.f);
+        UNSCOPED_INFO("past the 512 m region");
+        CHECK(at(3, -2).first == 19.f);
     }
 
     namespace
@@ -440,10 +448,8 @@ namespace tut
     // camera's place and the point's offset is the cell its global position is in, from a camera beside it and from one
     // 10 km off, at the grid's far corner, and where the 32-bit ids wrap. A camera's place split in float misses at the
     // far corner.
-    template<> template<>
-    void alwaterfield_object::test<9>()
+    TEST_CASE("alwaterfield: the tiled layers' lattice", "[alwaterfield]")
     {
-        set_test_name("the tiled layers' lattice");
         // Far corner: a million regions out. Wrap: the big layer's skewed y crosses 2^32 among the points.
         const F64 far_corner = 1048576.0 * WIDTH;
         const F64 wrap_y = 4294967296.0 / (ALWaterField::BIG_SCALE * ALWaterField::HEX_SKEW_YY * ALWaterField::HEX_GRID);
@@ -474,49 +480,61 @@ namespace tut
                         const std::pair<U32, U32> from_near = shaderCell(near_places, layer, (F32)(x - eye[0]), (F32)(y - eye[1]));
                         const std::pair<U32, U32> from_far =
                             shaderCell(far_places, layer, (F32)(x - eye[0] - 7071.0), (F32)(y - eye[1] + 7071.0));
-                        ensure_equals("the cell beside the camera", from_near.first, cx);
-                        ensure_equals("the cell beside the camera, y", from_near.second, cy);
-                        ensure_equals("the cell from 10 km off", from_far.first, cx);
-                        ensure_equals("the cell from 10 km off, y", from_far.second, cy);
+                        UNSCOPED_INFO("the cell beside the camera");
+                        REQUIRE(from_near.first == cx);
+                        UNSCOPED_INFO("the cell beside the camera, y");
+                        REQUIRE(from_near.second == cy);
+                        UNSCOPED_INFO("the cell from 10 km off");
+                        REQUIRE(from_far.first == cx);
+                        UNSCOPED_INFO("the cell from 10 km off, y");
+                        REQUIRE(from_far.second == cy);
                         ++checked;
                         wrapped += cy < 16 ? 1 : 0;
                     }
                 }
             }
         }
-        ensure("most points are away from a cell's edge", checked > 5000);
-        ensure("the wrap's points include ids past it", wrapped > 0);
+        UNSCOPED_INFO("most points are away from a cell's edge");
+        CHECK(checked > 5000);
+        UNSCOPED_INFO("the wrap's points include ids past it");
+        CHECK(wrapped > 0);
 
         const ALWaterField::LatticePlaces places = ALWaterField::latticePlaces(-EYE_X, EYE_Y);
         for (F32 f : { places.mFrac.mV[0], places.mFrac.mV[1], places.mFrac.mV[2], places.mFrac.mV[3] })
         {
-            ensure("a fraction in [0, 1)", f >= 0.f && f < 1.f);
+            {
+                INFO("a fraction in [0, 1)");
+                REQUIRE(f >= 0.f);
+                REQUIRE(f < 1.f);
+            }
         }
     }
 
     // A normal map's mean decoded slope: the first two channels over every pixel, and nothing without three.
-    template<> template<>
-    void alwaterfield_object::test<10>()
+    TEST_CASE("alwaterfield: a normal map's mean", "[alwaterfield]")
     {
-        set_test_name("a normal map's mean");
         const U8 rgba[4 * 4] = { 255, 0, 255, 9, 0, 0, 255, 9, 255, 255, 255, 9, 255, 255, 255, 9 };
         const LLVector2 mean = ALWaterField::meanNormal(rgba, 2, 2, 4);
-        ensure_approximately_equals("x: three of four at 1", mean.mV[VX], 0.5f, 20);
-        ensure_approximately_equals("y: two of four at 1", mean.mV[VY], 0.f, 20);
+        UNSCOPED_INFO("x: three of four at 1");
+        CHECK_THAT(mean.mV[VX], ll_test::WithinBits(0.5f, 20));
+        UNSCOPED_INFO("y: two of four at 1");
+        CHECK_THAT(mean.mV[VY], ll_test::WithinBits(0.f, 20));
         const U8 rgb[3] = { 128, 64, 255 };
         const LLVector2 one = ALWaterField::meanNormal(rgb, 1, 1, 3);
-        ensure_approximately_equals("one pixel, x", one.mV[VX], 128.f / 255.f * 2.f - 1.f, 20);
-        ensure_approximately_equals("one pixel, y", one.mV[VY], 64.f / 255.f * 2.f - 1.f, 20);
-        ensure("two channels have no mean", ALWaterField::meanNormal(rgb, 1, 1, 2) == LLVector2::zero);
-        ensure("no pixels have no mean", ALWaterField::meanNormal(nullptr, 4, 4, 3) == LLVector2::zero);
+        UNSCOPED_INFO("one pixel, x");
+        CHECK_THAT(one.mV[VX], ll_test::WithinBits(128.f / 255.f * 2.f - 1.f, 20));
+        UNSCOPED_INFO("one pixel, y");
+        CHECK_THAT(one.mV[VY], ll_test::WithinBits(64.f / 255.f * 2.f - 1.f, 20));
+        UNSCOPED_INFO("two channels have no mean");
+        CHECK(ALWaterField::meanNormal(rgb, 1, 1, 2) == LLVector2::zero);
+        UNSCOPED_INFO("no pixels have no mean");
+        REQUIRE(ALWaterField::meanNormal(nullptr, 4, 4, 3) == LLVector2::zero);
     }
 
     // The square's corner the GPU places the cells from, relative to an origin (the agent region's): the corner's global
     // position less the origin, near and far from the grid's origin and with the origin a region off the camera's.
-    template<> template<>
-    void alwaterfield_object::test<11>()
+    TEST_CASE("alwaterfield: the cell square relative to the agent region", "[alwaterfield]")
     {
-        set_test_name("the cell square relative to the agent region");
         const F64 eyes[3][2] = { { EYE_X, EYE_Y }, { 97.3, 201.9 }, { 1048576.0 * WIDTH + 97.3, 1048000.0 * WIDTH + 3.1 } };
         for (const auto& eye : eyes)
         {
@@ -527,37 +545,53 @@ namespace tut
                 const F64 origin_x = layout.mCentreX * WIDTH + off;
                 const F64 origin_y = layout.mCentreY * WIDTH - off;
                 const LLVector4 square = ALWaterField::cellSquare(layout, origin_x, origin_y);
-                ensure_equals("x from the origin", (F64)square.mV[VX],
-                              (F64)(layout.mCentreX - layout.mCells) * WIDTH - origin_x);
-                ensure_equals("y from the origin", (F64)square.mV[VY],
-                              (F64)(layout.mCentreY - layout.mCells) * WIDTH - origin_y);
-                ensure_equals("a cell's width", (F64)square.mV[VZ], WIDTH);
-                ensure_equals("the cells a side", (S32)square.mV[VW], layout.side());
+                UNSCOPED_INFO("x from the origin");
+                REQUIRE((F64)square.mV[VX] == (F64)(layout.mCentreX - layout.mCells) * WIDTH - origin_x);
+                UNSCOPED_INFO("y from the origin");
+                REQUIRE((F64)square.mV[VY] == (F64)(layout.mCentreY - layout.mCells) * WIDTH - origin_y);
+                UNSCOPED_INFO("a cell's width");
+                REQUIRE((F64)square.mV[VZ] == WIDTH);
+                UNSCOPED_INFO("the cells a side");
+                REQUIRE((S32)square.mV[VW] == layout.side());
             }
         }
     }
 
     // Negative global coordinates: the cell holding a point is its floor's, and the square, its patches and the camera's
     // cell work as they do anywhere.
-    template<> template<>
-    void alwaterfield_object::test<12>()
+    TEST_CASE("alwaterfield: negative coordinates", "[alwaterfield]")
     {
-        set_test_name("negative coordinates");
-        ensure_equals("just below 0", ALWaterField::cellOf(-0.5, WIDTH), -1);
-        ensure_equals("a whole cell below", ALWaterField::cellOf(-WIDTH, WIDTH), -1);
-        ensure_equals("past it", ALWaterField::cellOf(-WIDTH - 0.5, WIDTH), -2);
+        UNSCOPED_INFO("just below 0");
+        CHECK(ALWaterField::cellOf(-0.5, WIDTH) == -1);
+        UNSCOPED_INFO("a whole cell below");
+        CHECK(ALWaterField::cellOf(-WIDTH, WIDTH) == -1);
+        UNSCOPED_INFO("past it");
+        CHECK(ALWaterField::cellOf(-WIDTH - 0.5, WIDTH) == -2);
         const F64 eye_x = -5.0 * WIDTH + 30.0;
         const F64 eye_y = -0.25;
         const ALWaterField::Layout layout =
             ALWaterField::layout(eye_x, eye_y, WIDTH, 256.f, INFINITE_STRETCH, {}, ALWaterField::tessReach(16.f));
-        ensure_equals("centre x", layout.mCentreX, -5);
-        ensure_equals("centre y", layout.mCentreY, -1);
-        ensure("the camera lies in the centre cell", eye_x >= layout.mCentreX * WIDTH && eye_x < (layout.mCentreX + 1) * WIDTH);
-        ensure("and its patches", layout.mPatchMinX <= layout.mCentreX && layout.mPatchMaxX >= layout.mCentreX &&
-                                       layout.mPatchMinY <= layout.mCentreY && layout.mPatchMaxY >= layout.mCentreY);
+        UNSCOPED_INFO("centre x");
+        CHECK(layout.mCentreX == -5);
+        UNSCOPED_INFO("centre y");
+        CHECK(layout.mCentreY == -1);
+        {
+            INFO("the camera lies in the centre cell");
+            CHECK(eye_x >= layout.mCentreX * WIDTH);
+            CHECK(eye_x < (layout.mCentreX + 1) * WIDTH);
+        }
+        {
+            INFO("and its patches");
+            CHECK(layout.mPatchMinX <= layout.mCentreX);
+            CHECK(layout.mPatchMaxX >= layout.mCentreX);
+            CHECK(layout.mPatchMinY <= layout.mCentreY);
+            CHECK(layout.mPatchMaxY >= layout.mCentreY);
+        }
         const F64 lo = layout.mPatchMinX * WIDTH;
-        ensure("the west patch column's nearest point within the reach", eye_x - (lo + WIDTH) < layout.mReach);
-        ensure("and the one past it not", eye_x - lo >= layout.mReach);
+        UNSCOPED_INFO("the west patch column's nearest point within the reach");
+        CHECK(eye_x - (lo + WIDTH) < layout.mReach);
+        UNSCOPED_INFO("and the one past it not");
+        CHECK(eye_x - lo >= layout.mReach);
     }
 
     namespace
@@ -596,10 +630,8 @@ namespace tut
     // The cell map, region by region: the same as asking every texel of every region; at the largest square; with a
     // region straddling the square's edge, one past the map, two claiming a cell, the first listed holding it; and the
     // texels past the square filled the same way.
-    template<> template<>
-    void alwaterfield_object::test<13>()
+    TEST_CASE("alwaterfield: the cell map, region by region", "[alwaterfield]")
     {
-        set_test_name("the cell map, region by region");
         const S32 cx = ALWaterField::cellOf(EYE_X, WIDTH);
         const S32 cy = ALWaterField::cellOf(EYE_Y, WIDTH);
         const std::vector<ALWaterField::Region> regions = {
@@ -611,19 +643,26 @@ namespace tut
         };
         const ALWaterField::Layout layout =
             ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 256.f, INFINITE_STRETCH, regions, 0.0);
-        ensure_equals("the largest square", layout.mCells, ALWaterField::MAX_CELLS);
+        UNSCOPED_INFO("the largest square");
+        CHECK(layout.mCells == ALWaterField::MAX_CELLS);
         std::vector<F32> texels;
         ALWaterField::fillCells(layout, regions, 19.f, texels);
         const std::vector<F32> brute = bruteCells(layout, regions, 19.f);
-        ensure("as every texel asking every region", texels == brute);
+        UNSCOPED_INFO("as every texel asking every region");
+        CHECK(texels == brute);
 
         const auto at = [&](S32 i, S32 j) { return texels[((size_t)j * ALWaterField::MAP_SIZE + i) * 2]; };
         const S32 n = layout.mCells;
-        ensure_equals("the first listed holds the camera's cell", at(n, n), 21.5f);
-        ensure_equals("the second region of two holds its own", at(n + 1, n + 1), 99.f);
-        ensure_equals("the straddling region inside the square", at(2 * n, n - 2), 30.f);
-        ensure_equals("and past the square, in the map", at(2 * n + 1, n - 2), 30.f);
-        ensure_equals("the west straddler's cell inside", at(0, n + 10), 12.f);
+        UNSCOPED_INFO("the first listed holds the camera's cell");
+        CHECK(at(n, n) == 21.5f);
+        UNSCOPED_INFO("the second region of two holds its own");
+        CHECK(at(n + 1, n + 1) == 99.f);
+        UNSCOPED_INFO("the straddling region inside the square");
+        CHECK(at(2 * n, n - 2) == 30.f);
+        UNSCOPED_INFO("and past the square, in the map");
+        CHECK(at(2 * n + 1, n - 2) == 30.f);
+        UNSCOPED_INFO("the west straddler's cell inside");
+        CHECK(at(0, n + 10) == 12.f);
 
         // Random squares and regions, against the same.
         U32 seed = 12345u;
@@ -639,16 +678,15 @@ namespace tut
             }
             const ALWaterField::Layout l = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, (F32)(next() % 4000), INFINITE_STRETCH, random, 0.0);
             ALWaterField::fillCells(l, random, 19.f, texels);
-            ensure("trial " + std::to_string(trial), texels == bruteCells(l, random, 19.f));
+            UNSCOPED_INFO("trial " + std::to_string(trial));
+            REQUIRE(texels == bruteCells(l, random, 19.f));
         }
     }
 
     // Moving within its cell moves nothing of the square: the cell map's key, the square, stays the same however far
     // across the cell the camera goes.
-    template<> template<>
-    void alwaterfield_object::test<14>()
+    TEST_CASE("alwaterfield: the square stays as the camera moves within its cell", "[alwaterfield]")
     {
-        set_test_name("the square stays as the camera moves within its cell");
         const F64 base_x = 1000.0 * WIDTH;
         const F64 base_y = 1031.0 * WIDTH;
         const ALWaterField::Layout first = ALWaterField::layout(base_x, base_y, WIDTH, 1024.f, INFINITE_STRETCH, {}, 0.0);
@@ -658,34 +696,49 @@ namespace tut
             {
                 const ALWaterField::Layout l =
                     ALWaterField::layout(base_x + fx * WIDTH, base_y + fy * WIDTH, WIDTH, 1024.f, INFINITE_STRETCH, {}, 0.0);
-                ensure("the same layout", l == first);
+                UNSCOPED_INFO("the same layout");
+                REQUIRE(l == first);
             }
         }
         const ALWaterField::Layout next = ALWaterField::layout(base_x + WIDTH, base_y, WIDTH, 1024.f, INFINITE_STRETCH, {}, 0.0);
-        ensure_equals("a cell east recentres it", next.mCentreX, first.mCentreX + 1);
+        UNSCOPED_INFO("a cell east recentres it");
+        CHECK(next.mCentreX == first.mCentreX + 1);
     }
 
     // The patches' rectangle in the cell map's cells, its end past the last; empty without waves. And the order the
     // patches run in: along the axis the camera looks along most, from the end behind it.
-    template<> template<>
-    void alwaterfield_object::test<15>()
+    TEST_CASE("alwaterfield: the patch rectangle and order", "[alwaterfield]")
     {
-        set_test_name("the patch rectangle and order");
         const ALWaterField::Layout flat = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
-        ensure("no waves, no rectangle", ALWaterField::patchRect(flat).empty());
+        UNSCOPED_INFO("no waves, no rectangle");
+        REQUIRE(ALWaterField::patchRect(flat).empty());
         const ALWaterField::Layout waved =
             ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, ALWaterField::tessReach(64.f));
         const ALWaterField::PatchRect rect = ALWaterField::patchRect(waved);
         const S32 west = waved.mCentreX - waved.mCells;
         const S32 south = waved.mCentreY - waved.mCells;
-        ensure_equals("min x", rect.mMinX, waved.mPatchMinX - west);
-        ensure_equals("min y", rect.mMinY, waved.mPatchMinY - south);
-        ensure_equals("end x, past the last", rect.mEndX, waved.mPatchMaxX - west + 1);
-        ensure_equals("end y, past the last", rect.mEndY, waved.mPatchMaxY - south + 1);
-        ensure("a cell of the square all round it", rect.mMinX >= 1 && rect.mMinY >= 1 &&
-                                                         rect.mEndX <= waved.side() - 1 && rect.mEndY <= waved.side() - 1);
-        ensure("the camera's cell among them", rect.mMinX <= waved.mCells && rect.mEndX > waved.mCells &&
-                                                   rect.mMinY <= waved.mCells && rect.mEndY > waved.mCells);
+        UNSCOPED_INFO("min x");
+        CHECK(rect.mMinX == waved.mPatchMinX - west);
+        UNSCOPED_INFO("min y");
+        CHECK(rect.mMinY == waved.mPatchMinY - south);
+        UNSCOPED_INFO("end x, past the last");
+        CHECK(rect.mEndX == waved.mPatchMaxX - west + 1);
+        UNSCOPED_INFO("end y, past the last");
+        CHECK(rect.mEndY == waved.mPatchMaxY - south + 1);
+        {
+            INFO("a cell of the square all round it");
+            CHECK(rect.mMinX >= 1);
+            CHECK(rect.mMinY >= 1);
+            CHECK(rect.mEndX <= waved.side() - 1);
+            CHECK(rect.mEndY <= waved.side() - 1);
+        }
+        {
+            INFO("the camera's cell among them");
+            CHECK(rect.mMinX <= waved.mCells);
+            CHECK(rect.mEndX > waved.mCells);
+            CHECK(rect.mMinY <= waved.mCells);
+            CHECK(rect.mEndY > waved.mCells);
+        }
 
         const S32 east[4] = { 1, 0, 0, 0 };
         const S32 north_west[4] = { 0, 0, 1, 0 };
@@ -696,99 +749,138 @@ namespace tut
             return order.mOrder[0] == expected[0] && order.mOrder[1] == expected[1] && order.mOrder[2] == expected[2] &&
                    order.mOrder[3] == expected[3];
         };
-        ensure("looking east: x slow, from the west, y from the south", same(ALWaterField::patchOrder(1.f, 0.2f), east));
-        ensure("looking north, a little west: y slow, from the south, x from the east",
-               same(ALWaterField::patchOrder(-0.3f, 0.9f), north_west));
-        ensure("looking south, a little east: y slow, from the north", same(ALWaterField::patchOrder(0.2f, -0.9f), south_east));
-        ensure("looking west, a little south: x slow, from the east, y from the north",
-               same(ALWaterField::patchOrder(-0.9f, -0.3f), west_south));
+        UNSCOPED_INFO("looking east: x slow, from the west, y from the south");
+        CHECK(same(ALWaterField::patchOrder(1.f, 0.2f), east));
+        UNSCOPED_INFO("looking north, a little west: y slow, from the south, x from the east");
+        CHECK(same(ALWaterField::patchOrder(-0.3f, 0.9f), north_west));
+        UNSCOPED_INFO("looking south, a little east: y slow, from the north");
+        CHECK(same(ALWaterField::patchOrder(0.2f, -0.9f), south_east));
+        UNSCOPED_INFO("looking west, a little south: x slow, from the east, y from the north");
+        CHECK(same(ALWaterField::patchOrder(-0.9f, -0.3f), west_south));
     }
 
     // The reach across the plane of a camera above it: every point of the plane within the reach of the camera itself,
     // and no other, lies within it of the point below; none at or past the reach's height.
-    template<> template<>
-    void alwaterfield_object::test<16>()
+    TEST_CASE("alwaterfield: the reach across the plane from a height", "[alwaterfield]")
     {
-        set_test_name("the reach across the plane from a height");
-        ensure_equals("on the plane, the whole reach", ALWaterField::reachAcross(800.0, 0.0), 800.0);
-        ensure_equals("at the reach's height, none", ALWaterField::reachAcross(800.0, 800.0), 0.0);
-        ensure_equals("above it, none", ALWaterField::reachAcross(800.0, 3000.0), 0.0);
-        ensure_equals("below the plane as above it", ALWaterField::reachAcross(800.0, -600.0),
-                      ALWaterField::reachAcross(800.0, 600.0));
-        ensure_equals("no reach, none", ALWaterField::reachAcross(0.0, 0.0), 0.0);
+        UNSCOPED_INFO("on the plane, the whole reach");
+        CHECK(ALWaterField::reachAcross(800.0, 0.0) == 800.0);
+        UNSCOPED_INFO("at the reach's height, none");
+        CHECK(ALWaterField::reachAcross(800.0, 800.0) == 0.0);
+        UNSCOPED_INFO("above it, none");
+        CHECK(ALWaterField::reachAcross(800.0, 3000.0) == 0.0);
+        UNSCOPED_INFO("below the plane as above it");
+        CHECK(ALWaterField::reachAcross(800.0, -600.0) == ALWaterField::reachAcross(800.0, 600.0));
+        UNSCOPED_INFO("no reach, none");
+        CHECK(ALWaterField::reachAcross(0.0, 0.0) == 0.0);
         for (F64 h : { 0.0, 50.0, 500.0, 799.0 })
         {
             const F64 across = ALWaterField::reachAcross(800.0, h);
-            ensure("a point that far across is the reach from the camera", std::fabs(std::sqrt(across * across + h * h) - 800.0) < 1e-9);
+            UNSCOPED_INFO("a point that far across is the reach from the camera");
+            REQUIRE(std::fabs(std::sqrt(across * across + h * h) - 800.0) < 1e-9);
         }
         // A camera 2 km up lays out no patches; at 300 m, fewer than at the water.
         const ALWaterField::Layout high = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {},
                                                                ALWaterField::reachAcross(ALWaterField::tessReach(64.f), 2000.0));
-        ensure("none from 2 km up", ALWaterField::patchRect(high).empty());
+        UNSCOPED_INFO("none from 2 km up");
+        REQUIRE(ALWaterField::patchRect(high).empty());
         const ALWaterField::Layout low = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {},
                                                               ALWaterField::reachAcross(ALWaterField::tessReach(64.f), 0.0));
         const ALWaterField::Layout mid = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {},
                                                               ALWaterField::reachAcross(ALWaterField::tessReach(64.f), 700.0));
-        ensure("fewer from 700 m", mid.mReach < low.mReach && mid.mPatchMaxX - mid.mPatchMinX < low.mPatchMaxX - low.mPatchMinX);
+        {
+            INFO("fewer from 700 m");
+            CHECK(mid.mReach < low.mReach);
+            CHECK(mid.mPatchMaxX - mid.mPatchMinX < low.mPatchMaxX - low.mPatchMinX);
+        }
     }
 
     // A camera at no finite place, or cells of no width, lay out nothing; a camera far past any grid is held at the
     // cells' limit; a stretch past any rim takes no more than the most rings; a draw distance or reach that is not a
     // number takes none.
-    template<> template<>
-    void alwaterfield_object::test<17>()
+    TEST_CASE("alwaterfield: what the layout will not take", "[alwaterfield]")
     {
-        set_test_name("what the layout will not take");
         const F64 nan = std::numeric_limits<F64>::quiet_NaN();
         const F64 inf = std::numeric_limits<F64>::infinity();
-        ensure_equals("a NaN camera", ALWaterField::layout(nan, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
-        ensure_equals("an infinite one", ALWaterField::layout(EYE_X, -inf, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
-        ensure_equals("no width", ALWaterField::layout(EYE_X, EYE_Y, 0.0, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
-        ensure_equals("a negative one", ALWaterField::layout(EYE_X, EYE_Y, -WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells, 0);
-        ensure("nothing to draw for it", ALWaterField::fieldDraws(ALWaterField::Layout(), ALWaterField::PatchRect()).mCount == 0);
+        UNSCOPED_INFO("a NaN camera");
+        CHECK(ALWaterField::layout(nan, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells == 0);
+        UNSCOPED_INFO("an infinite one");
+        CHECK(ALWaterField::layout(EYE_X, -inf, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells == 0);
+        UNSCOPED_INFO("no width");
+        CHECK(ALWaterField::layout(EYE_X, EYE_Y, 0.0, 512.f, INFINITE_STRETCH, {}, 0.0).mCells == 0);
+        UNSCOPED_INFO("a negative one");
+        CHECK(ALWaterField::layout(EYE_X, EYE_Y, -WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0).mCells == 0);
+        UNSCOPED_INFO("nothing to draw for it");
+        CHECK(ALWaterField::fieldDraws(ALWaterField::Layout(), ALWaterField::PatchRect()).mCount == 0);
 
         const ALWaterField::Layout distant = ALWaterField::layout(1e300, -1e300, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
-        ensure_equals("far east, at the limit", distant.mCentreX, ALWaterField::CELL_LIMIT);
-        ensure_equals("far south, at the limit", distant.mCentreY, -ALWaterField::CELL_LIMIT);
-        ensure_equals("a cellOf past the limit", ALWaterField::cellOf(1e300, WIDTH), ALWaterField::CELL_LIMIT);
-        ensure_equals("a cellOf of NaN", ALWaterField::cellOf(nan, WIDTH), 0);
+        UNSCOPED_INFO("far east, at the limit");
+        CHECK(distant.mCentreX == ALWaterField::CELL_LIMIT);
+        UNSCOPED_INFO("far south, at the limit");
+        CHECK(distant.mCentreY == -ALWaterField::CELL_LIMIT);
+        UNSCOPED_INFO("a cellOf past the limit");
+        CHECK(ALWaterField::cellOf(1e300, WIDTH) == ALWaterField::CELL_LIMIT);
+        UNSCOPED_INFO("a cellOf of NaN");
+        CHECK(ALWaterField::cellOf(nan, WIDTH) == 0);
 
         const ALWaterField::Layout wide = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, 1e300, {}, 0.0);
-        ensure("a finite number of rings for any stretch", wide.mRings > 0 && wide.mRings <= 40);
+        {
+            INFO("a finite number of rings for any stretch");
+            CHECK(wide.mRings > 0);
+            CHECK(wide.mRings <= 40);
+        }
         const ALWaterField::Layout odd = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, std::numeric_limits<F32>::quiet_NaN(),
                                                               INFINITE_STRETCH, {}, nan);
-        ensure_equals("a NaN draw distance takes the fewest cells", odd.mCells, ALWaterField::MIN_CELLS);
-        ensure_equals("and a NaN reach none", odd.mReach, 0.0);
+        UNSCOPED_INFO("a NaN draw distance takes the fewest cells");
+        CHECK(odd.mCells == ALWaterField::MIN_CELLS);
+        UNSCOPED_INFO("and a NaN reach none");
+        CHECK(odd.mReach == 0.0);
     }
 
     // The field's draws: the cells, the rings at three triangles a quad, ring 0's four sides at a triangle a cell along
     // the square and two more, and the fringe, only with patches, a cell along each side of their rectangle.
-    template<> template<>
-    void alwaterfield_object::test<18>()
+    TEST_CASE("alwaterfield: the field's draws", "[alwaterfield]")
     {
-        set_test_name("the field's draws");
         const ALWaterField::Layout flat = ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, 0.0);
         const ALWaterField::FieldDraws draws = ALWaterField::fieldDraws(flat, ALWaterField::PatchRect());
-        ensure_equals("three without patches", draws.mCount, 3);
-        ensure_equals("the cells", draws.mDraws[0].mPart, ALWaterField::Draw::CELLS);
-        ensure("as strips", draws.mDraws[0].mStrip && draws.mDraws[0].mVertices == 4);
-        ensure_equals("a cell an instance", draws.mDraws[0].mInstances, flat.side() * flat.side());
-        ensure_equals("the rings", draws.mDraws[1].mPart, ALWaterField::Draw::RINGS);
-        ensure("three triangles a quad", !draws.mDraws[1].mStrip && draws.mDraws[1].mVertices == 9);
-        ensure_equals("twelve quads a ring", draws.mDraws[1].mInstances, ALWaterField::RING_QUADS * flat.mRings);
-        ensure_equals("the zippers", draws.mDraws[2].mPart, ALWaterField::Draw::ZIPPERS);
-        ensure_equals("four of them", draws.mDraws[2].mInstances, 4);
-        ensure_equals("a triangle a cell along the side and two", draws.mDraws[2].mVertices, 3 * (flat.side() + 2));
+        UNSCOPED_INFO("three without patches");
+        CHECK(draws.mCount == 3);
+        UNSCOPED_INFO("the cells");
+        CHECK(draws.mDraws[0].mPart == ALWaterField::Draw::CELLS);
+        {
+            INFO("as strips");
+            CHECK(draws.mDraws[0].mStrip);
+            CHECK(draws.mDraws[0].mVertices == 4);
+        }
+        UNSCOPED_INFO("a cell an instance");
+        CHECK(draws.mDraws[0].mInstances == flat.side() * flat.side());
+        UNSCOPED_INFO("the rings");
+        CHECK(draws.mDraws[1].mPart == ALWaterField::Draw::RINGS);
+        {
+            INFO("three triangles a quad");
+            CHECK(!draws.mDraws[1].mStrip);
+            CHECK(draws.mDraws[1].mVertices == 9);
+        }
+        UNSCOPED_INFO("twelve quads a ring");
+        CHECK(draws.mDraws[1].mInstances == ALWaterField::RING_QUADS * flat.mRings);
+        UNSCOPED_INFO("the zippers");
+        CHECK(draws.mDraws[2].mPart == ALWaterField::Draw::ZIPPERS);
+        UNSCOPED_INFO("four of them");
+        CHECK(draws.mDraws[2].mInstances == 4);
+        UNSCOPED_INFO("a triangle a cell along the side and two");
+        CHECK(draws.mDraws[2].mVertices == 3 * (flat.side() + 2));
 
         const ALWaterField::Layout waved =
             ALWaterField::layout(EYE_X, EYE_Y, WIDTH, 512.f, INFINITE_STRETCH, {}, ALWaterField::tessReach(64.f));
         const ALWaterField::PatchRect rect = ALWaterField::patchRect(waved);
         const ALWaterField::FieldDraws fringed = ALWaterField::fieldDraws(waved, rect);
-        ensure_equals("four with patches", fringed.mCount, 4);
-        ensure_equals("the fringe", fringed.mDraws[3].mPart, ALWaterField::Draw::FRINGE);
-        ensure_equals("a triangle a patch along its edge and one", fringed.mDraws[3].mVertices,
-                      3 * (ALWaterField::PATCHES_PER_CELL + 1));
-        ensure_equals("a cell along each side", fringed.mDraws[3].mInstances,
-                      2 * ((rect.mEndX - rect.mMinX) + (rect.mEndY - rect.mMinY)));
+        UNSCOPED_INFO("four with patches");
+        CHECK(fringed.mCount == 4);
+        UNSCOPED_INFO("the fringe");
+        CHECK(fringed.mDraws[3].mPart == ALWaterField::Draw::FRINGE);
+        UNSCOPED_INFO("a triangle a patch along its edge and one");
+        CHECK(fringed.mDraws[3].mVertices == 3 * (ALWaterField::PATCHES_PER_CELL + 1));
+        UNSCOPED_INFO("a cell along each side");
+        CHECK(fringed.mDraws[3].mInstances == 2 * ((rect.mEndX - rect.mMinX) + (rect.mEndY - rect.mMinY)));
     }
 }

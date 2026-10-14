@@ -273,13 +273,19 @@ void LLViewerAssetStats::getStat(LLTrace::Recording& rec, T& req, LLViewerAssetS
         || rec.getSampleCount(sDequeued[cat])
         || rec.getSampleCount(sResponse[cat]))
     {
+        // With nothing answered, or nothing fetched, there is nothing to take
+        // the least, the most or the mean of: zeros, rather than what an
+        // empty minimum, maximum and mean come out as (the largest float,
+        // the smallest, and NaN).
+        const S32 responses = rec.getSampleCount(sResponse[cat]);
+        const S32 fetches   = rec.getSampleCount(sBytesFetched[cat]);
         req .enqueued(rec.getSampleCount(sEnqueued[cat]))
             .dequeued(rec.getSampleCount(sDequeued[cat]))
-            .resp_count(rec.getSampleCount(sResponse[cat]))
-            .resp_min(rec.getMin(sResponse[cat]).value())
-            .resp_max(rec.getMax(sResponse[cat]).value())
-            .resp_mean(rec.getMean(sResponse[cat]).value())
-            .resp_mean_bytes(rec.getMean(sBytesFetched[cat]));
+            .resp_count(responses)
+            .resp_min(responses ? rec.getMin(sResponse[cat]).value() : 0.0)
+            .resp_max(responses ? rec.getMax(sResponse[cat]).value() : 0.0)
+            .resp_mean(responses ? rec.getMean(sResponse[cat]).value() : 0.0)
+            .resp_mean_bytes(fetches ? rec.getMean(sBytesFetched[cat]) : 0.0);
     }
 }
 

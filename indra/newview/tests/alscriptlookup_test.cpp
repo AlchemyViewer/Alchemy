@@ -30,6 +30,8 @@
 
 #include "../alscriptlookup.h"
 #include "alincludeidentity.h"
+#include "almainloop.h"
+#include "alteststateguard.h"
 #include "llfile.h"
 #include "workqueue.h"
 
@@ -38,7 +40,7 @@
 #include "llfocusmgr.h"
 #include "newview_test_fakes.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -318,7 +320,7 @@ namespace
     bool has(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
 }
 
-namespace tut
+namespace
 {
     struct alscriptlookup_data
     {
@@ -357,7 +359,7 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             navigation = std::make_unique<al_studio_test::StudioNavigation>(services);
             unit       = std::make_unique<ALScriptLookup>(services, studio, studio, navigation->unit, studio);
@@ -392,19 +394,14 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptlookup_data> alscriptlookup_group;
-    typedef alscriptlookup_group::object    alscriptlookup_object;
-    alscriptlookup_group                    alscriptlookup_instance("alscriptlookup");
-
-    template<> template<>
-    void alscriptlookup_object::test<1>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: places kept once and sorted own first and language words reserved", "[alscriptlookup]")
     {
-        set_test_name("places once each, the script's own first then each other's by name; the language's own words reserved");
         Doc::Lookup lookup;
         ALScriptLookup::addPlace(lookup, place("", 1, 2));
         ALScriptLookup::addPlace(lookup, place("", 1, 2, 7));
         ALScriptLookup::addPlace(lookup, place("x", 1, 2));
-        ensure_equals("once a file and a start", lookup.places.size(), size_t(2));
+        UNSCOPED_INFO("once a file and a start");
+        CHECK(lookup.places.size() == size_t(2));
 
         std::vector<Doc::Place> places = { place("object:z", 0, 0, 5, "Beta"),  place("", 3, 0, 5, "Zeta"),
                                            place("object:y", 2, 0, 5, "Alpha"), place("object:x", 0, 0, 5, "Beta"),
@@ -415,82 +412,133 @@ namespace tut
         {
             order.push_back(each.file + ":" + std::to_string(each.span.line));
         }
-        ensure_equals("own whatever it is called, then by name, file and place", joined(order),
+        UNSCOPED_INFO("own whatever it is called, then by name, file and place");
+        CHECK(joined(order) ==
                       joined(Names{ ":1", ":3", "object:y:1", "object:y:2", "object:x:0", "object:z:0" }));
 
-        ensure("an LSL keyword", ALScriptLookup::reserved(false, "state") && !ALScriptLookup::reserved(true, "state"));
-        ensure("a Luau keyword", ALScriptLookup::reserved(true, "local") && !ALScriptLookup::reserved(false, "local"));
-        ensure("the preprocessor's, in LSL", ALScriptLookup::reserved(false, "switch") && !ALScriptLookup::reserved(true, "switch"));
-        ensure("the definitions'", ALScriptLookup::reserved(false, "llSay") && ALScriptLookup::reserved(true, "ll.Say"));
-        ensure("a name of the script's", !ALScriptLookup::reserved(false, "count") && !ALScriptLookup::reserved(true, "count"));
+        {
+            INFO("an LSL keyword");
+            CHECK(ALScriptLookup::reserved(false, "state"));
+            CHECK_FALSE(ALScriptLookup::reserved(true, "state"));
+        }
+        {
+            INFO("a Luau keyword");
+            CHECK(ALScriptLookup::reserved(true, "local"));
+            CHECK_FALSE(ALScriptLookup::reserved(false, "local"));
+        }
+        {
+            INFO("the preprocessor's, in LSL");
+            CHECK(ALScriptLookup::reserved(false, "switch"));
+            CHECK_FALSE(ALScriptLookup::reserved(true, "switch"));
+        }
+        {
+            INFO("the definitions'");
+            CHECK(ALScriptLookup::reserved(false, "llSay"));
+            CHECK(ALScriptLookup::reserved(true, "ll.Say"));
+        }
+        {
+            INFO("a name of the script's");
+            CHECK_FALSE(ALScriptLookup::reserved(false, "count"));
+            CHECK_FALSE(ALScriptLookup::reserved(true, "count"));
+        }
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<2>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: a name declared nowhere shared is found in the script alone at once", "[alscriptlookup]")
     {
-        set_test_name("a name declared nowhere shared looked up in the script alone, answered at once and shown, the preview held");
         make();
         studio.others = { { b, "B" } };
         tab("a", a, A_TEXT, "A").preview = true;
         Doc& doc      = lookUp(ALEditorCommand::FindReferences, false);
-        ensure("the preview held", !doc.preview);
-        ensure("nothing else asked", studio.asked.empty() && studio.loads.empty());
-        ensure_equals("shown", studio.shows, 1);
-        ensure_equals("in its tab", studio.shownIn, std::string("a"));
-        ensure_equals("from", studio.shown.from, std::string("a"));
-        ensure_equals("named", studio.shown.fromName, std::string("A"));
-        ensure_equals("the name", studio.shown.name, std::string("count"));
-        ensure("in order", studio.shown.places.size() == 2 && studio.shown.places[0].span.line == 0);
-        ensure("not declared", !studio.shown.hasDefinition);
-        ensure("said", !services.statuses.empty() && has(services.statuses.back(), "ReferencesFound [COUNT]=2"));
-        ensure("done with", doc.lookup->command == ALEditorCommand::None && doc.lookup->pending == 0);
+        UNSCOPED_INFO("the preview held");
+        CHECK_FALSE(doc.preview);
+        {
+            INFO("nothing else asked");
+            CHECK(studio.asked.empty());
+            CHECK(studio.loads.empty());
+        }
+        CHECK(studio.shows == 1);
+        CHECK(studio.shownIn == std::string("a"));
+        CHECK(studio.shown.from == std::string("a"));
+        CHECK(studio.shown.fromName == std::string("A"));
+        CHECK(studio.shown.name == std::string("count"));
+        {
+            INFO("in order");
+            REQUIRE(studio.shown.places.size() == 2);
+            CHECK(studio.shown.places[0].span.line == 0);
+        }
+        CHECK_FALSE(studio.shown.hasDefinition);
+        REQUIRE_FALSE(services.statuses.empty());
+        CHECK(has(services.statuses.back(), "ReferencesFound [COUNT]=2"));
+        {
+            INFO("done with");
+            CHECK(doc.lookup->command == ALEditorCommand::None);
+            CHECK(doc.lookup->pending == 0);
+        }
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<3>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: the object's other scripts are read and expanded and asked for places", "[alscriptlookup]")
     {
-        set_test_name("the object's others: one open without the name passed over, one read, expanded, asked, and its place added");
         make();
         tab("c", c, "default { touch_start(integer n) { } }\n", "C");
         studio.others = { { c, "C" }, { b, "B" } };
         Doc& doc      = lookUp(ALEditorCommand::FindReferences);
-        ensure("candidates asked for", studio.asked == Names{ "a" });
-        ensure_equals("one to read", studio.loads.size(), size_t(1));
-        ensure("the open one passed over", studio.expands.empty());
-        ensure("waiting said", has(services.statuses.back(), "LookingAcross [COUNT]=1 [NAME]=count"));
-        ensure_equals("nothing shown yet", studio.shows, 0);
+        UNSCOPED_INFO("candidates asked for");
+        CHECK(studio.asked == Names{ "a" });
+        REQUIRE(studio.loads.size() == size_t(1));
+        UNSCOPED_INFO("the open one passed over");
+        CHECK(studio.expands.empty());
+        {
+            INFO("waiting said");
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(has(services.statuses.back(), "LookingAcross [COUNT]=1 [NAME]=count"));
+        }
+        UNSCOPED_INFO("nothing shown yet");
+        CHECK(studio.shows == 0);
 
         const LLUUID asset("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
         studio.loads[0].loaded(asset, B_TEXT);
-        ensure_equals("expanded", studio.expands.size(), size_t(1));
+        REQUIRE(studio.expands.size() == size_t(1));
         const ALScriptPreprocessor::Request& request = studio.expands[0].request;
-        ensure("as the compiler sees it, not optimized",
-               request.ref == b && request.name == "B" && request.assetId == asset && request.sourceText() == B_TEXT && !request.optimize);
+        {
+            INFO("as the compiler sees it, not optimized");
+            CHECK(request.ref == b);
+            CHECK(request.name == "B");
+            CHECK(request.assetId == asset);
+            CHECK(request.sourceText() == B_TEXT);
+            CHECK_FALSE(request.optimize);
+        }
 
         studio.expands[0].expanded(
             expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "A", ALScriptPreprocessor::pathOf(a), "integer count;\n"));
-        ensure_equals("asked", studio.asks.size(), size_t(1));
+        REQUIRE(studio.asks.size() == size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
-        ensure("where the declaration went", asked.kind == ALScriptAnalysis::Kind::References && asked.line == 0 && asked.column == 8);
-        ensure_equals("by who asked and the script", asked.id, "lookup:" + doc.id + ":" + b.id());
-        ensure_equals("of this lookup", asked.version, doc.lookup->generation);
+        {
+            INFO("where the declaration went");
+            CHECK(asked.kind == ALScriptAnalysis::Kind::References);
+            CHECK(asked.line == 0);
+            CHECK(asked.column == 8);
+        }
+        UNSCOPED_INFO("by who asked and the script");
+        CHECK(asked.id == "lookup:" + doc.id + ":" + b.id());
+        UNSCOPED_INFO("of this lookup");
+        CHECK(asked.version == doc.lookup->generation);
 
         studio.asks[0].answered(answer({ span(0, 8, 5), span(1, 8, 5) }));
-        ensure_equals("shown", studio.shows, 1);
-        ensure_equals("its own through the other's expansion left out", studio.shown.places.size(), size_t(3));
+        CHECK(studio.shows == 1);
+        UNSCOPED_INFO("its own through the other's expansion left out");
+        REQUIRE(studio.shown.places.size() == size_t(3));
         const Doc::Place& other = studio.shown.places[2];
-        ensure_equals("in B", other.file, ALScriptPreprocessor::pathOf(b));
-        ensure_equals("named", other.fileName, std::string("B"));
-        ensure_equals("as written", other.text, std::string("foo() { count = 2; }"));
-        ensure_equals("the name in it", other.at, 8);
-        ensure("declared", studio.shown.hasDefinition);
-        ensure("across scripts", has(services.statuses.back(), "ReferencesFoundAcross [COUNT]=3 [FILES]=2"));
+        CHECK(other.file == ALScriptPreprocessor::pathOf(b));
+        CHECK(other.fileName == std::string("B"));
+        CHECK(other.text == std::string("foo() { count = 2; }"));
+        UNSCOPED_INFO("the name in it");
+        CHECK(other.at == 8);
+        CHECK(studio.shown.hasDefinition);
+        CHECK(has(services.statuses.back(), "ReferencesFoundAcross [COUNT]=3 [FILES]=2"));
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<4>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: an open script is expanded from its tab and an include's line read once", "[alscriptlookup]")
     {
-        set_test_name("an open script with the name answered on the spot, the others still counted; an include's line where it is had");
         make();
         Doc& open     = tab("b", b, B_TEXT, "B");
         studio.others = { { b, "B" }, { c, "C" } };
@@ -498,95 +546,155 @@ namespace tut
         studio.lines[inc + "#0"] = "   integer count; // kept";
         Doc& doc = services.findDoc("a") ? *services.findDoc("a") : tab("a", a, A_TEXT, "A");
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("count"), true, inc, span(0, 8, 5), {}, doc.editor->document().version());
-        ensure("the open one expanded at once", studio.expands.size() == 1 && studio.expands[0].request.sourceText() == open.editor->text());
-        ensure("from its tab's own copy, not another", studio.expands[0].request.source == open.snapshot());
-        ensure_equals("the other read", studio.loads.size(), size_t(1));
-        ensure("both waited for", doc.lookup->pending == 2 && studio.shows == 0);
+        {
+            INFO("the open one expanded at once");
+            REQUIRE(studio.expands.size() == 1);
+            CHECK(studio.expands[0].request.sourceText() == open.editor->text());
+        }
+        UNSCOPED_INFO("from its tab's own copy, not another");
+        CHECK(studio.expands[0].request.source == open.snapshot());
+        UNSCOPED_INFO("the other read");
+        REQUIRE(studio.loads.size() == size_t(1));
+        {
+            INFO("both waited for");
+            CHECK(doc.lookup->pending == 2);
+            CHECK(studio.shows == 0);
+        }
 
         studio.expands[0].expanded(expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "inc.lsl", inc, "integer count;\n"));
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer({ span(0, 8, 5) }));
-        ensure("still one to come", studio.shows == 0 && doc.lookup->pending == 1);
+        {
+            INFO("still one to come");
+            CHECK(studio.shows == 0);
+            CHECK(doc.lookup->pending == 1);
+        }
         studio.loads[0].loaded(LLUUID::null, "");
-        ensure_equals("an empty one passed over", studio.shows, 1);
-        ensure_equals("one place", studio.shown.places.size(), size_t(1));
+        UNSCOPED_INFO("an empty one passed over");
+        CHECK(studio.shows == 1);
+        REQUIRE(studio.shown.places.size() == size_t(1));
         const Doc::Place& found = studio.shown.places[0];
-        ensure("in the include", found.file == inc && found.fileName == "inc.lsl");
-        ensure("as the include reads", found.text == "integer count; // kept" && found.at == 5);
-        ensure_equals("its lines asked for once", studio.linesAsked[inc], 1);
+        {
+            INFO("in the include");
+            CHECK(found.file == inc);
+            CHECK(found.fileName == "inc.lsl");
+        }
+        {
+            INFO("as the include reads");
+            CHECK(found.text == "integer count; // kept");
+            CHECK(found.at == 5);
+        }
+        UNSCOPED_INFO("its lines asked for once");
+        CHECK(studio.linesAsked[inc] == 1);
 
         studio.lines.clear();
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("count"), true, inc, span(0, 8, 5), {}, doc.editor->document().version());
+        // This lookup's own questions answered, not the last one's.
+        CHECK(studio.expands.size() == size_t(2));
+        CHECK(studio.loads.size() == size_t(2));
         studio.expands.back().expanded(expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "inc.lsl", inc, "integer count;\n"));
+        CHECK(studio.asks.size() == size_t(2));
         studio.asks.back().answered(answer({ span(0, 8, 5) }));
         studio.loads.back().loaded(LLUUID::null, "default { }\n");
-        ensure_equals("shown again", studio.shows, 2);
-        ensure("the expansion's line, the name not placed in it",
-               studio.shown.places.size() == 1 && studio.shown.places[0].text == "integer count;" && studio.shown.places[0].at == -1);
+        UNSCOPED_INFO("shown again");
+        CHECK(studio.shows == 2);
+        {
+            INFO("the expansion's line, the name not placed in it");
+            REQUIRE(studio.shown.places.size() == 1);
+            CHECK(studio.shown.places[0].text == "integer count;");
+            CHECK(studio.shown.places[0].at == -1);
+        }
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<5>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: answers to an earlier lookup or after the unit is gone are dropped", "[alscriptlookup]")
     {
-        set_test_name("answers to an earlier lookup, or after the lookups are gone, dropped; a script not naming the home passed over");
         make();
         studio.others = { { b, "B" } };
         Doc& doc      = lookUp(ALEditorCommand::FindReferences);
         lookUp(ALEditorCommand::FindReferences, false);
-        ensure_equals("the second shown", studio.shows, 1);
+        UNSCOPED_INFO("the second shown");
+        CHECK(studio.shows == 1);
+        REQUIRE(studio.loads.size() == size_t(1));
         studio.loads[0].loaded(LLUUID::null, B_TEXT);
-        ensure("the first's answer dropped", studio.expands.empty() && studio.shows == 1);
+        {
+            INFO("the first's answer dropped");
+            CHECK(studio.expands.empty());
+            CHECK(studio.shows == 1);
+        }
 
         lookUp(ALEditorCommand::FindReferences);
+        CHECK(studio.loads.size() == size_t(2));
         studio.loads.back().loaded(LLUUID::null, B_TEXT);
+        REQUIRE(studio.expands.size() == size_t(1));
         studio.expands.back().expanded(expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT));
-        ensure("no declaration in it: nothing asked", studio.asks.empty());
-        ensure_equals("shown without it", studio.shows, 2);
+        UNSCOPED_INFO("no declaration in it: nothing asked");
+        CHECK(studio.asks.empty());
+        UNSCOPED_INFO("shown without it");
+        CHECK(studio.shows == 2);
 
         const U32 generation = doc.lookup->generation;
         lookUp(ALEditorCommand::FindReferences);
-        ensure("a new generation", doc.lookup->generation != generation);
+        CHECK(doc.lookup->generation != generation);
+        CHECK(studio.loads.size() == size_t(3));
         studio.loads.back().loaded(LLUUID::null, B_TEXT);
+        CHECK(studio.expands.size() == size_t(2));
         // A lookup of another tab's, still waiting on its read, as this
         // one waits on its expansion: both current, and both gone with it.
         Doc& other = tab("x", c, A_TEXT, "X");
         unit->start(other, ALEditorCommand::FindReferences, refsOf("count"), true, std::string(), span(0, 8, 5), {},
                     other.editor->document().version());
+        CHECK(studio.loads.size() == size_t(4));
         const size_t expands = studio.expands.size();
         unit.reset();
         studio.expands.back().expanded(
             expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "A", ALScriptPreprocessor::pathOf(a), "integer count;\n"));
-        ensure("nothing asked once gone", studio.asks.empty() && studio.shows == 2);
+        {
+            INFO("nothing asked once gone");
+            CHECK(studio.asks.empty());
+            CHECK(studio.shows == 2);
+        }
         studio.loads.back().loaded(LLUUID::null, B_TEXT);
-        ensure("nothing read once gone", studio.expands.size() == expands);
+        UNSCOPED_INFO("nothing read once gone");
+        CHECK(studio.expands.size() == expands);
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<6>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: Rename says what is not renamable and hints at what return will do", "[alscriptlookup]")
     {
-        set_test_name("Rename: one that may not be said so; else the new name asked, the row under it saying what return will do");
         make();
         lookUp(ALEditorCommand::Rename, false, false);
-        ensure("not renamable", has(services.statuses.back(), "NotRenamable") && studio.askedName.empty());
+        {
+            INFO("not renamable");
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(has(services.statuses.back(), "NotRenamable"));
+            CHECK(studio.askedName.empty());
+        }
 
         Doc& doc = lookUp(ALEditorCommand::Rename, false);
-        ensure_equals("asked in its tab", studio.askedName, std::string("a"));
+        UNSCOPED_INFO("asked in its tab");
+        CHECK(studio.askedName == std::string("a"));
         ALScriptOutlineEntry entry;
         entry.name = "total";
         doc.outline.push_back(entry);
-        ensure("nothing typed", has(studio.hint(""), "RenameHint [COUNT]=2 [FILES]=1 [NAME]=count"));
-        ensure("no name", has(studio.hint("9lives"), "RenameBadName") && has(studio.hint("9lives"), "[NAME]=9lives"));
-        ensure("reserved", has(studio.hint("state"), "RenameReserved [NAME]=state"));
-        ensure("the same", has(studio.hint(" count "), "RenameSame"));
-        ensure("a clash said, allowed", has(studio.hint("total"), "RenameClash"));
-        ensure("what it will do", has(studio.hint("sum"), "RenameTo [COUNT]=2") && has(studio.hint("sum"), "[NEW]=sum"));
+        UNSCOPED_INFO("nothing typed");
+        CHECK(has(studio.hint(""), "RenameHint [COUNT]=2 [FILES]=1 [NAME]=count"));
+        CHECK(has(studio.hint("9lives"), "RenameBadName"));
+        CHECK(has(studio.hint("9lives"), "[NAME]=9lives"));
+        CHECK(has(studio.hint("state"), "RenameReserved [NAME]=state"));
+        CHECK(has(studio.hint(" count "), "RenameSame"));
+        UNSCOPED_INFO("a clash said, allowed");
+        CHECK(has(studio.hint("total"), "RenameClash"));
+        {
+            INFO("what it will do");
+            CHECK(has(studio.hint("sum"), "RenameTo [COUNT]=2"));
+            CHECK(has(studio.hint("sum"), "[NEW]=sum"));
+        }
         services.docs.clear();
-        ensure("its tab gone: nothing said", studio.hint("sum").empty());
+        UNSCOPED_INFO("its tab gone: nothing said");
+        CHECK(studio.hint("sum").empty());
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<7>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: a rename across scripts edits open tabs and opens others with it pending", "[alscriptlookup]")
     {
-        set_test_name("a rename across scripts: here as one step, open ones unchanged since, others opened with it waiting, the rest left");
         make();
         Doc& doc   = tab("a", a, A_TEXT, "A");
         Doc& open  = tab("b", b, "foo() { count = 2; }\nbar() { total = count; }\n", "B");
@@ -604,135 +712,215 @@ namespace tut
                       place(pc, 0, 8, 5, "C"), place(pd, 2, 4, 5, "D"), place("disk:/e.lsl", 0, 8, 5, "e.lsl"), place("weird:x", 0, 0) },
                     doc.editor->document().version());
         moved.editor->insertText("// ");
-        ensure("asked", (bool)studio.chosen);
-        ensure("across scripts", has(studio.hint("sum"), "RenameToAcross [COUNT]=9 [FILES]=6"));
+        UNSCOPED_INFO("asked");
+        REQUIRE((bool)studio.chosen);
+        CHECK(has(studio.hint("sum"), "RenameToAcross [COUNT]=9 [FILES]=6"));
 
         studio.chosen("9lives");
-        ensure("no name", has(services.statuses.back(), "RenameBadName") && doc.editor->text() == A_TEXT);
+        REQUIRE_FALSE(services.statuses.empty());
+        CHECK(has(services.statuses.back(), "RenameBadName"));
+        CHECK(doc.editor->text() == A_TEXT);
         studio.chosen("state");
-        ensure("reserved", has(services.statuses.back(), "RenameReserved"));
+        CHECK(has(services.statuses.back(), "RenameReserved"));
         studio.chosen("count");
-        ensure("the same: nothing", services.reports.empty() && doc.editor->text() == A_TEXT);
+        {
+            INFO("the same: nothing");
+            CHECK(services.reports.empty());
+            CHECK(doc.editor->text() == A_TEXT);
+        }
 
         studio.chosen(" total ");
-        ensure_equals("here", doc.editor->text(), std::string("integer total;\ndefault { state_entry() { total = 1; } }\n"));
-        ensure_equals("one step", doc.editor->undoJournal().undoLabel(), std::string("rename"));
-        ensure_equals("open and unchanged: where it still stands", open.editor->text(),
+        UNSCOPED_INFO("here");
+        CHECK(doc.editor->text() == std::string("integer total;\ndefault { state_entry() { total = 1; } }\n"));
+        UNSCOPED_INFO("one step");
+        CHECK(doc.editor->undoJournal().undoLabel() == std::string("rename"));
+        UNSCOPED_INFO("open and unchanged: where it still stands");
+        CHECK(open.editor->text() ==
                       std::string("foo() { total = 2; }\nbar() { total = total; }\n"));
-        ensure_equals("there as one step too", open.editor->undoJournal().undoLabel(), std::string("rename"));
-        ensure("moved on since: left", has(moved.editor->text(), "count") && !has(moved.editor->text(), "total"));
-        ensure("not open: opened", services.opened.size() == 1 && services.opened[0].ref == d && services.opened[0].name == "D");
+        UNSCOPED_INFO("there as one step too");
+        CHECK(open.editor->undoJournal().undoLabel() == std::string("rename"));
+        {
+            INFO("moved on since: left");
+            CHECK(has(moved.editor->text(), "count"));
+            CHECK_FALSE(has(moved.editor->text(), "total"));
+        }
+        {
+            INFO("not open: opened");
+            REQUIRE(services.opened.size() == 1);
+            CHECK(services.opened[0].ref == d);
+            CHECK(services.opened[0].name == "D");
+        }
         Doc* waiting = services.findDoc("d");
-        ensure("the change waiting", waiting && waiting->pendingEdits.size() == 1 && waiting->pendingEdits[0].now == "total");
-        ensure("a file opened", studio.filesOpened == Names{ "/e.lsl" });
-        ensure_equals("and changed", services.findDoc("disk:/e.lsl")->editor->text(), std::string("integer total = 4;\n"));
-        ensure_equals("said once", services.reports.size(), size_t(1));
+        {
+            INFO("the change waiting");
+            REQUIRE(waiting);
+            REQUIRE(waiting->pendingEdits.size() == 1);
+            CHECK(waiting->pendingEdits[0].now == "total");
+        }
+        UNSCOPED_INFO("a file opened");
+        CHECK(studio.filesOpened == Names{ "/e.lsl" });
+        const Doc* file = services.findDoc("disk:/e.lsl");
+        {
+            INFO("and changed");
+            REQUIRE(file);
+            CHECK(file->editor->text() == std::string("integer total = 4;\n"));
+        }
+        UNSCOPED_INFO("said once");
+        REQUIRE(services.reports.size() == size_t(1));
         const al_studio_test::FakeServices::Said& said = services.reports[0];
-        ensure("the counts", has(said.text, "RenamedIn [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=4"));
-        ensure("opened, a clause joined on", has(said.text, "[SECOND]=RenamedOpened [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=2"));
-        ensure("left, another", has(said.text, "[SECOND]=RenamedLeft [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=2"));
-        ensure("as the language joins clauses and ends a sentence", has(said.text, "Sentence [TEXT]=JoinClauses [FIRST]=JoinClauses"));
-        ensure("a failure where any was left", said.failure);
-        ensure("its tab brought forward", studio.activated == Names{ "a" });
+        CHECK(has(said.text, "RenamedIn [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=4"));
+        UNSCOPED_INFO("opened, a clause joined on");
+        CHECK(has(said.text, "[SECOND]=RenamedOpened [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=2"));
+        UNSCOPED_INFO("left, another");
+        CHECK(has(said.text, "[SECOND]=RenamedLeft [NAME]=total [PLACES]=Places [COUNT]=6 [SCRIPTS]=Scripts [COUNT]=2"));
+        UNSCOPED_INFO("as the language joins clauses and ends a sentence");
+        CHECK(has(said.text, "Sentence [TEXT]=JoinClauses [FIRST]=JoinClauses"));
+        UNSCOPED_INFO("a failure where any was left");
+        CHECK(said.failure);
+        UNSCOPED_INFO("its tab brought forward");
+        CHECK(studio.activated == Names{ "a" });
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<8>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: a stale rename is refused and one in this script alone is said as here", "[alscriptlookup]")
     {
-        set_test_name("a rename of a script that has moved on since the lookup refused, and one in only this script said as here");
         make();
         Doc& doc = lookUp(ALEditorCommand::Rename, false);
         doc.editor->insertText(" ");
         studio.chosen("total");
-        ensure("stale", has(services.statuses.back(), "RenameStale [NAME]=total") && services.reports.empty());
+        REQUIRE_FALSE(services.statuses.empty());
+        CHECK(has(services.statuses.back(), "RenameStale [NAME]=total"));
+        CHECK(services.reports.empty());
 
         lookUp(ALEditorCommand::Rename, false);
         studio.chosen("total");
-        ensure_equals("said", services.reports.size(), size_t(1));
-        ensure("here", has(services.reports[0].text, "RenamedHere") && !has(services.reports[0].text, ";"));
-        ensure("not a failure", !services.reports[0].failure);
+        REQUIRE(services.reports.size() == size_t(1));
+        {
+            INFO("here");
+            CHECK(has(services.reports[0].text, "RenamedHere"));
+            CHECK_FALSE(has(services.reports[0].text, ";"));
+        }
+        CHECK_FALSE(services.reports[0].failure);
 
         Doc& open = tab("b", b, "foo() { count = 2; }\n", "B");
         doc.editor->setText(A_TEXT);
         unit->start(doc, ALEditorCommand::Rename, refsOf("count"), false, std::string(), span(0, 8, 5),
                     { place("", 0, 8), place(ALScriptPreprocessor::pathOf(b), 0, 8, 5, "B") }, doc.editor->document().version());
         studio.chosen("sum");
-        ensure("in both, none opened", has(services.reports.back().text, "RenamedIn") && !has(services.reports.back().text, ";"));
-        ensure_equals("B too", open.editor->text(), std::string("foo() { sum = 2; }\n"));
+        {
+            INFO("in both, none opened");
+            CHECK(has(services.reports.back().text, "RenamedIn"));
+            CHECK_FALSE(has(services.reports.back().text, ";"));
+        }
+        UNSCOPED_INFO("B too");
+        CHECK(open.editor->text() == std::string("foo() { sum = 2; }\n"));
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<9>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: pending edits are made where the old name stands and the rest said missed", "[alscriptlookup]")
     {
-        set_test_name("edits waiting for a text made where the old name stands, the rest said missed; none where nothing may change");
         make();
         Doc& doc   = tab("d", d, "integer count;\nx = count;\n", "D");
         doc.loaded = false;
         doc.pendingEdits = { { span(0, 8, 5), "count", "total" }, { span(1, 0, 5), "count", "total" } };
         unit->applyPendingEdits(doc);
-        ensure("not loaded: kept", doc.pendingEdits.size() == 2 && doc.editor->text() == "integer count;\nx = count;\n");
+        {
+            INFO("not loaded: kept");
+            CHECK(doc.pendingEdits.size() == 2);
+            CHECK(doc.editor->text() == "integer count;\nx = count;\n");
+        }
 
         doc.loaded = true;
         doc.editor->setReadOnly(true);
         unit->applyPendingEdits(doc);
-        ensure("made", doc.pendingEdits.empty() && doc.editor->text() == "integer total;\nx = count;\n");
-        ensure_equals("one step", doc.editor->undoJournal().undoLabel(), std::string("rename"));
-        ensure("the one missed said", services.reports.size() == 1 && has(services.reports[0].text, "RenameMissed [COUNT]=1 [NAME]=D"));
-        ensure("of the tab, a failure", services.reports[0].doc == "d" && services.reports[0].failure);
+        {
+            INFO("made");
+            CHECK(doc.pendingEdits.empty());
+            CHECK(doc.editor->text() == "integer total;\nx = count;\n");
+        }
+        UNSCOPED_INFO("one step");
+        CHECK(doc.editor->undoJournal().undoLabel() == std::string("rename"));
+        {
+            INFO("the one missed said");
+            REQUIRE(services.reports.size() == 1);
+            CHECK(has(services.reports[0].text, "RenameMissed [COUNT]=1 [NAME]=D"));
+        }
+        {
+            INFO("of the tab, a failure");
+            CHECK(services.reports[0].doc == "d");
+            CHECK(services.reports[0].failure);
+        }
 
         Doc::PendingEdit replace{ span(0, 8, 5), "total", "sum", true };
         doc.pendingEdits = { replace };
         unit->applyPendingEdits(doc);
-        ensure("a replace", doc.editor->text() == "integer sum;\nx = count;\n" && doc.editor->undoJournal().undoLabel() == "replace");
-        ensure("nothing missed", services.reports.size() == 1);
+        {
+            INFO("a replace");
+            CHECK(doc.editor->text() == "integer sum;\nx = count;\n");
+            CHECK(doc.editor->undoJournal().undoLabel() == "replace");
+        }
+        UNSCOPED_INFO("nothing missed");
+        CHECK(services.reports.size() == 1);
 
         doc.modifiable   = false;
         doc.pendingEdits = { { span(0, 8, 3), "sum", "total", true } };
         unit->applyPendingEdits(doc);
-        ensure("none made", doc.editor->text() == "integer sum;\nx = count;\n");
-        ensure("every one missed", services.reports.size() == 2 && has(services.reports[1].text, "ReplaceMissed [COUNT]=1"));
+        UNSCOPED_INFO("none made");
+        CHECK(doc.editor->text() == "integer sum;\nx = count;\n");
+        {
+            INFO("every one missed");
+            REQUIRE(services.reports.size() == 2);
+            CHECK(has(services.reports[1].text, "ReplaceMissed [COUNT]=1"));
+        }
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<10>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: other scripts are read a few at a time and a new lookup drops the rest", "[alscriptlookup]")
     {
-        set_test_name("the other scripts read a few at a time, the next begun as one is done with; a lookup begun again lets the rest go");
         make();
         const ALScriptRef e{ object, LLUUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee") };
         const ALScriptRef f{ object, LLUUID("ffffffff-ffff-ffff-ffff-ffffffffffff") };
         studio.others = { { b, "B" }, { c, "C" }, { d, "D" }, { e, "E" }, { f, "F" } };
         Doc& doc      = lookUp(ALEditorCommand::FindReferences);
-        ensure_equals("no more than so many read at once", studio.loads.size(), size_t(ALScriptLookup::AT_ONCE));
-        ensure_equals("every one waited for", doc.lookup->pending, S32(5));
+        UNSCOPED_INFO("no more than so many read at once");
+        REQUIRE(studio.loads.size() == size_t(ALScriptLookup::AT_ONCE));
+        UNSCOPED_INFO("every one waited for");
+        CHECK(doc.lookup->pending == S32(5));
         // One that does not name it: passed over, and the next read.
         studio.loads[0].loaded(LLUUID::null, "default { }\n");
-        ensure_equals("the next begun", studio.loads.size(), size_t(ALScriptLookup::AT_ONCE + 1));
-        ensure_equals("one fewer waited for", doc.lookup->pending, S32(4));
+        UNSCOPED_INFO("the next begun");
+        REQUIRE(studio.loads.size() == size_t(ALScriptLookup::AT_ONCE + 1));
+        UNSCOPED_INFO("one fewer waited for");
+        CHECK(doc.lookup->pending == S32(4));
         studio.loads[1].loaded(LLUUID::null, "");
         studio.loads[2].loaded(LLUUID::null, "");
-        ensure_equals("and on", studio.loads.size(), size_t(5));
+        UNSCOPED_INFO("and on");
+        REQUIRE(studio.loads.size() == size_t(5));
         studio.loads[3].loaded(LLUUID::null, "");
         studio.loads[4].loaded(LLUUID::null, "");
-        ensure("all done with: shown", doc.lookup->pending == 0 && studio.shows == 1);
+        {
+            INFO("all done with: shown");
+            CHECK(doc.lookup->pending == 0);
+            CHECK(studio.shows == 1);
+        }
 
         // Begun again with some still to read: what the first had not
         // begun is let go of, and its answers dropped.
         studio.loads.clear();
         lookUp(ALEditorCommand::FindReferences);
-        ensure_equals("two read", studio.loads.size(), size_t(2));
+        UNSCOPED_INFO("two read");
+        REQUIRE(studio.loads.size() == size_t(2));
         lookUp(ALEditorCommand::FindReferences);
-        ensure_equals("two more, for the new one", studio.loads.size(), size_t(4));
+        UNSCOPED_INFO("two more, for the new one");
+        REQUIRE(studio.loads.size() == size_t(4));
         studio.loads[0].loaded(LLUUID::null, "");
         studio.loads[1].loaded(LLUUID::null, "");
-        ensure_equals("the first's answers begin nothing", studio.loads.size(), size_t(4));
+        UNSCOPED_INFO("the first's answers begin nothing");
+        REQUIRE(studio.loads.size() == size_t(4));
         studio.loads[2].loaded(LLUUID::null, "");
-        ensure_equals("the new one's go on", studio.loads.size(), size_t(5));
+        UNSCOPED_INFO("the new one's go on");
+        CHECK(studio.loads.size() == size_t(5));
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<11>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: folderCandidates are the folder's other scripts in the same language", "[alscriptlookup]")
     {
-        set_test_name("an inventory script's lookups reach the others of its folder in its language: SLua by subtype or runtime, not notecards, not itself");
         const auto made = [](const char* name, LLAssetType::EType type, U32 subtype, const char* runtime) {
             LLPointer<LLInventoryItem> item = new LLInventoryItem();
             item->setUUID(LLUUID::generateNewID());
@@ -750,106 +938,178 @@ namespace tut
         const std::vector<const LLInventoryItem*> folder = { own.get(), lib.get(), lua.get(), onluau.get(), readme.get() };
 
         const std::vector<ALScriptLookup::Candidate> lsl = ALScriptLookup::folderCandidates(folder, own->getUUID(), false);
-        ensure("LSL: the other LSL script", lsl.size() == 1 && lsl[0].name == "lib.lsl" && lsl[0].ref.inInventory() && lsl[0].ref.item == lib->getUUID());
+        {
+            INFO("LSL: the other LSL script");
+            REQUIRE(lsl.size() == 1);
+            CHECK(lsl[0].name == "lib.lsl");
+            CHECK(lsl[0].ref.inInventory());
+            CHECK(lsl[0].ref.item == lib->getUUID());
+        }
         const std::vector<ALScriptLookup::Candidate> slua = ALScriptLookup::folderCandidates(folder, lua->getUUID(), true);
-        ensure("SLua: by runtime too", slua.size() == 1 && slua[0].name == "port.luau");
+        {
+            INFO("SLua: by runtime too");
+            REQUIRE(slua.size() == 1);
+            CHECK(slua[0].name == "port.luau");
+        }
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<12>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: a previewed rename is made at the places kept and clashes only with code", "[alscriptlookup]")
     {
-        set_test_name("Rename previewed: Shift-Return shows each place, made at those kept; a name anywhere in what it changes is a clash; an include's other scripts said out of reach");
         make();
         lookUp(ALEditorCommand::Rename, false);
-        ensure("previewing offered", (bool)studio.previewed);
-        ensure("the prompt says Shift-Return shows it first", has(studio.hint("sum"), "RenamePreviewHint"));
+        UNSCOPED_INFO("previewing offered");
+        REQUIRE((bool)studio.previewed);
+        UNSCOPED_INFO("the prompt says Shift-Return shows it first");
+        CHECK(has(studio.hint("sum"), "RenamePreviewHint"));
         studio.previewed("9lives");
-        ensure("no name: nothing shown", has(services.statuses.back(), "RenameBadName") && !studio.apply);
+        {
+            INFO("no name: nothing shown");
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(has(services.statuses.back(), "RenameBadName"));
+            CHECK_FALSE(studio.apply);
+        }
         studio.previewed("sum");
-        ensure("shown from its tab", studio.previewIn == "a" && studio.previewName == "sum" && studio.previewOf.places.size() == 2);
-        ensure("what it will do said over them", has(studio.previewSaid, "RenameTo [COUNT]=2") && !has(studio.previewSaid, "RenamePreviewHint"));
+        {
+            INFO("shown from its tab");
+            CHECK(studio.previewIn == "a");
+            CHECK(studio.previewName == "sum");
+            REQUIRE(studio.previewOf.places.size() == 2);
+        }
+        {
+            INFO("what it will do said over them");
+            CHECK(has(studio.previewSaid, "RenameTo [COUNT]=2"));
+            CHECK_FALSE(has(studio.previewSaid, "RenamePreviewHint"));
+        }
         studio.apply({ 1 });
-        Doc& doc = *services.findDoc("a");
-        ensure_equals("made at the one kept", doc.editor->text(), std::string("integer count;\ndefault { state_entry() { sum = 1; } }\n"));
+        Doc* found = services.findDoc("a");
+        REQUIRE(found);
+        Doc& doc = *found;
+        UNSCOPED_INFO("made at the one kept");
+        CHECK(doc.editor->text() == std::string("integer count;\ndefault { state_entry() { sum = 1; } }\n"));
 
         // A local of the same name -- in no outline -- is a clash; a name in
         // a comment or a string is not.
         doc.editor->setText("integer count;\ndefault { state_entry() { integer total = count; llSay(0, \"hidden\"); } } // gone\n");
         lookUp(ALEditorCommand::Rename, false);
-        ensure("a local's name", has(studio.hint("total"), "RenameClash") && has(studio.hint("total"), "[SCRIPT]=A"));
-        ensure("not a string's", !has(studio.hint("hidden"), "RenameClash"));
-        ensure("nor a comment's", !has(studio.hint("gone"), "RenameClash"));
+        {
+            INFO("a local's name");
+            CHECK(has(studio.hint("total"), "RenameClash"));
+            CHECK(has(studio.hint("total"), "[SCRIPT]=A"));
+        }
+        UNSCOPED_INFO("not a string's");
+        CHECK_FALSE(has(studio.hint("hidden"), "RenameClash"));
+        UNSCOPED_INFO("nor a comment's");
+        CHECK_FALSE(has(studio.hint("gone"), "RenameClash"));
 
         // A place in an include: the scripts elsewhere that include it are
         // not reached, and said to be so.
         unit->start(doc, ALEditorCommand::Rename, refsOf("count"), true, "disk:/lib.lsl", span(0, 8, 5),
                     { place("", 1, 26), place("disk:/lib.lsl", 0, 8, 5, "lib.lsl") }, doc.editor->document().version());
-        ensure("out of reach said", has(studio.hint("sum"), "RenameUnreached [NAMES]=lib.lsl"));
+        UNSCOPED_INFO("out of reach said");
+        CHECK(has(studio.hint("sum"), "RenameUnreached [NAMES]=lib.lsl"));
 
-        ensure("SLua: a comment is not a mention", !ALScriptLookup::mentions("local a = 1 -- total\n", "total", true));
-        ensure("nor a long comment", !ALScriptLookup::mentions("--[[ total ]] local b = 2", "total", true));
-        ensure("nor a long string", !ALScriptLookup::mentions("local s = [==[ total ]==]", "total", true));
-        ensure("a local is", ALScriptLookup::mentions("local total = 1", "total", true));
-        ensure("not part of a longer name", !ALScriptLookup::mentions("integer totals;", "total", false));
-        ensure("LSL: nor in a block comment", !ALScriptLookup::mentions("/* total */ integer x;", "total", false));
+        UNSCOPED_INFO("SLua: a comment is not a mention");
+        CHECK_FALSE(ALScriptLookup::mentions("local a = 1 -- total\n", "total", true));
+        UNSCOPED_INFO("nor a long comment");
+        CHECK_FALSE(ALScriptLookup::mentions("--[[ total ]] local b = 2", "total", true));
+        UNSCOPED_INFO("nor a long string");
+        CHECK_FALSE(ALScriptLookup::mentions("local s = [==[ total ]==]", "total", true));
+        UNSCOPED_INFO("a local is");
+        CHECK(ALScriptLookup::mentions("local total = 1", "total", true));
+        UNSCOPED_INFO("not part of a longer name");
+        CHECK_FALSE(ALScriptLookup::mentions("integer totals;", "total", false));
+        UNSCOPED_INFO("LSL: nor in a block comment");
+        CHECK_FALSE(ALScriptLookup::mentions("/* total */ integer x;", "total", false));
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<13>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: the object's scripts wait on its prims and what was missed is said", "[alscriptlookup]")
     {
-        set_test_name("an object's others taken once its prims have said what they hold; the prims that did not, and a script not read, said with what was found");
         make();
         studio.others         = { { b, "B" }, { c, "C" } };
         studio.unlisted       = 2;
         studio.holdCandidates = true;
         lookUp(ALEditorCommand::FindReferences);
-        ensure("asked", studio.asked == Names{ "a" });
-        ensure("nothing read while the prims are asked", studio.loads.empty());
-        ensure_equals("nothing shown", studio.shows, 0);
+        CHECK(studio.asked == Names{ "a" });
+        UNSCOPED_INFO("nothing read while the prims are asked");
+        CHECK(studio.loads.empty());
+        CHECK(studio.shows == 0);
         studio.heldCandidates();
-        ensure_equals("both read", studio.loads.size(), size_t(2));
+        UNSCOPED_INFO("both read");
+        REQUIRE(studio.loads.size() == size_t(2));
         studio.loads[0].loaded(LLUUID::null, std::nullopt);
-        ensure_equals("one still out", studio.shows, 0);
+        UNSCOPED_INFO("one still out");
+        CHECK(studio.shows == 0);
         studio.loads[1].loaded(LLUUID::null, std::string("default { }\n"));
-        ensure_equals("shown", studio.shows, 1);
+        CHECK(studio.shows == 1);
+        REQUIRE_FALSE(services.statuses.empty());
         const std::string said = services.statuses.back();
-        ensure("found, then what was passed over: " + said,
-               has(said, "ReferencesFound") && has(said, "LookupUnlisted [COUNT]=2") && has(said, "LookupUnread [COUNT]=1 [NAMES]=B"));
+        {
+            INFO("found, then what was passed over: " + said);
+            CHECK(has(said, "ReferencesFound"));
+            CHECK(has(said, "LookupUnlisted [COUNT]=2"));
+            CHECK(has(said, "LookupUnread [COUNT]=1 [NAMES]=B"));
+        }
 
         // A rename says it under the prompt, all prims listed this time.
         studio.holdCandidates = false;
         studio.unlisted       = 0;
         studio.loads.clear();
         lookUp(ALEditorCommand::Rename);
-        ensure_equals("read again", studio.loads.size(), size_t(2));
+        UNSCOPED_INFO("read again");
+        REQUIRE(studio.loads.size() == size_t(2));
         studio.loads[0].loaded(LLUUID::null, std::nullopt);
         studio.loads[1].loaded(LLUUID::null, std::string("default { }\n"));
-        ensure("a new name asked", static_cast<bool>(studio.hint));
+        UNSCOPED_INFO("a new name asked");
+        REQUIRE(static_cast<bool>(studio.hint));
         const std::string hint = studio.hint("total");
-        ensure("the hint says it: " + hint, has(hint, "LookupUnread [COUNT]=1 [NAMES]=B") && !has(hint, "LookupUnlisted"));
+        {
+            INFO("the hint says it: " + hint);
+            CHECK(has(hint, "LookupUnread [COUNT]=1 [NAMES]=B"));
+            CHECK_FALSE(has(hint, "LookupUnlisted"));
+        }
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<14>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: ALScriptPlaces::Lines gives lines without returns and none past the end", "[alscriptlookup]")
     {
-        set_test_name("a text's lines found once: held, read where it is, or open in a tab; none past the end; a line's return left off");
         const ALScriptPlaces::Lines held(std::make_shared<const std::string>("one\r\ntwo\n\nfour"));
-        ensure("four lines", held.has(0) && held.has(3) && !held.has(4) && !held.has(-1));
-        ensure("each as it is", held.line(0) == "one" && held.line(1) == "two" && held.line(2).empty() && held.line(3) == "four");
-        ensure("none past the end", held.line(9).empty());
+        {
+            INFO("four lines");
+            CHECK(held.has(0));
+            CHECK(held.has(3));
+            CHECK_FALSE(held.has(4));
+            CHECK_FALSE(held.has(-1));
+        }
+        {
+            INFO("each as it is");
+            CHECK(held.line(0) == "one");
+            CHECK(held.line(1) == "two");
+            CHECK(held.line(2).empty());
+            CHECK(held.line(3) == "four");
+        }
+        UNSCOPED_INFO("none past the end");
+        CHECK(held.line(9).empty());
         const std::string           text = "a\nb\n";
         const ALScriptPlaces::Lines here(text);
-        ensure("read where it is, the last line empty", here.line(1) == "b" && here.has(2) && here.line(2).empty() && !here.has(3));
+        {
+            INFO("read where it is, the last line empty");
+            CHECK(here.line(1) == "b");
+            CHECK(here.has(2));
+            CHECK(here.line(2).empty());
+            CHECK_FALSE(here.has(3));
+        }
         const ALTextDocument        open("x\ny");
         const ALScriptPlaces::Lines tab(&open);
-        ensure("a tab's", tab.line(1) == "y" && !tab.has(2));
-        ensure("nothing: no lines", !ALScriptPlaces::Lines().has(0));
+        {
+            INFO("a tab's");
+            CHECK(tab.line(1) == "y");
+            CHECK_FALSE(tab.has(2));
+        }
+        UNSCOPED_INFO("nothing: no lines");
+        CHECK_FALSE(ALScriptPlaces::Lines().has(0));
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<15>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: a rename preview compares an open unchanged file with its renamed text", "[alscriptlookup]")
     {
-        set_test_name("a rename previewed shows what it makes of a file, at the places kept: here, or in another open and unchanged; not in one that is not");
         make();
         Doc& doc  = tab("a", a, A_TEXT, "A");
         Doc& open = tab("b", b, "foo() { count = 2; }\nbar() { total = count; }\n", "B");
@@ -858,33 +1118,47 @@ namespace tut
                     { place("", 0, 8), place("", 1, 26), place(pb, 0, 8, 5, "B"), place(pb, 1, 16, 5, "B"), place(pd, 2, 4, 5, "D") },
                     doc.editor->document().version());
         studio.previewed("sum");
-        ensure("offered", (bool)studio.changes);
+        REQUIRE((bool)studio.changes);
 
         studio.changes("", { 1, 2, 3 });
-        ensure_equals("here, at the one of its own kept", studio.compared.size(), 1U);
-        ensure_equals("beside it as it is", studio.compared.back(),
+        UNSCOPED_INFO("here, at the one of its own kept");
+        REQUIRE(studio.compared.size() == 1U);
+        UNSCOPED_INFO("beside it as it is");
+        CHECK(studio.compared.back() ==
                       "a: " + std::string(A_TEXT) + " | integer count;\ndefault { state_entry() { sum = 1; } }\n (CompareNow | RenameAfter [NAME]=sum [SCRIPT]=A)");
-        ensure("in its tab, brought forward", studio.activated.back() == "a");
-        ensure("nothing changed", doc.editor->text() == A_TEXT);
+        REQUIRE_FALSE(studio.activated.empty());
+        UNSCOPED_INFO("in its tab, brought forward");
+        CHECK(studio.activated.back() == "a");
+        UNSCOPED_INFO("nothing changed");
+        CHECK(doc.editor->text() == A_TEXT);
 
         studio.changes(pb, { 2, 3 });
-        ensure_equals("another open", studio.compared.back(),
+        UNSCOPED_INFO("another open");
+        CHECK(studio.compared.back() ==
                       "b: foo() { count = 2; }\nbar() { total = count; }\n | foo() { sum = 2; }\nbar() { total = sum; }\n (CompareNow | RenameAfter [NAME]=sum [SCRIPT]=B)");
-        ensure("in its tab", studio.activated.back() == "b");
+        UNSCOPED_INFO("in its tab");
+        CHECK(studio.activated.back() == "b");
 
         const size_t before = studio.compared.size();
         studio.changes(pd, { 4 });
-        ensure("not open: said, not shown", studio.compared.size() == before && has(services.statuses.back(), "RenameChangesNotHere [NAME]=sum [SCRIPT]=D") &&
-                                                services.statusFailures.back());
+        {
+            INFO("not open: said, not shown");
+            CHECK(studio.compared.size() == before);
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(has(services.statuses.back(), "RenameChangesNotHere [NAME]=sum [SCRIPT]=D"));
+            CHECK(services.statusFailures.back());
+        }
         open.editor->insertText("// ");
         studio.changes(pb, { 2, 3 });
-        ensure("changed since: said", studio.compared.size() == before && has(services.statuses.back(), "RenameChangesNotHere"));
+        {
+            INFO("changed since: said");
+            CHECK(studio.compared.size() == before);
+            CHECK(has(services.statuses.back(), "RenameChangesNotHere"));
+        }
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<16>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: open files on disk are looked through and renamed with the script", "[alscriptlookup]")
     {
-        set_test_name("files on disk open here are looked through too, which no object lists: a module's field renamed in the script, the module and another script requiring it");
         make();
         const std::string LIB      = "disk:/s/lib.luau";
         const std::string OTHER    = "disk:/s/b.luau";
@@ -904,40 +1178,65 @@ namespace tut
         // module's declaration.
         unit->start(doc, ALEditorCommand::Rename, refsOf("twice"), true, LIB, span(1, 11, 5),
                     { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
-        ensure_equals("each open file of the language, as it stands in its tab", studio.expands.size(), size_t(2));
+        UNSCOPED_INFO("each open file of the language, as it stands in its tab");
+        REQUIRE(studio.expands.size() == size_t(2));
         const ALScriptPreprocessor::Request& module = studio.expands[0].request;
-        ensure("the module, by its path, no item", module.path == LIB && module.ref.isNull() && module.name == "lib.luau" &&
-                                                       module.sourceText() == LIB_TEXT);
-        ensure("the other script", studio.expands[1].request.path == OTHER && studio.expands[1].request.sourceText() == B_LUA);
+        {
+            INFO("the module, by its path, no item");
+            CHECK(module.path == LIB);
+            CHECK(module.ref.isNull());
+            CHECK(module.name == "lib.luau");
+            CHECK(module.sourceText() == LIB_TEXT);
+        }
+        CHECK(studio.expands[1].request.path == OTHER);
+        CHECK(studio.expands[1].request.sourceText() == B_LUA);
 
         // The module read alone is the home itself; the other script has it
         // ahead of its own lines.
         studio.expands[0].expanded(expansion("lib.luau", LIB, LIB_TEXT));
         studio.expands[1].expanded(expansion("b.luau", OTHER, B_LUA, "lib.luau", LIB, LIB_TEXT));
-        ensure_equals("both asked", studio.asks.size(), size_t(2));
-        ensure("the module at its declaration", studio.asks[0].request.line == 1 && studio.asks[0].request.column == 11 &&
-                                                    studio.asks[0].request.id == "lookup:a:" + LIB);
-        ensure("the other where the module's declaration went", studio.asks[1].request.line == 1 && studio.asks[1].request.column == 11);
+        UNSCOPED_INFO("both asked");
+        REQUIRE(studio.asks.size() == size_t(2));
+        {
+            INFO("the module at its declaration");
+            CHECK(studio.asks[0].request.line == 1);
+            CHECK(studio.asks[0].request.column == 11);
+            CHECK(studio.asks[0].request.id == "lookup:a:" + LIB);
+        }
+        {
+            INFO("the other where the module's declaration went");
+            CHECK(studio.asks[1].request.line == 1);
+            CHECK(studio.asks[1].request.column == 11);
+        }
         studio.asks[0].answered(answer({ span(1, 11, 5) }));
         studio.asks[1].answered(answer({ span(1, 11, 5), span(4, 10, 5) }));
-        ensure("asked for the new name", (bool)studio.chosen);
-        ensure_equals("each place once: the script's, the module's, the other's", doc.lookup->places.size(), size_t(3));
-        ensure("the other's, by its path", std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
+        UNSCOPED_INFO("asked for the new name");
+        REQUIRE((bool)studio.chosen);
+        UNSCOPED_INFO("each place once: the script's, the module's, the other's");
+        CHECK(doc.lookup->places.size() == size_t(3));
+        UNSCOPED_INFO("the other's, by its path");
+        CHECK(std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
                    return place.file == OTHER && place.fileName == "b.luau" && place.span.line == 1 && place.span.column == 10;
                }));
 
         studio.chosen("double");
-        ensure_equals("here", doc.editor->text(), std::string("local lib = require(\"./lib\")\nprint(lib.double(2))\n"));
-        ensure_equals("in the module", lib.editor->text(), std::string("local M = {}\nfunction M.double(n) return n * 2 end\nreturn M\n"));
-        ensure_equals("in the other script", other.editor->text(), std::string("local lib = require(\"./lib\")\nprint(lib.double(4))\n"));
-        ensure("each its own step", lib.editor->undoJournal().undoLabel() == "rename" && other.editor->undoJournal().undoLabel() == "rename");
-        ensure_equals("another language's file left alone", lsl.editor->text(), std::string("integer twice;\n"));
+        UNSCOPED_INFO("here");
+        CHECK(doc.editor->text() == std::string("local lib = require(\"./lib\")\nprint(lib.double(2))\n"));
+        UNSCOPED_INFO("in the module");
+        CHECK(lib.editor->text() == std::string("local M = {}\nfunction M.double(n) return n * 2 end\nreturn M\n"));
+        UNSCOPED_INFO("in the other script");
+        CHECK(other.editor->text() == std::string("local lib = require(\"./lib\")\nprint(lib.double(4))\n"));
+        {
+            INFO("each its own step");
+            CHECK(lib.editor->undoJournal().undoLabel() == "rename");
+            CHECK(other.editor->undoJournal().undoLabel() == "rename");
+        }
+        UNSCOPED_INFO("another language's file left alone");
+        CHECK(lsl.editor->text() == std::string("integer twice;\n"));
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<17>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: scripts on disk in the script's folders are read and opened to be renamed", "[alscriptlookup]")
     {
-        set_test_name("scripts on disk under the folders a script reads from are looked through, open or not: one not open read as it is on disk, and opened to be renamed");
         make();
         // A folder of the scripter's, as the window lists it, where it
         // stands: what the walk names each file by.
@@ -964,15 +1263,26 @@ namespace tut
         doc.language.lua = true;
         unit->start(doc, ALEditorCommand::Rename, refsOf("twice"), true, LIB, span(1, 11, 5),
                     { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
-        ensure_equals("the module open here once, the other read from disk, and the one not naming it passed over", studio.expands.size(), size_t(2));
-        ensure("the module, as its tab has it", studio.expands[0].request.path == LIB && studio.expands[0].request.sourceText() == LIB_TEXT);
-        ensure("the other, as it is on disk", studio.expands[1].request.path == B && studio.expands[1].request.name == "b.luau" &&
-                                                  studio.expands[1].request.sourceText() == B_LUA);
+        UNSCOPED_INFO("the module open here once, the other read from disk, and the one not naming it passed over");
+        REQUIRE(studio.expands.size() == size_t(2));
+        {
+            INFO("the module, as its tab has it");
+            CHECK(studio.expands[0].request.path == LIB);
+            CHECK(studio.expands[0].request.sourceText() == LIB_TEXT);
+        }
+        {
+            INFO("the other, as it is on disk");
+            CHECK(studio.expands[1].request.path == B);
+            CHECK(studio.expands[1].request.name == "b.luau");
+            CHECK(studio.expands[1].request.sourceText() == B_LUA);
+        }
         studio.expands[0].expanded(expansion("lib.luau", LIB, LIB_TEXT));
         studio.expands[1].expanded(expansion("b.luau", B, B_LUA, "lib.luau", LIB, LIB_TEXT));
+        REQUIRE(studio.asks.size() == size_t(2));
         studio.asks[0].answered(answer({ span(1, 11, 5) }));
         studio.asks[1].answered(answer({ span(1, 11, 5), span(4, 10, 5) }));
-        ensure("the other's place, by its path", std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
+        UNSCOPED_INFO("the other's place, by its path");
+        CHECK(std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
                    return place.file == B && place.span.line == 1 && place.span.column == 10;
                }));
 
@@ -984,17 +1294,20 @@ namespace tut
             return &opened;
         };
         studio.chosen("double");
-        ensure("opened to be renamed", studio.filesOpened == Names{ b_file });
+        UNSCOPED_INFO("opened to be renamed");
+        CHECK(studio.filesOpened == Names{ b_file });
         const Doc* other = services.findDoc(B);
-        ensure("renamed there", other && other->editor->text() == "local lib = require(\"./lib\")\nprint(lib.double(4))\n");
+        {
+            INFO("renamed there");
+            REQUIRE(other);
+            CHECK(other->editor->text() == "local lib = require(\"./lib\")\nprint(lib.double(4))\n");
+        }
         std::error_code ec;
         fs::remove_all(root, ec);
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<18>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: SLua read apart asks in the module and maps places back through the piece", "[alscriptlookup]")
     {
-        set_test_name("SLua read apart, as the checker reads it: another script asked at the module's declaration in the module, with its modules, and each place read back through its own piece");
         make();
         const std::string LIB      = "disk:/s/lib.luau";
         const std::string OTHER    = "disk:/s/b.luau";
@@ -1007,29 +1320,46 @@ namespace tut
         doc.language.lua   = true;
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5),
                     { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
-        ensure_equals("the other expanded", studio.expands.size(), size_t(1));
-        ensure("apart asked for", studio.expands[0].request.apart);
+        UNSCOPED_INFO("the other expanded");
+        REQUIRE(studio.expands.size() == size_t(1));
+        UNSCOPED_INFO("apart asked for");
+        CHECK(studio.expands[0].request.apart);
         studio.expands[0].expanded(apartExpansion("b.luau", OTHER, B_LUA, "./lib", "lib.luau", LIB, LIB_TEXT));
-        ensure_equals("asked", studio.asks.size(), size_t(1));
+        REQUIRE(studio.asks.size() == size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
-        ensure("the script alone, its require a call", asked.text && *asked.text == B_LUA);
-        ensure("in the module, at its declaration in its own lines", asked.module == LIB && asked.line == 1 && asked.column == 11);
-        ensure("with its modules", asked.modules && asked.modules->modules.size() == 1 && asked.modules->modules[0].key == LIB &&
-                                       asked.modules->reaches.size() == 1 && asked.modules->reaches[0].name == "./lib");
+        {
+            INFO("the script alone, its require a call");
+            REQUIRE(asked.text);
+            CHECK(*asked.text == B_LUA);
+        }
+        {
+            INFO("in the module, at its declaration in its own lines");
+            CHECK(asked.module == LIB);
+            CHECK(asked.line == 1);
+            CHECK(asked.column == 11);
+        }
+        {
+            INFO("with its modules");
+            REQUIRE(asked.modules);
+            REQUIRE(asked.modules->modules.size() == 1);
+            CHECK(asked.modules->modules[0].key == LIB);
+            REQUIRE(asked.modules->reaches.size() == 1);
+            CHECK(asked.modules->reaches[0].name == "./lib");
+        }
 
         ALScriptAnalysis::Result result = answer({ span(1, 10, 5) });
         result.references.elsewhere.push_back({ LIB, span(1, 11, 5) });
         studio.asks[0].answered(result);
-        ensure("the other's place, through its piece", std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
+        UNSCOPED_INFO("the other's place, through its piece");
+        CHECK(std::any_of(doc.lookup->places.begin(), doc.lookup->places.end(), [&](const Doc::Place& place) {
                    return place.file == OTHER && place.fileName == "b.luau" && place.span.line == 1 && place.span.column == 10;
                }));
-        ensure_equals("each once: the script's, the module's, the other's", doc.lookup->places.size(), size_t(3));
+        UNSCOPED_INFO("each once: the script's, the module's, the other's");
+        CHECK(doc.lookup->places.size() == size_t(3));
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<19>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: a file open under another path to it is read once as its tab has it", "[alscriptlookup]")
     {
-        set_test_name("a file open here by another way to its path is the one file: looked through once, as its tab has it, and found to be where the name is declared");
         make();
         namespace fs = std::filesystem;
         const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + LLUUID::generateNewID().asString());
@@ -1053,20 +1383,26 @@ namespace tut
         doc.language.lua = true;
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5),
                     { place("", 1, 10), place(LIB, 1, 11, 5, "lib.luau") }, doc.editor->document().version());
-        ensure_equals("the module once, and the other", studio.expands.size(), size_t(2));
-        ensure("the module as its tab has it", studio.expands[0].request.path == LIB_TAB && studio.expands[0].request.sourceText() == TYPED);
-        ensure("the other from disk", studio.expands[1].request.sourceText() == B_LUA);
+        UNSCOPED_INFO("the module once, and the other");
+        REQUIRE(studio.expands.size() == size_t(2));
+        {
+            INFO("the module as its tab has it");
+            CHECK(studio.expands[0].request.path == LIB_TAB);
+            CHECK(studio.expands[0].request.sourceText() == TYPED);
+        }
+        UNSCOPED_INFO("the other from disk");
+        CHECK(studio.expands[1].request.sourceText() == B_LUA);
         studio.expands[0].expanded(expansion("lib.luau", LIB_TAB, TYPED));
-        ensure_equals("the home itself, asked at its declaration", studio.asks.size(), size_t(1));
-        ensure("there", studio.asks[0].request.line == 1 && studio.asks[0].request.column == 11);
+        UNSCOPED_INFO("the home itself, asked at its declaration");
+        REQUIRE(studio.asks.size() == size_t(1));
+        CHECK(studio.asks[0].request.line == 1);
+        CHECK(studio.asks[0].request.column == 11);
         std::error_code ec;
         fs::remove_all(root, ec);
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<20>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: folders on disk are walked off the main thread and stale walks dropped", "[alscriptlookup]")
     {
-        set_test_name("with a main loop to hand them back to, the folders on disk are walked and read off the main thread, the lookup held open for them; nothing comes of a walk once the lookups are gone");
         make();
         namespace fs = std::filesystem;
         const fs::path made = fs::temp_directory_path() / ("alscriptlookup_" + LLUUID::generateNewID().asString());
@@ -1075,9 +1411,11 @@ namespace tut
         const std::string B_LUA = "local lib = require(\"./lib\")\nprint(lib.twice(4))\n";
         llofstream((root / "b.luau").string(), std::ios::binary) << B_LUA;
         studio.disk = { root.string() };
-        // The main loop's queue, as the viewer's is: kept, since a walk
-        // let go of may hand back to it after the test.
-        LL::WorkQueue& main_loop = newview_test::mainLoop();
+        // A main loop's queue, as the viewer's is, chosen for this test
+        // alone: the queue kept, since a walk let go of may hand back to it
+        // after the test.
+        LL::WorkQueue&           main_loop = newview_test::mainLoop();
+        const ALMainLoop::Choice chosen(&main_loop);
         const auto pumped = [&main_loop](const std::function<bool()>& until, std::chrono::milliseconds within) {
             const auto deadline = std::chrono::steady_clock::now() + within;
             while (std::chrono::steady_clock::now() < deadline)
@@ -1096,12 +1434,27 @@ namespace tut
         const std::string LIB = "disk:/s/lib.luau";
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
                     doc.editor->document().version());
-        ensure("nothing read here", studio.expands.empty());
-        ensure("held open for the walk", doc.lookup->pending == 1 && studio.shows == 0);
-        ensure("what it read handed back", pumped([&] { return !studio.expands.empty(); }, std::chrono::seconds(5)));
-        ensure("the one naming it, as it is on disk", studio.expands.size() == 1 && studio.expands[0].request.sourceText() == B_LUA);
+        // The thread the walks run on, made with the first of them, is the
+        // process's from here, as the viewer's is until it quits.
+        ll_test::StateGuard::accept("the live thread pools");
+        ll_test::StateGuard::accept("the live work queues");
+        UNSCOPED_INFO("nothing read here");
+        CHECK(studio.expands.empty());
+        {
+            INFO("held open for the walk");
+            CHECK(doc.lookup->pending == 1);
+            CHECK(studio.shows == 0);
+        }
+        UNSCOPED_INFO("what it read handed back");
+        REQUIRE(pumped([&] { return !studio.expands.empty(); }, std::chrono::seconds(5)));
+        {
+            INFO("the one naming it, as it is on disk");
+            REQUIRE(studio.expands.size() == 1);
+            CHECK(studio.expands[0].request.sourceText() == B_LUA);
+        }
         studio.expands[0].expanded(expansion("b.luau", studio.expands[0].request.path, B_LUA));
-        ensure_equals("shown once it is done with", studio.shows, 1);
+        UNSCOPED_INFO("shown once it is done with");
+        CHECK(studio.shows == 1);
 
         // Begun again while its walk is under way: the walk let go of, and
         // only the new lookup's read looked through.
@@ -1109,37 +1462,56 @@ namespace tut
                     doc.editor->document().version());
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
                     doc.editor->document().version());
-        ensure("the new one's handed back", pumped([&] { return studio.expands.size() > 1; }, std::chrono::seconds(5)));
+        UNSCOPED_INFO("the new one's handed back");
+        REQUIRE(pumped([&] { return studio.expands.size() > 1; }, std::chrono::seconds(5)));
         pumped([] { return false; }, std::chrono::milliseconds(300));
-        ensure_equals("and nothing of the old one's", studio.expands.size(), size_t(2));
+        UNSCOPED_INFO("and nothing of the old one's");
+        REQUIRE(studio.expands.size() == size_t(2));
         studio.expands[1].expanded(expansion("b.luau", studio.expands[1].request.path, B_LUA));
-        ensure_equals("shown once", studio.shows, 2);
+        UNSCOPED_INFO("shown once");
+        CHECK(studio.shows == 2);
 
         // Begun again, and the lookups gone before what it read is back.
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("twice"), true, LIB, span(1, 11, 5), { place("", 1, 10) },
                     doc.editor->document().version());
         unit.reset();
         pumped([] { return false; }, std::chrono::milliseconds(300));
-        ensure_equals("nothing comes of it", studio.expands.size(), size_t(2));
+        UNSCOPED_INFO("nothing comes of it");
+        CHECK(studio.expands.size() == size_t(2));
         std::error_code ec;
         fs::remove_all(root, ec);
     }
 
-    template<> template<>
-    void alscriptlookup_object::test<21>()
+    TEST_CASE_METHOD(alscriptlookup_data, "alscriptlookup: held lines match a tab's with a lone CR a break and CRLF one", "[alscriptlookup]")
     {
-        set_test_name("a text's lines held apart are the lines its tab would have: a lone CR a break, CRLF one");
         const std::string           text = "one\rtwo\r\nthree\n\rfive";
         const ALScriptPlaces::Lines held(std::make_shared<const std::string>(text));
         const ALTextDocument        open(text);
         const ALScriptPlaces::Lines tab(&open);
-        ensure("as many as the tab's", held.has(4) && !held.has(5) && tab.has(4) && !tab.has(5));
+        {
+            INFO("as many as the tab's");
+            CHECK(held.has(4));
+            CHECK_FALSE(held.has(5));
+            CHECK(tab.has(4));
+            CHECK_FALSE(tab.has(5));
+        }
         for (S32 line = 0; line < 5; ++line)
         {
-            ensure_equals("line " + std::to_string(line) + " the tab's", held.line(line), tab.line(line));
+            CAPTURE(line);
+            REQUIRE(held.line(line) == tab.line(line));
         }
-        ensure("each as it is", held.line(1) == "two" && held.line(3).empty() && held.line(4) == "five");
+        {
+            INFO("each as it is");
+            CHECK(held.line(1) == "two");
+            CHECK(held.line(3).empty());
+            CHECK(held.line(4) == "five");
+        }
         const ALScriptPlaces::Lines here(text);
-        ensure("read where it is, the same", here.line(2) == "three" && here.has(4) && !here.has(5));
+        {
+            INFO("read where it is, the same");
+            CHECK(here.line(2) == "three");
+            CHECK(here.has(4));
+            CHECK_FALSE(here.has(5));
+        }
     }
 }

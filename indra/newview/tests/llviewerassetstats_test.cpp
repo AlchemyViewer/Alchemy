@@ -27,10 +27,9 @@
 
 #include "linden_common.h"
 
-#include <tut/tut.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <iostream>
 
-#include "lltut.h"
 #include "../llviewerassetstats.h"
 #include "lluuid.h"
 #include "llsdutil.h"
@@ -131,8 +130,6 @@ static const LLUUID region1("4e2d81a3-6263-6ffe-ad5c-8ce04bee07e8");
 static const LLUUID region2("68762cc8-b68b-4e45-854b-e830734f2d4a");
 static const U64 region1_handle(0x0000040000003f00ULL);
 static const U64 region2_handle(0x0000030000004200ULL);
-static const std::string region1_handle_str("0000040000003f00");
-static const std::string region2_handle_str("0000030000004200");
 
 #if 0
 static bool
@@ -237,40 +234,33 @@ get_region(const LLSD & sd, U64 region_handle1)
     return LLSD();
 }
 
-namespace tut
+namespace
 {
-    namespace
-    {
         // The fixture's ThreadRecorder makes itself this thread's recorder,
-        // with its own timer stack and current accumulators, and leaves all
-        // of them null when it goes; the fixture makes it the master recorder
-        // too. This takes the runner's as they were before the test's
-        // recorder, and puts them back after it.
+        // with its own current accumulators, and leaves all of them null
+        // when it goes; the fixture makes it the master recorder too. This
+        // takes the runner's as they were before the test's recorder, and
+        // puts them back after it.
         struct RecorderRestore
         {
             template <typename T>
             using Current = LLThreadLocalSingletonPointer<T>;
 
-            LLTrace::ThreadRecorder*        mMaster{ LLTrace::get_master_thread_recorder() };
-            LLTrace::ThreadRecorder*        mRecorder{ LLTrace::get_thread_recorder() };
-            LLTrace::BlockTimerStackRecord* mTimerStack{ Current<LLTrace::BlockTimerStackRecord>::getInstance() };
-            LLTrace::CountAccumulator*      mCounts{ Current<LLTrace::CountAccumulator>::getInstance() };
-            LLTrace::SampleAccumulator*     mSamples{ Current<LLTrace::SampleAccumulator>::getInstance() };
-            LLTrace::EventAccumulator*      mEvents{ Current<LLTrace::EventAccumulator>::getInstance() };
-            LLTrace::TimeBlockAccumulator*  mTimers{ Current<LLTrace::TimeBlockAccumulator>::getInstance() };
+            LLTrace::ThreadRecorder*    mMaster{ LLTrace::get_master_thread_recorder() };
+            LLTrace::ThreadRecorder*    mRecorder{ LLTrace::get_thread_recorder() };
+            LLTrace::CountAccumulator*  mCounts{ Current<LLTrace::CountAccumulator>::getInstance() };
+            LLTrace::SampleAccumulator* mSamples{ Current<LLTrace::SampleAccumulator>::getInstance() };
+            LLTrace::EventAccumulator*  mEvents{ Current<LLTrace::EventAccumulator>::getInstance() };
 
             ~RecorderRestore()
             {
                 LLTrace::set_master_thread_recorder(mMaster);
                 LLTrace::set_thread_recorder(mRecorder);
-                Current<LLTrace::BlockTimerStackRecord>::setInstance(mTimerStack);
                 Current<LLTrace::CountAccumulator>::setInstance(mCounts);
                 Current<LLTrace::SampleAccumulator>::setInstance(mSamples);
                 Current<LLTrace::EventAccumulator>::setInstance(mEvents);
-                Current<LLTrace::TimeBlockAccumulator>::setInstance(mTimers);
             }
         };
-    } // anonymous namespace
 
     struct tst_viewerassetstats_index
     {
@@ -281,6 +271,11 @@ namespace tut
 
         ~tst_viewerassetstats_index()
         {
+            // The global stats a case made, where a failed REQUIRE stopped it
+            // before it deleted them, are not left for the cases after it;
+            // deleted while the case's recorder is still there.
+            delete gViewerAssetStats;
+            gViewerAssetStats = nullptr;
             LLTrace::set_master_thread_recorder(NULL);
         }
 
@@ -288,16 +283,11 @@ namespace tut
         RecorderRestore         mRestore;
         LLTrace::ThreadRecorder mThreadRecorder;
     };
-    typedef test_group<tst_viewerassetstats_index> tst_viewerassetstats_index_t;
-    typedef tst_viewerassetstats_index_t::object tst_viewerassetstats_index_object_t;
-    tut::tst_viewerassetstats_index_t tut_tst_viewerassetstats_index("tst_viewerassetstats_test");
 
-    // Testing free functions without global stats allocated
-    template<> template<>
-    void tst_viewerassetstats_index_object_t::test<1>()
+    TEST_CASE_METHOD(tst_viewerassetstats_index, "tst_viewerassetstats_test: the free functions run without global stats allocated", "[tst_viewerassetstats_test]")
     {
         // Check that helpers aren't bothered by missing global stats
-        ensure("Global gViewerAssetStats should be NULL", (NULL == gViewerAssetStats));
+        CHECK(gViewerAssetStats == nullptr);
 
         LLViewerAssetStatsFF::record_enqueue(LLViewerAssetType::AT_TEXTURE, false, false);
 
@@ -306,27 +296,27 @@ namespace tut
         LLViewerAssetStatsFF::record_response(LLViewerAssetType::AT_GESTURE, false, false, (U64Microseconds)12300000ULL);
     }
 
-    // Create a non-global instance and check the structure
-    template<> template<>
-    void tst_viewerassetstats_index_object_t::test<2>()
+    TEST_CASE_METHOD(tst_viewerassetstats_index, "tst_viewerassetstats_test: a non-global instance's LLSD has every key", "[tst_viewerassetstats_test]")
     {
-        ensure("Global gViewerAssetStats should be NULL", (NULL == gViewerAssetStats));
+        CHECK(gViewerAssetStats == nullptr);
 
         LLViewerAssetStats * it = new LLViewerAssetStats();
 
-        ensure("Global gViewerAssetStats should still be NULL", (NULL == gViewerAssetStats));
+        UNSCOPED_INFO("making an instance does not make it the global");
+        CHECK(gViewerAssetStats == nullptr);
 
         LLSD sd_full = it->asLLSD(false);
 
         // Default (NULL) region ID doesn't produce LLSD results so should
         // get an empty map back from output
-        ensure("Stat-less LLSD initially", is_no_stats_map(sd_full));
+        UNSCOPED_INFO("Stat-less LLSD initially");
+        CHECK(is_no_stats_map(sd_full));
 
         // Once the region is set, we will get a response even with no data collection
         it->setRegion(region1_handle);
         sd_full = it->asLLSD(false);
-        ensure("Correct single-key LLSD map root", is_double_key_map(sd_full, "duration", "regions"));
-        ensure("Correct single-slot LLSD array regions", is_single_slot_array(sd_full["regions"], region1_handle));
+        CHECK(is_double_key_map(sd_full, "duration", "regions"));
+        CHECK(is_single_slot_array(sd_full["regions"], region1_handle));
 
         LLSD sd = sd_full["regions"][0];
 
@@ -335,16 +325,16 @@ namespace tut
         // Check the structure of the LLSD
         for (int i = 0; i < LL_ARRAY_SIZE(all_keys); ++i)
         {
-            std::string line = llformat("Has '%s' key", all_keys[i]);
-            ensure(line, sd.has(all_keys[i]));
+            CAPTURE(all_keys[i]);
+            REQUIRE(sd.has(all_keys[i]));
         }
 
         for (int i = 0; i < LL_ARRAY_SIZE(resp_keys); ++i)
         {
             for (int j = 0; j < LL_ARRAY_SIZE(sub_keys); ++j)
             {
-                std::string line = llformat("Key '%s' has '%s' key", resp_keys[i], sub_keys[j]);
-                ensure(line, sd[resp_keys[i]].has(sub_keys[j]));
+                CAPTURE(resp_keys[i], sub_keys[j]);
+                REQUIRE(sd[resp_keys[i]].has(sub_keys[j]));
             }
         }
 
@@ -352,34 +342,30 @@ namespace tut
         {
             for (int j = 0; j < LL_ARRAY_SIZE(mmm_sub_keys); ++j)
             {
-                std::string line = llformat("Key '%s' has '%s' key", mmm_resp_keys[i], mmm_sub_keys[j]);
-                ensure(line, sd[mmm_resp_keys[i]].has(mmm_sub_keys[j]));
+                CAPTURE(mmm_resp_keys[i], mmm_sub_keys[j]);
+                REQUIRE(sd[mmm_resp_keys[i]].has(mmm_sub_keys[j]));
             }
         }
     }
 
-    // Create a non-global instance and check some content
-    template<> template<>
-    void tst_viewerassetstats_index_object_t::test<3>()
+    TEST_CASE_METHOD(tst_viewerassetstats_index, "tst_viewerassetstats_test: a new non-global instance's counts and response times start at zero", "[tst_viewerassetstats_test]")
     {
         LLViewerAssetStats * it = new LLViewerAssetStats();
         it->setRegion(region1_handle);
 
         LLSD sd = it->asLLSD(false);
-        ensure("Correct single-key LLSD map root", is_double_key_map(sd, "regions", "duration"));
-        ensure("Correct single-slot LLSD array regions", is_single_slot_array(sd["regions"], region1_handle));
-        sd = sd[0];
+        CHECK(is_double_key_map(sd, "regions", "duration"));
+        CHECK(is_single_slot_array(sd["regions"], region1_handle));
+        sd = sd["regions"][0];
 
         delete it;
 
         // Check a few points on the tree for content
-        ensure("sd[get_texture_temp_http][dequeued] is 0", (0 == sd["get_texture_temp_http"]["dequeued"].asInteger()));
-        ensure("sd[get_sound_udp][resp_min] is 0", (0.0 == sd["get_sound_udp"]["resp_min"].asReal()));
+        CHECK(sd["get_texture_temp_http"]["dequeued"].asInteger() == 0);
+        CHECK(sd["get_sound_udp"]["resp_min"].asReal() == 0.0);
     }
 
-    // Create a global instance and verify free functions do something useful
-    template<> template<>
-    void tst_viewerassetstats_index_object_t::test<4>()
+    TEST_CASE_METHOD(tst_viewerassetstats_index, "tst_viewerassetstats_test: the free functions record into a global instance and reset clears it", "[tst_viewerassetstats_test]")
     {
         gViewerAssetStats = new LLViewerAssetStats();
         LLViewerAssetStatsFF::set_region(region1_handle);
@@ -391,32 +377,32 @@ namespace tut
         LLViewerAssetStatsFF::record_dequeue(LLViewerAssetType::AT_BODYPART, false, false);
 
         LLSD sd = gViewerAssetStats->asLLSD(false);
-        ensure("Correct single-key LLSD map root", is_double_key_map(sd, "regions", "duration"));
-        ensure("Correct single-slot LLSD array regions", is_single_slot_array(sd["regions"], region1_handle));
+        CHECK(is_double_key_map(sd, "regions", "duration"));
+        CHECK(is_single_slot_array(sd["regions"], region1_handle));
         sd = sd["regions"][0];
 
         // Check a few points on the tree for content
-        ensure("sd[get_texture_non_temp_udp][enqueued] is 1", (1 == sd["get_texture_non_temp_udp"]["enqueued"].asInteger()));
-        ensure("sd[get_texture_temp_udp][enqueued] is 0", (0 == sd["get_texture_temp_udp"]["enqueued"].asInteger()));
-        ensure("sd[get_texture_non_temp_http][enqueued] is 0", (0 == sd["get_texture_non_temp_http"]["enqueued"].asInteger()));
-        ensure("sd[get_texture_temp_http][enqueued] is 0", (0 == sd["get_texture_temp_http"]["enqueued"].asInteger()));
-        ensure("sd[get_gesture_udp][dequeued] is 0", (0 == sd["get_gesture_udp"]["dequeued"].asInteger()));
+        CHECK(sd["get_texture_non_temp_udp"]["enqueued"].asInteger() == 1);
+        CHECK(sd["get_texture_temp_udp"]["enqueued"].asInteger() == 0);
+        CHECK(sd["get_texture_non_temp_http"]["enqueued"].asInteger() == 0);
+        CHECK(sd["get_texture_temp_http"]["enqueued"].asInteger() == 0);
+        CHECK(sd["get_gesture_udp"]["dequeued"].asInteger() == 0);
 
         // Reset and check zeros...
         // Reset leaves current region in place
         gViewerAssetStats->reset();
-        sd = gViewerAssetStats->asLLSD(false)["regions"][region1_handle_str];
+        sd = gViewerAssetStats->asLLSD(false);
+        CHECK(is_single_slot_array(sd["regions"], region1_handle));
+        sd = sd["regions"][0];
 
         delete gViewerAssetStats;
         gViewerAssetStats = NULL;
 
-        ensure("sd[get_texture_non_temp_udp][enqueued] is reset", (0 == sd["get_texture_non_temp_udp"]["enqueued"].asInteger()));
-        ensure("sd[get_gesture_udp][dequeued] is reset", (0 == sd["get_gesture_udp"]["dequeued"].asInteger()));
+        CHECK(sd["get_texture_non_temp_udp"]["enqueued"].asInteger() == 0);
+        CHECK(sd["get_gesture_udp"]["dequeued"].asInteger() == 0);
     }
 
-    // Check multiple region collection
-    template<> template<>
-    void tst_viewerassetstats_index_object_t::test<5>()
+    TEST_CASE_METHOD(tst_viewerassetstats_index, "tst_viewerassetstats_test: stats are collected per region across two regions", "[tst_viewerassetstats_test]")
     {
         gViewerAssetStats = new LLViewerAssetStats();
 
@@ -439,43 +425,43 @@ namespace tut
 
         // std::cout << sd << std::endl;
 
-        ensure("Correct double-key LLSD map root", is_double_key_map(sd, "duration", "regions"));
-        ensure("Correct double-slot LLSD array regions", is_double_slot_array(sd["regions"], region1_handle, region2_handle));
+        CHECK(is_double_key_map(sd, "duration", "regions"));
+        CHECK(is_double_slot_array(sd["regions"], region1_handle, region2_handle));
         LLSD sd1 = get_region(sd, region1_handle);
         LLSD sd2 = get_region(sd, region2_handle);
-        ensure("Region1 is present in results", sd1.isMap());
-        ensure("Region2 is present in results", sd2.isMap());
+        UNSCOPED_INFO("Region1 is present in results");
+        REQUIRE(sd1.isMap());
+        UNSCOPED_INFO("Region2 is present in results");
+        REQUIRE(sd2.isMap());
 
         // Check a few points on the tree for content
-        ensure_equals("sd1[get_texture_non_temp_udp][enqueued] is 1", sd1["get_texture_non_temp_udp"]["enqueued"].asInteger(), 1);
-        ensure_equals("sd1[get_texture_temp_udp][enqueued] is 0", sd1["get_texture_temp_udp"]["enqueued"].asInteger(), 0);
-        ensure_equals("sd1[get_texture_non_temp_http][enqueued] is 0", sd1["get_texture_non_temp_http"]["enqueued"].asInteger(), 0);
-        ensure_equals("sd1[get_texture_temp_http][enqueued] is 0", sd1["get_texture_temp_http"]["enqueued"].asInteger(), 0);
-        ensure_equals("sd1[get_gesture_udp][dequeued] is 0", sd1["get_gesture_udp"]["dequeued"].asInteger(), 0);
+        CHECK(sd1["get_texture_non_temp_udp"]["enqueued"].asInteger() == 1);
+        CHECK(sd1["get_texture_temp_udp"]["enqueued"].asInteger() == 0);
+        CHECK(sd1["get_texture_non_temp_http"]["enqueued"].asInteger() == 0);
+        CHECK(sd1["get_texture_temp_http"]["enqueued"].asInteger() == 0);
+        CHECK(sd1["get_gesture_udp"]["dequeued"].asInteger() == 0);
 
         // Check a few points on the tree for content
-        ensure("sd2[get_gesture_udp][enqueued] is 4", (4 == sd2["get_gesture_udp"]["enqueued"].asInteger()));
-        ensure("sd2[get_gesture_udp][dequeued] is 0", (0 == sd2["get_gesture_udp"]["dequeued"].asInteger()));
-        ensure("sd2[get_texture_non_temp_udp][enqueued] is 0", (0 == sd2["get_texture_non_temp_udp"]["enqueued"].asInteger()));
+        CHECK(sd2["get_gesture_udp"]["enqueued"].asInteger() == 4);
+        CHECK(sd2["get_gesture_udp"]["dequeued"].asInteger() == 0);
+        CHECK(sd2["get_texture_non_temp_udp"]["enqueued"].asInteger() == 0);
 
         // Reset and check zeros...
         // Reset leaves current region in place
         gViewerAssetStats->reset();
         sd = gViewerAssetStats->asLLSD(false);
-        ensure("Correct single-key LLSD map root", is_double_key_map(sd, "regions", "duration"));
-        ensure("Correct single-slot LLSD array regions (p2)", is_single_slot_array(sd["regions"], region2_handle));
+        CHECK(is_double_key_map(sd, "regions", "duration"));
+        CHECK(is_single_slot_array(sd["regions"], region2_handle));
         sd2 = sd["regions"][0];
 
         delete gViewerAssetStats;
         gViewerAssetStats = NULL;
 
-        ensure("sd2[get_texture_non_temp_udp][enqueued] is reset", (0 == sd2["get_texture_non_temp_udp"]["enqueued"].asInteger()));
-        ensure("sd2[get_gesture_udp][enqueued] is reset", (0 == sd2["get_gesture_udp"]["enqueued"].asInteger()));
+        CHECK(sd2["get_texture_non_temp_udp"]["enqueued"].asInteger() == 0);
+        CHECK(sd2["get_gesture_udp"]["enqueued"].asInteger() == 0);
     }
 
-    // Check multiple region collection jumping back-and-forth between regions
-    template<> template<>
-    void tst_viewerassetstats_index_object_t::test<6>()
+    TEST_CASE_METHOD(tst_viewerassetstats_index, "tst_viewerassetstats_test: stats per region add up across moves back and forth between regions", "[tst_viewerassetstats_test]")
     {
         gViewerAssetStats = new LLViewerAssetStats();
 
@@ -511,44 +497,45 @@ namespace tut
 
         LLSD sd = gViewerAssetStats->asLLSD(false);
 
-        ensure("Correct double-key LLSD map root", is_double_key_map(sd, "duration", "regions"));
-        ensure("Correct double-slot LLSD array regions", is_double_slot_array(sd["regions"], region1_handle, region2_handle));
+        CHECK(is_double_key_map(sd, "duration", "regions"));
+        CHECK(is_double_slot_array(sd["regions"], region1_handle, region2_handle));
         LLSD sd1 = get_region(sd, region1_handle);
         LLSD sd2 = get_region(sd, region2_handle);
-        ensure("Region1 is present in results", sd1.isMap());
-        ensure("Region2 is present in results", sd2.isMap());
+        UNSCOPED_INFO("Region1 is present in results");
+        REQUIRE(sd1.isMap());
+        UNSCOPED_INFO("Region2 is present in results");
+        REQUIRE(sd2.isMap());
 
         // Check a few points on the tree for content
-        ensure("sd1[get_texture_non_temp_udp][enqueued] is 1", (1 == sd1["get_texture_non_temp_udp"]["enqueued"].asInteger()));
-        ensure("sd1[get_texture_temp_udp][enqueued] is 0", (0 == sd1["get_texture_temp_udp"]["enqueued"].asInteger()));
-        ensure("sd1[get_texture_non_temp_http][enqueued] is 0", (0 == sd1["get_texture_non_temp_http"]["enqueued"].asInteger()));
-        ensure("sd1[get_texture_temp_http][enqueued] is 1", (1 == sd1["get_texture_temp_http"]["enqueued"].asInteger()));
-        ensure("sd1[get_gesture_udp][dequeued] is 0", (0 == sd1["get_gesture_udp"]["dequeued"].asInteger()));
+        CHECK(sd1["get_texture_non_temp_udp"]["enqueued"].asInteger() == 1);
+        CHECK(sd1["get_texture_temp_udp"]["enqueued"].asInteger() == 0);
+        CHECK(sd1["get_texture_non_temp_http"]["enqueued"].asInteger() == 0);
+        CHECK(sd1["get_texture_temp_http"]["enqueued"].asInteger() == 1);
+        CHECK(sd1["get_gesture_udp"]["dequeued"].asInteger() == 0);
 
         // Check a few points on the tree for content
-        ensure("sd2[get_gesture_udp][enqueued] is 8", (8 == sd2["get_gesture_udp"]["enqueued"].asInteger()));
-        ensure("sd2[get_gesture_udp][dequeued] is 0", (0 == sd2["get_gesture_udp"]["dequeued"].asInteger()));
-        ensure("sd2[get_texture_non_temp_udp][enqueued] is 0", (0 == sd2["get_texture_non_temp_udp"]["enqueued"].asInteger()));
+        CHECK(sd2["get_gesture_udp"]["enqueued"].asInteger() == 8);
+        CHECK(sd2["get_gesture_udp"]["dequeued"].asInteger() == 0);
+        CHECK(sd2["get_texture_non_temp_udp"]["enqueued"].asInteger() == 0);
 
         // Reset and check zeros...
         // Reset leaves current region in place
         gViewerAssetStats->reset();
         sd = gViewerAssetStats->asLLSD(false);
-        ensure("Correct single-key LLSD map root", is_double_key_map(sd, "duration", "regions"));
-        ensure("Correct single-slot LLSD array regions (p2)", is_single_slot_array(sd["regions"], region2_handle));
+        CHECK(is_double_key_map(sd, "duration", "regions"));
+        CHECK(is_single_slot_array(sd["regions"], region2_handle));
         sd2 = get_region(sd, region2_handle);
-        ensure("Region2 is present in results", sd2.isMap());
+        UNSCOPED_INFO("Region2 is present in results");
+        REQUIRE(sd2.isMap());
 
         delete gViewerAssetStats;
         gViewerAssetStats = NULL;
 
-        ensure_equals("sd2[get_texture_non_temp_udp][enqueued] is reset", sd2["get_texture_non_temp_udp"]["enqueued"].asInteger(), 0);
-        ensure_equals("sd2[get_gesture_udp][enqueued] is reset", sd2["get_gesture_udp"]["enqueued"].asInteger(), 0);
+        CHECK(sd2["get_texture_non_temp_udp"]["enqueued"].asInteger() == 0);
+        CHECK(sd2["get_gesture_udp"]["enqueued"].asInteger() == 0);
     }
 
-    // Non-texture assets ignore transport and persistence flags
-    template<> template<>
-    void tst_viewerassetstats_index_object_t::test<7>()
+    TEST_CASE_METHOD(tst_viewerassetstats_index, "tst_viewerassetstats_test: non-texture assets ignore the transport and persistence flags", "[tst_viewerassetstats_test]")
     {
         gViewerAssetStats = new LLViewerAssetStats();
         LLViewerAssetStatsFF::set_region(region1_handle);
@@ -577,37 +564,39 @@ namespace tut
         LLViewerAssetStatsFF::record_enqueue(LLViewerAssetType::AT_LSL_BYTECODE, true, true);
 
         LLSD sd = gViewerAssetStats->asLLSD(false);
-        ensure("Correct single-key LLSD map root", is_double_key_map(sd, "regions", "duration"));
-        ensure("Correct single-slot LLSD array regions", is_single_slot_array(sd["regions"], region1_handle));
+        CHECK(is_double_key_map(sd, "regions", "duration"));
+        CHECK(is_single_slot_array(sd["regions"], region1_handle));
         sd = get_region(sd, region1_handle);
-        ensure("Region1 is present in results", sd.isMap());
+        UNSCOPED_INFO("Region1 is present in results");
+        REQUIRE(sd.isMap());
 
         // Check a few points on the tree for content
-        ensure("sd[get_gesture_udp][enqueued] is 0", (0 == sd["get_gesture_udp"]["enqueued"].asInteger()));
-        ensure("sd[get_gesture_udp][dequeued] is 0", (0 == sd["get_gesture_udp"]["dequeued"].asInteger()));
+        CHECK(sd["get_gesture_udp"]["enqueued"].asInteger() == 0);
+        CHECK(sd["get_gesture_udp"]["dequeued"].asInteger() == 0);
 
-        ensure("sd[get_wearable_http][enqueued] is 2", (2 == sd["get_wearable_http"]["enqueued"].asInteger()));
-        ensure("sd[get_wearable_http][dequeued] is 2", (2 == sd["get_wearable_http"]["dequeued"].asInteger()));
+        CHECK(sd["get_wearable_http"]["enqueued"].asInteger() == 2);
+        CHECK(sd["get_wearable_http"]["dequeued"].asInteger() == 2);
 
-        ensure("sd[get_wearable_udp][enqueued] is 2", (2 == sd["get_wearable_udp"]["enqueued"].asInteger()));
-        ensure("sd[get_wearable_udp][dequeued] is 2", (2 == sd["get_wearable_udp"]["dequeued"].asInteger()));
+        CHECK(sd["get_wearable_udp"]["enqueued"].asInteger() == 2);
+        CHECK(sd["get_wearable_udp"]["dequeued"].asInteger() == 2);
 
-        ensure("sd[get_other_http][enqueued] is 2", (2 == sd["get_other_http"]["enqueued"].asInteger()));
-        ensure("sd[get_other_http][dequeued] is 0", (0 == sd["get_other_http"]["dequeued"].asInteger()));
+        CHECK(sd["get_other_http"]["enqueued"].asInteger() == 2);
+        CHECK(sd["get_other_http"]["dequeued"].asInteger() == 0);
 
-        ensure("sd[get_other_udp][enqueued] is 2", (2 == sd["get_other_udp"]["enqueued"].asInteger()));
-        ensure("sd[get_other_udp][dequeued] is 0", (0 == sd["get_other_udp"]["dequeued"].asInteger()));
+        CHECK(sd["get_other_udp"]["enqueued"].asInteger() == 2);
+        CHECK(sd["get_other_udp"]["dequeued"].asInteger() == 0);
 
         // Reset and check zeros...
         // Reset leaves current region in place
         gViewerAssetStats->reset();
         sd = get_region(gViewerAssetStats->asLLSD(false), region1_handle);
-        ensure("Region1 is present in results", sd.isMap());
+        UNSCOPED_INFO("Region1 is present in results");
+        REQUIRE(sd.isMap());
 
         delete gViewerAssetStats;
         gViewerAssetStats = NULL;
 
-        ensure_equals("sd[get_texture_non_temp_udp][enqueued] is reset", sd["get_texture_non_temp_udp"]["enqueued"].asInteger(), 0);
-        ensure_equals("sd[get_gesture_udp][dequeued] is reset", sd["get_gesture_udp"]["dequeued"].asInteger(), 0);
+        CHECK(sd["get_texture_non_temp_udp"]["enqueued"].asInteger() == 0);
+        CHECK(sd["get_gesture_udp"]["dequeued"].asInteger() == 0);
     }
 }

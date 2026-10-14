@@ -57,6 +57,7 @@
 
 #include "../../llui/tests/alheadlessui_fixture.h"
 #include "alscriptstudio_stubs.h"
+#include "newview_test_fakes.h"
 
 #include <filesystem>
 #include <functional>
@@ -461,6 +462,7 @@ namespace al_studio_test
             unit(services, given ? *given : tabs, *this)
         {
             std::filesystem::create_directories(fsyspath(folder));
+            newview_test::useRecoveryWriter();
             store = std::make_unique<ALRecoveryStore>(folder, "this-session");
             ALRecovery::useStore(store.get());
         }

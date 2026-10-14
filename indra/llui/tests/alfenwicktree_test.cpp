@@ -26,12 +26,12 @@
 
 #include "alfenwicktree.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alfenwicktree_data
     {
@@ -55,30 +55,27 @@ namespace tut
             return at;
         }
 
-        static void same(const std::string& what, const ALFenwickTree<S32>& tree, const std::vector<S32>& values)
+        static void require_same(const std::string& what, const ALFenwickTree<S32>& tree, const std::vector<S32>& values)
         {
-            ensure_equals(what + ": size", tree.size(), values.size());
+            INFO(what);
+            REQUIRE(tree.size() == values.size());
             for (size_t i = 0; i <= values.size(); ++i)
             {
-                ensure_equals(what + ": before " + std::to_string(i), tree.before(i), before(values, i));
+                CAPTURE(i);
+                REQUIRE(tree.before(i) == before(values, i));
             }
             const S32 total = before(values, values.size());
-            ensure_equals(what + ": total", tree.total(), total);
+            REQUIRE(tree.total() == total);
             for (S32 sum = -1; sum <= total + 2; ++sum)
             {
-                ensure_equals(what + ": reach " + std::to_string(sum), tree.reach(sum), reach(values, sum));
+                CAPTURE(sum);
+                REQUIRE(tree.reach(sum) == reach(values, sum));
             }
         }
     };
 
-    typedef test_group<alfenwicktree_data> alfenwicktree_group;
-    typedef alfenwicktree_group::object    alfenwicktree_object;
-    alfenwicktree_group                    alfenwicktree_instance("alfenwicktree");
-
-    template<> template<>
-    void alfenwicktree_object::test<1>()
+    TEST_CASE_METHOD(alfenwicktree_data, "alfenwicktree: before and reach agree with plain sums through single changes", "[alfenwicktree]")
     {
-        set_test_name("the sums before every place, and the place every sum reaches, are what adding up finds, through changes one at a time");
         std::vector<S32> values;
         for (S32 i = 0; i < 37; ++i)
         {
@@ -86,7 +83,7 @@ namespace tut
         }
         ALFenwickTree<S32> tree;
         tree.assign(values);
-        same("made", tree, values);
+        require_same("made", tree, values);
         U32 seed = 12345;
         for (S32 step = 0; step < 200; ++step)
         {
@@ -95,22 +92,23 @@ namespace tut
             const S32    value = static_cast<S32>((seed >> 20) % 9);
             values[index]      = value;
             tree.set(index, value);
-            ensure_equals("the value kept", tree.at(index), value);
+            REQUIRE(tree.at(index) == value);
         }
-        same("changed", tree, values);
+        require_same("changed", tree, values);
     }
 
-    template<> template<>
-    void alfenwicktree_object::test<2>()
+    TEST_CASE_METHOD(alfenwicktree_data, "alfenwicktree: reach passes a run of zeros whole and empty or one-value trees work", "[alfenwicktree]")
     {
-        set_test_name("a run that sums to nothing is passed whole, nothing and one are trees too");
         ALFenwickTree<S32> tree;
-        same("none", tree, {});
+        require_same("none", tree, {});
         tree.assign({ 3, 0, 0, 2 });
-        ensure_equals("past the run of nothing", tree.reach(3), size_t(3));
-        ensure_equals("within the first", tree.reach(2), size_t(0));
-        ensure_equals("past them all", tree.reach(5), size_t(4));
+        UNSCOPED_INFO("past the run of nothing");
+        CHECK(tree.reach(3) == size_t(3));
+        UNSCOPED_INFO("within the first");
+        CHECK(tree.reach(2) == size_t(0));
+        UNSCOPED_INFO("past them all");
+        CHECK(tree.reach(5) == size_t(4));
         tree.assign({ 4 });
-        same("one", tree, { 4 });
+        require_same("one", tree, { 4 });
     }
 }

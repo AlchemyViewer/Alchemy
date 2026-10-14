@@ -32,9 +32,9 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     // A match is given a style, and a style's parameters start from the
     // default font, so the fonts are loaded first.
@@ -43,185 +43,169 @@ namespace tut
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
     };
 
-    typedef test_group<LLUrlMatchData> factory;
-    typedef factory::object object;
 }
 
 namespace
 {
-    tut::factory tf("LLUrlMatch");
-}
-
-namespace tut
-{
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: a match is empty until its values are set", "[LLUrlMatch]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         //
         // test the empty() method
         //
         LLUrlMatch match;
-        ensure("empty()", match.empty());
+        CHECK(match.empty());
 
         match.setValues(0, 1, "http://secondlife.com", "", "Second Life", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure("! empty()", ! match.empty());
+        CHECK_FALSE(match.empty());
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getStart is 0 by default and then the start set", "[LLUrlMatch]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         //
         // test the getStart() method
         //
         LLUrlMatch match;
-        ensure_equals("getStart() == 0", match.getStart(), 0);
+        CHECK(match.getStart() == 0);
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getStart() == 10", match.getStart(), 10);
+        CHECK(match.getStart() == 10);
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getEnd is 0 by default and then the end set", "[LLUrlMatch]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         //
         // test the getEnd() method
         //
         LLUrlMatch match;
-        ensure_equals("getEnd() == 0", match.getEnd(), 0);
+        CHECK(match.getEnd() == 0);
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getEnd() == 20", match.getEnd(), 20);
+        CHECK(match.getEnd() == 20);
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getUrl is empty by default and then the url last set", "[LLUrlMatch]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         //
         // test the getUrl() method
         //
         LLUrlMatch match;
-        ensure_equals("getUrl() == ''", match.getUrl(), "");
+        CHECK(match.getUrl() == "");
 
         match.setValues(10, 20, "http://slurl.com/", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getUrl() == 'http://slurl.com/'", match.getUrl(), "http://slurl.com/");
+        CHECK(match.getUrl() == "http://slurl.com/");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getUrl() == '' (2)", match.getUrl(), "");
+        CHECK(match.getUrl() == "");
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getLabel is empty by default and then the label last set", "[LLUrlMatch]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         //
         // test the getLabel() method
         //
         LLUrlMatch match;
-        ensure_equals("getLabel() == ''", match.getLabel(), "");
+        CHECK(match.getLabel() == "");
 
         match.setValues(10, 20, "", "Label", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getLabel() == 'Label'", match.getLabel(), "Label");
+        CHECK(match.getLabel() == "Label");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getLabel() == '' (2)", match.getLabel(), "");
+        CHECK(match.getLabel() == "");
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getTooltip is empty by default and then the tooltip last set", "[LLUrlMatch]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         //
         // test the getTooltip() method
         //
         LLUrlMatch match;
-        ensure_equals("getTooltip() == ''", match.getTooltip(), "");
+        CHECK(match.getTooltip() == "");
 
         match.setValues(10, 20, "", "", "", "Info", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getTooltip() == 'Info'", match.getTooltip(), "Info");
+        CHECK(match.getTooltip() == "Info");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getTooltip() == '' (2)", match.getTooltip(), "");
+        CHECK(match.getTooltip() == "");
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getIcon is empty by default and then the icon last set", "[LLUrlMatch]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         //
         // test the getIcon() method
         //
         LLUrlMatch match;
-        ensure_equals("getIcon() == ''", match.getIcon(), "");
+        CHECK(match.getIcon() == "");
 
         match.setValues(10, 20, "", "", "", "", "Icon", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getIcon() == 'Icon'", match.getIcon(), "Icon");
+        CHECK(match.getIcon() == "Icon");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure_equals("getIcon() == '' (2)", match.getIcon(), "");
+        CHECK(match.getIcon() == "");
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getMenuName is empty by default and then the menu last set", "[LLUrlMatch]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         //
         // test the getMenuName() method
         //
         LLUrlMatch match;
-        ensure("getMenuName() empty", match.getMenuName().empty());
+        CHECK(match.getMenuName().empty());
 
         match.setValues(10, 20, "", "", "", "", "Icon", LLStyle::Params(), "xui_file.xml", "", LLUUID::null);
-        ensure_equals("getMenuName() == \"xui_file.xml\"", match.getMenuName(), "xui_file.xml");
+        CHECK(match.getMenuName() == "xui_file.xml");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure("getMenuName() empty (2)", match.getMenuName().empty());
+        CHECK(match.getMenuName().empty());
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE_METHOD(LLUrlMatchData, "LLUrlMatch: getLocation is empty by default and then the location last set", "[LLUrlMatch]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         //
         // test the getLocation() method
         //
         LLUrlMatch match;
-        ensure("getLocation() empty", match.getLocation().empty());
+        CHECK(match.getLocation().empty());
 
         match.setValues(10, 20, "", "", "", "", "Icon", LLStyle::Params(), "xui_file.xml", "Paris", LLUUID::null);
-        ensure_equals("getLocation() == \"Paris\"", match.getLocation(), "Paris");
+        CHECK(match.getLocation() == "Paris");
 
         match.setValues(10, 20, "", "", "", "", "", LLStyle::Params(), "", "", LLUUID::null);
-        ensure("getLocation() empty (2)", match.getLocation().empty());
+        CHECK(match.getLocation().empty());
     }
 }

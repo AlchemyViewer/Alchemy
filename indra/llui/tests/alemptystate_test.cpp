@@ -32,11 +32,11 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct alemptystate_data
     {
@@ -62,17 +62,11 @@ namespace tut
         }
     };
 
-    typedef test_group<alemptystate_data> alemptystate_test;
-    typedef alemptystate_test::object     alemptystate_object;
-    tut::alemptystate_test alemptystate_testgroup("alemptystate");
-
-    // The parts are read down the middle in the order they are given.
-    template<> template<>
-    void alemptystate_object::test<1>()
+    TEST_CASE_METHOD(alemptystate_data, "alemptystate: headline then sentence then button read down the middle", "[alemptystate]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALEmptyState* state = build();
@@ -82,23 +76,25 @@ namespace tut
         const LLRect sentence = part(state, "sentence")->getRect();
         const LLRect action = part(state, "action")->getRect();
 
-        ensure("the sentence is under the headline " + where(sentence),
-               sentence.mTop <= headline.mBottom);
-        ensure("and the button under the sentence " + where(action),
-               action.mTop <= sentence.mBottom);
-        ensure("all of it is inside the room",
-               state->getLocalRect().contains(headline) && state->getLocalRect().contains(action));
+        UNSCOPED_INFO("the sentence is under the headline " << where(sentence));
+        CHECK(sentence.mTop <= headline.mBottom);
+        UNSCOPED_INFO("and the button under the sentence " << where(action));
+        CHECK(action.mTop <= sentence.mBottom);
+        {
+            INFO("all of it is inside the room");
+            CHECK(state->getLocalRect().contains(headline));
+            CHECK(state->getLocalRect().contains(action));
+        }
         state->die();
     }
 
     // The block is centred down the room rather than sitting at the top of
     // it: what is being said is about the whole of the pane.
-    template<> template<>
-    void alemptystate_object::test<2>()
+    TEST_CASE_METHOD(alemptystate_data, "alemptystate: the block is centred down the room", "[alemptystate]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALEmptyState* state = build(300, 400);
@@ -108,44 +104,44 @@ namespace tut
         const LLRect sentence = part(state, "sentence")->getRect();
         const S32 above = 400 - headline.mTop;
         const S32 below = sentence.mBottom;
-        ensure("as much room above as below: " + std::to_string(above) + " and " + std::to_string(below),
-               llabs(above - below) <= 2);
+        CAPTURE(above, below);
+        CHECK(llabs(above - below) <= 2);
         state->die();
     }
 
     // What is not given is not there: a state with only a sentence is one
     // line of text and not a line of text under two empty rows.
-    template<> template<>
-    void alemptystate_object::test<3>()
+    TEST_CASE_METHOD(alemptystate_data, "alemptystate: parts not given are hidden and a lone sentence is centred", "[alemptystate]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALEmptyState* state = build();
         state->say(LLStringUtil::null, "Nothing matches that.");
 
-        ensure("no headline is shown", !part(state, "headline")->getVisible());
-        ensure("nor a button nobody gave", !part(state, "action")->getVisible());
-        ensure("the sentence is shown", part(state, "sentence")->getVisible());
+        CHECK_FALSE(part(state, "headline")->getVisible());
+        UNSCOPED_INFO("nor a button nobody gave");
+        CHECK_FALSE(part(state, "action")->getVisible());
+        CHECK(part(state, "sentence")->getVisible());
 
         // And it is in the middle of the room, not under where a headline
-        // would have been.
+        // would have been: as much room above it as below, but for the odd
+        // pixel of halving.
         const LLRect sentence = part(state, "sentence")->getRect();
-        const S32 middle = state->getRect().getHeight() / 2;
-        ensure("centred on its own " + where(sentence),
-               sentence.mTop >= middle && sentence.mBottom <= middle);
+        const S32 above = state->getRect().getHeight() - sentence.mTop;
+        const S32 below = sentence.mBottom;
+        CAPTURE(above, below);
+        CHECK(llabs(above - below) <= 1);
         state->die();
     }
 
-    // A sentence too long for the width is read down rather than cut off.
-    template<> template<>
-    void alemptystate_object::test<4>()
+    TEST_CASE_METHOD(alemptystate_data, "alemptystate: a sentence too long for the width wraps rather than being cut off", "[alemptystate]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALEmptyState* state = build(220, 400);
@@ -157,20 +153,19 @@ namespace tut
                    "and every field the tag answers to is on this page.");
         const S32 many = part(state, "sentence")->getRect().getHeight();
 
-        ensure("it takes more than one line: " + std::to_string(one_line) + " then " + std::to_string(many),
-               many > one_line);
-        ensure("and stays inside the room",
-               state->getLocalRect().contains(part(state, "sentence")->getRect()));
+        CAPTURE(one_line, many);
+        CHECK(many > one_line);
+        UNSCOPED_INFO("and stays inside the room");
+        CHECK(state->getLocalRect().contains(part(state, "sentence")->getRect()));
         state->die();
     }
 
     // The one thing that would fix it, pressed.
-    template<> template<>
-    void alemptystate_object::test<5>()
+    TEST_CASE_METHOD(alemptystate_data, "alemptystate: pressing the action button tells the pane", "[alemptystate]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALEmptyState* state = build();
@@ -181,37 +176,36 @@ namespace tut
 
         LLButton* button = state->getChild<LLButton>("action", true);
         button->onCommit();
-        ensure_equals("the pane is told", pressed, 1);
+        UNSCOPED_INFO("the pane is told");
+        CHECK(pressed == 1);
         state->die();
     }
 
-    // Saying something else says something else.
-    template<> template<>
-    void alemptystate_object::test<6>()
+    TEST_CASE_METHOD(alemptystate_data, "alemptystate: saying something new replaces the headline and the sentence", "[alemptystate]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALEmptyState* state = build();
         state->say("Nothing selected", "Choose one.");
-        ensure_equals("it says what it was told", state->headline(), std::string("Nothing selected"));
+        CHECK(state->headline() == std::string("Nothing selected"));
 
         state->say("No field of that name", "Clear the filter.");
-        ensure_equals("and then the other thing", state->headline(), std::string("No field of that name"));
-        ensure_equals("with its own sentence", state->sentence(), std::string("Clear the filter."));
-        ensure("and no button, since none was given", !part(state, "action")->getVisible());
+        CHECK(state->headline() == std::string("No field of that name"));
+        CHECK(state->sentence() == std::string("Clear the filter."));
+        UNSCOPED_INFO("and no button, since none was given");
+        CHECK_FALSE(part(state, "action")->getVisible());
         state->die();
     }
 
     // Two ways out: side by side under the sentence, each telling its own.
-    template<> template<>
-    void alemptystate_object::test<7>()
+    TEST_CASE_METHOD(alemptystate_data, "alemptystate: a second action sits beside the first and tells its own handler", "[alemptystate]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALEmptyState* state = build();
@@ -221,47 +215,64 @@ namespace tut
         state->say("No script open", "Open one, or make one.", "Open File...", "New Script...");
         const LLRect a = part(state, "action")->getRect();
         const LLRect b = part(state, "second_action")->getRect();
-        ensure("both shown", part(state, "action")->getVisible() && part(state, "second_action")->getVisible());
-        ensure("on one row", a.mTop == b.mTop);
-        ensure("side by side", a.mRight <= b.mLeft);
-        ensure("inside the room", state->getLocalRect().contains(a) && state->getLocalRect().contains(b));
-        ensure("under the sentence", a.mTop <= part(state, "sentence")->getRect().mBottom);
+        CHECK(part(state, "action")->getVisible());
+        CHECK(part(state, "second_action")->getVisible());
+        UNSCOPED_INFO("on one row");
+        CHECK(a.mTop == b.mTop);
+        UNSCOPED_INFO("side by side");
+        CHECK(a.mRight <= b.mLeft);
+        {
+            INFO("inside the room");
+            CHECK(state->getLocalRect().contains(a));
+            CHECK(state->getLocalRect().contains(b));
+        }
+        UNSCOPED_INFO("under the sentence");
+        CHECK(a.mTop <= part(state, "sentence")->getRect().mBottom);
         state->getChild<LLButton>("second_action", true)->onCommit();
-        ensure("the second is its own", first == 0 && second == 1);
+        {
+            INFO("the second is its own");
+            CHECK(first == 0);
+            CHECK(second == 1);
+        }
 
         state->say("No script open", "Open one.", "Open File...");
-        ensure("gone when not given", !part(state, "second_action")->getVisible());
+        UNSCOPED_INFO("gone when not given");
+        CHECK_FALSE(part(state, "second_action")->getVisible());
         state->die();
     }
 
     // A way out not to lead with: a link under the buttons, clicked as one.
-    template<> template<>
-    void alemptystate_object::test<8>()
+    TEST_CASE_METHOD(alemptystate_data, "alemptystate: a link sits under the buttons and is clicked as a button is", "[alemptystate]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALEmptyState* state = build();
         S32 clicked = 0;
         state->onLink([&clicked]() { ++clicked; });
         state->say("No script open", "Go to one, or make one.", "Go to Script...", "New Script...");
-        ensure("no link until given", !part(state, "link")->getVisible());
+        UNSCOPED_INFO("no link until given");
+        CHECK_FALSE(part(state, "link")->getVisible());
         state->setLink("Open a file...");
         const LLRect link = part(state, "link")->getRect();
-        ensure("shown", part(state, "link")->getVisible());
-        ensure("under the buttons", link.mTop <= part(state, "action")->getRect().mBottom);
-        ensure("inside the room", state->getLocalRect().contains(link));
-        ensure("narrower than the room", link.getWidth() < state->getRect().getWidth() - 32);
+        CHECK(part(state, "link")->getVisible());
+        UNSCOPED_INFO("under the buttons");
+        CHECK(link.mTop <= part(state, "action")->getRect().mBottom);
+        UNSCOPED_INFO("inside the room");
+        CHECK(state->getLocalRect().contains(link));
+        UNSCOPED_INFO("narrower than the room");
+        CHECK(link.getWidth() < state->getRect().getWidth() - 32);
         LLTextBox* text = state->getChild<LLTextBox>("link", true);
         const S32  x    = link.getWidth() / 2;
         const S32  y    = link.getHeight() / 2;
         text->handleMouseDown(x, y, MASK_NONE);
         text->handleMouseUp(x, y, MASK_NONE);
-        ensure_equals("clicked", clicked, 1);
+        CHECK(clicked == 1);
         state->setLink(std::string());
-        ensure("gone when taken away", !part(state, "link")->getVisible());
+        UNSCOPED_INFO("gone when taken away");
+        CHECK_FALSE(part(state, "link")->getVisible());
         state->die();
     }
 }

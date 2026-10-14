@@ -33,7 +33,7 @@
 #include "llfile.h"
 #include "lluuid.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -44,7 +44,7 @@
 #include <unistd.h>
 #endif
 
-namespace tut
+namespace
 {
     struct alscriptsnippets_data
     {
@@ -103,27 +103,28 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptsnippets_data> alscriptsnippets_group;
-    typedef alscriptsnippets_group::object    alscriptsnippets_object;
-    alscriptsnippets_group                    alscriptsnippets_instance("alscriptsnippets");
-
-    template<> template<>
-    void alscriptsnippets_object::test<1>()
+    TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: snippets read back as written and one with no body yet stays out", "[alscriptsnippets]")
     {
-        set_test_name("written and read back; one being written, with no body yet, stays out of the file");
         const std::string file = folder + "/lsl.xml";
         std::vector<ALScriptSnippets::Snippet> none;
-        ensure("no file is no snippets, and nothing wrong", ALScriptSnippets::readFrom(file, false, none) && none.empty());
-        ensure("written", ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"$1\");"), snippet("half", "") }));
+        {
+            INFO("no file is no snippets, and nothing wrong");
+            CHECK(ALScriptSnippets::readFrom(file, false, none));
+            REQUIRE(none.empty());
+        }
+        CHECK(ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"$1\");"), snippet("half", "") }));
         std::vector<ALScriptSnippets::Snippet> back;
-        ensure("read", ALScriptSnippets::readFrom(file, false, back));
-        ensure("the one with a body", back.size() == 1 && back[0].name == "say" && back[0].body == "llSay(0, \"$1\");");
+        REQUIRE(ALScriptSnippets::readFrom(file, false, back));
+        {
+            INFO("the one with a body");
+            REQUIRE(back.size() == 1);
+            CHECK(back[0].name == "say");
+            CHECK(back[0].body == "llSay(0, \"$1\");");
+        }
     }
 
-    template<> template<>
-    void alscriptsnippets_object::test<2>()
+    TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: a file that does not read is kept beside and not written over", "[alscriptsnippets]")
     {
-        set_test_name("a file that does not read as snippets is kept beside, not written over");
         const std::string file   = folder + "/lsl.xml";
         const std::string broken = "<llsd><array><map><key>name</key><string>mine</string></map>  <!-- a comma too far -->";
         {
@@ -131,56 +132,71 @@ namespace tut
             out << broken;
         }
         std::vector<ALScriptSnippets::Snippet> held;
-        ensure("it does not read", !ALScriptSnippets::readFrom(file, false, held));
-        ensure("written all the same", ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"hi\");") }));
-        ensure("what it held kept, as it was", LLFile::isfile(file + ".unreadable") && read(file + ".unreadable") == broken);
+        CHECK_FALSE(ALScriptSnippets::readFrom(file, false, held));
+        UNSCOPED_INFO("written all the same");
+        CHECK(ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"hi\");") }));
+        {
+            INFO("what it held kept, as it was");
+            CHECK(LLFile::isfile(file + ".unreadable"));
+            CHECK(read(file + ".unreadable") == broken);
+        }
         std::vector<ALScriptSnippets::Snippet> back;
-        ensure("the new file reads", ALScriptSnippets::readFrom(file, false, back) && back.size() == 1);
+        {
+            INFO("the new file reads");
+            CHECK(ALScriptSnippets::readFrom(file, false, back));
+            REQUIRE(back.size() == 1);
+        }
 
         // Broken again: kept beside the first, which is not written over.
         {
             llofstream out(file, std::ios::binary);
             out << "again";
         }
-        ensure("written", ALScriptSnippets::writeTo(file, { snippet("say", "x") }));
-        ensure("the first kept still", read(file + ".unreadable") == broken);
-        ensure("the second beside it", read(file + ".unreadable.1") == "again");
+        CHECK(ALScriptSnippets::writeTo(file, { snippet("say", "x") }));
+        UNSCOPED_INFO("the first kept still");
+        CHECK(read(file + ".unreadable") == broken);
+        UNSCOPED_INFO("the second beside it");
+        CHECK(read(file + ".unreadable.1") == "again");
     }
 
-    template<> template<>
-    void alscriptsnippets_object::test<3>()
+    TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: a write replaces the file whole and a failed one leaves it as it was", "[alscriptsnippets]")
     {
-        set_test_name("written whole in the file's place: nothing is left beside it, and a write that fails leaves the file as it was");
         const std::string file = folder + "/lsl.xml";
-        ensure("written", ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"one\");") }));
+        CHECK(ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"one\");") }));
         const std::string first = read(file);
-        ensure("written again, over it", ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"two\");") }));
-        ensure("replaced", read(file) != first && read(file).find("two") != std::string::npos);
-        ensure("and nothing half-written beside it", !LLFile::isfile(ALFileWrite::besideOf(file)));
+        UNSCOPED_INFO("written again, over it");
+        CHECK(ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"two\");") }));
+        {
+            INFO("replaced");
+            CHECK(read(file) != first);
+            CHECK(read(file).find("two") != std::string::npos);
+        }
+        UNSCOPED_INFO("and nothing half-written beside it");
+        CHECK_FALSE(LLFile::isfile(ALFileWrite::besideOf(file)));
 
         // A file that cannot be written is not touched: never opened for
-        // writing and left cut short. Root writes what it likes.
+        // writing and left cut short.
 #if !LL_WINDOWS
         if (geteuid() == 0)
         {
-            return;
+            SKIP("root writes what it likes");
         }
 #endif
         const std::string written = read(file);
         std::error_code   ec;
         std::filesystem::permissions(fsyspath(file), std::filesystem::perms::owner_read, std::filesystem::perm_options::replace, ec);
-        ensure("a file nothing can be written in", !ec);
+        UNSCOPED_INFO("a file nothing can be written in");
+        REQUIRE_FALSE(ec);
         const bool wrote = ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"three\");") });
         std::filesystem::permissions(fsyspath(file), std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
                                      std::filesystem::perm_options::replace, ec);
-        ensure("not written", !wrote);
-        ensure("and the file as it was", read(file) == written);
+        CHECK_FALSE(wrote);
+        UNSCOPED_INFO("and the file as it was");
+        CHECK(read(file) == written);
     }
 
-    template<> template<>
-    void alscriptsnippets_object::test<4>()
+    TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: a notecard carries both languages and passes over keys it does not know", "[alscriptsnippets]")
     {
-        set_test_name("a notecard carries both languages and reads back into each; keys it does not know are passed over");
         ALScriptSnippets::Snippet say = snippet("say", "llSay(0, \"${1:hello}\");");
         say.prefix                    = "say";
         say.detail                    = "Say something";
@@ -189,15 +205,17 @@ namespace tut
         const std::string text = ALScriptSnippets::notecardText({ say, builtin, snippet("", "no name") }, { snippet("print", "print(${1})") });
         std::vector<ALScriptSnippets::Snippet> lsl;
         std::vector<ALScriptSnippets::Snippet> slua;
-        ensure("read", ALScriptSnippets::readNotecard(text, false, lsl, slua));
-        ensure_equals("the LSL one, and not the viewer's or the unnamed", lsl.size(), 1U);
-        ensure_equals("its name", lsl[0].name, std::string("say"));
-        ensure_equals("its prefix", lsl[0].prefix, std::string("say"));
-        ensure_equals("its detail", lsl[0].detail, std::string("Say something"));
-        ensure_equals("its body", lsl[0].body, say.body);
-        ensure("not the viewer's", !lsl[0].builtin);
-        ensure_equals("the SLua one in SLua's", slua.size(), 1U);
-        ensure_equals("its body", slua[0].body, std::string("print(${1})"));
+        REQUIRE(ALScriptSnippets::readNotecard(text, false, lsl, slua));
+        UNSCOPED_INFO("the LSL one, and not the viewer's or the unnamed");
+        REQUIRE(lsl.size() == 1U);
+        CHECK(lsl[0].name == std::string("say"));
+        CHECK(lsl[0].prefix == std::string("say"));
+        CHECK(lsl[0].detail == std::string("Say something"));
+        CHECK(lsl[0].body == say.body);
+        CHECK_FALSE(lsl[0].builtin);
+        UNSCOPED_INFO("the SLua one in SLua's");
+        REQUIRE(slua.size() == 1U);
+        CHECK(slua[0].body == std::string("print(${1})"));
 
         // Written by hand or by an older viewer: no language, and a key
         // this one does not know.
@@ -205,105 +223,154 @@ namespace tut
                                   "<key>colour</key><string>red</string></map></array></llsd>";
         lsl.clear();
         slua.clear();
-        ensure("read", ALScriptSnippets::readNotecard(plain, true, lsl, slua));
-        ensure("into the language shown", lsl.empty() && slua.size() == 1 && slua[0].name == "loop");
+        CHECK(ALScriptSnippets::readNotecard(plain, true, lsl, slua));
+        {
+            INFO("into the language shown");
+            REQUIRE(lsl.empty());
+            REQUIRE(slua.size() == 1);
+            CHECK(slua[0].name == "loop");
+        }
     }
 
-    template<> template<>
-    void alscriptsnippets_object::test<5>()
+    TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: a notecard that is not snippets reads as nothing and says so", "[alscriptsnippets]")
     {
-        set_test_name("a notecard that is not snippets reads as nothing, and says so");
         std::vector<ALScriptSnippets::Snippet> lsl;
         std::vector<ALScriptSnippets::Snippet> slua;
         for (const char* text : { "Dear diary, today I scripted a door.", "<llsd><map><key>name</key><string>x</string></map></llsd>",
                                   "<llsd><array><map><key>title</key><string>x</string></map></array></llsd>", "<llsd><array /></llsd>", "" })
         {
-            ensure(std::string("not snippets: ") + text, !ALScriptSnippets::readNotecard(text, false, lsl, slua));
-            ensure("and nothing added", lsl.empty() && slua.empty());
+            CAPTURE(text);
+            REQUIRE_FALSE(ALScriptSnippets::readNotecard(text, false, lsl, slua));
+            {
+                INFO("and nothing added");
+                REQUIRE(lsl.empty());
+                REQUIRE(slua.empty());
+            }
         }
     }
 
-    template<> template<>
-    void alscriptsnippets_object::test<6>()
+    TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: merge leaves out the same snippet and numbers one whose name is taken", "[alscriptsnippets]")
     {
-        set_test_name("brought in beside one's own: the same left out, a name taken by another body numbered, and again left out");
         std::vector<ALScriptSnippets::Snippet> own = { snippet("say", "llSay(0, \"a\");"), snippet("loop", "for") };
         const std::vector<ALScriptSnippets::Snippet> incoming = { snippet("say", "llSay(0, \"b\");"), snippet("loop", "for"),
                                                                   snippet("new", "x") };
         ALScriptSnippets::Merged merged = ALScriptSnippets::merge(own, incoming);
-        ensure_equals("one added under its own name", merged.added, 1U);
-        ensure_equals("one under a number", merged.renamed, 1U);
-        ensure_equals("one the same", merged.skipped, 1U);
-        ensure_equals("four now", own.size(), 4U);
-        ensure_equals("numbered", own[2].name, std::string("say (2)"));
-        ensure_equals("with its body", own[2].body, std::string("llSay(0, \"b\");"));
-        ensure_equals("and the new one", own[3].name, std::string("new"));
+        UNSCOPED_INFO("one added under its own name");
+        CHECK(merged.added == 1U);
+        UNSCOPED_INFO("one under a number");
+        CHECK(merged.renamed == 1U);
+        UNSCOPED_INFO("one the same");
+        CHECK(merged.skipped == 1U);
+        REQUIRE(own.size() == 4U);
+        CHECK(own[2].name == std::string("say (2)"));
+        CHECK(own[2].body == std::string("llSay(0, \"b\");"));
+        CHECK(own[3].name == std::string("new"));
 
         // The same notecard again brings nothing in.
         merged = ALScriptSnippets::merge(own, incoming);
-        ensure("nothing again", merged.added == 0 && merged.renamed == 0 && merged.skipped == 3);
-        ensure_equals("still four", own.size(), 4U);
+        {
+            INFO("nothing again");
+            CHECK(merged.added == 0);
+            CHECK(merged.renamed == 0);
+            CHECK(merged.skipped == 3);
+        }
+        REQUIRE(own.size() == 4U);
 
         // A third body takes the next number free.
         merged = ALScriptSnippets::merge(own, { snippet("say", "llSay(0, \"c\");") });
-        ensure_equals("numbered past the taken", own.back().name, std::string("say (3)"));
+        {
+            INFO("numbered past the taken");
+            CHECK(merged.renamed == 1U);
+            CHECK(own.back().name == std::string("say (3)"));
+        }
     }
 
-    template<> template<>
-    void alscriptsnippets_object::test<7>()
+    TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: a followed notecard's snippets go to their languages and are never saved", "[alscriptsnippets]")
     {
-        set_test_name("a followed notecard's snippets: each in its language, one saying none in both, taken in place of those before; text that is not snippets taken as nothing; never written as one's own");
         const std::string text = "<llsd><array>"
                                  "<map><key>name</key><string>say</string><key>body</key><string>llSay(0, \"\");</string><key>language</key><string>lsl</string></map>"
                                  "<map><key>name</key><string>loop</string><key>body</key><string>for</string><key>language</key><string>slua</string></map>"
                                  "<map><key>name</key><string>banner</string><key>body</key><string>x</string></map>"
                                  "</array></llsd>";
-        ensure("followed", ALScriptSnippets::follow(text));
+        CHECK(ALScriptSnippets::follow(text));
         const std::vector<ALScriptSnippets::Snippet>& lsl  = ALScriptSnippets::followed(false);
         const std::vector<ALScriptSnippets::Snippet>& slua = ALScriptSnippets::followed(true);
-        ensure("LSL's and the one saying none", lsl.size() == 2 && lsl[0].name == "say" && lsl[1].name == "banner");
-        ensure("SLua's and the one saying none", slua.size() == 2 && slua[0].name == "loop" && slua[1].name == "banner");
-        ensure("each the notecard's", lsl[0].followed && lsl[1].followed && slua[0].followed && !lsl[0].builtin);
+        {
+            INFO("LSL's and the one saying none");
+            REQUIRE(lsl.size() == 2);
+            CHECK(lsl[0].name == "say");
+            CHECK(lsl[1].name == "banner");
+        }
+        {
+            INFO("SLua's and the one saying none");
+            REQUIRE(slua.size() == 2);
+            CHECK(slua[0].name == "loop");
+            CHECK(slua[1].name == "banner");
+        }
+        {
+            INFO("each the notecard's");
+            CHECK(lsl[0].followed);
+            CHECK(lsl[1].followed);
+            CHECK(slua[0].followed);
+            CHECK_FALSE(lsl[0].builtin);
+        }
 
-        ensure("not snippets: not taken", !ALScriptSnippets::follow("Dear diary"));
-        ensure("those before stay", ALScriptSnippets::followed(false).size() == 2);
+        UNSCOPED_INFO("not snippets: not taken");
+        CHECK_FALSE(ALScriptSnippets::follow("Dear diary"));
+        UNSCOPED_INFO("those before stay");
+        REQUIRE(ALScriptSnippets::followed(false).size() == 2);
 
         // Never written where the scripter's own are, nor carried by their
         // notecard; copied in, one's own.
         const std::string file = folder + "/lsl.xml";
-        ensure("written", ALScriptSnippets::writeTo(file, { snippet("mine", "y"), lsl[0] }));
+        CHECK(ALScriptSnippets::writeTo(file, { snippet("mine", "y"), lsl[0] }));
         std::vector<ALScriptSnippets::Snippet> back;
-        ensure("read", ALScriptSnippets::readFrom(file, false, back));
-        ensure("one's own alone", back.size() == 1 && back[0].name == "mine");
-        ensure("not on one's notecard", ALScriptSnippets::notecardText(lsl, {}).find("banner") == std::string::npos);
+        REQUIRE(ALScriptSnippets::readFrom(file, false, back));
+        {
+            INFO("one's own alone");
+            REQUIRE(back.size() == 1);
+            CHECK(back[0].name == "mine");
+        }
+        UNSCOPED_INFO("not on one's notecard");
+        CHECK(ALScriptSnippets::notecardText(lsl, {}).find("banner") == std::string::npos);
         std::vector<ALScriptSnippets::Snippet> own;
         ALScriptSnippets::merge(own, { lsl[1] });
-        ensure("copied in: one's own", own.size() == 1 && !own[0].followed);
+        {
+            INFO("copied in: one's own");
+            REQUIRE(own.size() == 1);
+            CHECK_FALSE(own[0].followed);
+        }
 
-        ensure("none followed", ALScriptSnippets::follow(std::string()));
-        ensure("none left", ALScriptSnippets::followed(false).empty() && ALScriptSnippets::followed(true).empty());
+        UNSCOPED_INFO("none followed");
+        CHECK(ALScriptSnippets::follow(std::string()));
+        {
+            INFO("none left");
+            REQUIRE(ALScriptSnippets::followed(false).empty());
+            REQUIRE(ALScriptSnippets::followed(true).empty());
+        }
     }
 
-    template<> template<>
-    void alscriptsnippets_object::test<8>()
+    TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: every shipped snippet expands with whole stops and no placeholder left", "[alscriptsnippets]")
     {
-        set_test_name("every snippet the viewer ships expands whole: each stop over all of what its placeholder holds, no bracket of it left "
-                      "outside, and nothing of a placeholder left in the text");
         for (const char* language : { "lsl.xml", "slua.xml" })
         {
             const std::string                      file = std::string(LLUI_TEST_APP_DIR) + "/app_settings/snippets/" + language;
+            CAPTURE(file);
             std::vector<ALScriptSnippets::Snippet> shipped;
-            ensure(std::string("read: ") + file, ALScriptSnippets::readFrom(file, true, shipped) && !shipped.empty());
+            REQUIRE(ALScriptSnippets::readFrom(file, true, shipped));
+            REQUIRE_FALSE(shipped.empty());
             for (const ALScriptSnippets::Snippet& one : shipped)
             {
-                const std::string                 named    = std::string(language) + ", " + one.name;
+                CAPTURE(one.name);
                 const ALSnippetSession::Expansion expanded = ALSnippetSession::expand(one.body, ALTextPos(0, 0), std::string());
                 const ALTextDocument              text(expanded.text);
-                ensure(named + ": no placeholder left in " + expanded.text, expanded.text.find("${") == std::string::npos);
+                UNSCOPED_INFO("no placeholder left in " << expanded.text);
+                REQUIRE(expanded.text.find("${") == std::string::npos);
                 for (size_t i = 0; i < expanded.stops.size(); ++i)
                 {
                     const std::string held = text.text(expanded.stops[i]);
-                    ensure(named + ": stop " + std::to_string(i + 1) + " holds the whole of its text, not \"" + held + "\"", whole(held));
+                    UNSCOPED_INFO("stop " << i + 1 << " holds the whole of its text, not \"" << held << "\"");
+                    REQUIRE(whole(held));
                 }
             }
         }

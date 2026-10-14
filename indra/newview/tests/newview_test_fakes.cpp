@@ -46,6 +46,6 @@ const std::string& rlvGetAnonym(const LLAvatarName&)
 
 LL::WorkQueue& newview_test::mainLoop()
 {
-    static LL::WorkQueue queue("mainloop", 1024);
+    static LL::WorkQueue queue("newview_test main loop", 1024);
     return queue;
 }

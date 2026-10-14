@@ -154,16 +154,29 @@
     <tag name="web_browser" note="A page rendered in the viewer, with what it is allowed to do." />
     <tag name="window_shade" note="A panel that rolls down over what it covers to say something about it." />
     <tag name="xy_vector" note="Two numbers chosen at once by pointing at where they meet." />
+    <tag name="angle_dial" note="A direction chosen by turning a handle round a circle, with the angle it points at in degrees beside it." />
+    <tag name="choice_list" note="A list to choose one line from, a note beside each and a mark before it, for completions and lists like them; it never takes the keyboard, and whoever shows it hands it the keys that move it." />
+    <tag name="code_editor" note="Code to work in: a text view with a gutter of line numbers and marks, the matching bracket lit, problems underlined, blocks that fold and words that complete." />
+    <tag name="color_table_panel" note="Every named colour in the colour table, a row each, with whose it is and the way back to what it was." />
+    <tag name="corner_field" note="Four corner radii, drawn as the rounded rectangle they make with a box at each corner, linked to change together or each on its own." />
+    <tag name="diff_bar" note="The bar over a comparison: where its changes are, and the ways from one to the next." />
+    <tag name="diff_view" note="Two texts compared, side by side or inline, with what one has and the other has not marked in each." />
     <tag name="dock_panel" note="A pane that knows it can be in a window of its own, and how to come back." />
     <tag name="empty_state" note="What a pane says when there is nothing in it: what is missing, how to get some, and the one thing that would fix it." />
+    <tag name="find_bar" note="A text view's find and replace: what to look for, what to put in its place, and how to match it." />
     <tag name="follows_control" note="Which edges of its parent an element is tied to, drawn as the four struts and two springs that says." />
     <tag name="history_list" note="Everything done to a document, newest first, with a mark where the present is." />
+    <tag name="image_field" note="A picture named the way a file names one, shown as itself, with the skin's pictures to choose from and a way through to the tool that edits them." />
     <tag name="jump_bar" note="The path to where you are, each step of it offering the steps it could have been." />
+    <tag name="offset_pad" note="An offset chosen by dragging a dot across a square, with the two numbers beside it for anyone who knows the one they want." />
+    <tag name="output_view" note="What something has said over a session, an entry a line with when, who and what kind, filtered, kept at its newest, with links in it." />
+    <tag name="pane_list" note="A studio pane's list whose rows are places: a row chosen shows its place, return or a double click goes there, and escape goes back." />
     <tag name="quick_open" note="A few letters and a ranked list, for reaching a thing by name rather than by looking for it." />
     <tag name="scope_bar" note="A query written as a sentence: fixed words, dropdowns, and one field for what is looked for." />
     <tag name="setting_row" note="One setting on one line: its name, a slider, its value, and a button back to its default that shows only when there is something to go back from." />
     <tag name="specimen_list" note="A list whose rows carry the things themselves rather than words about them." />
     <tag name="tab_strip" note="The documents a window holds, one tab each over the one it shows, with a dot for unsaved work and a way to close each." />
+    <tag name="text_view" note="A document laid out and drawn with a caret in it: the text every editor here is built on." />
 
     <tag name="time" note="A time of day, chosen as hours and minutes with a pair of arrows and typed if the file allows it." />
     <tag name="inspector" note="A tooltip that is a panel: what a hover says when it has more to say than one line." />

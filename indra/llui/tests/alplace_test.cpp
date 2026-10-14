@@ -26,74 +26,83 @@
 
 #include "alplace.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    struct alplace_data
+    // Left edges lined up and the gap clear; over where under runs out and
+    // over does not, under where neither fits.
+    TEST_CASE("alplace: under places a box below the anchor unless only over it fits", "[alplace]")
     {
-    };
-    typedef test_group<alplace_data> alplace_group;
-    typedef alplace_group::object    alplace_object;
-    alplace_group                    alplace_test_group("alplace");
-
-    template<> template<>
-    void alplace_object::test<1>()
-    {
-        set_test_name("under the anchor, left edges lined up and the gap clear; over it where under runs out and over does not; under where neither fits");
         const LLRect bounds(0, 400, 600, 0);
-        ensure("under", ALPlace::under(LLRect(50, 300, 120, 285), 200, 100, bounds) == LLRect(50, 285, 250, 185));
-        ensure("the gap clear", ALPlace::under(LLRect(50, 300, 120, 285), 200, 100, bounds, 2) == LLRect(50, 283, 250, 183));
-        ensure("just fits", ALPlace::under(LLRect(50, 300, 120, 100), 200, 100, bounds) == LLRect(50, 100, 250, 0));
-        ensure("over where under runs out", ALPlace::under(LLRect(50, 60, 120, 45), 200, 100, bounds, 2) == LLRect(50, 162, 250, 62));
-        ensure("over just fits", ALPlace::under(LLRect(50, 300, 120, 45), 200, 100, bounds) == LLRect(50, 400, 250, 300));
-        ensure("under where neither fits", ALPlace::under(LLRect(50, 320, 120, 45), 200, 100, bounds) == LLRect(50, 45, 250, -55));
+        UNSCOPED_INFO("under");
+        CHECK(ALPlace::under(LLRect(50, 300, 120, 285), 200, 100, bounds) == LLRect(50, 285, 250, 185));
+        UNSCOPED_INFO("the gap clear");
+        CHECK(ALPlace::under(LLRect(50, 300, 120, 285), 200, 100, bounds, 2) == LLRect(50, 283, 250, 183));
+        UNSCOPED_INFO("just fits");
+        CHECK(ALPlace::under(LLRect(50, 300, 120, 100), 200, 100, bounds) == LLRect(50, 100, 250, 0));
+        UNSCOPED_INFO("over where under runs out");
+        CHECK(ALPlace::under(LLRect(50, 60, 120, 45), 200, 100, bounds, 2) == LLRect(50, 162, 250, 62));
+        UNSCOPED_INFO("over just fits");
+        CHECK(ALPlace::under(LLRect(50, 300, 120, 45), 200, 100, bounds) == LLRect(50, 400, 250, 300));
+        UNSCOPED_INFO("under where neither fits");
+        CHECK(ALPlace::under(LLRect(50, 320, 120, 45), 200, 100, bounds) == LLRect(50, 45, 250, -55));
     }
 
-    template<> template<>
-    void alplace_object::test<2>()
+    TEST_CASE("alplace: over places a box above the anchor unless only under it fits", "[alplace]")
     {
-        set_test_name("over the anchor first; under it where over runs out and under does not; over where neither fits");
         const LLRect bounds(0, 400, 600, 0);
-        ensure("over", ALPlace::over(LLRect(50, 200, 120, 184), 200, 40, bounds) == LLRect(50, 240, 250, 200));
-        ensure("the gap clear", ALPlace::over(LLRect(50, 200, 120, 184), 200, 40, bounds, 3) == LLRect(50, 243, 250, 203));
-        ensure("just fits", ALPlace::over(LLRect(50, 360, 120, 344), 200, 40, bounds) == LLRect(50, 400, 250, 360));
-        ensure("under where over runs out", ALPlace::over(LLRect(50, 380, 120, 364), 200, 40, bounds) == LLRect(50, 364, 250, 324));
-        ensure("over where neither fits", ALPlace::over(LLRect(50, 380, 120, 20), 200, 40, bounds) == LLRect(50, 420, 250, 380));
+        UNSCOPED_INFO("over");
+        CHECK(ALPlace::over(LLRect(50, 200, 120, 184), 200, 40, bounds) == LLRect(50, 240, 250, 200));
+        UNSCOPED_INFO("the gap clear");
+        CHECK(ALPlace::over(LLRect(50, 200, 120, 184), 200, 40, bounds, 3) == LLRect(50, 243, 250, 203));
+        UNSCOPED_INFO("just fits");
+        CHECK(ALPlace::over(LLRect(50, 360, 120, 344), 200, 40, bounds) == LLRect(50, 400, 250, 360));
+        UNSCOPED_INFO("under where over runs out");
+        CHECK(ALPlace::over(LLRect(50, 380, 120, 364), 200, 40, bounds) == LLRect(50, 364, 250, 324));
+        UNSCOPED_INFO("over where neither fits");
+        CHECK(ALPlace::over(LLRect(50, 380, 120, 20), 200, 40, bounds) == LLRect(50, 420, 250, 380));
     }
 
-    template<> template<>
-    void alplace_object::test<3>()
+    TEST_CASE("alplace: a box is moved across into the bounds or starts at their left if wider", "[alplace]")
     {
-        set_test_name("across, a box is moved in to keep inside the bounds, and one wider than them starts at their left");
         const LLRect bounds(100, 400, 600, 0);
-        ensure("from the right", ALPlace::under(LLRect(550, 300, 580, 285), 200, 50, bounds) == LLRect(400, 285, 600, 235));
-        ensure("from the left", ALPlace::over(LLRect(20, 300, 80, 285), 200, 50, bounds) == LLRect(100, 350, 300, 300));
-        ensure("wider than them", ALPlace::under(LLRect(300, 300, 380, 285), 700, 50, bounds) == LLRect(100, 285, 800, 235));
+        UNSCOPED_INFO("from the right");
+        CHECK(ALPlace::under(LLRect(550, 300, 580, 285), 200, 50, bounds) == LLRect(400, 285, 600, 235));
+        UNSCOPED_INFO("from the left");
+        CHECK(ALPlace::over(LLRect(20, 300, 80, 285), 200, 50, bounds) == LLRect(100, 350, 300, 300));
+        UNSCOPED_INFO("wider than them");
+        CHECK(ALPlace::under(LLRect(300, 300, 380, 285), 700, 50, bounds) == LLRect(100, 285, 800, 235));
     }
 
-    template<> template<>
-    void alplace_object::test<4>()
+    // Tops lined up.
+    TEST_CASE("alplace: beside places a box right of the anchor else left else under else over", "[alplace]")
     {
-        set_test_name("beside the anchor, tops lined up: right where there is room, else left, else under, else over");
         const LLRect bounds(0, 400, 600, 0);
         const LLRect list(200, 300, 350, 200);
-        ensure("on the right", ALPlace::beside(list, 150, 80, bounds, 2) == LLRect(352, 300, 502, 220));
-        ensure("just fits there", ALPlace::beside(list, 248, 80, bounds, 2) == LLRect(352, 300, 600, 220));
+        UNSCOPED_INFO("on the right");
+        CHECK(ALPlace::beside(list, 150, 80, bounds, 2) == LLRect(352, 300, 502, 220));
+        UNSCOPED_INFO("just fits there");
+        CHECK(ALPlace::beside(list, 248, 80, bounds, 2) == LLRect(352, 300, 600, 220));
         const LLRect right(380, 300, 530, 200);
-        ensure("else on the left", ALPlace::beside(right, 150, 80, bounds, 2) == LLRect(228, 300, 378, 220));
-        ensure("just fits there", ALPlace::beside(right, 378, 80, bounds, 2) == LLRect(0, 300, 378, 220));
-        ensure("else under", ALPlace::beside(list, 249, 80, bounds, 2) == LLRect(200, 198, 449, 118));
-        ensure("else over", ALPlace::beside(LLRect(200, 120, 350, 20), 249, 80, bounds, 2) == LLRect(200, 202, 449, 122));
+        UNSCOPED_INFO("else on the left");
+        CHECK(ALPlace::beside(right, 150, 80, bounds, 2) == LLRect(228, 300, 378, 220));
+        UNSCOPED_INFO("just fits there");
+        CHECK(ALPlace::beside(right, 378, 80, bounds, 2) == LLRect(0, 300, 378, 220));
+        UNSCOPED_INFO("else under");
+        CHECK(ALPlace::beside(list, 249, 80, bounds, 2) == LLRect(200, 198, 449, 118));
+        UNSCOPED_INFO("else over");
+        CHECK(ALPlace::beside(LLRect(200, 120, 350, 20), 249, 80, bounds, 2) == LLRect(200, 202, 449, 122));
     }
 
-    template<> template<>
-    void alplace_object::test<5>()
+    TEST_CASE("alplace: beside moves a box up or down into the bounds unless it is taller", "[alplace]")
     {
-        set_test_name("beside, a box is moved in to keep inside the bounds up and down, its top kept where it is taller than they are");
         const LLRect bounds(0, 400, 600, 0);
-        ensure("up from the bottom", ALPlace::beside(LLRect(200, 60, 350, 0), 150, 80, bounds) == LLRect(350, 80, 500, 0));
-        ensure("down from the top", ALPlace::beside(LLRect(200, 420, 350, 380), 150, 80, bounds) == LLRect(350, 400, 500, 320));
-        ensure("taller than them", ALPlace::beside(LLRect(200, 300, 350, 200), 150, 500, bounds) == LLRect(350, 400, 500, -100));
+        UNSCOPED_INFO("up from the bottom");
+        CHECK(ALPlace::beside(LLRect(200, 60, 350, 0), 150, 80, bounds) == LLRect(350, 80, 500, 0));
+        UNSCOPED_INFO("down from the top");
+        CHECK(ALPlace::beside(LLRect(200, 420, 350, 380), 150, 80, bounds) == LLRect(350, 400, 500, 320));
+        UNSCOPED_INFO("taller than them");
+        CHECK(ALPlace::beside(LLRect(200, 300, 350, 200), 150, 500, bounds) == LLRect(350, 400, 500, -100));
     }
 }

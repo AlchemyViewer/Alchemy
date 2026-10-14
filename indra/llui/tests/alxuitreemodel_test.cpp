@@ -36,7 +36,7 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstring>
 #include <memory>
@@ -50,7 +50,7 @@ void LLOpenFilteredFolders::doItem(LLFolderViewItem* item) {}
 void LLSelectFirstFilteredItem::doFolder(LLFolderViewFolder* folder) {}
 void LLSelectFirstFilteredItem::doItem(LLFolderViewItem* item) {}
 
-namespace tut
+namespace
 {
     struct alxuitreemodel_data
     {
@@ -149,66 +149,69 @@ namespace tut
             return n;
         }
 
-        static void checkAgainstMap(const ALXUITreeItem* item, const ALXUISourceMap& map, S32& from_xml)
+        static void require_agrees_with_map(const ALXUITreeItem* item, const ALXUISourceMap& map, S32& from_xml)
         {
-            ensure_equals(std::string("from-XML flag agrees with the map for ") + item->getName(),
-                          item->isFromXML(), map.isFromXML(item->getView()));
+            UNSCOPED_INFO("from-XML flag agrees with the map for " << item->getName());
+            REQUIRE(item->isFromXML() == map.isFromXML(item->getView()));
             from_xml += item->isFromXML();
             for (auto it = item->getChildrenBegin(); it != item->getChildrenEnd(); ++it)
             {
-                checkAgainstMap(static_cast<const ALXUITreeItem*>(it->get()), map, from_xml);
+                require_agrees_with_map(static_cast<const ALXUITreeItem*>(it->get()), map, from_xml);
             }
         }
     };
 
-    typedef test_group<alxuitreemodel_data> alxuitreemodel_test;
-    typedef alxuitreemodel_test::object     alxuitreemodel_object;
-    tut::alxuitreemodel_test alxuitreemodel_testgroup("alxuitreemodel");
-
     // Every view appears exactly once; the rows the file created are the
     // ones the map knows; a row is found by the same path the selection
     // holds and by its view; tags are the registered ones.
-    template<> template<>
-    void alxuitreemodel_object::test<1>()
+    TEST_CASE_METHOD(alxuitreemodel_data, "alxuitreemodel: the model has one row per view found by path and by view with its tag", "[alxuitreemodel]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
         ll_test::FloaterViewScope floater_view(fv.get());
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
-        ensure("built", floater != nullptr);
+        REQUIRE(floater != nullptr);
 
         ALXUISourceMap map;
         map.build(floater, root);
 
         ALXUITreeModel model;
         ALXUITreeItem* root_item = model.build(floater, map);
-        ensure("a root item", root_item != nullptr);
-        ensure_equals("one item per view", countItems(root_item), countViews(floater));
-        ensure_equals("and the model counts the same", (S32)model.count(), countViews(floater));
+        REQUIRE(root_item != nullptr);
+        CHECK(countItems(root_item) == countViews(floater));
+        UNSCOPED_INFO("and the model counts the same");
+        CHECK((S32)model.count() == countViews(floater));
 
         S32 from_xml = 0;
-        checkAgainstMap(root_item, map, from_xml);
-        ensure_equals("four rows from the file", from_xml, 4);
+        require_agrees_with_map(root_item, map, from_xml);
+        UNSCOPED_INFO("four rows from the file");
+        CHECK(from_xml == 4);
 
         ALXUITreeItem* second = model.itemFor(ALXUISelection::fromString("outer/inner#1"));
-        ensure("the second inner by path", second != nullptr);
-        ensure_equals("is the view the selection resolves to",
-                      second->getView(), ALXUISelection::resolve(floater, ALXUISelection::fromString("outer/inner#1")));
-        ensure_equals("and is found by its view", model.itemFor(second->getView()), second);
-        ensure_equals("with its tag", second->getTag(), std::string("panel"));
-        ensure_equals("in order after the first", second->getOrder(), 1);
-        ensure_equals("the root's tag", root_item->getTag(), std::string("floater"));
+        UNSCOPED_INFO("the second inner by path");
+        REQUIRE(second != nullptr);
+        UNSCOPED_INFO("is the view the selection resolves to");
+        CHECK(second->getView() == ALXUISelection::resolve(floater, ALXUISelection::fromString("outer/inner#1")));
+        UNSCOPED_INFO("and is found by its view");
+        CHECK(model.itemFor(second->getView()) == second);
+        CHECK(second->getTag() == std::string("panel"));
+        UNSCOPED_INFO("in order after the first");
+        CHECK(second->getOrder() == 1);
+        CHECK(root_item->getTag() == std::string("floater"));
 
-        ensure("the floater has a drag handle", dragHandle(floater) != nullptr);
+        REQUIRE(dragHandle(floater) != nullptr);
         const ALXUITreeItem* drag = model.itemFor(dragHandle(floater));
-        ensure("a code-built child has a row", drag != nullptr);
-        ensure("marked as such", !drag->isFromXML());
-        ensure("with the tag its type is registered under", !drag->getTag().empty());
+        UNSCOPED_INFO("a code-built child has a row");
+        REQUIRE(drag != nullptr);
+        UNSCOPED_INFO("marked as such");
+        CHECK_FALSE(drag->isFromXML());
+        UNSCOPED_INFO("with the tag its type is registered under");
+        CHECK_FALSE(drag->getTag().empty());
 
         delete floater;
         fv.reset();
@@ -217,19 +220,18 @@ namespace tut
     // The filter matches by name and by tag and hides code-built rows on
     // request; the eye flips the view and not the document; a rebuild
     // leaves no stale key.
-    template<> template<>
-    void alxuitreemodel_object::test<2>()
+    TEST_CASE_METHOD(alxuitreemodel_data, "alxuitreemodel: the filter matches name and tag and the eye flips only the view", "[alxuitreemodel]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
         ll_test::FloaterViewScope floater_view(fv.get());
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
-        ensure("built", floater != nullptr);
+        REQUIRE(floater != nullptr);
         ALXUISourceMap map;
         map.build(floater, root);
         ALXUITreeModel model;
@@ -238,39 +240,64 @@ namespace tut
         ALXUITreeItem* outer = model.itemFor(ALXUISelection::fromString("outer"));
         ALXUITreeItem* hidden = model.itemFor(ALXUISelection::fromString("outer/inner#1"));
         ALXUITreeItem* drag = model.itemFor(dragHandle(floater));
-        ensure("rows", outer && hidden && drag);
+        REQUIRE(outer);
+        REQUIRE(hidden);
+        REQUIRE(drag);
 
         ALXUITreeFilter& filter = model.getFilter();
-        ensure("no filter passes everything", filter.check(outer) && filter.check(drag));
+        {
+            INFO("no filter passes everything");
+            CHECK(filter.check(outer));
+            CHECK(filter.check(drag));
+        }
         filter.setWords("OUT");
-        ensure("a name matches, case folded", filter.check(outer));
-        ensure("and another does not", !filter.check(hidden));
+        UNSCOPED_INFO("a name matches, case folded");
+        CHECK(filter.check(outer));
+        UNSCOPED_INFO("and another does not");
+        CHECK_FALSE(filter.check(hidden));
         LLFolderViewFilter::Match match = filter.getFilterMatch(outer);
-        ensure_equals("the match is where the name has it", match.mOffset, 0u);
-        ensure_equals("and as long as the term", match.mLength, 3u);
+        UNSCOPED_INFO("the match is where the name has it");
+        CHECK(match.mOffset == 0u);
+        UNSCOPED_INFO("and as long as the term");
+        CHECK(match.mLength == 3u);
         filter.setWords("panel");
-        ensure("a tag matches", filter.check(outer));
+        UNSCOPED_INFO("a tag matches");
+        CHECK(filter.check(outer));
         filter.setWords("");
         filter.setShowCodeBuilt(false);
-        ensure("a code-built row is hidden on request", !filter.check(drag));
-        ensure("a file's row is not", filter.check(outer));
-        ensure("the filter is active with the switch alone", filter.isActive());
+        UNSCOPED_INFO("a code-built row is hidden on request");
+        CHECK_FALSE(filter.check(drag));
+        UNSCOPED_INFO("a file's row is not");
+        CHECK(filter.check(outer));
+        UNSCOPED_INFO("the filter is active with the switch alone");
+        CHECK(filter.isActive());
 
-        ensure("the second inner is hidden as authored", !hidden->isShown());
-        ensure("and says so", !hidden->isAuthoredVisible());
+        UNSCOPED_INFO("the second inner is hidden as authored");
+        CHECK_FALSE(hidden->isShown());
+        UNSCOPED_INFO("and says so");
+        CHECK_FALSE(hidden->isAuthoredVisible());
         hidden->toggleShown();
-        ensure("the eye shows it", hidden->getView()->getVisible());
-        ensure("for the session", hidden->isShown());
-        ensure("the authored state is remembered", !hidden->isAuthoredVisible());
+        UNSCOPED_INFO("the eye shows it");
+        CHECK(hidden->getView()->getVisible());
+        UNSCOPED_INFO("for the session");
+        CHECK(hidden->isShown());
+        UNSCOPED_INFO("the authored state is remembered");
+        CHECK_FALSE(hidden->isAuthoredVisible());
+        const ALXUISourceMap::Origin* hidden_origin = map.find(hidden->getView());
+        REQUIRE(hidden_origin != nullptr);
         std::string authored;
-        map.find(hidden->getView())->node->getAttributeString("visible", authored);
-        ensure_equals("and the document still says what it said", authored, std::string("false"));
+        hidden_origin->node->getAttributeString("visible", authored);
+        UNSCOPED_INFO("and the document still says what it said");
+        CHECK(authored == std::string("false"));
         hidden->toggleShown();
-        ensure("and flips back", !hidden->getView()->getVisible());
+        UNSCOPED_INFO("and flips back");
+        CHECK_FALSE(hidden->getView()->getVisible());
 
         outer->toggleShown();
-        ensure("a visible view hides", !outer->getView()->getVisible());
-        ensure("against what was authored", outer->isAuthoredVisible());
+        UNSCOPED_INFO("a visible view hides");
+        CHECK_FALSE(outer->getView()->getVisible());
+        UNSCOPED_INFO("against what was authored");
+        CHECK(outer->isAuthoredVisible());
 
         // Rebuild over a new tree: the paths resolve to the new views, the
         // rows are new, and every row's view is in the new tree.
@@ -278,14 +305,20 @@ namespace tut
         delete floater;
         LLXMLNodePtr root2;
         LLFloater* floater2 = build(fv.get(), root2);
+        REQUIRE(floater2 != nullptr);
         map.build(floater2, root2);
         model.build(floater2, map);
         ALXUITreeItem* outer2 = model.itemFor(ALXUISelection::fromString("outer"));
-        ensure("the same path after a rebuild", outer2 != nullptr);
-        ensure("is a new row", outer2 != old_outer.get());
-        ensure_equals("names the new view", outer2->getView(), ALXUISelection::resolve(floater2, ALXUISelection::fromString("outer")));
-        ensure_equals("with the same count", (S32)model.count(), countViews(floater2));
-        ensure("every row's view is in the new tree", allUnder(model.rootItem(), floater2));
+        UNSCOPED_INFO("the same path after a rebuild");
+        REQUIRE(outer2 != nullptr);
+        UNSCOPED_INFO("is a new row");
+        CHECK(outer2 != old_outer.get());
+        UNSCOPED_INFO("names the new view");
+        CHECK(outer2->getView() == ALXUISelection::resolve(floater2, ALXUISelection::fromString("outer")));
+        UNSCOPED_INFO("with the same count");
+        CHECK((S32)model.count() == countViews(floater2));
+        UNSCOPED_INFO("every row's view is in the new tree");
+        CHECK(allUnder(model.rootItem(), floater2));
         old_outer = nullptr;
 
         delete floater2;
@@ -297,38 +330,38 @@ namespace tut
     // is one, and adding a child starts it -- never end. The studio hit
     // this by handing a folder view and one of its rows the same item, and
     // the window opened and never came back.
-    template<> template<>
-    void alxuitreemodel_object::test<3>()
+    TEST_CASE_METHOD(alxuitreemodel_data, "alxuitreemodel: an item refuses itself as a child and still takes another", "[alxuitreemodel]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
         ll_test::FloaterViewScope floater_view(fv.get());
 
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root);
-        ensure("built", floater != nullptr);
+        REQUIRE(floater != nullptr);
 
         ALXUISourceMap map;
         map.build(floater, root);
 
         ALXUITreeModel model;
         ALXUITreeItem* root_item = model.build(floater, map);
-        ensure("a root item", root_item != nullptr);
+        REQUIRE(root_item != nullptr);
 
         const auto before = root_item->getChildrenCount();
         root_item->addChild(root_item);
-        ensure_equals("an item does not take itself as a child",
-                      root_item->getChildrenCount(), before);
+        UNSCOPED_INFO("an item does not take itself as a child");
+        CHECK(root_item->getChildrenCount() == before);
 
         // And what it refuses is only that: an item that is not this one is
         // taken as before.
         ALXUITreeItem* outer = model.itemFor(ALXUISelection::fromString("outer"));
-        ensure("a row to adopt", outer != nullptr);
+        REQUIRE(outer != nullptr);
         root_item->addChild(outer);
-        ensure_equals("another item still is", root_item->getChildrenCount(), before + 1);
+        UNSCOPED_INFO("another item still is");
+        CHECK(root_item->getChildrenCount() == before + 1);
 
         delete floater;
         fv.reset();
@@ -339,12 +372,11 @@ namespace tut
     // is the drop -- to whoever holds the document. A row whose element
     // takes children divides in three; one whose does not, in two. And a
     // row moves only where the tree was given something to move it with.
-    template<> template<>
-    void alxuitreemodel_object::test<4>()
+    TEST_CASE_METHOD(alxuitreemodel_data, "alxuitreemodel: a drag lands before or into or after a row by where on its line it is", "[alxuitreemodel]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
         ll_test::FloaterViewScope floater_view(fv.get());
@@ -360,12 +392,12 @@ namespace tut
             "</floater>\n";
         LLXMLNodePtr root;
         LLFloater* floater = build(fv.get(), root, WITH_COMBO);
-        ensure("built", floater != nullptr);
+        REQUIRE(floater != nullptr);
         ALXUISourceMap map;
         map.build(floater, root);
         ALXUITreeModel model;
         ALXUITreeItem* root_item = model.build(floater, map);
-        ensure("a root item", root_item != nullptr);
+        REQUIRE(root_item != nullptr);
 
         // A tree of rows over the items, the way the studio builds one.
         LLPanel::Params hp(LLUICtrlFactory::getDefaultParams<LLPanel>());
@@ -420,30 +452,44 @@ namespace tut
 
         LLFolderViewItem* outer = rows["outer"];
         LLFolderViewItem* inner = rows["outer/inner"];
-        ensure("a row for the container", outer != nullptr);
-        ensure("and one for the leaf", inner != nullptr);
-        ensure("the container's row is a folder", outer->as<LLFolderViewFolder>() != nullptr);
+        REQUIRE(outer != nullptr);
+        REQUIRE(inner != nullptr);
+        UNSCOPED_INFO("the container's row is a folder");
+        CHECK(outer->as<LLFolderViewFolder>() != nullptr);
 
         // Nothing moves until the tree has something to move rows with.
-        ensure("a row does not move on its own", !inner->isMovable());
+        UNSCOPED_INFO("a row does not move on its own");
+        CHECK_FALSE(inner->isMovable());
         std::vector<ALXUISelection::path_t> picked;
         model.setDragStarter([&picked](const ALXUISelection::path_t& path)
         {
             picked.push_back(path);
             return true;
         });
-        ensure("given a starter, a row the file wrote moves", inner->isMovable());
+        UNSCOPED_INFO("given a starter, a row the file wrote moves");
+        CHECK(inner->isMovable());
         // And so does a folder, whatever built the rows under it: an element
         // moved takes everything under it along.
         LLFolderViewItem* combo = rows["outer/combo"];
-        ensure("the combo box's row is a folder", combo && combo->as<LLFolderViewFolder>() != nullptr);
-        ensure("holding rows nobody wrote", combo->as<LLFolderViewFolder>()->getItemsCount()
+        {
+            INFO("the combo box's row is a folder");
+            REQUIRE(combo);
+            REQUIRE(combo->as<LLFolderViewFolder>() != nullptr);
+        }
+        UNSCOPED_INFO("holding rows nobody wrote");
+        CHECK(combo->as<LLFolderViewFolder>()->getItemsCount()
                                               + combo->as<LLFolderViewFolder>()->getFoldersCount() > 0);
-        ensure("and it moves", combo->isMovable());
-        ensure("as does the panel holding it", outer->isMovable());
+        UNSCOPED_INFO("and it moves");
+        CHECK(combo->isMovable());
+        UNSCOPED_INFO("as does the panel holding it");
+        CHECK(outer->isMovable());
         std::vector<LLFolderViewModelItem*> items { inner->getViewModelItem() };
-        ensure("and starting a drag says which", model.startDrag(items));
-        ensure_equals("by path", ALXUISelection::toString(picked.front()), std::string("outer/inner"));
+        UNSCOPED_INFO("and starting a drag says which");
+        CHECK(model.startDrag(items));
+        UNSCOPED_INFO("to the starter, once");
+        REQUIRE(picked.size() == 1u);
+        UNSCOPED_INFO("by path");
+        CHECK(ALXUISelection::toString(picked.front()) == std::string("outer/inner"));
 
         // Where a drag over each row is, as the document is told.
         struct Asked
@@ -474,76 +520,130 @@ namespace tut
             asked.clear();
             const S32 top = row->getRect().getHeight();
             row->handleDragAndDrop(20, top - from_top, MASK_NONE, drop, DAD_WIDGET, &cargo, &accept, tip);
-            ensure("the row asked the document once", asked.size() == 1);
+            INFO("the row asked the document once");
+            REQUIRE(asked.size() == 1);
             return asked.front();
         };
         const S32 line = inner->getItemHeight();
 
-        ensure("the leaf's top half is before it", over(inner, 1).zone == ALXUITreeModel::DropZone::Before);
-        ensure("and its bottom half is after it", over(inner, line - 1).zone == ALXUITreeModel::DropZone::After);
-        ensure("a leaf has no middle", over(inner, line / 2).zone != ALXUITreeModel::DropZone::Into);
-        ensure_equals("and names itself", over(inner, 1).path, std::string("outer/inner"));
-        ensure("which the drag is told it may", accept == ACCEPT_YES_SINGLE);
+        {
+            INFO("the leaf's top half is before it");
+            CHECK(over(inner, 1).zone == ALXUITreeModel::DropZone::Before);
+        }
+        {
+            INFO("and its bottom half is after it");
+            CHECK(over(inner, line - 1).zone == ALXUITreeModel::DropZone::After);
+        }
+        {
+            INFO("a leaf has no middle");
+            CHECK(over(inner, line / 2).zone != ALXUITreeModel::DropZone::Into);
+        }
+        {
+            INFO("and names itself");
+            CHECK(over(inner, 1).path == std::string("outer/inner"));
+        }
+        UNSCOPED_INFO("which the drag is told it may");
+        CHECK(accept == ACCEPT_YES_SINGLE);
 
-        ensure("the container's top third is before it", over(outer, 1).zone == ALXUITreeModel::DropZone::Before);
-        ensure("its middle is into it", over(outer, line / 2).zone == ALXUITreeModel::DropZone::Into);
-        ensure("and its bottom third is after it", over(outer, line - 1).zone == ALXUITreeModel::DropZone::After);
-        ensure_equals("by its own path", over(outer, 1).path, std::string("outer"));
+        {
+            INFO("the container's top third is before it");
+            CHECK(over(outer, 1).zone == ALXUITreeModel::DropZone::Before);
+        }
+        {
+            INFO("its middle is into it");
+            CHECK(over(outer, line / 2).zone == ALXUITreeModel::DropZone::Into);
+        }
+        {
+            INFO("and its bottom third is after it");
+            CHECK(over(outer, line - 1).zone == ALXUITreeModel::DropZone::After);
+        }
+        {
+            INFO("by its own path");
+            CHECK(over(outer, 1).path == std::string("outer"));
+        }
 
         // The drop itself is the same question with the answer meant.
-        ensure("a drop says it is one", over(inner, 1, /*drop=*/true).drop);
-        ensure("and a hover says it is not", !over(inner, 1).drop);
+        {
+            INFO("a drop says it is one");
+            CHECK(over(inner, 1, /*drop=*/true).drop);
+        }
+        {
+            INFO("and a hover says it is not");
+            CHECK_FALSE(over(inner, 1).drop);
+        }
 
         // Refused, the drag is told so.
         take = false;
         over(inner, 1);
-        ensure("what the document refuses the drag may not do", accept == ACCEPT_NO);
+        UNSCOPED_INFO("what the document refuses the drag may not do");
+        CHECK(accept == ACCEPT_NO);
 
         delete host;
         delete floater;
         fv.reset();
     }
 
-    template<> template<>
-    void alxuitreemodel_object::test<5>()
+    TEST_CASE_METHOD(alxuitreemodel_data, "alxuitreemodel: a filter pass lights matches and their holders and stops out of time", "[alxuitreemodel]")
     {
-        set_test_name("a tree filtered: each row by the filter, the words lit where they are, a holder lit by what passes under it; a pass out of time stops");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::unique_ptr<LLFloaterView> fv(floaterView());
         ll_test::FloaterViewScope floater_view(fv.get());
         LLXMLNodePtr root;
         LLFloater*   floater = build(fv.get(), root);
+        REQUIRE(floater != nullptr);
         ALXUISourceMap map;
         map.build(floater, root);
         // A label with a capital, which the words find all the same.
-        floater->findChild<LLView>("inner", true)->setName("Inner");
+        LLView* first_inner = floater->findChild<LLView>("inner", true);
+        REQUIRE(first_inner != nullptr);
+        first_inner->setName("Inner");
         ALXUITreeModel model;
         model.build(floater, map);
         ALXUITreeItem* top   = model.rootItem();
         ALXUITreeItem* outer = model.itemFor(ALXUISelection::fromString("outer"));
         ALXUITreeItem* inner = model.itemFor(ALXUISelection::fromString("outer/Inner"));
-        ensure("rows", top && outer && inner);
+        REQUIRE(top);
+        REQUIRE(outer);
+        REQUIRE(inner);
 
         ALXUITreeFilter& filter = model.getFilter();
         filter.setWords("INNER");
         filter.resetTime(60000);
-        ensure("a pass with time finishes", top->filter(filter));
+        UNSCOPED_INFO("a pass with time finishes");
+        CHECK(top->filter(filter));
         const S32 now = filter.getCurrentGeneration();
-        ensure("the row the words are in passes", inner->passedFilter(now));
-        ensure("lit where they are", inner->getFilterStringOffset() == 0 && inner->getFilterStringSize() == 5);
+        UNSCOPED_INFO("the row the words are in passes");
+        CHECK(inner->passedFilter(now));
+        {
+            INFO("lit where they are");
+            CHECK(inner->getFilterStringOffset() == 0);
+            CHECK(inner->getFilterStringSize() == 5);
+        }
         ALXUITreeItem* drag = model.itemFor(dragHandle(floater));
-        ensure("a row they are not in, holding nothing, does not", drag && !drag->passedFilter(now));
-        ensure("one holding a row that does, does", outer->passedFilter(now) && outer->descendantsPassedFilter(now));
-        ensure("unlit, the words not being in it", !outer->hasFilterStringMatch());
-        ensure("and so does the top", top->descendantsPassedFilter(now));
+        {
+            INFO("a row they are not in, holding nothing, does not");
+            REQUIRE(drag);
+            CHECK_FALSE(drag->passedFilter(now));
+        }
+        {
+            INFO("one holding a row that does, does");
+            CHECK(outer->passedFilter(now));
+            CHECK(outer->descendantsPassedFilter(now));
+        }
+        UNSCOPED_INFO("unlit, the words not being in it");
+        CHECK_FALSE(outer->hasFilterStringMatch());
+        UNSCOPED_INFO("and so does the top");
+        CHECK(top->descendantsPassedFilter(now));
 
         filter.setWords("inner");
         filter.setWords("in");
         filter.resetTime(0);
-        ensure("a pass out of time stops", !top->filter(filter));
-        ensure("before the top is reached", top->getLastFilterGeneration() < filter.getCurrentGeneration());
+        UNSCOPED_INFO("a pass out of time stops");
+        CHECK_FALSE(top->filter(filter));
+        UNSCOPED_INFO("before the top is reached");
+        CHECK(top->getLastFilterGeneration() < filter.getCurrentGeneration());
     }
 }

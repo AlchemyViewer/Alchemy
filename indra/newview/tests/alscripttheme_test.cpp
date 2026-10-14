@@ -35,13 +35,13 @@
 
 #include "../../llui/tests/alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <fstream>
 #include <iterator>
 
-namespace tut
+namespace
 {
     struct alscripttheme_data
     {
@@ -54,17 +54,11 @@ namespace tut
         }
     };
 
-    typedef test_group<alscripttheme_data> alscripttheme_test;
-    typedef alscripttheme_test::object     alscripttheme_object;
-    tut::alscripttheme_test alscripttheme_testgroup("alscripttheme");
-
-    template<> template<>
-    void alscripttheme_object::test<1>()
+    TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: every shipped theme loads and colours only names the editor knows", "[alscripttheme]")
     {
-        set_test_name("every theme the viewer ships reads, and colours only what a theme speaks for");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         S32 shipped = 0;
         for (const ALScriptTheme& theme : ALScriptTheme::available())
@@ -74,40 +68,43 @@ namespace tut
                 continue;
             }
             ++shipped;
-            ensure("a name: " + theme.path, !theme.name.empty());
-            ensure("colours: " + theme.name, !theme.colors.empty());
+            CAPTURE(theme.path);
+            REQUIRE_FALSE(theme.name.empty());
+            REQUIRE_FALSE(theme.colors.empty());
             for (const auto& [name, color] : theme.colors)
             {
-                ensure(theme.name + " colours " + name + ", which no editor is painted by", spoken(name));
+                UNSCOPED_INFO("it colours " << name << ", which no editor is painted by");
+                REQUIRE(spoken(name));
             }
         }
-        ensure("the viewer ships themes", shipped > 1);
+        CHECK(shipped > 1);
     }
 
-    template<> template<>
-    void alscripttheme_object::test<2>()
+    TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: editor colours come first and every colour name has a label", "[alscripttheme]")
     {
-        set_test_name("the editor's own colours come first, and every name reads as words");
         const std::vector<std::string>& names = ALScriptTheme::names();
-        ensure("names", !names.empty());
-        ensure_equals("the text first", names.front(), std::string("ScriptText"));
-        ensure("an editor colour", ALScriptTheme::isEditorColor("ScriptBackground"));
-        ensure_equals("read as a person reads it", ALScriptTheme::labelOf("ScriptBackground"), std::string("Background"));
-        ensure("a kind is not the editor's", !ALScriptTheme::isEditorColor(names.back()));
-        ensure_equals("a kind's name spaced", ALScriptTheme::labelOf("ScriptDocComment"), std::string("Doc comment"));
+        REQUIRE_FALSE(names.empty());
+        UNSCOPED_INFO("the text first");
+        CHECK(names.front() == std::string("ScriptText"));
+        CHECK(ALScriptTheme::isEditorColor("ScriptBackground"));
+        UNSCOPED_INFO("read as a person reads it");
+        CHECK(ALScriptTheme::labelOf("ScriptBackground") == std::string("Background"));
+        UNSCOPED_INFO("a kind is not the editor's");
+        CHECK_FALSE(ALScriptTheme::isEditorColor(names.back()));
+        UNSCOPED_INFO("a kind's name spaced");
+        CHECK(ALScriptTheme::labelOf("ScriptDocComment") == std::string("Doc comment"));
         for (const std::string& name : names)
         {
-            ensure("a label for " + name, !ALScriptTheme::labelOf(name).empty());
+            CAPTURE(name);
+            REQUIRE_FALSE(ALScriptTheme::labelOf(name).empty());
         }
     }
 
-    template<> template<>
-    void alscripttheme_object::test<3>()
+    TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: the chosen theme is read and written through the UI's setting", "[alscripttheme]")
     {
-        set_test_name("the theme chosen is the UI's setting, read and written through it");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLControlGroup* config = LLUI::getInstance()->mSettingGroups["config"];
         if (!config->controlExists("ALScriptStudioTheme"))
@@ -122,55 +119,80 @@ namespace tut
             ~ChosenBack() { ALScriptTheme::setChosen(was); }
         } chosen_back;
         ALScriptTheme::setChosen("Monokai");
-        ensure_equals("the setting says it", config->getString("ALScriptStudioTheme"), std::string("Monokai"));
-        ensure_equals("and so does the theme", ALScriptTheme::chosen(), std::string("Monokai"));
+        UNSCOPED_INFO("the setting says it");
+        CHECK(config->getString("ALScriptStudioTheme") == std::string("Monokai"));
+        UNSCOPED_INFO("and so does the theme");
+        CHECK(ALScriptTheme::chosen() == std::string("Monokai"));
         ALScriptTheme::setChosen(std::string());
-        ensure("none", ALScriptTheme::chosen().empty());
+        REQUIRE(ALScriptTheme::chosen().empty());
     }
 
-    template<> template<>
-    void alscripttheme_object::test<4>()
+    // What reads less than it should: code against both grounds, the text against its bands, the line numbers
+    // against the gutter.
+    TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: illegible reports each colour too faint against its ground", "[alscripttheme]")
     {
-        set_test_name("what reads less than it should: code against both grounds, the text against its bands, the line numbers against the gutter");
         ALScriptTheme theme;
         theme.colors["ScriptBackground"] = LLColor4(1.f, 1.f, 1.f, 1.f);
         theme.colors["ScriptText"]       = LLColor4(0.f, 0.f, 0.f, 1.f);
         theme.colors["ScriptComment"]    = LLColor4(0.2f, 0.4f, 0.2f, 1.f);
-        ensure("black and a dark green on white read", theme.illegible().empty());
+        UNSCOPED_INFO("black and a dark green on white read");
+        REQUIRE(theme.illegible().empty());
 
         theme.colors["ScriptString"] = LLColor4(0.9f, 0.6f, 0.6f, 1.f);
         std::vector<ALScriptTheme::Illegible> said = theme.illegible();
-        ensure("a pale pink does not", said.size() == 1 && said[0].name == "ScriptString" && said[0].against == "ScriptBackground" &&
-                                           said[0].contrast < ALSurface::LEGIBLE);
+        {
+            INFO("a pale pink does not");
+            REQUIRE(said.size() == 1);
+            CHECK(said[0].name == "ScriptString");
+            CHECK(said[0].against == "ScriptBackground");
+            CHECK(said[0].contrast < ALSurface::LEGIBLE);
+        }
         theme.colors.erase("ScriptString");
 
         theme.colors["ScriptBgReadOnlyColor"] = LLColor4(0.3f, 0.3f, 0.3f, 1.f);
         said                                  = theme.illegible();
-        ensure("a dark read-only ground takes both from the text", said.size() == 2 && said[0].against == "ScriptBgReadOnlyColor");
+        {
+            INFO("a dark read-only ground takes both from the text");
+            REQUIRE(said.size() == 2);
+            CHECK(said[0].against == "ScriptBgReadOnlyColor");
+        }
         theme.colors.erase("ScriptBgReadOnlyColor");
 
         theme.colors["ScriptSelectionColor"] = LLColor4(0.f, 0.f, 0.3f, 0.9f);
         said                                 = theme.illegible();
-        ensure("a selection the text is lost in, as laid over the ground",
-               said.size() == 1 && said[0].name == "ScriptText" && said[0].against == "ScriptSelectionColor");
+        {
+            INFO("a selection the text is lost in, as laid over the ground");
+            REQUIRE(said.size() == 1);
+            CHECK(said[0].name == "ScriptText");
+            CHECK(said[0].against == "ScriptSelectionColor");
+        }
         theme.colors["ScriptSelectionColor"] = LLColor4(0.f, 0.f, 0.3f, 0.2f);
-        ensure("thin enough, it reads", theme.illegible().empty());
+        UNSCOPED_INFO("thin enough, it reads");
+        REQUIRE(theme.illegible().empty());
 
         theme.colors["ScriptGutterColor"]     = LLColor4(0.95f, 0.95f, 0.95f, 1.f);
         theme.colors["ScriptLineNumberColor"] = LLColor4(0.75f, 0.75f, 0.75f, 1.f);
         said                                  = theme.illegible();
-        ensure("faint numbers on the gutter", said.size() == 1 && said[0].against == "ScriptGutterColor");
+        {
+            INFO("faint numbers on the gutter");
+            REQUIRE(said.size() == 1);
+            CHECK(said[0].against == "ScriptGutterColor");
+        }
         theme.colors["ScriptLineNumberColor"] = LLColor4(0.5f, 0.5f, 0.5f, 1.f);
-        ensure("numbers are held to less than the code", theme.illegible().empty() && !theme.illegible(7.f, 4.5f).empty());
+        {
+            INFO("numbers are held to less than the code");
+            REQUIRE(theme.illegible().empty());
+            REQUIRE_FALSE(theme.illegible(7.f, 4.5f).empty());
+        }
     }
 
-    template<> template<>
-    void alscripttheme_object::test<5>()
+    // Every theme the viewer ships reads: the text and each kind of code at 4.5:1, the line numbers at 3:1; the
+    // high-contrast ones at 7 and 4.5.
+    TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: every shipped theme reads at its contrast thresholds", "[alscripttheme]")
     {
-        set_test_name("every theme the viewer ships reads: the text and each kind of code at 4.5:1, the line numbers at 3:1; the high-contrast ones at 7 and 4.5");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         S32 high = 0;
         for (const ALScriptTheme& theme : ALScriptTheme::available())
@@ -179,6 +201,7 @@ namespace tut
             {
                 continue;
             }
+            CAPTURE(theme.name);
             const bool contrast = theme.name.find("High Contrast") != std::string::npos;
             high += contrast;
             std::string said;
@@ -186,28 +209,29 @@ namespace tut
             {
                 said += "\n  " + each.name + " on " + each.against + ": " + std::to_string(each.contrast);
             }
-            ensure(theme.name + " reads:" + said, said.empty());
+            UNSCOPED_INFO("colours that read too faintly:" << said);
+            REQUIRE(said.empty());
         }
-        ensure_equals("a dark and a light high-contrast theme", high, 2);
+        UNSCOPED_INFO("a dark and a light high-contrast theme");
+        CHECK(high == 2);
     }
 
-    template<> template<>
-    void alscripttheme_object::test<6>()
+    TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: every colour a theme speaks for has its label in strings.xml", "[alscripttheme]")
     {
-        set_test_name("every colour a theme speaks for has its label in strings.xml, to be translated");
 #ifdef LLUI_TEST_APP_DIR
         std::ifstream in(std::string(LLUI_TEST_APP_DIR) + "/skins/default/xui/en/strings.xml");
         if (!in)
         {
-            skip("no source tree: LLUI_TEST_APP_DIR does not point at newview");
+            SKIP("no source tree: LLUI_TEST_APP_DIR does not point at newview");
         }
         const std::string strings((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         for (const std::string& name : ALScriptTheme::names())
         {
-            ensure("a label for " + name, strings.find("name=\"ScriptColorLabel_" + name + "\"") != std::string::npos);
+            CAPTURE(name);
+            REQUIRE(strings.find("name=\"ScriptColorLabel_" + name + "\"") != std::string::npos);
         }
 #else
-        skip("no LLUI_TEST_APP_DIR");
+        SKIP("no LLUI_TEST_APP_DIR");
 #endif
     }
 
@@ -216,24 +240,24 @@ namespace tut
     // the caret's line and the selection, the line numbers against the
     // gutter -- the dark skins included, whose defaults were once the
     // white skin's.
-    template<> template<>
-    void alscripttheme_object::test<7>()
+    TEST_CASE_METHOD(alscripttheme_data, "alscripttheme: every shipped skin's script colours read and its studio parts differ", "[alscripttheme]")
     {
 #ifdef LLUI_TEST_APP_DIR
         const std::string skins = std::string(LLUI_TEST_APP_DIR) + "/skins/";
         LLXMLNodePtr default_root;
         if (!LLXMLNode::parseFile(skins + "default/colors.xml", default_root, nullptr))
         {
-            skip("no source tree: LLUI_TEST_APP_DIR does not point at newview");
+            SKIP("no source tree: LLUI_TEST_APP_DIR does not point at newview");
         }
         for (const char* skin : { "default", "alchemy", "gemini", "heretic", "ionic" })
         {
+            CAPTURE(skin);
             ALColorSheet sheet;
             sheet.read(default_root, "default/colors.xml");
             if (std::string(skin) != "default")
             {
                 LLXMLNodePtr root;
-                ensure(std::string(skin) + " parses", LLXMLNode::parseFile(skins + skin + "/colors.xml", root, nullptr));
+                REQUIRE(LLXMLNode::parseFile(skins + skin + "/colors.xml", root, nullptr));
                 sheet.read(root, std::string(skin) + "/colors.xml");
             }
             sheet.resolve();
@@ -246,23 +270,26 @@ namespace tut
             {
                 said += "\n  " + each.name + " on " + each.against + ": " + std::to_string(each.contrast);
             }
-            ensure(std::string(skin) + "'s script colours read:" + said, said.empty());
+            UNSCOPED_INFO("script colours that read too faintly:" << said);
+            REQUIRE(said.empty());
             // And the studios' parts told apart by what they are: a divider
             // from the panes it divides, a tab not chosen from the chosen
             // one, the notice and the strips from the panes.
-            const auto apart = [&](const char* a, const char* b, F32 least) {
+            const auto require_apart = [&](const char* a, const char* b, F32 least) {
+                CAPTURE(a, b);
                 const LLColor4* x = sheet.find(a);
                 const LLColor4* y = sheet.find(b);
-                ensure(std::string(skin) + " has " + a + " and " + b, x && y);
-                ensure(std::string(skin) + ": " + a + " apart from " + b, ALSurface::contrast(*x, *y) >= least);
+                REQUIRE(x);
+                REQUIRE(y);
+                REQUIRE(ALSurface::contrast(*x, *y) >= least);
             };
-            apart("StudioDividerColor", "StudioPaneColor", 1.3f);
-            apart("StudioTabColor", "PanelDefaultBackgroundColor", 1.08f);
-            apart("StudioNoticeColor", "StudioPaneColor", 1.08f);
-            apart("StudioStripColor", "StudioPaneColor", 1.05f);
+            require_apart("StudioDividerColor", "StudioPaneColor", 1.3f);
+            require_apart("StudioTabColor", "PanelDefaultBackgroundColor", 1.08f);
+            require_apart("StudioNoticeColor", "StudioPaneColor", 1.08f);
+            require_apart("StudioStripColor", "StudioPaneColor", 1.05f);
         }
 #else
-        skip("no LLUI_TEST_APP_DIR");
+        SKIP("no LLUI_TEST_APP_DIR");
 #endif
     }
 }

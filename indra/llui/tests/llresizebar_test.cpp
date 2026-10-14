@@ -32,18 +32,15 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     // LLView's constructor is protected, for LLUICtrlFactory.
-    namespace
-    {
         struct TestView : public LLView
         {
             TestView(const LLView::Params& p) : LLView(p) {}
         };
-    }
 
     struct llresizebar_data
     {
@@ -73,34 +70,27 @@ namespace tut
         }
     };
 
-    typedef test_group<llresizebar_data> llresizebar_test;
-    typedef llresizebar_test::object     llresizebar_object;
-    tut::llresizebar_test llresizebar_testgroup("llresizebar");
-
     // Double-clicking asks the resized view for its rect. The hover path asks
     // whether there is one first, and this one has to as well.
-    template<> template<>
-    void llresizebar_object::test<1>()
+    TEST_CASE_METHOD(llresizebar_data, "llresizebar: double-clicking a bar with nothing to resize is handled", "[llresizebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLResizeBar> bar(orphanBar());
-        ensure("double-clicking a bar with nothing to resize is handled",
-               bar->handleDoubleClick(1, 1, 0));
+        CHECK(bar->handleDoubleClick(1, 1, 0));
     }
 
     // A resize listener hears about resizes. Passing the mouse over the bar is
     // not one -- it is the event a bar sees most, and its subscribers read the
     // sizes of panels when they get it.
-    template<> template<>
-    void llresizebar_object::test<2>()
+    TEST_CASE_METHOD(llresizebar_data, "llresizebar: hovering over a bar is handled and is not a resize", "[llresizebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLResizeBar> bar(orphanBar());
@@ -108,35 +98,33 @@ namespace tut
         bool heard = false;
         bar->setResizeListener([&heard](void*) { heard = true; });
 
-        ensure("the hover is handled", bar->handleHover(1, 1, 0));
-        ensure("but it is not a resize", !heard);
+        CHECK(bar->handleHover(1, 1, 0));
+        CHECK_FALSE(heard);
     }
 
     // Every parameter has a name. One left out of the block's constructor takes
     // the empty name, which registers it as the block's unnamed value instead
     // of as something a file or a schema can ask for.
-    template<> template<>
-    void llresizebar_object::test<3>()
+    TEST_CASE_METHOD(llresizebar_data, "llresizebar: every parameter is registered under its name", "[llresizebar]")
     {
         LLResizeBar::Params p;   // builds the block descriptor
 
         LLInitParam::BlockDescriptor& descriptor = LLResizeBar::Params::getBlockDescriptor();
-        ensure("min_size is named", descriptor.findNamedParam("min_size") != nullptr);
-        ensure("max_size is named", descriptor.findNamedParam("max_size") != nullptr);
-        ensure("side is named", descriptor.findNamedParam("side") != nullptr);
-        ensure("resizing_view is named", descriptor.findNamedParam("resizing_view") != nullptr);
+        CHECK(descriptor.findNamedParam("min_size") != nullptr);
+        CHECK(descriptor.findNamedParam("max_size") != nullptr);
+        CHECK(descriptor.findNamedParam("side") != nullptr);
+        CHECK(descriptor.findNamedParam("resizing_view") != nullptr);
     }
 
     // A drag that leaves the window goes on resizing from the edge it left by,
     // which is what the corner handle does with the same gesture. Disabled, so
     // the cursor the bar would set is never asked for -- there is no window
     // here to take one, and canResize gates only that.
-    template<> template<>
-    void llresizebar_object::test<4>()
+    TEST_CASE_METHOD(llresizebar_data, "llresizebar: a drag that leaves the window resizes on from the edge it left by", "[llresizebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         // The root's rect is the window as far as the bar is concerned.
@@ -161,27 +149,23 @@ namespace tut
         bar->handleHover(400, 10, 0);
         gFocusMgr.setMouseCapture(nullptr);
 
-        ensure_equals("the resize followed the cursor to the window's edge",
-                      resized->getRect().getWidth(), 300);
+        UNSCOPED_INFO("the resize followed the cursor to the window's edge");
+        CHECK(resized->getRect().getWidth() == 300);
     }
 
     // Being disabled is a reason focus cannot arrive, not a reason it cannot
     // leave. A control disabled while it held focus would otherwise keep it,
     // with nothing able to ask for it back.
-    namespace
-    {
         struct PlainCtrl : public LLUICtrl
         {
             PlainCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
         };
-    }
 
-    template<> template<>
-    void llresizebar_object::test<5>()
+    TEST_CASE_METHOD(llresizebar_data, "llresizebar: a disabled control gives up focus and cannot take it back", "[llresizebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLUICtrl::Params p;
@@ -190,14 +174,15 @@ namespace tut
         std::unique_ptr<PlainCtrl> c(new PlainCtrl(p));
 
         c->setFocus(true);
-        ensure("an enabled control takes focus", c->hasFocus());
+        UNSCOPED_INFO("enabled");
+        CHECK(c->hasFocus());
 
         c->setEnabled(false);
         c->setFocus(false);
-        ensure("and a disabled one gives it up", !c->hasFocus());
+        CHECK_FALSE(c->hasFocus());
 
         c->setFocus(true);
-        ensure("but does not take it back", !c->hasFocus());
+        CHECK_FALSE(c->hasFocus());
 
         gFocusMgr.setKeyboardFocus(nullptr);
     }
@@ -205,12 +190,11 @@ namespace tut
     // A panel names the file it was built from while it builds, and everything
     // built after it reads that name back. One whose referenced file will not
     // load has to put the name back too.
-    template<> template<>
-    void llresizebar_object::test<6>()
+    TEST_CASE_METHOD(llresizebar_data, "llresizebar: a panel whose file will not load puts the file name back", "[llresizebar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLUICtrlFactory::instance().pushFileName("panel_people.xml");
@@ -224,15 +208,14 @@ namespace tut
 
         LLXMLNodePtr node;
         const std::string xml = "<panel name=\"missing\" filename=\"no_such_file_at_all.xml\"/>";
-        ensure("parsed", LLXMLNode::parseBuffer(const_cast<char*>(xml.data()), xml.size(), node));
+        REQUIRE(LLXMLNode::parseBuffer(const_cast<char*>(xml.data()), xml.size(), node));
 
         LLPanel::Params pp(LLUICtrlFactory::getDefaultParams<LLPanel>());
         std::unique_ptr<LLPanel> panel(LLUICtrlFactory::create<LLPanel>(pp));
         panel->setXMLFilename("no_such_file_at_all.xml");
-        ensure("a panel whose file will not load did not build",
-               !panel->initPanelXML(node, nullptr, LLUICtrlFactory::getDefaultParams<LLPanel>()));
+        CHECK_FALSE(panel->initPanelXML(node, nullptr, LLUICtrlFactory::getDefaultParams<LLPanel>()));
 
         const std::string after = LLUICtrlFactory::instance().getCurFileName();
-        ensure_equals("and left the file name where it found it", after, before);
+        CHECK(after == before);
     }
 }

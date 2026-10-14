@@ -31,6 +31,7 @@
 #include "../llaccordionctrl.h"
 #include "../lllayoutstack.h"
 #include "../llui.h"
+#include "../lluicolortable.h"
 
 #include "albigscript.h"
 
@@ -42,6 +43,11 @@
 
 #include <cstdio>
 #include <vector>
+
+#if AL_TEST_CATCH2
+#include "alteststateguard.h"
+#include "altestteardown.h"
+#endif
 
 #ifndef LLUI_TEST_APP_DIR
 #  define LLUI_TEST_APP_DIR ""
@@ -86,9 +92,26 @@ namespace ll_test
         // handed what it did not ask for: fonts without GL textures draw
         // nothing, and fonts with them need the context to stay current,
         // so tests of the two kinds cannot share a process.
+        //
+        // A Catch2 binary ends it after the last case, while APR and LLError
+        // are still up, rather than at static destruction. What making it
+        // changes -- the directory object, the floater view, the root view,
+        // the fonts -- is the state the guard compares with from then on, so
+        // the case that first asked is not blamed for it.
         static HeadlessUI& get(bool gl_textures = false)
         {
+#if AL_TEST_CATCH2
+            static HeadlessUI* made = [gl_textures]
+            {
+                HeadlessUI* ui = new HeadlessUI(gl_textures);
+                ll_test::Teardown::add([ui] { delete ui; });
+                ll_test::StateGuard::accept();
+                return ui;
+            }();
+            HeadlessUI& ui = *made;
+#else
             static HeadlessUI ui(gl_textures);
+#endif
             if (gl_textures != ui.mGLTextures)
             {
                 LL_ERRS("HeadlessUI") << "HeadlessUI::get(gl_textures=" << gl_textures
@@ -105,6 +128,15 @@ namespace ll_test
         HeadlessUI(const HeadlessUI&) = delete;
         HeadlessUI& operator=(const HeadlessUI&) = delete;
 
+        // The directory object goes with it, so the process's is put back.
+        ~HeadlessUI()
+        {
+            if (gDirUtilp == &mDir)
+            {
+                gDirUtilp = mPreviousDir;
+            }
+        }
+
     private:
         explicit HeadlessUI(bool gl_textures)
         :   mDir(LLUI_TEST_APP_DIR),
@@ -117,6 +149,7 @@ namespace ll_test
                 return;
             }
 
+            mPreviousDir = gDirUtilp;
             gDirUtilp = &mDir;
 
             mConfig.declareS32("UIResizeBarHeight", 6, "Read by LLLayoutStack::Params");
@@ -163,10 +196,29 @@ namespace ll_test
         }
 
         UIDir mDir;
+        LLDir* mPreviousDir { nullptr };
         LLControlGroup mConfig;
         const bool mGLTextures;
         bool mOk { false };
     };
+
+    // The skin's colours in the colour table, loaded once for the process as
+    // the viewer loads them at start, for the tests that read them: the
+    // table's names cannot be taken back out, so the first to load them
+    // loads them for every case after. A Catch2 binary's state guard takes
+    // the loaded table as the state to compare with from then on.
+    inline bool loadSkinColours(const HeadlessUI& ui)
+    {
+        static const bool loaded = [&ui]
+        {
+            const bool read = ui.ok() && LLUIColorTable::instance().loadFromSettings();
+#if AL_TEST_CATCH2
+            ll_test::StateGuard::accept("the colour table");
+#endif
+            return read;
+        }();
+        return loaded;
+    }
 
     // How many times a document says it changed, from when this is made:
     // what a test holds an operation to -- one notification for a

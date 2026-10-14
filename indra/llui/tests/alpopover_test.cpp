@@ -33,11 +33,11 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alpopover_data
     {
@@ -74,74 +74,76 @@ namespace tut
         }
     };
 
-    typedef test_group<alpopover_data> alpopover_test;
-    typedef alpopover_test::object     alpopover_object;
-    tut::alpopover_test alpopover_testgroup("alpopover");
-
     // Under the control, its left edge with the control's, and the size the
     // content asked for: what is in it decides how big it is.
-    template<> template<>
-    void alpopover_object::test<1>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a popover hangs under its control left-aligned at its content's size", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLPanel* over = anchor();
-        ALPopover* popover = ALPopover::show(over, content(160, 90));
-        ensure("opens", popover != nullptr);
-        ensure("and is shown", popover->getVisible());
+        LLPanel* body = content(160, 90);
+        ALPopover* popover = ALPopover::show(over, body);
+        REQUIRE(popover != nullptr);
+        CHECK(popover->getVisible());
 
         const LLRect screen = over->calcScreenRect();
         const LLRect where = popover->getRect();
-        ensure_equals("the size the content asked for", where.getWidth(), 160);
-        ensure_equals("in both directions", where.getHeight(), 90);
-        ensure_equals("left edges line up", where.mLeft, screen.mLeft);
-        ensure_equals("and it hangs from the bottom of the control",
-                      where.mTop, screen.mBottom);
+        {
+            INFO("the size the content asked for");
+            CHECK(where.getWidth() == 160);
+            CHECK(where.getHeight() == 90);
+        }
+        UNSCOPED_INFO("left edges line up");
+        CHECK(where.mLeft == screen.mLeft);
+        UNSCOPED_INFO("and it hangs from the bottom of the control");
+        CHECK(where.mTop == screen.mBottom);
 
-        ensure("the content is in it", popover->getChild<LLPanel>("content", true) != nullptr);
+        UNSCOPED_INFO("the content is in it");
+        CHECK(popover->findChild<LLPanel>("content", true) == body);
         popover->closeFloater();
         over->die();
     }
 
     // A popover that would hang off the bottom of the screen goes above the
     // control instead: one a person cannot see the whole of has not opened.
-    template<> template<>
-    void alpopover_object::test<2>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a popover that would hang off the screen's bottom goes above instead", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLPanel* over = anchor(200, 10);
         ALPopover* popover = ALPopover::show(over, content(160, 90));
-        ensure("opens", popover != nullptr);
-        ensure("and is on the screen", popover->getRect().mBottom >= 0);
-        ensure("above the control rather than below it",
-               popover->getRect().mBottom >= over->calcScreenRect().mTop);
+        REQUIRE(popover != nullptr);
+        UNSCOPED_INFO("and is on the screen");
+        CHECK(popover->getRect().mBottom >= 0);
+        UNSCOPED_INFO("above the control rather than below it");
+        CHECK(popover->getRect().mBottom >= over->calcScreenRect().mTop);
         popover->closeFloater();
         over->die();
     }
 
     // Three ways out, and a caller applying on close has to tell them apart.
-    template<> template<>
-    void alpopover_object::test<3>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: each of the three ways out says whether the popover was escaped", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         // Settled: what was chosen stands.
         {
             LLPanel* over = anchor();
             ALPopover* popover = ALPopover::show(over, content());
+            REQUIRE(popover != nullptr);
             std::vector<bool> said;
             popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
             popover->settle();
-            ensure_equals("said once", said.size(), 1u);
-            ensure("and said it was not escaped", !said.front());
+            REQUIRE(said.size() == 1u);
+            UNSCOPED_INFO("and said it was not escaped");
+            CHECK_FALSE(said.front());
             over->die();
         }
 
@@ -149,11 +151,13 @@ namespace tut
         {
             LLPanel* over = anchor();
             ALPopover* popover = ALPopover::show(over, content());
+            REQUIRE(popover != nullptr);
             std::vector<bool> said;
             popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
-            ensure("escape is taken", popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
-            ensure_equals("said once", said.size(), 1u);
-            ensure("and said it was escaped", said.front());
+            CHECK(popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            REQUIRE(said.size() == 1u);
+            UNSCOPED_INFO("and said it was escaped");
+            CHECK(said.front());
             over->die();
         }
 
@@ -162,47 +166,51 @@ namespace tut
         {
             LLPanel* over = anchor();
             ALPopover* popover = ALPopover::show(over, content());
+            REQUIRE(popover != nullptr);
             std::vector<bool> said;
             popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
             popover->onFocusLost();
-            ensure_equals("said once", said.size(), 1u);
-            ensure("and said it was not escaped", !said.front());
+            REQUIRE(said.size() == 1u);
+            UNSCOPED_INFO("and said it was not escaped");
+            CHECK_FALSE(said.front());
             over->die();
         }
     }
 
     // Nothing to hang it off is nothing to open, and the content given is not
     // leaked over it.
-    template<> template<>
-    void alpopover_object::test<4>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: with no anchor or no content nothing opens", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ensure("no anchor, no popover", ALPopover::show(nullptr, content()) == nullptr);
+        LLPanel*                orphan = content();
+        const LLHandle<LLPanel> given  = orphan->getHandle();
+        UNSCOPED_INFO("no anchor, no popover");
+        CHECK(ALPopover::show(nullptr, orphan) == nullptr);
+        UNSCOPED_INFO("and the content given deleted, not leaked");
+        CHECK(given.isDead());
         LLPanel* over = anchor();
-        ensure("and no content, none either", ALPopover::show(over, nullptr) == nullptr);
+        UNSCOPED_INFO("and no content, none either");
+        CHECK(ALPopover::show(over, nullptr) == nullptr);
         over->die();
     }
 
-    // A control at the right edge of the screen opens its popover on the
-    // screen, not off the side of it.
-    template<> template<>
-    void alpopover_object::test<5>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a control at the screen's right edge opens its popover on the screen", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const S32 screen_width = gFloaterView->getRect().getWidth();
         LLPanel* over = anchor(screen_width - 40, 300);
         ALPopover* popover = ALPopover::show(over, content(160, 90));
-        ensure("opens", popover != nullptr);
-        ensure("and is on the screen: right edge " + std::to_string(popover->getRect().mRight)
-                   + " of " + std::to_string(screen_width),
-               popover->getRect().mRight <= screen_width);
-        ensure("and no narrower for it", popover->getRect().getWidth() == 160);
+        REQUIRE(popover != nullptr);
+        UNSCOPED_INFO("on the screen, not off its right edge");
+        CHECK(popover->getRect().mRight <= screen_width);
+        UNSCOPED_INFO("and no narrower for it");
+        CHECK(popover->getRect().getWidth() == 160);
         popover->closeFloater();
         over->die();
     }
@@ -211,12 +219,11 @@ namespace tut
     // to the window its anchor is in, and it asks before the viewer's menu
     // does -- otherwise a window's own shortcuts stop working the moment one
     // of its popovers has the keyboard.
-    template<> template<>
-    void alpopover_object::test<6>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a key the popover does not take goes home to its anchor's window", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         struct Home : public LLFloater
@@ -239,22 +246,35 @@ namespace tut
         home->addChild(over);
 
         ALPopover* popover = ALPopover::show(over, content());
-        ensure_equals("it knows where home is", popover->home(), home);
-        ensure("and asks before the viewer's own menu does", popover->hasAccelerators());
-        ensure("a key home takes is taken", popover->handleKeyHere('F', MASK_CONTROL));
-        ensure_equals("and home heard it", home->heard.size(), 1u);
-        ensure("a key home declines is declined", !popover->handleKeyHere('Q', MASK_CONTROL));
-        ensure_equals("having been asked", home->heard.size(), 2u);
-        ensure("escape is still the popover's own", popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
-        ensure_equals("and never reaches home", home->heard.size(), 2u);
+        REQUIRE(popover != nullptr);
+        UNSCOPED_INFO("it knows where home is");
+        CHECK(popover->home() == home);
+        UNSCOPED_INFO("and asks before the viewer's own menu does");
+        CHECK(popover->hasAccelerators());
+        UNSCOPED_INFO("a key home takes is taken");
+        CHECK(popover->handleKeyHere('F', MASK_CONTROL));
+        UNSCOPED_INFO("and home heard it");
+        CHECK(home->heard.size() == 1u);
+        UNSCOPED_INFO("a key home declines is declined");
+        CHECK_FALSE(popover->handleKeyHere('Q', MASK_CONTROL));
+        UNSCOPED_INFO("having been asked");
+        CHECK(home->heard.size() == 2u);
+        UNSCOPED_INFO("escape is still the popover's own");
+        CHECK(popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+        UNSCOPED_INFO("and never reaches home");
+        CHECK(home->heard.size() == 2u);
 
         // Hung off nothing in a window, it has no home and no claim on the
         // menu's keys.
         LLPanel* loose = anchor();
         ALPopover* alone = ALPopover::show(loose, content());
-        ensure("no home", alone->home() == nullptr);
-        ensure("no claim", !alone->hasAccelerators());
-        ensure("and a key it does not take is declined", !alone->handleKeyHere('Q', MASK_CONTROL));
+        REQUIRE(alone != nullptr);
+        UNSCOPED_INFO("no home");
+        CHECK(alone->home() == nullptr);
+        UNSCOPED_INFO("no claim");
+        CHECK_FALSE(alone->hasAccelerators());
+        UNSCOPED_INFO("and a key it does not take is declined");
+        CHECK_FALSE(alone->handleKeyHere('Q', MASK_CONTROL));
         alone->closeFloater();
         loose->die();
         home->die();
@@ -262,12 +282,11 @@ namespace tut
 
     // A popover built to remember its size opens at the size the last of
     // its kind was left at, and one of another kind does not.
-    template<> template<>
-    void alpopover_object::test<7>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a remembering popover opens at the size the last of its kind was left at", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         // As a popover with more to it than a panel is made: derived, and
@@ -284,31 +303,34 @@ namespace tut
         LLPanel* over = anchor();
         ALPopover* first = new Remembering(ALPopover::paramsRemembered(kind, 200, 120));
         first->openBeside(over);
-        ensure_equals("opens at the size given", first->getRect().getWidth(), 200);
+        UNSCOPED_INFO("opens at the size given");
+        CHECK(first->getRect().getWidth() == 200);
         first->reshape(260, 150);
         first->closeFloater();
 
         ALPopover* second = new Remembering(ALPopover::paramsRemembered(kind, 200, 120));
         second->openBeside(over);
-        ensure_equals("the next of its kind opens as wide as the last was left", second->getRect().getWidth(), 260);
-        ensure_equals("and as tall", second->getRect().getHeight(), 150);
+        UNSCOPED_INFO("the next of its kind opens as wide as the last was left");
+        CHECK(second->getRect().getWidth() == 260);
+        UNSCOPED_INFO("and as tall");
+        CHECK(second->getRect().getHeight() == 150);
         second->closeFloater();
 
         ALPopover* other = new Remembering(ALPopover::paramsRemembered(other_kind, 200, 120));
         other->openBeside(over);
-        ensure_equals("another kind is not told", other->getRect().getWidth(), 200);
+        UNSCOPED_INFO("another kind is not told");
+        CHECK(other->getRect().getWidth() == 200);
         other->closeFloater();
         over->die();
     }
     // A popover is its window's dependent: the window closing takes it,
     // however the window went, and one that has already gone is not
     // touched when the window goes after it.
-    template<> template<>
-    void alpopover_object::test<8>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a popover goes with its window and one gone first is left alone", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const auto home = []() {
             LLFloater::Params fp(LLFloater::getDefaultParams());
@@ -325,57 +347,66 @@ namespace tut
         LLPanel*   over   = anchor();
         window->addChild(over);
         ALPopover*        popover = ALPopover::show(over, content());
+        REQUIRE(popover != nullptr);
         std::vector<bool> said;
         popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
-        ensure("its window's dependent", popover->getDependee() == window);
+        UNSCOPED_INFO("its window's dependent");
+        CHECK(popover->getDependee() == window);
         window->closeFloater();
-        ensure("gone with its window", popover->isDead());
-        ensure_equals("said so once", said.size(), 1u);
-        ensure("and not as escaped: nobody pressed escape", !said.front());
+        UNSCOPED_INFO("gone with its window");
+        CHECK(popover->isDead());
+        REQUIRE(said.size() == 1u);
+        UNSCOPED_INFO("and not as escaped: nobody pressed escape");
+        CHECK_FALSE(said.front());
 
         // Gone first: the window closing after it finds nothing of it.
         LLFloater* again = home();
         LLPanel*   under = anchor();
         again->addChild(under);
         ALPopover* first = ALPopover::show(under, content());
+        REQUIRE(first != nullptr);
         first->escape();
-        ensure("gone", first->isDead());
+        CHECK(first->isDead());
         again->closeFloater();
-        ensure("and the window closed after it", again->isDead());
+        UNSCOPED_INFO("and the window closed after it");
+        CHECK(again->isDead());
     }
 
     // Beside a rect of the screen given for it -- where something on a
     // zoomed canvas is drawn -- rather than beside the anchor's own rect,
     // and still the dependent of the anchor's window.
-    template<> template<>
-    void alpopover_object::test<9>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: showAt hangs a popover from a screen rect given for it", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLPanel*     over   = anchor();
         const LLRect screen(300, 260, 380, 240);
         ALPopover*   popover = ALPopover::showAt(screen, over, content(160, 90));
-        ensure("opens", popover != nullptr && popover->getVisible());
+        REQUIRE(popover != nullptr);
+        CHECK(popover->getVisible());
         const LLRect where = popover->getRect();
-        ensure_equals("its left with the rect's", where.mLeft, screen.mLeft);
-        ensure_equals("hung from the rect's bottom", where.mTop, screen.mBottom);
-        ensure("not the anchor's", where.mLeft != over->calcScreenRect().mLeft);
+        UNSCOPED_INFO("its left with the rect's");
+        CHECK(where.mLeft == screen.mLeft);
+        UNSCOPED_INFO("hung from the rect's bottom");
+        CHECK(where.mTop == screen.mBottom);
+        UNSCOPED_INFO("not the anchor's");
+        CHECK(where.mLeft != over->calcScreenRect().mLeft);
         popover->closeFloater();
-        ensure("no anchor, no popover", ALPopover::showAt(screen, nullptr, content()) == nullptr);
+        UNSCOPED_INFO("no anchor, no popover");
+        CHECK(ALPopover::showAt(screen, nullptr, content()) == nullptr);
         over->die();
     }
 
     // Quiet as a menu is, and closed from the keyboard with nothing else
     // taking it -- no window over which to hand it back -- it gives the
     // keyboard back to what had it, not to the world.
-    template<> template<>
-    void alpopover_object::test<10>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a popover is silent and escaped gives the keyboard back to what had it", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLPanel*              over = anchor();
         LLLineEditor::Params  lp(LLUICtrlFactory::getDefaultParams<LLLineEditor>());
@@ -384,13 +415,16 @@ namespace tut
         LLLineEditor* field   = LLUICtrlFactory::create<LLLineEditor>(lp);
         over->addChild(field);
         field->setFocus(true);
-        ensure("the field has the keyboard", gFocusMgr.getKeyboardFocus() == field);
+        UNSCOPED_INFO("the field has the keyboard");
+        CHECK(gFocusMgr.getKeyboardFocus() == field);
         ALPopover* popover = ALPopover::showOver(over, content(), "Go to line");
-        ensure("shown", popover != nullptr);
-        ensure("silent", popover->getSoundFlags() == LLView::SILENT);
-        ensure("it has the keyboard", gFocusMgr.getKeyboardFocus() != field);
+        REQUIRE(popover != nullptr);
+        CHECK(popover->getSoundFlags() == LLView::SILENT);
+        UNSCOPED_INFO("the popover has the keyboard");
+        CHECK(gFocusMgr.getKeyboardFocus() != field);
         popover->escape();
-        ensure("the keyboard back in the field", gFocusMgr.getKeyboardFocus() == field);
+        UNSCOPED_INFO("the keyboard back in the field");
+        CHECK(gFocusMgr.getKeyboardFocus() == field);
         gFocusMgr.setKeyboardFocus(nullptr);
         over->die();
     }
@@ -400,12 +434,11 @@ namespace tut
     // keyboard back to what had it: the window taking it as its dependent
     // closes puts it on its first control, which is not where the keys were,
     // and the arrows there move the avatar.
-    template<> template<>
-    void alpopover_object::test<11>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: escape and return over a window give the keyboard back to what had it", "[alpopover]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLFloater::Params fp(LLFloater::getDefaultParams());
         fp.name            = "home";
@@ -427,11 +460,14 @@ namespace tut
         (void)first;
         for (const bool escaping : { true, false })
         {
+            CAPTURE(escaping);
             typed->setFocus(true);
-            ensure("the second field has the keyboard", gFocusMgr.getKeyboardFocus() == typed);
+            UNSCOPED_INFO("the second field has the keyboard");
+            REQUIRE(gFocusMgr.getKeyboardFocus() == typed);
             ALPopover* popover = ALPopover::showOver(window, content(), "Go to line");
-            ensure("shown", popover != nullptr);
-            ensure("it has the keyboard", gFocusMgr.getKeyboardFocus() != typed);
+            REQUIRE(popover != nullptr);
+            UNSCOPED_INFO("the popover has the keyboard");
+            REQUIRE(gFocusMgr.getKeyboardFocus() != typed);
             if (escaping)
             {
                 popover->escape();
@@ -440,19 +476,18 @@ namespace tut
             {
                 popover->settle();
             }
-            ensure(escaping ? "escaped: the keyboard back where it was" : "settled: the keyboard back where it was", gFocusMgr.getKeyboardFocus() == typed);
+            UNSCOPED_INFO("the keyboard back where it was");
+            REQUIRE(gFocusMgr.getKeyboardFocus() == typed);
         }
         gFocusMgr.setKeyboardFocus(nullptr);
         window->closeFloater();
     }
 
-    template<> template<>
-    void alpopover_object::test<12>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a slot holds one popover and says how it went; a new one escapes it", "[alpopover]")
     {
-        set_test_name("a slot holds one popover: told of it as it goes, escaped or settled, and empty then; another held escapes it first");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLPanel*                          over = anchor();
         ALPopoverSlot                     slot;
@@ -460,84 +495,116 @@ namespace tut
         const auto                        tell = [&said](int which) {
             return [&said, which](bool escaped) { said.emplace_back(which, escaped); };
         };
-        ensure("empty", !slot.isOpen() && slot.get() == nullptr);
+        CHECK_FALSE(slot.isOpen());
+        CHECK(slot.get() == nullptr);
 
         ALPopover* first = ALPopover::show(over, content());
         slot.hold(first, tell(1));
-        ensure("holds it", slot.isOpen() && slot.get() == first);
+        CHECK(slot.isOpen());
+        CHECK(slot.get() == first);
         slot.close(false);
-        ensure("settled, and told so", said == std::vector<std::pair<int, bool>>{ { 1, false } });
-        ensure("empty again", !slot.isOpen() && slot.get() == nullptr);
+        UNSCOPED_INFO("settled, and told so");
+        CHECK(said == std::vector<std::pair<int, bool>>{ { 1, false } });
+        {
+            INFO("empty again");
+            CHECK_FALSE(slot.isOpen());
+            CHECK(slot.get() == nullptr);
+        }
         slot.close();
-        ensure_equals("nothing to close, nobody told", said.size(), 1u);
+        UNSCOPED_INFO("nothing to close, nobody told");
+        CHECK(said.size() == 1u);
 
         slot.hold(ALPopover::show(over, content()), tell(2));
         slot.close();
-        ensure("escaped, and told so", said.size() == 2 && said[1] == std::make_pair(2, true));
+        {
+            INFO("escaped, and told so");
+            REQUIRE(said.size() == 2);
+            CHECK(said[1] == std::make_pair(2, true));
+        }
 
         slot.hold(ALPopover::show(over, content()), tell(3));
         TestPopover* fourth = new TestPopover();
         slot.hold(fourth, tell(4));
-        ensure("the one it held escaped for the next", said.size() == 3 && said[2] == std::make_pair(3, true));
-        ensure("and the next held", slot.get() == fourth);
+        {
+            INFO("the one it held escaped for the next");
+            REQUIRE(said.size() == 3);
+            CHECK(said[2] == std::make_pair(3, true));
+        }
+        UNSCOPED_INFO("and the next held");
+        CHECK(slot.get() == fourth);
         fourth->openBeside(over);
         fourth->onFocusLost();
-        ensure("one looked away from is settled, and told so", said.size() == 4 && said[3] == std::make_pair(4, false));
-        ensure("and the slot empty", !slot.isOpen());
+        {
+            INFO("one looked away from is settled, and told so");
+            REQUIRE(said.size() == 4);
+            CHECK(said[3] == std::make_pair(4, false));
+        }
+        UNSCOPED_INFO("and the slot empty");
+        CHECK_FALSE(slot.isOpen());
         over->die();
     }
 
-    template<> template<>
-    void alpopover_object::test<13>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a popover held again tells only the new listener; one let go tells none", "[alpopover]")
     {
-        set_test_name("a popover held again is told of to the new listener only; one dropped, or in a slot that goes, dies without a word");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLPanel*         over = anchor();
         ALPopoverSlot    slot;
         std::vector<int> said;
         ALPopover*       popover = ALPopover::show(over, content());
+        REQUIRE(popover != nullptr);
         slot.hold(popover, [&said](bool) { said.push_back(1); });
         slot.hold(popover, [&said](bool) { said.push_back(2); });
-        ensure("still up, held", slot.get() == popover && popover->getVisible() && said.empty());
+        {
+            INFO("still up, held");
+            CHECK(slot.get() == popover);
+            CHECK(popover->getVisible());
+            CHECK(said.empty());
+        }
         slot.close();
-        ensure("the new listener told, the old not", said == std::vector<int>{ 2 });
+        UNSCOPED_INFO("the new listener told, the old not");
+        CHECK(said == std::vector<int>{ 2 });
 
         const auto dead = [](const LLHandle<ALPopover>& handle) { return !handle.get() || handle.get()->isDead(); };
         said.clear();
         ALPopover*                dropped = ALPopover::show(over, content());
+        REQUIRE(dropped != nullptr);
         const LLHandle<ALPopover> handle  = dropped->getDerivedHandle<ALPopover>();
         slot.hold(dropped, [&said](bool) { said.push_back(3); });
         slot.drop();
-        ensure("dropped: it dies", dead(handle));
-        ensure("and the slot is empty", !slot.isOpen());
+        UNSCOPED_INFO("dropped: it dies");
+        CHECK(dead(handle));
+        UNSCOPED_INFO("and the slot is empty");
+        CHECK_FALSE(slot.isOpen());
         if (ALPopover* late = handle.get())
         {
             late->closeFloater();
         }
-        ensure("nobody told, even as it closes after", said.empty());
+        UNSCOPED_INFO("nobody told, even as it closes after");
+        CHECK(said.empty());
 
         LLHandle<ALPopover> scoped;
         {
             ALPopoverSlot gone;
             ALPopover*    held = ALPopover::show(over, content());
+            REQUIRE(held != nullptr);
             scoped             = held->getDerivedHandle<ALPopover>();
             gone.hold(held, [&said](bool) { said.push_back(4); });
         }
-        ensure("a slot that goes: it dies", dead(scoped));
-        ensure("nobody told", said.empty());
+        UNSCOPED_INFO("a slot that goes: it dies");
+        CHECK(dead(scoped));
+        UNSCOPED_INFO("nobody told");
+        CHECK(said.empty());
         over->die();
     }
 
-    template<> template<>
-    void alpopover_object::test<14>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: one told its popover went may open the next and the slot holds it", "[alpopover]")
     {
-        set_test_name("one told its popover went may open the next from there, and the slot holds that one");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLPanel*      over = anchor();
         ALPopoverSlot slot;
@@ -548,20 +615,26 @@ namespace tut
             slot.hold(next, [&next_told](bool) { next_told = true; });
         });
         slot.close();
-        ensure("the next held", next != nullptr && slot.get() == next);
+        {
+            INFO("the next held");
+            REQUIRE(next != nullptr);
+            CHECK(slot.get() == next);
+        }
         next->openBeside(over);
         slot.close();
-        ensure("and told of as it goes", next_told && !slot.isOpen());
+        {
+            INFO("and told of as it goes");
+            CHECK(next_told);
+            CHECK_FALSE(slot.isOpen());
+        }
         over->die();
     }
 
-    template<> template<>
-    void alpopover_object::test<15>()
+    TEST_CASE_METHOD(alpopover_data, "alpopover: an owner told its popover went may delete the slot that told it", "[alpopover]")
     {
-        set_test_name("an owner told its popover went may go, its slot with it, and the closing reads nothing of the slot after");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLPanel* over  = anchor();
         auto*    owner = new ALPopoverSlot();
@@ -572,7 +645,11 @@ namespace tut
             owner = nullptr;
         });
         owner->close();
-        ensure("told, and gone", told && owner == nullptr);
+        {
+            INFO("told, and gone");
+            CHECK(told);
+            CHECK(owner == nullptr);
+        }
         over->die();
     }
 }

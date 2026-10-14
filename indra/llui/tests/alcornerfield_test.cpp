@@ -32,11 +32,11 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct alcornerfield_data
     {
@@ -54,45 +54,47 @@ namespace tut
         static F64 box(ALCornerField* f, const char* name) { return f->getChild<LLSpinCtrl>(name)->getValue().asReal(); }
     };
 
-    typedef test_group<alcornerfield_data> alcornerfield_test;
-    typedef alcornerfield_test::object     alcornerfield_object;
-    tut::alcornerfield_test alcornerfield_testgroup("alcornerfield");
-
-    template<> template<>
-    void alcornerfield_object::test<1>()
+    TEST_CASE_METHOD(alcornerfield_data, "alcornerfield: the value is four radii clockwise from the top left and four alike link", "[alcornerfield]")
     {
-        set_test_name("the value is four radii clockwise from the top left: one number is all four, two the diagonals, none is none; four alike are linked");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALCornerField*        f    = field();
         const LLCheckBoxCtrl* link = f->getChild<LLCheckBoxCtrl>("link");
         f->setValue("1 2 3 4");
-        ensure_equals("four", f->getValue().asString(), std::string("1 2 3 4"));
-        ensure("each in its box", box(f, "tl") == 1.0 && box(f, "tr") == 2.0 && box(f, "br") == 3.0 && box(f, "bl") == 4.0);
-        ensure("not linked", !link->get());
+        CHECK(f->getValue().asString() == std::string("1 2 3 4"));
+        {
+            INFO("each in its box");
+            CHECK(box(f, "tl") == 1.0);
+            CHECK(box(f, "tr") == 2.0);
+            CHECK(box(f, "br") == 3.0);
+            CHECK(box(f, "bl") == 4.0);
+        }
+        CHECK_FALSE(link->get());
         f->setValue("3");
-        ensure_equals("one is all four", f->getValue().asString(), std::string("3 3 3 3"));
-        ensure("and linked", link->get());
+        UNSCOPED_INFO("one is all four");
+        CHECK(f->getValue().asString() == std::string("3 3 3 3"));
+        CHECK(link->get());
         f->setValue("1 2");
-        ensure_equals("two are the diagonals", f->getValue().asString(), std::string("1 2 1 2"));
-        ensure("not linked", !link->get());
+        UNSCOPED_INFO("two are the diagonals");
+        CHECK(f->getValue().asString() == std::string("1 2 1 2"));
+        CHECK_FALSE(link->get());
         f->setValue("5 6 7 8 9");
-        ensure_equals("past four, the first four", f->getValue().asString(), std::string("5 6 7 8"));
+        UNSCOPED_INFO("past four, the first four");
+        CHECK(f->getValue().asString() == std::string("5 6 7 8"));
         f->setValue("");
-        ensure_equals("none is none", f->getValue().asString(), std::string("0 0 0 0"));
-        ensure("and linked", link->get());
+        UNSCOPED_INFO("none is none");
+        CHECK(f->getValue().asString() == std::string("0 0 0 0"));
+        CHECK(link->get());
         f->die();
     }
 
-    template<> template<>
-    void alcornerfield_object::test<2>()
+    TEST_CASE_METHOD(alcornerfield_data, "alcornerfield: a box typed in sets all four when linked and its own when not", "[alcornerfield]")
     {
-        set_test_name("linked, a box typed in is all four; unlinked, only its own corner; each typing commits once");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALCornerField* f       = field();
         S32            commits = 0;
@@ -101,50 +103,73 @@ namespace tut
         LLSpinCtrl* br = f->getChild<LLSpinCtrl>("br");
         br->setValue(LLSD(5.0));
         br->onCommit();
-        ensure_equals("linked: all four", f->getValue().asString(), std::string("5 5 5 5"));
-        ensure("shown in every box", box(f, "tl") == 5.0 && box(f, "bl") == 5.0);
-        ensure_equals("committed once", commits, 1);
+        UNSCOPED_INFO("linked: all four");
+        CHECK(f->getValue().asString() == std::string("5 5 5 5"));
+        {
+            INFO("shown in every box");
+            CHECK(box(f, "tl") == 5.0);
+            CHECK(box(f, "bl") == 5.0);
+        }
+        CHECK(commits == 1);
 
         f->getChild<LLCheckBoxCtrl>("link")->set(false);
         LLSpinCtrl* tl = f->getChild<LLSpinCtrl>("tl");
         tl->setValue(LLSD(1.0));
         tl->onCommit();
-        ensure_equals("unlinked: its own corner", f->getValue().asString(), std::string("1 5 5 5"));
-        ensure_equals("the others' boxes as they were", box(f, "tr"), 5.0);
-        ensure_equals("committed again", commits, 2);
+        UNSCOPED_INFO("unlinked: its own corner");
+        CHECK(f->getValue().asString() == std::string("1 5 5 5"));
+        UNSCOPED_INFO("the others' boxes as they were");
+        CHECK(box(f, "tr") == 5.0);
+        CHECK(commits == 2);
         f->die();
     }
 
-    template<> template<>
-    void alcornerfield_object::test<3>()
+    TEST_CASE_METHOD(alcornerfield_data, "alcornerfield: the boxes sit at their corners beside a picture that takes no press", "[alcornerfield]")
     {
-        set_test_name("the boxes sit where their corners are, beside the picture, which is not pointed at; the range is the boxes'");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALCornerField* f = field();
         const LLRect   tl = f->getChild<LLSpinCtrl>("tl")->getRect();
         const LLRect   tr = f->getChild<LLSpinCtrl>("tr")->getRect();
         const LLRect   br = f->getChild<LLSpinCtrl>("br")->getRect();
         const LLRect   bl = f->getChild<LLSpinCtrl>("bl")->getRect();
-        ensure("the top two over the bottom two", tl.mBottom > bl.mTop && tr.mBottom > br.mTop);
-        ensure("the left two left of the right two", tl.mRight < tr.mLeft && bl.mRight < br.mLeft);
-        ensure("beside the picture, which is at the left", tl.mLeft > 0 && tl.mLeft >= 72);
-        ensure("the link beside them", f->getChild<LLCheckBoxCtrl>("link")->getRect().mLeft > tr.mRight);
+        {
+            INFO("the top two over the bottom two");
+            CHECK(tl.mBottom > bl.mTop);
+            CHECK(tr.mBottom > br.mTop);
+        }
+        {
+            INFO("the left two left of the right two");
+            CHECK(tl.mRight < tr.mLeft);
+            CHECK(bl.mRight < br.mLeft);
+        }
+        {
+            INFO("beside the picture, which is at the left");
+            CHECK(tl.mLeft >= 72);
+            CHECK(bl.mLeft >= 72);
+        }
+        UNSCOPED_INFO("the link beside them");
+        CHECK(f->getChild<LLCheckBoxCtrl>("link")->getRect().mLeft > tr.mRight);
 
         f->setValue("2 2 2 2");
         f->handleMouseDown(20, 30, MASK_NONE);
-        ensure("a press on the picture takes nothing", !f->hasMouseCapture());
-        ensure_equals("and moves nothing", f->getValue().asString(), std::string("2 2 2 2"));
+        UNSCOPED_INFO("a press on the picture takes nothing");
+        CHECK_FALSE(f->hasMouseCapture());
+        UNSCOPED_INFO("and moves nothing");
+        CHECK(f->getValue().asString() == std::string("2 2 2 2"));
 
         f->reshape(200, ALCornerField::HEIGHT);
-        ensure("narrowed, the link has no room and is hidden", !f->getChild<LLCheckBoxCtrl>("link")->getVisible());
+        UNSCOPED_INFO("narrowed, the link has no room and is hidden");
+        CHECK_FALSE(f->getChild<LLCheckBoxCtrl>("link")->getVisible());
         f->reshape(300, ALCornerField::HEIGHT);
-        ensure("widened, it is back", f->getChild<LLCheckBoxCtrl>("link")->getVisible());
+        UNSCOPED_INFO("widened, it is back");
+        CHECK(f->getChild<LLCheckBoxCtrl>("link")->getVisible());
 
         f->setRange(0.f, 10.f, 1.f, 0);
-        ensure_equals("the range is the boxes'", f->getChild<LLSpinCtrl>("tr")->getMaxValue(), 10.f);
+        UNSCOPED_INFO("the range is the boxes'");
+        CHECK(f->getChild<LLSpinCtrl>("tr")->getMaxValue() == 10.f);
         f->die();
     }
 }

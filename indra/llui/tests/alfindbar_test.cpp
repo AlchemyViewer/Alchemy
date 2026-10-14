@@ -33,9 +33,9 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alfindbar_data
     {
@@ -50,19 +50,14 @@ namespace tut
         }
     };
 
-    typedef test_group<alfindbar_data> alfindbar_test;
-    typedef alfindbar_test::object     alfindbar_object;
-    tut::alfindbar_test alfindbar_testgroup("alfindbar");
-
     // Every glyph is a stop for Tab, and Space or Return presses the one the
     // keyboard is on, as the mouse does: a toggle turned, a way through
     // taken -- and a way with nothing to go to, not.
-    template<> template<>
-    void alfindbar_object::test<1>()
+    TEST_CASE_METHOD(alfindbar_data, "alfindbar: every glyph is a Tab stop and Space or Return presses it", "[alfindbar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALFindBar* bar = make();
         S32        changed = 0;
@@ -72,34 +67,42 @@ namespace tut
 
         for (const char* name : { "expand", "match_case", "whole_word", "regex", "previous", "next", "in_selection", "close" })
         {
-            ensure(std::string(name) + " is reached by Tab", bar->getChild<LLUICtrl>(name)->hasTabStop());
+            CAPTURE(name);
+            REQUIRE(bar->getChild<LLUICtrl>(name)->hasTabStop());
         }
 
         LLUICtrl* match_case = bar->getChild<LLUICtrl>("match_case");
-        ensure("Space is taken", match_case->handleUnicodeCharHere(' '));
-        ensure("and turns it on", bar->options().caseSensitive);
-        ensure_equals("which is said", changed, 1);
-        ensure("Return is taken", match_case->handleKeyHere(KEY_RETURN, MASK_NONE));
-        ensure("and turns it off again", !bar->options().caseSensitive);
+        UNSCOPED_INFO("Space is taken");
+        CHECK(match_case->handleUnicodeCharHere(' '));
+        UNSCOPED_INFO("and turns it on");
+        CHECK(bar->options().caseSensitive);
+        UNSCOPED_INFO("which is said");
+        CHECK(changed == 1);
+        UNSCOPED_INFO("Return is taken");
+        CHECK(match_case->handleKeyHere(KEY_RETURN, MASK_NONE));
+        UNSCOPED_INFO("and turns it off again");
+        CHECK_FALSE(bar->options().caseSensitive);
 
         LLUICtrl* next = bar->getChild<LLUICtrl>("next");
         next->handleKeyHere(KEY_RETURN, MASK_NONE);
-        ensure_equals("nothing found, nothing to go to", nexts, 0);
+        UNSCOPED_INFO("nothing found, nothing to go to");
+        CHECK(nexts == 0);
         bar->setCount(0, 3, std::string());
         next->handleKeyHere(KEY_RETURN, MASK_NONE);
-        ensure_equals("the next, from the keyboard", nexts, 1);
-        ensure("anything else is not the button's", !next->handleKeyHere('Q', MASK_NONE));
+        UNSCOPED_INFO("the next, from the keyboard");
+        CHECK(nexts == 1);
+        UNSCOPED_INFO("anything else is not the button's");
+        CHECK_FALSE(next->handleKeyHere('Q', MASK_NONE));
         bar->die();
     }
     // While the bar has the keyboard, a letter with Alt -- with Command
     // and Option on a Mac -- turns a way of matching on and off, and the
     // tip says which.
-    template<> template<>
-    void alfindbar_object::test<2>()
+    TEST_CASE_METHOD(alfindbar_data, "alfindbar: a letter with Alt toggles a way of matching and the tip names the key", "[alfindbar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 #if LL_DARWIN
         constexpr MASK toggle = MASK_CONTROL | MASK_ALT;
@@ -109,35 +112,44 @@ namespace tut
         ALFindBar* bar     = make();
         S32        changed = 0;
         bar->onChanged([&]() { ++changed; });
-        ensure("C is taken", bar->handleKeyHere('C', toggle));
-        ensure("and matches case", bar->options().caseSensitive);
+        UNSCOPED_INFO("C is taken");
+        CHECK(bar->handleKeyHere('C', toggle));
+        UNSCOPED_INFO("and matches case");
+        CHECK(bar->options().caseSensitive);
         bar->handleKeyHere('W', toggle);
-        ensure("W, whole words", bar->options().wholeWord);
+        UNSCOPED_INFO("W, whole words");
+        CHECK(bar->options().wholeWord);
         bar->handleKeyHere('R', toggle);
-        ensure("R, patterns", bar->options().regex);
+        UNSCOPED_INFO("R, patterns");
+        CHECK(bar->options().regex);
         bar->handleKeyHere('L', toggle);
-        ensure("L, the selection only", bar->inSelection());
-        ensure_equals("each said", changed, 4);
+        UNSCOPED_INFO("L, the selection only");
+        CHECK(bar->inSelection());
+        UNSCOPED_INFO("each said");
+        CHECK(changed == 4);
         bar->handleKeyHere('C', toggle);
-        ensure("and again, off", !bar->options().caseSensitive);
-        ensure("another letter is not the bar's", !bar->handleKeyHere('Q', toggle));
-        ensure("nor the letter with another mask", !bar->handleKeyHere('C', MASK_SHIFT));
+        UNSCOPED_INFO("and again, off");
+        CHECK_FALSE(bar->options().caseSensitive);
+        UNSCOPED_INFO("another letter is not the bar's");
+        CHECK_FALSE(bar->handleKeyHere('Q', toggle));
+        UNSCOPED_INFO("nor the letter with another mask");
+        CHECK_FALSE(bar->handleKeyHere('C', MASK_SHIFT));
         // The viewer gives the keys their names; here, as they are.
         ll_test::KeyNamesScope key_names([](std::string_view name) { return std::string(name); });
         const std::string tip = bar->getChild<LLUICtrl>("match_case")->getToolTip();
-        ensure("the tip says the key: " + tip, tip.find(LLKeyboard::stringFromAccelerator(toggle, 'C')) != std::string::npos);
+        UNSCOPED_INFO("the tip says the key: " << tip);
+        CHECK(tip.find(LLKeyboard::stringFromAccelerator(toggle, 'C')) != std::string::npos);
         bar->die();
     }
 
     // In the bar, Return with Shift goes back; with Control and Alt --
     // Command and Option on a Mac -- it replaces every one, with the
     // replacement in sight, and the button's tip says so.
-    template<> template<>
-    void alfindbar_object::test<3>()
+    TEST_CASE_METHOD(alfindbar_data, "alfindbar: Shift-Return goes back and Control-Alt-Return replaces every match", "[alfindbar]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALFindBar* bar      = make();
         S32        previous = 0;
@@ -146,24 +158,32 @@ namespace tut
         bar->onReplaceAll([&]() { ++every; });
         bar->setCount(0, 3, std::string());
         LLUICtrl* field = bar->getChild<LLUICtrl>("find");
-        ensure("Shift and Return, from the field, taken", field->handleKey(KEY_RETURN, MASK_SHIFT, false));
-        ensure_equals("back", previous, 1);
+        UNSCOPED_INFO("Shift and Return, from the field, taken");
+        CHECK(field->handleKey(KEY_RETURN, MASK_SHIFT, false));
+        CHECK(previous == 1);
         constexpr MASK replace_all = MASK_CONTROL | MASK_ALT;
-        ensure("the Replace All key taken", field->handleKey(KEY_RETURN, replace_all, false));
-        ensure_equals("with the replacement folded away, nothing replaced", every, 0);
+        UNSCOPED_INFO("the Replace All key taken");
+        CHECK(field->handleKey(KEY_RETURN, replace_all, false));
+        UNSCOPED_INFO("with the replacement folded away, nothing replaced");
+        CHECK(every == 0);
         bar->setReplaceShown(true);
         field->handleKey(KEY_RETURN, replace_all, false);
-        ensure_equals("with it out, every one", every, 1);
+        UNSCOPED_INFO("with it out, every one");
+        CHECK(every == 1);
         bar->setCount(-1, 0, std::string());
         field->handleKey(KEY_RETURN, replace_all, false);
-        ensure_equals("with nothing found, nothing", every, 1);
+        UNSCOPED_INFO("with nothing found, nothing");
+        CHECK(every == 1);
         ll_test::KeyNamesScope key_names([](std::string_view name) { return std::string(name); });
         const std::string tip = bar->getChild<LLUICtrl>("replace_all")->getToolTip();
-        ensure("the tip says the key: " + tip, tip.find(LLKeyboard::stringFromAccelerator(replace_all, KEY_RETURN)) != std::string::npos);
+        UNSCOPED_INFO("the tip says the key: " << tip);
+        CHECK(tip.find(LLKeyboard::stringFromAccelerator(replace_all, KEY_RETURN)) != std::string::npos);
         bar->setCount(0, 3, std::string(), false, 1);
-        ensure("going round, in the count's tip", !bar->getChild<LLUICtrl>("count")->getToolTip().empty());
+        UNSCOPED_INFO("going round, in the count's tip");
+        CHECK_FALSE(bar->getChild<LLUICtrl>("count")->getToolTip().empty());
         bar->setCount(0, 3, std::string());
-        ensure("and gone with the next count", bar->getChild<LLUICtrl>("count")->getToolTip().empty());
+        UNSCOPED_INFO("and gone with the next count");
+        CHECK(bar->getChild<LLUICtrl>("count")->getToolTip().empty());
         bar->die();
     }
 }

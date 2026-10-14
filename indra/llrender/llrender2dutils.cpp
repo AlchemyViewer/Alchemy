@@ -34,7 +34,6 @@
 #include "llrect.h"
 #include "llgl.h"
 #include "lltexture.h"
-#include "llfasttimer.h"
 
 // Project includes
 #include "llrender2dutils.h"

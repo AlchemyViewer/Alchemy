@@ -26,11 +26,11 @@
 
 #include "alfoldmodel.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct alfoldmodel_data
     {
@@ -59,96 +59,129 @@ namespace tut
         }
     };
 
-    typedef test_group<alfoldmodel_data> alfoldmodel_group;
-    typedef alfoldmodel_group::object    alfoldmodel_object;
-    alfoldmodel_group                    alfoldmodel_instance("alfoldmodel");
-
-    template<> template<>
-    void alfoldmodel_object::test<1>()
+    TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: an indent block takes its closer and blank lines and a lone brace", "[alfoldmodel]")
     {
-        set_test_name("a block is a line and the deeper ones after it, its closer with it, blank lines going with it, a brace alone its header's");
         const ALTextDocument lua("function f()\n    if x then\n        y()\n\n    end\nend\nz()");
-        ensure_equals("each block, its closer taken", blocks(lua), std::string("0-5 1-4"));
+        UNSCOPED_INFO("each block, its closer taken");
+        CHECK(blocks(lua) == std::string("0-5 1-4"));
 
         const ALTextDocument lsl("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}");
-        ensure_equals("a brace on a line of its own folds from the header above it", blocks(lsl), std::string("0-6 2-5"));
+        UNSCOPED_INFO("a brace on a line of its own folds from the header above it");
+        CHECK(blocks(lsl) == std::string("0-6 2-5"));
 
         // Three spaces are deeper than a tab of two, and not one of four.
         const ALTextDocument tabs("a\n\tb\n   c");
-        ensure_equals("a tab as wide as it is set", blocks(tabs, 4), std::string("0-2"));
-        ensure_equals("and narrower", blocks(tabs, 2), std::string("0-2 1-2"));
+        UNSCOPED_INFO("a tab as wide as it is set");
+        CHECK(blocks(tabs, 4) == std::string("0-2"));
+        UNSCOPED_INFO("and narrower");
+        CHECK(blocks(tabs, 2) == std::string("0-2 1-2"));
 
-        ensure("the block starting at a line", model.startingAt(lua, 4, 1) && model.startingAt(lua, 4, 1)->end == 4);
-        ensure("none starts at a line inside", !model.startingAt(lua, 4, 2));
-        ensure("the innermost around it", model.around(lua, 4, 2) && model.around(lua, 4, 2)->start == 1);
-        ensure("not one that starts on it", model.around(lua, 4, 1) && model.around(lua, 4, 1)->start == 0);
-        ensure("none around a line outside every block", !model.around(lua, 4, 6));
+        {
+            INFO("the block starting at a line");
+            REQUIRE(model.startingAt(lua, 4, 1));
+            CHECK(model.startingAt(lua, 4, 1)->end == 4);
+        }
+        UNSCOPED_INFO("none starts at a line inside");
+        CHECK_FALSE(model.startingAt(lua, 4, 2));
+        {
+            INFO("the innermost around it");
+            REQUIRE(model.around(lua, 4, 2));
+            CHECK(model.around(lua, 4, 2)->start == 1);
+        }
+        {
+            INFO("not one that starts on it");
+            REQUIRE(model.around(lua, 4, 1));
+            CHECK(model.around(lua, 4, 1)->start == 0);
+        }
+        UNSCOPED_INFO("none around a line outside every block");
+        CHECK_FALSE(model.around(lua, 4, 6));
     }
 
-    template<> template<>
-    void alfoldmodel_object::test<2>()
+    TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: fold and unfold by a line or all at once and reveal a line inside", "[alfoldmodel]")
     {
-        set_test_name("folded and unfolded by a line, all at once, and opened for a line inside");
         const ALTextDocument doc("function f()\n    if x then\n        y()\n    end\nend");
         std::optional<ALFoldModel::Region> folded = model.fold(doc, 4, 2);
-        ensure("the innermost block around the line", folded && folded->start == 1 && folded->end == 3);
-        ensure("folded", model.isFolded(1) && !model.isFolded(0));
-        ensure("not twice", !model.fold(doc, 4, 1));
-        ensure_equals("what it hides", lines(model.hidden(doc, 4)), std::string("2-3"));
-        ensure("opened by a line inside it", model.unfold(doc, 4, 2) && !model.isFolded(1));
-        ensure("nothing to open", !model.unfold(doc, 4, 2));
+        {
+            INFO("the innermost block around the line");
+            REQUIRE(folded);
+            CHECK(folded->start == 1);
+            CHECK(folded->end == 3);
+        }
+        CHECK(model.isFolded(1));
+        CHECK_FALSE(model.isFolded(0));
+        UNSCOPED_INFO("not twice");
+        CHECK_FALSE(model.fold(doc, 4, 1));
+        UNSCOPED_INFO("what it hides");
+        CHECK(lines(model.hidden(doc, 4)) == std::string("2-3"));
+        {
+            INFO("opened by a line inside it");
+            CHECK(model.unfold(doc, 4, 2));
+            CHECK_FALSE(model.isFolded(1));
+        }
+        UNSCOPED_INFO("nothing to open");
+        CHECK_FALSE(model.unfold(doc, 4, 2));
 
         model.foldAll(doc, 4);
-        ensure("every block", model.folded() == std::vector<S32>{ 0, 1 });
-        ensure("opened for a line inside two", model.reveal(doc, 4, 2) && model.folded().empty());
+        CHECK(model.folded() == std::vector<S32>{ 0, 1 });
+        {
+            INFO("opened for a line inside two");
+            CHECK(model.reveal(doc, 4, 2));
+            CHECK(model.folded().empty());
+        }
         model.fold(doc, 4, 1);
-        ensure("a line inside none opens nothing", !model.reveal(doc, 4, 4) && model.isFolded(1));
+        {
+            INFO("a line inside none opens nothing");
+            CHECK_FALSE(model.reveal(doc, 4, 4));
+            CHECK(model.isFolded(1));
+        }
         model.unfoldAll();
-        ensure("all open", model.folded().empty());
+        CHECK(model.folded().empty());
     }
 
-    template<> template<>
-    void alfoldmodel_object::test<3>()
+    TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: folds follow edits around them and go with their blocks", "[alfoldmodel]")
     {
-        set_test_name("folds slide with an edit, stay on the edit's first line, go inside it, and go with their blocks");
         ALTextDocument doc("a\nf()\n    x\n    y\ng()\n    z");
         model.fold(doc, 4, 1);
         model.fold(doc, 4, 4);
-        ensure("two folded", model.folded() == std::vector<S32>{ 1, 4 });
+        CHECK(model.folded() == std::vector<S32>{ 1, 4 });
 
         // Two lines put in above: both move down.
         ALTextDocument::Edit edit = doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)), "\nb\nc");
         model.edited(edit);
-        ensure("slid", model.folded() == std::vector<S32>{ 3, 6 });
-        ensure_equals("hiding what they did", lines(model.hidden(doc, 4)), std::string("4-5 7-7"));
+        CHECK(model.folded() == std::vector<S32>{ 3, 6 });
+        UNSCOPED_INFO("hiding what they did");
+        CHECK(lines(model.hidden(doc, 4)) == std::string("4-5 7-7"));
 
         // Typing on a block's first line is not opening it.
         edit = doc.replace(ALTextRange(ALTextPos(3, 3), ALTextPos(3, 3)), " -- note");
         model.edited(edit);
-        ensure("kept", model.isFolded(3));
+        CHECK(model.isFolded(3));
 
         // Whole lines taken from above a folded block: it moves up with them.
         edit = doc.replace(ALTextRange(ALTextPos(1, 0), ALTextPos(3, 0)), "");
         model.edited(edit);
-        ensure("moved up with the lines", model.folded() == std::vector<S32>{ 1, 4 });
+        CHECK(model.folded() == std::vector<S32>{ 1, 4 });
 
         // An edit through a folded block's first line takes the fold.
         edit = doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(1, 3)), "");
         model.edited(edit);
-        ensure("gone", model.folded() == std::vector<S32>{ 3 });
+        CHECK(model.folded() == std::vector<S32>{ 3 });
 
         // Its block gone -- the line under it outdented -- the fold goes.
-        ensure_equals("the text now", doc.text(), std::string("a -- note\n    x\n    y\ng()\n    z"));
+        CHECK(doc.text() == std::string("a -- note\n    x\n    y\ng()\n    z"));
         edit = doc.replace(ALTextRange(ALTextPos(4, 0), ALTextPos(4, 4)), "");
         model.edited(edit);
-        ensure("folded still", model.isFolded(3));
-        ensure("nothing hidden once its block is gone", model.hidden(doc, 4).empty() && model.folded().empty());
+        UNSCOPED_INFO("folded still");
+        CHECK(model.isFolded(3));
+        {
+            INFO("nothing hidden once its block is gone");
+            CHECK(model.hidden(doc, 4).empty());
+            CHECK(model.folded().empty());
+        }
     }
 
-    template<> template<>
-    void alfoldmodel_object::test<4>()
+    TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: syntax blocks span lines with lone braces and middles and regions", "[alfoldmodel]")
     {
-        set_test_name("by syntax: what opens and closes, across lines; a brace alone its header's; a line that opens again after its close starts; a middle word; a comment's regions");
         const ALTextDocument doc("default\n{\n    if (a) {\n        x;\n    } else {\n        y;\n    }\n}\n// #region setup\nz;\n// #endregion\n");
         ALFoldModel folds;
         // Braces as the syntax, a word `else` a middle where it stands alone.
@@ -174,11 +207,19 @@ namespace tut
         {
             out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
         }
-        ensure_equals("the state from its header, the if to before its else, the else to its close, the region", out, std::string("0-7 2-3 4-6 8-10"));
-        ensure_equals("a blank line's indent is the next's", folds.indentOf(doc, 4, 3), 8);
+        UNSCOPED_INFO("the state from its header, the if to before its else, the else to its close, the region");
+        CHECK(out == std::string("0-7 2-3 4-6 8-10"));
+        UNSCOPED_INFO("a blank line's indent is the next's");
+        CHECK(folds.indentOf(doc, 4, 3) == 8);
         const std::vector<S32> open = folds.openAt(doc, 4, 5, 3);
-        ensure("open at the else's line: the state, from its header, and the else", open.size() == 2 && open[0] == 0 && open[1] == 4);
-        ensure("none at the region's line", folds.openAt(doc, 4, 9, 3).empty());
+        {
+            INFO("open at the else's line: the state, from its header, and the else");
+            REQUIRE(open.size() == 2);
+            CHECK(open[0] == 0);
+            CHECK(open[1] == 4);
+        }
+        UNSCOPED_INFO("none at the region's line");
+        CHECK(folds.openAt(doc, 4, 9, 3).empty());
 
         const ALTextDocument lua("if a then\n  x()\nelseif b then\n  y()\nelse\n  z()\nend\n");
         ALFoldModel words;
@@ -204,21 +245,22 @@ namespace tut
         {
             out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
         }
-        ensure_equals("each arm a block of its own, the last through the end", out, std::string("0-1 2-3 4-6"));
+        UNSCOPED_INFO("each arm a block of its own, the last through the end");
+        CHECK(out == std::string("0-1 2-3 4-6"));
     }
 
-    template<> template<>
-    void alfoldmodel_object::test<5>()
+    TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: lines taken from a fold's start take the fold and Return moves it down", "[alfoldmodel]")
     {
-        set_test_name("whole lines taken from a folded block's first line take its fold, and leave the block after them as it was; lines put in above it at its start take it down with them");
         const char* const text = "foo()\n{\n    x();\n}\nbar()\n{\n    y();\n}";
         ALTextDocument    doc(text);
-        ensure_equals("two blocks", blocks(doc), std::string("0-3 4-7"));
+        CHECK(blocks(doc) == std::string("0-3 4-7"));
         model.fold(doc, 4, 0);
         ALTextDocument::Edit edit = doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)), "");
         model.edited(edit);
-        ensure_equals("the block after them now first", doc.line(0), std::string("bar()"));
-        ensure("the fold gone with its line, the block now there not folded for it", model.folded().empty());
+        UNSCOPED_INFO("the block after them now first");
+        CHECK(doc.line(0) == std::string("bar()"));
+        UNSCOPED_INFO("the fold gone with its line, the block now there not folded for it");
+        CHECK(model.folded().empty());
 
         // Both folded: the one after moves up, and is one fold still.
         ALTextDocument both(text);
@@ -227,8 +269,10 @@ namespace tut
         two.fold(both, 4, 4);
         edit = both.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(4, 0)), "");
         two.edited(edit);
-        ensure("the one after moved up, once", two.folded() == std::vector<S32>{ 0 });
-        ensure_equals("hiding its lines once", lines(two.hidden(both, 4)), std::string("1-3"));
+        UNSCOPED_INFO("the one after moved up, once");
+        CHECK(two.folded() == std::vector<S32>{ 0 });
+        UNSCOPED_INFO("hiding its lines once");
+        CHECK(lines(two.hidden(both, 4)) == std::string("1-3"));
 
         // Return at its first line's start: the line goes down, and the fold
         // with it.
@@ -237,17 +281,18 @@ namespace tut
         down.fold(above, 4, 0);
         edit = above.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "\n");
         down.edited(edit);
-        ensure("moved down with its line", down.folded() == std::vector<S32>{ 1 });
-        ensure_equals("hiding what it did", lines(down.hidden(above, 4)), std::string("2-4"));
+        UNSCOPED_INFO("moved down with its line");
+        CHECK(down.folded() == std::vector<S32>{ 1 });
+        UNSCOPED_INFO("hiding what it did");
+        CHECK(lines(down.hidden(above, 4)) == std::string("2-4"));
         edit = above.replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "q");
         down.edited(edit);
-        ensure("typing at its start keeps it", down.folded() == std::vector<S32>{ 1 });
+        UNSCOPED_INFO("typing at its start keeps it");
+        CHECK(down.folded() == std::vector<S32>{ 1 });
     }
 
-    template<> template<>
-    void alfoldmodel_object::test<6>()
+    TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: openAt gives a lone bracket under an opening header its own block once", "[alfoldmodel]")
     {
-        set_test_name("by syntax, open at a line: a bracket alone on its line under a header that opens a block of its own starts its own, once each, as the blocks have it");
         const ALTextDocument doc("llSetLinkPrimitiveParamsFast(LINK_THIS,\n[\n    PRIM_COLOR, ALL_SIDES\n]);\n");
         ALFoldModel          folds;
         folds.setSyntax(
@@ -272,15 +317,16 @@ namespace tut
         {
             out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
         }
-        ensure_equals("the call's block from its line, the list's from its own", out, std::string("0-3 1-3"));
-        ensure("both open inside them, each once", folds.openAt(doc, 4, 2, 8) == std::vector<S32>({ 0, 1 }));
-        ensure("the innermost alone the list's", folds.openAt(doc, 4, 2, 1) == std::vector<S32>({ 1 }));
+        UNSCOPED_INFO("the call's block from its line, the list's from its own");
+        CHECK(out == std::string("0-3 1-3"));
+        UNSCOPED_INFO("both open inside them, each once");
+        CHECK(folds.openAt(doc, 4, 2, 8) == std::vector<S32>({ 0, 1 }));
+        UNSCOPED_INFO("the innermost alone the list's");
+        CHECK(folds.openAt(doc, 4, 2, 1) == std::vector<S32>({ 1 }));
     }
 
-    template<> template<>
-    void alfoldmodel_object::test<7>()
+    TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: syntax blocks are read once and again only for lines relexed", "[alfoldmodel]")
     {
-        set_test_name("by syntax, a line's blocks are read once and again only where it is said to have been lexed anew, the text lexed through first");
         const ALTextDocument doc("a {\n  b {\n  }\n}\nc {\n}\n");
         ALFoldModel          folds;
         // The lines whose braces lex as something other than code, as in a
@@ -310,23 +356,31 @@ namespace tut
             }
             return out;
         };
-        ensure_equals("the blocks", found(), std::string("0-3 1-2 4-5"));
-        ensure_equals("each line with anything on it asked once", asked, 6);
-        ensure_equals("the text lexed through its last line first", lexed, doc.lineCount() - 1);
+        CHECK(found() == std::string("0-3 1-2 4-5"));
+        UNSCOPED_INFO("each line with anything on it asked once");
+        CHECK(asked == 6);
+        UNSCOPED_INFO("the text lexed through its last line first");
+        CHECK(lexed == doc.lineCount() - 1);
         folds.invalidate();
         quiet[1] = quiet[2] = true;
-        ensure_equals("found again, none asked again", found(), std::string("0-3 1-2 4-5"));
-        ensure_equals("asked no more", asked, 6);
+        UNSCOPED_INFO("found again, none asked again");
+        CHECK(found() == std::string("0-3 1-2 4-5"));
+        UNSCOPED_INFO("asked no more");
+        CHECK(asked == 6);
         folds.relexed(1, 2);
-        ensure_equals("those said lexed anew read again", found(), std::string("0-3 4-5"));
-        ensure_equals("and they alone", asked, 8);
-        ensure("the sticky headers lex through the line before theirs", folds.openAt(doc, 4, 5, 3) == std::vector<S32>({ 4 }) && lexed == 4);
+        UNSCOPED_INFO("those said lexed anew read again");
+        CHECK(found() == std::string("0-3 4-5"));
+        UNSCOPED_INFO("and they alone");
+        CHECK(asked == 8);
+        {
+            INFO("the sticky headers lex through the line before theirs");
+            CHECK(folds.openAt(doc, 4, 5, 3) == std::vector<S32>({ 4 }));
+            CHECK(lexed == 4);
+        }
     }
 
-    template<> template<>
-    void alfoldmodel_object::test<8>()
+    TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: blocks kept through random edits match a whole walk and walk only near", "[alfoldmodel]")
     {
-        set_test_name("by syntax, through edits of every kind, in a short text and in a long one whose blocks are left open, the blocks found from the walk kept are those a walk of the whole text finds, and an edit walks only near it and puts the blocks together from what it walked");
         // The same edits on every run from a seed, four runs.
         S32 nearby  = 0;
         S32 spliced = 0;
@@ -426,7 +480,8 @@ namespace tut
             ALFoldModel kept;
             kept.setSyntax(blocks, nullptr);
             kept.setLineComment("//");
-            ensure_equals("all of it walked first", (kept.regions(doc, 4), kept.lastWalked()), doc.lineCount());
+            UNSCOPED_INFO("all of it walked first");
+            REQUIRE((kept.regions(doc, 4), kept.lastWalked()) == doc.lineCount());
             // The same edits on every run, each number drawn in a statement of
             // its own so that no compiler's order of arguments changes them.
             U32        seed = first_seed;
@@ -444,8 +499,7 @@ namespace tut
             const S32         PIECE_COUNT = static_cast<S32>(sizeof(PIECES) / sizeof(PIECES[0]));
             for (S32 step = 0; step < 600; ++step)
             {
-                const std::string at  = "step " + std::to_string(step);
-                const S32         how = pick(10);
+                const S32 how = pick(10);
                 ALTextDocument::Edit edit;
                 if (how < 7)
                 {
@@ -526,16 +580,19 @@ namespace tut
                 whole.setSyntax(blocks, nullptr);
                 whole.setLineComment("//");
                 const std::string found = said(kept.regions(doc, 4));
-                ensure_equals(at + ": the blocks", found, said(whole.regions(doc, 4)));
+                CAPTURE(first_seed, step);
+                REQUIRE(found == said(whole.regions(doc, 4)));
                 nearby += kept.lastWalked() < doc.lineCount() / 4 ? 1 : 0;
-            spliced += kept.lastSpliced() ? 1 : 0;
+                spliced += kept.lastSpliced() ? 1 : 0;
             }
         };
         run(20261009u, functions(60, false), false);
         run(7u, functions(60, false), false);
         run(4242u, functions(60, false), false);
         run(99u, functions(400, true), true);
-        ensure("most edits walked only near them: " + std::to_string(nearby), nearby > 1200);
-        ensure("and most put the blocks together from the walk's changes: " + std::to_string(spliced), spliced > 300);
+        UNSCOPED_INFO("most edits walked only near them: " << nearby);
+        CHECK(nearby > 1200);
+        UNSCOPED_INFO("and most put the blocks together from the walk's changes: " << spliced);
+        CHECK(spliced > 300);
     }
 }

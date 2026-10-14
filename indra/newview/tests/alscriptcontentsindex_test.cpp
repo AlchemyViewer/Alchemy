@@ -26,7 +26,7 @@
 
 #include "../alscriptcontentsindex.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <functional>
 #include <map>
@@ -34,7 +34,7 @@
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alscriptcontentsindex_data
     {
@@ -144,66 +144,84 @@ namespace tut
             return out;
         }
     };
-    typedef test_group<alscriptcontentsindex_data> alscriptcontentsindex_group;
-    typedef alscriptcontentsindex_group::object    alscriptcontentsindex_object;
-    tut::alscriptcontentsindex_group               alscriptcontentsindex_instance("alscriptcontentsindex");
 
-    template<> template<>
-    void alscriptcontentsindex_object::test<1>()
+    TEST_CASE_METHOD(alscriptcontentsindex_data, "alscriptcontentsindex: a prim is asked once for all who ask and not again while current", "[alscriptcontentsindex]")
     {
-        set_test_name("a prim is asked once however many ask, every one hears the answer, and one known and current is not asked again");
         const LLUUID chair = object(10);
         S32          heard = 0;
         index.onHeard([&heard, chair](const Index::Contents& contents) { heard += contents.prim == chair; });
-        ensure("asked", index.ask(chair));
-        ensure("not again while it is not answered", !index.ask(chair));
-        ensure("asking", index.asking(chair));
-        ensure_equals(asked.size(), size_t(1));
-        ensure("not known yet", !index.fetched(chair) && index.prim(chair) == nullptr);
-        ensure("answered", answer(chair, { "sit.lsl", "readme" }, true, "Chair"));
-        ensure_equals("heard once", heard, 1);
-        ensure_equals(names(chair), std::string("sit.lsl readme"));
-        ensure_equals("its name", index.prim(chair)->name, std::string("Chair"));
-        ensure("no longer asking", !index.asking(chair));
+        CHECK(index.ask(chair));
+        UNSCOPED_INFO("not again while it is not answered");
+        CHECK_FALSE(index.ask(chair));
+        CHECK(index.asking(chair));
+        CHECK(asked.size() == size_t(1));
+        CHECK_FALSE(index.fetched(chair));
+        CHECK(index.prim(chair) == nullptr);
+        CHECK(answer(chair, { "sit.lsl", "readme" }, true, "Chair"));
+        CHECK(heard == 1);
+        CHECK(names(chair) == std::string("sit.lsl readme"));
+        REQUIRE(index.prim(chair) != nullptr);
+        CHECK(index.prim(chair)->name == std::string("Chair"));
+        CHECK_FALSE(index.asking(chair));
 
         // Known: asked again only where the object's copy is not current,
         // where asked again by a person, or of the region.
-        ensure("not current, asked", index.ask(chair) && answer(chair, { "sit.lsl" }));
+        {
+            INFO("not current, asked");
+            CHECK(index.ask(chair));
+            CHECK(answer(chair, { "sit.lsl" }));
+        }
         current.insert(chair);
-        ensure("current, not asked", !index.ask(chair));
-        ensure("a refetch is", index.ask(chair, true) && answer(chair, { "sit.lsl" }));
-        ensure("and of the region", index.ask(chair, false, true) && asked.back().second);
-        ensure("a refetch while asked asks again", index.ask(chair, true));
+        UNSCOPED_INFO("current, not asked");
+        CHECK_FALSE(index.ask(chair));
+        {
+            INFO("a refetch is asked");
+            CHECK(index.ask(chair, true));
+            CHECK(answer(chair, { "sit.lsl" }));
+        }
+        {
+            INFO("so is one of the region");
+            CHECK(index.ask(chair, false, true));
+            CHECK(asked.back().second);
+        }
+        UNSCOPED_INFO("a refetch while asked asks again");
+        CHECK(index.ask(chair, true));
     }
 
-    template<> template<>
-    void alscriptcontentsindex_object::test<2>()
+    TEST_CASE_METHOD(alscriptcontentsindex_data, "alscriptcontentsindex: a missed answer keeps the contents and a script's running is asked once", "[alscriptcontentsindex]")
     {
-        set_test_name("an answer that did not come leaves what was known; each script is asked once whether it runs, until let go of");
         const LLUUID chair = object(10);
         index.ask(chair);
         answer(chair, { "sit.lsl", "pose.lsl", "readme" });
-        ensure_equals("each script asked whether it runs", askedRunning.size(), size_t(2));
+        UNSCOPED_INFO("each script asked whether it runs");
+        REQUIRE(askedRunning.size() == size_t(2));
         index.running(askedRunning[0], true);
-        ensure("known", index.running(askedRunning[0]) == std::optional<bool>(true));
-        ensure("not known", !index.running(askedRunning[1]));
+        CHECK(index.running(askedRunning[0]) == std::optional<bool>(true));
+        UNSCOPED_INFO("one not answered is not known");
+        CHECK_FALSE(index.running(askedRunning[1]));
 
         index.ask(chair, true);
         answer(chair, {}, false);
-        ensure_equals("no answer is not an empty prim", names(chair), std::string("sit.lsl pose.lsl readme"));
-        ensure("still fetched", index.fetched(chair));
-        ensure_equals("only the one not known asked again", askedRunning.size(), size_t(3));
+        UNSCOPED_INFO("no answer is not an empty prim");
+        CHECK(names(chair) == std::string("sit.lsl pose.lsl readme"));
+        UNSCOPED_INFO("still fetched");
+        CHECK(index.fetched(chair));
+        UNSCOPED_INFO("only the one not known asked again");
+        CHECK(askedRunning.size() == size_t(3));
 
         index.forgetRunning({ chair });
-        ensure("let go of", !index.running(askedRunning[0]));
+        UNSCOPED_INFO("whether it runs let go of");
+        CHECK_FALSE(index.running(askedRunning[0]));
         index.forget(chair);
-        ensure("all of it", index.prim(chair) == nullptr && names(chair).empty());
+        {
+            INFO("all of the prim let go of");
+            CHECK(index.prim(chair) == nullptr);
+            CHECK(names(chair).empty());
+        }
     }
 
-    template<> template<>
-    void alscriptcontentsindex_object::test<3>()
+    TEST_CASE_METHOD(alscriptcontentsindex_data, "alscriptcontentsindex: ensureListed tells once every prim has answered and names the unlisted", "[alscriptcontentsindex]")
     {
-        set_test_name("an object listed whole: every prim asked, told once all have answered, and which could not be listed said");
         const LLUUID house = object(20, 4);
         // A prim known and current is not asked; one asked by someone else
         // is waited for.
@@ -215,16 +233,25 @@ namespace tut
 
         std::optional<Index::Listed> listed;
         index.ensureListed(id(23), [&listed](const Index::Listed& out) { listed = out; });
-        ensure_equals("the root and the one never asked", asked.size() - before, size_t(2));
-        ensure("not yet", !listed);
+        UNSCOPED_INFO("the root and the one never asked");
+        CHECK(asked.size() - before == size_t(2));
+        UNSCOPED_INFO("not told yet");
+        CHECK_FALSE(listed);
         answer(id(20), { "main.lsl" });
         answer(id(22), { "light.lsl" });
-        ensure("not while one is out", !listed);
+        UNSCOPED_INFO("not while one is out");
+        CHECK_FALSE(listed);
         answer(id(23), {}, false);
-        ensure("told", listed.has_value());
-        ensure("by its root", listed->root == house && listed->present);
-        ensure_equals("every prim", listed->prims.size(), size_t(4));
-        ensure("the one that did not answer said", listed->unlisted == std::vector<LLUUID>{ id(23) });
+        REQUIRE(listed.has_value());
+        {
+            INFO("by its root");
+            CHECK(listed->root == house);
+            CHECK(listed->present);
+        }
+        UNSCOPED_INFO("every prim");
+        CHECK(listed->prims.size() == size_t(4));
+        UNSCOPED_INFO("the one that did not answer said");
+        CHECK(listed->unlisted == std::vector<LLUUID>{ id(23) });
 
         // Everything known and current: told at once.
         for (U32 i = 20; i < 24; ++i)
@@ -235,18 +262,25 @@ namespace tut
         answer(id(23), {});
         listed.reset();
         index.ensureListed(house, [&listed](const Index::Listed& out) { listed = out; });
-        ensure("at once", listed.has_value() && listed->unlisted.empty());
+        {
+            INFO("at once");
+            REQUIRE(listed.has_value());
+            CHECK(listed->unlisted.empty());
+        }
 
         // Not in sight: no prims, not present, told at once.
         listed.reset();
         index.ensureListed(id(99), [&listed](const Index::Listed& out) { listed = out; });
-        ensure("away", listed.has_value() && !listed->present && listed->prims.empty());
+        {
+            INFO("not in sight");
+            REQUIRE(listed.has_value());
+            CHECK_FALSE(listed->present);
+            CHECK(listed->prims.empty());
+        }
     }
 
-    template<> template<>
-    void alscriptcontentsindex_object::test<4>()
+    TEST_CASE_METHOD(alscriptcontentsindex_data, "alscriptcontentsindex: an answer on the spot reaches the wait and a listener may list again", "[alscriptcontentsindex]")
     {
-        set_test_name("a world that answers on the spot answers into the wait, and one told may list again");
         const LLUUID shed = object(30, 2);
         Index::World world;
         world.linkset = [this](const LLUUID& any) { return objects[any]; };
@@ -261,59 +295,79 @@ namespace tut
         S32   told = 0;
         spot.ensureListed(shed, [&](const Index::Listed& listed) {
             ++told;
-            ensure("all listed", listed.unlisted.empty() && listed.prims.size() == 2);
+            {
+                INFO("all listed");
+                REQUIRE(listed.unlisted.empty());
+                REQUIRE(listed.prims.size() == 2);
+            }
             if (told == 1)
             {
                 spot.ensureListed(shed, [&told](const Index::Listed&) { ++told; });
             }
         });
-        ensure_equals("each told once", told, 2);
+        UNSCOPED_INFO("each told once");
+        CHECK(told == 2);
     }
 
-    template<> template<>
-    void alscriptcontentsindex_object::test<5>()
+    // The studio's draw looks once a second, and asks a prim at most every
+    // few seconds.
+    TEST_CASE_METHOD(alscriptcontentsindex_data, "alscriptcontentsindex: refresh asks a prim again once its serial moved or its copy went", "[alscriptcontentsindex]")
     {
-        set_test_name("what a prim holds asked again as the studio draws once it changed -- its serial moved, or its object's copy was let "
-                      "go of -- looking once a second, and a prim at most every few seconds");
         const LLUUID chair = object(40);
         current.insert(chair);
         serials[chair] = 3;
         index.ask(chair);
         answer(chair, { "sit.lsl" });
         index.refresh(10.0);
-        ensure("unchanged: not asked", pending.empty());
+        UNSCOPED_INFO("unchanged: not asked");
+        CHECK(pending.empty());
 
         // A script added from the build tools.
         serials[chair] = 4;
         index.refresh(10.5);
-        ensure("not looked at again within the second", pending.empty());
+        UNSCOPED_INFO("not looked at again within the second");
+        CHECK(pending.empty());
         index.refresh(11.0);
-        ensure("its serial moved: asked", pending.size() == 1 && asked.back().first == chair);
+        {
+            INFO("its serial moved: asked");
+            REQUIRE(pending.size() == 1);
+            CHECK(asked.back().first == chair);
+        }
         answer(chair, { "sit.lsl", "new.lsl" });
-        ensure_equals("what it holds now", names(chair), std::string("sit.lsl new.lsl"));
+        UNSCOPED_INFO("what it holds now");
+        CHECK(names(chair) == std::string("sit.lsl new.lsl"));
         index.refresh(12.0);
-        ensure("heard at its serial: not asked", pending.empty());
+        UNSCOPED_INFO("heard at its serial: not asked");
+        CHECK(pending.empty());
 
         // Its object's copy let go of, and no answer coming.
         current.erase(chair);
         index.refresh(13.0);
-        ensure("not asked again so soon", pending.empty());
+        UNSCOPED_INFO("not asked again so soon");
+        CHECK(pending.empty());
         index.refresh(16.0);
-        ensure("asked", pending.size() == 1);
+        UNSCOPED_INFO("asked");
+        CHECK(pending.size() == 1);
         index.refresh(17.0);
-        ensure("not while it is asked", pending.size() == 1);
+        UNSCOPED_INFO("not while it is asked");
+        CHECK(pending.size() == 1);
         answer(chair, {}, false);
-        ensure_equals("no answer keeps what was known", names(chair), std::string("sit.lsl new.lsl"));
+        UNSCOPED_INFO("no answer keeps what was known");
+        CHECK(names(chair) == std::string("sit.lsl new.lsl"));
         index.refresh(18.0);
-        ensure("not asked again at once", pending.empty());
+        UNSCOPED_INFO("not asked again at once");
+        CHECK(pending.empty());
         index.refresh(21.0);
-        ensure("asked again a while after", pending.size() == 1);
+        UNSCOPED_INFO("asked again a while after");
+        CHECK(pending.size() == 1);
         answer(chair, { "sit.lsl" });
 
         // Asked for directly, a prim that changed is asked though known.
         current.insert(chair);
-        ensure("current: not asked", !index.ask(chair));
+        UNSCOPED_INFO("current: not asked");
+        CHECK_FALSE(index.ask(chair));
         serials[chair] = 5;
-        ensure("its serial moved: asked", index.ask(chair));
+        UNSCOPED_INFO("its serial moved: asked");
+        CHECK(index.ask(chair));
     }
 }

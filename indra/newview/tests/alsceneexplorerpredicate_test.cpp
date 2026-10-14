@@ -14,11 +14,11 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../alsceneexplorerpredicate.h"
 
-namespace tut
+namespace
 {
     using namespace ALSceneExplorerPredicate;
 
@@ -68,262 +68,231 @@ namespace tut
         }
     };
 
-    typedef test_group<predicate_data> predicate_group;
-    typedef predicate_group::object    predicate_object;
-    tut::predicate_group pred("ALSceneExplorerPredicate");
-
-    // Default constraints match anything (and a null record never does).
-    template<> template<>
-    void predicate_object::test<1>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: default constraints match anything but a null record", "[ALSceneExplorerPredicate]")
     {
-        ensure("defaults match", matches(mFacts, mC));
+        UNSCOPED_INFO("defaults match");
+        CHECK(matches(mFacts, mC));
 
         ItemFacts no_record;
-        ensure("null record never matches", !matches(no_record, mC));
+        UNSCOPED_INFO("null record never matches");
+        CHECK_FALSE(matches(no_record, mC));
     }
 
     // Name search: targeted field only; caller pre-lowercases both sides.
-    template<> template<>
-    void predicate_object::test<2>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: a name search looks in the name and nowhere else", "[ALSceneExplorerPredicate]")
     {
         mC.mSearchType = SEARCH_NAME;
         mC.mFilterSubString = "oak";
-        ensure("name substring matches", matches(mFacts, mC));
+        UNSCOPED_INFO("name substring matches");
+        CHECK(matches(mFacts, mC));
 
         mC.mFilterSubString = "weathered"; // description text
-        ensure("name search ignores description", !matches(mFacts, mC));
+        UNSCOPED_INFO("name search ignores description");
+        CHECK_FALSE(matches(mFacts, mC));
     }
 
-    // Description / UUID / owner searches hit only their own field.
-    template<> template<>
-    void predicate_object::test<3>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: description / UUID / owner searches hit only their own field", "[ALSceneExplorerPredicate]")
     {
         mC.mSearchType = SEARCH_DESCRIPTION;
         mC.mFilterSubString = "weathered";
-        ensure("description matches", matches(mFacts, mC));
+        UNSCOPED_INFO("description matches");
+        CHECK(matches(mFacts, mC));
         mC.mFilterSubString = "oak";
-        ensure("description search ignores name", !matches(mFacts, mC));
+        UNSCOPED_INFO("description search ignores name");
+        CHECK_FALSE(matches(mFacts, mC));
 
         mC.mSearchType = SEARCH_UUID;
         mC.mFilterSubString = mUUID.substr(0, 8);
-        ensure("uuid prefix matches", matches(mFacts, mC));
+        UNSCOPED_INFO("uuid prefix matches");
+        CHECK(matches(mFacts, mC));
         mC.mFilterSubString = "oak";
-        ensure("uuid search ignores name", !matches(mFacts, mC));
+        UNSCOPED_INFO("uuid search ignores name");
+        CHECK_FALSE(matches(mFacts, mC));
 
         mC.mSearchType = SEARCH_OWNER;
         mC.mFilterSubString = "rye";
-        ensure("owner matches", matches(mFacts, mC));
+        UNSCOPED_INFO("owner matches");
+        CHECK(matches(mFacts, mC));
         mC.mFilterSubString = "oak";
-        ensure("owner search ignores name", !matches(mFacts, mC));
+        UNSCOPED_INFO("owner search ignores name");
+        CHECK_FALSE(matches(mFacts, mC));
     }
 
-    // ALL searches every field; a miss everywhere fails.
-    template<> template<>
-    void predicate_object::test<4>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: SEARCH_ALL finds text in any field and fails a miss in all", "[ALSceneExplorerPredicate]")
     {
         mC.mSearchType = SEARCH_ALL;
         for (const char* needle : { "oak", "weathered", "rye" })
         {
             mC.mFilterSubString = needle;
-            ensure(std::string("all-search finds ") + needle, matches(mFacts, mC));
+            CAPTURE(needle);
+            REQUIRE(matches(mFacts, mC));
         }
         mC.mFilterSubString = mUUID.substr(4, 8);
-        ensure("all-search finds uuid", matches(mFacts, mC));
+        UNSCOPED_INFO("all-search finds uuid");
+        CHECK(matches(mFacts, mC));
         mC.mFilterSubString = "no such text";
-        ensure("all-search can fail", !matches(mFacts, mC));
+        UNSCOPED_INFO("all-search can fail");
+        CHECK_FALSE(matches(mFacts, mC));
     }
 
-    // Owner modes for an owned object.
-    template<> template<>
-    void predicate_object::test<5>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: mine / others / group owner modes for an owned object", "[ALSceneExplorerPredicate]")
     {
         mC.mOwnerMode = OWNER_MINE;
-        ensure("someone else's object is not mine", !matches(mFacts, mC));
+        UNSCOPED_INFO("someone else's object is not mine");
+        CHECK_FALSE(matches(mFacts, mC));
         mRec.mOwnerId = mAgentId;
-        ensure("my object is mine", matches(mFacts, mC));
+        UNSCOPED_INFO("my object is mine");
+        CHECK(matches(mFacts, mC));
 
         mC.mOwnerMode = OWNER_OTHERS;
-        ensure("my object is not others'", !matches(mFacts, mC));
+        UNSCOPED_INFO("my object is not others'");
+        CHECK_FALSE(matches(mFacts, mC));
         mRec.mOwnerId = mOtherId;
-        ensure("their object is others'", matches(mFacts, mC));
+        UNSCOPED_INFO("their object is others'");
+        CHECK(matches(mFacts, mC));
 
         mC.mOwnerMode = OWNER_GROUP;
-        ensure("user-owned is not group-owned", !matches(mFacts, mC));
+        UNSCOPED_INFO("user-owned is not group-owned");
+        CHECK_FALSE(matches(mFacts, mC));
         mRec.mGroupOwned = true;
         mRec.mGroupId = mGroupId;
-        ensure("group-owned passes group mode", matches(mFacts, mC));
+        UNSCOPED_INFO("group-owned passes group mode");
+        CHECK(matches(mFacts, mC));
         mC.mOwnerMode = OWNER_OTHERS;
-        ensure("group-owned is excluded from others'", !matches(mFacts, mC));
+        UNSCOPED_INFO("group-owned is excluded from others'");
+        CHECK_FALSE(matches(mFacts, mC));
     }
 
-    // OWNER_SPECIFIC: direct owner or the deeding group.
-    template<> template<>
-    void predicate_object::test<6>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: OWNER_SPECIFIC matches the direct owner or the deeding group", "[ALSceneExplorerPredicate]")
     {
         mC.mOwnerMode = OWNER_SPECIFIC;
         mC.mOwnerId = mOtherId;
-        ensure("specific owner matches", matches(mFacts, mC));
+        UNSCOPED_INFO("specific owner matches");
+        CHECK(matches(mFacts, mC));
         mC.mOwnerId = mAgentId;
-        ensure("specific owner mismatch fails", !matches(mFacts, mC));
+        UNSCOPED_INFO("specific owner mismatch fails");
+        CHECK_FALSE(matches(mFacts, mC));
 
         mRec.mGroupOwned = true;
         mRec.mGroupId = mGroupId;
         mC.mOwnerId = mGroupId;
-        ensure("specific deeding group matches", matches(mFacts, mC));
+        UNSCOPED_INFO("specific deeding group matches");
+        CHECK(matches(mFacts, mC));
     }
 
     // Owner gating: avatars are their own owner; objects without props yet
     // fail owner modes until the reply lands.
-    template<> template<>
-    void predicate_object::test<7>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: owner modes take avatars as their own owner and wait for props", "[ALSceneExplorerPredicate]")
     {
         mFacts.mIsAvatar = true;
         mFacts.mItemId = mAgentId;
         mC.mOwnerMode = OWNER_MINE;
-        ensure("own avatar row is mine", matches(mFacts, mC));
+        UNSCOPED_INFO("own avatar row is mine");
+        CHECK(matches(mFacts, mC));
         mFacts.mItemId = mOtherId;
-        ensure("other avatar row is not mine", !matches(mFacts, mC));
+        UNSCOPED_INFO("other avatar row is not mine");
+        CHECK_FALSE(matches(mFacts, mC));
 
         mFacts.mIsAvatar = false;
         mFacts.mItemId = mRec.mId;
         mRec.mPropsValid = false;
-        ensure("unresolved props fail owner modes", !matches(mFacts, mC));
+        UNSCOPED_INFO("unresolved props fail owner modes");
+        CHECK_FALSE(matches(mFacts, mC));
 
         mRec.mPropsValid = true;
         mRec.mOwnerId = mAgentId;
-        ensure("resolved props re-apply owner modes", matches(mFacts, mC));
+        UNSCOPED_INFO("resolved props re-apply owner modes");
+        CHECK(matches(mFacts, mC));
 
         mRec.mPropsValid = false;
         mC.mOwnerMode = OWNER_ANY;
-        ensure("unresolved props pass without an owner mode", matches(mFacts, mC));
+        UNSCOPED_INFO("unresolved props pass without an owner mode");
+        CHECK(matches(mFacts, mC));
     }
 
     // Geometry mask: empty = any; otherwise the item's kind must be in it.
-    template<> template<>
-    void predicate_object::test<8>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: a geometry mask passes an item only if its kind is in it", "[ALSceneExplorerPredicate]")
     {
         mC.mGeomMask = 1u << ALObjectProperties::GEOM_MESH;
-        ensure("mesh passes mesh mask", matches(mFacts, mC));
+        UNSCOPED_INFO("mesh passes mesh mask");
+        CHECK(matches(mFacts, mC));
         mC.mGeomMask = 1u << ALObjectProperties::GEOM_PRIM;
-        ensure("mesh fails prim-only mask", !matches(mFacts, mC));
+        UNSCOPED_INFO("mesh fails prim-only mask");
+        CHECK_FALSE(matches(mFacts, mC));
         mC.mGeomMask = (1u << ALObjectProperties::GEOM_PRIM) | (1u << ALObjectProperties::GEOM_MESH);
-        ensure("mesh passes prim|mesh mask", matches(mFacts, mC));
+        UNSCOPED_INFO("mesh passes prim|mesh mask");
+        CHECK(matches(mFacts, mC));
     }
 
-    // Flag mask requires ALL set bits.
-    template<> template<>
-    void predicate_object::test<9>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: a flag mask requires every bit it sets", "[ALSceneExplorerPredicate]")
     {
         mC.mFlagMask = ALObjectProperties::FLAG_SCRIPTED;
-        ensure("single present flag passes", matches(mFacts, mC));
+        UNSCOPED_INFO("single present flag passes");
+        CHECK(matches(mFacts, mC));
         mC.mFlagMask = ALObjectProperties::FLAG_SCRIPTED | ALObjectProperties::FLAG_LIGHT;
-        ensure("two present flags pass", matches(mFacts, mC));
+        UNSCOPED_INFO("two present flags pass");
+        CHECK(matches(mFacts, mC));
         mC.mFlagMask = ALObjectProperties::FLAG_SCRIPTED | ALObjectProperties::FLAG_PHANTOM;
-        ensure("one missing flag fails the AND", !matches(mFacts, mC));
+        UNSCOPED_INFO("one missing flag fails the AND");
+        CHECK_FALSE(matches(mFacts, mC));
 
         mRec.mFlags |= ALObjectProperties::FLAG_FOR_SALE | ALObjectProperties::FLAG_PAYABLE;
         mC.mFlagMask = ALObjectProperties::FLAG_FOR_SALE | ALObjectProperties::FLAG_PAYABLE;
-        ensure("commerce flags filter", matches(mFacts, mC));
+        UNSCOPED_INFO("commerce flags filter");
+        CHECK(matches(mFacts, mC));
     }
 
     // Scope: region ignores position; radius compares distance; parcel uses
     // the caller-resolved containment fact.
-    template<> template<>
-    void predicate_object::test<10>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: region scope ignores distance while radius and parcel scopes filter", "[ALSceneExplorerPredicate]")
     {
         mRec.mDistance = 100.f;
         mC.mScope = SCOPE_REGION;
-        ensure("region scope ignores distance", matches(mFacts, mC));
+        UNSCOPED_INFO("region scope ignores distance");
+        CHECK(matches(mFacts, mC));
 
         mC.mScope = SCOPE_RADIUS;
         mC.mRadius = 64.f;
-        ensure("beyond radius fails", !matches(mFacts, mC));
+        UNSCOPED_INFO("beyond radius fails");
+        CHECK_FALSE(matches(mFacts, mC));
         mC.mRadius = 128.f;
-        ensure("within radius passes", matches(mFacts, mC));
+        UNSCOPED_INFO("within radius passes");
+        CHECK(matches(mFacts, mC));
 
         mC.mScope = SCOPE_PARCEL;
         mFacts.mInAgentParcel = true;
-        ensure("inside parcel passes", matches(mFacts, mC));
+        UNSCOPED_INFO("inside parcel passes");
+        CHECK(matches(mFacts, mC));
         mFacts.mInAgentParcel = false;
-        ensure("outside parcel fails", !matches(mFacts, mC));
+        UNSCOPED_INFO("outside parcel fails");
+        CHECK_FALSE(matches(mFacts, mC));
     }
 
     // Heaviness thresholds: roots gated, child prims exempt, zero = off.
-    template<> template<>
-    void predicate_object::test<11>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: land impact and triangle minimums gate roots but not child prims", "[ALSceneExplorerPredicate]")
     {
         mC.mMinLandImpact = 50.f;       // record has 40
-        ensure("under LI threshold fails", !matches(mFacts, mC));
+        UNSCOPED_INFO("under LI threshold fails");
+        CHECK_FALSE(matches(mFacts, mC));
         mC.mMinLandImpact = 40.f;
-        ensure("at LI threshold passes", matches(mFacts, mC));
+        UNSCOPED_INFO("at LI threshold passes");
+        CHECK(matches(mFacts, mC));
 
         mC.mMinLandImpact = 0.f;
         mC.mMinTriangles = 20000;       // record has 12000
-        ensure("under triangle threshold fails", !matches(mFacts, mC));
+        UNSCOPED_INFO("under triangle threshold fails");
+        CHECK_FALSE(matches(mFacts, mC));
         mC.mMinTriangles = 12000;
-        ensure("at triangle threshold passes", matches(mFacts, mC));
+        UNSCOPED_INFO("at triangle threshold passes");
+        CHECK(matches(mFacts, mC));
 
         mC.mMinTriangles = 20000;
         mFacts.mIsChildPrim = true;
-        ensure("child prims are exempt from thresholds", matches(mFacts, mC));
+        UNSCOPED_INFO("child prims are exempt from thresholds");
+        CHECK(matches(mFacts, mC));
     }
 
-    // Change classification: substring extension/shrink (the typing and
-    // backspacing cases), including the empty-needle transitions.
-    template<> template<>
-    void predicate_object::test<13>()
-    {
-        ensure_equals("same needle", classifySubstringChange("oak", "oak"), CHANGE_NONE);
-        ensure_equals("typing from empty", classifySubstringChange("", "oak"), CHANGE_MORE_RESTRICTIVE);
-        ensure_equals("extending", classifySubstringChange("oak", "oak t"), CHANGE_MORE_RESTRICTIVE);
-        ensure_equals("backspacing", classifySubstringChange("oak t", "oak"), CHANGE_LESS_RESTRICTIVE);
-        ensure_equals("clearing", classifySubstringChange("oak", ""), CHANGE_LESS_RESTRICTIVE);
-        ensure_equals("unrelated text", classifySubstringChange("oak", "pine"), CHANGE_RESTART);
-    }
-
-    // Change classification: require-all mask (the feature checkboxes).
-    template<> template<>
-    void predicate_object::test<14>()
-    {
-        const U32 a = ALObjectProperties::FLAG_SCRIPTED;
-        const U32 b = ALObjectProperties::FLAG_LIGHT;
-        const U32 c = ALObjectProperties::FLAG_PHANTOM;
-        ensure_equals("same mask", classifyRequireAllMaskChange(a | b, a | b), CHANGE_NONE);
-        ensure_equals("first requirement", classifyRequireAllMaskChange(0, a), CHANGE_MORE_RESTRICTIVE);
-        ensure_equals("added requirement", classifyRequireAllMaskChange(a, a | b), CHANGE_MORE_RESTRICTIVE);
-        ensure_equals("removed requirement", classifyRequireAllMaskChange(a | b, a), CHANGE_LESS_RESTRICTIVE);
-        ensure_equals("last requirement off", classifyRequireAllMaskChange(a, 0), CHANGE_LESS_RESTRICTIVE);
-        ensure_equals("swapped requirement", classifyRequireAllMaskChange(a | b, a | c), CHANGE_RESTART);
-    }
-
-    // Change classification: allowed-set mask (the type checkboxes; 0 = any).
-    template<> template<>
-    void predicate_object::test<15>()
-    {
-        const U32 prim = 1u << ALObjectProperties::GEOM_PRIM;
-        const U32 mesh = 1u << ALObjectProperties::GEOM_MESH;
-        ensure_equals("same set", classifyAllowedMaskChange(prim, prim), CHANGE_NONE);
-        ensure_equals("any to one kind", classifyAllowedMaskChange(0, prim), CHANGE_MORE_RESTRICTIVE);
-        ensure_equals("one kind to any", classifyAllowedMaskChange(prim, 0), CHANGE_LESS_RESTRICTIVE);
-        ensure_equals("allowing another kind", classifyAllowedMaskChange(prim, prim | mesh), CHANGE_LESS_RESTRICTIVE);
-        ensure_equals("disallowing a kind", classifyAllowedMaskChange(prim | mesh, prim), CHANGE_MORE_RESTRICTIVE);
-        ensure_equals("swapped kind", classifyAllowedMaskChange(prim, mesh), CHANGE_RESTART);
-    }
-
-    // Change classification: minimum thresholds (0 = off).
-    template<> template<>
-    void predicate_object::test<16>()
-    {
-        ensure_equals("same threshold", classifyMinThresholdChange(50.f, 50.f), CHANGE_NONE);
-        ensure_equals("enabling", classifyMinThresholdChange(0.f, 50.f), CHANGE_MORE_RESTRICTIVE);
-        ensure_equals("raising", classifyMinThresholdChange(50.f, 100.f), CHANGE_MORE_RESTRICTIVE);
-        ensure_equals("lowering", classifyMinThresholdChange(100.f, 50.f), CHANGE_LESS_RESTRICTIVE);
-        ensure_equals("disabling", classifyMinThresholdChange(50.f, 0.f), CHANGE_LESS_RESTRICTIVE);
-    }
-
-    // Predicates compose: every constraint must hold at once.
-    template<> template<>
-    void predicate_object::test<12>()
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: constraints compose and every one must hold at once", "[ALSceneExplorerPredicate]")
     {
         mC.mSearchType = SEARCH_NAME;
         mC.mFilterSubString = "oak";
@@ -332,9 +301,79 @@ namespace tut
         mC.mScope = SCOPE_RADIUS;
         mC.mRadius = 64.f;
         mC.mMinLandImpact = 10.f;
-        ensure("all constraints satisfied", matches(mFacts, mC));
+        UNSCOPED_INFO("all constraints satisfied");
+        CHECK(matches(mFacts, mC));
 
         mC.mFlagMask |= ALObjectProperties::FLAG_PHANTOM;
-        ensure("one failing constraint fails the set", !matches(mFacts, mC));
+        UNSCOPED_INFO("one failing constraint fails the set");
+        CHECK_FALSE(matches(mFacts, mC));
+    }
+
+    // Change classification: substring extension/shrink (the typing and
+    // backspacing cases), including the empty-needle transitions.
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: classifySubstringChange tells typing from backspacing", "[ALSceneExplorerPredicate]")
+    {
+        CHECK(classifySubstringChange("oak", "oak") == CHANGE_NONE);
+        UNSCOPED_INFO("typing from empty");
+        CHECK(classifySubstringChange("", "oak") == CHANGE_MORE_RESTRICTIVE);
+        UNSCOPED_INFO("extending");
+        CHECK(classifySubstringChange("oak", "oak t") == CHANGE_MORE_RESTRICTIVE);
+        UNSCOPED_INFO("backspacing");
+        CHECK(classifySubstringChange("oak t", "oak") == CHANGE_LESS_RESTRICTIVE);
+        UNSCOPED_INFO("clearing");
+        CHECK(classifySubstringChange("oak", "") == CHANGE_LESS_RESTRICTIVE);
+        UNSCOPED_INFO("unrelated text");
+        CHECK(classifySubstringChange("oak", "pine") == CHANGE_RESTART);
+    }
+
+    // Change classification: require-all mask (the feature checkboxes).
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: classifyRequireAllMaskChange restricts on added bits", "[ALSceneExplorerPredicate]")
+    {
+        const U32 a = ALObjectProperties::FLAG_SCRIPTED;
+        const U32 b = ALObjectProperties::FLAG_LIGHT;
+        const U32 c = ALObjectProperties::FLAG_PHANTOM;
+        CHECK(classifyRequireAllMaskChange(a | b, a | b) == CHANGE_NONE);
+        UNSCOPED_INFO("first requirement");
+        CHECK(classifyRequireAllMaskChange(0, a) == CHANGE_MORE_RESTRICTIVE);
+        UNSCOPED_INFO("added requirement");
+        CHECK(classifyRequireAllMaskChange(a, a | b) == CHANGE_MORE_RESTRICTIVE);
+        UNSCOPED_INFO("removed requirement");
+        CHECK(classifyRequireAllMaskChange(a | b, a) == CHANGE_LESS_RESTRICTIVE);
+        UNSCOPED_INFO("last requirement off");
+        CHECK(classifyRequireAllMaskChange(a, 0) == CHANGE_LESS_RESTRICTIVE);
+        UNSCOPED_INFO("swapped requirement");
+        CHECK(classifyRequireAllMaskChange(a | b, a | c) == CHANGE_RESTART);
+    }
+
+    // Change classification: allowed-set mask (the type checkboxes; 0 = any).
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: classifyAllowedMaskChange relaxes on added kinds with 0 as any", "[ALSceneExplorerPredicate]")
+    {
+        const U32 prim = 1u << ALObjectProperties::GEOM_PRIM;
+        const U32 mesh = 1u << ALObjectProperties::GEOM_MESH;
+        CHECK(classifyAllowedMaskChange(prim, prim) == CHANGE_NONE);
+        UNSCOPED_INFO("any to one kind");
+        CHECK(classifyAllowedMaskChange(0, prim) == CHANGE_MORE_RESTRICTIVE);
+        UNSCOPED_INFO("one kind to any");
+        CHECK(classifyAllowedMaskChange(prim, 0) == CHANGE_LESS_RESTRICTIVE);
+        UNSCOPED_INFO("allowing another kind");
+        CHECK(classifyAllowedMaskChange(prim, prim | mesh) == CHANGE_LESS_RESTRICTIVE);
+        UNSCOPED_INFO("disallowing a kind");
+        CHECK(classifyAllowedMaskChange(prim | mesh, prim) == CHANGE_MORE_RESTRICTIVE);
+        UNSCOPED_INFO("swapped kind");
+        CHECK(classifyAllowedMaskChange(prim, mesh) == CHANGE_RESTART);
+    }
+
+    // Change classification: minimum thresholds (0 = off).
+    TEST_CASE_METHOD(predicate_data, "ALSceneExplorerPredicate: classifyMinThresholdChange restricts on a raise with 0 as off", "[ALSceneExplorerPredicate]")
+    {
+        CHECK(classifyMinThresholdChange(50.f, 50.f) == CHANGE_NONE);
+        UNSCOPED_INFO("enabling");
+        CHECK(classifyMinThresholdChange(0.f, 50.f) == CHANGE_MORE_RESTRICTIVE);
+        UNSCOPED_INFO("raising");
+        CHECK(classifyMinThresholdChange(50.f, 100.f) == CHANGE_MORE_RESTRICTIVE);
+        UNSCOPED_INFO("lowering");
+        CHECK(classifyMinThresholdChange(100.f, 50.f) == CHANGE_LESS_RESTRICTIVE);
+        UNSCOPED_INFO("disabling");
+        CHECK(classifyMinThresholdChange(50.f, 0.f) == CHANGE_LESS_RESTRICTIVE);
     }
 }

@@ -30,62 +30,58 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alxuinotes_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
     };
 
-    typedef test_group<alxuinotes_data> alxuinotes_test;
-    typedef alxuinotes_test::object     alxuinotes_object;
-    tut::alxuinotes_test alxuinotes_testgroup("alxuinotes");
-
     // The file is read, and a tag somebody has written a sentence for has
     // one; a tag nobody has falls back to nothing, not to a complaint.
-    template<> template<>
-    void alxuinotes_object::test<1>()
+    TEST_CASE_METHOD(alxuinotes_data, "alxuinotes: the notes file is read and only a tag written about has a note", "[alxuinotes]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const ALXUINotes& notes = ALXUINotes::get();
-        ensure("the file was read: " + std::to_string(notes.count()), notes.count() > 100);
-        ensure("a button has a sentence", !notes.note("button").empty());
-        ensure("a tag nobody wrote about has none", notes.note("no_such_tag").empty());
-        ensure("and asking twice is the same file",
-               &ALXUINotes::get() == &notes);
+        CHECK(notes.count() > 100);
+        CHECK_FALSE(notes.note("button").empty());
+        CHECK(notes.note("no_such_tag").empty());
+        UNSCOPED_INFO("and asking twice is the same file");
+        CHECK(&ALXUINotes::get() == &notes);
     }
 
     // A correction written once, under no tag, answers for every tag; one
     // written under a tag answers only there.
-    template<> template<>
-    void alxuinotes_object::test<2>()
+    TEST_CASE_METHOD(alxuinotes_data, "alxuinotes: an untagged correction answers for every tag and a tagged one only there", "[alxuinotes]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const ALXUINotes& notes = ALXUINotes::get();
-        ensure("there are corrections: " + std::to_string(notes.attributeCount()), notes.attributeCount() > 10);
+        CHECK(notes.attributeCount() > 10);
 
         const ALXUINotes::Attribute* watermark = notes.attribute("line_editor", "watermark_text");
-        ensure("watermark_text is a mistake under a line editor", watermark != nullptr);
-        ensure("and is deprecated", watermark->deprecated);
-        ensure_equals("for label", watermark->instead, std::string("label"));
-        ensure("and the same mistake under a text editor",
-               notes.attribute("text_editor", "watermark_text") == watermark);
+        UNSCOPED_INFO("watermark_text is a mistake under a line editor");
+        REQUIRE(watermark != nullptr);
+        CHECK(watermark->deprecated);
+        CHECK(watermark->instead == std::string("label"));
+        UNSCOPED_INFO("and the same mistake under a text editor");
+        CHECK(notes.attribute("text_editor", "watermark_text") == watermark);
 
         const ALXUINotes::Attribute* min_width = notes.attribute("layout_panel", "min_width");
-        ensure("min_width is a mistake on a layout panel", min_width != nullptr);
-        ensure_equals("written min_dim instead", min_width->instead, std::string("min_dim"));
-        ensure("and is not one on a panel, which has no min_dim to write",
-               notes.attribute("panel", "min_width") == nullptr);
+        UNSCOPED_INFO("min_width is a mistake on a layout panel");
+        REQUIRE(min_width != nullptr);
+        CHECK(min_width->instead == std::string("min_dim"));
+        UNSCOPED_INFO("and is not one on a panel, which has no min_dim to write");
+        CHECK(notes.attribute("panel", "min_width") == nullptr);
 
-        ensure("a name nobody corrected has no line",
-               notes.attribute("button", "label") == nullptr);
+        UNSCOPED_INFO("a name nobody corrected has no line");
+        CHECK(notes.attribute("button", "label") == nullptr);
     }
 }

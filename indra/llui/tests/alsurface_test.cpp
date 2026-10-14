@@ -31,12 +31,12 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <string>
 
-namespace tut
+namespace
 {
     struct alsurface_data
     {
@@ -54,21 +54,18 @@ namespace tut
             return true;
         }
     };
-    typedef test_group<alsurface_data> alsurface_group;
-    typedef alsurface_group::object    alsurface_object;
-    alsurface_group                    alsurface_test_group("alsurface");
 
-    template<> template<>
-    void alsurface_object::test<1>()
+    TEST_CASE_METHOD(alsurface_data, "alsurface: shade carries paper towards ink opaquely and chosenOver lays as chosen", "[alsurface]")
     {
-        set_test_name("a surface is the paper carried towards the ink and opaque; the chosen band the same at its own weight");
         const LLColor4 paper(0.1f, 0.2f, 0.3f, 0.5f);
         const LLColor4 ink(0.9f, 0.8f, 0.7f, 1.f);
-        ensure("none of the way is the paper, opaque", nearest(ALSurface::shade(paper, ink, 0.f), LLColor4(0.1f, 0.2f, 0.3f, 1.f)));
-        ensure("all of it the ink", nearest(ALSurface::shade(paper, ink, 1.f), LLColor4(0.9f, 0.8f, 0.7f, 1.f)));
-        ensure("the ground its own way", nearest(ALSurface::ground(paper, ink), ALSurface::shade(paper, ink, ALSurface::GROUND)));
-        ensure("the chosen band its own", nearest(ALSurface::chosen(paper, ink), ALSurface::shade(paper, ink, ALSurface::CHOSEN)));
-        ensure("the frame the ink thinned", nearest(ALSurface::frame(ink, 0.5f), LLColor4(0.9f, 0.8f, 0.7f, ALSurface::FRAME * 0.5f)));
+        UNSCOPED_INFO("none of the way is the paper made opaque");
+        CHECK(nearest(ALSurface::shade(paper, ink, 0.f), LLColor4(0.1f, 0.2f, 0.3f, 1.f)));
+        UNSCOPED_INFO("all of it the ink");
+        CHECK(nearest(ALSurface::shade(paper, ink, 1.f), LLColor4(0.9f, 0.8f, 0.7f, 1.f)));
+        CHECK(nearest(ALSurface::ground(paper, ink), ALSurface::shade(paper, ink, ALSurface::GROUND)));
+        CHECK(nearest(ALSurface::chosen(paper, ink), ALSurface::shade(paper, ink, ALSurface::CHOSEN)));
+        CHECK(nearest(ALSurface::frame(ink, 0.5f), LLColor4(0.9f, 0.8f, 0.7f, ALSurface::FRAME * 0.5f)));
 
         // The ink at the chosen weight, laid over the paper as a draw lays
         // it, comes to the band a list with paper of its own is given.
@@ -79,16 +76,15 @@ namespace tut
             laid.mV[i] = paper.mV[i] * (1.f - over.mV[VALPHA]) + over.mV[i] * over.mV[VALPHA];
         }
         laid.mV[VALPHA] = 1.f;
-        ensure("the same band over any paper", nearest(laid, ALSurface::chosen(paper, ink)));
+        UNSCOPED_INFO("the same band over any paper");
+        CHECK(nearest(laid, ALSurface::chosen(paper, ink)));
     }
 
-    template<> template<>
-    void alsurface_object::test<2>()
+    TEST_CASE_METHOD(alsurface_data, "alsurface: each control part reads its skin colour and follows a later change", "[alsurface]")
     {
-        set_test_name("each part a control plays is drawn in the skin's colour for it");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         // The skin's, told here: nothing loads a skin's colours in a test.
         // Taken back after, since every surface drawn later would read them.
@@ -98,36 +94,43 @@ namespace tut
         table.setColor("LabelDisabledColor", LLColor4(0.2f, 0.3f, 0.4f, 1.f));
         table.setColor("EmphasisColor", LLColor4(0.9f, 0.6f, 0.1f, 1.f));
         table.setColor("LabelTextColor", LLColor4(0.8f, 0.8f, 0.9f, 1.f));
-        ensure("the well", nearest(ALSurface::well().get(), LLColor4(0.1f, 0.1f, 0.1f, 1.f)));
-        ensure("the rim", nearest(ALSurface::rim().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
-        ensure("the handle", nearest(ALSurface::handle().get(), LLColor4(0.9f, 0.6f, 0.1f, 1.f)));
-        ensure("the text", nearest(ALSurface::text().get(), LLColor4(0.8f, 0.8f, 0.9f, 1.f)));
-        ensure("the quiet words", nearest(ALSurface::quiet().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
+        CHECK(nearest(ALSurface::well().get(), LLColor4(0.1f, 0.1f, 0.1f, 1.f)));
+        CHECK(nearest(ALSurface::rim().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
+        CHECK(nearest(ALSurface::handle().get(), LLColor4(0.9f, 0.6f, 0.1f, 1.f)));
+        CHECK(nearest(ALSurface::text().get(), LLColor4(0.8f, 0.8f, 0.9f, 1.f)));
+        CHECK(nearest(ALSurface::quiet().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
         // And they follow a theme that changes after.
         table.setColor("EmphasisColor", LLColor4(0.1f, 0.6f, 0.9f, 1.f));
-        ensure("followed", nearest(ALSurface::handle().get(), LLColor4(0.1f, 0.6f, 0.9f, 1.f)));
+        UNSCOPED_INFO("the handle follows a changed EmphasisColor");
+        CHECK(nearest(ALSurface::handle().get(), LLColor4(0.1f, 0.6f, 0.9f, 1.f)));
     }
 
-    template<> template<>
-    void alsurface_object::test<3>()
+    TEST_CASE_METHOD(alsurface_data, "alsurface: contrast is the WCAG ratio and legible lifts a faint colour to it", "[alsurface]")
     {
-        set_test_name("contrast as WCAG measures it, a thin ink over its paper; a quiet word kept legible");
         const LLColor4 white(1.f, 1.f, 1.f, 1.f), black(0.f, 0.f, 0.f, 1.f);
-        ensure("black on white", std::fabs(ALSurface::contrast(black, white) - 21.f) < 0.01f);
-        ensure("either way round", std::fabs(ALSurface::contrast(white, black) - 21.f) < 0.01f);
-        ensure("a colour on itself", std::fabs(ALSurface::contrast(white, white) - 1.f) < 0.0001f);
+        CHECK(std::fabs(ALSurface::contrast(black, white) - 21.f) < 0.01f);
+        CHECK(std::fabs(ALSurface::contrast(white, black) - 21.f) < 0.01f);
+        CHECK(std::fabs(ALSurface::contrast(white, white) - 1.f) < 0.0001f);
         // #777777 on white is the grey that just misses 4.5.
         const LLColor4 grey(0x77 / 255.f, 0x77 / 255.f, 0x77 / 255.f, 1.f);
-        ensure("#777 on white", std::fabs(ALSurface::contrast(grey, white) - 4.48f) < 0.01f);
-        ensure("half of black over white reads as the grey between",
-               std::fabs(ALSurface::contrast(LLColor4(0.f, 0.f, 0.f, 0.5f), white) - ALSurface::contrast(LLColor4(0.5f, 0.5f, 0.5f, 1.f), white)) < 0.01f);
+        CHECK(std::fabs(ALSurface::contrast(grey, white) - 4.48f) < 0.01f);
+        UNSCOPED_INFO("half of black over white reads as the grey between");
+        CHECK(std::fabs(ALSurface::contrast(LLColor4(0.f, 0.f, 0.f, 0.5f), white) - ALSurface::contrast(LLColor4(0.5f, 0.5f, 0.5f, 1.f), white)) < 0.01f);
 
         const LLColor4 paper(0.1f, 0.1f, 0.1f, 1.f), ink(0.9f, 0.9f, 0.9f, 1.f);
         const LLColor4 faint(0.25f, 0.25f, 0.25f, 1.f), soft(0.7f, 0.7f, 0.7f, 1.f);
-        ensure("one that reads is kept", nearest(ALSurface::legible(ink, soft, paper), soft));
+        UNSCOPED_INFO("one that reads is kept");
+        CHECK(nearest(ALSurface::legible(ink, soft, paper), soft));
         const LLColor4 kept = ALSurface::legible(ink, faint, paper);
-        ensure("one that does not is taken back towards the ink until it does",
-               ALSurface::contrast(kept, paper) >= ALSurface::LEGIBLE && ALSurface::contrast(kept, paper) < ALSurface::LEGIBLE + 0.05f);
-        ensure("on the way from the ink", kept.mV[0] > faint.mV[0] && kept.mV[0] < ink.mV[0]);
+        {
+            INFO("one that does not is taken back towards the ink until it does");
+            CHECK(ALSurface::contrast(kept, paper) >= ALSurface::LEGIBLE);
+            CHECK(ALSurface::contrast(kept, paper) < ALSurface::LEGIBLE + 0.05f);
+        }
+        {
+            INFO("on the way from the ink");
+            CHECK(kept.mV[0] > faint.mV[0]);
+            CHECK(kept.mV[0] < ink.mV[0]);
+        }
     }
 }

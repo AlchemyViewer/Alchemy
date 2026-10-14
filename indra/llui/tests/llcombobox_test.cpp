@@ -32,11 +32,11 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct llcombobox_data
     {
@@ -67,22 +67,16 @@ namespace tut
         }
     };
 
-    typedef test_group<llcombobox_data>  llcombobox_test;
-    typedef llcombobox_test::object      llcombobox_object;
-    tut::llcombobox_test llcombobox_testgroup("llcombobox");
-
-    // The rect a caller asks for is the rect it gets.
-    template<> template<>
-    void llcombobox_object::test<1>()
+    TEST_CASE_METHOD(llcombobox_data, "llcombobox: the rect a caller asks for is the rect it gets", "[llcombobox]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         const LLRect asked(200, 21, 590, 1);
         LLComboBox* combo = build(asked);
-        ensure_equals("as asked", where(combo->getRect()), where(asked));
+        CHECK(where(combo->getRect()) == where(asked));
         combo->die();
     }
 
@@ -90,12 +84,11 @@ namespace tut
     // hands the button the rect it was given, which is in the parent's space;
     // whether anything corrects that before it is drawn is the whole question,
     // and a combo built at the origin cannot tell the difference.
-    template<> template<>
-    void llcombobox_object::test<2>()
+    TEST_CASE_METHOD(llcombobox_data, "llcombobox: a combo's visible parts lie in its own coordinates", "[llcombobox]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         for (bool text_entry : { true, false })
@@ -110,10 +103,9 @@ namespace tut
                 {
                     continue;
                 }
-                ensure(std::string(text_entry ? "typing: " : "no typing: ")
-                           + child->getName() + " at " + where(child->getRect())
-                           + " is inside " + where(within),
-                       within.contains(child->getRect()));
+                UNSCOPED_INFO((text_entry ? "typing: " : "no typing: ") << child->getName() << " at "
+                              << where(child->getRect()) << " is inside " << where(within));
+                REQUIRE(within.contains(child->getRect()));
             }
             combo->die();
         }
@@ -122,12 +114,11 @@ namespace tut
     // The field a value is typed into has room to hold one. Sized from a rect
     // that was not the combo's own, it comes out empty or inside out, and a
     // row that shows nothing at all is what that looks like.
-    template<> template<>
-    void llcombobox_object::test<3>()
+    TEST_CASE_METHOD(llcombobox_data, "llcombobox: the typing field is wide enough for a value and as tall as the combo", "[llcombobox]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLComboBox* combo = build(LLRect(200, 21, 590, 1));
@@ -139,38 +130,37 @@ namespace tut
                 editor = found;
             }
         }
-        ensure("it has a field to type in", editor != nullptr);
-        ensure("wide enough to hold a value: " + where(editor->getRect()),
-               editor->getRect().getWidth() > 200);
-        ensure_equals("and as tall as the combo", editor->getRect().getHeight(),
+        REQUIRE(editor != nullptr);
+        UNSCOPED_INFO("wide enough to hold a value: " + where(editor->getRect()));
+        CHECK(editor->getRect().getWidth() > 200);
+        CHECK(editor->getRect().getHeight() ==
                       combo->getRect().getHeight());
         combo->die();
     }
 
     // And it keeps them there when the row it is on is widened, which is what
     // a grid does to it now instead of building it again.
-    template<> template<>
-    void llcombobox_object::test<4>()
+    TEST_CASE_METHOD(llcombobox_data, "llcombobox: a widened combo keeps its parts inside it", "[llcombobox]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLComboBox* combo = build(LLRect(200, 21, 590, 1));
         combo->reshape(500, 20);
 
         const LLRect within = combo->getLocalRect();
-        ensure_equals("it took the width", within.getWidth(), 500);
+        CHECK(within.getWidth() == 500);
         for (LLView* child : *combo->getChildList())
         {
             if (!child->getVisible())
             {
                 continue;
             }
-            ensure(std::string("after widening, ") + child->getName() + " at "
-                       + where(child->getRect()) + " is inside " + where(within),
-                   within.contains(child->getRect()));
+            UNSCOPED_INFO("after widening, " << child->getName() << " at " << where(child->getRect())
+                          << " is inside " << where(within));
+            REQUIRE(within.contains(child->getRect()));
         }
         combo->die();
     }
@@ -178,12 +168,11 @@ namespace tut
     // A value nobody chose here is shown as the value in force: the ink this
     // control already keeps for a value it is not sure of, which is the same
     // distinction the spinner draws for an unset number.
-    template<> template<>
-    void llcombobox_object::test<5>()
+    TEST_CASE_METHOD(llcombobox_data, "llcombobox: an unset value is shown tentative until it is settled", "[llcombobox]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLComboBox* combo = build(LLRect(0, 22, 160, 0));
@@ -192,17 +181,41 @@ namespace tut
         combo->setValue("left");
 
         LLLineEditor* text = combo->findChild<LLLineEditor>("Combo Text Entry", true);
-        ensure("a combo that takes typing has an editor", text != nullptr);
-        ensure("a value chosen here is not tentative", !text->getTentative());
+        UNSCOPED_INFO("a combo that takes typing has an editor");
+        REQUIRE(text != nullptr);
+        UNSCOPED_INFO("a value chosen here is not tentative");
+        CHECK_FALSE(text->getTentative());
 
         // Set after the value, because setting a value the list has is a
         // choice and would take the mark off again.
         combo->setUnset(true);
-        ensure("the combo says nobody chose it", combo->isUnset());
-        ensure("so what is shown is not sure of itself", text->getTentative());
+        CHECK(combo->isUnset());
+        UNSCOPED_INFO("so what is shown is not sure of itself");
+        CHECK(text->getTentative());
 
         combo->setUnset(false);
-        ensure("and choosing it settles it", !text->getTentative());
+        UNSCOPED_INFO("and saying it is set settles it");
+        CHECK_FALSE(text->getTentative());
+
+        // A choice made in the control settles it too, without its owner
+        // saying so: an item chosen,
+        combo->setUnset(true);
+        combo->selectFirstItem();
+        {
+            INFO("and choosing it settles it");
+            CHECK_FALSE(text->getTentative());
+            CHECK_FALSE(combo->isUnset());
+        }
+
+        // or a value typed that the list does not have.
+        combo->setUnset(true);
+        text->setText(std::string("up"));
+        text->onCommit();
+        {
+            INFO("and typing it settles it");
+            CHECK(combo->getValue().asString() == std::string("up"));
+            CHECK_FALSE(combo->isUnset());
+        }
         combo->die();
     }
 }

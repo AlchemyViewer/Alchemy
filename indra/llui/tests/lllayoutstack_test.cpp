@@ -34,9 +34,9 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct lllayoutstack_data
     {
@@ -110,20 +110,15 @@ namespace tut
         }
     };
 
-    typedef test_group<lllayoutstack_data> lllayoutstack_test;
-    typedef lllayoutstack_test::object     lllayoutstack_object;
-    tut::lllayoutstack_test lllayoutstack_testgroup("lllayoutstack");
-
     // A panel that leaves its stack by being deleted is gone from the stack's
     // list, the same as one that was removed first. The stack lays out from
     // that list every frame, so an entry that outlives its panel is a read of
     // freed memory on the next draw.
-    template<> template<>
-    void lllayoutstack_object::test<1>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: a deleted panel leaves the stack's list as a removed one does", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLLayoutStack> s(stack());
@@ -131,26 +126,25 @@ namespace tut
         LLLayoutPanel* b = panel("b");
         s->addPanel(a);
         s->addPanel(b);
-        ensure_equals("two panels", s->getNumPanels(), 2);
+        CHECK(s->getNumPanels() == 2);
 
         delete a;
-        ensure_equals("a deleted panel has left the list", s->getNumPanels(), 1);
+        CHECK(s->getNumPanels() == 1);
 
         s->removeChild(b);
         delete b;
-        ensure_equals("a removed panel has left the list", s->getNumPanels(), 0);
+        CHECK(s->getNumPanels() == 0);
     }
 
     // A panel moved from one stack to another arrives with a resize bar, and
     // the bar belongs to the stack now holding it. Joining a stack is what
     // builds the bar and leaving one is what takes it away, so the two have to
     // happen in that order.
-    template<> template<>
-    void lllayoutstack_object::test<2>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: a panel moved to another stack has a resize bar of that stack", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLLayoutStack> a(stack());
@@ -158,14 +152,14 @@ namespace tut
         LLLayoutPanel* p = panel("p");
 
         a->addPanel(p);
-        ensure("a panel added to a stack has a resize bar", p->getResizeBar() != nullptr);
-        ensure("of that stack's", p->getResizeBar()->getParent() == a.get());
+        REQUIRE(p->getResizeBar() != nullptr);
+        CHECK(p->getResizeBar()->getParent() == a.get());
 
         b->addChild(p);
-        ensure_equals("the panel left the first stack", a->getNumPanels(), 0);
-        ensure_equals("and joined the second", b->getNumPanels(), 1);
-        ensure("the moved panel has a resize bar", p->getResizeBar() != nullptr);
-        ensure("of the stack that holds it now", p->getResizeBar()->getParent() == b.get());
+        CHECK(a->getNumPanels() == 0);
+        CHECK(b->getNumPanels() == 1);
+        REQUIRE(p->getResizeBar() != nullptr);
+        CHECK(p->getResizeBar()->getParent() == b.get());
 
         // Reads the bar of every panel on the list.
         b->updateLayout();
@@ -173,12 +167,11 @@ namespace tut
 
     // The same question asked by adding a panel a stack already holds: the
     // removal that arrives from inside must not take the new entry back off.
-    template<> template<>
-    void lllayoutstack_object::test<3>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: adding a panel the stack already holds keeps it on the list once", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLLayoutStack> s(stack());
@@ -186,8 +179,8 @@ namespace tut
 
         s->addPanel(p);
         s->addChild(p);
-        ensure_equals("the panel is on the list once", s->getNumPanels(), 1);
-        ensure("and still has a resize bar", p->getResizeBar() != nullptr);
+        CHECK(s->getNumPanels() == 1);
+        REQUIRE(p->getResizeBar() != nullptr);
 
         s->updateLayout();
     }
@@ -196,12 +189,11 @@ namespace tut
     // deleted rather than left with no parent and nobody to free it -- and
     // mouse capture is a thing a view gives up on its way out, so the focus
     // manager can say which of the two happened.
-    template<> template<>
-    void lllayoutstack_object::test<4>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: a resize bar is deleted when its panel leaves the stack", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLLayoutStack> s(stack());
@@ -209,15 +201,15 @@ namespace tut
         s->addPanel(p);
 
         LLResizeBar* barp = p->getResizeBar();
-        ensure("the panel has a resize bar", barp != nullptr);
+        REQUIRE(barp != nullptr);
 
         gFocusMgr.setMouseCapture(barp);
-        ensure("the bar holds the mouse", gFocusMgr.getMouseCapture() == barp);
+        CHECK(gFocusMgr.getMouseCapture() == barp);
 
         s->removeChild(p);
-        ensure("the bar went with the panel it belonged to",
-               gFocusMgr.getMouseCapture() == nullptr);
-        ensure("and the panel no longer names it", p->getResizeBar() == nullptr);
+        UNSCOPED_INFO("the bar was deleted, so it let go of the mouse");
+        CHECK(gFocusMgr.getMouseCapture() == nullptr);
+        CHECK(p->getResizeBar() == nullptr);
 
         delete p;
     }
@@ -225,12 +217,11 @@ namespace tut
     // The gap between panels is not owed after the last one that is showing,
     // and once a trailing panel is hidden that is no longer the last one on the
     // list. A gap charged for and never given back is space the stack loses.
-    template<> template<>
-    void lllayoutstack_object::test<5>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: no gap is owed after the last panel showing", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLLayoutStack> s(stack(10));
@@ -240,24 +231,23 @@ namespace tut
         s->addPanel(hidden);
 
         s->updateLayout();
-        ensure_equals("the only panel showing fills the stack",
-                      shown->getRect().getWidth(), 300);
+        UNSCOPED_INFO("the only panel showing fills the stack");
+        CHECK(shown->getRect().getWidth() == 300);
 
         hidden->setVisible(true);
         s->updateLayout();
-        ensure_equals("with both showing, one gap sits between them",
-                      shown->getRect().getWidth() + hidden->getRect().getWidth(), 290);
+        UNSCOPED_INFO("with both showing, one gap sits between them");
+        CHECK(shown->getRect().getWidth() + hidden->getRect().getWidth() == 290);
     }
 
     // Ignoring reshapes is the caller's answer about its own work, not the
     // layout pass's about its own: a panel told to ignore them is still
     // ignoring them on the far side of a layout.
-    template<> template<>
-    void lllayoutstack_object::test<6>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: a panel told to ignore reshapes still ignores them after a layout", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLLayoutStack> s(stack());
@@ -271,26 +261,24 @@ namespace tut
 
         S32 target = p->getTargetDim();
         p->reshape(target + 50, p->getRect().getHeight());
-        ensure_equals("a reshape the panel was told to ignore leaves its target alone",
-                      p->getTargetDim(), target);
+        CHECK(p->getTargetDim() == target);
     }
 
     // A frame's worth of animation, once a frame. Layout runs from updateClass
     // at the top of the frame and again from draw, while the interpolant is
     // computed once a frame -- so a second pass that moved a panel again would
     // move it twice as far as the frame is worth.
-    template<> template<>
-    void lllayoutstack_object::test<7>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: a second layout in the same frame moves an animating panel no further", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         const F32 TIME_CONSTANT = 1.f;
         if (partialInterpolant(TIME_CONSTANT) <= 0.f)
         {
-            skip("the frame clock did not move");
+            SKIP("the frame clock did not move");
         }
 
         std::unique_ptr<LLLayoutStack> s(stack(0, true, TIME_CONSTANT));
@@ -300,26 +288,26 @@ namespace tut
         LLFrameTimer::updateFrameCount();
         LLLayoutStack::updateClass();       // the frame's animation pass
         F32 after_frame = p->getVisibleAmount();
-        ensure("the frame opened the panel part way",
-               after_frame > 0.f && after_frame < 1.f);
+        CHECK(after_frame > 0.f);
+        CHECK(after_frame < 1.f);
 
         s->updateLayout();                  // what draw does, same frame
-        ensure_equals("a second pass in the same frame moves it no further",
-                      p->getVisibleAmount(), after_frame);
+        UNSCOPED_INFO("a second pass in the same frame moves it no further");
+        CHECK(p->getVisibleAmount() == after_frame);
 
         LLFrameTimer::updateFrameCount();
         s->updateLayout();
-        ensure("the next frame moves it again", p->getVisibleAmount() > after_frame);
+        UNSCOPED_INFO("the next frame moves it again");
+        CHECK(p->getVisibleAmount() > after_frame);
     }
 
     // Every panel of a stack gets the frame's animation, not just the first one
     // that wanted it: panels that open together open together.
-    template<> template<>
-    void lllayoutstack_object::test<8>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: every animating panel gets the frame's animation not just the first", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         // A time constant of zero is a whole animation in one pass.
@@ -334,42 +322,42 @@ namespace tut
         LLFrameTimer::updateFrameCount();
 
         s->updateLayout();
-        ensure_equals("the first panel opened", a->getVisibleAmount(), 1.f);
-        ensure_equals("so did the second", b->getVisibleAmount(), 1.f);
+        CHECK(a->getVisibleAmount() == 1.f);
+        CHECK(b->getVisibleAmount() == 1.f);
     }
 
     // A panel that never declared a minimum has one of zero, collapsed or not.
     // -1 is how the parameter says it was not given, and a dimension of -1
     // travels out of the space arithmetic and into a clip rect.
-    template<> template<>
-    void lllayoutstack_object::test<9>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: a panel that declares no minimum has a minimum of zero even collapsed", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLLayoutStack> s(stack());
         LLLayoutPanel* p = panel("p");
         s->addPanel(p);
 
-        ensure_equals("expanded, its minimum is zero", p->getRelevantMinDim(), 0);
+        UNSCOPED_INFO("expanded");
+        CHECK(p->getRelevantMinDim() == 0);
 
         s->collapsePanel(p, true);
         s->updateLayout();
-        ensure_equals("collapsed, its minimum is still zero", p->getRelevantMinDim(), 0);
-        ensure_equals("and it takes no room", p->getVisibleDim(), 0);
+        UNSCOPED_INFO("collapsed");
+        CHECK(p->getRelevantMinDim() == 0);
+        CHECK(p->getVisibleDim() == 0);
     }
 
     // Resize bars sit in front of the panels. A bar overlaps the panel on
     // either side of it by resize_bar_overlap, and a click in that overlap
     // belongs to the bar; whichever panel joined last is still behind it.
-    template<> template<>
-    void lllayoutstack_object::test<10>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: resize bars sit in front of the panels", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLLayoutStack> s(stack());
@@ -387,42 +375,43 @@ namespace tut
             }
             else
             {
-                ensure("every resize bar is in front of every panel", !seen_panel);
+                UNSCOPED_INFO("every resize bar is in front of every panel");
+                REQUIRE_FALSE(seen_panel);
             }
         }
-        ensure("the stack has panels to be in front of", seen_panel);
+        UNSCOPED_INFO("the stack has panels to be in front of");
+        CHECK(seen_panel);
     }
 
     // setTargetDim asks the stack for a size the panel will hold. Below the
     // panel's minimum, the minimum is what it asks for.
-    template<> template<>
-    void lllayoutstack_object::test<11>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: setTargetDim below the panel's minimum asks for the minimum", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLLayoutStack> s(stack());
         LLLayoutPanel* p = fixedPanel("fixed", 100);   // its minimum comes from that rect
         s->addPanel(p);
         s->updateLayout();
-        ensure_equals("the panel starts at its authored size", p->getTargetDim(), 100);
+        UNSCOPED_INFO("the panel starts at its authored size");
+        CHECK(p->getTargetDim() == 100);
 
         p->setTargetDim(10);
-        ensure_equals("a target under the minimum is the minimum", p->getTargetDim(), 100);
+        CHECK(p->getTargetDim() == 100);
     }
 
     // A resize bar sits between two panels and needs both of them to be able
     // to give room. Putting a panel that is neither auto- nor user-resizable
     // between the two that were resizing against each other takes the bar
     // away, and it goes silently: the drag area is simply not there any more.
-    template<> template<>
-    void lllayoutstack_object::test<12>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: a panel that cannot resize takes the resize bar from between two", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         // A panel the stack does not size and nobody may drag: a toolbar.
@@ -443,8 +432,9 @@ namespace tut
             s->addPanel(grows);
             s->addPanel(dragged);
             s->updateLayout();
-            ensure("the pair can resize, so there is somewhere to drag",
-                   grows->getResizeBar()->getVisible());
+            REQUIRE(grows->getResizeBar() != nullptr);
+            UNSCOPED_INFO("the pair can resize, so there is somewhere to drag");
+            CHECK(grows->getResizeBar()->getVisible());
             s->die();
         }
 
@@ -457,10 +447,12 @@ namespace tut
             s->addPanel(between);
             s->addPanel(dragged);
             s->updateLayout();
-            ensure("a band that cannot give room has no bar of its own",
-                   !between->getResizeBar()->getVisible());
-            ensure("and it takes the bar off the panel behind it too",
-                   !grows->getResizeBar()->getVisible());
+            REQUIRE(between->getResizeBar() != nullptr);
+            REQUIRE(grows->getResizeBar() != nullptr);
+            UNSCOPED_INFO("a band that cannot give room has no bar of its own");
+            CHECK_FALSE(between->getResizeBar()->getVisible());
+            UNSCOPED_INFO("and it takes the bar off the panel behind it too");
+            CHECK_FALSE(grows->getResizeBar()->getVisible());
             s->die();
         }
     }
@@ -469,12 +461,11 @@ namespace tut
     // worth nothing the rest of the time. A stack that says so draws its
     // handles only near the mouse -- the bar itself is where it always was
     // and takes the mouse the same way; what appears is the mark saying so.
-    template<> template<>
-    void lllayoutstack_object::test<13>()
+    TEST_CASE_METHOD(lllayoutstack_data, "lllayoutstack: drag handles shown on hover are drawn only near the mouse", "[lllayoutstack]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLLayoutStack::Params p;
@@ -493,24 +484,28 @@ namespace tut
         stack->updateLayout();
 
         LLView* handle = stack->findChild<LLView>("resize_handle_bg_panel", true);
-        ensure("a handle was made", handle != nullptr);
-        ensure("and it is not drawn until a hand goes for it", !handle->getVisible());
+        REQUIRE(handle != nullptr);
+        UNSCOPED_INFO("not drawn until a hand goes for it");
+        CHECK_FALSE(handle->getVisible());
 
         // Where the bar is, which is where a hand going for it would be.
         const LLResizeBar* bar = stack->findChild<LLResizeBar>("resize", true);
-        ensure("the bar is there", bar != nullptr);
+        REQUIRE(bar != nullptr);
         const LLRect on_it = bar->getRect();
 
         stack->showDragHandlesNear(on_it.getCenterX(), on_it.getCenterY());
-        ensure("a hand on it brings it out", handle->getVisible());
+        UNSCOPED_INFO("a hand on it brings it out");
+        CHECK(handle->getVisible());
 
         // Near it counts too, because a bar is a few pixels wide and a hand
         // is not that accurate.
         stack->showDragHandlesNear(on_it.mRight + 6, on_it.getCenterY());
-        ensure("and so does a hand beside it", handle->getVisible());
+        UNSCOPED_INFO("and so does a hand beside it");
+        CHECK(handle->getVisible());
 
         stack->showDragHandlesNear(on_it.mRight + 60, on_it.getCenterY());
-        ensure("a hand somewhere else does not", !handle->getVisible());
+        UNSCOPED_INFO("a hand somewhere else does not");
+        CHECK_FALSE(handle->getVisible());
 
         // A stack that draws its handles always is not affected by where the
         // mouse is: saying so is what turns this on.
@@ -521,9 +516,14 @@ namespace tut
         other->addChild(panel("b"));
         other->updateLayout();
         LLView* shown = other->findChild<LLView>("resize_handle_bg_panel", true);
-        ensure("drawn from the start", shown != nullptr && shown->getVisible());
+        {
+            INFO("drawn from the start");
+            REQUIRE(shown != nullptr);
+            CHECK(shown->getVisible());
+        }
         other->showDragHandlesNear(-100, -100);
-        ensure("and still drawn wherever the mouse is", shown->getVisible());
+        UNSCOPED_INFO("and still drawn wherever the mouse is");
+        CHECK(shown->getVisible());
 
         delete stack;
         delete other;

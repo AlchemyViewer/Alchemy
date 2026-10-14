@@ -26,9 +26,9 @@
 
 #include "../alscriptsaveflow.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alscriptsaveflow_data
     {
@@ -71,195 +71,245 @@ namespace tut
             return flow.compiled(answer);
         }
     };
-    typedef test_group<alscriptsaveflow_data> alscriptsaveflow_group;
-    typedef alscriptsaveflow_group::object    alscriptsaveflow_object;
-    alscriptsaveflow_group                    alscriptsaveflow_instance("ALScriptSaveFlow");
 
-    template<> template<>
-    void alscriptsaveflow_object::test<1>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: a Save asked during a send runs once after it however often it was asked", "[ALScriptSaveFlow]")
     {
-        set_test_name("a Save while one is sent follows it once it answers, and once however often it was asked");
-        ensure("goes", flow.ask(false, false) == Flow::Start::Go);
-        ensure("straight up", flow.route(script(1)) == Route::Send);
+        CHECK(flow.ask(false, false) == Flow::Start::Go);
+        UNSCOPED_INFO("straight up");
+        CHECK(flow.route(script(1)) == Route::Send);
         send();
-        ensure("sending", flow.sending());
-        ensure("asked again: queued", flow.ask(false, false) == Flow::Start::Queued);
-        ensure("and again", flow.ask(false, false) == Flow::Start::Queued);
+        CHECK(flow.sending());
+        UNSCOPED_INFO("asked again: queued");
+        CHECK(flow.ask(false, false) == Flow::Start::Queued);
+        UNSCOPED_INFO("and again");
+        CHECK(flow.ask(false, false) == Flow::Start::Queued);
         const Flow::Landing landing = compile(true, true);
-        ensure("its own save, saved", landing.ours && landing.markSaved && !landing.stopped);
-        ensure("nothing on its way", !flow.underway());
-        ensure("the one asked for meanwhile", flow.takeAgain());
-        ensure("once", !flow.takeAgain());
+        {
+            INFO("its own save, saved");
+            CHECK(landing.ours);
+            CHECK(landing.markSaved);
+            CHECK_FALSE(landing.stopped);
+        }
+        CHECK_FALSE(flow.underway());
+        UNSCOPED_INFO("the one asked for meanwhile");
+        CHECK(flow.takeAgain());
+        UNSCOPED_INFO("once");
+        CHECK_FALSE(flow.takeAgain());
         const Flow::Landing recompile = compile(true, true);
-        ensure("a recompile from elsewhere is not this tab's save", !recompile.ours && !recompile.markSaved);
+        {
+            INFO("a recompile from elsewhere is not this tab's save");
+            CHECK_FALSE(recompile.ours);
+            CHECK_FALSE(recompile.markSaved);
+        }
     }
 
-    template<> template<>
-    void alscriptsaveflow_object::test<2>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: Save Anyway lets one text past the analyzers' errors (S3-D1)", "[ALScriptSaveFlow]")
     {
-        set_test_name("Save Anyway lets past the check that stopped the save, for that text (S3-D1); nothing the preprocessor finds stops one");
-        ensure("the analyzers' errors stop it", flow.route(expanded(1, true, true, 2)) == Route::StoppedByAnalyzers);
-        ensure("and nothing waits", !flow.underway());
+        UNSCOPED_INFO("the analyzers' errors stop it");
+        CHECK(flow.route(expanded(1, true, true, 2)) == Route::StoppedByAnalyzers);
+        CHECK_FALSE(flow.underway());
         flow.letPast(1);
-        ensure("asked again: past the errors, on to the preprocessor", flow.route(expanded(1, true, true, 2)) == Route::Preprocess);
-        ensure("whatever it found, sent: the save keeps the work", flow.preprocessed(run(1, 1)) == Flow::Landed::Send);
-        ensure("the same text asked again: still past", flow.route(expanded(1, true, true, 2)) == Route::Preprocess);
-        ensure("a changed text asks afresh", flow.route(expanded(2, true, true, 2)) == Route::StoppedByAnalyzers);
+        UNSCOPED_INFO("asked again: past the errors, on to the preprocessor");
+        CHECK(flow.route(expanded(1, true, true, 2)) == Route::Preprocess);
+        UNSCOPED_INFO("whatever it found, sent: the save keeps the work");
+        CHECK(flow.preprocessed(run(1, 1)) == Flow::Landed::Send);
+        UNSCOPED_INFO("the same text asked again: still past");
+        CHECK(flow.route(expanded(1, true, true, 2)) == Route::Preprocess);
+        UNSCOPED_INFO("a changed text asks afresh");
+        CHECK(flow.route(expanded(2, true, true, 2)) == Route::StoppedByAnalyzers);
         flow.letPast(2);
-        ensure("let past", flow.route(expanded(2, true, true, 2)) == Route::Preprocess);
+        CHECK(flow.route(expanded(2, true, true, 2)) == Route::Preprocess);
         flow.preprocessed(run(2, 2));
         send();
         compile(true, true);
-        ensure("and a save that went up leaves nothing let past", flow.route(expanded(2, true, true, 2)) == Route::StoppedByAnalyzers);
+        UNSCOPED_INFO("and a save that went up leaves nothing let past");
+        CHECK(flow.route(expanded(2, true, true, 2)) == Route::StoppedByAnalyzers);
     }
 
-    template<> template<>
-    void alscriptsaveflow_object::test<3>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: a save held on errors waits for a check of its text and is asked again", "[ALScriptSaveFlow]")
     {
-        set_test_name("a save held on errors waits for a check of its text, and is asked again when it comes");
-        ensure("not checked yet", flow.route(script(4, true, false)) == Route::Check);
-        ensure("waiting", flow.stage() == Flow::Stage::Checking);
-        ensure("the check came: asked again", flow.checked());
-        ensure("once", !flow.checked());
-        ensure("checked, and clean: sent", flow.route(script(4, true, true, 0)) == Route::Send);
+        UNSCOPED_INFO("not checked yet");
+        CHECK(flow.route(script(4, true, false)) == Route::Check);
+        CHECK(flow.stage() == Flow::Stage::Checking);
+        UNSCOPED_INFO("the check came: asked again");
+        CHECK(flow.checked());
+        UNSCOPED_INFO("once");
+        CHECK_FALSE(flow.checked());
+        UNSCOPED_INFO("checked, and clean: sent");
+        CHECK(flow.route(script(4, true, true, 0)) == Route::Send);
     }
 
-    template<> template<>
-    void alscriptsaveflow_object::test<4>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: a text changed while preprocessed starts over and a running pass is joined", "[ALScriptSaveFlow]")
     {
-        set_test_name("a text changed while it is preprocessed starts the save over; a run already on its way is joined; a run nobody saves with is left alone");
-        ensure("run", flow.route(expanded(1)) == Route::Preprocess);
-        ensure("typed in meanwhile: from the start", flow.preprocessed(run(1, 2)) == Flow::Landed::MovedOn);
-        ensure("nothing on its way", !flow.underway());
-        ensure("a view's run, nobody saving", flow.preprocessed(run(2, 2)) == Flow::Landed::NotForSave);
-        ensure("a run on its way already: joined", flow.route(expanded(2, false, true, 0, true)) == Route::JoinPreprocessor);
-        ensure("waiting on it", flow.stage() == Flow::Stage::Preprocessing);
-        ensure("and sent when it comes", flow.preprocessed(run(2, 2)) == Flow::Landed::Send);
+        CHECK(flow.route(expanded(1)) == Route::Preprocess);
+        UNSCOPED_INFO("typed in meanwhile: from the start");
+        CHECK(flow.preprocessed(run(1, 2)) == Flow::Landed::MovedOn);
+        CHECK_FALSE(flow.underway());
+        UNSCOPED_INFO("a view's run, nobody saving");
+        CHECK(flow.preprocessed(run(2, 2)) == Flow::Landed::NotForSave);
+        UNSCOPED_INFO("a run on its way already: joined");
+        CHECK(flow.route(expanded(2, false, true, 0, true)) == Route::JoinPreprocessor);
+        CHECK(flow.stage() == Flow::Stage::Preprocessing);
+        UNSCOPED_INFO("and sent when it comes");
+        CHECK(flow.preprocessed(run(2, 2)) == Flow::Landed::Send);
     }
 
-    template<> template<>
-    void alscriptsaveflow_object::test<5>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: a close waiting on a save is dropped when the save stops unless quitting", "[ALScriptSaveFlow]")
     {
-        set_test_name("a close waiting on a save goes where the save stops, and not where the viewer is quitting over a failed compile");
         flow.setCloseAfter(true);
         flow.route(script(1));
         flow.stopped();
-        ensure("refused as it was sent", !flow.closeAfter() && !flow.underway());
+        {
+            INFO("refused as it was sent");
+            CHECK_FALSE(flow.closeAfter());
+            CHECK_FALSE(flow.underway());
+        }
 
         flow.setCloseAfter(true);
         send();
         flow.ask(false, false);
-        ensure("the text did not go up: stopped", compile(false, false).stopped);
-        ensure("the close with it", !flow.closeAfter());
-        ensure("and what was asked meanwhile", !flow.takeAgain());
+        UNSCOPED_INFO("the text did not go up: stopped");
+        CHECK(compile(false, false).stopped);
+        UNSCOPED_INFO("the close with it");
+        CHECK_FALSE(flow.closeAfter());
+        UNSCOPED_INFO("and what was asked meanwhile");
+        CHECK_FALSE(flow.takeAgain());
 
         flow.setCloseAfter(true);
         send();
-        ensure("up, and did not compile: stopped", compile(true, false).stopped && !flow.closeAfter());
+        {
+            INFO("up, and did not compile: stopped");
+            CHECK(compile(true, false).stopped);
+            CHECK_FALSE(flow.closeAfter());
+        }
 
         flow.setCloseAfter(true);
         send();
         const Flow::Landing quitting = compile(true, false, true);
-        ensure("unless quitting: saved, and closed", !quitting.stopped && quitting.markSaved && flow.closeAfter());
+        {
+            INFO("unless quitting: saved, and closed");
+            CHECK_FALSE(quitting.stopped);
+            CHECK(quitting.markSaved);
+            CHECK(flow.closeAfter());
+        }
 
         flow.setCloseAfter(true);
         send();
         compile(true, true);
-        ensure("compiled: closed", flow.closeAfter());
+        UNSCOPED_INFO("compiled: closed");
+        CHECK(flow.closeAfter());
     }
 
-    template<> template<>
-    void alscriptsaveflow_object::test<6>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: an external editor's save skips every check and out of reach nothing goes", "[ALScriptSaveFlow]")
     {
-        set_test_name("an external editor's save goes past every check and is the editor's until it lands; out of reach, or detached, nothing goes");
         flow.fromExternal(3);
-        ensure("the editor's", flow.external());
-        ensure("past the errors", flow.route(expanded(3, true, true, 5)) == Route::Preprocess);
-        ensure("and sent", flow.preprocessed(run(3, 3)) == Flow::Landed::Send);
+        CHECK(flow.external());
+        UNSCOPED_INFO("past the errors");
+        CHECK(flow.route(expanded(3, true, true, 5)) == Route::Preprocess);
+        UNSCOPED_INFO("and sent");
+        CHECK(flow.preprocessed(run(3, 3)) == Flow::Landed::Send);
         flow.endExternal();
-        ensure("ended", !flow.external());
+        CHECK_FALSE(flow.external());
 
         flow.setCloseAfter(true);
-        ensure("out of reach", flow.ask(true, false) == Flow::Start::OutOfReach && !flow.closeAfter());
+        CHECK(flow.ask(true, false) == Flow::Start::OutOfReach);
+        CHECK_FALSE(flow.closeAfter());
         flow.setCloseAfter(true);
-        ensure("detached", flow.ask(false, true) == Flow::Start::Detached && !flow.closeAfter());
+        CHECK(flow.ask(false, true) == Flow::Start::Detached);
+        CHECK_FALSE(flow.closeAfter());
     }
 
-    template<> template<>
-    void alscriptsaveflow_object::test<7>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: files and notecards go as they stand and errors stop only a held save", "[ALScriptSaveFlow]")
     {
-        set_test_name("a file is written and a notecard sent as they stand, never checked or preprocessed; not held, errors stop nothing");
         Flow::Tab file = expanded(1, true, false, 3);
         file.file      = true;
-        ensure("a file", flow.route(file) == Route::File);
+        CHECK(flow.route(file) == Route::File);
         Flow::Tab card = expanded(1, true, false, 3);
         card.notecard  = true;
-        ensure("a notecard", flow.route(card) == Route::Notecard);
-        ensure("not held: sent over errors", flow.route(script(1, false, true, 3)) == Route::Send);
-        ensure("or expanded first", flow.route(expanded(1, false, true, 3)) == Route::Preprocess);
+        CHECK(flow.route(card) == Route::Notecard);
+        UNSCOPED_INFO("not held: sent over errors");
+        CHECK(flow.route(script(1, false, true, 3)) == Route::Send);
+        UNSCOPED_INFO("or expanded first");
+        CHECK(flow.route(expanded(1, false, true, 3)) == Route::Preprocess);
     }
 
-    template<> template<>
-    void alscriptsaveflow_object::test<8>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: fixOnce is true once a save and again for the next", "[ALScriptSaveFlow]")
     {
-        set_test_name("the safe fixes are made once a save, however many checks it waits on, and afresh for the next");
-        ensure("once", flow.fixOnce());
+        CHECK(flow.fixOnce());
         flow.route(script(1, true, false));
         flow.checked();
-        ensure("not again while the same save waits", !flow.fixOnce());
+        UNSCOPED_INFO("not again while the same save waits");
+        CHECK_FALSE(flow.fixOnce());
         send();
-        ensure("afresh once it went", flow.fixOnce());
+        UNSCOPED_INFO("afresh once it went");
+        CHECK(flow.fixOnce());
         flow.stopped();
-        ensure("or stopped", flow.fixOnce());
+        UNSCOPED_INFO("or stopped");
+        CHECK(flow.fixOnce());
         flow.done();
-        ensure("or a file was written", flow.fixOnce());
+        UNSCOPED_INFO("or a file was written");
+        CHECK(flow.fixOnce());
     }
 
-    template<> template<>
-    void alscriptsaveflow_object::test<9>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: sent keeps the save point and source map and a notecard's items", "[ALScriptSaveFlow]")
     {
-        set_test_name("what went up is kept: where the journal stood, the map the compiler's lines are read through, a notecard's items");
         ALTextUndo::SavePoint at;
         at.serial = 7;
         LLUUID item;
         item.generate();
         flow.sent(at, ALSourceMap(), { item });
-        ensure("the save point", flow.savePoint().serial == 7);
-        ensure("the map", flow.sentMap().has_value());
-        ensure("the items", flow.sentItems().size() == 1 && flow.sentItems().front() == item);
+        CHECK(flow.savePoint().serial == 7);
+        CHECK(flow.sentMap().has_value());
+        REQUIRE(flow.sentItems().size() == 1);
+        CHECK(flow.sentItems().front() == item);
         flow.forgetSentItems();
-        ensure("let go of", flow.sentItems().empty());
+        UNSCOPED_INFO("let go of");
+        CHECK(flow.sentItems().empty());
         compile(true, true);
-        ensure("the map stays after, for what the script says as it runs", flow.sentMap().has_value());
+        UNSCOPED_INFO("the map stays after, for what the script says as it runs");
+        CHECK(flow.sentMap().has_value());
         flow.setWarnWeightFor(9);
-        ensure("the weight to warn of", flow.warnWeightFor() == 9);
+        CHECK(flow.warnWeightFor() == 9);
     }
 
-    template<> template<>
-    void alscriptsaveflow_object::test<10>()
+    TEST_CASE_METHOD(alscriptsaveflow_data, "ALScriptSaveFlow: the world is asked once a text and a moved item stops the save", "[ALScriptSaveFlow]")
     {
-        set_test_name("the world asked once a text what the item holds; moved, the save stops until asked again; a save asked meanwhile waits on the answer");
         Flow::Tab tab = script(1);
         tab.askWorld  = true;
-        ensure("asked first", flow.route(tab) == Route::AskWorld && flow.stage() == Flow::Stage::Asking);
-        ensure("a save asked meanwhile waits on the answer", flow.ask(false, false) == Flow::Start::Queued);
+        {
+            INFO("asked first");
+            CHECK(flow.route(tab) == Route::AskWorld);
+            CHECK(flow.stage() == Flow::Stage::Asking);
+        }
+        UNSCOPED_INFO("a save asked meanwhile waits on the answer");
+        CHECK(flow.ask(false, false) == Flow::Start::Queued);
         flow.worldAnswered(1, false);
-        ensure("answered, nothing moved: sent", flow.route(tab) == Route::Send);
+        UNSCOPED_INFO("answered, nothing moved: sent");
+        CHECK(flow.route(tab) == Route::Send);
 
         tab.version = 2;
-        ensure("a new text asks again", flow.route(tab) == Route::AskWorld);
+        UNSCOPED_INFO("a new text asks again");
+        CHECK(flow.route(tab) == Route::AskWorld);
         flow.worldAnswered(2, true);
-        ensure("moved: stopped", flow.route(tab) == Route::StoppedByWorld && !flow.underway());
-        ensure("and again", flow.route(tab) == Route::StoppedByWorld);
+        {
+            INFO("moved: stopped");
+            CHECK(flow.route(tab) == Route::StoppedByWorld);
+            CHECK_FALSE(flow.underway());
+        }
+        UNSCOPED_INFO("and again");
+        CHECK(flow.route(tab) == Route::StoppedByWorld);
         flow.letPast(2);
-        ensure("asked again: saved over it", flow.route(tab) == Route::Send);
+        UNSCOPED_INFO("asked again: saved over it");
+        CHECK(flow.route(tab) == Route::Send);
 
         Flow::Tab file = tab;
         file.file      = true;
-        ensure("a file asks nothing of the world", flow.route(file) == Route::File);
+        UNSCOPED_INFO("a file asks nothing of the world");
+        CHECK(flow.route(file) == Route::File);
         Flow::Tab card = script(3);
         card.notecard  = true;
         card.askWorld  = true;
-        ensure("a notecard is asked about too", flow.route(card) == Route::AskWorld);
+        UNSCOPED_INFO("a notecard is asked about too");
+        CHECK(flow.route(card) == Route::AskWorld);
     }
 }

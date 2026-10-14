@@ -35,12 +35,12 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alchangepeek_data
     {
@@ -64,7 +64,7 @@ namespace tut
         {
             if (!ui.ok())
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
             p.name   = "source";
@@ -80,137 +80,230 @@ namespace tut
         static void press(ALChangePeek& peek, const char* name) { ALViewType::as<ALFlatButton>(peek.getChild<LLView>(name))->press(); }
     };
 
-    typedef test_group<alchangepeek_data> alchangepeek_group;
-    typedef alchangepeek_group::object    alchangepeek_object;
-    tut::alchangepeek_group               alchangepeek_test("alchangepeek");
-
-    template<> template<>
-    void alchangepeek_object::test<1>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: changesOf finds each kind of change and changeAt the one a line is in", "[alchangepeek]")
     {
-        set_test_name("a text's changes from a saved one: lines changed, put in, taken out at the end; and the change a line is in");
         const std::vector<std::string> saved = { "a", "b", "c", "d", "e" };
         const std::vector<std::string> now   = { "a", "B", "c", "x", "d" };
         const std::vector<Change>      found = ALChangePeek::changesOf(saved, now);
-        ensure_equals("three", found.size(), 3U);
-        ensure("changed", found[0] == Change{ 1, 1, 1, 1 });
-        ensure("put in", found[1] == Change{ 3, 1, 3, 0 });
-        ensure("taken out at the end", found[2] == Change{ 5, 0, 4, 1 });
-        ensure_equals("by its line", ALChangePeek::changeAt(found, 1), 0);
-        ensure_equals("a line put in", ALChangePeek::changeAt(found, 3), 1);
-        ensure_equals("the line before lines taken out at the end", ALChangePeek::changeAt(found, 4), 2);
-        ensure_equals("a line the same", ALChangePeek::changeAt(found, 2), -1);
-        ensure("none where nothing changed", ALChangePeek::changesOf(saved, saved).empty());
+        REQUIRE(found.size() == 3U);
+        UNSCOPED_INFO("changed");
+        CHECK(found[0] == Change{ 1, 1, 1, 1 });
+        UNSCOPED_INFO("put in");
+        CHECK(found[1] == Change{ 3, 1, 3, 0 });
+        UNSCOPED_INFO("taken out at the end");
+        CHECK(found[2] == Change{ 5, 0, 4, 1 });
+        UNSCOPED_INFO("by its line");
+        CHECK(ALChangePeek::changeAt(found, 1) == 0);
+        UNSCOPED_INFO("a line put in");
+        CHECK(ALChangePeek::changeAt(found, 3) == 1);
+        UNSCOPED_INFO("the line before lines taken out at the end");
+        CHECK(ALChangePeek::changeAt(found, 4) == 2);
+        UNSCOPED_INFO("a line the same");
+        CHECK(ALChangePeek::changeAt(found, 2) == -1);
+        UNSCOPED_INFO("none where nothing changed");
+        CHECK(ALChangePeek::changesOf(saved, saved).empty());
     }
 
-    template<> template<>
-    void alchangepeek_object::test<2>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: a peek shows the saved lines in a gap under the change and steps on", "[alchangepeek]")
     {
-        set_test_name("peeked at: its lines as saved in a gap under its lines now, said which of how many; stepped through, the gap going with it");
         ALCodeEditor& e = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
-        ensure("a change", e.peekChange(1));
+        CHECK(e.peekChange(1));
         ALChangePeek& peek = *e.changePeek();
-        ensure("open, the first of three", peek.isOpen() && peek.changeShown() == 0 && peek.changeCount() == 3);
-        ensure("said", peek.said().find("1 of 3") != std::string::npos && peek.said().find("Changed") != std::string::npos);
-        ensure_equals("the line as saved", peek.savedText()->wholeText(), std::string("b"));
-        ensure_equals("numbered as it was", peek.savedText()->lineAnnotation(0).number, 2);
-        ensure_equals("under its line", peek.gapLine(), 2);
-        ensure("a gap opened there", e.lineAnnotation(2).gap > 0 && e.layout().gapRows(2) > 0);
-        ensure("drawn in it", peek.getVisible() && peek.getRect().getHeight() > 0);
+        {
+            INFO("open, the first of three");
+            CHECK(peek.isOpen());
+            CHECK(peek.changeShown() == 0);
+            CHECK(peek.changeCount() == 3);
+        }
+        CHECK(peek.said().find("1 of 3") != std::string::npos);
+        CHECK(peek.said().find("Changed") != std::string::npos);
+        UNSCOPED_INFO("the line as saved");
+        CHECK(peek.savedText()->wholeText() == std::string("b"));
+        UNSCOPED_INFO("numbered as it was");
+        CHECK(peek.savedText()->lineAnnotation(0).number == 2);
+        UNSCOPED_INFO("under its line");
+        CHECK(peek.gapLine() == 2);
+        {
+            INFO("a gap opened there");
+            CHECK(e.lineAnnotation(2).gap > 0);
+            CHECK(e.layout().gapRows(2) > 0);
+        }
+        {
+            INFO("drawn in it");
+            CHECK(peek.getVisible());
+            CHECK(peek.getRect().getHeight() > 0);
+        }
         const LLRect text  = e.textRect();
         const S32    under = text.mTop - (e.layout().lineTop(1) + e.layout().lineHeight(1) - e.scrollY());
-        ensure_equals("its top at its line's foot", peek.getRect().mTop, under);
-        ensure("above the next line", peek.getRect().mBottom >= text.mTop - (e.layout().lineTop(2) - e.scrollY()));
-        ensure("across the text", peek.getRect().mLeft == text.mLeft && peek.getRect().mRight == text.mRight);
+        UNSCOPED_INFO("its top at its line's foot");
+        CHECK(peek.getRect().mTop == under);
+        UNSCOPED_INFO("above the next line");
+        CHECK(peek.getRect().mBottom >= text.mTop - (e.layout().lineTop(2) - e.scrollY()));
+        {
+            INFO("across the text");
+            CHECK(peek.getRect().mLeft == text.mLeft);
+            CHECK(peek.getRect().mRight == text.mRight);
+        }
 
         press(peek, "next");
-        ensure("the line put in", peek.changeShown() == 1 && peek.gapLine() == 4 && !peek.savedText()->getVisible());
-        ensure("said as put in", peek.said().find("Added") != std::string::npos);
-        ensure("the gap gone from where it was", e.lineAnnotation(2).gap == 0);
-        ensure_equals("the caret on its line", e.caret().line, 3);
+        {
+            INFO("the line put in");
+            CHECK(peek.changeShown() == 1);
+            CHECK(peek.gapLine() == 4);
+            CHECK_FALSE(peek.savedText()->getVisible());
+        }
+        UNSCOPED_INFO("said as put in");
+        CHECK(peek.said().find("Added") != std::string::npos);
+        UNSCOPED_INFO("the gap gone from where it was");
+        CHECK(e.lineAnnotation(2).gap == 0);
+        UNSCOPED_INFO("the caret on its line");
+        CHECK(e.caret().line == 3);
         press(peek, "next");
-        ensure("taken out at the end, under the last line", peek.changeShown() == 2 && peek.gapLine() == 5 && peek.savedText()->wholeText() == "e");
-        ensure("none after", !peek.step(true) && peek.changeShown() == 2);
+        {
+            INFO("taken out at the end, under the last line");
+            CHECK(peek.changeShown() == 2);
+            CHECK(peek.gapLine() == 5);
+            CHECK(peek.savedText()->wholeText() == "e");
+        }
+        {
+            INFO("none after");
+            CHECK_FALSE(peek.step(true));
+            CHECK(peek.changeShown() == 2);
+        }
         press(peek, "previous");
         press(peek, "previous");
-        ensure("back to the first", peek.changeShown() == 0 && !peek.step(false));
+        {
+            INFO("back to the first");
+            CHECK(peek.changeShown() == 0);
+            CHECK_FALSE(peek.step(false));
+        }
         press(peek, "close");
-        ensure("closed, its gap shut", !peek.isOpen() && !peek.getVisible() && e.lineAnnotation(2).gap == 0);
+        {
+            INFO("closed, its gap shut");
+            CHECK_FALSE(peek.isOpen());
+            CHECK_FALSE(peek.getVisible());
+            CHECK(e.lineAnnotation(2).gap == 0);
+        }
     }
 
-    template<> template<>
-    void alchangepeek_object::test<3>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: take_back reverts a change as one undo step and other edits close it", "[alchangepeek]")
     {
-        set_test_name("a change taken back as one step to undo, the peek on to the next; an edit not its own closes it; nothing saved, nothing to peek");
         ALCodeEditor& e = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
-        e.peekChange(1);
+        CHECK(e.peekChange(1));
         ALChangePeek& peek = *e.changePeek();
         press(peek, "take_back");
-        ensure_equals("made as saved", e.wholeText(), std::string("a\nb\nc\nx\nd"));
-        ensure("on to the line put in, now the first of two", peek.isOpen() && peek.changeShown() == 0 && peek.changeCount() == 2 && peek.gapLine() == 4);
-        ensure("no gap left behind", e.lineAnnotation(2).gap == 0);
+        UNSCOPED_INFO("made as saved");
+        CHECK(e.wholeText() == std::string("a\nb\nc\nx\nd"));
+        {
+            INFO("on to the line put in, now the first of two");
+            CHECK(peek.isOpen());
+            CHECK(peek.changeShown() == 0);
+            CHECK(peek.changeCount() == 2);
+            CHECK(peek.gapLine() == 4);
+        }
+        UNSCOPED_INFO("no gap left behind");
+        CHECK(e.lineAnnotation(2).gap == 0);
         press(peek, "next");
-        ensure("the last taken back", peek.takeBack() && e.wholeText() == "a\nb\nc\nx\nd\ne");
-        ensure("none after it: closed", !peek.isOpen() && e.lineAnnotation(5).gap == 0 && e.lineAnnotation(6).gap == 0);
+        {
+            INFO("the last taken back");
+            CHECK(peek.takeBack());
+            CHECK(e.wholeText() == "a\nb\nc\nx\nd\ne");
+        }
+        {
+            INFO("none after it: closed");
+            CHECK_FALSE(peek.isOpen());
+            CHECK(e.lineAnnotation(5).gap == 0);
+            CHECK(e.lineAnnotation(6).gap == 0);
+        }
 
         e.undo();
-        ensure_equals("one step back", e.wholeText(), std::string("a\nb\nc\nx\nd"));
-        ensure("peeked again", e.peekChange(3) && peek.isOpen());
+        UNSCOPED_INFO("one step back");
+        CHECK(e.wholeText() == std::string("a\nb\nc\nx\nd"));
+        {
+            INFO("peeked again");
+            CHECK(e.peekChange(3));
+            CHECK(peek.isOpen());
+        }
         e.goTo(ALTextPos(0, 0));
         e.insertText("// ");
-        ensure("an edit not its own closes it", !peek.isOpen() && e.lineAnnotation(4).gap == 0);
+        {
+            INFO("an edit not its own closes it");
+            CHECK_FALSE(peek.isOpen());
+            CHECK(e.lineAnnotation(4).gap == 0);
+        }
 
         e.undoJournal().markNeverSaved();
-        ensure("nothing saved to tell a change by", !e.peekChange(3) && !peek.isOpen());
+        {
+            INFO("nothing saved to tell a change by");
+            CHECK_FALSE(e.peekChange(3));
+            CHECK_FALSE(peek.isOpen());
+        }
     }
 
-    template<> template<>
-    void alchangepeek_object::test<4>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: a press on a change bar opens the peek and Escape closes it", "[alchangepeek]")
     {
-        set_test_name("a press on a changed line's bar peeks at its change; Escape in the peek closes it");
         ALCodeEditor& e    = make("one\ntwo\nthree", "one\n2\nthree");
         const LLRect  text = e.textRect();
         const S32     y    = text.mTop - (e.layout().lineTop(1) - e.scrollY()) - e.layout().lineHeight(1) / 2;
-        ensure("barred", e.lineChanged(1));
-        ensure("pressed on the bar", e.handleMouseDown(e.leftEdge() + 1, y, MASK_NONE));
-        ensure("open at its change", e.changePeek() && e.changePeek()->isOpen() && e.changePeek()->changeShown() == 0);
-        ensure("Escape closes it", e.changePeek()->handleKeyHere(KEY_ESCAPE, MASK_NONE) && !e.changePeek()->isOpen());
+        UNSCOPED_INFO("barred");
+        CHECK(e.lineChanged(1));
+        UNSCOPED_INFO("pressed on the bar");
+        CHECK(e.handleMouseDown(e.leftEdge() + 1, y, MASK_NONE));
+        {
+            INFO("open at its change");
+            REQUIRE(e.changePeek());
+            CHECK(e.changePeek()->isOpen());
+            CHECK(e.changePeek()->changeShown() == 0);
+        }
+        {
+            INFO("Escape closes it");
+            CHECK(e.changePeek()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            CHECK_FALSE(e.changePeek()->isOpen());
+        }
         const S32 same = text.mTop - (e.layout().lineTop(0) - e.scrollY()) - e.layout().lineHeight(0) / 2;
         e.handleMouseDown(e.leftEdge() + 1, same, MASK_NONE);
-        ensure("a line not barred: no peek", !e.changePeek()->isOpen());
+        UNSCOPED_INFO("a line not barred: no peek");
+        CHECK_FALSE(e.changePeek()->isOpen());
     }
 
-    template<> template<>
-    void alchangepeek_object::test<5>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: changed words are marked in the peek and the editor until it closes", "[alchangepeek]")
     {
-        set_test_name("the words that changed marked: on the line as saved in the peek, and on the line now in the editor; let go of as it closes");
         ALCodeEditor& e = make("integer count = 1;\nstring s;", "integer total = 2;\nstring s;");
-        e.peekChange(0);
+        CHECK(e.peekChange(0));
         ALChangePeek& peek = *e.changePeek();
         const auto    has  = [](const ALTextRange& range, S32 line, S32 begin, S32 end) {
             return range.begin.line == line && range.begin.column <= begin && range.end.column >= end;
         };
         const std::vector<ALCodeEditor::Decoration>& was = peek.savedText()->decorations();
-        ensure("the word as saved", std::any_of(was.begin(), was.end(), [&](const ALCodeEditor::Decoration& d) { return has(d.range, 0, 8, 13); }));
-        ensure("and its number", std::any_of(was.begin(), was.end(), [&](const ALCodeEditor::Decoration& d) { return has(d.range, 0, 16, 17); }));
-        ensure("nothing else of the line", std::none_of(was.begin(), was.end(), [&](const ALCodeEditor::Decoration& d) { return has(d.range, 0, 0, 7); }));
+        UNSCOPED_INFO("the word as saved");
+        CHECK(std::any_of(was.begin(), was.end(), [&](const ALCodeEditor::Decoration& d) { return has(d.range, 0, 8, 13); }));
+        UNSCOPED_INFO("and its number");
+        CHECK(std::any_of(was.begin(), was.end(), [&](const ALCodeEditor::Decoration& d) { return has(d.range, 0, 16, 17); }));
+        UNSCOPED_INFO("nothing else of the line");
+        CHECK(std::none_of(was.begin(), was.end(), [&](const ALCodeEditor::Decoration& d) { return has(d.range, 0, 0, 7); }));
         const std::vector<ALTextRange>& now = e.highlights(ALCodeEditor::Highlight::Change);
-        ensure("the word now, in the editor", std::any_of(now.begin(), now.end(), [&](const ALTextRange& r) { return has(r, 0, 8, 13); }));
-        ensure("only on the line changed", std::none_of(now.begin(), now.end(), [](const ALTextRange& r) { return r.begin.line != 0; }));
+        UNSCOPED_INFO("the word now, in the editor");
+        CHECK(std::any_of(now.begin(), now.end(), [&](const ALTextRange& r) { return has(r, 0, 8, 13); }));
+        UNSCOPED_INFO("only on the line changed");
+        CHECK(std::none_of(now.begin(), now.end(), [](const ALTextRange& r) { return r.begin.line != 0; }));
         peek.close();
-        ensure("let go of", e.highlights(ALCodeEditor::Highlight::Change).empty());
+        UNSCOPED_INFO("let go of");
+        CHECK(e.highlights(ALCodeEditor::Highlight::Change).empty());
 
         // A line put in alone has nothing to mark against.
         editor->die();
         editor          = nullptr;
         ALCodeEditor& f = make("a\nb", "a\nput in\nb");
-        f.peekChange(1);
-        ensure("nothing marked", f.highlights(ALCodeEditor::Highlight::Change).empty() && f.changePeek()->savedText()->decorations().empty());
+        CHECK(f.peekChange(1));
+        {
+            INFO("nothing marked");
+            CHECK(f.highlights(ALCodeEditor::Highlight::Change).empty());
+            CHECK(f.changePeek()->savedText()->decorations().empty());
+        }
     }
 
-    template<> template<>
-    void alchangepeek_object::test<6>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: vim's change motions step through changes and an open peek follows", "[alchangepeek]")
     {
-        set_test_name("vim's ]c and [c in the source step through its changes since saved, a count as far as there are; a peek open goes along");
         ALCodeEditor& e = make("a\nb\nc\nd\ne\nf\ng", "a\nB\nc\nd\nE\nE2\nf\ng\nh");
         e.setModalKeymap(std::make_unique<ALVimKeymap>());
         e.setFocus(true);
@@ -223,52 +316,97 @@ namespace tut
         };
         const std::string text = e.wholeText();
         typed("]c");
-        ensure_equals("the first change", e.caret().line, 1);
+        UNSCOPED_INFO("the first change");
+        CHECK(e.caret().line == 1);
         typed("]c");
-        ensure_equals("the next", e.caret().line, 4);
+        UNSCOPED_INFO("the next");
+        CHECK(e.caret().line == 4);
         typed("j[c");
-        ensure_equals("back, from within it, to its start", e.caret().line, 4);
+        UNSCOPED_INFO("back, from within it, to its start");
+        CHECK(e.caret().line == 4);
         typed("[c");
-        ensure_equals("the one before", e.caret().line, 1);
+        UNSCOPED_INFO("the one before");
+        CHECK(e.caret().line == 1);
         typed("5]c");
-        ensure_equals("a count, as far as there are", e.caret().line, 8);
-        ensure("nothing typed", e.wholeText() == text);
+        UNSCOPED_INFO("a count, as far as there are");
+        CHECK(e.caret().line == 8);
+        UNSCOPED_INFO("nothing typed");
+        CHECK(e.wholeText() == text);
 
-        ensure("peeked at", e.peekChange(1) && e.changePeek()->changeShown() == 0);
+        {
+            INFO("peeked at");
+            REQUIRE(e.peekChange(1));
+            CHECK(e.changePeek()->changeShown() == 0);
+        }
         e.goTo(ALTextPos(1, 0));
         typed("]c");
-        ensure("the peek gone along", e.caret().line == 4 && e.changePeek()->isOpen() && e.changePeek()->changeShown() == 1);
-        ensure("as the editor steps without vim", e.stepChange(false) && e.caret().line == 1 && e.changePeek()->changeShown() == 0);
-        ensure("none before the first", !e.stepChange(false) && e.caret().line == 1);
+        {
+            INFO("the peek gone along");
+            CHECK(e.caret().line == 4);
+            CHECK(e.changePeek()->isOpen());
+            CHECK(e.changePeek()->changeShown() == 1);
+        }
+        {
+            INFO("as the editor steps without vim");
+            CHECK(e.stepChange(false));
+            CHECK(e.caret().line == 1);
+            CHECK(e.changePeek()->changeShown() == 0);
+        }
+        {
+            INFO("none before the first");
+            CHECK_FALSE(e.stepChange(false));
+            CHECK(e.caret().line == 1);
+        }
     }
 
-    template<> template<>
-    void alchangepeek_object::test<7>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: bars ignore CR LF and lone CR line ends and a save closes the peek", "[alchangepeek]")
     {
-        set_test_name("the bars against a saved text ended by CR LF or a lone CR: the lines that differ only; a save closes a peek; its lines tinted as a comparison's");
         ALCodeEditor& e = make("a\nb\nc\nd", "a\nB\nc\nd");
         e.barChangesSince("a\r\nb\r\nc\r\nd");
-        ensure("CR LF: the second line alone", !e.lineChanged(0) && e.lineChanged(1) && !e.lineChanged(2) && !e.lineChanged(3));
+        {
+            INFO("CR LF: the second line alone");
+            CHECK_FALSE(e.lineChanged(0));
+            CHECK(e.lineChanged(1));
+            CHECK_FALSE(e.lineChanged(2));
+            CHECK_FALSE(e.lineChanged(3));
+        }
         e.barChangesSince("a\rb\rc\rd");
-        ensure("a lone CR: the same", !e.lineChanged(0) && e.lineChanged(1) && !e.lineChanged(2) && !e.lineChanged(3));
+        {
+            INFO("a lone CR: the same");
+            CHECK_FALSE(e.lineChanged(0));
+            CHECK(e.lineChanged(1));
+            CHECK_FALSE(e.lineChanged(2));
+            CHECK_FALSE(e.lineChanged(3));
+        }
 
-        ensure("peeked", e.peekChange(1) && e.changePeek()->isOpen());
-        ensure("tinted as a comparison tints a line taken out",
-               e.changePeek()->savedText()->lineAnnotation(0).tint == ALDiffColors::get(ALDiffColors::Name::Removed).get());
+        {
+            INFO("peeked");
+            REQUIRE(e.peekChange(1));
+            CHECK(e.changePeek()->isOpen());
+        }
+        UNSCOPED_INFO("tinted as a comparison tints a line taken out");
+        CHECK(e.changePeek()->savedText()->lineAnnotation(0).tint == ALDiffColors::get(ALDiffColors::Name::Removed).get());
         e.resetDirty();
-        ensure("saved: closed, the gap shut", !e.changePeek()->isOpen() && e.lineAnnotation(2).gap == 0);
+        {
+            INFO("saved: closed, the gap shut");
+            CHECK_FALSE(e.changePeek()->isOpen());
+            CHECK(e.lineAnnotation(2).gap == 0);
+        }
         e.selectAll();
         e.insertText("a\nB!\nc\nd");
-        ensure("peeked again", e.peekChange(1) && e.changePeek()->isOpen());
+        {
+            INFO("peeked again");
+            REQUIRE(e.peekChange(1));
+            CHECK(e.changePeek()->isOpen());
+        }
         ALTextUndo::SavePoint point = e.undoJournal().savePoint();
         e.markSavedAt(point);
-        ensure("saved at a point: closed", !e.changePeek()->isOpen());
+        UNSCOPED_INFO("saved at a point: closed");
+        CHECK_FALSE(e.changePeek()->isOpen());
     }
 
-    template<> template<>
-    void alchangepeek_object::test<8>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: a peek scrolled partly out of the text is cut to the part in sight", "[alchangepeek]")
     {
-        set_test_name("scrolled partly out of the text: its rectangle the part in sight, what is inside it placed as the whole has them, the part cut off not its own");
         std::string saved;
         std::string now;
         for (S32 n = 0; n < 80; ++n)
@@ -277,60 +415,108 @@ namespace tut
             now += (n ? "\n" : "") + std::string(n >= 40 && n <= 47 ? "changed " : "line ") + std::to_string(n);
         }
         ALCodeEditor& e = make(saved, now);
-        ensure("a change", e.peekChange(40));
+        CHECK(e.peekChange(40));
         ALChangePeek& peek = *e.changePeek();
         const LLRect  text = e.textRect();
         // The change in sight, whole.
         e.setScrollY(e.layout().lineTop(38));
         peek.place();
         const S32 tall = peek.getRect().getHeight();
-        ensure("whole while in sight", tall > 40 && peek.cutBelow() == 0);
+        {
+            INFO("whole while in sight");
+            CHECK(tall > 40);
+            CHECK(peek.cutBelow() == 0);
+        }
 
         // Its top above the text's.
         e.setScrollY(e.layout().gapTop(peek.gapLine()) + 20);
         peek.place();
-        ensure("cut at the text's top", peek.getRect().mTop == text.mTop && peek.getRect().getHeight() == tall - 20 && peek.cutBelow() == 0);
+        {
+            INFO("cut at the text's top");
+            CHECK(peek.getRect().mTop == text.mTop);
+            CHECK(peek.getRect().getHeight() == tall - 20);
+            CHECK(peek.cutBelow() == 0);
+        }
 
         // Its top a little above the text's foot: the rest below, cut off.
         e.setScrollY(e.layout().gapTop(peek.gapLine()) - (text.getHeight() - 30));
         peek.place();
-        ensure("cut at the text's foot", peek.getRect().mBottom == text.mBottom && peek.getRect().getHeight() == 30 && peek.cutBelow() == tall - 30);
-        ensure("a point below the text not its own", !peek.getRect().pointInRect(text.mLeft + 10, text.mBottom - 1));
+        {
+            INFO("cut at the text's foot");
+            CHECK(peek.getRect().mBottom == text.mBottom);
+            CHECK(peek.getRect().getHeight() == 30);
+            CHECK(peek.cutBelow() == tall - 30);
+        }
+        UNSCOPED_INFO("a point below the text not its own");
+        CHECK_FALSE(peek.getRect().pointInRect(text.mLeft + 10, text.mBottom - 1));
         const LLRect bar = peek.getChild<LLView>("close")->getRect();
-        ensure("its bar at the top of what is in sight", bar.mTop == 30 - 2);
+        UNSCOPED_INFO("its bar at the top of what is in sight");
+        CHECK(bar.mTop == 30 - 2);
     }
 
-    template<> template<>
-    void alchangepeek_object::test<9>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: changesSinceSaved is kept until an edit or an undo or a save", "[alchangepeek]")
     {
-        set_test_name("the changes since saved worked out once while nothing moves: stepped through, and a peek shown at each, asking nothing again; an edit, an undo, a save each work them out again");
         ALCodeEditor& e     = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
         const auto    first = e.changesSinceSaved();
-        ensure("known: three", first && first->changes.size() == 3 && first->version == e.document().version());
-        ensure("asked again, the same", e.changesSinceSaved() == first);
+        {
+            INFO("known: three");
+            REQUIRE(first);
+            CHECK(first->changes.size() == 3);
+            CHECK(first->version == e.document().version());
+        }
+        UNSCOPED_INFO("asked again, the same");
+        CHECK(e.changesSinceSaved() == first);
         e.goTo(ALTextPos(0, 0));
-        ensure("stepped to the first", e.stepChange(true) && e.caret().line == 1);
-        ensure("a peek shown there", e.peekChange(1));
-        ensure("and on to the next", e.stepChange(true) && e.caret().line == 3 && e.changePeek()->changeShown() == 1);
-        ensure("nothing worked out again", e.changesSinceSaved() == first);
+        {
+            INFO("stepped to the first");
+            CHECK(e.stepChange(true));
+            CHECK(e.caret().line == 1);
+        }
+        UNSCOPED_INFO("a peek shown there");
+        CHECK(e.peekChange(1));
+        {
+            INFO("and on to the next");
+            CHECK(e.stepChange(true));
+            CHECK(e.caret().line == 3);
+            CHECK(e.changePeek()->changeShown() == 1);
+        }
+        UNSCOPED_INFO("nothing worked out again");
+        CHECK(e.changesSinceSaved() == first);
 
         e.goTo(ALTextPos(0, 0));
         e.insertText("y");
         const auto edited = e.changesSinceSaved();
-        ensure("an edit: again, of the text as it is", edited && edited != first && edited->version == e.document().version() &&
-                                                           edited->now.front() == "ya");
-        ensure("undone: again, three", e.perform(ALEditorCommand::Undo) && e.changesSinceSaved() != edited && e.changesSinceSaved()->changes.size() == 3);
+        {
+            INFO("an edit: again, of the text as it is");
+            REQUIRE(edited);
+            CHECK(edited != first);
+            CHECK(edited->version == e.document().version());
+            CHECK(edited->now.front() == "ya");
+        }
+        {
+            INFO("undone: again, three");
+            CHECK(e.perform(ALEditorCommand::Undo));
+            CHECK(e.changesSinceSaved() != edited);
+            REQUIRE(e.changesSinceSaved());
+            CHECK(e.changesSinceSaved()->changes.size() == 3);
+        }
         e.resetDirty();
-        ensure("saved: none", e.changesSinceSaved() && e.changesSinceSaved()->changes.empty());
+        {
+            INFO("saved: none");
+            REQUIRE(e.changesSinceSaved());
+            CHECK(e.changesSinceSaved()->changes.empty());
+        }
         // Changed by its document, which no journal is told of: again.
         e.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "z");
-        ensure("the text as it is", e.changesSinceSaved()->now.front() == "za");
+        {
+            INFO("the text as it is");
+            REQUIRE(e.changesSinceSaved());
+            CHECK(e.changesSinceSaved()->now.front() == "za");
+        }
     }
 
-    template<> template<>
-    void alchangepeek_object::test<10>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: an edit above a peek that adds or takes lines closes it leaving no gap", "[alchangepeek]")
     {
-        set_test_name("an edit above an open peek that adds or takes lines closes it with no gap left anywhere, its own or the text's end's");
         ALCodeEditor& e     = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
         const auto    clear = [&e]() {
             for (S32 l = 0; l <= e.document().lineCount(); ++l)
@@ -342,85 +528,160 @@ namespace tut
             }
             return true;
         };
-        ensure("no gap before", clear());
+        UNSCOPED_INFO("no gap before");
+        CHECK(clear());
 
         // A line put in above it.
-        ensure("peeked", e.peekChange(1) && e.changePeek()->gapLine() == 2 && e.lineAnnotation(2).gap > 0);
+        {
+            INFO("peeked");
+            REQUIRE(e.peekChange(1));
+            CHECK(e.changePeek()->gapLine() == 2);
+            CHECK(e.lineAnnotation(2).gap > 0);
+        }
         e.goTo(ALTextPos(0, 1));
         e.insertText("\n");
-        ensure("closed", !e.changePeek()->isOpen());
-        ensure("a line put in above: no gap left", clear());
+        UNSCOPED_INFO("closed");
+        CHECK_FALSE(e.changePeek()->isOpen());
+        UNSCOPED_INFO("a line put in above: no gap left");
+        CHECK(clear());
 
         // A line taken out above it.
-        ensure("peeked again", e.peekChange(4) && e.changePeek()->gapLine() == 5 && e.lineAnnotation(5).gap > 0);
+        {
+            INFO("peeked again");
+            REQUIRE(e.peekChange(4));
+            CHECK(e.changePeek()->gapLine() == 5);
+            CHECK(e.lineAnnotation(5).gap > 0);
+        }
         e.goTo(ALTextPos(1, 0));
-        ensure("joined", e.handleKeyHere(KEY_BACKSPACE, MASK_NONE) && e.document().lineCount() == 5);
-        ensure("closed again", !e.changePeek()->isOpen());
-        ensure("a line taken out above: no gap left", clear());
+        {
+            INFO("joined");
+            CHECK(e.handleKeyHere(KEY_BACKSPACE, MASK_NONE));
+            CHECK(e.document().lineCount() == 5);
+        }
+        UNSCOPED_INFO("closed again");
+        CHECK_FALSE(e.changePeek()->isOpen());
+        UNSCOPED_INFO("a line taken out above: no gap left");
+        CHECK(clear());
 
         // Under the last line, the text's end's gap, with a line put in.
         const S32 last = e.document().lineCount() - 1;
-        ensure("peeked at the end", e.peekChange(last) && e.changePeek()->gapLine() == e.document().lineCount() &&
-                                        e.lineAnnotation(e.document().lineCount()).gap > 0);
+        {
+            INFO("peeked at the end");
+            REQUIRE(e.peekChange(last));
+            CHECK(e.changePeek()->gapLine() == e.document().lineCount());
+            CHECK(e.lineAnnotation(e.document().lineCount()).gap > 0);
+        }
         e.goTo(ALTextPos(0, 0));
         e.insertText("\n");
-        ensure("closed at the end", !e.changePeek()->isOpen());
-        ensure("the end's gap shut", clear());
+        UNSCOPED_INFO("closed at the end");
+        CHECK_FALSE(e.changePeek()->isOpen());
+        UNSCOPED_INFO("the end's gap shut");
+        CHECK(clear());
     }
 
-    template<> template<>
-    void alchangepeek_object::test<11>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: F7 steps the peek and Escape closes it once the selection is gone", "[alchangepeek]")
     {
-        set_test_name("from the editor: F7 and Shift-F7 step the peek; Escape closes it once nothing else has it; and under vim");
         ALCodeEditor& e = make("a\nb\nc\nd\ne", "a\nB\nc\nx\nd");
         e.setFocus(true);
-        ensure("peeked", e.peekChange(1));
+        UNSCOPED_INFO("peeked");
+        CHECK(e.peekChange(1));
         ALChangePeek& peek = *e.changePeek();
-        ensure("F7: the next", e.handleKeyHere(KEY_F7, MASK_NONE) && peek.changeShown() == 1);
-        ensure("Shift-F7: the one before", e.handleKeyHere(KEY_F7, MASK_SHIFT) && peek.changeShown() == 0);
+        {
+            INFO("F7: the next");
+            CHECK(e.handleKeyHere(KEY_F7, MASK_NONE));
+            CHECK(peek.changeShown() == 1);
+        }
+        {
+            INFO("Shift-F7: the one before");
+            CHECK(e.handleKeyHere(KEY_F7, MASK_SHIFT));
+            CHECK(peek.changeShown() == 0);
+        }
 
         e.selectAll();
-        ensure("Escape lets the selection go first", e.handleKeyHere(KEY_ESCAPE, MASK_NONE) && peek.isOpen() && !e.hasSelection());
-        ensure("then closes it", e.handleKeyHere(KEY_ESCAPE, MASK_NONE) && !peek.isOpen() && e.lineAnnotation(2).gap == 0);
-        ensure("closed, F7 is the text's again", !peek.isOpen());
+        {
+            INFO("Escape lets the selection go first");
+            CHECK(e.handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            CHECK(peek.isOpen());
+            CHECK_FALSE(e.hasSelection());
+        }
+        {
+            INFO("then closes it");
+            CHECK(e.handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            CHECK_FALSE(peek.isOpen());
+            CHECK(e.lineAnnotation(2).gap == 0);
+        }
+        UNSCOPED_INFO("closed, F7 is the text's again: with no misspelling to go to, nothing takes it");
+        CHECK_FALSE(e.handleKeyHere(KEY_F7, MASK_NONE));
 
         e.setModalKeymap(std::make_unique<ALVimKeymap>());
-        ensure("peeked under vim", e.peekChange(1) && peek.isOpen());
-        ensure("Escape in its normal mode closes it", e.handleKeyHere(KEY_ESCAPE, MASK_NONE) && !peek.isOpen() && e.lineAnnotation(2).gap == 0);
+        {
+            INFO("peeked under vim");
+            CHECK(e.peekChange(1));
+            CHECK(peek.isOpen());
+        }
+        {
+            INFO("Escape in its normal mode closes it");
+            CHECK(e.handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            CHECK_FALSE(peek.isOpen());
+            CHECK(e.lineAnnotation(2).gap == 0);
+        }
     }
 
-    template<> template<>
-    void alchangepeek_object::test<12>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: without a gutter a press at the left edge of a changed line is no peek", "[alchangepeek]")
     {
-        set_test_name("without a gutter, a press at the text's left edge on a changed line is the text's, not a peek");
         ALCodeEditor& e = make("one\ntwo\nthree", "one\n2\nthree");
         e.setShowLineNumbers(false);
         e.setShowFoldMarkers(false);
-        ensure_equals("no gutter", e.gutterWidth(), 0);
+        UNSCOPED_INFO("no gutter");
+        CHECK(e.gutterWidth() == 0);
         const LLRect text = e.textRect();
         const S32    y    = text.mTop - (e.layout().lineTop(1) - e.scrollY()) - e.layout().lineHeight(1) / 2;
-        ensure("barred", e.lineChanged(1));
-        ensure_equals("no bar to press", e.changeBarAt(e.leftEdge() + 1, y), -1);
+        UNSCOPED_INFO("barred");
+        CHECK(e.lineChanged(1));
+        UNSCOPED_INFO("no bar to press");
+        CHECK(e.changeBarAt(e.leftEdge() + 1, y) == -1);
         e.handleMouseDown(e.leftEdge() + 1, y, MASK_NONE);
         e.handleMouseUp(e.leftEdge() + 1, y, MASK_NONE);
-        ensure("no peek", !e.changePeek() || !e.changePeek()->isOpen());
+        UNSCOPED_INFO("no peek");
+        CHECK((!e.changePeek() || !e.changePeek()->isOpen()));
     }
 
-    template<> template<>
-    void alchangepeek_object::test<13>()
+    TEST_CASE_METHOD(alchangepeek_data, "alchangepeek: a line put back as saved loses its bar once changes are worked out", "[alchangepeek]")
     {
-        set_test_name("a line typed on and put back as it was saved loses its bar once the changes are worked out, so the bars, the peek and ]c agree");
         ALCodeEditor& e = make("a\nb\nc", "a\nbx\nC");
         // The x taken out again: the line is the saved one, though the
         // history is two steps off the save.
         e.goTo(ALTextPos(1, 2));
-        ensure("put back", e.handleKeyHere(KEY_BACKSPACE, MASK_NONE) && e.document().text() == "a\nb\nC");
-        ensure("still unsaved, every line barred", e.isDirty() && e.lineChanged(0) && e.lineChanged(1) && e.lineChanged(2));
-        ensure("no change on it to peek at", !e.peekChange(1));
-        ensure("its bar gone, and the first line's", !e.lineChanged(1) && !e.lineChanged(0));
-        ensure("the changed line's kept", e.lineChanged(2) && e.peekChange(2));
+        {
+            INFO("put back");
+            CHECK(e.handleKeyHere(KEY_BACKSPACE, MASK_NONE));
+            CHECK(e.document().text() == "a\nb\nC");
+        }
+        {
+            INFO("still unsaved, every line barred");
+            CHECK(e.isDirty());
+            CHECK(e.lineChanged(0));
+            CHECK(e.lineChanged(1));
+            CHECK(e.lineChanged(2));
+        }
+        UNSCOPED_INFO("no change on it to peek at");
+        CHECK_FALSE(e.peekChange(1));
+        {
+            INFO("its bar gone, and the first line's");
+            CHECK_FALSE(e.lineChanged(1));
+            CHECK_FALSE(e.lineChanged(0));
+        }
+        {
+            INFO("the changed line's kept");
+            CHECK(e.lineChanged(2));
+            CHECK(e.peekChange(2));
+        }
         e.changePeek()->close();
         e.goTo(ALTextPos(0, 0));
-        ensure("]c goes to the barred line", e.stepChange(true) && e.caret().line == 2);
+        {
+            INFO("]c goes to the barred line");
+            CHECK(e.stepChange(true));
+            CHECK(e.caret().line == 2);
+        }
     }
 }
