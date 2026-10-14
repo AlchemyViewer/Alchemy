@@ -243,8 +243,6 @@ TEST_CASE("retry_policy: getSecondsUntilRetryAfter parses seconds and an HTTP da
 
 TEST_CASE("retry_policy: retry-after is honoured in both llmessage and CoreHttp headers", "[retry_policy]")
 {
-    std::cerr << "7 starts" << std::endl;
-
     LLSD sd_headers;
     time_t nowseconds;
     time(&nowseconds);
@@ -261,7 +259,8 @@ TEST_CASE("retry_policy: retry-after is honoured in both llmessage and CoreHttp 
     CHECK(should_retry);
     CHECK_THAT(seconds_to_wait, ll_test::WithinBits(17.0F, 6));
 
-    // retry header should override, give delay of 0
+    // A retry-after date 7 seconds off overrides the default: a delay of
+    // about 7 seconds.
     std::string date_string = LLDate((F64)(nowseconds+7)).asRFC1123();
     sd_headers[HTTP_IN_HEADER_RETRY_AFTER] = date_string;
     policy.onFailure(503,sd_headers);

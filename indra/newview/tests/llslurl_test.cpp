@@ -340,8 +340,8 @@ namespace
         {
             INFO("secondlife:///secondlife/ slurl naming no grid");
             CHECK(slurl.getType() == LLSLURL::LOCATION);
-            CHECK(slurl.getType() == LLSLURL::LOCATION);
             CHECK("myregion" == slurl.getRegion());
+            CHECK(slurl.getPosition() == LLVector3(1, 2, 3));
             CHECK(slurl.getGrid() == "util.agni.lindenlab.com");
         }
 
@@ -349,8 +349,8 @@ namespace
         {
             INFO("secondlife://Aditi/secondlife/ slurl");
             CHECK(slurl.getType() == LLSLURL::LOCATION);
-            CHECK(slurl.getType() == LLSLURL::LOCATION);
             CHECK("myregion" == slurl.getRegion());
+            CHECK(slurl.getPosition() == LLVector3(1, 2, 3));
             CHECK(slurl.getGrid() == "Aditi");
         }
 

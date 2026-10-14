@@ -946,7 +946,7 @@ namespace
         UNSCOPED_INFO("load a known credential: authenticator");
         CHECK_THAT(my_authenticator, ll_test::LLSDEquals(my_new_cred->getAuthenticator()));
         UNSCOPED_INFO("load a known credential: grid");
-        CHECK(my_cred->getGrid() == "my_grid");
+        CHECK(my_new_cred->getGrid() == "my_grid");
 
         // test deletion of a credential
         handler->deleteCredential(my_new_cred);
@@ -954,9 +954,9 @@ namespace
         UNSCOPED_INFO("delete credential: identifier");
         REQUIRE(my_new_cred->getIdentifier().isUndefined());
         UNSCOPED_INFO("delete credential: authenticator");
-        REQUIRE(my_new_cred->getIdentifier().isUndefined());
+        REQUIRE(my_new_cred->getAuthenticator().isUndefined());
         UNSCOPED_INFO("delete credential: grid");
-        CHECK(my_cred->getGrid() == "my_grid");
+        CHECK(my_new_cred->getGrid() == "my_grid");
         // load unknown cred
 
         my_new_cred = handler->loadCredential("my_grid");
@@ -1404,7 +1404,7 @@ namespace
         // trusted
         test_chain->add(new LLBasicCertificate(mX509ChildCert, &mValidationDate));
 
-        // validate without the trust flag.
+        // validate with the trust flag: the store's cache of validated certs vouches for the child.
         test_store->validate(VALIDATION_POLICY_TRUSTED, test_chain, validation_params);
 
         // Validate with child cert but no parent, and no parent in CA store
@@ -1429,7 +1429,7 @@ namespace
                                  LLCertValidationTrustException,
                                  (*test_chain)[1],
                                  test_store->validate,
-                                 VALIDATION_POLICY_TRUSTED | VALIDATION_POLICY_TRUSTED,
+                                 VALIDATION_POLICY_TRUSTED,
                                  test_chain,
                                  validation_params);
         // validate without the trust flag
@@ -1443,8 +1443,11 @@ namespace
         test_store->validate(VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
                              test_chain, validation_params);
 
+        // valid from its first second
         validation_params = LLSD::emptyMap();
         validation_params[CERT_VALIDATION_DATE] = child_info[CERT_VALID_FROM].asDate();
+        CHECK_NOTHROW(test_store->validate(VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
+                                           test_chain, validation_params));
 
         validation_params[CERT_VALIDATION_DATE] = LLDate(child_info[CERT_VALID_FROM].asDate().secondsSinceEpoch() - 1.0);
 

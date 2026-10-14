@@ -244,12 +244,15 @@ namespace
 #endif // HACKED_GODLIKE_VIEWER
 
         // make sure that even if pref is high, if access is low we block access
-        // this shouldn't occur in real life but we want to be safe
-        cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
+        // this shouldn't occur in real life but we want to be safe. The
+        // preference goes after the rating, which setMaturity would pull it
+        // down to.
         aa.setMaturity('P');
+        cgr.setU32("PreferredMaturity", SIM_ACCESS_ADULT);
 #ifndef HACKED_GODLIKE_VIEWER
         {
             INFO("pref adult, actual pg");
+            CHECK(aa.prefersAdult());
             CHECK(aa.wantsPGOnly());
             CHECK_FALSE(aa.canAccessMature());
             CHECK_FALSE(aa.canAccessAdult());

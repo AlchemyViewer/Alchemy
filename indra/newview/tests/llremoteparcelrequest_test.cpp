@@ -88,17 +88,23 @@ namespace
         CHECK(observer->mProcessed);
     }
 
-    // CHOP-220: a dangling observer pointer.
-    TEST_CASE_METHOD(RemoteParcelRequestData, "LLRemoteParcelRequest: a reply after its observer is deleted does not crash", "[LLRemoteParcelRequest]")
+    // CHOP-220: a dangling observer pointer. The deleted observer comes
+    // before a live one for the same parcel: the reply passes it over, does
+    // not crash on it, and still reaches the live one.
+    TEST_CASE_METHOD(RemoteParcelRequestData, "LLRemoteParcelRequest: a reply after an observer is deleted passes it over and reaches the rest", "[LLRemoteParcelRequest]")
     {
         LLRemoteParcelInfoObserver * observer = new TestObserver();
+        TestObserver live;
 
         LLRemoteParcelInfoProcessor & processor = LLRemoteParcelInfoProcessor::instance();
         processor.addObserver(LLUUID(TEST_PARCEL_ID), observer);
+        processor.addObserver(LLUUID(TEST_PARCEL_ID), &live);
 
         delete observer;
         observer = NULL;
 
         processor.processParcelData(testParcelData());
+        CHECK(live.mProcessed);
+        processor.removeObserver(LLUUID(TEST_PARCEL_ID), &live);
     }
 }

@@ -348,7 +348,7 @@ namespace
     // validate grid selection
     TEST_CASE_METHOD(viewerNetworkTest, "LLViewerNetwork: setGridChoice selects the grid the getters answer for", "[LLViewerNetwork]")
     {
-        // adding a grid with simply a name will populate the values.
+        // The sample grid file, for a grid besides Agni and Aditi to choose.
         llofstream gridfile(TEST_FILENAME);
         gridfile << gSampleGridFile;
         gridfile.close();
