@@ -4633,4 +4633,57 @@ namespace
         CHECK(has(r, "gOwner = tostring(owner)"));
         require_checks_clean(r);
     }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: with uuidKeys off llList2Key's item is read as text as List2String reads it", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "list gMixed;\n"
+                                "default { state_entry() {\n"
+                                "    list l = [\"hello world\"];\n"
+                                "    string msg = llList2Key(l, 0);\n"
+                                "    llOwnerSay(msg);\n"
+                                "    key k = llList2Key(l, 0);\n"
+                                "    if (k) llOwnerSay((string)k);\n"
+                                "    gMixed = llParseString2List(llGetObjectDesc(), [\",\"], []) + [1];\n"
+                                "    llOwnerSay(llList2Key(gMixed, 0));\n"
+                                "} }\n";
+        ALLSLToSLua::Options o;
+        o.uuidKeys                  = false;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("Tapple's: the item's text, as LSL gave it");
+            CHECK(has(r, "local msg: string = l[1] or \"\"\n"));
+            CHECK(has(r, "local k: string = l[1] or \"\"\n"));
+            CHECK(has(r, "if (touuid(k) or NULL_KEY).istruthy then print(k) end"));
+            CHECK_FALSE(has(r, "List2Key("));
+        }
+        {
+            INFO("items that may be neither, read as List2String reads them, and said");
+            CHECK(has(r, "print(llcompat.List2String(gMixed, 0))"));
+            CHECK(noted(r, "SluaList2KeyText"));
+        }
+        require_checks_clean(r);
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        CAPTURE(close.text);
+        REQUIRE(close.converted);
+        {
+            INFO("closeToLSL: List2String's call, as Tapple wrote it");
+            CHECK(has(close, "local msg = llcompat.List2String(l, 0)\n"));
+            CHECK(has(close, "local k = llcompat.List2String(l, 0)\n"));
+            CHECK_FALSE(has(close, "List2Key("));
+        }
+        require_checks_clean(close);
+
+        const ALLSLToSLua::Result uuids = require_converted(lsl);
+        CAPTURE(uuids.text);
+        {
+            INFO("uuids by default: List2Key's uuid");
+            CHECK(has(uuids, "local msg = tostring(llcompat.List2Key(l, 0))"));
+            CHECK(has(uuids, "local k = llcompat.List2Key(l, 0)"));
+            CHECK_FALSE(noted(uuids, "SluaList2KeyText"));
+        }
+    }
 }
