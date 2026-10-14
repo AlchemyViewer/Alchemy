@@ -13652,6 +13652,11 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
         return;
     }
 
+    if (!profile_attachments && avatar->isProfilePending())
+    { // the last profile's time is still on its way; another would throw it away
+        return;
+    }
+
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
     // don't continue to profile an avatar that is known to be too slow

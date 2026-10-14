@@ -4,6 +4,7 @@ set(
   llrender_SOURCES
   aldepthbounds.cpp
   algpubuffer.cpp
+  algputimer.cpp
   alimageslot.cpp
   alprimitiveplot.cpp
   alsamplerstate.cpp
@@ -42,6 +43,7 @@ set(
   llrender_HEADERS
   aldepthbounds.h
   algpubuffer.h
+  algputimer.h
   alimageslot.h
   alprimitiveplot.h
   alsamplerstate.h
@@ -209,6 +211,7 @@ if(AL_BUILD_TESTS)
   #   by the matrices the draw syncs;
   # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its
   #   lifetime, and the readback and stream rings;
+  # - ALGPUTimer: one span timed at a time, and its query gone with it;
   # - ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps
   #   it, and integer images.
   al_add_test_binary(
@@ -217,6 +220,7 @@ if(AL_BUILD_TESTS)
     SOURCES
       tests/aldepthbounds_gl_test.cpp
       tests/algpubuffer_gl_test.cpp
+      tests/algputimer_gl_test.cpp
       tests/alimageslot_gl_test.cpp
       tests/alinfiniteprojection_gl_test.cpp
       tests/alinstanceddraw_gl_test.cpp
