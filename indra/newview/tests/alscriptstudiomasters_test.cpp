@@ -322,7 +322,12 @@ namespace
             return link;
         }
 
-        const al_studio_test::FakeServices::Said& said() const { return services.reports.back(); }
+        // The last thing said; there must be something.
+        const al_studio_test::FakeServices::Said& said() const
+        {
+            REQUIRE_FALSE(services.reports.empty());
+            return services.reports.back();
+        }
         static bool says(const std::string& text, const std::string& word) { return text.find(word) != std::string::npos; }
         typedef std::vector<std::string> Names;
     };
@@ -420,8 +425,14 @@ namespace
             studio->picked      = in(name);
             const size_t before = services.reports.size();
             unit->linkToFile(doc);
-            return !disk.linkOf(doc.ref) && services.reports.size() == before + 1 &&
-                   alscriptstudiomasters_data::says(said().text, word) && said().failure && said().doc == doc.id && services.findDoc(doc.id) == &doc;
+            // Read straight, not through said(): the count checked first guards it, and an assertion in
+            // here would clear the message of the CHECK this is called in.
+            if (disk.linkOf(doc.ref) || services.reports.size() != before + 1)
+            {
+                return false;
+            }
+            const al_studio_test::FakeServices::Said& last = services.reports.back();
+            return alscriptstudiomasters_data::says(last.text, word) && last.failure && last.doc == doc.id && services.findDoc(doc.id) == &doc;
         };
         UNSCOPED_INFO("SLua for an LSL script");
         CHECK(refused(lsl, "door.luau", "MasterNotLSLFile"));
@@ -987,6 +998,7 @@ namespace
         {
             INFO("Switch to File: the file's tab in its place, said there");
             REQUIRE_FALSE(services.findDoc(door_ref));
+            REQUIRE_FALSE(studio->closed.empty());
             CHECK(studio->closed.back() == "door");
             CHECK(says(said().text, "MasterGaveWay"));
             CHECK(said().doc == "disk:" + in("door.lsl"));
@@ -1004,6 +1016,7 @@ namespace
         {
             INFO("kept once clean");
             REQUIRE(services.findDoc(lamp_ref) == &lamp);
+            REQUIRE(lamp.offer);
             CHECK(says(lamp.offer->text, "MasterLinkedClean"));
         }
         lamp.editor->setText("default {}\n");

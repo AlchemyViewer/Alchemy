@@ -182,7 +182,7 @@ namespace
         CHECK(a.external->log->path() == file + ".log");
         CHECK(studio.subscribed == Names{ "a" });
         CHECK(a.external->subscribed);
-        CHECK(studio.started == Names{ file });
+        REQUIRE(studio.started == Names{ file });
         UNSCOPED_INFO("what it holds, known");
         CHECK(a.external->written == std::string("default {}"));
 
@@ -321,6 +321,7 @@ namespace
         ALScriptCompileResult result;
         result.messages = { "(1, 2) : ERROR : Syntax error\x07" };
         unit.log(a, result);
+        REQUIRE(a.external->log);
         const std::string log = contents(a.external->log->path());
         {
             INFO("the log: when, then the words, what cannot be printed dropped");
@@ -348,6 +349,7 @@ namespace
         ALScriptCompileResult result;
         unit.log(a, result);
         const std::string file = unit.fileName(a);
+        REQUIRE(a.external->log);
         const std::string log  = a.external->log->path();
         CHECK(exists(file));
         CHECK(exists(log));

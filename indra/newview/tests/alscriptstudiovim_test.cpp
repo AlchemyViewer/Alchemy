@@ -377,6 +377,12 @@ namespace
         a.editor->insertText(" ");
         {
             INFO("wq over something unsaved saves it to close");
+            CHECK(ex(a, "wq"));
+            CHECK(studio.savedToClose == Names{ "a" });
+        }
+        studio.savedToClose.clear();
+        {
+            INFO("and x the same");
             CHECK(ex(a, "x"));
             CHECK(studio.savedToClose == Names{ "a" });
         }
@@ -420,8 +426,14 @@ namespace
         CHECK(ex(a, "set", "rnu"));
         CHECK(relativeNumbers);
         {
-            INFO("off already: left");
+            INFO("on: turned off");
             CHECK(ex(a, "set", "norelativenumber"));
+            CHECK_FALSE(relativeNumbers);
+            CHECK(ran.size() == 4);
+        }
+        {
+            INFO("off already: left");
+            CHECK(ex(a, "set", "nornu"));
             CHECK_FALSE(relativeNumbers);
             CHECK(ran.size() == 4);
         }
@@ -626,6 +638,7 @@ namespace
         go("tabn", "9");
         UNSCOPED_INFO("nor to go to");
         CHECK(vim->message() == std::string("VimBadArgument"));
+        REQUIRE(services.frontDoc());
         UNSCOPED_INFO("still where it was");
         CHECK(services.frontDoc()->id == std::string("delta"));
     }
@@ -661,6 +674,7 @@ namespace
         CHECK((go("tabm", "-1"), order()) == std::string("alpha beta gamma delta"));
         UNSCOPED_INFO(":tabm 3 after the third, past itself");
         CHECK((go("tabm", "3"), order()) == std::string("alpha gamma beta delta"));
+        REQUIRE(services.frontDoc());
         UNSCOPED_INFO("still in front");
         CHECK(services.frontDoc()->id == std::string("beta"));
         go("tabm", "+5");
@@ -739,10 +753,12 @@ namespace
         CHECK(said->message() == std::string("VimArgumentRequired"));
 
         ex(a, "e", "beta");
+        REQUIRE(services.frontDoc());
         UNSCOPED_INFO("a tab by its name");
         CHECK(services.frontDoc()->id == std::string("beta"));
         vim.pump();
         ex(a, "e", "#");
+        REQUIRE(services.frontDoc());
         UNSCOPED_INFO("# the one before");
         CHECK(services.frontDoc()->id == std::string("alpha"));
         Doc& main = tab("mainfile");

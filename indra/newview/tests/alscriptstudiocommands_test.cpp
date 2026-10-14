@@ -87,7 +87,7 @@ namespace
         CHECK_FALSE(commands.addUnlisted("save", [this]() { done.push_back("third"); }));
         commands.run("save");
         UNSCOPED_INFO("the first's");
-        CHECK(done == std::vector<std::string>{ "first" });
+        REQUIRE(done == std::vector<std::string>{ "first" });
         UNSCOPED_INFO("an unlisted one is a command like any");
         CHECK(commands.addUnlisted("reveal", [this]() { done.push_back("reveal"); }));
         commands.run("reveal");
@@ -142,7 +142,7 @@ namespace
         });
         commands.run("first");
         UNSCOPED_INFO("ran to its end");
-        CHECK(done == std::vector<std::string>{ "first" });
+        REQUIRE(done == std::vector<std::string>{ "first" });
         commands.run("made_63");
         UNSCOPED_INFO("and what it made runs");
         CHECK(done.back() == std::string("made"));

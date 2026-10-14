@@ -38,6 +38,7 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <iterator>
 
 namespace
 {
@@ -452,7 +453,9 @@ namespace
         {
             INFO("a file there, opened and taken up");
             REQUIRE(studio().activated.size() == 1);
-            REQUIRE(services().findDoc("disk:" + file.file)->carriedText);
+            const Doc* on_disk = services().findDoc("disk:" + file.file);
+            REQUIRE(on_disk != nullptr);
+            REQUIRE(on_disk->carriedText);
         }
 
         studio().inHand = false;
@@ -480,7 +483,9 @@ namespace
         {
             INFO("its script opened, and the text to go in once loaded");
             REQUIRE(services().opened.size() == 1);
-            CHECK(services().findDoc(ALScriptRef(entry.object, entry.item))->carriedText == std::optional<std::string>("kept\n"));
+            const Doc* reopened = services().findDoc(ALScriptRef(entry.object, entry.item));
+            REQUIRE(reopened != nullptr);
+            CHECK(reopened->carriedText == std::optional<std::string>("kept\n"));
         }
     }
 
@@ -497,9 +502,9 @@ namespace
         Doc& mine = tab("mine", "a\n");
         type(mine, "b");
         r.keep(mine);
-        Doc&        theirs = tab("theirs", "c\n");
-        const Entry left   = require_left_for(theirs, "left\n");
-        Doc&        gone   = tab("gone", "d\n");
+        Doc& theirs = tab("theirs", "c\n");
+        require_left_for(theirs, "left\n");
+        Doc& gone = tab("gone", "d\n");
         type(gone, "e");
         CHECK(r.setAside(gone));
         r.show();
@@ -536,7 +541,11 @@ namespace
 
         theirs.carriedText.reset();
         theirs.loaded = false;
+        // The offer made afresh, not the one before still standing.
+        studio().candidates.clear();
         r.show();
+        UNSCOPED_INFO("the one thrown away, offered still");
+        REQUIRE(studio().candidates.size() == 1);
         studio().chosen(studio().candidates.front().value);
         UNSCOPED_INFO("picked, taken up");
         REQUIRE(theirs.carriedText.has_value());
@@ -603,8 +612,11 @@ namespace
         // Loaded clean, as a tab opened again is: what it keeps of its own
         // forgets nothing of that.
         r.keep(again);
-        UNSCOPED_INFO("still there to take");
-        CHECK(std::filesystem::exists(fsyspath(again.recoverable->path)));
+        {
+            INFO("still there to take");
+            REQUIRE(again.recoverable);
+            CHECK(std::filesystem::exists(fsyspath(again.recoverable->path)));
+        }
         const Entry offered = *again.recoverable;
         r.takeUp(again, offered);
         UNSCOPED_INFO("taken up");
@@ -754,7 +766,8 @@ namespace
         UNSCOPED_INFO("not another session's");
         REQUIRE_FALSE(back);
         const std::vector<Entry> listed = store->list();
-        Entry                    read   = listed.front();
+        REQUIRE(listed.size() == 1);
+        Entry read = listed.front();
         {
             INFO("read whole, the picks with it");
             CHECK(store->load(read));
@@ -801,6 +814,12 @@ namespace
 
         std::vector<std::string> taken;
         bool                     has = true;
+        // The windows' taker is the process's, and holds this case's own:
+        // let go of however this ends.
+        struct TakerBack
+        {
+            ~TakerBack() { ALRecovery::takeWindowsTo(nullptr); }
+        } taker_back;
         ALRecovery::takeWindowsTo([&taken, &has](const Entry& entry) {
             taken.push_back(entry.name);
             return has;
@@ -831,7 +850,6 @@ namespace
             REQUIRE(taken.size() == 2);
             REQUIRE(studio().orphans.size() == 2);
         }
-        ALRecovery::takeWindowsTo(nullptr);
     }
 
     TEST_CASE_METHOD(alscriptstudiorecovery_data, "alscriptstudiorecovery: rekey lets go of the old key's entry and writes under the new one", "[alscriptstudiorecovery]")
@@ -900,9 +918,26 @@ namespace
         UNSCOPED_INFO("the old item's moved");
         REQUIRE(history->list("task:p:old").empty());
         const std::vector<ALSavedText> moved = history->list("task:p:new");
-        UNSCOPED_INFO("behind the new one's");
         REQUIRE(moved.size() == 2U);
+        {
+            // Newest first: the new item's own save, then the old item's.
+            INFO("behind the new one's");
+            ALSavedText newer = moved[0];
+            ALSavedText older = moved[1];
+            REQUIRE(history->load(newer));
+            REQUIRE(history->load(older));
+            CHECK(newer.text == "b");
+            CHECK(older.text == "a");
+        }
+        // Each item's saves are a folder of the history's.
+        const auto folders = [&folder]() {
+            std::error_code ec;
+            return std::distance(std::filesystem::directory_iterator(fsyspath(folder), ec), std::filesystem::directory_iterator());
+        };
+        const auto before = folders();
         ALRecovery::keepSaved(save("", "nobody's", 5.0));
         written();
+        UNSCOPED_INFO("a save of nobody's kept nowhere");
+        CHECK(folders() == before);
     }
 }

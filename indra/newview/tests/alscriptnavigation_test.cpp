@@ -229,12 +229,17 @@ namespace
         a.editor->setCaret(ALTextPos(2, 0));
         unit.noteJump(true);
         unit.goBack(false);
+        REQUIRE(studio.shown.size() == 3);
         UNSCOPED_INFO("a walk ended: the next is a jump of its own");
         CHECK(studio.shown.back() == "a:2");
         a.loaded = false;
         unit.noteJump();
-        UNSCOPED_INFO("a tab not loaded: nothing noted");
-        CHECK((!unit.canGo(false) || studio.shown.size() == 3));
+        {
+            // Noting a place drops the way forward, a:2 here.
+            INFO("a tab not loaded: nothing noted");
+            CHECK(unit.places(false) == 1);
+            CHECK(unit.canGo(true));
+        }
     }
 
     TEST_CASE_METHOD(alscriptnavigation_data, "alscriptnavigation: a row stayed on opens as a preview unless already open or passed or left", "[alscriptnavigation]")

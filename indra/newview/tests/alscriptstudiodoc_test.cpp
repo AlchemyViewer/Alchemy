@@ -204,8 +204,12 @@ namespace
         }
         UNSCOPED_INFO("the whole line");
         CHECK(util->range == ALTextRange(ALTextPos(1, 0), ALTextPos(1, lsl.lineLength(1))));
-        UNSCOPED_INFO("angled");
-        CHECK(Doc::namedIn(lsl, ALTextPos(2, 12), false, none)->name == "sys.lsl");
+        const std::optional<Doc::Named> sys = Doc::namedIn(lsl, ALTextPos(2, 12), false, none);
+        {
+            INFO("angled");
+            REQUIRE(sys.has_value());
+            CHECK(sys->name == "sys.lsl");
+        }
         {
             INFO("not a string elsewhere");
             CHECK_FALSE(Doc::namedIn(lsl, ALTextPos(3, 12), false, none));

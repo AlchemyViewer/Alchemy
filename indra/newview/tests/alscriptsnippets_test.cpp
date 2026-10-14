@@ -175,11 +175,11 @@ namespace
         CHECK_FALSE(LLFile::isfile(ALFileWrite::besideOf(file)));
 
         // A file that cannot be written is not touched: never opened for
-        // writing and left cut short. Root writes what it likes.
+        // writing and left cut short.
 #if !LL_WINDOWS
         if (geteuid() == 0)
         {
-            return;
+            SKIP("root writes what it likes");
         }
 #endif
         const std::string written = read(file);
@@ -278,8 +278,11 @@ namespace
 
         // A third body takes the next number free.
         merged = ALScriptSnippets::merge(own, { snippet("say", "llSay(0, \"c\");") });
-        UNSCOPED_INFO("numbered past the taken");
-        CHECK(own.back().name == std::string("say (3)"));
+        {
+            INFO("numbered past the taken");
+            CHECK(merged.renamed == 1U);
+            CHECK(own.back().name == std::string("say (3)"));
+        }
     }
 
     TEST_CASE_METHOD(alscriptsnippets_data, "alscriptsnippets: a followed notecard's snippets go to their languages and are never saved", "[alscriptsnippets]")
