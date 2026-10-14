@@ -94,13 +94,12 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
     {
         // copy framebuffer contents so far to a texture to be used for
         // reflections and refractions
-        LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
-
         LLRenderTarget& src = gPipeline.mRT->screen;
         LLRenderTarget& dst = gPipeline.mWaterDis;
 
         dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
-                    GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+                    GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        gPipeline.copySceneDepth(dst);
     }
 }
 
