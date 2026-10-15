@@ -22,13 +22,19 @@
 
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <stdexcept>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 namespace
 {
     using namespace std::chrono_literals;
+
+    // A copied guard would unlock its mutex once per copy.
+    static_assert(!std::is_copy_constructible_v<LLMutexLock> && !std::is_copy_assignable_v<LLMutexLock>);
+    static_assert(!std::is_copy_constructible_v<LLMutexTrylock> && !std::is_copy_assignable_v<LLMutexTrylock>);
 
     // Runs a body on a thread of its own and says whether it has returned. A body
     // still blocked when the worker goes out of scope is a deadlock the test has
@@ -180,6 +186,48 @@ namespace
 
         UNSCOPED_INFO("another thread could not acquire a released mutex");
         CHECK(acquired);
+    }
+
+    TEST_CASE_METHOD(llmutex_data, "llmutex: isLocked sees a hold from any thread", "[llmutex]")
+    {
+        mMutex.lock();
+        CHECK(mMutex.isLocked());
+
+        std::atomic<bool> seen_by_other{false};
+        onOtherThread([&]() { seen_by_other = mMutex.isLocked(); });
+        UNSCOPED_INFO("another thread did not see the hold");
+        CHECK(seen_by_other);
+
+        mMutex.unlock();
+        CHECK_FALSE(mMutex.isLocked());
+
+        std::atomic<bool> stale{true};
+        onOtherThread([&]() { stale = mMutex.isLocked(); });
+        CHECK_FALSE(stale);
+    }
+
+    TEST_CASE("llmutex: the standard lock types take an LLMutex", "[llmutex]")
+    {
+        LLMutex a;
+        LLMutex b;
+        {
+            std::scoped_lock both(a, b);
+            CHECK(a.isSelfLocked());
+            CHECK(b.isSelfLocked());
+        }
+        CHECK_FALSE(a.isLocked());
+        CHECK_FALSE(b.isLocked());
+
+        a.lock();
+        std::atomic<bool> other_got_it{true};
+        std::thread([&]()
+            {
+                std::unique_lock<LLMutex> lock(a, std::try_to_lock);
+                other_got_it = lock.owns_lock();
+            }).join();
+        UNSCOPED_INFO("try_to_lock took a mutex another thread holds");
+        CHECK_FALSE(other_got_it);
+        a.unlock();
     }
 
     TEST_CASE_METHOD(llmutex_data, "llmutex: LLMutexTrylock reports and releases", "[llmutex]")

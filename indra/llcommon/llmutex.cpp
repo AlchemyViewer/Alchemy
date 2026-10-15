@@ -69,14 +69,6 @@ void LLMutex::lock()
         mMutex.lock();
     }
 
-#if MUTEX_DEBUG
-    // Have to have the lock before we can access the debug info
-    auto id = LLThread::currentID();
-    if (mIsLocked[id])
-        LL_ERRS() << "Already locked in Thread: " << id << LL_ENDL;
-    mIsLocked[id] = true;
-#endif
-
     mLockingThread.store(LLThread::currentID(), std::memory_order_relaxed);
 }
 
@@ -88,29 +80,15 @@ void LLMutex::unlock()
         return;
     }
 
-#if MUTEX_DEBUG
-    // Access the debug info while we have the lock
-    auto id = LLThread::currentID();
-    if (!mIsLocked[id])
-        LL_ERRS() << "Not locked in Thread: " << id << LL_ENDL;
-    mIsLocked[id] = false;
-#endif
-
     mLockingThread.store(LLThread::id_t(), std::memory_order_relaxed);
     mMutex.unlock();
 }
 
-bool LLMutex::isLocked()
+bool LLMutex::isLocked() const
 {
-    if (!mMutex.try_lock())
-    {
-        return true;
-    }
-    else
-    {
-        mMutex.unlock();
-        return false;
-    }
+    // The owner fields, not a try_lock(): that would hold the lock for a moment against
+    // every other thread, and is undefined on a mutex the caller already holds.
+    return lockingThread() != LLThread::id_t();
 }
 
 bool LLMutex::isSelfLocked()
@@ -139,14 +117,6 @@ bool LLMutex::trylock()
     {
         return false;
     }
-
-#if MUTEX_DEBUG
-    // Have to have the lock before we can access the debug info
-    auto id = LLThread::currentID();
-    if (mIsLocked[id])
-        LL_ERRS() << "Already locked in Thread: " << id << LL_ENDL;
-    mIsLocked[id] = true;
-#endif
 
     mLockingThread.store(LLThread::currentID(), std::memory_order_relaxed);
     return true;
@@ -323,39 +293,6 @@ void LLCondition::broadcast()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     mCond.notify_all();
-}
-
-//---------------------------------------------------------------------
-//
-// LLScopedLock
-//
-LLScopedLock::LLScopedLock(std::mutex* mutex) : mMutex(mutex)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    if(mutex)
-    {
-        mutex->lock();
-        mLocked = true;
-    }
-    else
-    {
-        mLocked = false;
-    }
-}
-
-LLScopedLock::~LLScopedLock()
-{
-    unlock();
-}
-
-void LLScopedLock::unlock()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    if(mLocked)
-    {
-        mMutex->unlock();
-        mLocked = false;
-    }
 }
 
 //============================================================================

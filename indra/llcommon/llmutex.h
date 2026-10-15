@@ -39,23 +39,17 @@
 
 //============================================================================
 
-//#define MUTEX_DEBUG (LL_DEBUG || LL_RELEASE_WITH_DEBUG_INFO)
-#define MUTEX_DEBUG 0 //disable mutex debugging as it's interfering with profiles
-
-#if MUTEX_DEBUG
-#include <map>
-#endif
-
 class LL_COMMON_API LLMutex
 {
 public:
     LLMutex();
-    virtual ~LLMutex();
+    ~LLMutex();
 
     void lock();        // blocks
     bool trylock();     // non-blocking, returns true if lock held.
+    bool try_lock() { return trylock(); } // for std::unique_lock and std::scoped_lock
     void unlock();      // undefined behavior when called on mutex not being held
-    bool isLocked();    // non-blocking, but does do a lock/unlock so not free
+    bool isLocked() const; // non-blocking; exact for the holder, a snapshot for any other thread
     bool isSelfLocked(); //return true if locked in a same thread
     LLThread::id_t lockingThread() const; //get ID of locking thread
 
@@ -71,10 +65,6 @@ protected:
     static_assert(std::atomic<LLThread::id_t>::is_always_lock_free,
                   "LLMutex::mLockingThread is read on the lock() fast path; a locking atomic here "
                   "would put a mutex inside the mutex");
-
-#if MUTEX_DEBUG
-    std::unordered_map<LLThread::id_t, bool> mIsLocked;
-#endif
 };
 
 //============================================================================
@@ -210,6 +200,9 @@ public:
             mMutex->lock();
     }
 
+    LLMutexLock(const LLMutexLock&) = delete;
+    LLMutexLock& operator=(const LLMutexLock&) = delete;
+
     ~LLMutexLock()
     {
         if (mMutex)
@@ -280,19 +273,8 @@ public:
             mLocked = mMutex->trylock();
     }
 
-    LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms) : mMutex(mutex), mLocked(false)
-    {
-        if (!mMutex)
-            return;
-
-        for (U32 i = 0; i < aTries; ++i)
-        {
-            mLocked = mMutex->trylock();
-            if (mLocked)
-                break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-        }
-    }
+    LLMutexTrylock(const LLMutexTrylock&) = delete;
+    LLMutexTrylock& operator=(const LLMutexTrylock&) = delete;
 
     ~LLMutexTrylock()
     {
@@ -308,52 +290,6 @@ public:
 private:
     LLMutex*    mMutex;
     bool        mLocked;
-};
-
-//============================================================================
-
-/**
-* @class LLScopedLock
-* @brief Small class to help lock and unlock mutexes.
-*
-* The constructor handles the lock, and the destructor handles
-* the unlock. Instances of this class are <b>not</b> thread safe.
-*/
-class LL_COMMON_API LLScopedLock
-{
-public:
-    /**
-    * @brief Constructor which accepts a mutex, and locks it.
-    *
-    * @param mutex An allocated mutex. If you pass in NULL,
-    * this wrapper will not lock.
-    */
-    LLScopedLock(std::mutex* mutex);
-
-    /**
-    * @brief Destructor which unlocks the mutex if still locked.
-    */
-    ~LLScopedLock();
-
-    /*
-    * @brief Non-copyable constructor and operator
-    */
-    LLScopedLock(const LLScopedLock&) = delete;
-    LLScopedLock& operator=(const LLScopedLock&) = delete;
-
-    /**
-    * @brief Check lock.
-    */
-    bool isLocked() const { return mLocked; }
-
-    /**
-    * @brief This method unlocks the mutex.
-    */
-    void unlock();
-
-protected:
-    bool mLocked;
-    std::mutex* mMutex;
 };
 
 #endif // LL_LLMUTEX_H
