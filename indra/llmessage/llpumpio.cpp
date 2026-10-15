@@ -173,6 +173,12 @@ LLPumpIO::LLPumpIO(apr_pool_t* pool) :
 
 LLPumpIO::~LLPumpIO()
 {
+    // Removed as the pump removes them, which frees the client data their
+    // descriptors carry: the list's own destructor would not.
+    for (current_chain_t chain = mRunningChains.begin(); chain != mRunningChains.end();)
+    {
+        chain = removeRunningChain(chain);
+    }
     cleanup();
 }
 
