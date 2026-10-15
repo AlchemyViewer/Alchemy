@@ -147,7 +147,9 @@ jobs:
               echo "No test log: the tests did not run."
               exit 0
             fi
-            reports="$(grep -oE 'SUMMARY: [A-Za-z]+Sanitizer: [^ ]+' "$log" | sort | uniq -c | sort -rn || true)"
+            # A leak's summary gives its size where the others give their kind.
+            reports="$(grep -oE 'SUMMARY: [A-Za-z]+Sanitizer: [^ ]+( byte\(s\) leaked)?' "$log" |
+              sed -E 's/: [0-9]+ byte\(s\) leaked/: leak/' | sort | uniq -c | sort -rn || true)"
             if [[ -z "$reports" ]]; then
               echo "No sanitizer reports."
             else

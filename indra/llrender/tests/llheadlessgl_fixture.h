@@ -65,6 +65,12 @@
 #include <iterator>
 #include <string>
 #include <utility>
+#include <vector>
+
+#if LL_LINUX
+#include <dlfcn.h>
+#include <link.h>
+#endif
 
 namespace ll_test
 {
@@ -434,6 +440,7 @@ namespace ll_test
             {
                 throw std::runtime_error("Failed to create the hidden window");
             }
+            pinLoadedLibraries();
 
             installDebugMessageCallback();
 
@@ -522,6 +529,35 @@ namespace ll_test
         }
 
         LLWindow* window() const { return mWindow; }
+
+        // Every library loaded once the window and its context are made --
+        // the GL driver's among them -- kept mapped until the process ends.
+        // SDL unloads the driver with its last window, before LeakSanitizer
+        // looks at exit, and an unloaded library's globals hold nothing to
+        // it, nor can it name the library's frames: all Mesa keeps for the
+        // process would be reported, and nothing could say it was Mesa's.
+        static void pinLoadedLibraries()
+        {
+#if LL_LINUX
+            // Named first, and opened after: dlopen() is not for the loader's
+            // own walk of what it has loaded.
+            std::vector<std::string> names;
+            dl_iterate_phdr(
+                [](dl_phdr_info* info, size_t, void* out) -> int
+                {
+                    if (info->dlpi_name && info->dlpi_name[0])
+                    {
+                        static_cast<std::vector<std::string>*>(out)->emplace_back(info->dlpi_name);
+                    }
+                    return 0;
+                },
+                &names);
+            for (const std::string& name : names)
+            {
+                dlopen(name.c_str(), RTLD_NOW | RTLD_NOLOAD | RTLD_NODELETE);
+            }
+#endif
+        }
 
         // Clear the framebuffer to opaque black so a fresh readFramebufferRGBA
         // reflects only what the test rendered this turn.

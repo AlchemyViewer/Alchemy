@@ -22,7 +22,8 @@ endif()
 
 # A sanitized build's runs. Each sanitizer's options are put before whatever
 # its variable already holds, so an option a developer sets in the shell
-# comes later and wins. Leaks are not looked for. Catch2 installs a SIGSEGV
+# comes later and wins. LeakSanitizer, ASan's, looks for leaks as each
+# process ends. Catch2 installs a SIGSEGV
 # handler of its own to name the case that crashed, which would take the
 # report from ASan and TSan, so they keep theirs. A report fails the entry
 # whatever the process's exit code: UBSan reports and carries on, and a
@@ -52,7 +53,8 @@ if(AL_SANITIZING)
   if("address" IN_LIST AL_SANITIZERS)
     list(
       APPEND AL_TEST_SANITIZER_ENVIRONMENT
-      "ASAN_OPTIONS=string_prepend:detect_leaks=0:allow_user_segv_handler=0:check_initialization_order=1:"
+      "ASAN_OPTIONS=string_prepend:detect_leaks=1:allow_user_segv_handler=0:check_initialization_order=1:"
+      "LSAN_OPTIONS=string_prepend:suppressions='${suppressions}/lsan.supp':print_suppressions=0:"
     )
     list(APPEND AL_TEST_CRASH_ENVIRONMENT "ASAN_OPTIONS=string_append::handle_segv=0")
     set(AL_TEST_TIMEOUT_SCALE 3)
