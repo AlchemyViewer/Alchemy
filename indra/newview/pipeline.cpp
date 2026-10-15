@@ -1316,7 +1316,7 @@ void LLPipeline::releaseGLBuffers()
     mWaterPatchPrimitives.release();
     mWaterSurface.release();
     mDepthPyramid.release();
-    mSkyBehindQuery.release();
+    mSkyBehindQuery = {};
     mSkyBehindQueryFrame = 0;
 
     if (mNoiseMap)
@@ -11788,10 +11788,10 @@ void LLPipeline::doAtmospherics()
             }
             {
                 ALWaterStencil::OnWater stencil;
-                std::optional<ALSamplesQuery::Conditional> if_water;
+                std::optional<ALConditionalRender> if_water;
                 if (mSkyBehindQueryFrame == gFrameCount)
                 {
-                    if_water.emplace(mSkyBehindQuery);
+                    if_water.emplace(gGL.queries(), mSkyBehindQuery);
                 }
                 apply_haze(*gHazeOnWaterProgram.selectVariant(), true);
             }

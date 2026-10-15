@@ -9,7 +9,6 @@ set(
   alprimitiveplot.cpp
   alquerypool.cpp
   alsamplerstate.cpp
-  alsamplesquery.cpp
   altexture3d.cpp
   altextureslot.cpp
   alfontcolrv1.cpp
@@ -49,7 +48,6 @@ set(
   alprimitiveplot.h
   alquerypool.h
   alsamplerstate.h
-  alsamplesquery.h
   altexture3d.h
   altextureslot.h
   alfontcolrv1.h

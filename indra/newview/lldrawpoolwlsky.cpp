@@ -156,7 +156,8 @@ static bool query_water_in_view()
         LLGLDepthTest depth(GL_TRUE, GL_FALSE);
         LLGLSColorMask no_color(false, false);
         LLGLDisable no_cull(GL_CULL_FACE);
-        gPipeline.mSkyBehindQuery.begin();
+        ALQueryScope query(gGL.queries(), ALQueryKind::Occlusion);
+        gPipeline.mSkyBehindQuery = query.ticket();
         field.uniform1f(LLShaderMgr::WATER_RAISE, 0.f);
         gPipeline.mWaterSurface.draw(field, false);
         const F32 raise = gPipeline.mWaterSurface.maxDisplacement();
@@ -165,11 +166,10 @@ static bool query_water_in_view()
             field.uniform1f(LLShaderMgr::WATER_RAISE, raise);
             gPipeline.mWaterSurface.draw(field, false);
         }
-        gPipeline.mSkyBehindQuery.end();
     }
     field.unbind();
     gPipeline.mSkyBehindQueryFrame = gFrameCount;
-    return true;
+    return gPipeline.mSkyBehindQuery.isValid();
 }
 
 void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const
@@ -259,10 +259,10 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
         if (sky_behind)
         {
             LL_PROFILE_GPU_ZONE("sky behind");
-            std::optional<ALSamplesQuery::Conditional> if_water;
+            std::optional<ALConditionalRender> if_water;
             if (queried)
             {
-                if_water.emplace(gPipeline.mSkyBehindQuery);
+                if_water.emplace(gGL.queries(), gPipeline.mSkyBehindQuery);
             }
             behind.bindTarget();
             behind.clear();
