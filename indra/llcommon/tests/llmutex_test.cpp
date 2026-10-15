@@ -16,6 +16,8 @@
 
 #include "llmutex.h"
 
+#include "llcoros.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
@@ -177,5 +179,28 @@ namespace
         CHECK(counter == NUM_THREADS * NUM_ITERATIONS);
         UNSCOPED_INFO("thread claimed ownership it did not have");
         CHECK(false_self_locks.load() == 0);
+    }
+
+    // LLMutex::lock() asserts this on every call in assert builds.
+    TEST_CASE("llmutex: only a launched coroutine is off the main coroutine", "[llmutex]")
+    {
+        CHECK(LLCoros::on_main_coro());
+
+        std::atomic<bool> thread_main{false};
+        std::thread([&]() { thread_main = LLCoros::on_main_coro(); }).join();
+        UNSCOPED_INFO("a plain thread is its own main coroutine");
+        CHECK(thread_main);
+
+        bool coro_main = true;
+        bool ran = false;
+        LLCoros::instance().launch("llmutex_test", [&]()
+            {
+                coro_main = LLCoros::on_main_coro();
+                ran = true;
+            });
+        // The launched coroutine runs to completion before launch() returns here.
+        REQUIRE(ran);
+        CHECK_FALSE(coro_main);
+        CHECK(LLCoros::on_main_coro());
     }
 }
