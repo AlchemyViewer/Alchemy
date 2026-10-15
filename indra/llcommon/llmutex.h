@@ -37,6 +37,10 @@
 #include <unordered_map>
 #include <condition_variable>
 
+#if defined(__GLIBC__)
+#include <pthread.h>
+#endif
+
 //============================================================================
 
 class LL_COMMON_API LLMutex
@@ -91,7 +95,40 @@ public:
     template<bool SHARED> void unlock();
 
 private:
-    std::shared_mutex mSharedMutex;
+#if defined(__GLIBC__)
+    // glibc's default rwlock lets a new reader in past a waiting writer, so readers that
+    // keep overlapping keep a writer out for as long as they do. This one prefers writers,
+    // as the SRW lock and libc++'s shared_mutex do. glibc calls that kind nonrecursive: a
+    // reader taking it again behind a waiting writer would wait on itself, which a shared
+    // re-entry here never does.
+    class RWLock
+    {
+    public:
+        RWLock()
+        {
+            pthread_rwlockattr_t attr;
+            pthread_rwlockattr_init(&attr);
+            pthread_rwlockattr_setkind_np(&attr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
+            pthread_rwlock_init(&mLock, &attr);
+            pthread_rwlockattr_destroy(&attr);
+        }
+        ~RWLock() { pthread_rwlock_destroy(&mLock); }
+
+        RWLock(const RWLock&) = delete;
+        RWLock& operator=(const RWLock&) = delete;
+
+        void lock() { pthread_rwlock_wrlock(&mLock); }
+        void unlock() { pthread_rwlock_unlock(&mLock); }
+        void lock_shared() { pthread_rwlock_rdlock(&mLock); }
+        void unlock_shared() { pthread_rwlock_unlock(&mLock); }
+
+    private:
+        pthread_rwlock_t mLock;
+    };
+#else
+    using RWLock = std::shared_mutex;
+#endif
+    RWLock mSharedMutex;
     // The exclusive holder. Relaxed for the reason LLMutex::mLockingThread is.
     std::atomic<LLThread::id_t> mExclusiveOwner;
     // Owner-only: the holds the exclusive holder has taken beyond its first, either way.

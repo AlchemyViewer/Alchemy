@@ -170,8 +170,8 @@ void LLSharedMutex::lockShared()
 
     if (SharedHold* hold = findSharedHold(this))
     {
-        // Never back to the lock itself: SRW locks and libc++ queue a new reader behind
-        // a waiting writer, which would here be waiting on this thread.
+        // Never back to the lock itself: it queues a new reader behind a waiting writer,
+        // which would here be waiting on this thread.
         ++hold->mDepth;
         return;
     }

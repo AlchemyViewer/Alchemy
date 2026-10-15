@@ -450,9 +450,9 @@ namespace
 
     TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: a reader re-enters while a writer waits", "[llsharedmutex]")
     {
-        // The deadlock the recursion tracking exists for. SRW locks and libc++ queue new
-        // readers behind a waiting writer, so a reader that went back to the lock itself
-        // would wait on a writer that is waiting on it.
+        // The deadlock the recursion tracking exists for. The lock queues new readers
+        // behind a waiting writer, so a reader that went back to the lock itself would
+        // wait on a writer that is waiting on it.
         std::atomic<bool> writer_started{false};
         std::atomic<bool> first_held{false};
         Worker reader([&]()
@@ -482,6 +482,42 @@ namespace
 
         UNSCOPED_INFO("the re-entering reader deadlocked behind the writer");
         CHECK(reader.finishesWithin(RELEASED));
+        CHECK(writer.finishesWithin(RELEASED));
+    }
+
+    TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: a writer gets in while readers keep overlapping", "[llsharedmutex]")
+    {
+        // A lock that lets new readers in past a waiting writer, as glibc's default rwlock
+        // does, keeps the writer out for as long as the readers overlap.
+        std::atomic<bool> stop{false};
+        auto read = [&]()
+        {
+            while (!stop)
+            {
+                mMutex.lockShared();
+                std::this_thread::sleep_for(1ms);
+                mMutex.unlockShared();
+            }
+        };
+        Worker reader1(read);
+        Worker reader2(read);
+        Worker reader3(read);
+        Worker reader4(read);
+        std::this_thread::sleep_for(BLOCKED);
+
+        Worker writer([this]()
+            {
+                mMutex.lockExclusive();
+                mMutex.unlockExclusive();
+            });
+        UNSCOPED_INFO("the readers kept the writer out");
+        CHECK(writer.finishesWithin(RELEASED));
+
+        stop = true;
+        CHECK(reader1.finishesWithin(RELEASED));
+        CHECK(reader2.finishesWithin(RELEASED));
+        CHECK(reader3.finishesWithin(RELEASED));
+        CHECK(reader4.finishesWithin(RELEASED));
         CHECK(writer.finishesWithin(RELEASED));
     }
 
