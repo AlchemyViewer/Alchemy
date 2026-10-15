@@ -271,7 +271,7 @@ const LLHTTPNode* LLHTTPNode::traverse(
 
 
 
-void LLHTTPNode::addNode(const std::string& path, LLHTTPNode* nodeToAdd)
+bool LLHTTPNode::addNode(const std::string& path, LLHTTPNode* nodeToAdd)
 {
     typedef boost::tokenizer< boost::char_separator<char> > tokenizer;
     boost::char_separator<char> sep("/", "", boost::drop_empty_tokens);
@@ -291,7 +291,7 @@ void LLHTTPNode::addNode(const std::string& path, LLHTTPNode* nodeToAdd)
     {
         LL_WARNS() << "LLHTTPNode::addNode: already a node that handles "
             << path << LL_ENDL;
-        return;
+        return false;
     }
 
     while (true)
@@ -334,6 +334,7 @@ void LLHTTPNode::addNode(const std::string& path, LLHTTPNode* nodeToAdd)
         if (lastOne) break;
         node = nextNode;
     }
+    return true;
 }
 
 static void append_node_paths(LLSD& result,
@@ -466,7 +467,11 @@ void LLHTTPRegistrar::buildAllServices(LLHTTPNode& root)
         LL_DEBUGS("AppInit") << "LLHTTPRegistrar::buildAllServices adding node for path "
             << i->first << LL_ENDL;
 
-        root.addNode(i->first, i->second->build());
+        LLHTTPNode* node = i->second->build();
+        if (!root.addNode(i->first, node))
+        {
+            delete node;
+        }
     }
 }
 

@@ -34,7 +34,6 @@ uniform sampler2D screenTex;
 
 uniform vec4 fogCol;
 uniform vec3 lightDir;
-uniform vec3 specular;
 uniform float lightExp;
 uniform vec2 fbScale;
 uniform float refScale;

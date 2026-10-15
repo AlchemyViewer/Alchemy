@@ -207,6 +207,8 @@ void LLBakingShaderMgr::setShaders()
 void LLBakingShaderMgr::unloadShaders()
 {
     gAlphaMaskProgram.unload();
+    // The shared objects are the manager's, so they go here rather than with the program.
+    clearShaderObjects();
 
     mVertexShaderLevel[SHADER_INTERFACE] = 0;
 

@@ -50,7 +50,6 @@
 #include "indra_constants.h"
 #include "lldir.h"
 #include "llerror.h"
-#include "llfasttimer.h"
 #include "llhttpnodeadapter.h"
 #include "llmd5.h"
 #include "llmessagebuilder.h"
@@ -243,8 +242,9 @@ LLMessageSystem::LLMessageSystem(const std::string& filename, U32 port,
     mTemplateMessageReader = new LLTemplateMessageReader(mMessageNumbers);
     mLLSDMessageReader = new LLSDMessageReader();
 
-    // initialize various bits of net info
-    mSocket = 0;
+    // initialize various bits of net info. No socket is -1: 0 is a
+    // descriptor, stdin's.
+    mSocket = -1;
     mPort = port;
 
     S32 error = start_net(mSocket, mPort);
@@ -336,11 +336,9 @@ LLMessageSystem::~LLMessageSystem()
     for_each(mMessageNumbers.begin(), mMessageNumbers.end(), DeletePairedPointer());
     mMessageNumbers.clear();
 
-    if (!mbError)
-    {
-        end_net(mSocket);
-    }
-    mSocket = 0;
+    // Closed whatever else failed: the template loads before the socket
+    // opens, so a system without one still has a socket.
+    end_net(mSocket);
 
     delete mTemplateMessageReader;
     mTemplateMessageReader = NULL;

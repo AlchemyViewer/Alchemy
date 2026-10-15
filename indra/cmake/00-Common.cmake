@@ -300,6 +300,27 @@ if(LINUX)
   endif()
 endif()
 
+# No hot/cold splitting where GCC links with a mold older than 2.42.1. GCC
+# moves a function's unlikely blocks into a part of their own ("[clone
+# .cold]"), and where they all optimise away it still emits the part, empty,
+# with an unwind entry covering no bytes at the address of whatever follows
+# it. Those mold versions (rui314/mold#1648) put that entry in .eh_frame_hdr's
+# search table beside the real function's, in an order their unstable sort
+# leaves to chance; where the empty one comes last the unwinder finds no
+# entry for the function, and an exception thrown through it ends the program
+# in std::terminate whatever would have caught it. Without splitting there
+# are no such parts. The link option is for LTO, which generates the code
+# there. The vcpkg ports keep their empty parts: only a mold that leaves them
+# out of the table mends those.
+if(
+  COMPILER_IS_GCC
+  AND CMAKE_CXX_COMPILER_LINKER_ID STREQUAL "MOLD"
+  AND CMAKE_CXX_COMPILER_LINKER_VERSION VERSION_LESS 2.42.1
+)
+  target_compile_options(al_flags INTERFACE -fno-reorder-blocks-and-partition)
+  target_link_options(al_flags INTERFACE -fno-reorder-blocks-and-partition)
+endif()
+
 # Toolchain conformance and miscellany.
 if(WINDOWS)
   target_compile_options(

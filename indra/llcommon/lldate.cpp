@@ -38,7 +38,6 @@
 
 #include "lltimer.h"
 #include "llstring.h"
-#include "llfasttimer.h"
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>

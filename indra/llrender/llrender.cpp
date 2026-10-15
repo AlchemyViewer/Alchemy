@@ -28,6 +28,7 @@
 
 #include "llrender.h"
 
+#include "algpubuffer.h"
 #include "alsamplerstate.h"
 #include "llvertexbuffer.h"
 #include "llcubemap.h"
@@ -39,6 +40,7 @@
 #include "hbxxh.h"
 #include "alprojection.h"
 #include "llcamera.h"
+#include "llthread.h"
 
 #include <algorithm>
 
@@ -109,6 +111,7 @@ LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 bool LLRender::sClassicMode = false;
 bool LLRender::sMirrorPass = false;
 bool LLRender::sReverseZ = false;
+bool LLRender::sCompute = false;
 bool LLRender::sGBufferNormHDR = true;
 bool LLRender::s10bitBackBuffer = false;
 
@@ -311,6 +314,11 @@ LLRender::LLRender()
         mTextureSlots[i].mIndex = i;
     }
 
+    for (U32 i = 0; i < AL_NUM_IMAGE_SLOTS; ++i)
+    {
+        mImageSlots[i].mIndex = i;
+    }
+
     for (U32 i = 0; i < LL_NUM_LIGHT_UNITS; ++i)
     {
         mLightState[i].mIndex = i;
@@ -352,12 +360,23 @@ LLRender::~LLRender()
 
 bool LLRender::init(bool needs_vertex_buffer)
 {
+    // LLGLState's map describes the main context. A worker thread's shared context keeps its
+    // own caps, and the map is not the worker's to write.
+    const bool main_context = on_main_thread();
+
 #if GL_ARB_debug_output && !LL_DARWIN
     if (gGLManager.mHasDebugOutput && gDebugGL)
     { //setup debug output callback
         //glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW_ARB, 0, NULL, GL_TRUE);
         glDebugMessageCallback((GLDEBUGPROC) gl_debug_callback, NULL);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    }
+    if (main_context && gGLManager.mHasDebugOutput)
+    {
+        // Both caps are set raw: above, by a debug context's default, or by whoever made the
+        // context before this ran. They are read back rather than assumed.
+        LLGLState::seedState(GL_DEBUG_OUTPUT, glIsEnabled(GL_DEBUG_OUTPUT));
+        LLGLState::seedState(GL_DEBUG_OUTPUT_SYNCHRONOUS, glIsEnabled(GL_DEBUG_OUTPUT_SYNCHRONOUS));
     }
 #endif
 
@@ -381,6 +400,15 @@ bool LLRender::init(bool needs_vertex_buffer)
     }
     mCurrTextureUnitIndex = 0;
 
+    // The same for the image units and the indirect and storage buffer bindings, which a fresh context holds at 0.
+    for (ALImageSlot& slot : mImageSlots)
+    {
+        slot.reset();
+    }
+    mDrawIndirectBuffer     = 0;
+    mDispatchIndirectBuffer = 0;
+    mStorageBindings.fill(StorageBinding());
+
     // Nor is the last context's blending or colour mask: GL starts every context writing all
     // four channels and blending ONE, ZERO. The mask cache takes that default. The blend
     // factors go to unknown, so the BT_ALPHA below is issued rather than skipped for
@@ -401,6 +429,16 @@ bool LLRender::init(bool needs_vertex_buffer)
     mPolygonOffsetUnits  = 0.f;
     mPatchVertices       = 3;
 
+    // The clear colour is issued rather than assumed: a window may have cleared to a colour of
+    // its own before this ran. The scissor box GL starts at is the size of the window the
+    // context was made for, which nothing here knows, so it stays unknown until set.
+    mClearColor = LLColor4(0.f, 0.f, 0.f, 0.f);
+    glClearColor(0.f, 0.f, 0.f, 0.f);
+    mScissor[0] = 0;
+    mScissor[1] = 0;
+    mScissor[2] = -1;
+    mScissor[3] = -1;
+
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
 
@@ -412,6 +450,10 @@ bool LLRender::init(bool needs_vertex_buffer)
 
     // necessary for reflection maps
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    if (main_context)
+    {
+        LLGLState::seedState(GL_TEXTURE_CUBE_MAP_SEAMLESS, GL_TRUE);
+    }
 
 #if LL_WINDOWS
     if (glGenVertexArrays == nullptr)
@@ -516,7 +558,7 @@ void LLRender::refreshState(void)
     mDirty = true;
 
     // Called when GL state may have been changed behind our back, so re-assert the shared
-    // blocks' bindings along with the texture units and colour mask.
+    // blocks' bindings along with the texture units and the state the setters cache.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
 
@@ -529,11 +571,52 @@ void LLRender::refreshState(void)
 
     mTextureSlots[active_unit].activate();
 
-    setColorMask(mCurrColorMask[0], mCurrColorMask[1], mCurrColorMask[2], mCurrColorMask[3]);
+    for (ALImageSlot& slot : mImageSlots)
+    {
+        slot.refreshState();
+    }
 
-    // Unconditional re-issue: setPolygonOffset would see the cache already agreeing with the
-    // requested value and skip the GL call, leaving the fresh context at its 0,0 default.
+    // Whatever is bound there now is not known; the next indirect draw or dispatch binds its own buffer.
+    mDrawIndirectBuffer     = UNKNOWN_BUFFER;
+    mDispatchIndirectBuffer = UNKNOWN_BUFFER;
+
+    // A storage point is bound once for the programs after it, so what each held goes back.
+    for (U32 binding = 0; binding < AL_NUM_STORAGE_BINDINGS; ++binding)
+    {
+        issueStorageBinding(binding);
+    }
+
+    // The cached state below is issued straight to GL: each setter would see its cache
+    // agreeing with the value asked for and skip the call.
+    glColorMask(mCurrColorMask[0] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[1] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[2] ? GL_TRUE : GL_FALSE,
+                mCurrColorMask[3] ? GL_TRUE : GL_FALSE);
+
+    // Blend factors still unknown since init have nothing to put back.
+    if (mCurrBlendColorSFactor != BF_UNDEF && mCurrBlendColorDFactor != BF_UNDEF &&
+        mCurrBlendAlphaSFactor != BF_UNDEF && mCurrBlendAlphaDFactor != BF_UNDEF)
+    {
+        glBlendFuncSeparate(sGLBlendFactor[mCurrBlendColorSFactor], sGLBlendFactor[mCurrBlendColorDFactor],
+                            sGLBlendFactor[mCurrBlendAlphaSFactor], sGLBlendFactor[mCurrBlendAlphaDFactor]);
+    }
+
+    glLineWidth(mLineWidth);
+
+    // Loaded only on a context with tessellation, the one that has a patch size.
+    if (glPatchParameteri)
+    {
+        glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
+    }
+
     rebasePolygonOffset();
+
+    // The same for the clear colour and a scissor box that was ever set.
+    glClearColor(mClearColor.mV[VRED], mClearColor.mV[VGREEN], mClearColor.mV[VBLUE], mClearColor.mV[VALPHA]);
+    if (mScissor[2] >= 0)
+    {
+        glScissor(mScissor[0], mScissor[1], mScissor[2], mScissor[3]);
+    }
 
     flush();
 
@@ -987,13 +1070,13 @@ void LLRender::setColorMask(bool writeColor, bool writeAlpha)
 
 void LLRender::setColorMask(bool writeColorR, bool writeColorG, bool writeColorB, bool writeAlpha)
 {
-    flush();
-
     if (mCurrColorMask[0] != writeColorR ||
         mCurrColorMask[1] != writeColorG ||
         mCurrColorMask[2] != writeColorB ||
         mCurrColorMask[3] != writeAlpha)
     {
+        flush();
+
         mCurrColorMask[0] = writeColorR;
         mCurrColorMask[1] = writeColorG;
         mCurrColorMask[2] = writeColorB;
@@ -1088,6 +1171,17 @@ ALTextureSlot* LLRender::getTextureSlot(U32 index)
     }
 }
 
+ALImageSlot* LLRender::getImageSlot(U32 index)
+{
+    if (index < mImageSlots.size())
+    {
+        return &mImageSlots[index];
+    }
+
+    LL_DEBUGS() << "Non-existing image unit requested: " << index << LL_ENDL;
+    return &mDummyImageSlot;
+}
+
 void LLRender::forgetTextures(S32 count, const U32* names)
 {
     const U32* end = names + count;
@@ -1097,6 +1191,114 @@ void LLRender::forgetTextures(S32 count, const U32* names)
         {
             slot.mCurrTexture = 0;
         }
+    }
+
+    // Deleting a texture an image unit holds rebinds the unit to texture 0, which is what reset() records.
+    for (ALImageSlot& slot : mImageSlots)
+    {
+        if (slot.mCurrTexture != 0 && std::find(names, end, slot.mCurrTexture) != end)
+        {
+            slot.reset();
+        }
+    }
+}
+
+void LLRender::forgetBuffer(U32 name)
+{
+    if (name == 0)
+    {
+        return;
+    }
+    // Deleting a bound buffer returns the binding to 0.
+    if (mDrawIndirectBuffer == name)
+    {
+        mDrawIndirectBuffer = 0;
+    }
+    if (mDispatchIndirectBuffer == name)
+    {
+        mDispatchIndirectBuffer = 0;
+    }
+    for (StorageBinding& binding : mStorageBindings)
+    {
+        if (binding.mName == name)
+        {
+            binding = StorageBinding();
+        }
+    }
+}
+
+void LLRender::bindStorageBuffer(U32 binding, const ALGPUBuffer& buffer)
+{
+    llassert(buffer.isAllocated());
+    setStorageBinding(binding, { buffer.getGLName(), 0, 0 });
+}
+
+void LLRender::bindStorageBuffer(U32 binding, const ALGPUBuffer& buffer, size_t offset, size_t bytes)
+{
+    llassert(gGLManager.mShaderStorageBufferOffsetAlignment > 0
+             && offset % (size_t)gGLManager.mShaderStorageBufferOffsetAlignment == 0);
+    if (!buffer.isAllocated() || bytes == 0 || offset > buffer.size() || bytes > buffer.size() - offset)
+    {
+        llassert(false);
+        return;
+    }
+    setStorageBinding(binding, { buffer.getGLName(), offset, bytes });
+}
+
+void LLRender::unbindStorageBuffer(U32 binding)
+{
+    setStorageBinding(binding, StorageBinding());
+}
+
+U32 LLRender::getStorageBuffer(U32 binding) const
+{
+    return binding < AL_NUM_STORAGE_BINDINGS ? mStorageBindings[binding].mName : 0;
+}
+
+void LLRender::setStorageBinding(U32 binding, const StorageBinding& wanted)
+{
+    llassert(sCompute);
+    llassert(binding < AL_NUM_STORAGE_BINDINGS);
+    if (binding >= AL_NUM_STORAGE_BINDINGS || !gGLManager.mHasCompute)
+    {
+        return;
+    }
+    StorageBinding& held = mStorageBindings[binding];
+    if (held.mName == wanted.mName && held.mOffset == wanted.mOffset && held.mBytes == wanted.mBytes)
+    {
+        return;
+    }
+    // What is batched was meant to see the point as it was.
+    flush();
+    held = wanted;
+    issueStorageBinding(binding);
+}
+
+void LLRender::issueStorageBinding(U32 binding) const
+{
+    if (!gGLManager.mHasCompute)
+    {
+        return;
+    }
+    const StorageBinding& held = mStorageBindings[binding];
+    if (held.mBytes != 0)
+    {
+        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, binding, held.mName, (GLintptr)held.mOffset,
+                          (GLsizeiptr)held.mBytes);
+    }
+    else
+    {
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, held.mName);
+    }
+}
+
+// static
+void LLRender::bindIndirectBuffer(U32 target, U32& bound, U32 name)
+{
+    if (bound != name)
+    {
+        glBindBuffer(target, name);
+        bound = name;
     }
 }
 
@@ -1653,11 +1855,10 @@ void LLRender::diffuseColor4ub(U8 r, U8 g, U8 b, U8 a)
 
 void LLRender::setLineWidth(F32 width)
 {
-    gGL.flush();
-
     width = llclamp(width, gGLManager.mAliasedLineRange[0], gGLManager.mAliasedLineRange[1]);
     if(mLineWidth != width)
     {
+        flush();
         mLineWidth = width;
         glLineWidth(width);
     }
@@ -1683,6 +1884,145 @@ void LLRender::setPatchVertices(U32 count)
         mPatchVertices = count;
         flush();
         glPatchParameteri(GL_PATCH_VERTICES, count);
+    }
+}
+
+void LLRender::setClearColor(const LLColor4& color)
+{
+    if (mClearColor != color)
+    {
+        mClearColor = color;
+        glClearColor(color.mV[VRED], color.mV[VGREEN], color.mV[VBLUE], color.mV[VALPHA]);
+    }
+}
+
+void LLRender::clear(U32 mask)
+{
+    flush();
+    glClear(mask);
+}
+
+void LLRender::drawArraysInstanced(eGeomModes mode, U32 first, U32 count, U32 instances)
+{
+    // An input left in the program would read whatever buffer the last vertex buffer left on its array.
+    llassert(LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->mAttributeMask == 0);
+    flush();
+    syncMatrices();
+    llassert(validate_bound_samplers());
+    STOP_GLERROR;
+    glDrawArraysInstanced(LLVertexBuffer::sGLMode[mode], first, count, instances);
+    STOP_GLERROR;
+}
+
+void LLRender::drawArraysIndirect(eGeomModes mode, const ALGPUBuffer& buffer, size_t offset)
+{
+    // An input left in the program would read whatever buffer the last vertex buffer left on its array.
+    llassert(LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->mAttributeMask == 0);
+    // GL reads the command at an offset a whole number of GLuints in, and all four of its words.
+    llassert(offset % sizeof(U32) == 0);
+    if (!buffer.isAllocated() || offset + sizeof(ALDrawArraysIndirectCommand) > buffer.size())
+    {
+        llassert(false);
+        return;
+    }
+    flush();
+    syncMatrices();
+    llassert(validate_bound_samplers());
+    STOP_GLERROR;
+    bindIndirectBuffer(GL_DRAW_INDIRECT_BUFFER, mDrawIndirectBuffer, buffer.getGLName());
+    glDrawArraysIndirect(LLVertexBuffer::sGLMode[mode], reinterpret_cast<const void*>(offset));
+    STOP_GLERROR;
+}
+
+void LLRender::memoryBarrier(U32 barriers)
+{
+    llassert(sCompute);
+    if (barriers == 0 || !gGLManager.mHasCompute)
+    {
+        return;
+    }
+    // The barrier orders what was issued before it, which includes what is batched.
+    flush();
+    glMemoryBarrier(barriers);
+}
+
+void LLRender::dispatchCompute(U32 groups_x, U32 groups_y, U32 groups_z)
+{
+    llassert(sCompute);
+    llassert(LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->isCompute());
+    if (!gGLManager.mHasCompute)
+    {
+        return;
+    }
+    flush();
+    syncMatrices();
+
+    if (groups_x == 0 || groups_y == 0 || groups_z == 0)
+    {
+        return;
+    }
+
+    // GL drops a dispatch past the limit with an error and nothing run. Said here, once, with the counts that did it,
+    // rather than left to a GL error log.
+    const U32 groups[3] = { groups_x, groups_y, groups_z };
+    for (U32 i = 0; i < 3; ++i)
+    {
+        if (groups[i] > (U32)gGLManager.mMaxComputeWorkGroupCount[i])
+        {
+            static bool s_warned = false;
+            if (!s_warned)
+            {
+                s_warned = true;
+                LL_WARNS("Shader") << "Compute dispatch of " << groups_x << "x" << groups_y << "x" << groups_z
+                                   << " groups from " << LLGLSLShader::sCurBoundShaderPtr->mName
+                                   << " exceeds the context's " << gGLManager.mMaxComputeWorkGroupCount[0] << "x"
+                                   << gGLManager.mMaxComputeWorkGroupCount[1] << "x"
+                                   << gGLManager.mMaxComputeWorkGroupCount[2] << "; nothing dispatched" << LL_ENDL;
+            }
+            return;
+        }
+    }
+
+    llassert(validate_bound_samplers());
+    STOP_GLERROR;
+    glDispatchCompute(groups_x, groups_y, groups_z);
+    STOP_GLERROR;
+}
+
+void LLRender::dispatchComputeIndirect(const ALGPUBuffer& buffer, size_t offset)
+{
+    llassert(sCompute);
+    llassert(LLGLSLShader::sCurBoundShaderPtr && LLGLSLShader::sCurBoundShaderPtr->isCompute());
+    llassert(offset % sizeof(U32) == 0);
+    if (!gGLManager.mHasCompute)
+    {
+        return;
+    }
+    if (!buffer.isAllocated() || offset + sizeof(ALDispatchIndirectCommand) > buffer.size())
+    {
+        llassert(false);
+        return;
+    }
+    flush();
+    syncMatrices();
+    llassert(validate_bound_samplers());
+    STOP_GLERROR;
+    bindIndirectBuffer(GL_DISPATCH_INDIRECT_BUFFER, mDispatchIndirectBuffer, buffer.getGLName());
+    glDispatchComputeIndirect(static_cast<GLintptr>(offset));
+    STOP_GLERROR;
+}
+
+void LLRender::setScissor(S32 x, S32 y, S32 width, S32 height)
+{
+    llassert(width >= 0 && height >= 0);
+    if (mScissor[0] != x || mScissor[1] != y || mScissor[2] != width || mScissor[3] != height)
+    {
+        flush();
+        mScissor[0] = x;
+        mScissor[1] = y;
+        mScissor[2] = width;
+        mScissor[3] = height;
+        glScissor(x, y, width, height);
     }
 }
 

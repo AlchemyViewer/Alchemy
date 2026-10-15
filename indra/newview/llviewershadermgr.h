@@ -117,6 +117,7 @@ extern LLGLSLShader         gClipProgram;
 extern LLGLSLShader         gBenchmarkProgram;
 extern LLGLSLShader         gReflectionProbeDisplayProgram;
 extern LLGLSLShader         gCopyProgram;
+extern LLGLSLShader         gCopyDepthProgram;
 extern LLGLSLShader         gPBRTerrainBakeProgram;
 extern LLGLSLShader         gDrawColorProgram;
 
@@ -162,6 +163,16 @@ extern LLGLSLShader         gLensDirtGenProgram;
 extern LLGLSLShader         gHighlightProgram;
 extern LLGLSLShader         gHighlightNormalProgram;
 extern LLGLSLShader         gHighlightSpecularProgram;
+// Selection outlines (ALSelectionOutline): the id pass and the wireframe, with rigged variants and linked with
+// interface/selectionAlphaF.glsl, the jump pass, the tile pass and the edge pass, each linked with
+// interface/selectionUtilF.glsl.
+extern LLGLSLShader         gSelectionIdProgram;
+extern LLGLSLShader         gSelectionWireframeProgram;
+extern LLGLSLShader         gSelectionJumpProgram;
+extern LLGLSLShader         gSelectionTileProgram;
+extern LLGLSLShader         gSelectionOutlineProgram;
+extern LLGLSLShader         gSelectionGlowReachProgram;
+extern LLGLSLShader         gSelectionGlowRowProgram;
 
 extern LLGLSLShader         gDeferredHighlightProgram;
 
@@ -193,6 +204,7 @@ extern LLGLSLShader         gHazeWaterProgram;
 extern LLGLSLShader         gDeferredBlurLightProgram;
 extern LLGLSLShader         gDeferredAvatarProgram;
 extern LLGLSLShader         gDeferredSoftenProgram;
+extern LLGLSLShader         gDeferredSoftenSkyProgram;
 extern LLGLSLShader         gDeferredShadowProgram;
 extern LLGLSLShader         gDeferredTerrainShadowProgram;
 extern LLGLSLShader         gDeferredShadowCubeProgram;

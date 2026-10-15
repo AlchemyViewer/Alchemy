@@ -298,9 +298,9 @@ jobs:
       VIEWER_GRID: "agni"
       # Link Time Optimization
       AL_USE_LTO: ${{ matrix.configuration == 'release' && startsWith(matrix.build_variant, 'Viewer') }}
-      # Setting this variable directs Linden's TUT test driver code to capture
-      # test-program log output at the specified level, but to display it only if
-      # the individual test fails.
+      # Setting this variable directs the tests' main to capture test-program
+      # log output at the specified level, but to display it only if the
+      # individual test case fails.
       LOGFAIL: DEBUG
       master_message_template_checkout: ${{ github.workspace }}/.master-message-template
       # vcpkg Setup. No local binary cache: nothing reads it again on a
@@ -514,6 +514,39 @@ jobs:
             esac
           fi
 
+      # Each Catch2 binary's run of all its tests in one process, while it is
+      # still combined_pending: the default run leaves those out until they
+      # are known to share a process, and this is where that is learned, on
+      # every row. It reports, and never fails the job. The runs go side by
+      # side, so the step takes about as long as the longest, which CTest
+      # stops at an hour; the step's own limit is past that, so a hang is
+      # recorded as CTest's timeout and reaches the JUnit report.
+      - name: Run pending combined tests
+        if: ${{ !cancelled() && matrix.build_variant == 'Tests' }}
+        continue-on-error: true
+        timeout-minutes: 75
+        shell: bash
+        env:
+          BUILD_DIRECTORY: ${{ steps.configure.outputs.build_directory }}
+        run: |
+          case "$BUILD_CONFIG" in
+            release) cmake_config=Release ;;
+            relwithdebinfo) cmake_config=RelWithDebInfo ;;
+            optdebug) cmake_config=OptDebug ;;
+            *) cmake_config=Debug ;;
+          esac
+          # This run writes LastTest.log over the build's; the build's is kept
+          # under a name the upload below still takes.
+          log="$BUILD_DIRECTORY/Testing/Temporary/LastTest.log"
+          if [[ -f "$log" ]]; then
+            cp "$log" "$BUILD_DIRECTORY/Testing/Temporary/LastTest-build.log"
+          fi
+          jobs="$(nproc 2>/dev/null || sysctl -n hw.logicalcpu)"
+          # CTest reads a relative --output-junit from the test directory.
+          ctest --test-dir "$BUILD_DIRECTORY" -C "$cmake_config" -L combined_pending \
+            --parallel "$jobs" --output-on-failure --no-tests=ignore \
+            --output-junit Testing/combined-pending-results.xml
+
       # What each test did, on a row whose tests failed as much as on one
       # whose tests passed: the JUnit file CTest writes and its own log. The
       # build step's artifact name is unset when a test fails, so this one
@@ -525,6 +558,7 @@ jobs:
           name: "test-results-${{ runner.os }}-${{ matrix.arch }}"
           path: |
             ${{ steps.configure.outputs.build_directory }}/Testing/test-results.xml
+            ${{ steps.configure.outputs.build_directory }}/Testing/combined-pending-results.xml
             ${{ steps.configure.outputs.build_directory }}/Testing/Temporary/LastTest*.log
           if-no-files-found: warn
 

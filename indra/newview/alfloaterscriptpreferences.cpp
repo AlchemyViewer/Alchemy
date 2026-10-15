@@ -91,10 +91,11 @@ namespace
         "ALScriptStudioAutoClose",
         "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
         "ALScriptStudioVimClipboard",
-        "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatOnSave",      "ALScriptTrimOnSave",        "ALScriptFixOnSave",
+        "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatBraceSpaces", "ALScriptFormatWidth",       "ALScriptFormatOnSave",      "ALScriptTrimOnSave",        "ALScriptFixOnSave",
         "ALScriptTemplateLSL",       "ALScriptTemplateSLua",       "ALScriptPreprocDefines",    "ExternalEditor",
         "ALScriptConvertLLTimers",   "ALScriptConvertDetectedTable", "ALScriptConvertSLuaCalls", "ALScriptConvertIdioms",
         "ALScriptConvertHandlerFields", "ALScriptConvertTypes",    "ALScriptConvertComments",   "ALScriptConvertKeepComments",
+        "ALScriptConvertKeyTextAny", "ALScriptConvertUuidKeys",
     };
 
     // What each preset of Convert to SLua sets: SLua's own ways, or as
@@ -102,6 +103,7 @@ namespace
     // the scripter's either way.
     const std::pair<const char*, bool> CONVERT_MODERN[] = {
         { "ALScriptConvertLLTimers", true }, { "ALScriptConvertDetectedTable", true }, { "ALScriptConvertSLuaCalls", true }, { "ALScriptConvertIdioms", true },
+        { "ALScriptConvertUuidKeys", true },
     };
 
     // The places an include is looked for, as the setting spells them.

@@ -29,7 +29,7 @@
 #include "../lsl/allsltoslua.h"
 #include "../preprocessor/alpreprocessor.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "llsdserialize.h"
 
 #include "Luau/Allocator.h"
@@ -55,7 +55,7 @@
 // warm job (ALLuauService::warm). Where the fragment declines, the whole
 // script answers both, and the two agree by construction; what is compared
 // is where it answers.
-namespace tut
+namespace
 {
     struct alluaufragment_data
     {
@@ -495,44 +495,46 @@ namespace tut
             }
         }
 
-        void report(const char* corpus, const Tally& tally, bool answers = true)
+        void require_answers_as_whole(const char* corpus, const Tally& tally, bool answers = true)
         {
             std::printf("alluaufragment, %s solver, %s: %zu places, %zu answered over a fragment; told apart by a type beside a name %zu, "
                         "by which fit %zu, by a few names %zu, by a signature's parameters %zu\n",
                         newSolver ? "new" : "old", corpus, tally.asked, tally.answered, tally.types, tally.fits, tally.few, tally.generics);
-            ensure(std::string(corpus) + ": the fragment answers as the whole script does:\n" + tally.faults, tally.faults.empty());
+            CAPTURE(corpus);
+            UNSCOPED_INFO("the fragment answers as the whole script does:\n" + tally.faults);
+            REQUIRE(tally.faults.empty());
             if (answers)
             {
-                ensure(std::string(corpus) + ": most places answered over a fragment", tally.answered * 2 > tally.asked);
+                UNSCOPED_INFO("most places answered over a fragment");
+                REQUIRE(tally.answered * 2 > tally.asked);
             }
         }
     };
 
-    typedef test_group<alluaufragment_data> alluaufragment_group;
-    typedef alluaufragment_group::object    alluaufragment_object;
-    alluaufragment_group                    alluaufragment_instance("alluaufragment");
-
-    template<> template<>
-    void alluaufragment_object::test<1>()
+    TEST_CASE_METHOD(alluaufragment_data, "alluaufragment: over the studio's templates the fragment answers as the whole script does", "[alluaufragment]")
     {
-        set_test_name("over the studio's templates, the fragment answers as the whole script does");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         llifstream in(std::string(AL_SCRIPT_TEMPLATES_DIR) + "/slua.xml", std::ios::in | std::ios::binary);
         LLSD       templates;
-        ensure("read", in.is_open() && LLSDSerialize::fromXML(templates, in) != LLSDParser::PARSE_FAILURE && templates.isArray());
+        {
+            INFO("read");
+            CHECK(in.is_open());
+            CHECK(LLSDSerialize::fromXML(templates, in) != LLSDParser::PARSE_FAILURE);
+            REQUIRE(templates.isArray());
+        }
         Tally tally;
         for (LLSD::array_const_iterator it = templates.beginArray(); it != templates.endArray(); ++it)
         {
             ask((*it)["name"].asString(), probesOf((*it)["body"].asString(), 12), tally);
         }
-        report("the templates", tally);
+        require_answers_as_whole("the templates", tally);
     }
 
-    template<> template<>
-    void alluaufragment_object::test<2>()
+    TEST_CASE_METHOD(alluaufragment_data, "alluaufragment: over Tailslide's scripts as SLua the fragment answers as the whole does", "[alluaufragment]")
     {
-        set_test_name("over Tailslide's test scripts written again as SLua, the fragment answers as the whole script does");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         const std::string        dir = std::string(AL_ALSCRIPT_TEST_DIR) + "/tailslide/scripts";
         std::vector<std::string> files;
         for (const auto& entry : std::filesystem::recursive_directory_iterator(dir))
@@ -543,11 +545,14 @@ namespace tut
             }
         }
         std::sort(files.begin(), files.end());
-        ensure("the scripts: " + dir, files.size() > 100);
+        UNSCOPED_INFO("the scripts: " + dir);
+        REQUIRE(files.size() > 100);
         // The converter reads Tailslide's table of LSL's builtins, which the
         // LSL service fills for the whole process.
         ALLSLService lsl;
-        ensure("builtins loaded: " + error, lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
+        const bool   builtins = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error);
+        UNSCOPED_INFO("builtins loaded: " + error);
+        CHECK(builtins);
         Tally tally;
         for (const std::string& name : files)
         {
@@ -557,14 +562,13 @@ namespace tut
                 ask(name, probesOf(converted.text, 6), tally);
             }
         }
-        report("Tailslide's scripts", tally);
+        require_answers_as_whole("Tailslide's scripts", tally);
     }
 
-    template<> template<>
-    void alluaufragment_object::test<3>()
+    TEST_CASE_METHOD(alluaufragment_data, "alluaufragment: over an expanded script with modules the fragment answers as the whole does", "[alluaufragment]")
     {
-        set_test_name("over a script the preprocessor expanded, its requires apart as the studio checks them, the fragment answers as the whole script does, a module changed since the last check or not");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         namespace fs           = std::filesystem;
         const fs::path    dir  = fs::path(AL_ALSCRIPT_TEST_DIR) / "preprocessor";
         ALPreprocessor::Options options;
@@ -584,7 +588,11 @@ namespace tut
             return ALPreprocessor::Found::Yes;
         };
         const ALPreprocessor::Result made = ALPreprocessor::run(readFile((dir / "test_require.luau").string()), options);
-        ensure("expanded", made.problems.empty() && !made.apart.script.text.empty());
+        {
+            INFO("expanded");
+            REQUIRE(made.problems.empty());
+            REQUIRE_FALSE(made.apart.script.text.empty());
+        }
         ALLuauService::Modules modules;
         for (const ALPreprocessor::Result::Piece& piece : made.apart.modules)
         {
@@ -594,12 +602,12 @@ namespace tut
         {
             modules.reaches.push_back({ resolved.from, resolved.name, resolved.path });
         }
-        ensure("its modules", modules.modules.size() == 2);
+        REQUIRE(modules.modules.size() == 2);
         fragment.setModules(modules);
         whole.setModules(modules);
         Tally tally;
         ask("test_require", probesOf(made.apart.script.text, 12), tally);
-        report("an expanded script", tally);
+        require_answers_as_whole("an expanded script", tally);
         // A module changed since the last check: util, which had a function
         // since taken out.
         ALLuauService::Modules before = modules;
@@ -620,17 +628,17 @@ namespace tut
             fragment.setModules(modules);
             ask("test_require, util changed", { probe }, changed, /*settled*/ true);
         }
-        report("an expanded script, a module changed since", changed, false);
-        ensure_equals("a module changed since: every place asked of the whole script", changed.answered, size_t(0));
+        require_answers_as_whole("an expanded script, a module changed since", changed, false);
+        UNSCOPED_INFO("a module changed since: every place asked of the whole script");
+        CHECK(changed.answered == size_t(0));
         fragment.setModules({});
         whole.setModules({});
     }
 
-    template<> template<>
-    void alluaufragment_object::test<4>()
+    TEST_CASE_METHOD(alluaufragment_data, "alluaufragment: a line opened above the statement typed makes the whole script answer", "[alluaufragment]")
     {
-        set_test_name("a line opened above the statement being typed since the last check: Luau would start the fragment where the text has no such place, and the whole script answers instead");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         // Return pressed at the start of `print(a)`, then `.` typed in it
         // before another check: the last check's statement began at the
         // fifth column of a line that is empty now.
@@ -642,15 +650,16 @@ namespace tut
         fragment.warm(base);
         const size_t before = fragment.fragmentsChecked();
         const Told   told   = judged(fragment.complete(text, 3, 12), whole.complete(text, 3, 12));
-        ensure_equals("asked of the whole script", fragment.fragmentsChecked(), before);
-        ensure("and answered as it is:" + told.faults, told.faults.empty());
+        UNSCOPED_INFO("asked of the whole script");
+        CHECK(fragment.fragmentsChecked() == before);
+        UNSCOPED_INFO("and answered as it is:" + told.faults);
+        REQUIRE(told.faults.empty());
     }
 
-    template<> template<>
-    void alluaufragment_object::test<5>()
+    TEST_CASE_METHOD(alluaufragment_data, "alluaufragment: a handler stub is offered at an overloaded callee's argument but not within it", "[alluaufragment]")
     {
-        set_test_name("an overloaded callee's handler is offered written out where its argument is being written, and not in a field of one, a table in one or a type asserted of one: over a fragment as over the whole script");
-        ensure("definitions loaded: " + error, loaded);
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
         const auto stubbed = [](const std::vector<ALScriptCompletion>& found) {
             return std::any_of(found.begin(), found.end(), [](const ALScriptCompletion& c) { return !c.snippet.empty(); });
         };
@@ -677,8 +686,83 @@ namespace tut
             const std::string text = base + place.line + "\n";
             fragment.check(base);
             fragment.warm(base);
-            ensure_equals(std::string(place.line) + ": over a fragment", stubbed(fragment.complete(text, 1, place.column)), place.offered);
-            ensure_equals(std::string(place.line) + ": over the whole script", stubbed(whole.complete(text, 1, place.column)), place.offered);
+            CAPTURE(place.line);
+            UNSCOPED_INFO("over a fragment");
+            REQUIRE(stubbed(fragment.complete(text, 1, place.column)) == place.offered);
+            UNSCOPED_INFO("over the whole script");
+            REQUIRE(stubbed(whole.complete(text, 1, place.column)) == place.offered);
         }
+    }
+
+    TEST_CASE_METHOD(alluaufragment_data, "alluaufragment: a local declared again in one scope is the one in effect over a fragment", "[alluaufragment]")
+    {
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
+        // `test` a function, then a number in the same scope, and a line
+        // typed below since the last check: the name alone, and a third
+        // `test` initialized with it. Luau keeps both declarations among the
+        // scope's bindings, a table ordered by where the parser put each,
+        // and took whichever it gave first. And the number declared since
+        // the last check as well, which the fragment declares beside the
+        // function it brings from that check -- with the other locals the
+        // line uses, so that there are enough for that table's order to be
+        // by where they were put too. Each round puts more locals above, so
+        // that everything lands elsewhere.
+        struct Place
+        {
+            const char* checked;
+            const char* typed;
+            S32         column;
+        };
+        const Place places[] = {
+            { "local test = 1\n", "test", 0 },
+            { "local test = 1\n", "local test = test", 13 },
+            { "", "local test = 1\ntest", 0 },
+            { "", "local test = 1\nprint(a, b, c, d, e, f, g, h, test)", 30 },
+        };
+        fragment.setDocument("redeclared");
+        whole.setDocument("redeclared");
+        size_t asked = 0, answered = 0;
+        for (S32 round = 0; round < 24; ++round)
+        {
+            std::string above;
+            for (S32 i = 0; i < round; ++i)
+            {
+                above += llformat("local v%d = %d\n", i, i);
+            }
+            above += "local a, b, c, d, e, f, g, h = 1, 2, 3, 4, 5, 6, 7, 8\nlocal function test()\nend\n";
+            const auto ask = [&](const std::string& base, const std::string& typed, auto question) {
+                const std::string text = base + typed + "\n";
+                const S32         line = static_cast<S32>(std::count(text.begin(), text.end(), '\n')) - 1;
+                fragment.check(base);
+                fragment.warm(base);
+                const size_t before = fragment.fragmentsChecked();
+                question(fragment, text, line, "a fragment");
+                question(whole, text, line, "the whole script");
+                ++asked;
+                answered += fragment.fragmentsChecked() != before;
+            };
+            for (const Place& place : places)
+            {
+                ask(above + place.checked, place.typed, [&](ALLuauService& service, const std::string& text, S32 line, const char* over) {
+                    const std::vector<ALScriptCompletion> found = service.complete(text, line, place.column);
+                    const auto test = std::find_if(found.begin(), found.end(), [](const ALScriptCompletion& c) { return c.text == "test"; });
+                    CAPTURE(round, place.typed, over);
+                    REQUIRE(test != found.end());
+                    REQUIRE(test->kind == ALScriptSymbolKind::Variable);
+                });
+            }
+            // A function of two strings declared over one of a number: a
+            // call typed below takes the two.
+            ask(above + "local function call(n: number)\nend\nlocal call = function(s: string, t: string)\nend\n", "call(\"x\", \"y\")",
+                [&](ALLuauService& service, const std::string& text, S32 line, const char* over) {
+                    const ALScriptSignature found = service.signature(text, line, 5);
+                    CAPTURE(round, over, found.label);
+                    REQUIRE(found.found);
+                    REQUIRE(found.parameters.size() == 2);
+                });
+        }
+        UNSCOPED_INFO("answered over a fragment");
+        CHECK(answered * 2 > asked);
     }
 }

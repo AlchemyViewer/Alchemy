@@ -161,6 +161,9 @@ public:
 
     // The tab an editor is of, its source's or its expansion's.
     Doc* docOf(const ALTextView& view);
+    // The same, or the tab whose comparison it is a side of: the tab a :
+    // line typed there is about, though its text is not the tab's.
+    Doc* tabOf(const ALTextView& view);
     // The tab `which` names, as :b and :bd take one: its number in the
     // strip, # the tab in front before this one, % the one in front, else
     // its name or a part of one, in any case, that no other has. Null

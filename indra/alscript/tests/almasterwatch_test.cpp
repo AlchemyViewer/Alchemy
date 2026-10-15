@@ -30,7 +30,7 @@
 #include "llfile.h"
 #include "lluuid.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -40,7 +40,7 @@
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     namespace fs = std::filesystem;
 
@@ -206,42 +206,39 @@ namespace tut
         }
     };
 
-    typedef test_group<almasterwatch_data> almasterwatch_group;
-    typedef almasterwatch_group::object    almasterwatch_object;
-    almasterwatch_group                    almasterwatch_instance("almasterwatch");
-
-    template<> template<>
-    void almasterwatch_object::test<1>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: a master saved outside is released once the burst has been quiet a second", "[almasterwatch]")
     {
-        set_test_name("a master saved outside is released once the burst has been quiet a second");
         const std::string door = in("door.lsl");
         put(door, "default {}\n", 100);
         ALMasterWatch& watched = make();
         watched.watch({ almasterwatch_data::master(door) });
-        ensure("watched at once, its look answered here", watched.watching(door));
+        UNSCOPED_INFO("watched at once, its look answered here");
+        CHECK(watched.watching(door));
         looked();
         pass(5.0);
-        ensure("what was there already is no change", released.empty());
+        UNSCOPED_INFO("what was there already is no change");
+        REQUIRE(released.empty());
 
         put(door, "default { state_entry() {} }\n", 200);
         watched.lookNow();
-        ensure("moving: not heard yet", waiting.empty());
+        UNSCOPED_INFO("moving: not heard yet");
+        REQUIRE(waiting.empty());
         watched.lookNow();
         pass(0.9);
-        ensure("not before the quiet", released.empty());
+        UNSCOPED_INFO("not before the quiet");
+        REQUIRE(released.empty());
         pass(0.2);
-        ensure_equals("released once", released.size(), size_t(1));
-        ensure_equals("the master", almasterwatch_data::joined(released[0].masters), std::string("door.lsl"));
-        ensure("no include", released[0].includes.empty());
+        REQUIRE(released.size() == size_t(1));
+        CHECK(almasterwatch_data::joined(released[0].masters) == std::string("door.lsl"));
+        REQUIRE(released[0].includes.empty());
         looked();
         pass(5.0);
-        ensure_equals("and not again", released.size(), size_t(1));
+        UNSCOPED_INFO("and not again");
+        REQUIRE(released.size() == size_t(1));
     }
 
-    template<> template<>
-    void almasterwatch_object::test<2>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: a checkout of many files is released once and together after the last", "[almasterwatch]")
     {
-        set_test_name("a checkout of many files is released once, all together, after the last of them");
         std::vector<ALMasterLinks::Watched> files;
         for (int i = 0; i < 10; ++i)
         {
@@ -263,16 +260,15 @@ namespace tut
         }
         looked();
         pass(0.9);
-        ensure("the burst goes on: nothing yet", released.empty());
+        UNSCOPED_INFO("the burst goes on: nothing yet");
+        REQUIRE(released.empty());
         pass(0.2);
-        ensure_equals("released once", released.size(), size_t(1));
-        ensure_equals("all ten together", released[0].masters.size(), size_t(10));
+        REQUIRE(released.size() == size_t(1));
+        REQUIRE(released[0].masters.size() == size_t(10));
     }
 
-    template<> template<>
-    void almasterwatch_object::test<3>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: masters and includes are told apart as they are released", "[almasterwatch]")
     {
-        set_test_name("masters and includes are told apart as they are released");
         const std::string door = in("door.lsl");
         const std::string util = in("util.lsl");
         put(door, "a", 100);
@@ -283,15 +279,13 @@ namespace tut
         put(util, "b2", 200);
         looked();
         pass(1.1);
-        ensure_equals("released once", released.size(), size_t(1));
-        ensure_equals("the master", almasterwatch_data::joined(released[0].masters), std::string("door.lsl"));
-        ensure_equals("the include", almasterwatch_data::joined(released[0].includes), std::string("util.lsl"));
+        REQUIRE(released.size() == size_t(1));
+        CHECK(almasterwatch_data::joined(released[0].masters) == std::string("door.lsl"));
+        CHECK(almasterwatch_data::joined(released[0].includes) == std::string("util.lsl"));
     }
 
-    template<> template<>
-    void almasterwatch_object::test<4>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: an emptied file is held longer than the quiet unless filled again meanwhile", "[almasterwatch]")
     {
-        set_test_name("an emptied file is held a moment and a half, and one filled again meanwhile no longer than the quiet");
         const std::string door = in("door.lsl");
         put(door, "default {}\n", 100);
         ALMasterWatch& watched = make();
@@ -300,31 +294,34 @@ namespace tut
         put(door, "", 200);
         looked();
         pass(1.1);
-        ensure("quiet, but emptied: held", released.empty());
+        UNSCOPED_INFO("quiet, but emptied: held");
+        REQUIRE(released.empty());
         pass(0.5);
-        ensure_equals("taken as empty after the hold", released.size(), size_t(1));
+        UNSCOPED_INFO("taken as empty after the hold");
+        REQUIRE(released.size() == size_t(1));
 
         // An editor saving in two steps: emptied, then filled.
         put(door, "default { touch_start(integer n) {} }\n", 300);
         looked();
         pass(1.1);
-        ensure_equals("filled again: released", released.size(), size_t(2));
+        UNSCOPED_INFO("filled again: released");
+        REQUIRE(released.size() == size_t(2));
         put(door, "", 400);
         looked();
         pass(0.3);
         put(door, "default { state_entry() {} }\n", 500);
         looked();
         pass(0.9);
-        ensure("a second after it was filled: not yet", released.size() == 2);
+        UNSCOPED_INFO("a second after it was filled: not yet");
+        REQUIRE(released.size() == 2);
         pass(0.2);
-        ensure_equals("then, before the emptied hold would have ended", released.size(), size_t(3));
-        ensure_equals("the file, once", released[2].masters.size(), size_t(1));
+        UNSCOPED_INFO("then, before the emptied hold would have ended");
+        REQUIRE(released.size() == size_t(3));
+        REQUIRE(released[2].masters.size() == size_t(1));
     }
 
-    template<> template<>
-    void almasterwatch_object::test<5>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: what the studio writes is no change and takes a waiting change with it", "[almasterwatch]")
     {
-        set_test_name("what the studio writes itself is no change, and takes with it a change waiting in the burst");
         const std::string door = in("door.lsl");
         put(door, "a", 100);
         ALMasterWatch& watched = make();
@@ -334,7 +331,8 @@ namespace tut
         watched.seen(door);
         looked();
         pass(5.0);
-        ensure("the studio's own write: nothing", released.empty());
+        UNSCOPED_INFO("the studio's own write: nothing");
+        REQUIRE(released.empty());
 
         // Saved outside, and heard; then written by the studio before the
         // burst ends, which sends it itself.
@@ -343,22 +341,26 @@ namespace tut
         put(door, "studio again", 400);
         watched.seen(door);
         pass(5.0);
-        ensure("nothing waiting on it from before", released.empty());
+        UNSCOPED_INFO("nothing waiting on it from before");
+        REQUIRE(released.empty());
         looked();
         pass(5.0);
-        ensure("and nothing after", released.empty());
+        UNSCOPED_INFO("and nothing after");
+        REQUIRE(released.empty());
     }
 
-    template<> template<>
-    void almasterwatch_object::test<6>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: a save after a studio write during the first look is heard", "[almasterwatch]")
     {
-        set_test_name("a file the studio writes while its first look is out is watched from that write, and a save after it is heard");
         const std::string door = in("door.lsl");
         put(door, "first", 100);
         ALMasterWatch& watched = make(/*look_at_once*/ false);
         watched.watch({ almasterwatch_data::master(door) });
-        ensure("waiting on its first look", watched.waiting(door) && !watched.watching(door));
-        ensure_equals("asked once", asked.size(), size_t(1));
+        {
+            INFO("waiting on its first look");
+            CHECK(watched.waiting(door));
+            CHECK_FALSE(watched.watching(door));
+        }
+        REQUIRE(asked.size() == size_t(1));
 
         // The studio writes it, then somebody else saves it, all before the
         // look answers: the save is heard, the studio's write is not.
@@ -366,16 +368,16 @@ namespace tut
         watched.seen(door);
         put(door, "outside", 300);
         answer(0);
-        ensure("watched now", watched.watching(door));
+        UNSCOPED_INFO("watched now");
+        CHECK(watched.watching(door));
         looked();
         pass(1.1);
-        ensure_equals("the save after the studio's write heard", released.size(), size_t(1));
+        UNSCOPED_INFO("the save after the studio's write heard");
+        REQUIRE(released.size() == size_t(1));
     }
 
-    template<> template<>
-    void almasterwatch_object::test<7>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: a studio write during the first look is no change however old the look", "[almasterwatch]")
     {
-        set_test_name("a file the studio writes while its first look is out is no change, whenever the look was made");
         const std::string door = in("door.lsl");
         const std::string lamp = in("lamp.lsl");
         put(door, "first", 100);
@@ -387,35 +389,34 @@ namespace tut
         put(door, "studio", 200);
         watched.seen(door);
         answer(0, before);
-        ensure("both watched", watched.watching(door) && watched.watching(lamp));
+        CHECK(watched.watching(door));
+        CHECK(watched.watching(lamp));
         looked();
         pass(5.0);
-        ensure("the studio's write is no change", released.empty());
+        UNSCOPED_INFO("the studio's write is no change");
+        REQUIRE(released.empty());
     }
 
-    template<> template<>
-    void almasterwatch_object::test<8>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: a first look answering for a file no longer wanted makes no watch of it", "[almasterwatch]")
     {
-        set_test_name("a first look answering for a file no longer wanted makes no watch of it");
         const std::string door = in("door.lsl");
         put(door, "first", 100);
         ALMasterWatch& watched = make(/*look_at_once*/ false);
         watched.watch({ almasterwatch_data::master(door) });
         watched.watch({});
-        ensure("not waiting now", !watched.waiting(door));
+        UNSCOPED_INFO("not waiting now");
+        CHECK_FALSE(watched.waiting(door));
         answer(0);
-        ensure("not watched", !watched.watching(door));
-        ensure_equals("nothing at all", watched.size(), size_t(0));
+        CHECK_FALSE(watched.watching(door));
+        REQUIRE(watched.size() == size_t(0));
         put(door, "changed", 200);
         looked();
         pass(5.0);
-        ensure("nothing heard", released.empty());
+        REQUIRE(released.empty());
     }
 
-    template<> template<>
-    void almasterwatch_object::test<9>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: a file wanted again waits on the newer look and one wanted still on its own", "[almasterwatch]")
     {
-        set_test_name("a file let go of and wanted again waits on the newer look; one wanted still keeps the look it waits on");
         const std::string door = in("door.lsl");
         const std::string lamp = in("lamp.lsl");
         put(door, "first", 100);
@@ -424,30 +425,43 @@ namespace tut
         watched.watch({ almasterwatch_data::master(door) });
         watched.watch({});
         watched.watch({ almasterwatch_data::master(door) });
-        ensure_equals("asked again", asked.size(), size_t(2));
+        UNSCOPED_INFO("asked again");
+        REQUIRE(asked.size() == size_t(2));
         answer(0);
-        ensure("the older look makes no watch", !watched.watching(door) && watched.waiting(door));
+        {
+            INFO("the older look makes no watch");
+            CHECK_FALSE(watched.watching(door));
+            CHECK(watched.waiting(door));
+        }
         answer(1);
-        ensure("the newer one does", watched.watching(door));
+        UNSCOPED_INFO("the newer one does");
+        CHECK(watched.watching(door));
 
         // Wanted still while another is added: the look it waits on answers
         // it, and only the new file is asked after.
         watched.watch({ almasterwatch_data::master(door), almasterwatch_data::master(lamp) });
-        ensure("door watched already: lamp alone asked", asked.size() == 3 && asked[2].paths.size() == 1);
+        {
+            INFO("door watched already: lamp alone asked");
+            REQUIRE(asked.size() == 3);
+            REQUIRE(asked[2].paths.size() == 1);
+        }
         const std::string other = in("other.lsl");
         watched.watch({ almasterwatch_data::master(door), almasterwatch_data::master(lamp), almasterwatch_data::master(other) });
-        ensure_equals("lamp waits on its look still: other alone asked", asked[3].paths.size(), size_t(1));
+        {
+            INFO("lamp waits on its look still: other alone asked");
+            REQUIRE(asked.size() == size_t(4));
+            REQUIRE(asked[3].paths.size() == size_t(1));
+        }
         answer(3);
-        ensure("other watched", watched.watching(other));
-        ensure("lamp waits on its own", watched.waiting(lamp));
+        CHECK(watched.watching(other));
+        UNSCOPED_INFO("lamp waits on its own");
+        CHECK(watched.waiting(lamp));
         answer(2);
-        ensure("lamp watched", watched.watching(lamp));
+        CHECK(watched.watching(lamp));
     }
 
-    template<> template<>
-    void almasterwatch_object::test<10>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: masters are looked at twice a second and includes once; past 256 every 2 s", "[almasterwatch]")
     {
-        set_test_name("a master is looked at twice a second, an include once, and everything every two seconds past 256 files");
         const std::string door = in("door.lsl");
         const std::string util = in("util.lsl");
         size_t            looks = 0;
@@ -459,9 +473,14 @@ namespace tut
                                                     return true;
                                                 });
         watch->watch({ almasterwatch_data::master(door), almasterwatch_data::include(util) });
-        ensure_equals("a master", *watch->periodOf(door), ALMasterWatch::MASTER_PERIOD);
-        ensure_equals("an include", *watch->periodOf(util), ALMasterWatch::INCLUDE_PERIOD);
-        ensure_equals("both looked at first", looks, size_t(2));
+        std::optional<F32> door_period = watch->periodOf(door);
+        std::optional<F32> util_period = watch->periodOf(util);
+        REQUIRE(door_period.has_value());
+        REQUIRE(util_period.has_value());
+        CHECK(*door_period == ALMasterWatch::MASTER_PERIOD);
+        CHECK(*util_period == ALMasterWatch::INCLUDE_PERIOD);
+        UNSCOPED_INFO("both looked at first");
+        CHECK(looks == size_t(2));
 
         std::vector<ALMasterLinks::Watched> many = { almasterwatch_data::master(door), almasterwatch_data::include(util) };
         for (size_t i = 0; i < ALMasterWatch::MANY - 1; ++i)
@@ -469,22 +488,33 @@ namespace tut
             many.push_back(almasterwatch_data::master(in("m" + std::to_string(i) + ".lsl")));
         }
         watch->watch(many);
-        ensure_equals("257 watched", watch->size(), size_t(257));
-        ensure_equals("past 256: a master every two seconds", *watch->periodOf(door), ALMasterWatch::MANY_PERIOD);
-        ensure_equals("and an include", *watch->periodOf(util), ALMasterWatch::MANY_PERIOD);
-        ensure_equals("only the new ones looked at", looks, size_t(257));
+        REQUIRE(watch->size() == size_t(257));
+        door_period = watch->periodOf(door);
+        util_period = watch->periodOf(util);
+        REQUIRE(door_period.has_value());
+        REQUIRE(util_period.has_value());
+        UNSCOPED_INFO("past 256: a master every two seconds");
+        CHECK(*door_period == ALMasterWatch::MANY_PERIOD);
+        CHECK(*util_period == ALMasterWatch::MANY_PERIOD);
+        UNSCOPED_INFO("only the new ones looked at");
+        CHECK(looks == size_t(257));
 
         watch->watch({ almasterwatch_data::master(door), almasterwatch_data::include(util) });
-        ensure_equals("fewer again: a master's own", *watch->periodOf(door), ALMasterWatch::MASTER_PERIOD);
-        ensure_equals("an include's own", *watch->periodOf(util), ALMasterWatch::INCLUDE_PERIOD);
-        ensure_equals("nothing looked at again", looks, size_t(257));
-        ensure("one not watched has no period", !watch->periodOf(in("m0.lsl")));
+        door_period = watch->periodOf(door);
+        util_period = watch->periodOf(util);
+        REQUIRE(door_period.has_value());
+        REQUIRE(util_period.has_value());
+        UNSCOPED_INFO("fewer again: a master's own");
+        CHECK(*door_period == ALMasterWatch::MASTER_PERIOD);
+        CHECK(*util_period == ALMasterWatch::INCLUDE_PERIOD);
+        UNSCOPED_INFO("nothing looked at again");
+        CHECK(looks == size_t(257));
+        UNSCOPED_INFO("one not watched has no period");
+        REQUIRE_FALSE(watch->periodOf(in("m0.lsl")));
     }
 
-    template<> template<>
-    void almasterwatch_object::test<11>()
+    TEST_CASE_METHOD(almasterwatch_data, "almasterwatch: with no main loop to answer through the first looks are made at once", "[almasterwatch]")
     {
-        set_test_name("with no main loop to answer through, the first looks are made at once, here");
         const std::string door = in("door.lsl");
         put(door, "first", 100);
         watch = std::make_unique<ALMasterWatch>(
@@ -492,10 +522,12 @@ namespace tut
             clock());
         watch->setQuiet(0.5);
         watch->watch({ almasterwatch_data::master(door) });
-        ensure("watched at once", watch->watching(door));
+        UNSCOPED_INFO("watched at once");
+        CHECK(watch->watching(door));
         put(door, "second", 200);
         looked();
         pass(0.6);
-        ensure_equals("released after the quiet set", released.size(), size_t(1));
+        UNSCOPED_INFO("released after the quiet set");
+        REQUIRE(released.size() == size_t(1));
     }
 }

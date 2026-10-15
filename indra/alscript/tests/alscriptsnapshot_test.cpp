@@ -25,9 +25,9 @@
 
 #include "../preprocessor/alscriptsnapshot.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alscriptsnapshot_data
     {
@@ -41,14 +41,8 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptsnapshot_data> alscriptsnapshot_group;
-    typedef alscriptsnapshot_group::object    alscriptsnapshot_object;
-    alscriptsnapshot_group                    alscriptsnapshot_instance("alscriptsnapshot");
-
-    template<> template<>
-    void alscriptsnapshot_object::test<1>()
+    TEST_CASE_METHOD(alscriptsnapshot_data, "alscriptsnapshot: a run uses answers and reports misses and notes each unknown name once", "[alscriptsnapshot]")
     {
-        set_test_name("a run takes what was answered, says what was not found, and notes each name nobody looked up once");
         ALScriptSnapshot snapshot;
         snapshot.options().fileName = "main.lsl";
         ALPreprocessor::Include lib;
@@ -59,19 +53,27 @@ namespace tut
         snapshot.answer(ask("gone.lsl"), ALPreprocessor::Found::No);
         const ALPreprocessor::Result made = snapshot.run(
             "#include \"lib.lsl\"\n#include \"gone.lsl\"\n#include \"new.lsl\"\n#include \"new.lsl\"\ndefault { state_entry() { helper(); } }\n");
-        ensure("the answered one in", made.text.find("integer helper()") != std::string::npos);
-        ensure("the missing one said", std::any_of(made.problems.begin(), made.problems.end(), [](const ALScriptProblem& p) { return p.key == "PreprocIncludeNotFound"; }));
+        UNSCOPED_INFO("the answered one in");
+        CHECK(made.text.find("integer helper()") != std::string::npos);
+        UNSCOPED_INFO("the missing one said");
+        CHECK(std::any_of(made.problems.begin(), made.problems.end(), [](const ALScriptProblem& p) { return p.key == "PreprocIncludeNotFound"; }));
         const std::vector<ALPreprocessor::Ask> missed = snapshot.missed();
-        ensure("the unknown one noted once", missed.size() == 1 && missed[0].name == "new.lsl");
-        ensure("taken away by the asking", snapshot.missed().empty());
+        {
+            INFO("the unknown one noted once");
+            REQUIRE(missed.size() == 1);
+            CHECK(missed[0].name == "new.lsl");
+        }
+        UNSCOPED_INFO("taken away by the asking");
+        CHECK(snapshot.missed().empty());
     }
 
-    template<> template<>
-    void alscriptsnapshot_object::test<2>()
+    TEST_CASE_METHOD(alscriptsnapshot_data, "alscriptsnapshot: keyOf is the name and who asks and whether it is a require", "[alscriptsnapshot]")
     {
-        set_test_name("a name's key is its name, who asks, and whether it is a require");
-        ensure("the same", ALScriptSnapshot::keyOf(ask("a")) == ALScriptSnapshot::keyOf(ask("a")));
-        ensure("another asking", ALScriptSnapshot::keyOf(ask("a", "disk:/x.lsl")) != ALScriptSnapshot::keyOf(ask("a")));
-        ensure("a require", ALScriptSnapshot::keyOf(ask("a", std::string(), true)) != ALScriptSnapshot::keyOf(ask("a")));
+        UNSCOPED_INFO("the same");
+        CHECK(ALScriptSnapshot::keyOf(ask("a")) == ALScriptSnapshot::keyOf(ask("a")));
+        UNSCOPED_INFO("another asking");
+        CHECK(ALScriptSnapshot::keyOf(ask("a", "disk:/x.lsl")) != ALScriptSnapshot::keyOf(ask("a")));
+        UNSCOPED_INFO("a require");
+        CHECK(ALScriptSnapshot::keyOf(ask("a", std::string(), true)) != ALScriptSnapshot::keyOf(ask("a")));
     }
 }

@@ -27,7 +27,6 @@
 // linden includes
 #include "linden_common.h"
 
-#include "llfasttimer.h"
 #include "llgl.h"
 #include "llimagej2c.h"
 #include "llsd.h"
@@ -251,7 +250,7 @@ void LLProcessTexture::process(std::ostream& output)
     avatar.updateVisualParams();
 
     // Prepare gl for avatar baking
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    gGL.setClearColor(LLColor4::transparent);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
     EBakedTextureIndex bake_type = LLAvatarAppearance::getDictionary()->findBakedByImageName(mInputData["slot_id"].asString());

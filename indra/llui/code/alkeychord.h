@@ -33,9 +33,10 @@
 
 class LLView;
 
-// A key as the studio's keymaps name it. SDL's windows -- the Mac's and
-// Linux's -- say KEY_DIVIDE for the slash key, which is the keypad's
-// slash on Windows, so a key bound as '/' is heard from either.
+// A key as the studio's keymaps name it. The keypad's slash is KEY_DIVIDE,
+// and was the slash key's too on SDL's windows -- the Mac's and Linux's --
+// before they gave it '/', as Windows does; so a key bound as '/' is heard
+// from either, and a binding kept as KEY_DIVIDE reads as '/'.
 inline KEY alKeyAsBound(KEY key)
 {
     return key == KEY_DIVIDE ? KEY('/') : key;

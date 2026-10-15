@@ -26,7 +26,7 @@
 
 #include "../lltimer.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -34,7 +34,7 @@
 #include <thread>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct timer_data
     {
@@ -42,74 +42,77 @@ namespace tut
         // LLCommon::initClass, which the test runner does not call.
         timer_data() { LLTimer::initClass(); }
     };
-    typedef test_group<timer_data> timer_group;
-    typedef timer_group::object timer_object;
-    tut::timer_group timer_instance("LLTimer");
 
-    template<> template<>
-    void timer_object::test<1>()
+    TEST_CASE_METHOD(timer_data, "LLTimer: a new timer reads expired until it is given an expiry", "[LLTimer]")
     {
-        set_test_name("a new timer reads expired until it is given an expiry");
         LLTimer timer;
-        ensure("expired", timer.hasExpired());
+        CHECK(timer.hasExpired());
         timer.setTimerExpirySec(10.f);
-        ensure("not expired once given ten seconds", !timer.hasExpired());
+        CHECK_FALSE(timer.hasExpired());
     }
 
-    template<> template<>
-    void timer_object::test<2>()
+    TEST_CASE_METHOD(timer_data, "LLTimer: resetWithExpiry restarts the timer and keeps the expiry", "[LLTimer]")
     {
-        set_test_name("resetWithExpiry restarts the timer and keeps the expiry");
         LLTimer timer;
-        ms_sleep(50);
+        // A timer the reset did not restart reads at least this quarter
+        // second (a Windows Sleep can come back a tick, 16 ms, early); one it
+        // did reads under 0.2 s, with more than 9.8 s of its 10 left, unless
+        // this thread is kept off the processor that long between the reset
+        // and the reads.
+        ms_sleep(250);
         timer.resetWithExpiry(10.f);
-        ensure("not expired", !timer.hasExpired());
-        ensure("the whole expiry to run", timer.getRemainingTimeF32() > 9.9f);
-        ensure("restarted", timer.getElapsedTimeF32() < 0.04f);
+        CHECK_FALSE(timer.hasExpired());
+        CHECK(timer.getRemainingTimeF32() > 9.8f);
+        CHECK(timer.getElapsedTimeF32() < 0.2f);
     }
 
-    template<> template<>
-    void timer_object::test<3>()
+    TEST_CASE_METHOD(timer_data, "LLTimer: start() after an expiry clears it which is why resetWithExpiry exists", "[LLTimer]")
     {
-        set_test_name("start() after an expiry clears it, which is why resetWithExpiry exists");
         LLTimer timer;
         timer.setTimerExpirySec(10.f);
         timer.start();
-        ensure("start() cleared the expiry", timer.hasExpired());
+        CHECK(timer.hasExpired());
     }
 
-    template<> template<>
-    void timer_object::test<4>()
+    TEST_CASE_METHOD(timer_data, "LLTimer: the uptime is the application's and not this timer's", "[LLTimer]")
     {
-        set_test_name("the uptime is the application's, not this timer's");
         LLTimer timer;
-        ms_sleep(50);
+        // As above: unrestarted, at least a quarter second; restarted, under
+        // 0.2 s however busy the machine, short of a 0.2 s stall.
+        ms_sleep(250);
         timer.reset();
-        ensure("the timer was just reset", timer.getElapsedTimeF64() < 0.04);
-        ensure("the uptime runs from before the reset", LLTimer::getUptimeSeconds() > timer.getElapsedTimeF64());
+        CHECK(timer.getElapsedTimeF64() < 0.2);
+        UNSCOPED_INFO("the uptime runs from before the reset");
+        CHECK(LLTimer::getUptimeSeconds() > timer.getElapsedTimeF64());
     }
 
-    template<> template<>
-    void timer_object::test<5>()
+    TEST_CASE_METHOD(timer_data, "LLTimer: total time matches the calendar and keeps pace with the steady clock", "[LLTimer]")
     {
-        set_test_name("the total time reads the calendar once and keeps pace with the steady clock");
         const auto calendar = std::chrono::system_clock::now().time_since_epoch();
         const F64  calendar_seconds = std::chrono::duration<F64>(calendar).count();
         const F64  total = LLTimer::getTotalSeconds();
-        ensure("anchored to the calendar", std::fabs(total - calendar_seconds) < 1.0);
+        CHECK(std::fabs(total - calendar_seconds) < 1.0);
 
-        const auto steady_start = std::chrono::steady_clock::now();
+        // Each read of the total is between two of the steady clock's, so
+        // what the total counted lies between what the steady clock counted
+        // inside those brackets and outside them, however long this thread is
+        // kept off the processor at any point. The millisecond either side is
+        // for the total's whole microseconds and the clocks' grain: a total
+        // fast or slow by half a percent over the 200 ms falls outside it.
+        const auto outer_start = std::chrono::steady_clock::now();
         const U64  total_start = totalTime();
+        const auto inner_start = std::chrono::steady_clock::now();
         ms_sleep(200);
-        const F64 steady = std::chrono::duration<F64>(std::chrono::steady_clock::now() - steady_start).count();
-        const F64 counted = (F64)((U64)totalTime() - total_start) / 1000000.0;
-        ensure("counts as the steady clock does", std::fabs(counted - steady) < 0.005);
+        const auto inner_end = std::chrono::steady_clock::now();
+        const U64  total_end = totalTime();
+        const auto outer_end = std::chrono::steady_clock::now();
+        const F64 counted = (F64)(total_end - total_start) / 1000000.0;
+        CHECK(counted > std::chrono::duration<F64>(inner_end - inner_start).count() - 0.001);
+        CHECK(counted < std::chrono::duration<F64>(outer_end - outer_start).count() + 0.001);
     }
 
-    template<> template<>
-    void timer_object::test<6>()
+    TEST_CASE_METHOD(timer_data, "LLTimer: total time read on many threads never steps back or runs fast", "[LLTimer]")
     {
-        set_test_name("the total time read on many threads at once never steps and never runs fast");
         const auto steady_start = std::chrono::steady_clock::now();
         const U64  total_start = totalTime();
         std::atomic<bool> stepped_back{ false };
@@ -134,9 +137,13 @@ namespace tut
         {
             reader.join();
         }
+        // The total read between the steady clock's two reads, so it cannot
+        // have counted more than they did, however the readers were
+        // scheduled; the millisecond is the clocks' grain, as above.
+        const U64 total_end = totalTime();
         const F64 steady = std::chrono::duration<F64>(std::chrono::steady_clock::now() - steady_start).count();
-        const F64 counted = (F64)((U64)totalTime() - total_start) / 1000000.0;
-        ensure("no thread saw it step back", !stepped_back);
-        ensure("counted no faster than the steady clock", counted < steady + 0.005);
+        const F64 counted = (F64)(total_end - total_start) / 1000000.0;
+        CHECK_FALSE(stepped_back);
+        CHECK(counted < steady + 0.001);
     }
 }

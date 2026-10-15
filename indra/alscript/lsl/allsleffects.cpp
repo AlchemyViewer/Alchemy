@@ -67,6 +67,21 @@ namespace
         return node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_STATE_STATEMENT;
     }
 
+    bool isPrint(LSLASTNode* node)
+    {
+        return node->getNodeType() == NODE_EXPRESSION && node->getNodeSubType() == NODE_PRINT_EXPRESSION;
+    }
+
+    // What a library call does past the script: anything, where it is not
+    // pure; and changes something, where it is called for more than its
+    // answer.
+    void library(ALLSLEffects::Writes& out, LSLSymbol* callee)
+    {
+        const ALLSLTraits::Trait* t = ALLSLTraits::of(callee->getName());
+        out.impure                  = out.impure || !t || !t->pure;
+        out.changes                 = out.changes || !t || !(t->pure || t->mustUse);
+    }
+
     // Every node of a subtree, the root first.
     template <class F> void each(LSLASTNode* root, const F& f)
     {
@@ -91,19 +106,29 @@ namespace
 void ALLSLEffects::Writes::add(const Writes& more)
 {
     variables.insert(more.variables.begin(), more.variables.end());
-    impure = impure || more.impure;
+    impure  = impure || more.impure;
+    changes = changes || more.changes;
 }
 
 ALLSLEffects::ALLSLEffects(LSLScript* script)
 {
-    mUnknown.impure = true;
+    mUnknown.impure  = true;
+    mUnknown.changes = true;
     if (!script || !script->getGlobals())
     {
         return;
     }
-    // Each function's own writes, and whom it calls; then each takes in
-    // its callees' until nothing more comes in.
+    // Each function's own writes and reads, and whom it calls; then each
+    // takes in its callees' until nothing more comes in.
     boost::unordered_flat_map<LSLSymbol*, std::vector<LSLSymbol*>> callees;
+    for (LSLASTNode* global : *script->getGlobals())
+    {
+        if (global->getNodeType() == NODE_GLOBAL_FUNCTION && global->getSymbol())
+        {
+            mFunctions[global->getSymbol()];
+            mReads[global->getSymbol()];
+        }
+    }
     for (LSLASTNode* global : *script->getGlobals())
     {
         if (global->getNodeType() != NODE_GLOBAL_FUNCTION || !global->getSymbol())
@@ -112,8 +137,17 @@ ALLSLEffects::ALLSLEffects(LSLScript* script)
         }
         LSLSymbol* function = global->getSymbol();
         Writes&    own      = mFunctions[function];
+        auto&      read     = mReads[function];
         each(global, [&](LSLASTNode* node) {
-            if (LSLSymbol* written = assigned(node); written && written->getSubType() == SYM_GLOBAL)
+            if (node->getNodeType() == NODE_IDENTIFIER)
+            {
+                LSLSymbol* named = static_cast<LSLIdentifier*>(node)->getSymbol();
+                if (named && named->getSymbolType() == SYM_VARIABLE && named->getSubType() == SYM_GLOBAL)
+                {
+                    read.insert(named);
+                }
+            }
+            else if (LSLSymbol* written = assigned(node); written && written->getSubType() == SYM_GLOBAL)
             {
                 own.variables.insert(written);
             }
@@ -121,16 +155,25 @@ ALLSLEffects::ALLSLEffects(LSLScript* script)
             {
                 if (callee->getSubType() == SYM_BUILTIN)
                 {
-                    own.impure = own.impure || !ALLSLTraits::pure(callee->getName());
+                    library(own, callee);
                 }
                 else
                 {
                     callees[function].push_back(callee);
+                    if (!mReads.contains(callee))
+                    {
+                        mReadsAny.insert(function);
+                    }
                 }
             }
             else if (isState(node))
             {
-                own.impure = true;
+                own.impure  = true;
+                own.changes = true;
+            }
+            else if (isPrint(node))
+            {
+                own.changes = true;
             }
         });
     }
@@ -139,17 +182,30 @@ ALLSLEffects::ALLSLEffects(LSLScript* script)
         grew = false;
         for (auto& [function, calls] : callees)
         {
-            Writes& own = mFunctions[function];
+            Writes& own  = mFunctions[function];
+            auto&   read = mReads[function];
             for (LSLSymbol* callee : calls)
             {
                 const Writes& theirs = ofFunction(callee);
                 const size_t  had    = own.variables.size();
+                const size_t  heard  = read.size();
                 const bool    was    = own.impure;
+                const bool    did    = own.changes;
+                const bool    any    = mReadsAny.contains(function);
                 if (&theirs != &own)
                 {
                     own.add(theirs);
                 }
-                grew = grew || own.variables.size() != had || own.impure != was;
+                if (const auto found = mReads.find(callee); callee != function && found != mReads.end())
+                {
+                    read.insert(found->second.begin(), found->second.end());
+                }
+                if (mReadsAny.contains(callee))
+                {
+                    mReadsAny.insert(function);
+                }
+                grew = grew || own.variables.size() != had || read.size() != heard || own.impure != was || own.changes != did ||
+                       mReadsAny.contains(function) != any;
             }
         }
     }
@@ -159,6 +215,12 @@ const ALLSLEffects::Writes& ALLSLEffects::ofFunction(LSLSymbol* function) const
 {
     const auto found = mFunctions.find(function);
     return found == mFunctions.end() ? mUnknown : found->second;
+}
+
+bool ALLSLEffects::reads(LSLSymbol* function, LSLSymbol* variable) const
+{
+    const auto found = mReads.find(function);
+    return found == mReads.end() || mReadsAny.contains(function) || found->second.contains(variable);
 }
 
 ALLSLEffects::Writes ALLSLEffects::of(LSLASTNode* node) const
@@ -177,7 +239,7 @@ ALLSLEffects::Writes ALLSLEffects::of(LSLASTNode* node) const
         {
             if (callee->getSubType() == SYM_BUILTIN)
             {
-                out.impure = out.impure || !ALLSLTraits::pure(callee->getName());
+                library(out, callee);
             }
             else
             {
@@ -186,7 +248,12 @@ ALLSLEffects::Writes ALLSLEffects::of(LSLASTNode* node) const
         }
         else if (isState(n))
         {
-            out.impure = true;
+            out.impure  = true;
+            out.changes = true;
+        }
+        else if (isPrint(n))
+        {
+            out.changes = true;
         }
     });
     return out;

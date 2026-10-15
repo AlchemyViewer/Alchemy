@@ -63,6 +63,18 @@ default {
         // read past its terminator while sniffing for the prefix
         if ( (integer)"0X1F" == 31 ) return;     // $[E20012]
         if ( (integer)"0" == 0 ) return;         // $[E20012]
+        // string -> integer behaves like a 32-bit strtoul(): anything past 0xFFFFFFFF
+        // saturates to -1 rather than wrapping, whether or not there's a sign.
+        if ( (integer)"4294967295" == -1 ) return;   // $[E20012]
+        if ( (integer)"4294967296" == -1 ) return;   // $[E20012]
+        if ( (integer)"4294967297" == -1 ) return;   // $[E20012]
+        if ( (integer)"0x100000000" == -1 ) return;  // $[E20012]
+        if ( (integer)"-4294967296" == -1 ) return;  // $[E20012]
+        if ( (integer)"99999999999999999999" == -1 ) return; // $[E20012]
+        // but in-range negatives are negated in unsigned space
+        if ( (integer)"-4294967295" == 1 ) return;   // $[E20012]
+        if ( (integer)"  -5xyz" == -5 ) return;      // $[E20012]
+        if ( (integer)"-" == 0 ) return;             // $[E20012]
         // dividing by -1 negates, and INT_MIN / -1 wraps back to INT_MIN
         if ( 5 / -1 == -5 ) return;              // $[E20012]
         if ( 0x80000000 / -1 == 0x80000000 ) return; // $[E20012]

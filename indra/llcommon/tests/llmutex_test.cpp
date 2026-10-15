@@ -16,13 +16,13 @@
 
 #include "llmutex.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <thread>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct llmutex_data
     {
@@ -38,69 +38,56 @@ namespace tut
         }
     };
 
-    typedef test_group<llmutex_data> llmutex_group;
-    typedef llmutex_group::object object;
-    llmutex_group llmutexgrp("llmutex");
-
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(llmutex_data, "llmutex: lock marks ownership and unlock clears it", "[llmutex]")
     {
-        set_test_name("lock marks ownership, unlock clears it");
-
-        ensure("unlocked mutex reports self-locked", !mMutex.isSelfLocked());
-        ensure_equals("unlocked mutex has an owner", mMutex.lockingThread(), LLThread::id_t());
+        CHECK_FALSE(mMutex.isSelfLocked());
+        CHECK(mMutex.lockingThread() == LLThread::id_t());
 
         mMutex.lock();
-        ensure("locked mutex does not report self-locked", mMutex.isSelfLocked());
-        ensure_equals("locking thread not recorded", mMutex.lockingThread(), LLThread::currentID());
-        ensure("isLocked() false while held", mMutex.isLocked());
+        CHECK(mMutex.isSelfLocked());
+        CHECK(mMutex.lockingThread() == LLThread::currentID());
+        CHECK(mMutex.isLocked());
 
         mMutex.unlock();
-        ensure("still self-locked after unlock", !mMutex.isSelfLocked());
-        ensure_equals("owner not cleared on unlock", mMutex.lockingThread(), LLThread::id_t());
-        ensure("isLocked() true after unlock", !mMutex.isLocked());
+        CHECK_FALSE(mMutex.isSelfLocked());
+        CHECK(mMutex.lockingThread() == LLThread::id_t());
+        CHECK_FALSE(mMutex.isLocked());
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(llmutex_data, "llmutex: lock is recursive and balanced", "[llmutex]")
     {
-        set_test_name("lock is recursive and balanced");
-
         mMutex.lock();
         mMutex.lock();
         mMutex.lock();
 
-        ensure("self-lock lost during recursion", mMutex.isSelfLocked());
+        CHECK(mMutex.isSelfLocked());
 
         mMutex.unlock();
-        ensure("released on the first of three unlocks", mMutex.isLocked());
+        UNSCOPED_INFO("released on the first of three unlocks");
+        CHECK(mMutex.isLocked());
         mMutex.unlock();
-        ensure("released on the second of three unlocks", mMutex.isLocked());
+        UNSCOPED_INFO("released on the second of three unlocks");
+        CHECK(mMutex.isLocked());
         mMutex.unlock();
 
-        ensure("not released after balanced unlocks", !mMutex.isLocked());
-        ensure("still self-locked after balanced unlocks", !mMutex.isSelfLocked());
+        CHECK_FALSE(mMutex.isLocked());
+        CHECK_FALSE(mMutex.isSelfLocked());
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(llmutex_data, "llmutex: trylock recurses on a self-held mutex", "[llmutex]")
     {
-        set_test_name("trylock recurses on a self-held mutex");
-
         mMutex.lock();
-        ensure("trylock failed on a mutex this thread already holds", mMutex.trylock());
+        CHECK(mMutex.trylock());
 
         mMutex.unlock();
-        ensure("recursive trylock did not need a matching unlock", mMutex.isLocked());
+        UNSCOPED_INFO("recursive trylock did not need a matching unlock");
+        CHECK(mMutex.isLocked());
         mMutex.unlock();
-        ensure("not released after balanced unlocks", !mMutex.isLocked());
+        CHECK_FALSE(mMutex.isLocked());
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(llmutex_data, "llmutex: ownership does not leak across threads", "[llmutex]")
     {
-        set_test_name("ownership does not leak across threads");
-
         mMutex.lock();
 
         std::atomic<bool> saw_self_locked{true};
@@ -115,8 +102,10 @@ namespace tut
             }
         });
 
-        ensure("another thread saw our lock as its own", !saw_self_locked);
-        ensure("another thread acquired a held mutex", !trylock_succeeded);
+        UNSCOPED_INFO("another thread saw our lock as its own");
+        CHECK_FALSE(saw_self_locked);
+        UNSCOPED_INFO("another thread acquired a held mutex");
+        CHECK_FALSE(trylock_succeeded);
 
         mMutex.unlock();
 
@@ -130,32 +119,27 @@ namespace tut
             }
         });
 
-        ensure("another thread could not acquire a released mutex", acquired);
+        UNSCOPED_INFO("another thread could not acquire a released mutex");
+        CHECK(acquired);
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE_METHOD(llmutex_data, "llmutex: LLMutexTrylock reports and releases", "[llmutex]")
     {
-        set_test_name("LLMutexTrylock reports and releases");
-
         {
             LLMutexTrylock lock(&mMutex);
-            ensure("trylock scope failed on a free mutex", lock.isLocked());
-            ensure("trylock scope did not take ownership", mMutex.isSelfLocked());
+            CHECK(lock.isLocked());
+            CHECK(mMutex.isSelfLocked());
         }
-        ensure("trylock scope did not release", !mMutex.isLocked());
+        CHECK_FALSE(mMutex.isLocked());
 
         // A null mutex is legal and locks nothing -- callers pass member pointers that
         // may not be constructed yet.
         LLMutexTrylock null_lock(nullptr);
-        ensure("null trylock scope claimed a lock", !null_lock.isLocked());
+        CHECK_FALSE(null_lock.isLocked());
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE_METHOD(llmutex_data, "llmutex: mutual exclusion holds under contention", "[llmutex]")
     {
-        set_test_name("mutual exclusion holds under contention");
-
         // Deliberately a non-atomic counter: the mutex is what makes it safe, so a lost
         // acquisition shows up as a short count.
         constexpr int NUM_THREADS = 8;
@@ -189,7 +173,9 @@ namespace tut
             thread.join();
         }
 
-        ensure_equals("lost an acquisition under contention", counter, NUM_THREADS * NUM_ITERATIONS);
-        ensure_equals("thread claimed ownership it did not have", false_self_locks.load(), 0);
+        UNSCOPED_INFO("lost an acquisition under contention");
+        CHECK(counter == NUM_THREADS * NUM_ITERATIONS);
+        UNSCOPED_INFO("thread claimed ownership it did not have");
+        CHECK(false_self_locks.load() == 0);
     }
 }

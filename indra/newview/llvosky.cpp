@@ -54,7 +54,6 @@
 #include "llenvironment.h"
 
 #include "lltrace.h"
-#include "llfasttimer.h"
 
 #undef min
 #undef max

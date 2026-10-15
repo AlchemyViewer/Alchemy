@@ -39,8 +39,10 @@
 #include "llkdumem.h"
 #endif
 #include "kdu_block_coding.h"
-// Tut header
-#include "lltut.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <memory>
 
 // -------------------------------------------------------------------------------------------
 // Stubbing: Declarations required to link and run the class being tested
@@ -242,86 +244,53 @@ void kdu_params::operator delete(void *) {}
 } // namespace kdu_core
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// The tests
 // -------------------------------------------------------------------------------------------
 
-namespace tut
+namespace
 {
-    // Test wrapper declarations
-    struct llimagej2ckdu_test
+    struct llimagej2ckdu_data
     {
-        // Derived test class
+        // The codec, its protected steps made callable.
         class LLTestImageJ2CKDU : public LLImageJ2CKDU
         {
         public:
-            // Provides public access to some protected methods for testing
-            bool callGetMetadata(LLImageJ2C &base) { return getMetadata(base); }
-            bool callDecodeImpl(LLImageJ2C &base, LLImageRaw &raw_image, F32 decode_time, S32 first_channel, S32 max_channel_count)
+            bool callGetMetadata(LLImageJ2C& base) { return getMetadata(base); }
+            bool callDecodeImpl(LLImageJ2C& base, LLImageRaw& raw_image, F32 decode_time, S32 first_channel, S32 max_channel_count)
             {
                 return decodeImpl(base, raw_image, decode_time, first_channel, max_channel_count);
             }
-            bool callEncodeImpl(LLImageJ2C &base, const LLImageRaw &raw_image, const char* comment_text)
+            bool callEncodeImpl(LLImageJ2C& base, const LLImageRaw& raw_image, const char* comment_text)
             {
                 return encodeImpl(base, raw_image, comment_text);
             }
         };
-        // Instance to be tested
-        LLTestImageJ2CKDU* mImage;
 
-        // Constructor and destructor of the test wrapper
-        llimagej2ckdu_test()
-        {
-            mImage = new LLTestImageJ2CKDU;
-        }
-        ~llimagej2ckdu_test()
-        {
-            delete mImage;
-        }
+        std::unique_ptr<LLTestImageJ2CKDU> mImage = std::make_unique<LLTestImageJ2CKDU>();
     };
 
-    // Tut templating thingamagic: test group, object and test instance
-    typedef test_group<llimagej2ckdu_test> llimagej2ckdu_t;
-    typedef llimagej2ckdu_t::object llimagej2ckdu_object_t;
-    tut::llimagej2ckdu_t tut_llimagej2ckdu("LLImageJ2CKDU");
-
-    // ---------------------------------------------------------------------------------------
-    // Test functions
-    // Notes:
-    // * Test as many as you possibly can without requiring a full blown simulation of everything
-    // * The tests are executed in sequence so the test instance state may change between calls
-    // * Remember that you cannot test private methods with tut
-    // ---------------------------------------------------------------------------------------
-
-    // Test 1 : test getMetadata()
-    template<> template<>
-    void llimagej2ckdu_object_t::test<1>()
+    // A stream of nothing over the stubs above "works". Linked with KDU
+    // itself, the call throws, and getMetadata() says false.
+    TEST_CASE_METHOD(llimagej2ckdu_data, "llimagej2ckdu: getMetadata over the stubbed KDU succeeds", "[llimagej2ckdu]")
     {
-        LLImageJ2C* image = new LLImageJ2C();
-        bool res = mImage->callGetMetadata(*image);
-        // Trying to set up a data stream with all NIL values and stubbed KDU will "work" and return true
-        // Note that is linking with KDU, that call will throw an exception and fail, returning false
-        ensure("getMetadata() test failed", res);
+        LLImageJ2C image;
+        CHECK(mImage->callGetMetadata(image));
     }
 
-    // Test 2 : test decodeImpl()
-    template<> template<>
-    void llimagej2ckdu_object_t::test<2>()
+    // Decoding says true whenever there is nothing more to do, a decode that
+    // failed included.
+    TEST_CASE_METHOD(llimagej2ckdu_data, "llimagej2ckdu: decodeImpl with nothing to decode says it is done", "[llimagej2ckdu]")
     {
-        LLImageJ2C* image = new LLImageJ2C();
-        LLImageRaw* raw = new LLImageRaw();
-        bool res = mImage->callDecodeImpl(*image, *raw, 0.0, 0, 0);
-        // Decoding returns true whenever there's nothing else to do, including if decoding failed, so we'll get true here
-        ensure("decodeImpl() test failed", res);
+        LLImageJ2C image;
+        LLImageRaw raw;
+        CHECK(mImage->callDecodeImpl(image, raw, 0.0, 0, 0));
     }
 
-    // Test 3 : test encodeImpl()
-    template<> template<>
-    void llimagej2ckdu_object_t::test<3>()
+    // Encoding says true unless KDU threw, though nothing was encoded.
+    TEST_CASE_METHOD(llimagej2ckdu_data, "llimagej2ckdu: encodeImpl over the stubbed KDU succeeds", "[llimagej2ckdu]")
     {
-        LLImageJ2C* image = new LLImageJ2C();
-        LLImageRaw* raw = new LLImageRaw();
-        bool res = mImage->callEncodeImpl(*image, *raw, NULL);
-        // Encoding returns true unless an exception was raised, so we'll get true here though nothing really was done
-        ensure("encodeImpl() test failed", res);
+        LLImageJ2C image;
+        LLImageRaw raw;
+        CHECK(mImage->callEncodeImpl(image, raw, nullptr));
     }
 }

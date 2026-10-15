@@ -29,12 +29,12 @@
 #include "alsyntaxgrammar.h"
 #include "alsyntaxhighlighter.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <set>
 #include <string>
 
-namespace tut
+namespace
 {
     struct altextspelling_data
     {
@@ -47,7 +47,9 @@ namespace tut
         altextspelling_data()
         {
             std::string error;
-            ensure("lsl loads: " + error, library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error));
+            const bool  loaded = library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/lsl.xml", error);
+            INFO("lsl loads: " << error);
+            REQUIRE(loaded);
             spelling.setChecker(
                 [this](const std::string& word) {
                     asked.push_back(word);
@@ -71,44 +73,41 @@ namespace tut
         }
     };
 
-    typedef test_group<altextspelling_data> altextspelling_group;
-    typedef altextspelling_group::object    altextspelling_object;
-    altextspelling_group                    altextspelling_instance("altextspelling");
-
-    template<> template<>
-    void altextspelling_object::test<1>()
+    TEST_CASE_METHOD(altextspelling_data, "altextspelling: prose is checked word by word but code-like and very short words are not", "[altextspelling]")
     {
-        set_test_name("prose is checked word by word, and what reads as code or is too short to be wrong is not");
         ALTextDocument      doc("the catt sat on_it 2nd myVar Xyzzy zz");
         ALSyntaxHighlighter highlighter;
         highlighter.attach(&doc);
-        ensure("someone to ask", spelling.available());
-        ensure_equals("the words it lacks", words(doc, 0, spelling.misspellings(doc, highlighter, 0, true)), std::string("catt|Xyzzy"));
-        ensure("none off", ALTextSpelling().misspellings(doc, highlighter, 0, false).empty());
-        ensure("none past the text", spelling.misspellings(doc, highlighter, 5, true).empty());
+        UNSCOPED_INFO("someone to ask");
+        CHECK(spelling.available());
+        UNSCOPED_INFO("the words it lacks");
+        CHECK(words(doc, 0, spelling.misspellings(doc, highlighter, 0, true)) == std::string("catt|Xyzzy"));
+        UNSCOPED_INFO("none off");
+        CHECK(ALTextSpelling().misspellings(doc, highlighter, 0, false).empty());
+        UNSCOPED_INFO("none past the text");
+        CHECK(spelling.misspellings(doc, highlighter, 5, true).empty());
     }
 
-    template<> template<>
-    void altextspelling_object::test<2>()
+    TEST_CASE_METHOD(altextspelling_data, "altextspelling: in code only comments and strings are prose even one opened above", "[altextspelling]")
     {
-        set_test_name("in code only comments and strings are prose, and a comment opened above a line makes it prose");
         ALTextDocument      doc("string mesage = \"a speling\"; // the dogg\nintegre x;");
         ALSyntaxHighlighter highlighter;
         highlighter.setGrammar(library.find("lsl"));
         highlighter.attach(&doc);
-        ensure_equals("the comment and the string", words(doc, 0, spelling.misspellings(doc, highlighter, 0, true)), std::string("speling|dogg"));
-        ensure("the code under them, never", spelling.misspellings(doc, highlighter, 1, true).empty());
+        UNSCOPED_INFO("the comment and the string");
+        CHECK(words(doc, 0, spelling.misspellings(doc, highlighter, 0, true)) == std::string("speling|dogg"));
+        UNSCOPED_INFO("the code under them, never");
+        CHECK(spelling.misspellings(doc, highlighter, 1, true).empty());
         // A comment opened above: the line under it is prose now, and
         // checked again though its own text did not change.
         doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "/*\n");
         spelling.edited(ALTextDocument::Edit{ ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), std::string(), "/*\n" }, doc.lineCount());
-        ensure_equals("in the comment", words(doc, 2, spelling.misspellings(doc, highlighter, 2, true)), std::string("integre"));
+        UNSCOPED_INFO("in the comment");
+        CHECK(words(doc, 2, spelling.misspellings(doc, highlighter, 2, true)) == std::string("integre"));
     }
 
-    template<> template<>
-    void altextspelling_object::test<3>()
+    TEST_CASE_METHOD(altextspelling_data, "altextspelling: a line's misspellings are kept until it changes and slide with edits", "[altextspelling]")
     {
-        set_test_name("a line's words are kept until it changes, and the lines below slide with an edit rather than being checked again");
         ALTextDocument      doc("the catt\nthe dogg\nand matt");
         ALSyntaxHighlighter highlighter;
         highlighter.attach(&doc);
@@ -118,52 +117,80 @@ namespace tut
         }
         const size_t checked = asked.size();
         spelling.misspellings(doc, highlighter, 1, true);
-        ensure_equals("asked again, nothing checked again", asked.size(), checked);
+        UNSCOPED_INFO("asked again, nothing checked again");
+        CHECK(asked.size() == checked);
 
         // A line put in above: the two below slide, and only the new one is
         // checked.
         const ALTextDocument::Edit made = doc.replace(ALTextRange(ALTextPos(0, 8), ALTextPos(0, 8)), "\nthe ratt");
         spelling.edited(made, doc.lineCount());
-        ensure_equals("the line after, slid", words(doc, 2, spelling.misspellings(doc, highlighter, 2, true)), std::string("dogg"));
-        ensure_equals("and the last", words(doc, 3, spelling.misspellings(doc, highlighter, 3, true)), std::string("matt"));
-        ensure_equals("still nothing checked again", asked.size(), checked);
-        ensure_equals("the line put in", words(doc, 1, spelling.misspellings(doc, highlighter, 1, true)), std::string("ratt"));
-        ensure("checked now", asked.size() > checked);
+        UNSCOPED_INFO("the line after, slid");
+        CHECK(words(doc, 2, spelling.misspellings(doc, highlighter, 2, true)) == std::string("dogg"));
+        UNSCOPED_INFO("and the last");
+        CHECK(words(doc, 3, spelling.misspellings(doc, highlighter, 3, true)) == std::string("matt"));
+        UNSCOPED_INFO("still nothing checked again");
+        CHECK(asked.size() == checked);
+        UNSCOPED_INFO("the line put in");
+        CHECK(words(doc, 1, spelling.misspellings(doc, highlighter, 1, true)) == std::string("ratt"));
+        UNSCOPED_INFO("checked now");
+        CHECK(asked.size() > checked);
 
         spelling.recheck();
         const size_t before = asked.size();
         spelling.misspellings(doc, highlighter, 3, true);
-        ensure("all of it checked again once the dictionary changed", asked.size() > before);
+        UNSCOPED_INFO("all of it checked again once the dictionary changed");
+        CHECK(asked.size() > before);
     }
 
-    template<> template<>
-    void altextspelling_object::test<4>()
+    TEST_CASE_METHOD(altextspelling_data, "altextspelling: the misspelling at a place gets suggestions and one can be taken", "[altextspelling]")
     {
-        set_test_name("the misspelling at a place, what it might have been, and one of those taken");
         ALTextDocument      doc("the catt sat");
         ALSyntaxHighlighter highlighter;
         highlighter.attach(&doc);
         ALTextRange word;
-        ensure("in one", spelling.misspelledAt(doc, highlighter, ALTextPos(0, 6), true, &word));
-        ensure("the word", word == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 8)));
-        ensure("its end counts", spelling.misspelledAt(doc, highlighter, ALTextPos(0, 8), true));
-        ensure("not in a word spelled right", !spelling.misspelledAt(doc, highlighter, ALTextPos(0, 10), true));
+        UNSCOPED_INFO("in one");
+        REQUIRE(spelling.misspelledAt(doc, highlighter, ALTextPos(0, 6), true, &word));
+        UNSCOPED_INFO("the word");
+        CHECK(word == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 8)));
+        UNSCOPED_INFO("its end counts");
+        CHECK(spelling.misspelledAt(doc, highlighter, ALTextPos(0, 8), true));
+        UNSCOPED_INFO("not in a word spelled right");
+        CHECK_FALSE(spelling.misspelledAt(doc, highlighter, ALTextPos(0, 10), true));
 
         spelling.suggestAt(doc, highlighter, ALTextPos(0, 5), true);
-        ensure("suggested for", spelling.suggestedFor() == word);
-        ensure("what the suggester said", spelling.suggestions() == std::vector<std::string>{ "catt?", "cat" });
-        ensure("the test's dictionary takes nothing in", !spelling.canTeach(true));
+        UNSCOPED_INFO("suggested for");
+        CHECK(spelling.suggestedFor() == word);
+        UNSCOPED_INFO("what the suggester said");
+        CHECK(spelling.suggestions() == std::vector<std::string>{ "catt?", "cat" });
+        UNSCOPED_INFO("the test's dictionary takes nothing in");
+        CHECK_FALSE(spelling.canTeach(true));
         const std::optional<std::pair<ALTextRange, std::string>> taken = spelling.take(1);
-        ensure("taken", taken.has_value() && taken->first == word && taken->second == "cat");
-        ensure("and let go of", spelling.suggestions().empty() && spelling.suggestedFor().empty());
-        ensure("none past the end", !spelling.take(5));
+        {
+            INFO("taken");
+            REQUIRE(taken.has_value());
+            CHECK(taken->first == word);
+            CHECK(taken->second == "cat");
+        }
+        {
+            INFO("and let go of");
+            CHECK(spelling.suggestions().empty());
+            CHECK(spelling.suggestedFor().empty());
+        }
+        UNSCOPED_INFO("none past the end");
+        CHECK_FALSE(spelling.take(5));
 
         spelling.suggestAt(doc, highlighter, ALTextPos(0, 10), true);
-        ensure("nothing for a word spelled right", spelling.suggestions().empty() && spelling.suggestedFor().empty());
+        {
+            INFO("nothing for a word spelled right");
+            CHECK(spelling.suggestions().empty());
+            CHECK(spelling.suggestedFor().empty());
+        }
         spelling.suggestAt(doc, highlighter, ALTextPos(0, 5), false);
-        ensure("nor while it is off", spelling.suggestedFor().empty());
+        UNSCOPED_INFO("nor while it is off");
+        CHECK(spelling.suggestedFor().empty());
         spelling.suggestAt(doc, highlighter, ALTextPos(0, 5), true);
         spelling.edited(ALTextDocument::Edit{ ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), std::string(), "x" }, doc.lineCount());
-        ensure("an edit lets them go", spelling.suggestions().empty());
+        UNSCOPED_INFO("an edit lets them go");
+        CHECK(spelling.suggestions().empty());
     }
 }

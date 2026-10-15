@@ -17,10 +17,12 @@
 #define LL_SYNC_H
 
 #include "llcond.h"
-#include "lltut.h"
 #include "stringize.h"
 #include "llerror.h"
 #include "llcoros.h"
+
+// A timeout fails the test case, as a FAIL does.
+#include <catch2/catch_test_macros.hpp>
 
 /**
  * Instantiate Sync in any test in which we need to suspend one coroutine
@@ -105,9 +107,8 @@ private:
         LL_DEBUGS() << name << " yield_until(" << until << ") suspending" << LL_ENDL;
         if (! mCond.wait_for_equal(mTimeout, until))
         {
-            tut::fail(STRINGIZE(name << ' ' << func << '(' << arg << ") timed out after "
-                                << int(mTimeout.value()) << "ms (expected " << until
-                                << ", actual " << mCond.get() << ')'));
+            FAIL(name << ' ' << func << '(' << arg << ") timed out after " << int(mTimeout.value())
+                      << "ms (expected " << until << ", actual " << mCond.get() << ')');
         }
         // each time we wake up, bump mCond
         bump();

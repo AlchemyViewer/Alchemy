@@ -28,13 +28,13 @@
 
 #include "llsdserialize.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <sstream>
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct almasterlinks_data
     {
@@ -88,52 +88,73 @@ namespace tut
         }
     };
 
-    typedef test_group<almasterlinks_data> almasterlinks_group;
-    typedef almasterlinks_group::object    almasterlinks_object;
-    almasterlinks_group                    almasterlinks_instance("almasterlinks");
-
-    template<> template<>
-    void almasterlinks_object::test<1>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: a link is found by object and item then replaced in place and removed", "[almasterlinks]")
     {
-        set_test_name("a link is found by its object and item, put over, and removed");
         ALMasterLinks links;
-        ensure("none at first", links.empty() && !links.of(almasterlinks_data::key(1), almasterlinks_data::key(2)));
+        {
+            INFO("none at first");
+            REQUIRE(links.empty());
+            REQUIRE_FALSE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(2)));
+        }
 
         links.put(almasterlinks_data::link(1, 2, "/s/door.lsl"));
         links.put(almasterlinks_data::link(0, 2, "/s/inventory.lsl"));
         links.put(almasterlinks_data::link(3, 4, "/s/lamp.lsl"));
-        ensure_equals("three", links.size(), size_t(3));
-        ensure_equals("by its object and item", links.of(almasterlinks_data::key(1), almasterlinks_data::key(2))->master, std::string("/s/door.lsl"));
-        ensure_equals("the same item in the inventory is another", links.of(LLUUID::null, almasterlinks_data::key(2))->master,
-                      std::string("/s/inventory.lsl"));
-        ensure("not by the item in another object", !links.of(almasterlinks_data::key(3), almasterlinks_data::key(2)));
+        REQUIRE(links.size() == size_t(3));
+        const ALMasterLink* const door = links.of(almasterlinks_data::key(1), almasterlinks_data::key(2));
+        REQUIRE(door);
+        UNSCOPED_INFO("by its object and item");
+        CHECK(door->master == std::string("/s/door.lsl"));
+        const ALMasterLink* const inventory = links.of(LLUUID::null, almasterlinks_data::key(2));
+        REQUIRE(inventory);
+        UNSCOPED_INFO("the same item in the inventory is another");
+        CHECK(inventory->master == std::string("/s/inventory.lsl"));
+        UNSCOPED_INFO("not by the item in another object");
+        REQUIRE_FALSE(links.of(almasterlinks_data::key(3), almasterlinks_data::key(2)));
 
         ALMasterLink again = almasterlinks_data::link(1, 2, "/s/door2.lsl");
         again.made         = ALMasterLink::Made::Hint;
         ALMasterLink& put  = links.put(again);
-        ensure_equals("put over, not beside", links.size(), size_t(3));
-        ensure_equals("what put answers is the one kept", put.master, std::string("/s/door2.lsl"));
-        ensure("and found so", links.of(almasterlinks_data::key(1), almasterlinks_data::key(2))->made == ALMasterLink::Made::Hint);
-        ensure_equals("in its place", links.all()[0].master, std::string("/s/door2.lsl"));
+        UNSCOPED_INFO("put over, not beside");
+        REQUIRE(links.size() == size_t(3));
+        UNSCOPED_INFO("what put answers is the one kept");
+        CHECK(put.master == std::string("/s/door2.lsl"));
+        const ALMasterLink* const replaced = links.of(almasterlinks_data::key(1), almasterlinks_data::key(2));
+        REQUIRE(replaced);
+        UNSCOPED_INFO("and found so");
+        CHECK(replaced->made == ALMasterLink::Made::Hint);
+        UNSCOPED_INFO("in its place");
+        CHECK(links.all()[0].master == std::string("/s/door2.lsl"));
 
         ALMasterLink* found = links.find(almasterlinks_data::key(3), almasterlinks_data::key(4));
-        ensure("found to change", found != nullptr);
+        UNSCOPED_INFO("found to change");
+        REQUIRE(found != nullptr);
         found->hash = "xxh128:00";
-        ensure_equals("changed where it is kept", links.of(almasterlinks_data::key(3), almasterlinks_data::key(4))->hash, std::string("xxh128:00"));
-        ensure("nothing to change of an item not linked", !links.find(almasterlinks_data::key(9), almasterlinks_data::key(9)));
+        const ALMasterLink* const lamp = links.of(almasterlinks_data::key(3), almasterlinks_data::key(4));
+        REQUIRE(lamp);
+        UNSCOPED_INFO("changed where it is kept");
+        CHECK(lamp->hash == std::string("xxh128:00"));
+        UNSCOPED_INFO("nothing to change of an item not linked");
+        REQUIRE_FALSE(links.find(almasterlinks_data::key(9), almasterlinks_data::key(9)));
 
-        ensure("removed", links.remove(almasterlinks_data::key(1), almasterlinks_data::key(2)));
-        ensure("and gone", !links.of(almasterlinks_data::key(1), almasterlinks_data::key(2)));
-        ensure("not twice", !links.remove(almasterlinks_data::key(1), almasterlinks_data::key(2)));
-        ensure_equals("the rest kept, in order", links.all()[0].master, std::string("/s/inventory.lsl"));
-        ensure_equals("and found where they now are", links.of(almasterlinks_data::key(3), almasterlinks_data::key(4))->master,
-                      std::string("/s/lamp.lsl"));
+        CHECK(links.remove(almasterlinks_data::key(1), almasterlinks_data::key(2)));
+        UNSCOPED_INFO("and gone");
+        REQUIRE_FALSE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(2)));
+        UNSCOPED_INFO("not twice");
+        CHECK_FALSE(links.remove(almasterlinks_data::key(1), almasterlinks_data::key(2)));
+        {
+            INFO("the rest kept, in order");
+            REQUIRE(links.size() == size_t(2));
+            CHECK(links.all()[0].master == std::string("/s/inventory.lsl"));
+        }
+        const ALMasterLink* const moved = links.of(almasterlinks_data::key(3), almasterlinks_data::key(4));
+        REQUIRE(moved);
+        UNSCOPED_INFO("and found where they now are");
+        CHECK(moved->master == std::string("/s/lamp.lsl"));
     }
 
-    template<> template<>
-    void almasterlinks_object::test<2>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: mastering lists a file's items comparing paths as their platform does", "[almasterlinks]")
     {
-        set_test_name("every item a master file masters, a path compared as its platform compares it");
         ALMasterLinks links;
         links.put(almasterlinks_data::link(1, 10, "/s/net/door.lsl"));
         links.put(almasterlinks_data::link(2, 11, "/s/net/door.lsl"));
@@ -141,33 +162,43 @@ namespace tut
         links.put(almasterlinks_data::link(4, 13, "C:\\Scripts\\Door.lsl"));
         links.put(almasterlinks_data::link(5, 14, "\\\\host\\share\\door.lsl"));
 
-        ensure_equals("one file masters several items, in the order put", almasterlinks_data::items(links.mastering("/s/net/door.lsl")),
+        UNSCOPED_INFO("one file masters several items, in the order put");
+        CHECK(almasterlinks_data::items(links.mastering("/s/net/door.lsl")) ==
                       std::string("10 11"));
-        ensure("a path from a root of /, as written: the disk's own case", links.mastering("/s/net/Door.lsl").empty());
-        ensure("nor another file", links.mastering("/s/net/window.lsl").empty());
-        ensure_equals("Windows's, in any case and with either separator",
-                      almasterlinks_data::items(links.mastering("c:/scripts/door.LSL")), std::string("13"));
-        ensure_equals("a share's the same", almasterlinks_data::items(links.mastering("//HOST/share/door.lsl")),
+        UNSCOPED_INFO("a path from a root of /, as written: the disk's own case");
+        REQUIRE(links.mastering("/s/net/Door.lsl").empty());
+        UNSCOPED_INFO("nor another file");
+        REQUIRE(links.mastering("/s/net/window.lsl").empty());
+        UNSCOPED_INFO("Windows's, in any case and with either separator");
+        CHECK(almasterlinks_data::items(links.mastering("c:/scripts/door.LSL")) == std::string("13"));
+        UNSCOPED_INFO("a share's the same");
+        CHECK(almasterlinks_data::items(links.mastering("//HOST/share/door.lsl")) ==
                       std::string("14"));
-        ensure_equals("the key of Windows's", ALMasterLinks::keyOf("C:/Scripts/Door.lsl"), std::string("c:\\scripts\\door.lsl"));
-        ensure_equals("and of any other", ALMasterLinks::keyOf("/S/Door.lsl"), std::string("/S/Door.lsl"));
+        UNSCOPED_INFO("the key of Windows's");
+        CHECK(ALMasterLinks::keyOf("C:/Scripts/Door.lsl") == std::string("c:\\scripts\\door.lsl"));
+        UNSCOPED_INFO("and of any other");
+        CHECK(ALMasterLinks::keyOf("/S/Door.lsl") == std::string("/S/Door.lsl"));
 
         // Changed through find(): the index follows.
-        links.find(almasterlinks_data::key(2), almasterlinks_data::key(11))->master = "/s/net/lamp.lsl";
-        ensure_equals("a master changed through find", almasterlinks_data::items(links.mastering("/s/net/door.lsl")),
+        ALMasterLink* const remastered = links.find(almasterlinks_data::key(2), almasterlinks_data::key(11));
+        REQUIRE(remastered);
+        remastered->master = "/s/net/lamp.lsl";
+        UNSCOPED_INFO("a master changed through find");
+        CHECK(almasterlinks_data::items(links.mastering("/s/net/door.lsl")) ==
                       std::string("10"));
-        ensure_equals("is found under the new", almasterlinks_data::items(links.mastering("/s/net/lamp.lsl")),
+        UNSCOPED_INFO("is found under the new");
+        CHECK(almasterlinks_data::items(links.mastering("/s/net/lamp.lsl")) ==
                       std::string("11 12"));
         links.remove(almasterlinks_data::key(1), almasterlinks_data::key(10));
-        ensure("and one removed is not", links.mastering("/s/net/door.lsl").empty());
-        ensure_equals("nor are the others lost by it", almasterlinks_data::items(links.mastering("/s/net/lamp.lsl")),
+        UNSCOPED_INFO("and one removed is not");
+        REQUIRE(links.mastering("/s/net/door.lsl").empty());
+        UNSCOPED_INFO("nor are the others lost by it");
+        CHECK(almasterlinks_data::items(links.mastering("/s/net/lamp.lsl")) ==
                       std::string("11 12"));
     }
 
-    template<> template<>
-    void almasterlinks_object::test<3>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: usersOf finds links that last read a file by its identity or its path", "[almasterlinks]")
     {
-        set_test_name("every link whose last expansion read a file, by the file's identity or its path");
         ALMasterLinks links;
         ALMasterLink  door = almasterlinks_data::link(1, 10, "/s/door.lsl");
         door.uses          = { "disk:/s/lib/util.lsl", "disk:/s/lib/net.lsl", "disk:/s/lib/util.lsl" };
@@ -179,28 +210,34 @@ namespace tut
         links.put(lamp);
         links.put(win);
 
-        ensure_equals("by its identity, each user once", almasterlinks_data::items(links.usersOf("disk:/s/lib/util.lsl")),
+        UNSCOPED_INFO("by its identity, each user once");
+        CHECK(almasterlinks_data::items(links.usersOf("disk:/s/lib/util.lsl")) ==
                       std::string("10 11"));
-        ensure_equals("or by its path alone", almasterlinks_data::items(links.usersOf("/s/lib/net.lsl")),
+        UNSCOPED_INFO("or by its path alone");
+        CHECK(almasterlinks_data::items(links.usersOf("/s/lib/net.lsl")) ==
                       std::string("10"));
-        ensure("a master is not a use of itself", links.usersOf("/s/door.lsl").empty());
-        ensure_equals("Windows's in any case", almasterlinks_data::items(links.usersOf("disk:c:/s/lib/util.lsl")),
+        UNSCOPED_INFO("a master is not a use of itself");
+        REQUIRE(links.usersOf("/s/door.lsl").empty());
+        UNSCOPED_INFO("Windows's in any case");
+        CHECK(almasterlinks_data::items(links.usersOf("disk:c:/s/lib/util.lsl")) ==
                       std::string("12"));
 
         // The uses of the next expansion, written through find().
-        links.find(almasterlinks_data::key(1), almasterlinks_data::key(10))->uses = { "disk:/s/lib/net.lsl" };
-        ensure_equals("uses changed through find", almasterlinks_data::items(links.usersOf("disk:/s/lib/util.lsl")),
+        ALMasterLink* const expanded = links.find(almasterlinks_data::key(1), almasterlinks_data::key(10));
+        REQUIRE(expanded);
+        expanded->uses = { "disk:/s/lib/net.lsl" };
+        UNSCOPED_INFO("uses changed through find");
+        CHECK(almasterlinks_data::items(links.usersOf("disk:/s/lib/util.lsl")) ==
                       std::string("11"));
         ALMasterLink again = lamp;
         again.uses.clear();
         links.put(again);
-        ensure("and through put", links.usersOf("disk:/s/lib/util.lsl").empty());
+        UNSCOPED_INFO("and through put");
+        REQUIRE(links.usersOf("disk:/s/lib/util.lsl").empty());
     }
 
-    template<> template<>
-    void almasterlinks_object::test<4>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: orphaned links are kept ninety days and then pruned; no other is", "[almasterlinks]")
     {
-        set_test_name("orphaned links are kept ninety days and then pruned; no other is");
         const LLDate  now(1800000000.0);
         const F64     day = 24.0 * 60.0 * 60.0;
         ALMasterLinks links;
@@ -223,26 +260,36 @@ namespace tut
             links.put(one);
         }
 
-        ensure_equals("one pruned", links.prune(now), size_t(1));
-        ensure("the old orphan", !links.of(almasterlinks_data::key(1), almasterlinks_data::key(10)));
-        ensure("not the young one", links.of(almasterlinks_data::key(1), almasterlinks_data::key(11)) != nullptr);
-        ensure("nor any not orphaned, however old",
-               links.of(almasterlinks_data::key(1), almasterlinks_data::key(12)) && links.of(almasterlinks_data::key(1), almasterlinks_data::key(13)));
+        CHECK(links.prune(now) == size_t(1));
+        UNSCOPED_INFO("the old orphan");
+        REQUIRE_FALSE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(10)));
+        UNSCOPED_INFO("not the young one");
+        REQUIRE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(11)) != nullptr);
+        {
+            INFO("nor any not orphaned, however old");
+            REQUIRE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(12)));
+            REQUIRE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(13)));
+        }
         const ALMasterLink* dated = links.of(almasterlinks_data::key(1), almasterlinks_data::key(14));
-        ensure("one with no date is kept", dated != nullptr);
-        ensure("and dated now", dated->orphanedSince == now);
-        ensure_equals("found by its master still", links.mastering("/s/b.lsl").size(), size_t(1));
+        UNSCOPED_INFO("one with no date is kept");
+        REQUIRE(dated != nullptr);
+        UNSCOPED_INFO("and dated now");
+        CHECK(dated->orphanedSince == now);
+        UNSCOPED_INFO("found by its master still");
+        REQUIRE(links.mastering("/s/b.lsl").size() == size_t(1));
 
-        ensure_equals("fewer days where asked", links.prune(now, 30.0), size_t(1));
-        ensure("the young one now", !links.of(almasterlinks_data::key(1), almasterlinks_data::key(11)));
-        ensure_equals("the one dated now goes in its time", links.prune(LLDate(now.secondsSinceEpoch() + 91 * day)), size_t(1));
-        ensure_equals("and nothing else", links.size(), size_t(2));
+        UNSCOPED_INFO("fewer days where asked");
+        CHECK(links.prune(now, 30.0) == size_t(1));
+        UNSCOPED_INFO("the young one now");
+        REQUIRE_FALSE(links.of(almasterlinks_data::key(1), almasterlinks_data::key(11)));
+        UNSCOPED_INFO("the one dated now goes in its time");
+        CHECK(links.prune(LLDate(now.secondsSinceEpoch() + 91 * day)) == size_t(1));
+        UNSCOPED_INFO("and nothing else");
+        REQUIRE(links.size() == size_t(2));
     }
 
-    template<> template<>
-    void almasterlinks_object::test<5>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: the LLSD is versioned and every field round-trips through notation", "[almasterlinks]")
     {
-        set_test_name("the LLSD is versioned, and every field comes back, through notation too");
         ALMasterLinks links;
         ALMasterLink  full;
         full.object        = almasterlinks_data::key(1);
@@ -275,54 +322,73 @@ namespace tut
         }
 
         const LLSD llsd = links.toLLSD();
-        ensure_equals("version 1", llsd["version"].asInteger(), 1);
-        ensure_equals("every link", llsd["links"].size(), 5);
+        CHECK(llsd["version"].asInteger() == 1);
+        UNSCOPED_INFO("every link");
+        REQUIRE(llsd["links"].size() == 5);
 
         std::ostringstream out;
         LLSDSerialize::toNotation(llsd, out);
         std::istringstream in(out.str());
         LLSD               back;
-        ensure("as notation", LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
+        REQUIRE(LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
 
         const ALMasterLinks read = ALMasterLinks::fromLLSD(back);
-        ensure_equals("all read", read.size(), size_t(5));
+        UNSCOPED_INFO("all read");
+        REQUIRE(read.size() == size_t(5));
         const ALMasterLink* got = read.of(full.object, full.item);
-        ensure("the full one", got != nullptr);
-        ensure_equals("master", got->master, full.master);
-        ensure("made", got->made == full.made);
-        ensure("lua", got->lua);
-        ensure_equals("target", got->target, full.target);
-        ensure_equals("base", got->base, full.base);
-        ensure_equals("hash", got->hash, full.hash);
-        ensure_equals("stamp, to the nanosecond", got->stamp, full.stamp);
-        ensure_equals("uses", almasterlinks_data::joined(got->uses), almasterlinks_data::joined(full.uses));
-        ensure_equals("object name", got->objectName, full.objectName);
-        ensure_equals("item name", got->itemName, full.itemName);
-        ensure_equals("region name", got->regionName, full.regionName);
-        ensure("linked", got->linked == full.linked);
-        ensure("state", got->state == full.state);
-        ensure("orphaned since", got->orphanedSince == full.orphanedSince);
+        UNSCOPED_INFO("the full one");
+        REQUIRE(got != nullptr);
+        CHECK(got->master == full.master);
+        CHECK(got->made == full.made);
+        CHECK(got->lua);
+        CHECK(got->target == full.target);
+        CHECK(got->base == full.base);
+        CHECK(got->hash == full.hash);
+        UNSCOPED_INFO("stamp, to the nanosecond");
+        CHECK(got->stamp == full.stamp);
+        CHECK(almasterlinks_data::joined(got->uses) == almasterlinks_data::joined(full.uses));
+        CHECK(got->objectName == full.objectName);
+        CHECK(got->itemName == full.itemName);
+        CHECK(got->regionName == full.regionName);
+        CHECK(got->linked == full.linked);
+        CHECK(got->state == full.state);
+        CHECK(got->orphanedSince == full.orphanedSince);
         const ALMasterLink* plain = read.of(LLUUID::null, inventory.item);
-        ensure("the inventory's, with no object", plain && plain->object.isNull() && plain->state == ALMasterLink::State::Differing);
-        ensure("no date where none was", plain->orphanedSince.isNull() && !back["links"][1].has("orphaned_since"));
+        {
+            INFO("the inventory's, with no object");
+            REQUIRE(plain);
+            CHECK(plain->object.isNull());
+            CHECK(plain->state == ALMasterLink::State::Differing);
+        }
+        {
+            INFO("no date where none was");
+            CHECK(plain->orphanedSince.isNull());
+            REQUIRE_FALSE(back["links"][1].has("orphaned_since"));
+        }
         for (const ALMasterLink::State state : { ALMasterLink::State::Active, ALMasterLink::State::Pending, ALMasterLink::State::Suspended })
         {
             const ALMasterLink* one = read.of(almasterlinks_data::key(5), almasterlinks_data::key(10 + static_cast<int>(state)));
-            ensure("each state", one && one->state == state && one->made == ALMasterLink::Made::Hint);
+            CAPTURE(state);
+            REQUIRE(one);
+            REQUIRE(one->state == state);
+            REQUIRE(one->made == ALMasterLink::Made::Hint);
         }
-        ensure_equals("found by their masters", read.mastering("/s/x.lsl").size(), size_t(3));
-        ensure_equals("and their uses", read.usersOf("disk:/s/lib/b.luau").size(), size_t(1));
+        UNSCOPED_INFO("found by their masters");
+        REQUIRE(read.mastering("/s/x.lsl").size() == size_t(3));
+        UNSCOPED_INFO("and their uses");
+        REQUIRE(read.usersOf("disk:/s/lib/b.luau").size() == size_t(1));
     }
 
-    template<> template<>
-    void almasterlinks_object::test<6>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: malformed records are skipped and unknown values are read carefully", "[almasterlinks]")
     {
-        set_test_name("a malformed record is passed over and the rest read; what is not known is read carefully");
-        ensure("not a map", ALMasterLinks::fromLLSD(LLSD("links")).empty());
-        ensure("no links", ALMasterLinks::fromLLSD(LLSD::emptyMap()).empty());
+        UNSCOPED_INFO("not a map");
+        REQUIRE(ALMasterLinks::fromLLSD(LLSD("links")).empty());
+        UNSCOPED_INFO("no links");
+        REQUIRE(ALMasterLinks::fromLLSD(LLSD::emptyMap()).empty());
         LLSD wrong;
         wrong["links"] = "none";
-        ensure("links not a list", ALMasterLinks::fromLLSD(wrong).empty());
+        UNSCOPED_INFO("links not a list");
+        REQUIRE(ALMasterLinks::fromLLSD(wrong).empty());
 
         const auto record = [](const std::string& object, const std::string& item, const LLSD& master) {
             LLSD out;
@@ -362,33 +428,49 @@ namespace tut
         links.append(record(object, almasterlinks_data::key(5).asString(), "/s/later.lsl"));
 
         const ALMasterLinks read = ALMasterLinks::fromLLSD(llsd);
-        ensure_equals("the two whole records", read.size(), size_t(2));
-        ensure("not one whose object is no key, read as the inventory's", !read.of(LLUUID::null, almasterlinks_data::key(4)));
+        UNSCOPED_INFO("the two whole records");
+        REQUIRE(read.size() == size_t(2));
+        UNSCOPED_INFO("not one whose object is no key, read as the inventory's");
+        REQUIRE_FALSE(read.of(LLUUID::null, almasterlinks_data::key(4)));
         const ALMasterLink* later = read.of(almasterlinks_data::key(1), almasterlinks_data::key(5));
-        ensure("an item twice is read once, the later", later && later->master == "/s/later.lsl");
+        {
+            INFO("an item twice is read once, the later");
+            REQUIRE(later);
+            CHECK(later->master == "/s/later.lsl");
+        }
         const ALMasterLink* plain = read.of(LLUUID::null, almasterlinks_data::key(6));
-        ensure("one with no object is the inventory's", plain != nullptr);
-        ensure("what it does not say is as a new link has it", plain->made == ALMasterLink::Made::Picked && plain->state == ALMasterLink::State::Active);
-        ensure_equals("a stamp written as an integer", plain->stamp, S64(12345));
+        UNSCOPED_INFO("one with no object is the inventory's");
+        REQUIRE(plain != nullptr);
+        {
+            INFO("what it does not say is as a new link has it");
+            CHECK(plain->made == ALMasterLink::Made::Picked);
+            CHECK(plain->state == ALMasterLink::State::Active);
+        }
+        UNSCOPED_INFO("a stamp written as an integer");
+        CHECK(plain->stamp == S64(12345));
 
         // The earlier of the item twice, alone.
         LLSD once;
         once["links"].append(good);
         const ALMasterLinks careful = ALMasterLinks::fromLLSD(once);
         const ALMasterLink* odd     = careful.of(almasterlinks_data::key(1), almasterlinks_data::key(5));
-        ensure("read", odd != nullptr);
-        ensure("a way of making not known is a hint's", odd->made == ALMasterLink::Made::Hint);
-        ensure("a state not known is suspended", odd->state == ALMasterLink::State::Suspended);
-        ensure("a stamp not a number is none", odd->stamp == 0);
-        ensure("a base not a key is none", odd->base.isNull());
-        ensure_equals("only the uses that are names", almasterlinks_data::joined(odd->uses), std::string("disk:/s/lib/a.lsl"));
-        ensure("a version not given is read all the same", careful.size() == 1);
+        REQUIRE(odd != nullptr);
+        UNSCOPED_INFO("a way of making not known is a hint's");
+        CHECK(odd->made == ALMasterLink::Made::Hint);
+        UNSCOPED_INFO("a state not known is suspended");
+        CHECK(odd->state == ALMasterLink::State::Suspended);
+        UNSCOPED_INFO("a stamp not a number is none");
+        CHECK(odd->stamp == 0);
+        UNSCOPED_INFO("a base not a key is none");
+        CHECK(odd->base.isNull());
+        UNSCOPED_INFO("only the uses that are names");
+        CHECK(almasterlinks_data::joined(odd->uses) == std::string("disk:/s/lib/a.lsl"));
+        UNSCOPED_INFO("a version not given is read all the same");
+        REQUIRE(careful.size() == 1);
     }
 
-    template<> template<>
-    void almasterlinks_object::test<7>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: thousands of links over a few masters and includes are found by each", "[almasterlinks]")
     {
-        set_test_name("thousands of links over a few masters and includes are found by each");
         ALMasterLinks links;
         constexpr int LINKS   = 5000;
         constexpr int MASTERS = 50;
@@ -398,29 +480,35 @@ namespace tut
             one.uses         = { "disk:/s/lib/common.lsl", "disk:/s/lib/part" + std::to_string(n % 7) + ".lsl" };
             links.put(one);
         }
-        ensure_equals("all kept", links.size(), size_t(LINKS));
+        UNSCOPED_INFO("all kept");
+        REQUIRE(links.size() == size_t(LINKS));
         for (int m = 0; m < MASTERS; ++m)
         {
             const std::vector<const ALMasterLink*> found = links.mastering("/s/master" + std::to_string(m) + ".lsl");
-            ensure_equals("each master's", found.size(), size_t(LINKS / MASTERS));
-            ensure("each the master's", found.front()->master == "/s/master" + std::to_string(m) + ".lsl");
+            CAPTURE(m);
+            REQUIRE(found.size() == size_t(LINKS / MASTERS));
+            REQUIRE(found.front()->master == "/s/master" + std::to_string(m) + ".lsl");
         }
-        ensure_equals("every user of the include they share", links.usersOf("disk:/s/lib/common.lsl").size(), size_t(LINKS));
-        ensure_equals("and of one a seventh read", links.usersOf("/s/lib/part3.lsl").size(), size_t((LINKS - 3 + 6) / 7));
+        UNSCOPED_INFO("every user of the include they share");
+        REQUIRE(links.usersOf("disk:/s/lib/common.lsl").size() == size_t(LINKS));
+        UNSCOPED_INFO("and of one a seventh read");
+        REQUIRE(links.usersOf("/s/lib/part3.lsl").size() == size_t((LINKS - 3 + 6) / 7));
         for (int n = 0; n < LINKS; n += 2)
         {
             links.remove(almasterlinks_data::key(1 + n / 100), almasterlinks_data::key(100000 + n));
         }
-        ensure_equals("half removed", links.size(), size_t(LINKS / 2));
-        ensure_equals("the rest found by their master", links.mastering("/s/master1.lsl").size(), size_t(LINKS / MASTERS));
-        ensure("none removed found", links.mastering("/s/master0.lsl").empty());
-        ensure("each found by its item", links.of(almasterlinks_data::key(1 + 4999 / 100), almasterlinks_data::key(104999)) != nullptr);
+        UNSCOPED_INFO("half removed");
+        REQUIRE(links.size() == size_t(LINKS / 2));
+        UNSCOPED_INFO("the rest found by their master");
+        REQUIRE(links.mastering("/s/master1.lsl").size() == size_t(LINKS / MASTERS));
+        UNSCOPED_INFO("none removed found");
+        REQUIRE(links.mastering("/s/master0.lsl").empty());
+        UNSCOPED_INFO("each found by its item");
+        REQUIRE(links.of(almasterlinks_data::key(1 + 4999 / 100), almasterlinks_data::key(104999)) != nullptr);
     }
 
-    template<> template<>
-    void almasterlinks_object::test<8>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: the missed flag round-trips through the LLSD and is written only where set", "[almasterlinks]")
     {
-        set_test_name("whether the last expansion missed something comes back through the LLSD, and is written only where set");
         ALMasterLinks links;
         ALMasterLink  missing = almasterlinks_data::link(1, 10, "/s/door.lsl");
         missing.missed        = true;
@@ -428,18 +516,27 @@ namespace tut
         links.put(almasterlinks_data::link(1, 11, "/s/lamp.lsl"));
 
         const LLSD llsd = links.toLLSD();
-        ensure_equals("still version 1", llsd["version"].asInteger(), 1);
-        ensure("written where set", llsd["links"][0]["missed"].asBoolean());
-        ensure("and not where not", !llsd["links"][1].has("missed"));
+        UNSCOPED_INFO("still version 1");
+        CHECK(llsd["version"].asInteger() == 1);
+        UNSCOPED_INFO("written where set");
+        CHECK(llsd["links"][0]["missed"].asBoolean());
+        UNSCOPED_INFO("and not where not");
+        REQUIRE_FALSE(llsd["links"][1].has("missed"));
 
         std::ostringstream out;
         LLSDSerialize::toNotation(llsd, out);
         std::istringstream in(out.str());
         LLSD               back;
-        ensure("as notation", LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
-        const ALMasterLinks read = ALMasterLinks::fromLLSD(back);
-        ensure("read back set", read.of(almasterlinks_data::key(1), almasterlinks_data::key(10))->missed);
-        ensure("and not", !read.of(almasterlinks_data::key(1), almasterlinks_data::key(11))->missed);
+        REQUIRE(LLSDSerialize::fromNotation(back, in, static_cast<llssize>(out.str().size())) > 0);
+        const ALMasterLinks       read  = ALMasterLinks::fromLLSD(back);
+        const ALMasterLink* const set   = read.of(almasterlinks_data::key(1), almasterlinks_data::key(10));
+        const ALMasterLink* const unset = read.of(almasterlinks_data::key(1), almasterlinks_data::key(11));
+        REQUIRE(set);
+        REQUIRE(unset);
+        UNSCOPED_INFO("read back set");
+        CHECK(set->missed);
+        UNSCOPED_INFO("and not");
+        CHECK_FALSE(unset->missed);
 
         // As an older version wrote it, with no such field, and as it might
         // be written otherwise.
@@ -455,16 +552,24 @@ namespace tut
         record["missed"] = LLSD::emptyMap();
         older["links"].append(record);
         const ALMasterLinks old = ALMasterLinks::fromLLSD(older);
-        ensure_equals("all read", old.size(), size_t(3));
-        ensure("none said is none missed", !old.of(LLUUID::null, almasterlinks_data::key(12))->missed);
-        ensure("a number is read as one", old.of(LLUUID::null, almasterlinks_data::key(13))->missed);
-        ensure("what is no value is none", !old.of(LLUUID::null, almasterlinks_data::key(14))->missed);
+        UNSCOPED_INFO("all read");
+        REQUIRE(old.size() == size_t(3));
+        const ALMasterLink* const unsaid   = old.of(LLUUID::null, almasterlinks_data::key(12));
+        const ALMasterLink* const number   = old.of(LLUUID::null, almasterlinks_data::key(13));
+        const ALMasterLink* const no_value = old.of(LLUUID::null, almasterlinks_data::key(14));
+        REQUIRE(unsaid);
+        REQUIRE(number);
+        REQUIRE(no_value);
+        UNSCOPED_INFO("none said is none missed");
+        CHECK_FALSE(unsaid->missed);
+        UNSCOPED_INFO("a number is read as one");
+        CHECK(number->missed);
+        UNSCOPED_INFO("what is no value is none");
+        CHECK_FALSE(no_value->missed);
     }
 
-    template<> template<>
-    void almasterlinks_object::test<9>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: affectedBy lists users and links that missed but none suspended or orphaned", "[almasterlinks]")
     {
-        set_test_name("an include's change may send its users and every link that missed something, each once, none suspended or orphaned");
         ALMasterLinks links;
         const auto    with = [&links](int item, const std::vector<std::string>& uses, bool missed, ALMasterLink::State state) {
             ALMasterLink one = almasterlinks_data::link(1, item, "/s/master" + std::to_string(item) + ".lsl");
@@ -483,25 +588,30 @@ namespace tut
         with(16, { "disk:/s/lib/util.lsl" }, false, State::Differing);
         with(17, {}, true, State::Suspended);
 
-        ensure_equals("its users and those that missed, in the order put",
-                      almasterlinks_data::items(links.affectedBy("disk:/s/lib/util.lsl")), std::string("10 11 14 16"));
-        ensure_equals("by its path alone the same", almasterlinks_data::items(links.affectedBy("/s/lib/util.lsl")),
+        UNSCOPED_INFO("its users and those that missed, in the order put");
+        CHECK(almasterlinks_data::items(links.affectedBy("disk:/s/lib/util.lsl")) == std::string("10 11 14 16"));
+        UNSCOPED_INFO("by its path alone the same");
+        CHECK(almasterlinks_data::items(links.affectedBy("/s/lib/util.lsl")) ==
                       std::string("10 11 14 16"));
-        ensure_equals("a file nobody read: those that missed", almasterlinks_data::items(links.affectedBy("/s/lib/new.lsl")),
+        UNSCOPED_INFO("a file nobody read: those that missed");
+        CHECK(almasterlinks_data::items(links.affectedBy("/s/lib/new.lsl")) ==
                       std::string("11 14"));
-        ensure_equals("one both a user and missing is one", almasterlinks_data::items(links.affectedBy("/s/lib/net.lsl")),
+        UNSCOPED_INFO("one both a user and missing is one");
+        CHECK(almasterlinks_data::items(links.affectedBy("/s/lib/net.lsl")) ==
                       std::string("11 14 15"));
 
         // Expanded again, and nothing missed now.
-        links.find(almasterlinks_data::key(1), almasterlinks_data::key(14))->missed = false;
-        ensure_equals("no longer", almasterlinks_data::items(links.affectedBy("/s/lib/new.lsl")), std::string("11"));
-        ensure("nothing at all with nothing linked", ALMasterLinks().affectedBy("/s/lib/util.lsl").empty());
+        ALMasterLink* const expanded = links.find(almasterlinks_data::key(1), almasterlinks_data::key(14));
+        REQUIRE(expanded);
+        expanded->missed = false;
+        UNSCOPED_INFO("no longer");
+        CHECK(almasterlinks_data::items(links.affectedBy("/s/lib/new.lsl")) == std::string("11"));
+        UNSCOPED_INFO("nothing at all with nothing linked");
+        REQUIRE(ALMasterLinks().affectedBy("/s/lib/util.lsl").empty());
     }
 
-    template<> template<>
-    void almasterlinks_object::test<10>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: watched lists live and suspended masters and live disk includes once each", "[almasterlinks]")
     {
-        set_test_name("the files to watch: live and suspended links' masters, live ones' disk includes, each once, a master as a master");
         ALMasterLinks links;
         const auto    with = [&links](int item, const std::string& master, const std::vector<std::string>& uses, ALMasterLink::State state) {
             ALMasterLink one = almasterlinks_data::link(1, item, master);
@@ -524,21 +634,26 @@ namespace tut
         with(16, "C:\\S\\G.lsl", { "disk:/s/a.lsl" }, State::Active);
         with(17, "c:/s/g.lsl", {}, State::Active);
 
-        ensure_equals("each once, in the order met", almasterlinks_data::watched(links.watched()),
+        UNSCOPED_INFO("each once, in the order met");
+        CHECK(almasterlinks_data::watched(links.watched()) ==
                       std::string("/s/a.lsl* /s/lib/u.lsl /s/lib/v.lsl /s/b.lsl* /s/c.lsl* /s/c2.lsl* /s/e.lsl* C:\\S\\G.lsl*"));
-        ensure("nothing with nothing linked", ALMasterLinks().watched().empty());
+        UNSCOPED_INFO("nothing with nothing linked");
+        REQUIRE(ALMasterLinks().watched().empty());
 
         // Orphaned, the file it masters is watched no longer.
-        links.find(almasterlinks_data::key(1), almasterlinks_data::key(14))->state = State::Orphaned;
-        links.find(almasterlinks_data::key(1), almasterlinks_data::key(13))->state = State::Orphaned;
-        ensure_equals("an include again where it no longer masters", almasterlinks_data::watched(links.watched()),
+        ALMasterLink* const gone = links.find(almasterlinks_data::key(1), almasterlinks_data::key(14));
+        REQUIRE(gone);
+        gone->state = State::Orphaned;
+        ALMasterLink* const include = links.find(almasterlinks_data::key(1), almasterlinks_data::key(13));
+        REQUIRE(include);
+        include->state = State::Orphaned;
+        UNSCOPED_INFO("an include again where it no longer masters");
+        CHECK(almasterlinks_data::watched(links.watched()) ==
                       std::string("/s/a.lsl* /s/lib/u.lsl /s/lib/v.lsl /s/b.lsl* /s/c.lsl* /s/c2.lsl C:\\S\\G.lsl*"));
     }
 
-    template<> template<>
-    void almasterlinks_object::test<11>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: orphansNamed lists an item name's orphans by object name then latest", "[almasterlinks]")
     {
-        set_test_name("the orphaned links of an item's name, those of the object's name first, then the latest");
         ALMasterLinks links;
         const auto    orphan = [&links](int item, const std::string& item_name, const std::string& object_name, F64 since) {
             ALMasterLink one  = almasterlinks_data::link(1, item, "/s/" + std::to_string(item) + ".lsl");
@@ -561,29 +676,38 @@ namespace tut
         links.put(live);
         orphan(17, "door", "Shed", 3000.0);
 
-        ensure_equals("the object's first, then the latest, as put among equals",
-                      almasterlinks_data::items(links.orphansNamed("door", "Door")), std::string("12 11 13 17 10"));
-        ensure_equals("an object of no such name: the latest first",
-                      almasterlinks_data::items(links.orphansNamed("door", "Window")), std::string("13 17 12 10 11"));
-        ensure_equals("names compared as written", almasterlinks_data::items(links.orphansNamed("Door", "door")), std::string("15"));
-        ensure("an item of no such name has none", links.orphansNamed("window", "Door").empty());
-        ensure("nor an item with no name", links.orphansNamed("", "Door").empty());
+        UNSCOPED_INFO("the object's first, then the latest, as put among equals");
+        CHECK(almasterlinks_data::items(links.orphansNamed("door", "Door")) == std::string("12 11 13 17 10"));
+        UNSCOPED_INFO("an object of no such name: the latest first");
+        CHECK(almasterlinks_data::items(links.orphansNamed("door", "Window")) == std::string("13 17 12 10 11"));
+        UNSCOPED_INFO("names compared as written");
+        CHECK(almasterlinks_data::items(links.orphansNamed("Door", "door")) == std::string("15"));
+        UNSCOPED_INFO("an item of no such name has none");
+        REQUIRE(links.orphansNamed("window", "Door").empty());
+        UNSCOPED_INFO("nor an item with no name");
+        REQUIRE(links.orphansNamed("", "Door").empty());
     }
 
-    template<> template<>
-    void almasterlinks_object::test<12>()
+    TEST_CASE_METHOD(almasterlinks_data, "almasterlinks: a notecard link round-trips through the LLSD and a script's omits the flag", "[almasterlinks]")
     {
-        set_test_name("a notecard's link comes back through the LLSD as one, and a script's says nothing of it");
         ALMasterLinks links;
         ALMasterLink  note = almasterlinks_data::link(1, 10, "/s/readme.txt");
         note.notecard      = true;
         links.put(note);
         links.put(almasterlinks_data::link(1, 11, "/s/lamp.lsl"));
         const LLSD llsd = links.toLLSD();
-        ensure("written where set", llsd["links"][0]["notecard"].asBoolean());
-        ensure("and not where not", !llsd["links"][1].has("notecard"));
-        const ALMasterLinks read = ALMasterLinks::fromLLSD(llsd);
-        ensure("read back a notecard's", read.of(almasterlinks_data::key(1), almasterlinks_data::key(10))->notecard);
-        ensure("and a script's", !read.of(almasterlinks_data::key(1), almasterlinks_data::key(11))->notecard);
+        UNSCOPED_INFO("written where set");
+        CHECK(llsd["links"][0]["notecard"].asBoolean());
+        UNSCOPED_INFO("and not where not");
+        REQUIRE_FALSE(llsd["links"][1].has("notecard"));
+        const ALMasterLinks       read   = ALMasterLinks::fromLLSD(llsd);
+        const ALMasterLink* const card   = read.of(almasterlinks_data::key(1), almasterlinks_data::key(10));
+        const ALMasterLink* const script = read.of(almasterlinks_data::key(1), almasterlinks_data::key(11));
+        REQUIRE(card);
+        REQUIRE(script);
+        UNSCOPED_INFO("read back a notecard's");
+        CHECK(card->notecard);
+        UNSCOPED_INFO("and a script's");
+        CHECK_FALSE(script->notecard);
     }
 }

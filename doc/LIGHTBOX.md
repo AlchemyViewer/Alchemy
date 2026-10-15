@@ -1223,7 +1223,10 @@ only; apply per row, not on the parent panel. Reference patterns:
   Advanced section apply while `RenderHDREnabled` is on (on GL above 4.05, the
   pipeline's own test), and so do Cross Filter and its Advanced section, which
   streak what the bloom pyramid holds; Glow (Legacy) and its Advanced section
-  apply while it is off. An effect that only runs on one side of the fork
+  apply while it is off. Cross Filter also needs a texture barrier, so on a
+  driver with neither GL 4.5 nor a texture barrier extension its sections stay
+  hidden under HDR too, as the renderer leaves it off there. An effect that only
+  runs on one side of the fork, or only with some capability,
   belongs in the table in `refreshBloomSections()`, not just behind an
   `enabled_control`. `refreshBloomSections()` hides the other side's accordion tabs
   and re-arranges the accordion, live on the setting's signal. A tab's

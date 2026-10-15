@@ -31,13 +31,13 @@
 #include "../luau/alluausharedstart.h"
 #include "../preprocessor/alsourcemap.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <numeric>
 #include <sstream>
 
-namespace tut
+namespace
 {
     struct alscriptweight_data
     {
@@ -122,7 +122,7 @@ namespace tut
 
         // A shared start's edits made from the end back, as an editor's
         // replaceAll does.
-        static std::string applied(const std::string& script, const ALLuauSharedStart::Rewrite& rewrite)
+        static std::string require_applied(const std::string& script, const ALLuauSharedStart::Rewrite& rewrite)
         {
             std::vector<std::string> lines;
             for (size_t from = 0; from <= script.size();)
@@ -133,7 +133,8 @@ namespace tut
             }
             for (auto edit = rewrite.edits.rbegin(); edit != rewrite.edits.rend(); ++edit)
             {
-                ensure("one line each", edit->line == edit->endLine);
+                UNSCOPED_INFO("one line each");
+                REQUIRE(edit->line == edit->endLine);
                 std::string& line = lines[static_cast<size_t>(edit->line)];
                 line.replace(static_cast<size_t>(edit->column), static_cast<size_t>(edit->endColumn - edit->column), edit->text);
             }
@@ -156,15 +157,11 @@ namespace tut
             return out;
         }
     };
-    typedef test_group<alscriptweight_data> alscriptweight_group;
-    typedef alscriptweight_group::object    alscriptweight_object;
-    alscriptweight_group                    alscriptweight_instance("ALScriptWeight");
 
     // SLua weighs what the server charges, the bytecode; each function is
     // its prototype, where its lines are, and each line the instructions
     // that came of it.
-    template<> template<>
-    void alscriptweight_object::test<1>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: SLua weighs the bytecode the server charges; each function a part", "[ALScriptWeight]")
     {
         const std::string script = "local function greet(name: string)\n"
                                    "    ll.OwnerSay(\"hello \" .. name)\n"
@@ -181,42 +178,62 @@ namespace tut
                                    "nothing()\n"
                                    "greet(tostring(count(10)))\n";
         const ALScriptWeight weight = ALScriptWeigh::slua(script);
-        ensure("compiled: " + weight.error, weight.compiled);
-        ensure_equals("against SLua's limit", weight.limit, size_t(131072));
-        ensure("not an estimate", !weight.estimate);
-        ensure("something, and not much", weight.total > 50 && weight.total < 2000);
+        UNSCOPED_INFO("compiled: " + weight.error);
+        CHECK(weight.compiled);
+        UNSCOPED_INFO("against SLua's limit");
+        CHECK(weight.limit == size_t(131072));
+        CHECK_FALSE(weight.estimate);
+        CHECK(weight.total > 50);
+        CHECK(weight.total < 2000);
         const ALScriptWeight::Part* greet = named(weight, "greet");
         const ALScriptWeight::Part* count = named(weight, "count");
-        ensure("each function a part:" + listed(weight), greet && count);
-        ensure_equals("where it is declared", greet->line, 0);
-        ensure_equals("and where it ends", count->line, 4);
-        ensure("to its last line", count->endLine >= 8);
+        {
+            INFO("each function a part:" + listed(weight));
+            REQUIRE(greet);
+            REQUIRE(count);
+        }
+        {
+            INFO("where each is declared");
+            CHECK(greet->line == 0);
+            CHECK(count->line == 4);
+        }
+        UNSCOPED_INFO("and where count ends: the line of its end");
+        CHECK(count->endLine == 10);
         const ALScriptWeight::Part* nothing = named(weight, "nothing");
-        ensure("a function that does nothing weighs least:" + listed(weight),
-               nothing && nothing->bytes < greet->bytes && nothing->bytes < count->bytes);
-        ensure("the script itself, and its strings", named(weight, "script") && named(weight, "strings"));
+        {
+            INFO("a function that does nothing weighs least:" + listed(weight));
+            REQUIRE(nothing);
+            CHECK(nothing->bytes < greet->bytes);
+            CHECK(nothing->bytes < count->bytes);
+        }
+        CHECK(named(weight, "script"));
+        CHECK(named(weight, "strings"));
         const size_t parts = std::accumulate(weight.parts.begin(), weight.parts.end(), size_t(0),
                                              [](size_t sum, const ALScriptWeight::Part& p) { return sum + p.bytes; });
-        ensure("the parts are nearly the whole: " + std::to_string(parts) + " of " + std::to_string(weight.total),
-               parts <= weight.total && weight.total - parts < 16);
+        {
+            INFO("the parts are nearly the whole: " << parts << " of " << weight.total);
+            CHECK(parts <= weight.total);
+            CHECK(weight.total - parts < 16);
+        }
         bool body = false;
         for (const ALScriptWeight::Line& line : weight.lines)
         {
             body = body || (line.line == 7 && line.bytes > 0);
         }
-        ensure("the loop's body has bytes of its own", body);
+        UNSCOPED_INFO("the loop's body has bytes of its own");
+        CHECK(body);
     }
 
     // A long string is weight as much as code is; and a script that does
     // not compile says so.
-    template<> template<>
-    void alscriptweight_object::test<2>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: a long string weighs as code does; a script that fails to compile says so", "[ALScriptWeight]")
     {
         const std::string    words(2000, 'x');
         const ALScriptWeight heavy = ALScriptWeigh::slua("local s = \"" + words + "\"\nprint(s)\n");
         const ALScriptWeight light = ALScriptWeigh::slua("local s = \"x\"\nprint(s)\n");
-        ensure("both compiled", heavy.compiled && light.compiled);
-        ensure("the string weighs", heavy.total >= light.total + 2000);
+        CHECK(heavy.compiled);
+        CHECK(light.compiled);
+        CHECK(heavy.total >= light.total + 2000);
         // Heavy, it is a part of its own, and no longer the table of
         // strings'.
         const ALScriptWeight::Part* constant = nullptr;
@@ -226,10 +243,24 @@ namespace tut
         }
         // At the line that loads it: a local never set again is folded into
         // where it is used, print(s), as -O1 compiles it.
-        ensure("a part of its own:" + listed(heavy), constant && constant->bytes >= 2000 && constant->line == 1);
-        ensure("named by its start: " + (constant ? constant->name : std::string()), constant && constant->name.rfind("\"xxxx", 0) == 0);
-        ensure("not the strings' too", named(heavy, "strings") && named(heavy, "strings")->bytes < 100);
-        ensure("a light one stays the strings'", std::none_of(light.parts.begin(), light.parts.end(), [](const ALScriptWeight::Part& one) {
+        {
+            INFO("a part of its own:" + listed(heavy));
+            REQUIRE(constant);
+            CHECK(constant->bytes >= 2000);
+            CHECK(constant->line == 1);
+        }
+        {
+            INFO("named by its start: " + (constant ? constant->name : std::string()));
+            REQUIRE(constant);
+            CHECK(constant->name.rfind("\"xxxx", 0) == 0);
+        }
+        {
+            INFO("not the strings' too");
+            REQUIRE(named(heavy, "strings"));
+            CHECK(named(heavy, "strings")->bytes < 100);
+        }
+        UNSCOPED_INFO("a light one stays the strings'");
+        CHECK(std::none_of(light.parts.begin(), light.parts.end(), [](const ALScriptWeight::Part& one) {
                    return one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings";
                }));
         // And for the LSL targets: LSO's in its code, Mono's in its strings,
@@ -246,8 +277,15 @@ namespace tut
                 sum += part.bytes;
             }
             const std::string target = ALScriptWeight::nameOf(one.target);
-            ensure(target + ": a part of its own:" + listed(one), one.compiled && found && found->bytes >= 2000 && found->line == 0);
-            ensure(target + ": counted once", sum <= one.total);
+            {
+                INFO(target + ": a part of its own:" + listed(one));
+                REQUIRE(one.compiled);
+                REQUIRE(found);
+                REQUIRE(found->bytes >= 2000);
+                REQUIRE(found->line == 0);
+            }
+            UNSCOPED_INFO(target + ": counted once");
+            REQUIRE(sum <= one.total);
         }
         // A table's values written in it, which no instruction loads -- the
         // template carries them: heavy ones are parts of their own too, at
@@ -259,7 +297,8 @@ namespace tut
         {
             values += one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" && one.bytes >= 300 && one.line >= 0 && one.line <= 3;
         }
-        ensure_equals("each value a part of its own, at the table:" + listed(table), values, size_t(2));
+        UNSCOPED_INFO("each value a part of its own, at the table:" + listed(table));
+        CHECK(values == size_t(2));
         // Named by whole characters: the cut, 32 bytes in, falls inside
         // one, or just after one.
         const auto whole = [](const std::string& name) {
@@ -296,20 +335,26 @@ namespace tut
             {
                 found = one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" ? &one : found;
             }
-            ensure("a wide one named: " + listed(wide), found && whole(found->name) && found->name.find("\xE2\x80\xA6") != std::string::npos);
+            {
+                INFO("a wide one named: " + listed(wide));
+                REQUIRE(found);
+                REQUIRE(whole(found->name));
+                REQUIRE(found->name.find("\xE2\x80\xA6") != std::string::npos);
+            }
         }
 
         const ALScriptWeight broken = ALScriptWeigh::slua("local function (\n");
-        ensure("a script that does not compile", !broken.compiled && !broken.error.empty());
+        CHECK_FALSE(broken.compiled);
+        CHECK_FALSE(broken.error.empty());
     }
 
     // LSO weighs its image to the top of its heap: the registers, the
     // globals, the functions, the states with their handlers, and the heap;
     // each function, state, handler and global a part, where it is.
-    template<> template<>
-    void alscriptweight_object::test<3>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: LSO weighs its image to the top of its heap", "[ALScriptWeight]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         const std::string script = "integer gCount = 0;\n"
                                    "string gName = \"a name a little longer than a word\";\n"
                                    "integer twice(integer n)\n"
@@ -328,29 +373,43 @@ namespace tut
                                    "    }\n"
                                    "}\n";
         const ALScriptWeight weight = ALScriptWeigh::lso(script);
-        ensure("compiled: " + weight.error, weight.compiled);
-        ensure_equals("against LSO's limit", weight.limit, size_t(16384));
-        ensure("well under it", weight.total > 0 && weight.total < 4096);
+        UNSCOPED_INFO("compiled: " + weight.error);
+        CHECK(weight.compiled);
+        UNSCOPED_INFO("against LSO's limit");
+        CHECK(weight.limit == size_t(16384));
+        CHECK(weight.total > 0);
+        CHECK(weight.total < 4096);
         const ALScriptWeight::Part* twice = named(weight, "twice");
         const ALScriptWeight::Part* state = named(weight, "default");
         const ALScriptWeight::Part* touch = named(weight, "touch_start");
-        ensure("each a part:" + listed(weight), twice && state && touch && named(weight, "state_entry") && named(weight, "registers"));
-        ensure_equals("a function where it is", twice->line, 2);
-        ensure_equals("a handler in its state", touch->within, std::string("default"));
+        {
+            INFO("each a part:" + listed(weight));
+            REQUIRE(twice);
+            REQUIRE(state);
+            REQUIRE(touch);
+            CHECK(named(weight, "state_entry"));
+            CHECK(named(weight, "registers"));
+        }
+        UNSCOPED_INFO("a function where it is");
+        CHECK(twice->line == 2);
+        UNSCOPED_INFO("a handler in its state");
+        CHECK(touch->within == std::string("default"));
         // Where its handlers begin and a jump table entry for each; each
         // handler, from where it begins to where it ends, its own part.
-        ensure_equals("a state is its table, its handlers apart:" + listed(weight), state->bytes, size_t(5 + 8 * 2));
+        UNSCOPED_INFO("a state is its table, its handlers apart:" + listed(weight));
+        CHECK(state->bytes == size_t(5 + 8 * 2));
         const ALScriptWeight::Part* count = named(weight, "gCount");
         const ALScriptWeight::Part* name  = named(weight, "gName");
-        ensure("the globals too", count && name);
-        ensure("a string global weighs its string", name->bytes > count->bytes);
+        REQUIRE(count);
+        REQUIRE(name);
+        UNSCOPED_INFO("a string global weighs its string");
+        CHECK(name->bytes > count->bytes);
     }
 
-    // What does not fit in 16 KB says so.
-    template<> template<>
-    void alscriptweight_object::test<4>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: what does not fit in 16 KB says so", "[ALScriptWeight]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         std::string script = "list gWords = [";
         for (int i = 0; i < 600; ++i)
         {
@@ -358,37 +417,25 @@ namespace tut
         }
         script += "];\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay(llList2String(gWords, 0));\n    }\n}\n";
         const ALScriptWeight weight = ALScriptWeigh::lso(script);
-        ensure("does not fit: " + weight.error + " " + std::to_string(weight.total), !weight.compiled && !weight.error.empty());
-        ensure("and weighs more than there is", weight.total > weight.limit);
-        const ALScriptWeight broken = ALScriptWeigh::lso("default { state_entry() { integer x = ; } }\n");
-        ensure("a script that does not parse", !broken.compiled && !broken.error.empty());
-    }
-
-    // A long list parses on every platform: each element nests the parse two
-    // states deeper, and the parser's limit is the same everywhere.
-    template<> template<>
-    void alscriptweight_object::test<10>()
-    {
-        ensure("builtins: " + error, lslLoaded);
-        std::string script = "list gNumbers = [";
-        for (int i = 0; i < 3000; ++i)
         {
-            script += (i ? ", " : "") + std::to_string(i);
+            INFO("does not fit: " << weight.error << " " << weight.total);
+            CHECK_FALSE(weight.compiled);
+            CHECK_FALSE(weight.error.empty());
         }
-        script += "];\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay((string)llGetListLength(gNumbers));\n    }\n}\n";
-        lsl.check(script);
-        ensure("it parses", lsl.parsed());
-        const ALScriptWeight weight = ALScriptWeigh::lso(script);
-        ensure("and is weighed: " + weight.error, weight.total > 0);
+        UNSCOPED_INFO("and weighs more than there is");
+        CHECK(weight.total > weight.limit);
+        const ALScriptWeight broken = ALScriptWeigh::lso("default { state_entry() { integer x = ; } }\n");
+        CHECK_FALSE(broken.compiled);
+        CHECK_FALSE(broken.error.empty());
     }
 
     // Mono is an estimate: the IL sized by the opcode table with what it
     // declares, over what an assembly costs; each function and handler a
     // part where it is, and the parts are the whole.
-    template<> template<>
-    void alscriptweight_object::test<5>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: Mono is an estimate: the IL sized by the opcode table with what it declares", "[ALScriptWeight]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         const std::string script = "integer gCount = 0;\n"
                                    "integer twice(integer n)\n"
                                    "{\n"
@@ -406,30 +453,43 @@ namespace tut
                                    "    }\n"
                                    "}\n";
         const ALScriptWeight weight = ALScriptWeigh::mono(script);
-        ensure("compiled: " + weight.error, weight.compiled);
-        ensure("an estimate", weight.estimate);
-        ensure_equals("against Mono's limit", weight.limit, size_t(65536));
-        ensure("over what an assembly costs, and under the limit", weight.total > ALScriptWeigh::MONO_BASE_BYTES && weight.total < 8192);
+        UNSCOPED_INFO("compiled: " + weight.error);
+        CHECK(weight.compiled);
+        CHECK(weight.estimate);
+        UNSCOPED_INFO("against Mono's limit");
+        CHECK(weight.limit == size_t(65536));
+        CHECK(weight.total > ALScriptWeigh::MONO_BASE_BYTES);
+        CHECK(weight.total < 8192);
         const ALScriptWeight::Part* twice = named(weight, "twice");
         const ALScriptWeight::Part* touch = named(weight, "touch_start");
         const ALScriptWeight::Part* entry = named(weight, "state_entry");
-        ensure("each a part:" + listed(weight), twice && touch && entry && named(weight, "globals") && named(weight, "assembly"));
-        ensure_equals("a function where it is", twice->line, 1);
-        ensure_equals("a handler in its state", touch->within, std::string("default"));
-        ensure_equals("where it is", touch->line, 11);
-        ensure("a long string weighs:" + listed(weight), touch->bytes > entry->bytes);
+        {
+            INFO("each a part:" + listed(weight));
+            REQUIRE(twice);
+            REQUIRE(touch);
+            REQUIRE(entry);
+            CHECK(named(weight, "globals"));
+            CHECK(named(weight, "assembly"));
+        }
+        UNSCOPED_INFO("a function where it is");
+        CHECK(twice->line == 1);
+        UNSCOPED_INFO("a handler in its state");
+        CHECK(touch->within == std::string("default"));
+        CHECK(touch->line == 11);
+        UNSCOPED_INFO("a long string weighs:" + listed(weight));
+        CHECK(touch->bytes > entry->bytes);
         const size_t parts = std::accumulate(weight.parts.begin(), weight.parts.end(), size_t(0),
                                              [](size_t sum, const ALScriptWeight::Part& p) { return sum + p.bytes; });
-        ensure_equals("the parts are the whole", parts, weight.total);
+        CHECK(parts == weight.total);
     }
 
     // LSL on Luau: the fork's own compiler, the asset as the server makes
     // it, the bytecode read back as SLua's is; and again with its lines,
     // for what each comes to.
-    template<> template<>
-    void alscriptweight_object::test<6>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: LSL on Luau: the asset as the server makes it with the fork's compiler", "[ALScriptWeight]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         const std::string script = "integer gCount = 0;\n"
                                    "integer twice(integer n)\n"
                                    "{\n"
@@ -447,72 +507,119 @@ namespace tut
                                    "    }\n"
                                    "}\n";
         const ALScriptWeight weight = ALScriptWeigh::lslLuau(script);
-        ensure("compiled: " + weight.error + listed(weight), weight.compiled);
-        ensure_equals("against Luau's limit", weight.limit, size_t(131072));
-        ensure("not an estimate", !weight.estimate);
-        ensure("something, and not much: " + std::to_string(weight.total) + listed(weight), weight.total > 50 && weight.total < 4096);
+        UNSCOPED_INFO("compiled: " + weight.error + listed(weight));
+        CHECK(weight.compiled);
+        UNSCOPED_INFO("against Luau's limit");
+        CHECK(weight.limit == size_t(131072));
+        CHECK_FALSE(weight.estimate);
+        {
+            INFO("parts:" + listed(weight));
+            CHECK(weight.total > 50);
+            CHECK(weight.total < 4096);
+        }
         const ALScriptWeight::Part* twice = named(weight, "twice");
-        ensure("a function a part:" + listed(weight), twice != nullptr);
-        ensure("where it is: " + std::to_string(twice->line), twice->line == 1);
+        UNSCOPED_INFO("a function a part:" + listed(weight));
+        REQUIRE(twice != nullptr);
+        CHECK(twice->line == 1);
         const ALScriptWeight::Part* touch = named(weight, "touch_start");
-        ensure("a handler in its state:" + listed(weight), touch && touch->within == "default" && touch->kind == ALScriptWeight::Part::Kind::Handler);
-        ensure_equals("where it is", touch->line, 11);
+        {
+            INFO("a handler in its state:" + listed(weight));
+            REQUIRE(touch);
+            CHECK(touch->within == "default");
+            CHECK(touch->kind == ALScriptWeight::Part::Kind::Handler);
+        }
+        CHECK(touch->line == 11);
         // Its lines, read off the compiler's lined bytecode, which the
         // server's is not: the total stays what the server charges.
-        ensure("each line weighed:" + lined(weight), at(weight, 9) > 0 && at(weight, 13) > 0 && at(weight, 3) > 0);
-        ensure("the handler's long line its own:" + lined(weight), at(weight, 13) > at(weight, 9));
-        ensure("nothing past the script's lines:" + lined(weight), within(weight, 16, 1000) == 0);
+        {
+            INFO("each line weighed:" + lined(weight));
+            CHECK(at(weight, 9) > 0);
+            CHECK(at(weight, 13) > 0);
+            CHECK(at(weight, 3) > 0);
+        }
+        UNSCOPED_INFO("the handler's long line its own:" + lined(weight));
+        CHECK(at(weight, 13) > at(weight, 9));
+        UNSCOPED_INFO("nothing past the script's lines:" + lined(weight));
+        CHECK(within(weight, 16, 1000) == 0);
         const ALScriptWeight broken = ALScriptWeigh::lslLuau("default { state_entry() { integer x = ; } }\n");
-        ensure("a script that does not compile", !broken.compiled && !broken.error.empty());
+        CHECK_FALSE(broken.compiled);
+        CHECK_FALSE(broken.error.empty());
     }
 
     // LSO by line: what the compiler wrote while it stood at each
     // statement and expression, a function's missing return at its closing
     // brace, and a global's value on its line. A function's lines are its
     // code, which is the function less its header.
-    template<> template<>
-    void alscriptweight_object::test<7>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: LSO by line: what the compiler wrote at each statement and expression", "[ALScriptWeight]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         const ALScriptWeight weight = ALScriptWeigh::lso(byLine());
-        ensure("compiled: " + weight.error, weight.compiled);
-        ensure("by line:" + lined(weight), !weight.lines.empty());
-        ensure("the loop's body" + lined(weight), at(weight, 13) > 0);
-        ensure("the loop itself: its test, its step and its jump back" + lined(weight), at(weight, 11) > 0);
-        ensure("a long string weighs more than a short one" + lined(weight), at(weight, 15) > at(weight, 16) + 40);
-        ensure("the return it does not write, at its closing brace" + lined(weight), at(weight, 17) > 0);
-        ensure("a function's return" + lined(weight), at(weight, 4) > 0);
-        ensure("a global string's value" + lined(weight), at(weight, 1) >= 34);
-        ensure("a brace that makes nothing" + lined(weight), at(weight, 7) == 0 && at(weight, 3) == 0);
+        UNSCOPED_INFO("compiled: " + weight.error);
+        CHECK(weight.compiled);
+        CHECK_FALSE(weight.lines.empty());
+        UNSCOPED_INFO("the loop's body" + lined(weight));
+        CHECK(at(weight, 13) > 0);
+        UNSCOPED_INFO("the loop itself: its test, its step and its jump back" + lined(weight));
+        CHECK(at(weight, 11) > 0);
+        UNSCOPED_INFO("a long string weighs more than a short one" + lined(weight));
+        CHECK(at(weight, 15) > at(weight, 16) + 40);
+        UNSCOPED_INFO("the return it does not write, at its closing brace" + lined(weight));
+        CHECK(at(weight, 17) > 0);
+        UNSCOPED_INFO("a function's return" + lined(weight));
+        CHECK(at(weight, 4) > 0);
+        UNSCOPED_INFO("a global string's value" + lined(weight));
+        CHECK(at(weight, 1) >= 34);
+        {
+            INFO("a brace that makes nothing" + lined(weight));
+            CHECK(at(weight, 7) == 0);
+            CHECK(at(weight, 3) == 0);
+        }
         const ALScriptWeight::Part* entry = named(weight, "state_entry");
         const ALScriptWeight::Part* twice = named(weight, "twice");
-        ensure("both parts:" + listed(weight), entry && twice);
-        ensure_equals("a handler's lines are all of it but its header, where its code begins", entry->bytes - within(weight, entry->line, entry->endLine),
+        {
+            INFO("both parts:" + listed(weight));
+            REQUIRE(entry);
+            REQUIRE(twice);
+        }
+        UNSCOPED_INFO("a handler's lines are all of it but its header, where its code begins");
+        CHECK(entry->bytes - within(weight, entry->line, entry->endLine) ==
                       size_t(5));
-        ensure_equals("a function's lines are all of it but its header: where its code begins, its type and its parameter's",
-                      twice->bytes - within(weight, twice->line, twice->endLine), size_t(9));
+        UNSCOPED_INFO("a function's lines are all of it but its header: where its code begins, its type and its parameter's");
+        CHECK(twice->bytes - within(weight, twice->line, twice->endLine) == size_t(9));
     }
 
     // Mono by line, the same way: each instruction, with its string, is
     // the line it was written for; a global's initialiser is its line's.
-    template<> template<>
-    void alscriptweight_object::test<8>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: Mono by line: each instruction with its string is its line's", "[ALScriptWeight]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         const ALScriptWeight weight = ALScriptWeigh::mono(byLine());
-        ensure("compiled: " + weight.error, weight.compiled);
-        ensure("by line:" + lined(weight), !weight.lines.empty());
-        ensure("the loop's body" + lined(weight), at(weight, 13) > 0);
-        ensure("the loop itself" + lined(weight), at(weight, 11) > 0);
-        ensure("a long string weighs more than a short one" + lined(weight), at(weight, 15) > at(weight, 16) + 40);
-        ensure("the return it does not write, at its closing brace" + lined(weight), at(weight, 17) > 0);
-        ensure("a global string's initialiser" + lined(weight), at(weight, 1) >= 34);
-        ensure("a brace that makes nothing" + lined(weight), at(weight, 7) == 0 && at(weight, 3) == 0);
+        UNSCOPED_INFO("compiled: " + weight.error);
+        CHECK(weight.compiled);
+        CHECK_FALSE(weight.lines.empty());
+        UNSCOPED_INFO("the loop's body" + lined(weight));
+        CHECK(at(weight, 13) > 0);
+        UNSCOPED_INFO("the loop itself" + lined(weight));
+        CHECK(at(weight, 11) > 0);
+        UNSCOPED_INFO("a long string weighs more than a short one" + lined(weight));
+        CHECK(at(weight, 15) > at(weight, 16) + 40);
+        UNSCOPED_INFO("the return it does not write, at its closing brace" + lined(weight));
+        CHECK(at(weight, 17) > 0);
+        UNSCOPED_INFO("a global string's initialiser" + lined(weight));
+        CHECK(at(weight, 1) >= 34);
+        {
+            INFO("a brace that makes nothing" + lined(weight));
+            CHECK(at(weight, 7) == 0);
+            CHECK(at(weight, 3) == 0);
+        }
         for (const ALScriptWeight::Part& part : weight.parts)
         {
             if (part.line >= 0)
             {
-                ensure(part.name + "'s lines are no more than it" + lined(weight), within(weight, part.line, part.endLine) <= part.bytes);
+                UNSCOPED_INFO(part.name + "'s lines are no more than it" + lined(weight));
+                REQUIRE(within(weight, part.line, part.endLine) <= part.bytes);
             }
         }
         size_t all = 0;
@@ -520,16 +627,17 @@ namespace tut
         {
             all += line.bytes;
         }
-        ensure("the lines are less than the whole", all > 0 && all < weight.total);
+        CHECK(all > 0);
+        CHECK(all < weight.total);
     }
 
     // In the source's places: a part in an include is in the include, at
     // its line there, and a line's bytes are the source line's; what the
     // map has no origin for keeps its part without a place.
-    template<> template<>
-    void alscriptweight_object::test<9>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: in the source's places: a part in an include is at its line there", "[ALScriptWeight]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         const std::vector<std::string> lines = { "integer twice(integer n)",
                                                  "{",
                                                  "    return n * 2;",
@@ -565,45 +673,86 @@ namespace tut
             return map;
         };
         const ALScriptWeight weight = ALScriptWeigh::lso(expanded);
-        ensure("compiled: " + weight.error, weight.compiled);
+        UNSCOPED_INFO("compiled: " + weight.error);
+        CHECK(weight.compiled);
         const ALScriptWeight placed = weight.inSource(mapped(true));
-        ensure_equals("the same weight", placed.total, weight.total);
+        CHECK(placed.total == weight.total);
         const ALScriptWeight::Part* twice = named(placed, "twice");
         const ALScriptWeight::Part* entry = named(placed, "state_entry");
-        ensure("both:" + listed(placed), twice && entry);
-        ensure_equals("a function in the include", twice->file, std::string("disk:/scripts/lib.lsl"));
-        ensure_equals("at its line there", twice->line, 0);
-        ensure_equals("to its end there", twice->endLine, 3);
-        ensure("a handler in the script", entry->file.empty());
-        ensure_equals("at the script's line", entry->line, 3);
+        {
+            INFO("both:" + listed(placed));
+            REQUIRE(twice);
+            REQUIRE(entry);
+        }
+        UNSCOPED_INFO("a function in the include");
+        CHECK(twice->file == std::string("disk:/scripts/lib.lsl"));
+        UNSCOPED_INFO("at its line there");
+        CHECK(twice->line == 0);
+        UNSCOPED_INFO("to its end there");
+        CHECK(twice->endLine == 3);
+        UNSCOPED_INFO("a handler in the script");
+        CHECK(entry->file.empty());
+        UNSCOPED_INFO("at the script's line");
+        CHECK(entry->line == 3);
         size_t in_include = 0, in_script = 0;
         for (const ALScriptWeight::Line& line : placed.lines)
         {
-            ensure("a line of one of the two" + lined(placed), line.file.empty() || line.file == "disk:/scripts/lib.lsl");
-            ensure("not the #include's" + lined(placed), !(line.file.empty() && line.line == 0));
+            UNSCOPED_INFO("a line of one of the two" + lined(placed));
+            REQUIRE((line.file.empty() || line.file == "disk:/scripts/lib.lsl"));
+            UNSCOPED_INFO("not the #include's" + lined(placed));
+            REQUIRE_FALSE((line.file.empty() && line.line == 0));
             (line.file.empty() ? in_script : in_include) += line.bytes;
         }
-        ensure("the include's return is its line's", in_include > 0);
-        ensure("the call is the script's", in_script > 0);
+        UNSCOPED_INFO("the include's return is its line's");
+        CHECK(in_include > 0);
+        UNSCOPED_INFO("the call is the script's");
+        CHECK(in_script > 0);
         size_t all = 0;
         for (const ALScriptWeight::Line& line : weight.lines)
         {
             all += line.bytes;
         }
-        ensure_equals("every line's bytes somewhere", in_include + in_script, all);
+        UNSCOPED_INFO("every line's bytes somewhere");
+        CHECK(in_include + in_script == all);
 
         const ALScriptWeight lost = weight.inSource(mapped(false));
-        ensure("a part the map has no origin for is kept" + listed(lost), named(lost, "twice") != nullptr);
-        ensure_equals("without a place", named(lost, "twice")->line, -1);
-        ensure_equals("the handler still placed", named(lost, "state_entry")->line, 3);
+        UNSCOPED_INFO("a part the map has no origin for is kept" + listed(lost));
+        REQUIRE(named(lost, "twice") != nullptr);
+        UNSCOPED_INFO("without a place");
+        CHECK(named(lost, "twice")->line == -1);
+        const ALScriptWeight::Part* lost_entry = named(lost, "state_entry");
+        {
+            INFO("the handler still placed" + listed(lost));
+            REQUIRE(lost_entry);
+            CHECK(lost_entry->line == 3);
+        }
+    }
+
+    // A long list parses on every platform: each element nests the parse two
+    // states deeper, and the parser's limit is the same everywhere.
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: a long list parses on every platform: each element nests two states deeper", "[ALScriptWeight]")
+    {
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
+        std::string script = "list gNumbers = [";
+        for (int i = 0; i < 3000; ++i)
+        {
+            script += (i ? ", " : "") + std::to_string(i);
+        }
+        script += "];\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay((string)llGetListLength(gNumbers));\n    }\n}\n";
+        lsl.check(script);
+        CHECK(lsl.parsed());
+        const ALScriptWeight weight = ALScriptWeigh::lso(script);
+        UNSCOPED_INFO("and is weighed: " + weight.error);
+        CHECK(weight.total > 0);
     }
 
     // Mono's user string heap holds a string once, however many loads of
     // it there are: a second load costs the instruction alone, on its line.
-    template<> template<>
-    void alscriptweight_object::test<11>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: Mono's user string heap holds a string once however often it is loaded", "[ALScriptWeight]")
     {
-        ensure("builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("builtins: " + error);
+        CHECK(lslLoaded);
         const auto script = [](int says) {
             std::string text = "default\n{\n    state_entry()\n    {\n";
             for (int i = 0; i < says; ++i)
@@ -615,17 +764,24 @@ namespace tut
         const ALScriptWeight one   = ALScriptWeigh::mono(script(1));
         const ALScriptWeight two   = ALScriptWeigh::mono(script(2));
         const ALScriptWeight three = ALScriptWeigh::mono(script(3));
-        ensure("compiled: " + one.error + two.error + three.error, one.compiled && two.compiled && three.compiled);
-        ensure_equals("the third load as the second", three.total - two.total, two.total - one.total);
-        ensure("the second less than the string" + lined(two), two.total - one.total < 20);
-        ensure("the string is the first line's" + lined(two), at(two, 4) > at(two, 5) + 80);
+        {
+            INFO("compiled: " + one.error + two.error + three.error);
+            CHECK(one.compiled);
+            CHECK(two.compiled);
+            CHECK(three.compiled);
+        }
+        UNSCOPED_INFO("the third load as the second");
+        CHECK(three.total - two.total == two.total - one.total);
+        UNSCOPED_INFO("the second less than the string" + lined(two));
+        CHECK(two.total - one.total < 20);
+        UNSCOPED_INFO("the string is the first line's" + lined(two));
+        CHECK(at(two, 4) > at(two, 5) + 80);
     }
 
     // SLua's handlers and callbacks are named as the script means them, a
     // state's with its state, each part from its function to its end; and
     // a line carries the strings and constants it is first to name.
-    template<> template<>
-    void alscriptweight_object::test<12>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: SLua's handlers and callbacks are named as the script means them", "[ALScriptWeight]")
     {
         const std::string script = "local greeting = \"a sentence of some length, said to the owner as the script starts up\"\n"
                                    "local function twice(n: number): number\n"
@@ -645,7 +801,8 @@ namespace tut
                                    "    print(\"tick\")\n"
                                    "end)\n";
         const ALScriptWeight weight = ALScriptWeigh::slua(script);
-        ensure("compiled: " + weight.error, weight.compiled);
+        UNSCOPED_INFO("compiled: " + weight.error);
+        CHECK(weight.compiled);
         const auto find = [&](const std::string& name, const std::string& within) -> const ALScriptWeight::Part* {
             for (const ALScriptWeight::Part& part : weight.parts)
             {
@@ -657,32 +814,60 @@ namespace tut
             return nullptr;
         };
         const ALScriptWeight::Part* twice = find("twice", "");
-        ensure("a local function, from its function to its end:" + listed(weight), twice && twice->line == 1 && twice->endLine == 3 && twice->endColumn == 3);
-        ensure("not a handler", twice->kind == ALScriptWeight::Part::Kind::Function);
+        {
+            INFO("a local function, from its function to its end:" + listed(weight));
+            REQUIRE(twice);
+            CHECK(twice->line == 1);
+            CHECK(twice->endLine == 3);
+            CHECK(twice->endColumn == 3);
+        }
+        UNSCOPED_INFO("not a handler");
+        CHECK(twice->kind == ALScriptWeight::Part::Kind::Function);
         const ALScriptWeight::Part* entry = find("state_entry", "default");
-        ensure("a state's handler, with its state:" + listed(weight), entry && entry->kind == ALScriptWeight::Part::Kind::Handler);
-        ensure("from its function to its end", entry->line == 6 && entry->column == 18 && entry->endLine == 8);
-        ensure("a state named by a string:" + listed(weight), find("touch_start", "other place") != nullptr);
+        {
+            INFO("a state's handler, with its state:" + listed(weight));
+            REQUIRE(entry);
+            CHECK(entry->kind == ALScriptWeight::Part::Kind::Handler);
+        }
+        {
+            INFO("from its function to its end");
+            CHECK(entry->line == 6);
+            CHECK(entry->column == 18);
+            CHECK(entry->endLine == 8);
+        }
+        UNSCOPED_INFO("a state named by a string:" + listed(weight));
+        CHECK(find("touch_start", "other place") != nullptr);
         const ALScriptWeight::Part* touched = find("touch_start", "");
-        ensure("LLEvents' handler by its event:" + listed(weight), touched && touched->kind == ALScriptWeight::Part::Kind::Handler && touched->line == 11);
+        {
+            INFO("LLEvents' handler by its event:" + listed(weight));
+            REQUIRE(touched);
+            CHECK(touched->kind == ALScriptWeight::Part::Kind::Handler);
+            CHECK(touched->line == 11);
+        }
         const ALScriptWeight::Part* tick = find("LLTimers:every", "");
-        ensure("what LLTimers calls, by how it is set going:" + listed(weight), tick && tick->kind == ALScriptWeight::Part::Kind::Function);
+        {
+            INFO("what LLTimers calls, by how it is set going:" + listed(weight));
+            REQUIRE(tick);
+            CHECK(tick->kind == ALScriptWeight::Part::Kind::Function);
+        }
 
         // The greeting, a constant the compiler puts where it is used, is
         // that line's; the strings every line names are counted on some
         // line, so that the lines come to most of the whole.
-        ensure("the long string on the line that says it:" + lined(weight), at(weight, 7) > 80);
-        ensure("a short one on its own line:" + lined(weight), at(weight, 12) > 4 + std::string("touched").size());
+        UNSCOPED_INFO("the long string on the line that says it:" + lined(weight));
+        CHECK(at(weight, 7) > 80);
+        UNSCOPED_INFO("a short one on its own line:" + lined(weight));
+        CHECK(at(weight, 12) > 4 + std::string("touched").size());
         const size_t lines = within(weight, 0, 100);
-        ensure("most of the whole on some line: " + std::to_string(lines) + " of " + std::to_string(weight.total), lines * 3 > weight.total * 2);
+        UNSCOPED_INFO("most of the whole on some line: " << lines << " of " << weight.total);
+        CHECK(lines * 3 > weight.total * 2);
     }
 
     // Each string the table keeps: what it takes up, how many instructions
     // name it and how many load it as a value, the first line naming it,
     // and a function's name as such. They come to the table, its count
     // before them.
-    template<> template<>
-    void alscriptweight_object::test<13>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: each string the table keeps: its bytes and uses and loads and first line", "[ALScriptWeight]")
     {
         const std::string script = "local function greet(name: string)\n"           // 0
                                    "    ll.OwnerSay(\"hello \" .. name)\n"             // 1
@@ -693,7 +878,8 @@ namespace tut
                                    "greet(\"hello again\")\n"                         // 6
                                    "greet(\"hello again\")\n";                        // 7
         const ALScriptWeight w = ALScriptWeigh::slua(script);
-        ensure("compiled: " + w.error, w.compiled);
+        UNSCOPED_INFO("compiled: " + w.error);
+        CHECK(w.compiled);
         const auto of = [&w](const std::string& text) -> const ALScriptWeight::String* {
             for (const ALScriptWeight::String& one : w.strings)
             {
@@ -705,41 +891,79 @@ namespace tut
             return nullptr;
         };
         const ALScriptWeight::String* again = of("hello again");
-        ensure("a value loaded twice", again && again->uses == 2 && again->loads == 2 && again->line == 6 && again->bytes == 12);
+        {
+            INFO("a value loaded twice");
+            REQUIRE(again);
+            CHECK(again->uses == 2);
+            CHECK(again->loads == 2);
+            CHECK(again->line == 6);
+            CHECK(again->bytes == 12);
+        }
         const ALScriptWeight::String* colour = of("colour");
-        ensure("a field's name: named, never loaded", colour && colour->uses >= 2 && colour->loads == 0 && colour->line == 4);
+        {
+            INFO("a field's name: named, never loaded");
+            REQUIRE(colour);
+            CHECK(colour->uses >= 2);
+            CHECK(colour->loads == 0);
+            CHECK(colour->line == 4);
+        }
         const ALScriptWeight::String* blue = of("blue");
-        ensure("a comparison's: named, never loaded", blue && blue->uses == 1 && blue->loads == 0);
+        {
+            INFO("a comparison's: named, never loaded");
+            REQUIRE(blue);
+            CHECK(blue->uses == 1);
+            CHECK(blue->loads == 0);
+        }
         const ALScriptWeight::String* say = of("OwnerSay");
-        ensure("an import's path", say && say->uses >= 1 && say->loads == 0 && say->line == 1);
+        {
+            INFO("an import's path");
+            REQUIRE(say);
+            CHECK(say->uses >= 1);
+            CHECK(say->loads == 0);
+            CHECK(say->line == 1);
+        }
         const ALScriptWeight::String* greet = of("greet");
-        ensure("a function's name, at the line it starts on", greet && greet->name && greet->uses == 0 && greet->line == 0);
+        {
+            INFO("a function's name, at the line it starts on");
+            REQUIRE(greet);
+            CHECK(greet->name);
+            CHECK(greet->uses == 0);
+            CHECK(greet->line == 0);
+        }
         size_t bytes = 0;
         for (const ALScriptWeight::String& one : w.strings)
         {
             bytes += one.bytes;
         }
         const ALScriptWeight::Part* table = named(w, "strings");
-        ensure("they come to the table, with its count", table && table->bytes == bytes + 1);
+        {
+            INFO("they come to the table, with its count");
+            REQUIRE(table);
+            CHECK(table->bytes == bytes + 1);
+        }
 
         // LSL compiled for Luau's VM: its strings, at the lines the lined
         // compile says.
-        ensure("the builtins: " + error, lslLoaded);
+        UNSCOPED_INFO("the builtins: " + error);
+        CHECK(lslLoaded);
         const ALScriptWeight lsl = ALScriptWeigh::lslLuau(byLine());
         bool found = false;
         for (const ALScriptWeight::String& one : lsl.strings)
         {
             found = found || (one.text == "a sentence of some length, said to the owner on every start" && one.line == 15);
         }
-        ensure("LSL on Luau's, placed", lsl.compiled && found);
+        {
+            INFO("LSL on Luau's, placed");
+            CHECK(lsl.compiled);
+            CHECK(found);
+        }
     }
 
     // Strings that start alike: where keeping the start once and joining it
     // back on would weigh less, what it would save -- the table's bytes
     // before less after, less the join at each load and the local once.
     // Only strings loaded as values; a short start saves nothing.
-    template<> template<>
-    void alscriptweight_object::test<14>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: strings that start alike: where keeping the start once would weigh less", "[ALScriptWeight]")
     {
         const std::string start = "You have touched the object of the day: ";
         const std::vector<std::string> rests = { "alpha", "bravo", "charlie", "delta" };
@@ -753,11 +977,15 @@ namespace tut
         // Two sharing a start too short to be worth it.
         script += "ll.OwnerSay(\"short one\")\nll.OwnerSay(\"short two\")\n";
         const ALScriptWeight w = ALScriptWeigh::slua(script);
-        ensure("compiled: " + w.error, w.compiled);
-        ensure_equals("one start worth keeping", w.sharedStarts.size(), size_t(1));
+        UNSCOPED_INFO("compiled: " + w.error);
+        CHECK(w.compiled);
+        UNSCOPED_INFO("one start worth keeping");
+        REQUIRE(w.sharedStarts.size() == size_t(1));
         const ALScriptWeight::SharedStart& shared = w.sharedStarts.front();
-        ensure_equals("the start the four share", shared.start, start);
-        ensure_equals("the four, not the field's", shared.strings.size(), rests.size());
+        UNSCOPED_INFO("the start the four share");
+        CHECK(shared.start == start);
+        UNSCOPED_INFO("the four, not the field's");
+        CHECK(shared.strings.size() == rests.size());
         size_t before = 0;
         size_t after  = 1 + start.size();
         for (const std::string& rest : rests)
@@ -766,10 +994,12 @@ namespace tut
             after += 1 + rest.size();
         }
         const size_t cost = after + rests.size() * ALScriptWeigh::SHARED_START_PER_LOAD + ALScriptWeigh::SHARED_START_ONCE;
-        ensure_equals("what it saves", shared.saved, before - cost);
+        UNSCOPED_INFO("what it saves");
+        CHECK(shared.saved == before - cost);
         for (const size_t i : shared.strings)
         {
-            ensure("each one of them", w.strings[i].text.rfind(start, 0) == 0 && w.strings[i].text != start + "zulu");
+            REQUIRE(w.strings[i].text.rfind(start, 0) == 0);
+            REQUIRE(w.strings[i].text != start + "zulu");
         }
 
         // The costs against the compiler's own: the four written whole, and
@@ -784,23 +1014,29 @@ namespace tut
         }
         const ALScriptWeight as_whole = ALScriptWeigh::slua(whole);
         const ALScriptWeight as_apart = ALScriptWeigh::slua(apart);
-        ensure("both compiled", as_whole.compiled && as_apart.compiled && as_whole.sharedStarts.size() == 1);
+        CHECK(as_whole.compiled);
+        CHECK(as_apart.compiled);
+        REQUIRE(as_whole.sharedStarts.size() == 1);
         const S64 really = S64(as_whole.total) - S64(as_apart.total);
-        ensure(llformat("saves about what was said: %lld against %zu", (long long)really, as_whole.sharedStarts[0].saved),
-               std::abs(really - S64(as_whole.sharedStarts[0].saved)) <= 8);
+        UNSCOPED_INFO("saves about what was said: " << really << " against " << as_whole.sharedStarts[0].saved);
+        CHECK(std::abs(really - S64(as_whole.sharedStarts[0].saved)) <= 8);
 
         // Nothing where only two share a start: two loads cost more than
         // one start saves, until the start is long.
-        ensure("two with a middling start: nothing",
-               ALScriptWeigh::slua("ll.OwnerSay(\"twenty bytes of start, then one\")\nll.OwnerSay(\"twenty bytes of start, then two\")\n").sharedStarts.empty());
-        ensure("two with a long one: worth it",
-               ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once, then one\")\n"
-                                   "ll.OwnerSay(\"a start long enough to be worth keeping once, then two\")\n")
-                       .sharedStarts.size() == 1);
+        UNSCOPED_INFO("two with a middling start: nothing");
+        CHECK(ALScriptWeigh::slua("ll.OwnerSay(\"twenty bytes of start, then one\")\nll.OwnerSay(\"twenty bytes of start, then two\")\n").sharedStarts.empty());
+        UNSCOPED_INFO("two with a long one: worth it");
+        CHECK(ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once, then one\")\n"
+                                 "ll.OwnerSay(\"a start long enough to be worth keeping once, then two\")\n")
+                     .sharedStarts.size() == 1);
         // Never inside a character.
         const ALScriptWeight cut = ALScriptWeigh::slua("ll.OwnerSay(\"a start long enough to be worth keeping once \xC3\xA9t\xC3\xA9\")\n"
                                                        "ll.OwnerSay(\"a start long enough to be worth keeping once \xC3\xA8re\")\n");
-        ensure("cut before the character", cut.sharedStarts.size() == 1 && cut.sharedStarts[0].start == "a start long enough to be worth keeping once ");
+        {
+            INFO("cut before the character");
+            REQUIRE(cut.sharedStarts.size() == 1);
+            CHECK(cut.sharedStarts[0].start == "a start long enough to be worth keeping once ");
+        }
     }
 
     // A shared start kept once in the script itself: each literal of its
@@ -812,8 +1048,7 @@ namespace tut
     // works out as it compiles and a string not of them left alone. What it
     // weighs after is what was said apart, with nothing left to keep once;
     // and it checks, strict as well.
-    template<> template<>
-    void alscriptweight_object::test<15>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: a shared start kept once in the script itself", "[ALScriptWeight]")
     {
         const std::string start = "You have touched the object of the day: ";
         const std::string script = "--!strict\n"                                                           // 0
@@ -825,52 +1060,74 @@ namespace tut
                                    "print \"" + start + "delta\"\n"                                           // 6
                                    "ll.OwnerSay(\"other\")\n";                                                // 7
         const ALScriptWeight before = ALScriptWeigh::slua(script);
-        ensure("weighed: " + before.error, before.compiled);
-        ensure_equals("one start", before.sharedStarts.size(), size_t(1));
+        UNSCOPED_INFO("weighed: " + before.error);
+        CHECK(before.compiled);
+        UNSCOPED_INFO("one start");
+        REQUIRE(before.sharedStarts.size() == size_t(1));
         const std::vector<std::string> strings = textsOf(before, before.sharedStarts[0]);
-        ensure("not the require's path, which is no string to keep once",
-               std::find(strings.begin(), strings.end(), start + "x") == strings.end());
+        UNSCOPED_INFO("not the require's path, which is no string to keep once");
+        CHECK(std::find(strings.begin(), strings.end(), start + "x") == strings.end());
         ALLuauSharedStart::Rewrite rewrite;
         std::string                error;
         const bool                 done = ALLuauSharedStart::rewrite(script, before.sharedStarts[0].start, strings, rewrite, error);
-        ensure("rewritten: " + error, done);
-        ensure_equals("its name", rewrite.name, std::string("sharedStart"));
-        const std::string after = applied(script, rewrite);
+        UNSCOPED_INFO("rewritten: " + error);
+        CHECK(done);
+        CHECK(rewrite.name == std::string("sharedStart"));
+        const std::string after = require_applied(script, rewrite);
         const auto has = [&after](const std::string& text) { return after.find(text) != std::string::npos; };
-        ensure("the local past the --! comment: " + after, after.rfind("--!strict\nlocal sharedStart\nsharedStart = \"" + start + "\"\n\n", 0) == 0);
-        ensure("a call's: " + after, has("ll.OwnerSay(sharedStart .. \"alpha\")"));
-        ensure("constant strings joined, still folded: " + after, has("ll.OwnerSay(sharedStart .. (\"bravo\" .. \"!\"))"));
-        ensure("a table's value, not its key: " + after, has("[\"" + start + "key\"] = sharedStart .. \"charlie\""));
-        ensure("a length Luau works out, left: " + after, has("print(#\"" + start + "delta\")"));
-        ensure("and a call with no brackets: " + after, has("print (sharedStart .. \"delta\")"));
-        ensure("a require's path left: " + after, has("require(\"" + start + "x\")"));
-        ensure("another string left: " + after, has("ll.OwnerSay(\"other\")"));
+        UNSCOPED_INFO("the local past the --! comment: " + after);
+        CHECK(after.rfind("--!strict\nlocal sharedStart\nsharedStart = \"" + start + "\"\n\n", 0) == 0);
+        UNSCOPED_INFO("a call's: " + after);
+        CHECK(has("ll.OwnerSay(sharedStart .. \"alpha\")"));
+        UNSCOPED_INFO("constant strings joined, still folded: " + after);
+        CHECK(has("ll.OwnerSay(sharedStart .. (\"bravo\" .. \"!\"))"));
+        UNSCOPED_INFO("a table's value, not its key: " + after);
+        CHECK(has("[\"" + start + "key\"] = sharedStart .. \"charlie\""));
+        UNSCOPED_INFO("a length Luau works out, left: " + after);
+        CHECK(has("print(#\"" + start + "delta\")"));
+        UNSCOPED_INFO("and a call with no brackets: " + after);
+        CHECK(has("print (sharedStart .. \"delta\")"));
+        UNSCOPED_INFO("a require's path left: " + after);
+        CHECK(has("require(\"" + start + "x\")"));
+        UNSCOPED_INFO("another string left: " + after);
+        CHECK(has("ll.OwnerSay(\"other\")"));
 
         // What it weighs now, and that it checks.
         const ALScriptWeight weighed = ALScriptWeigh::slua(after);
-        ensure("weighed after: " + weighed.error, weighed.compiled);
+        UNSCOPED_INFO("weighed after: " + weighed.error);
+        CHECK(weighed.compiled);
         // Nothing left to keep once: the start is the local's one value,
         // kept once already, and the require's path no literal to keep.
-        ensure_equals("nothing offered again", weighed.sharedStarts.size(), size_t(0));
-        ensure(llformat("lighter: %zu then %zu", before.total, weighed.total), weighed.total < before.total);
+        UNSCOPED_INFO("nothing offered again");
+        CHECK(weighed.sharedStarts.size() == size_t(0));
+        CHECK(weighed.total < before.total);
         ALLuauService     service;
         llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
         std::stringstream definitions;
         definitions << in.rdbuf();
-        ensure("definitions: " + error, service.loadDefinitions(definitions.str(), error));
+        const bool loaded = service.loadDefinitions(definitions.str(), error);
+        UNSCOPED_INFO("definitions: " + error);
+        REQUIRE(loaded);
         std::string said;
         for (const ALScriptProblem& p : service.check(after))
         {
             said += p.severity == ALScriptProblem::Severity::Error && p.message.find("require") == std::string::npos ? p.message + "\n" : std::string();
         }
-        ensure("checks, strict:\n" + said + "---\n" + after, said.empty());
+        UNSCOPED_INFO("checks, strict:\n" + said + "---\n" + after);
+        CHECK(said.empty());
 
-        ensure("nothing to make of a script without them",
-               !ALLuauSharedStart::rewrite("print(\"x\")\n", start, strings, rewrite, error) && !error.empty());
+        {
+            INFO("nothing to make of a script without them");
+            CHECK_FALSE(ALLuauSharedStart::rewrite("print(\"x\")\n", start, strings, rewrite, error));
+            CHECK_FALSE(error.empty());
+        }
         const bool taken = ALLuauSharedStart::rewrite("local sharedStart = 1\nprint(\"" + start + "alpha\")\n", start, { start + "alpha" }, rewrite, error);
-        ensure("rewritten with a name taken: " + error, taken);
-        ensure_equals("a name it has taken, another", rewrite.name, std::string("sharedStart2"));
-        ensure_equals("quoted as SLua reads it", ALLuauSharedStart::quoted("a\"b\\c\n\x01" "2"), std::string("\"a\\\"b\\\\c\\n\\0012\""));
+        UNSCOPED_INFO("rewritten with a name taken: " + error);
+        CHECK(taken);
+        UNSCOPED_INFO("a name it has taken, another");
+        CHECK(rewrite.name == std::string("sharedStart2"));
+        UNSCOPED_INFO("quoted as SLua reads it");
+        CHECK(ALLuauSharedStart::quoted("a\"b\\c\n\x01" "2") == std::string("\"a\\\"b\\\\c\\n\\0012\""));
     }
 
     // Strings loaded in closures: each function that loads one, and each
@@ -878,8 +1135,7 @@ namespace tut
     // script's body close it over as it ends, which the saving counts.
     // What it says is about what the compiler makes: a closure shared
     // before frees its constant made anew, a byte or two each.
-    template<> template<>
-    void alscriptweight_object::test<16>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: strings loaded in closures: the saving counts each closure's capture", "[ALScriptWeight]")
     {
         const std::string              start  = "You have touched the object of the day: ";
         const std::vector<std::string> rests  = { "alpha", "bravo", "charlie" };
@@ -893,13 +1149,20 @@ namespace tut
         }
         const ALScriptWeight as_whole = ALScriptWeigh::slua(whole);
         const ALScriptWeight as_apart = ALScriptWeigh::slua(apart);
-        ensure("both compiled: " + as_whole.error + as_apart.error, as_whole.compiled && as_apart.compiled);
-        ensure_equals("one start", as_whole.sharedStarts.size(), size_t(1));
+        {
+            INFO("both compiled: " + as_whole.error + as_apart.error);
+            CHECK(as_whole.compiled);
+            CHECK(as_apart.compiled);
+        }
+        UNSCOPED_INFO("one start");
+        REQUIRE(as_whole.sharedStarts.size() == size_t(1));
         const ALScriptWeight::SharedStart& shared = as_whole.sharedStarts.front();
-        ensure_equals("the start the three share", shared.start, start);
+        UNSCOPED_INFO("the start the three share");
+        CHECK(shared.start == start);
         for (const size_t i : shared.strings)
         {
-            ensure_equals("each loaded in a function of its own", as_whole.strings[i].functions.size(), size_t(1));
+            UNSCOPED_INFO("each loaded in a function of its own");
+            REQUIRE(as_whole.strings[i].functions.size() == size_t(1));
         }
         size_t before = 0;
         size_t after  = 1 + start.size();
@@ -910,10 +1173,11 @@ namespace tut
         }
         const size_t cost = after + rests.size() * (ALScriptWeigh::SHARED_START_PER_LOAD + ALScriptWeigh::SHARED_START_PER_FUNCTION) +
                             ALScriptWeigh::SHARED_START_ONCE + ALScriptWeigh::SHARED_START_CAPTURED;
-        ensure_equals("what it saves, a capture for each closure", shared.saved, before - cost);
+        UNSCOPED_INFO("what it saves, a capture for each closure");
+        CHECK(shared.saved == before - cost);
         const S64 really = S64(as_whole.total) - S64(as_apart.total);
-        ensure(llformat("saves about what was said: %lld against %zu", (long long)really, shared.saved),
-               std::abs(really - S64(shared.saved)) <= S64(8 + 2 * rests.size()));
+        UNSCOPED_INFO("saves about what was said: " << really << " against " << shared.saved);
+        CHECK(std::abs(really - S64(shared.saved)) <= S64(8 + 2 * rests.size()));
     }
 
     // Where the start's local goes: before the first of the script that is
@@ -923,8 +1187,7 @@ namespace tut
     // comment on it. What would not parse is refused, as is a start not
     // every string of which is written out; and a byte of no character is
     // quoted in hex.
-    template<> template<>
-    void alscriptweight_object::test<17>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: where the start's local goes: before the first thing that is not a comment", "[ALScriptWeight]")
     {
         const std::string              start   = "You have touched the object of the day: ";
         const std::vector<std::string> strings = { start + "alpha", start + "bravo" };
@@ -934,40 +1197,62 @@ namespace tut
             ALLuauSharedStart::Rewrite rewrite;
             std::string                why;
             const bool                 done = ALLuauSharedStart::rewrite(script, start, strings, rewrite, why);
-            ensure("rewritten: " + why + "\n" + script, done);
-            return alscriptweight_data::applied(script, rewrite);
+            UNSCOPED_INFO("rewritten: " + why + "\n" + script);
+            REQUIRE(done);
+            return alscriptweight_data::require_applied(script, rewrite);
         };
         const auto heads = [&](const std::string& head, const std::string& text) { return text.rfind(head + local, 0) == 0; };
         std::string after = kept("-- Door script\n--!strict\n" + said);
-        ensure("past an ordinary comment and the --! one: " + after, heads("-- Door script\n--!strict\n", after));
-        ensure("and the strings kept: " + after, after.find("ll.OwnerSay(sharedStart .. \"alpha\")") != std::string::npos);
+        UNSCOPED_INFO("past an ordinary comment and the --! one: " + after);
+        CHECK(heads("-- Door script\n--!strict\n", after));
+        UNSCOPED_INFO("and the strings kept: " + after);
+        CHECK(after.find("ll.OwnerSay(sharedStart .. \"alpha\")") != std::string::npos);
         after = kept("\n--!strict\n" + said);
-        ensure("past a blank first line: " + after, heads("\n--!strict\n", after));
+        UNSCOPED_INFO("past a blank first line: " + after);
+        CHECK(heads("\n--!strict\n", after));
         after = kept("--!strict\n\n--!optimize 2\n" + said);
-        ensure("past --! comments apart: " + after, heads("--!strict\n\n--!optimize 2\n", after));
+        UNSCOPED_INFO("past --! comments apart: " + after);
+        CHECK(heads("--!strict\n\n--!optimize 2\n", after));
         after = kept("--!strict\n    " + said);
-        ensure("at the start of an indented line: " + after, heads("--!strict\n", after) && after.find(local + "    ll.OwnerSay") != std::string::npos);
+        {
+            INFO("at the start of an indented line: " + after);
+            CHECK(heads("--!strict\n", after));
+            CHECK(after.find(local + "    ll.OwnerSay") != std::string::npos);
+        }
         after = kept("--[[ The door ]] " + said);
-        ensure("after a comment on the same line: " + after, heads("--[[ The door ]] ", after));
+        UNSCOPED_INFO("after a comment on the same line: " + after);
+        CHECK(heads("--[[ The door ]] ", after));
 
         ALLuauSharedStart::Rewrite rewrite;
         std::string                error;
-        ensure("a call's string on a line of its own would be ambiguous bracketed",
-               !ALLuauSharedStart::rewrite("ll.OwnerSay\n\"" + start + "alpha\"\nll.OwnerSay(\"" + start + "bravo\")\n", start, strings, rewrite, error) &&
-                   error.find("does not parse") != std::string::npos);
-        ensure("nothing made of it", rewrite.edits.empty());
-        ensure("a string not written out: " + error,
-               !ALLuauSharedStart::rewrite("ll.OwnerSay(\"" + start + "alpha\")\n", start, strings, rewrite, error) &&
-                   error.find("not every one") != std::string::npos);
-        ensure("none written out, a local joined on: " + error,
-               !ALLuauSharedStart::rewrite("local greeting = \"" + start + "\"\nll.OwnerSay(greeting .. \"alpha\")\nll.OwnerSay(greeting .. \"bravo\")\n",
-                                           start, strings, rewrite, error) &&
-                   error.find("none of these strings") != std::string::npos);
+        {
+            INFO("a call's string on a line of its own would be ambiguous bracketed");
+            CHECK_FALSE(ALLuauSharedStart::rewrite("ll.OwnerSay\n\"" + start + "alpha\"\nll.OwnerSay(\"" + start + "bravo\")\n", start, strings, rewrite, error));
+            CHECK(error.find("does not parse") != std::string::npos);
+        }
+        UNSCOPED_INFO("nothing made of it");
+        CHECK(rewrite.edits.empty());
+        {
+            const bool made = ALLuauSharedStart::rewrite("ll.OwnerSay(\"" + start + "alpha\")\n", start, strings, rewrite, error);
+            INFO("a string not written out: " + error);
+            CHECK_FALSE(made);
+            CHECK(error.find("not every one") != std::string::npos);
+        }
+        {
+            const bool made = ALLuauSharedStart::rewrite("local greeting = \"" + start + "\"\nll.OwnerSay(greeting .. \"alpha\")\nll.OwnerSay(greeting .. \"bravo\")\n",
+                                                         start, strings, rewrite, error);
+            INFO("none written out, a local joined on: " + error);
+            CHECK_FALSE(made);
+            CHECK(error.find("none of these strings") != std::string::npos);
+        }
 
-        ensure_equals("a byte of no character in hex, a whole one as it is", ALLuauSharedStart::quoted("\xFF" "a\xC3\xA9\xC3"),
+        UNSCOPED_INFO("a byte of no character in hex, a whole one as it is");
+        CHECK(ALLuauSharedStart::quoted("\xFF" "a\xC3\xA9\xC3") ==
                       std::string("\"\\xFFa\xC3\xA9\\xC3\""));
-        ensure_equals("an overlong form is no character", ALLuauSharedStart::quoted("\xC0\x80"), std::string("\"\\xC0\\x80\""));
-        ensure_equals("four bytes, whole", ALLuauSharedStart::quoted("\xF0\x9F\x98\x80"), std::string("\"\xF0\x9F\x98\x80\""));
+        UNSCOPED_INFO("an overlong form is no character");
+        CHECK(ALLuauSharedStart::quoted("\xC0\x80") == std::string("\"\\xC0\\x80\""));
+        UNSCOPED_INFO("four bytes, whole");
+        CHECK(ALLuauSharedStart::quoted("\xF0\x9F\x98\x80") == std::string("\"\xF0\x9F\x98\x80\""));
     }
 
     // What is not offered: strings Luau makes as it compiles -- an
@@ -976,31 +1261,31 @@ namespace tut
     // is not, the start kept once already, and a module's strings in the
     // source's places. What is: strings a `..` that is not folded goes on
     // to, each a literal of its own, kept once in place.
-    template<> template<>
-    void alscriptweight_object::test<18>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: what is not offered: strings Luau makes as it compiles", "[ALScriptWeight]")
     {
         const std::string start = "You have touched the object of the day: ";
-        ensure("an interpolated string's pattern",
-               ALScriptWeigh::slua("local function said(name: string)\n"
-                                   "    ll.OwnerSay(`" + start + "{name}, first`)\n"
-                                   "    ll.OwnerSay(`" + start + "{name}, second`)\n"
-                                   "    ll.OwnerSay(`" + start + "{name}, third`)\n"
-                                   "end\n"
-                                   "said(\"x\")\n")
-                   .sharedStarts.empty());
-        ensure("strings joined on a local's constant value",
-               ALScriptWeigh::slua("local greeting = \"" + start + "\"\n"
-                                   "ll.OwnerSay(greeting .. \"alpha\")\n"
-                                   "ll.OwnerSay(greeting .. \"bravo\")\n"
-                                   "ll.OwnerSay(greeting .. \"charlie\")\n")
-                   .sharedStarts.empty());
+        UNSCOPED_INFO("an interpolated string's pattern");
+        CHECK(ALScriptWeigh::slua("local function said(name: string)\n"
+                                 "    ll.OwnerSay(`" + start + "{name}, first`)\n"
+                                 "    ll.OwnerSay(`" + start + "{name}, second`)\n"
+                                 "    ll.OwnerSay(`" + start + "{name}, third`)\n"
+                                 "end\n"
+                                 "said(\"x\")\n")
+                 .sharedStarts.empty());
+        UNSCOPED_INFO("strings joined on a local's constant value");
+        CHECK(ALScriptWeigh::slua("local greeting = \"" + start + "\"\n"
+                                 "ll.OwnerSay(greeting .. \"alpha\")\n"
+                                 "ll.OwnerSay(greeting .. \"bravo\")\n"
+                                 "ll.OwnerSay(greeting .. \"charlie\")\n")
+                 .sharedStarts.empty());
         const auto feelings = [&start](const std::string& type) {
             return "type Mood = " + type + "\nlocal function feel(mood: Mood) end\n"
                    "feel(\"" + start + "happy\")\nfeel(\"" + start + "sad\")\nfeel(\"" + start + "bored\")\n";
         };
-        ensure_equals("given for a string", ALScriptWeigh::slua(feelings("string")).sharedStarts.size(), size_t(1));
-        ensure("given for a singleton",
-               ALScriptWeigh::slua(feelings("\"" + start + "happy\" | \"" + start + "sad\" | \"" + start + "bored\"")).sharedStarts.empty());
+        UNSCOPED_INFO("given for a string");
+        CHECK(ALScriptWeigh::slua(feelings("string")).sharedStarts.size() == size_t(1));
+        UNSCOPED_INFO("given for a singleton");
+        CHECK(ALScriptWeigh::slua(feelings("\"" + start + "happy\" | \"" + start + "sad\" | \"" + start + "bored\"")).sharedStarts.empty());
 
         // Kept once, with an interpolated string sharing the start beside
         // them: neither it nor the start's local is offered again.
@@ -1012,15 +1297,23 @@ namespace tut
                                         "ll.OwnerSay(\"" + start + "charlie\")\n"
                                         "said(\"x\")\n";
         const ALScriptWeight kept = ALScriptWeigh::slua(kept_script);
-        ensure("weighed: " + kept.error, kept.compiled && kept.sharedStarts.size() == 1);
-        ensure_equals("the three written out, not the pattern", kept.sharedStarts[0].strings.size(), size_t(3));
+        {
+            INFO("weighed: " + kept.error);
+            CHECK(kept.compiled);
+            REQUIRE(kept.sharedStarts.size() == 1);
+        }
+        UNSCOPED_INFO("the three written out, not the pattern");
+        CHECK(kept.sharedStarts[0].strings.size() == size_t(3));
         ALLuauSharedStart::Rewrite rewrite;
         std::string                error;
         bool                       done = ALLuauSharedStart::rewrite(kept_script, start, textsOf(kept, kept.sharedStarts[0]), rewrite, error);
-        ensure("rewritten: " + error, done);
-        const ALScriptWeight again = ALScriptWeigh::slua(applied(kept_script, rewrite));
-        ensure("weighed again: " + again.error, again.compiled);
-        ensure_equals("nothing offered again", again.sharedStarts.size(), size_t(0));
+        UNSCOPED_INFO("rewritten: " + error);
+        CHECK(done);
+        const ALScriptWeight again = ALScriptWeigh::slua(require_applied(kept_script, rewrite));
+        UNSCOPED_INFO("weighed again: " + again.error);
+        CHECK(again.compiled);
+        UNSCOPED_INFO("nothing offered again");
+        CHECK(again.sharedStarts.size() == size_t(0));
 
         // Joined on to a name, each piece is loaded on its own.
         const std::string joined = "local function touched(name: string)\n"
@@ -1030,13 +1323,21 @@ namespace tut
                                    "end\n"
                                    "touched(\"x\")\n";
         const ALScriptWeight pieces = ALScriptWeigh::slua(joined);
-        ensure("weighed: " + pieces.error, pieces.compiled && pieces.sharedStarts.size() == 1 && pieces.sharedStarts[0].start == start);
+        {
+            INFO("weighed: " + pieces.error);
+            CHECK(pieces.compiled);
+            REQUIRE(pieces.sharedStarts.size() == 1);
+            CHECK(pieces.sharedStarts[0].start == start);
+        }
         done = ALLuauSharedStart::rewrite(joined, start, textsOf(pieces, pieces.sharedStarts[0]), rewrite, error);
-        ensure("rewritten: " + error, done);
-        const std::string pieces_after = applied(joined, rewrite);
-        ensure("each piece kept in place: " + pieces_after, pieces_after.find("ll.OwnerSay(name .. sharedStart .. \"alpha\" .. \"!\")") != std::string::npos);
+        UNSCOPED_INFO("rewritten: " + error);
+        CHECK(done);
+        const std::string pieces_after = require_applied(joined, rewrite);
+        UNSCOPED_INFO("each piece kept in place: " + pieces_after);
+        CHECK(pieces_after.find("ll.OwnerSay(name .. sharedStart .. \"alpha\" .. \"!\")") != std::string::npos);
         const ALScriptWeight lighter = ALScriptWeigh::slua(pieces_after);
-        ensure(llformat("lighter: %zu then %zu", pieces.total, lighter.total), lighter.compiled && lighter.total < pieces.total);
+        CHECK(lighter.compiled);
+        CHECK(lighter.total < pieces.total);
 
         // A module's strings, in the source's places, are not the script's
         // to keep once: the first three lines are a module's.
@@ -1067,42 +1368,55 @@ namespace tut
             return map;
         };
         const ALScriptWeight bundled = ALScriptWeigh::slua(bundle);
-        ensure("weighed: " + bundled.error, bundled.compiled && bundled.sharedStarts.size() == 1);
-        ensure_equals("all the script's: kept", bundled.inSource(mapped(0)).sharedStarts.size(), size_t(1));
-        ensure_equals("two a module's: nothing", bundled.inSource(mapped(3)).sharedStarts.size(), size_t(0));
+        {
+            INFO("weighed: " + bundled.error);
+            CHECK(bundled.compiled);
+            CHECK(bundled.sharedStarts.size() == 1);
+        }
+        UNSCOPED_INFO("all the script's: kept");
+        CHECK(bundled.inSource(mapped(0)).sharedStarts.size() == size_t(1));
+        UNSCOPED_INFO("two a module's: nothing");
+        CHECK(bundled.inSource(mapped(3)).sharedStarts.size() == size_t(0));
     }
 
     // LSL's constants are folded as the grid's compiler folds them: a
     // constant read is its value in the bytecode, as if written out, and
     // not a global looked up by its name.
-    template<> template<>
-    void alscriptweight_object::test<19>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: LSL's constants are folded as the grid's compiler folds them", "[ALScriptWeight]")
     {
         const ALScriptWeight named   = ALScriptWeigh::slua("local x = PRIM_SIZE\nprint(x)\n");
         const ALScriptWeight written = ALScriptWeigh::slua("local x = 7\nprint(x)\n");
-        ensure("both compiled", named.compiled && written.compiled);
-        ensure_equals("the same as its value written out", named.total, written.total);
+        CHECK(named.compiled);
+        CHECK(written.compiled);
+        UNSCOPED_INFO("the same as its value written out");
+        CHECK(named.total == written.total);
         bool looked_up = false;
         for (const ALScriptWeight::String& one : named.strings)
         {
             looked_up = looked_up || one.text == "PRIM_SIZE";
         }
-        ensure("not its name among the strings", !looked_up);
+        UNSCOPED_INFO("not its name among the strings");
+        CHECK_FALSE(looked_up);
     }
 
     // A heavy string is named on one line as a string of the table is, a
     // return in it written out as a break and a tab are.
-    template<> template<>
-    void alscriptweight_object::test<20>()
+    TEST_CASE_METHOD(alscriptweight_data, "ALScriptWeight: a heavy string is named on one line as a string of the table is", "[ALScriptWeight]")
     {
         const ALScriptWeight weight = ALScriptWeigh::slua("local s = \"a\\rb\\tc" + std::string(300, 'x') + "\"\nprint(s)\n");
-        ensure("compiled: " + weight.error, weight.compiled);
+        UNSCOPED_INFO("compiled: " + weight.error);
+        CHECK(weight.compiled);
         const ALScriptWeight::Part* found = nullptr;
         for (const ALScriptWeight::Part& one : weight.parts)
         {
             found = one.kind == ALScriptWeight::Part::Kind::Constant && one.name != "strings" ? &one : found;
         }
-        ensure("a part of its own:" + listed(weight), found != nullptr);
-        ensure("named on one line: " + found->name, found->name.rfind("\"a\\rb\\tc", 0) == 0 && found->name.find('\r') == std::string::npos);
+        UNSCOPED_INFO("a part of its own:" + listed(weight));
+        REQUIRE(found != nullptr);
+        {
+            INFO("named on one line: " + found->name);
+            CHECK(found->name.rfind("\"a\\rb\\tc", 0) == 0);
+            CHECK(found->name.find('\r') == std::string::npos);
+        }
     }
 }

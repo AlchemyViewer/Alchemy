@@ -76,26 +76,33 @@ target_precompile_headers(llcorehttp REUSE_FROM llprecompiled)
 
 # tests
 if(AL_BUILD_TESTS)
-  # The suite runs under a Python peer that serves the requests it makes.
+  # The state guard's checks on what llcorehttp keeps for the process, for
+  # every test binary that links it.
+  add_library(llcorehttp_test_checks OBJECT tests/llcorehttp_test_checks.cpp)
+  target_link_libraries(llcorehttp_test_checks PRIVATE al::flags al_test_support llcorehttp llmessage)
+  set_target_properties(llcorehttp_test_checks PROPERTIES FOLDER "Tests/llcorehttp")
+
+  # The suites run under a Python peer that serves the requests they make.
   # An http_proxy in the environment would put a proxy between the two, so
   # the run clears it.
-  al_add_test(
-    llcorehttp
+  al_add_test_binary(
+    llcorehttp_tests
     PROJECT llcorehttp
     SOURCES
-      tests/test_httpstatus.hpp
-      tests/test_refcounted.hpp
-      tests/test_httpoperation.hpp
-      tests/test_httprequest.hpp
-      tests/test_httprequestqueue.hpp
-      tests/test_httpheaders.hpp
-      tests/test_bufferarray.hpp
-      tests/test_bufferstream.hpp
-      tests/test_jsonrpcws.hpp
-      tests/test_websocketmgr.hpp
+      tests/bufferarray_test.cpp
+      tests/bufferstream_test.cpp
+      tests/httpheaders_test.cpp
+      tests/httpoperation_test.cpp
+      tests/httprequest_test.cpp
+      tests/httprequestqueue_test.cpp
+      tests/httpstatus_test.cpp
+      tests/jsonrpcws_test.cpp
+      tests/refcounted_test.cpp
+      tests/websocketmgr_test.cpp
     LIBRARIES llcorehttp llmessage llcommon
+    SUPPORT llcorehttp_test_checks
     PYTHON
-    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
+    LAUNCHER ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
     ENVIRONMENT "http_proxy="
   )
 

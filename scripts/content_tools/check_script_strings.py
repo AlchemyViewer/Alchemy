@@ -41,8 +41,9 @@ the build keeps the copies together, so this does:
     loops that register several; one built in a way this cannot read is
     reported, not passed over.
 
-Tailslide and Luau are found under vcpkg/buildtrees, the newest checkout
-of each, unless named:
+Luau is found under vcpkg/buildtrees, the newest checkout of slua, and
+Tailslide in its Tailslide folder, where the fork has carried it since
+0.732.16, unless named:
 
     python scripts/content_tools/check_script_strings.py
     python scripts/content_tools/check_script_strings.py --tailslide DIR --luau DIR
@@ -566,8 +567,13 @@ def read_code_pairs():
 
 def read_tailslide(folder):
     """Tailslide's message tables, by code: the errors from E_ERROR, the
-    warnings from W_WARNING, each table's rows in the enum's order."""
-    src = open(os.path.join(folder, "libtailslide", "logger.cc"), encoding="utf-8").read()
+    warnings from W_WARNING, each table's rows in the enum's order. The
+    library's folder is tailslide/ in the fork's tree and libtailslide/ in
+    Tailslide's own."""
+    logger = os.path.join(folder, "tailslide", "logger.cc")
+    if not os.path.exists(logger):
+        logger = os.path.join(folder, "libtailslide", "logger.cc")
+    src = open(logger, encoding="utf-8").read()
     out = {}
     for name, base in (("_sErrorMessages", 10000), ("_sWarningMessages", 20000)):
         m = re.search(r"%s\[[^\]]*\]\s*=\s*\{(.*?)\};" % name, src, re.S)
@@ -622,14 +628,16 @@ def buildable(piece, literals):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--tailslide", help="a Tailslide checkout (with libtailslide/logger.cc)")
+    ap.add_argument("--tailslide", help="a Tailslide checkout (with tailslide/logger.cc or libtailslide/logger.cc)")
     ap.add_argument("--luau", help="a Luau checkout (with Analysis/src/Linter.cpp)")
     ap.add_argument("--list-luau", action="store_true", help="list the lint templates the map does not have")
     args = ap.parse_args()
 
-    tailslide = args.tailslide or newest(os.path.join(ROOT, "vcpkg", "buildtrees", "tailslide", "src", "*"))
-    luau = args.luau or newest(os.path.join(ROOT, "vcpkg", "buildtrees", "slua", "src", "*")) \
-        or newest(os.path.join(ROOT, "vcpkg", "buildtrees", "luau", "src", "*"))
+    slua = newest(os.path.join(ROOT, "vcpkg", "buildtrees", "slua", "src", "*"))
+    tailslide = args.tailslide
+    if not tailslide and slua and os.path.isdir(os.path.join(slua, "Tailslide")):
+        tailslide = os.path.join(slua, "Tailslide")
+    luau = args.luau or slua or newest(os.path.join(ROOT, "vcpkg", "buildtrees", "luau", "src", "*"))
 
     strings = read_strings()
     lsl_rows, lint_rows, shape_rows, err_rows = read_map()

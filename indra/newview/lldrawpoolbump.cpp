@@ -279,7 +279,7 @@ void LLDrawPoolBump::unbindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& 
 
 void LLDrawPoolBump::beginFullbrightShiny()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SHINY);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     sVertexMask = VERTEX_MASK_SHINY | LLVertexBuffer::MAP_TEXCOORD0;
 
@@ -345,7 +345,7 @@ void LLDrawPoolBump::beginFullbrightShiny()
 
 void LLDrawPoolBump::renderFullbrightShiny()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SHINY);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     {
         LLGLEnable blend_enable(GL_BLEND);
@@ -377,7 +377,7 @@ void LLDrawPoolBump::renderFullbrightShiny()
 
 void LLDrawPoolBump::endFullbrightShiny()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SHINY);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     LLCubeMap* cube_map = gSky.mVOSkyp ? gSky.mVOSkyp->getCubeMap() : NULL;
     if( cube_map && !LLPipeline::sReflectionProbesEnabled )
@@ -486,7 +486,7 @@ bool LLDrawPoolBump::bindBumpMap(U8 bump_code, LLViewerTexture* texture, S32 cha
 //static
 void LLDrawPoolBump::beginBump()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_BUMP);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     sVertexMask = VERTEX_MASK_BUMP;
     // Optional second pass: emboss bump map
     stop_glerror();
@@ -508,7 +508,7 @@ void LLDrawPoolBump::beginBump()
 //static
 void LLDrawPoolBump::renderBump(U32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_BUMP);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE, GL_LEQUAL);
     LLGLEnable blend(GL_BLEND);
     gGL.diffuseColor4f(1,1,1,1);
@@ -533,7 +533,7 @@ S32 LLDrawPoolBump::getNumDeferredPasses()
 
 void LLDrawPoolBump::renderDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_BUMP);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     // The program's LINEAR_DIFFUSE makes pushBumpBatch decode the diffuse on the sampler;
     // the hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes on store.
@@ -941,7 +941,9 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
             LLGLDepthTest depth(GL_FALSE);
             LLGLDisable cull(GL_CULL_FACE);
             LLGLDisable blend(GL_BLEND);
-            gGL.setColorMask(true, true);
+            // Scoped: this is reached from the post-deferred bump pass too, where the passes
+            // after it keep alpha writes off.
+            LLGLSColorMask mask(true, true);
 
             LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
             gNormalMapGenProgram.bind();

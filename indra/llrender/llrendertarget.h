@@ -32,6 +32,8 @@
 #include "llgl.h"
 #include "llrender.h"
 
+#include <array>
+
 /*
  Wrapper around OpenGL framebuffer objects for use in render-to-texture
 
@@ -151,6 +153,8 @@ public:
     //clear render targer, clears depth buffer if present,
     //uses scissor rect if in copy-to-texture mode
     // asserts that this target is currently bound
+    // An integer colour attachment clears to the clear colour's components rounded to integers, each held to what a
+    // 32-bit integer of the attachment's sign can hold: a negative one clears an unsigned attachment to 0.
     void clear(U32 mask = 0xFFFFFFFF);
 
     //get applied viewport
@@ -185,6 +189,9 @@ public:
 
     U32 getTexture(U32 attachment = 0) const;
     U32 getNumTextures() const;
+    // The sized internal format the attachment was allocated with, or the attached image's for the texture
+    // setColorAttachment lent it; 0 for no such attachment.
+    U32 getInternalFormat(U32 attachment = 0) const;
 
     U32 getDepth(void) const { return mDepth; }
     bool hasStencil() const { return mStencil; }
@@ -195,7 +202,8 @@ public:
     // These reproduce, as sampler objects, the filter and wrap state that allocation used to
     // write onto the texture objects themselves -- bilinear for attachment 0, point for the
     // data attachments behind it, mirrored repeat except on rectangle textures, and point
-    // with plain repeat for depth. That state was the last texture-object sampling state left
+    // with plain repeat for depth -- and point for an integer attachment wherever it is, the
+    // only filter GL reads integers through. That state was the last texture-object sampling state left
     // in the engine, and it stayed only because ALTextureSlot::bind(LLRenderTarget*) defaults its
     // sampler to 0, meaning "sample through whatever the texture object carries".
     //
@@ -212,8 +220,8 @@ public:
     // which the post-process chain does constantly.
     //
     // An unnamed key resolves through getDefaultColorSampler for THIS attachment --
-    // bilinear for 0, point for the data attachments -- rather than a flat constant that
-    // would quietly answer the question differently from the policy function.
+    // bilinear for 0, point for the data attachments and an integer one -- rather than a flat
+    // constant that would quietly answer the question differently from the policy function.
     void bindTexture(U32 index, S32 channel, ALSampler key = ALSamplers::TargetDefault);
 
     //flush rendering operations
@@ -250,6 +258,9 @@ protected:
     U32 mResY;
     std::vector<U32> mTex;
     std::vector<U32> mInternalFormat;
+    // The format of the texture setColorAttachment attached, which this target does not own and so keeps out of
+    // mInternalFormat; 0 otherwise.
+    U32 mExternalFormat = 0;
     U32 mFBO;
     LLRenderTarget* mPreviousRT = nullptr;
 
@@ -261,6 +272,13 @@ protected:
     U32 mMipLevels;
 
     ALTextureSlot::eTextureType mUsage;
+
+    // The colour attachment each draw buffer writes, -1 for none, as bindTarget, setDrawBuffers and setDrawOutput
+    // last set them: the buffers clearColorBuffers clears, one at a time.
+    std::array<S8, 4> mDrawBuffers = { -1, -1, -1, -1 };
+
+    // Clear each colour draw buffer to the clear colour by the call its attachment's kind takes, float or integer.
+    void clearColorBuffers();
 };
 
 #endif

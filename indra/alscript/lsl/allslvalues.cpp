@@ -108,11 +108,11 @@ LSLConstant* ALLSLArithmetic::operation(LSLOperator op, LSLConstant* cv, LSLCons
     }
     // Two vectors' dot and cross products, worked out as a single does it, a
     // step at a time, and as a double rounded once, and folded only where the
-    // two agree: LSO works in singles, and Mono's sums are not known to. The
-    // tailslide port's arithmetic has them as singles now (its
-    // vector-products.patch: the dot took x by the other's z, and the cross
-    // let a compiler fuse each product into its difference); that alone says
-    // nothing of where the two VMs part.
+    // two agree: LSO works in singles, and Mono's sums are not known to.
+    // Tailslide's arithmetic has them as singles since 1.5.15 (before, the
+    // dot took x by the other's z, and the cross let a compiler fuse each
+    // product into its difference); that alone says nothing of where the two
+    // VMs part.
     if (other && cv->getIType() == LST_VECTOR && other->getIType() == LST_VECTOR && (op == OP_MUL || op == OP_MOD))
     {
         const Vector3* u = static_cast<LSLVectorConstant*>(cv)->getValue();

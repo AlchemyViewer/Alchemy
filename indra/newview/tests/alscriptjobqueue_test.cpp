@@ -26,9 +26,9 @@
 
 #include "../alscriptjobqueue.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alscriptjobqueue_data
     {
@@ -47,130 +47,164 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptjobqueue_data> alscriptjobqueue_group;
-    typedef alscriptjobqueue_group::object    alscriptjobqueue_object;
-    alscriptjobqueue_group                    alscriptjobqueue_instance("alscriptjobqueue");
-
-    template<> template<>
-    void alscriptjobqueue_object::test<1>()
+    TEST_CASE_METHOD(alscriptjobqueue_data, "alscriptjobqueue: the latest job of each key waits and they run by rank then by age", "[alscriptjobqueue]")
     {
-        set_test_name("only the latest of each kind about each script waits, and the lowest rank goes first, the oldest first among equals");
         queue.add("back/check", "back", 1, 3, "back-check-1");
         queue.add("front/check", "front", 1, 1, "front-check-1");
         queue.add("front/check", "front", 2, 1, "front-check-2");
         queue.add("front/hover", "front", 2, 0, "front-hover");
         queue.add("front/weigh", "front", 2, 2, "front-weigh");
         queue.add("other/check", "other", 4, 3, "other-check");
-        ensure_equals("one of each key", queue.waiting(), size_t(5));
-        ensure_equals("by rank, then by when", drained(), std::string("front-hover front-check-2 front-weigh back-check-1 other-check"));
-        ensure_equals("nothing passed over", queue.passedOver(), size_t(0));
+        UNSCOPED_INFO("one of each key");
+        CHECK(queue.waiting() == size_t(5));
+        UNSCOPED_INFO("by rank, then by when");
+        CHECK(drained() == std::string("front-hover front-check-2 front-weigh back-check-1 other-check"));
+        CHECK(queue.passedOver() == size_t(0));
     }
 
-    template<> template<>
-    void alscriptjobqueue_object::test<2>()
+    TEST_CASE_METHOD(alscriptjobqueue_data, "alscriptjobqueue: a question about a stale text is passed over but not across a reopen", "[alscriptjobqueue]")
     {
-        set_test_name("a question about a text older than one asked about since is passed over; one asked before a newer text of a script opened again is not");
         queue.add("a/hover", "a", 5, 0, "hover-5");
         queue.add("a/check", "a", 6, 1, "check-6");
-        ensure_equals("the hover of the older text dropped as it is reached", drained(), std::string("check-6"));
-        ensure_equals("and counted", queue.passedOver(), size_t(1));
+        UNSCOPED_INFO("the hover of the older text dropped as it is reached");
+        CHECK(drained() == std::string("check-6"));
+        UNSCOPED_INFO("and counted");
+        CHECK(queue.passedOver() == size_t(1));
         // A script closed and opened again starts its versions over: what
         // its old text left waiting does not make the new one's stale.
         queue.add("b/hover", "b", 40, 0, "old-hover-40");
         queue.add("b/check", "b", 1, 1, "new-check-1");
-        ensure_equals("both run", drained(), std::string("old-hover-40 new-check-1"));
+        UNSCOPED_INFO("both run");
+        CHECK(drained() == std::string("old-hover-40 new-check-1"));
         queue.add("c/check", "c", 1, 1, "c-check");
         queue.add("d/check", "d", 1, 1, "d-check");
         queue.forget("c");
-        ensure_equals("a script let go of: nothing it asked runs", drained(), std::string("d-check"));
+        UNSCOPED_INFO("a script let go of: nothing it asked runs");
+        CHECK(drained() == std::string("d-check"));
     }
 
-    template<> template<>
-    void alscriptjobqueue_object::test<3>()
+    TEST_CASE_METHOD(alscriptjobqueue_data, "alscriptjobqueue: the running job is superseded only by its own key or a newer text", "[alscriptjobqueue]")
     {
-        set_test_name("the running job is told its answer is unwanted by its own key asked again or a newer text of its script, and by nothing else");
         queue.add("a/check", "a", 3, 1, "check-3");
-        ensure("taken", queue.take().has_value());
-        ensure("nothing asked since", !queue.superseded());
-        ensure("another script's question leaves it be", !queue.add("b/check", "b", 9, 1, "b-check"));
-        ensure("another kind, the same text, leaves it be", !queue.add("a/hover", "a", 3, 0, "hover-3"));
-        ensure("an older text's leaves it be", !queue.add("a/signature", "a", 2, 0, "signature-2"));
-        ensure("not yet", !queue.superseded());
-        ensure("its own key asked again stops it", queue.add("a/check", "a", 3, 1, "check-3-again"));
-        ensure("unwanted", queue.superseded());
-        ensure("said once", !queue.add("a/check", "a", 4, 1, "check-4"));
+        REQUIRE(queue.take().has_value());
+        UNSCOPED_INFO("nothing asked since");
+        CHECK_FALSE(queue.superseded());
+        UNSCOPED_INFO("another script's question leaves it be");
+        CHECK_FALSE(queue.add("b/check", "b", 9, 1, "b-check"));
+        UNSCOPED_INFO("another kind, the same text, leaves it be");
+        CHECK_FALSE(queue.add("a/hover", "a", 3, 0, "hover-3"));
+        UNSCOPED_INFO("an older text's leaves it be");
+        CHECK_FALSE(queue.add("a/signature", "a", 2, 0, "signature-2"));
+        UNSCOPED_INFO("not yet");
+        CHECK_FALSE(queue.superseded());
+        UNSCOPED_INFO("its own key asked again stops it");
+        CHECK(queue.add("a/check", "a", 3, 1, "check-3-again"));
+        CHECK(queue.superseded());
+        UNSCOPED_INFO("said once");
+        CHECK_FALSE(queue.add("a/check", "a", 4, 1, "check-4"));
         queue.finished();
-        ensure("done with", !queue.superseded());
+        UNSCOPED_INFO("done with");
+        CHECK_FALSE(queue.superseded());
         queue.add("x/hover", "x", 1, 0, "x-hover");
-        ensure("taken", queue.take().has_value());
-        ensure("a newer text of its script stops it", queue.add("x/check", "x", 2, 1, "x-check"));
+        REQUIRE(queue.take().has_value());
+        UNSCOPED_INFO("a newer text of its script stops it");
+        CHECK(queue.add("x/check", "x", 2, 1, "x-check"));
         queue.finished();
     }
 
-    template<> template<>
-    void alscriptjobqueue_object::test<4>()
+    TEST_CASE_METHOD(alscriptjobqueue_data, "alscriptjobqueue: a yielding job stops for a rank 0 question and runs after it", "[alscriptjobqueue]")
     {
-        set_test_name("a job that yields is stopped by a question of the lowest rank, waits again behind it and runs after; one that does not yield runs on");
         queue.add("back/check", "back", 1, 4, "back-check", true);
-        ensure("taken", queue.take().has_value());
-        ensure("a check of the front tab leaves it be", !queue.add("front/check", "front", 1, 1, "front-check"));
-        ensure("a question of the front tab stops it", queue.add("front/hover", "front", 1, 0, "front-hover"));
-        ensure("as it yields", queue.yielded());
-        ensure("its answer wanted still", !queue.superseded());
-        ensure("said once", !queue.add("front/signature", "front", 1, 0, "front-signature"));
+        REQUIRE(queue.take().has_value());
+        UNSCOPED_INFO("a check of the front tab leaves it be");
+        CHECK_FALSE(queue.add("front/check", "front", 1, 1, "front-check"));
+        UNSCOPED_INFO("a question of the front tab stops it");
+        CHECK(queue.add("front/hover", "front", 1, 0, "front-hover"));
+        CHECK(queue.yielded());
+        UNSCOPED_INFO("its answer wanted still");
+        CHECK_FALSE(queue.superseded());
+        UNSCOPED_INFO("said once");
+        CHECK_FALSE(queue.add("front/signature", "front", 1, 0, "front-signature"));
         queue.requeue("back-check");
         queue.finished();
-        ensure_equals("it runs after what it yielded to", drained(), std::string("front-hover front-signature front-check back-check"));
+        UNSCOPED_INFO("it runs after what it yielded to");
+        CHECK(drained() == std::string("front-hover front-signature front-check back-check"));
 
         // Asked again while it ran: the newer stands for it.
         queue.add("back/check", "back", 1, 4, "back-check-1", true);
-        ensure("taken", queue.take().has_value());
-        ensure("stopped", queue.add("front/hover", "front", 2, 0, "front-hover-2"));
+        REQUIRE(queue.take().has_value());
+        UNSCOPED_INFO("stopped");
+        CHECK(queue.add("front/hover", "front", 2, 0, "front-hover-2"));
         queue.add("back/check", "back", 2, 4, "back-check-2", true);
         queue.requeue("back-check-1");
         queue.finished();
-        ensure_equals("the newer alone", drained(), std::string("front-hover-2 back-check-2"));
+        UNSCOPED_INFO("the newer alone");
+        CHECK(drained() == std::string("front-hover-2 back-check-2"));
 
         // One that does not yield runs on.
         queue.add("back/weigh", "back", 3, 3, "back-weigh");
-        ensure("taken", queue.take().has_value());
-        ensure("left be", !queue.add("front/hover", "front", 3, 0, "front-hover-3") && !queue.yielded());
+        REQUIRE(queue.take().has_value());
+        {
+            INFO("left be");
+            CHECK_FALSE(queue.add("front/hover", "front", 3, 0, "front-hover-3"));
+            CHECK_FALSE(queue.yielded());
+        }
         queue.finished();
         drained();
     }
 
-    template<> template<>
-    void alscriptjobqueue_object::test<5>()
+    TEST_CASE_METHOD(alscriptjobqueue_data, "alscriptjobqueue: a yielded job keeps its turn and one forgotten while running is dropped", "[alscriptjobqueue]")
     {
-        set_test_name("a job that yielded waits again in the turn it was asked at, and runs through the next time; one let go of as it runs is unwanted and waits no more");
         queue.add("back/check", "back", 1, 4, "back-check", true);
-        ensure("taken", queue.take().has_value());
+        REQUIRE(queue.take().has_value());
         queue.add("other/check", "other", 1, 4, "other-check", true);
-        ensure("stopped by a question of the front tab", queue.add("front/hover", "front", 1, 0, "front-hover") && queue.yielded());
+        {
+            INFO("stopped by a question of the front tab");
+            CHECK(queue.add("front/hover", "front", 1, 0, "front-hover"));
+            CHECK(queue.yielded());
+        }
         queue.requeue("back-check");
         queue.finished();
         auto next = queue.take();
-        ensure("the question first", next && next->second == "front-hover");
+        {
+            INFO("the question first");
+            REQUIRE(next);
+            CHECK(next->second == "front-hover");
+        }
         queue.finished();
         next = queue.take();
-        ensure("then it, ahead of what was asked after it", next && next->second == "back-check");
-        ensure("not stopped again", !queue.add("front/hover", "front", 1, 0, "front-hover-again") && !queue.yielded());
-        ensure("its answer wanted", !queue.superseded());
+        {
+            INFO("then it, ahead of what was asked after it");
+            REQUIRE(next);
+            CHECK(next->second == "back-check");
+        }
+        {
+            INFO("not stopped again");
+            CHECK_FALSE(queue.add("front/hover", "front", 1, 0, "front-hover-again"));
+            CHECK_FALSE(queue.yielded());
+        }
+        UNSCOPED_INFO("its answer wanted");
+        CHECK_FALSE(queue.superseded());
         queue.finished();
-        ensure_equals("the rest after", drained(), std::string("front-hover-again other-check"));
+        UNSCOPED_INFO("the rest after");
+        CHECK(drained() == std::string("front-hover-again other-check"));
 
         // Let go of while it runs: unwanted, said once, and not put back
         // though it was stopped as it yielded.
         queue.add("gone/check", "gone", 1, 4, "gone-check", true);
-        ensure("taken", queue.take().has_value());
+        REQUIRE(queue.take().has_value());
         queue.add("gone/hover", "gone", 1, 0, "gone-hover");
-        ensure("yielded", queue.yielded());
-        ensure("let go of: to be stopped", queue.forget("gone"));
-        ensure("unwanted", queue.superseded());
-        ensure("said once", !queue.forget("gone"));
+        CHECK(queue.yielded());
+        UNSCOPED_INFO("let go of: to be stopped");
+        CHECK(queue.forget("gone"));
+        CHECK(queue.superseded());
+        UNSCOPED_INFO("said once");
+        CHECK_FALSE(queue.forget("gone"));
         queue.requeue("gone-check");
         queue.finished();
-        ensure_equals("nothing of it waits", queue.waiting(), size_t(0));
-        ensure("another script's running job left be", !queue.forget("other"));
+        UNSCOPED_INFO("nothing of it waits");
+        CHECK(queue.waiting() == size_t(0));
+        UNSCOPED_INFO("another script's running job left be");
+        CHECK_FALSE(queue.forget("other"));
     }
 }

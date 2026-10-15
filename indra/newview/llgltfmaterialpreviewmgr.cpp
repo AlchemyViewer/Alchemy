@@ -428,8 +428,13 @@ bool LLGLTFPreviewTexture::render()
 
     if (!mShouldRender) { return false; }
 
-    glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // The swatch's alpha is its coverage, drawn over a checkerboard. Without this the
+    // preview takes whatever mask the last frame ended on, and after a HUD pass that leaves
+    // alpha unwritten from the clears through the final blit.
+    LLGLSColorMask color_mask(true, true);
+
+    gGL.setClearColor(LLColor4::transparent);
+    gGL.clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     LLGLDepthTest depth(GL_FALSE);
     LLGLDisable stencil(GL_STENCIL_TEST);
@@ -507,7 +512,9 @@ bool LLGLTFPreviewTexture::render()
         // Alpha blend rendering
 
         screen.bindTarget();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Colour only: the sphere draws with the depth test off, and depth writes are off
+        // with it, so a depth clear here would do nothing.
+        gGL.clear(GL_COLOR_BUFFER_BIT);
 
         LLGLSLShader& shader = *gDeferredPBRAlphaProgram.selectVariant();
 
@@ -558,7 +565,10 @@ bool LLGLTFPreviewTexture::render()
     gDeferredPostNoDoFProgram.bind();
 
     // From LLPipeline::renderFinalize: "Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems."
-    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &screen);
+    // Under HDR that is colorCorrect's output in postPingMap; otherwise the glow combine has
+    // written the result back to the screen.
+    LLRenderTarget* last_in_chain = hdr ? &gPipeline.mRT->postPingMap : &screen;
+    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, last_in_chain);
     gDeferredPostNoDoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &gPipeline.mAuxillaryRT.deferredScreen);
 
     {

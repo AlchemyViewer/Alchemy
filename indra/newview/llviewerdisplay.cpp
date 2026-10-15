@@ -30,6 +30,7 @@
 
 #include "alfarplane.h"
 #include "alfloaterprogressview.h"
+#include "alhuddepth.h"
 #include "aluniformbuffer.h"
 #include "fsyspath.h"
 #include "hexdump.h"
@@ -45,7 +46,6 @@
 #include "lldrawpoolwater.h"
 #include "lldynamictexture.h"
 #include "llenvironment.h"
-#include "llfasttimer.h"
 #include "llfeaturemanager.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
@@ -199,8 +199,6 @@ void display_startup()
 
     if (gViewerWindow && gViewerWindow->getWindow())
     gViewerWindow->getWindow()->swapBuffers();
-
-    glClear(GL_DEPTH_BUFFER_BIT);
 }
 
 void display_update_camera()
@@ -823,7 +821,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             }
 
             gGL.setColorMask(true, true);
-            glClearColor(0.f, 0.f, 0.f, 0.f);
+            gGL.setClearColor(LLColor4::transparent);
 
             LLGLState::checkStates();
 
@@ -840,7 +838,6 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
                 LLGLState::checkStates();
 
                 const LLCamera saved_camera = LLViewerCamera::getCurrent();
-                glViewport(0,0,512,512);
 
                 LLVOAvatar::updateImpostors();
 
@@ -929,13 +926,13 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         {
             LLAppViewer::instance()->pingMainloopTimeout("Display:Sky");
-            LL_PROFILE_ZONE_NAMED_CATEGORY_ENVIRONMENT("update sky"); //LL_RECORD_BLOCK_TIME(FTM_UPDATE_SKY);
+            LL_PROFILE_ZONE_NAMED_CATEGORY_ENVIRONMENT("update sky");
             gSky.updateSky();
         }
 
         if(gUseWireframe)
         {
-            glClearColor(0.5f, 0.5f, 0.5f, 0.f);
+            gGL.setClearColor(LLColor4(0.5f, 0.5f, 0.5f, 0.f));
             glClear(GL_COLOR_BUFFER_BIT);
         }
 
@@ -990,11 +987,11 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         if (gUseWireframe)
         {
             constexpr F32 g = 0.5f;
-            glClearColor(g, g, g, 1.f);
+            gGL.setClearColor(LLColor4(g, g, g, 1.f));
         }
         else
         {
-            glClearColor(1, 0, 1, 1);
+            gGL.setClearColor(LLColor4::magenta);
         }
         gPipeline.mRT->deferredScreen.clear();
 
@@ -1227,7 +1224,7 @@ void display_cube_face()
 
     gGL.setColorMask(true, true);
 
-    glClearColor(0.f, 0.f, 0.f, 0.f);
+    gGL.setClearColor(LLColor4::transparent);
     gPipeline.generateSunShadow(*LLViewerCamera::getInstance());
 
     glClear(GL_DEPTH_BUFFER_BIT); // | GL_STENCIL_BUFFER_BIT);
@@ -1259,11 +1256,11 @@ void display_cube_face()
     gPipeline.mRT->deferredScreen.bindTarget();
     if (gUseWireframe)
     {
-        glClearColor(0.5f, 0.5f, 0.5f, 1.f);
+        gGL.setClearColor(LLColor4(0.5f, 0.5f, 0.5f, 1.f));
     }
     else
     {
-        glClearColor(1.f, 0.f, 1.f, 1.f);
+        gGL.setClearColor(LLColor4::magenta);
     }
     gPipeline.mRT->deferredScreen.clear();
 
@@ -1282,6 +1279,50 @@ void display_cube_face()
 
     LLSpatialGroup::sNoDelete = false;
     gPipeline.clearReferences();
+}
+
+// The viewport pixels the HUD can cover, a rect per attachment point with something on it, overlapping ones merged
+// (ALHUDDepth::mergeRect). A point's box is in the frame the HUD's model matrix takes in (LLVOAvatar::getHUDBBox),
+// with no rotation or offset of its own.
+static void hud_screen_rects(std::vector<LLRect>& rects)
+{
+    rects.clear();
+    // None without what restore_scene_depth puts the scene's depth back from.
+    LLMatrix4a proj;
+    LLMatrix4a model;
+    if (!gPipeline.mRT || !gPipeline.mScreenTriangleVB || !isAgentAvatarValid() || !get_hud_matrices(proj, model))
+    {
+        return;
+    }
+
+    LLMatrix4a mvp;
+    mvp.setMul(model, proj);
+
+    for (const auto& [id, attachment] : gAgentAvatarp->mAttachmentPoints)
+    {
+        if (!attachment || !attachment->getIsHUDAttachment() || attachment->mAttachedObjects.empty())
+        {
+            continue;
+        }
+        const LLBBox bbox = LLVOAvatar::getHUDBBox(attachment);
+        const LLRect rect = ALHUDDepth::boxRect(mvp, bbox.getMinLocal(), bbox.getMaxLocal(), gGLViewport[2], gGLViewport[3]);
+        if (!rect.isEmpty())
+        {
+            ALHUDDepth::mergeRect(rects, rect);
+        }
+    }
+}
+
+// Writes the scene's depth back under the HUD, as the final blit left it (ALHUDDepth::restore), within `rects`, which
+// hud_screen_rects gives only where it can.
+static void restore_scene_depth(const std::vector<LLRect>& rects)
+{
+    if (rects.empty())
+    {
+        return;
+    }
+    ALHUDDepth::restore(gCopyDepthProgram, gPipeline.mRT->deferredScreen, *gPipeline.mScreenTriangleVB, rects,
+                        gGLViewport[0], gGLViewport[1]);
 }
 
 void render_hud_attachments()
@@ -1372,12 +1413,24 @@ void render_hud_attachments()
 
         gPipeline.stateSort(hud_cam, result);
 
+        // The HUD is drawn over the window's framebuffer, whose depth the final blit filled with the scene's for the
+        // 3D UI around it. get_hud_matrices squeezes the HUD into a band of that depth in front of the scene, but a
+        // world surface at the near plane still reached into it, and the band widens with the HUD's own depth: a
+        // HUD with a prim parked far along its axis put its rear within reach of surfaces half a metre away. So
+        // under the HUD the depth is cleared, the HUD tests against itself alone, and the scene's is put back after
+        // it for the 3D UI that follows, which the world and the HUD both hide.
+        static std::vector<LLRect> hud_rects;
+        hud_screen_rects(hud_rects);
+        ALHUDDepth::clear(gCopyDepthProgram, hud_rects, gGLViewport[0], gGLViewport[1]);
+
         gPipeline.renderGeomPostDeferred(hud_cam);
 
         LLSpatialGroup::sNoDelete = false;
         //gPipeline.clearReferences();
 
         render_hud_elements();
+
+        restore_scene_depth(hud_rects);
 
         //restore type mask
         gPipeline.popRenderTypeMask();
@@ -1497,7 +1550,7 @@ bool setup_hud_matrices(const LLRect& screen_region)
 void render_ui(F32 zoom_factor, int subfield)
 {
     LLPerfStats::RecordSceneTime T ( LLPerfStats::StatType_t::RENDER_UI ); // render time capture - Primary UI stat can have HUD time overlap (TODO)
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI; //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     LL_PROFILE_GPU_ZONE("ui");
     LLGLState::checkStates();
 
@@ -1551,7 +1604,7 @@ void render_ui(F32 zoom_factor, int subfield)
         {
             if (!gDisconnected)
             {
-                LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 3D"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_3D);
+                LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 3D");
                 LLGLState::checkStates();
                 render_ui_3d();
                 LLGLState::checkStates();
@@ -1569,7 +1622,7 @@ void render_ui(F32 zoom_factor, int subfield)
 
         if (render_ui)
         {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 2D"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_2D);
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 2D");
             LLHUDObject::renderAll();
             render_ui_2d();
         }
@@ -1764,69 +1817,7 @@ void render_ui_2d()
         stop_glerror();
     }
 
-
-    if (LLPipeline::RenderUIBuffer)
-    {
-        if (LLView::sIsRectDirty)
-        {
-            LLView::sIsRectDirty = false;
-            LLRect t_rect;
-
-            gPipeline.mUIScreen.bindTarget();
-            gGL.setColorMask(true, true);
-            {
-                constexpr S32 pad = 8;
-
-                LLView::sDirtyRect.mLeft -= pad;
-                LLView::sDirtyRect.mRight += pad;
-                LLView::sDirtyRect.mBottom -= pad;
-                LLView::sDirtyRect.mTop += pad;
-
-                LLGLEnable scissor(GL_SCISSOR_TEST);
-                static LLRect last_rect = LLView::sDirtyRect;
-
-                //union with last rect to avoid mouse poop
-                last_rect.unionWith(LLView::sDirtyRect);
-
-                t_rect = LLView::sDirtyRect;
-                LLView::sDirtyRect = last_rect;
-                last_rect = t_rect;
-
-                last_rect.mLeft = LLRect::tCoordType(last_rect.mLeft / LLUI::getScaleFactor().mV[0]);
-                last_rect.mRight = LLRect::tCoordType(last_rect.mRight / LLUI::getScaleFactor().mV[0]);
-                last_rect.mTop = LLRect::tCoordType(last_rect.mTop / LLUI::getScaleFactor().mV[1]);
-                last_rect.mBottom = LLRect::tCoordType(last_rect.mBottom / LLUI::getScaleFactor().mV[1]);
-
-                LLRect clip_rect(last_rect);
-
-                glClear(GL_COLOR_BUFFER_BIT);
-
-                gViewerWindow->draw();
-            }
-
-            gPipeline.mUIScreen.flush();
-            gGL.setColorMask(true, false);
-
-            LLView::sDirtyRect = t_rect;
-        }
-
-        LLGLDisable cull(GL_CULL_FACE);
-        LLGLDisable blend(GL_BLEND);
-        S32 width = gViewerWindow->getWindowWidthScaled();
-        S32 height = gViewerWindow->getWindowHeightScaled();
-        gGL.getTextureSlot(0)->bind(&gPipeline.mUIScreen);
-        gGL.begin(LLRender::TRIANGLE_STRIP);
-        gGL.color4f(1.f,1.f,1.f,1.f);
-        gGL.texCoord2f(0.f, 0.f);                 gGL.vertex2i(0, 0);
-        gGL.texCoord2f((F32)width, 0.f);          gGL.vertex2i(width, 0);
-        gGL.texCoord2f(0.f, (F32)height);         gGL.vertex2i(0, height);
-        gGL.texCoord2f((F32)width, (F32)height);  gGL.vertex2i(width, height);
-        gGL.end();
-    }
-    else
-    {
-        gViewerWindow->draw();
-    }
+    gViewerWindow->draw();
 
     // reset current origin for font rendering, in case of tiling render
     LLFontGL::sCurOrigin.set(0, 0);

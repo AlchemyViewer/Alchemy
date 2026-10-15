@@ -2,6 +2,8 @@
 
 set(
   llrender_SOURCES
+  algpubuffer.cpp
+  alimageslot.cpp
   alsamplerstate.cpp
   altexture3d.cpp
   altextureslot.cpp
@@ -35,6 +37,8 @@ set(
 
 set(
   llrender_HEADERS
+  algpubuffer.h
+  alimageslot.h
   alsamplerstate.h
   altexture3d.h
   altextureslot.h
@@ -129,51 +133,96 @@ if(AL_BUILD_TESTS)
     "LLFONT_TEST_FONTS_XML=\"${font_test_fonts_xml}\""
   )
 
-  # Arithmetic only: where a local coordinate lands under the UI transform.
-  al_add_test(lluitransform PROJECT llrender LIBRARIES llrender)
+  # The state guard's checks on what llrender keeps for the process, for
+  # each of its test binaries.
+  add_library(llrender_test_checks OBJECT tests/llrender_test_checks.cpp)
+  target_link_libraries(llrender_test_checks PRIVATE al::flags al_test_support llrender)
+  set_target_properties(llrender_test_checks PROPERTIES FOLDER "Tests/llrender")
 
-  # Arithmetic only: the matrix stack, the projection helpers and the
-  # clip-plane classes against the scalar matrix and the formulas.
-  al_add_test(llrendermatrix PROJECT llrender LIBRARIES llrender)
-
-  # The font suites: tables and shaping, no GL.
-  foreach(test alfontcolrv1 llfontregistry llfontbitmapcache llfontfreetype)
-    al_add_test(${test} PROJECT llrender LIBRARIES llrender DEFINES ${font_defines})
-  endforeach()
-  # Both Unicode tables in one place, so the test can hold them against each
-  # other. llrender itself has no need of ICU.
-  al_add_test(alfontshaping PROJECT llrender LIBRARIES llrender ll::icu DEFINES ${font_defines})
-
-  # The GL-backed suites, on LLWindowManager's hidden window: the paths of
-  # the four font libraries above that rasterize, and the wholly-GL ones.
-  foreach(
-    test
-    alfontcolrv1_gl
-    llfontregistry_gl
-    llfontbitmapcache_gl
-    llfontfreetype_gl
-    llfontgl
-    llfonttextcache
-    llimagegl
-  )
-    al_add_test(${test} GL PROJECT llrender LIBRARIES llrender DEFINES ${font_defines})
-  endforeach()
-  al_add_test(
-    alfontshaping_gl
-    GL
+  # The suites that need no GL: arithmetic (where a local coordinate lands
+  # under the UI transform; the matrix stack, the projection helpers and the
+  # clip-plane classes), and the font tables and shaping. alfontshaping holds
+  # both Unicode tables against each other, so this binary links ICU, which
+  # llrender itself has no need of.
+  al_add_test_binary(
+    llrender_tests
     PROJECT llrender
+    SOURCES
+      tests/alfontcolrv1_test.cpp
+      tests/alfontshaping_test.cpp
+      tests/llfontbitmapcache_test.cpp
+      tests/llfontfreetype_test.cpp
+      tests/llfontregistry_test.cpp
+      tests/llrendermatrix_test.cpp
+      tests/lluitransform_test.cpp
     LIBRARIES llrender ll::icu
+    SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${font_defines}
   )
-  al_add_test(lluiimage GL PROJECT llrender LIBRARIES llrender)
-  # The quads the immediate-mode 2D helpers emit.
-  al_add_test(llrender2dutils_gl GL PROJECT llrender LIBRARIES llrender)
-  # The hidden window itself, and a worker thread's shared context on it.
-  al_add_test(alwindowsdlheadless GL PROJECT llrender LIBRARIES llrender)
-  # Tessellation stages and the quad conventions the terrain relies on.
-  al_add_test(altessellation_gl GL PROJECT llrender LIBRARIES llrender)
-  # Infinite reverse-Z projection: stored depth, round trip and depth order out to 100 km.
-  al_add_test(alinfiniteprojection_gl GL PROJECT llrender LIBRARIES llrender)
-  # Which fragment output reaches a render target's colour attachment.
-  al_add_test(llrendertarget_gl GL PROJECT llrender LIBRARIES llrender)
+
+  # The GL suites that stand a context up for each test case and end the GL
+  # classes with it, on LLWindowManager's hidden window: the paths of the
+  # font libraries above that rasterize, and llimagegl, which also makes a
+  # context again in the middle of a case. Never beside the shared context
+  # below, whose classes they would end under it.
+  al_add_test_binary(
+    llrender_gl_fresh_tests
+    PROJECT llrender
+    SOURCES
+      tests/alfontcolrv1_gl_test.cpp
+      tests/alfontshaping_gl_test.cpp
+      tests/llfontbitmapcache_gl_test.cpp
+      tests/llfontfreetype_gl_test.cpp
+      tests/llfontregistry_gl_test.cpp
+      tests/llimagegl_test.cpp
+    LIBRARIES llrender ll::icu
+    SUPPORT llrender_test_checks llcommon_test_checks
+    DEFINES ${font_defines}
+    GL
+  )
+
+  # The GL suites that share one context for the process, each case putting
+  # back what it changed of it:
+  # - fonts drawn, cached and laid out (llfontgl, llfonttextcache), UI images
+  #   and the immediate-mode 2D helpers' quads;
+  # - the hidden window itself, and a worker thread's shared context on it;
+  # - tessellation stages and the quad conventions the terrain relies on;
+  # - the infinite reverse-Z projection: stored depth, round trip and depth
+  #   order out to 100 km;
+  # - which fragment output reaches a render target's colour attachment, and
+  #   integer attachments cleared and drawn;
+  # - LLRender's cached clear colour and scissor box, and LLGLSScissor;
+  # - LLGLSLShader's uniform value cache, the compute path (programs built
+  #   through the shader manager, their images, storage blocks and
+  #   dispatches), integer textures through reserved samplers, what the debug
+  #   validator says of images and stencil reads, and which shader objects a
+  #   program owns and which the manager does;
+  # - LLRender::drawArraysInstanced: attribute-less instanced geometry, placed
+  #   by the matrices the draw syncs;
+  # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its
+  #   lifetime, and the readback and stream rings;
+  # - ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps
+  #   it, and integer images.
+  al_add_test_binary(
+    llrender_gl_shared_tests
+    PROJECT llrender
+    SOURCES
+      tests/algpubuffer_gl_test.cpp
+      tests/alimageslot_gl_test.cpp
+      tests/alinfiniteprojection_gl_test.cpp
+      tests/alinstanceddraw_gl_test.cpp
+      tests/alrenderstate_gl_test.cpp
+      tests/altessellation_gl_test.cpp
+      tests/alwindowsdlheadless_test.cpp
+      tests/llfontgl_test.cpp
+      tests/llfonttextcache_test.cpp
+      tests/llglslshader_gl_test.cpp
+      tests/llrender2dutils_gl_test.cpp
+      tests/llrendertarget_gl_test.cpp
+      tests/lluiimage_test.cpp
+    LIBRARIES llrender
+    SUPPORT llrender_test_checks llcommon_test_checks
+    DEFINES ${font_defines}
+    GL
+  )
 endif()

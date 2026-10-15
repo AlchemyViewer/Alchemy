@@ -4240,7 +4240,7 @@ std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc, bool
     std::vector<ALTextPos> places;
     for (const Doc::Shown& row : doc.shown())
     {
-        if (row.file.empty() && row.origin != definitions && row.origin != weight && (!migration || row.migration))
+        if (row.file.empty() && row.line >= 0 && row.origin != definitions && row.origin != weight && (!migration || row.migration))
         {
             places.push_back(doc.editor->document().clamp(ALTextPos(row.line, row.hasColumn ? row.column : 0)));
         }
@@ -4518,7 +4518,7 @@ void ALFloaterScriptStudio::problemChosen(const ALScriptProblemsPane::Place& pla
         }
         else
         {
-            const bool at = place.file.empty();
+            const bool at = place.file.empty() && place.line >= 0;
             goToPlace(place.ref, place.name, at ? place.line : 0, at && place.hasColumn ? place.column : 0, 0);
         }
         --mHoldPanes;
@@ -4551,6 +4551,14 @@ void ALFloaterScriptStudio::problemChosen(const ALScriptProblemsPane::Place& pla
         // In an include: opened in a tab of its own where it is a script
         // or a notecard in the world, or a file on disk.
         openIncludeAt(place.file, place.fileName, line, has_column ? column : -1, 0);
+    }
+    else if (line < 0)
+    {
+        // About no place in it: its tab, the caret where it was.
+        if (index != mActive)
+        {
+            activate(index);
+        }
     }
     else
     {
@@ -7617,26 +7625,14 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
     options.tabs          = !doc.editor->getSoftTabs();
     options.maxBlankLines = llclamp(gSavedSettings.getS32("ALScriptFormatBlankLines"), 0, 10);
     options.spacing       = gSavedSettings.getBOOL("ALScriptFormatSpacing");
-    const std::string text      = document.text();
-    const std::string formatted = ALScriptFormatter::formatLines(text, options, first, last);
-    // Line for line, since only some lines were asked for and the
-    // formatter keeps every line's number that way; each line that
-    // changed is one edit, and the whole one step.
-    std::vector<std::string> lines;
-    {
-        size_t at = 0;
-        while (at <= formatted.size())
-        {
-            const size_t nl = formatted.find('\n', at);
-            if (nl == std::string::npos)
-            {
-                lines.push_back(formatted.substr(at));
-                break;
-            }
-            lines.push_back(formatted.substr(at, nl - at));
-            at = nl + 1;
-        }
-    }
+    options.braceSpaces   = gSavedSettings.getBOOL("ALScriptFormatBraceSpaces");
+    options.width         = llmax(0, gSavedSettings.getS32("ALScriptFormatWidth"));
+    const std::string text = document.text();
+    // Line for line, since only some lines may be asked for and the
+    // formatter gives each line's as one, a line broken at the width
+    // and all; each line that changed is one edit, and the whole one
+    // step.
+    const std::vector<std::string> lines = ALScriptFormatter::formatEach(text, options, first, last);
     if (static_cast<S32>(lines.size()) != count)
     {
         // Said, rather than the command doing nothing where it was asked.
@@ -8194,10 +8190,14 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.detectedTable = gSavedSettings.getBOOL("ALScriptConvertDetectedTable");
     options.sluaCalls     = gSavedSettings.getBOOL("ALScriptConvertSLuaCalls");
     options.idioms        = gSavedSettings.getBOOL("ALScriptConvertIdioms");
+    options.uuidKeys      = gSavedSettings.getBOOL("ALScriptConvertUuidKeys");
     options.handlers      = gSavedSettings.getBOOL("ALScriptConvertHandlerFields") ? ALLSLToSLua::Options::Handlers::Field : ALLSLToSLua::Options::Handlers::On;
     options.types         = gSavedSettings.getBOOL("ALScriptConvertTypes");
+    options.keyTextAny    = gSavedSettings.getBOOL("ALScriptConvertKeyTextAny");
     options.comments      = gSavedSettings.getBOOL("ALScriptConvertComments");
     options.keepComments  = gSavedSettings.getBOOL("ALScriptConvertKeepComments");
+    // Its tables' braces as the formatter writes them.
+    options.braceSpaces   = gSavedSettings.getBOOL("ALScriptFormatBraceSpaces");
     // Its notes, and its comments, in the skin's words.
     options.words = alScriptKeyedWords;
     const std::string   source    = doc.editor->wholeText();
@@ -9629,7 +9629,9 @@ void ALFloaterScriptStudio::addBuildCommands()
     // The settings each turns on and off, heard as the preferences'
     // changes are (pumpPreprocessor).
     for (const auto& [name, setting] :
-         { std::pair{ "preflight", "ALScriptStudioPreflight" }, std::pair{ "preproc_enabled", "ALScriptPreprocEnabled" },
+         { std::pair{ "preflight", "ALScriptStudioPreflight" }, std::pair{ "fix_on_save", "ALScriptFixOnSave" },
+           std::pair{ "format_on_save", "ALScriptFormatOnSave" }, std::pair{ "trim_on_save", "ALScriptTrimOnSave" },
+           std::pair{ "preproc_enabled", "ALScriptPreprocEnabled" },
            std::pair{ "preproc_disk", "ALScriptPreprocDiskIncludes" }, std::pair{ "preproc_switch", "ALScriptPreprocSwitch" },
            std::pair{ "preproc_lazy", "ALScriptPreprocLazyLists" }, std::pair{ "preproc_compress", "ALScriptPreprocCompress" },
            std::pair{ "preproc_extensions", "ALScriptPreprocExtensions" }, std::pair{ "preproc_optimize", "ALScriptPreprocOptimizer" },

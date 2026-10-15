@@ -52,7 +52,7 @@ namespace LLPerfStats
     U64 meanFrameTime{0};
     std::mutex bufferToggleLock{};
 
-    F64 cpu_hertz{0.0};
+    F64 clock_hertz{0.0};
     U32 vsync_max_fps{60};
 
     Tunables tunables;
@@ -150,7 +150,7 @@ namespace LLPerfStats
     {
         // create a queue
         tunables.initialiseFromSettings();
-        LLPerfStats::cpu_hertz = (F64)LLTrace::BlockTimer::countsPerSecond();
+        LLPerfStats::clock_hertz = get_timer_info().mClockFrequency.value();
         LLPerfStats::vsync_max_fps = gViewerWindow->getWindow()->getRefreshRate();
     }
 
@@ -389,7 +389,7 @@ namespace LLPerfStats
         auto tot_avatar_time_raw = ms_to_raw(sTotalAvatarTime);
 
         // The frametime budget we have based on the target FPS selected
-        auto target_frame_time_raw = (U64)llround(LLPerfStats::cpu_hertz / (target_fps == 0 ? 1 : target_fps));
+        auto target_frame_time_raw = (U64)llround(LLPerfStats::clock_hertz / (target_fps == 0 ? 1 : target_fps));
         // LL_INFOS() << "Effective FPS(raw):" << tot_frame_time_raw << " Target:" << target_frame_time_raw << LL_ENDL;
         auto inferredFPS{1000/(U32)std::max(raw_to_ms(tot_frame_time_raw),1.0)};
         U32 settingsChangeFrequency{inferredFPS > 50?inferredFPS:50};

@@ -36,7 +36,6 @@
 #include "llwlhandlers.h"
 #include "lltrans.h"
 #include "lltrace.h"
-#include "llfasttimer.h"
 #include "alfarplane.h"
 #include "llviewercamera.h"
 #include "pipeline.h"
@@ -1635,7 +1634,7 @@ extern bool gCubeSnapshot;
 //-------------------------------------------------------------------------
 void LLEnvironment::update(const LLViewerCamera * cam)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT; //LL_RECORD_BLOCK_TIME(FTM_ENVIRONMENT_UPDATE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     //F32Seconds now(LLDate::now().secondsSinceEpoch());
     if (!gCubeSnapshot)
     {

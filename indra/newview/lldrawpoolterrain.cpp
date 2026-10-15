@@ -29,7 +29,6 @@
 #include "lldrawpoolterrain.h"
 
 #include "alterrainsurfacemaps.h"
-#include "llfasttimer.h"
 
 #include "llviewercontrol.h"
 #include "lldrawable.h"
@@ -251,21 +250,21 @@ void LLDrawPoolTerrain::bindParcelOverlay(LLGLSLShader* shader)
 
 void LLDrawPoolTerrain::beginDeferredPass(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_TERRAIN);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLFacePool::beginRenderPass(pass);
     gGL.setPatchVertices(LLVOSurfacePatch::PATCH_CORNERS);
 }
 
 void LLDrawPoolTerrain::endDeferredPass(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_TERRAIN);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLFacePool::endRenderPass(pass);
     sShader->unbind();
 }
 
 void LLDrawPoolTerrain::renderDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_TERRAIN);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LL_PROFILE_GPU_ZONE("terrain deferred");
     if (mDrawFace.empty())
     {
@@ -293,7 +292,7 @@ void LLDrawPoolTerrain::renderDeferred(S32 pass)
 
 void LLDrawPoolTerrain::beginShadowPass(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_TERRAIN);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLFacePool::beginRenderPass(pass);
     gGL.getTextureSlot(0)->unbind();
     gDeferredTerrainShadowProgram.bind();
@@ -302,14 +301,14 @@ void LLDrawPoolTerrain::beginShadowPass(S32 pass)
 
 void LLDrawPoolTerrain::endShadowPass(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_TERRAIN);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLFacePool::endRenderPass(pass);
     gDeferredTerrainShadowProgram.unbind();
 }
 
 void LLDrawPoolTerrain::renderShadow(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_TERRAIN);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LL_PROFILE_GPU_ZONE("terrain shadow");
     if (mDrawFace.empty())
     {

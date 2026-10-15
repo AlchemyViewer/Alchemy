@@ -37,8 +37,10 @@
 #include <string>
 #include <typeinfo>
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 #include "../test/lltestapp.h"
+#include "alteststateguard.h"
 #include "llsd.h"
 #include "llsdutil.h"
 #include "llevents.h"
@@ -53,6 +55,9 @@ using namespace llcoro;
 /*****************************************************************************
 *   Test helpers
 *****************************************************************************/
+namespace
+{
+
 /// Simulate an event API whose response is immediate: sent on receipt of the
 /// initial request, rather than after some delay. This is the case that
 /// distinguishes postAndSuspend() from calling post(), then calling
@@ -85,19 +90,55 @@ private:
     Sync& mSync;
 };
 
-/*****************************************************************************
-*   TUT
-*****************************************************************************/
-namespace tut
+/// The coroutines need LLApp::isRunning(), and on Windows LLCoros hands an
+/// exception escaping one to LLApp::instance(). An app per test, as this had,
+/// ran ~LLApp after each, and that ends LLCommon -- the APR pool, the LLTrace
+/// master recorder -- for every test after it in the process. So there is one
+/// app for the process, never destroyed, which each test sees start running
+/// and stop. Making it changes the LLApp and LLTrace's master recorder on
+/// purpose, so the state guard takes those as they are then.
+class CoroTestApp: public LLTestApp
 {
-    struct test_data
+public:
+    struct Running
+    {
+        Running()
+        {
+            app();
+            setStatus(APP_STATUS_RUNNING);
+        }
+        ~Running() { setStopped(); }
+    };
+
+private:
+    static CoroTestApp& app()
+    {
+        static CoroTestApp* sApp = nullptr;
+        if (!sApp)
+        {
+            sApp = new CoroTestApp;
+            ll_test::StateGuard::accept("the LLApp");
+            ll_test::StateGuard::accept("the LLTrace master recorder");
+        }
+        return *sApp;
+    }
+};
+
+} // anonymous namespace
+
+/*****************************************************************************
+*   Tests
+*****************************************************************************/
+namespace
+{
+    struct lleventcoro_data
     {
         Sync mSync;
         ImmediateAPI immediateAPI{mSync};
         std::string replyName, errorName, threw, stringdata;
         LLSD result, errordata;
         int which;
-        LLTestApp testApp;
+        CoroTestApp::Running running;
 
         void explicit_wait(std::shared_ptr<LLCoros::Promise<std::string>>& cbp);
         void waitForEventOn1();
@@ -105,11 +146,8 @@ namespace tut
         void postAndWait1();
         void coroPumpPost();
     };
-    typedef test_group<test_data> coroutine_group;
-    typedef coroutine_group::object object;
-    coroutine_group coroutinegrp("coroutine");
 
-    void test_data::explicit_wait(std::shared_ptr<LLCoros::Promise<std::string>>& cbp)
+    void lleventcoro_data::explicit_wait(std::shared_ptr<LLCoros::Promise<std::string>>& cbp)
     {
         BEGIN
         {
@@ -132,15 +170,15 @@ namespace tut
             debug("about to suspend");
             stringdata = future.get();
             mSync.bump();
-            ensure_equals("Got it", stringdata, "received");
+            // A CHECK: a REQUIRE's throw would leave this coroutine for
+            // LLCoros to rethrow in whichever case came next.
+            CHECK(stringdata == "received");
         }
         END
     }
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(lleventcoro_data, "coroutine: a coroutine suspended on a future wakes when its promise is set", "[coroutine]")
     {
-        set_test_name("explicit_wait");
         DEBUG;
 
         // Construct the coroutine instance that will run explicit_wait.
@@ -156,10 +194,10 @@ namespace tut
         // but give it a chance to wake up
         mSync.yield();
         // ensure the coroutine ran and woke up again with the intended result
-        ensure_equals(stringdata, "received");
+        CHECK(stringdata == "received");
     }
 
-    void test_data::waitForEventOn1()
+    void lleventcoro_data::waitForEventOn1()
     {
         BEGIN
         {
@@ -170,10 +208,8 @@ namespace tut
         END
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(lleventcoro_data, "coroutine: suspendUntilEventOn() wakes on a post to the named pump", "[coroutine]")
     {
-        set_test_name("waitForEventOn1");
         DEBUG;
         LLCoros::instance().launch("test<2>", [this](){ waitForEventOn1(); });
         mSync.bump();
@@ -182,10 +218,10 @@ namespace tut
         // give waitForEventOn1() a chance to run
         mSync.yield();
         debug("back from send");
-        ensure_equals(result.asString(), "received");
+        CHECK(result.asString() == "received");
     }
 
-    void test_data::coroPump()
+    void lleventcoro_data::coroPump()
     {
         BEGIN
         {
@@ -198,10 +234,8 @@ namespace tut
         END
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(lleventcoro_data, "coroutine: LLCoroEventPump::suspend() wakes on a post to its pump", "[coroutine]")
     {
-        set_test_name("coroPump");
         DEBUG;
         LLCoros::instance().launch("test<3>", [this](){ coroPump(); });
         mSync.bump();
@@ -210,10 +244,10 @@ namespace tut
         // give coroPump() a chance to run
         mSync.yield();
         debug("back from send");
-        ensure_equals(result.asString(), "received");
+        CHECK(result.asString() == "received");
     }
 
-    void test_data::postAndWait1()
+    void lleventcoro_data::postAndWait1()
     {
         BEGIN
         {
@@ -227,16 +261,14 @@ namespace tut
         END
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(lleventcoro_data, "coroutine: postAndSuspend() gets an immediate reply", "[coroutine]")
     {
-        set_test_name("postAndWait1");
         DEBUG;
         LLCoros::instance().launch("test<4>", [this](){ postAndWait1(); });
-        ensure_equals(result.asInteger(), 18);
+        CHECK(result.asInteger() == 18);
     }
 
-    void test_data::coroPumpPost()
+    void lleventcoro_data::coroPumpPost()
     {
         BEGIN
         {
@@ -249,17 +281,16 @@ namespace tut
         END
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE_METHOD(lleventcoro_data, "coroutine: LLCoroEventPump::postAndSuspend() gets an immediate reply", "[coroutine]")
     {
-        set_test_name("coroPumpPost");
         DEBUG;
         LLCoros::instance().launch("test<5>", [this](){ coroPumpPost(); });
-        ensure_equals(result.asInteger(), 18);
+        CHECK(result.asInteger() == 18);
     }
 
+    // A coroutine consumes what a PUMP holds for it, one value a wait.
     template <class PUMP>
-    void test()
+    static void check_coro_consumes()
     {
         PUMP pump(typeid(PUMP).name());
         bool running{false};
@@ -269,7 +300,8 @@ namespace tut
         LL_DEBUGS() << "test() posting first" << LL_ENDL;
         LLSD first{LLSDMap("desc", "first")("value", 0)};
         bool consumed = pump.post(first);
-        ensure("should not have consumed first", ! consumed);
+        UNSCOPED_INFO("should not have consumed first");
+        CHECK_FALSE(consumed);
         // now launch the coro
         LL_DEBUGS() << "test() launching listener coro" << LL_ENDL;
         running = true;
@@ -281,9 +313,9 @@ namespace tut
                 // should immediately retrieve 'first' without waiting
                 LL_DEBUGS() << "listener coro waiting for first" << LL_ENDL;
                 data.append(llcoro::suspendUntilEventOnWithTimeout(pump, 0.1f, LLSD()));
-                // Don't use ensure() from within the coro -- ensure() failure
-                // throws tut::fail, which won't propagate out to the main
-                // test driver, which will result in an odd failure.
+                // Don't check from within the coro -- a failed REQUIRE
+                // throws, which won't propagate out to the case, which will
+                // result in an odd failure.
                 // Wait for 'second' because it's not already pending.
                 LL_DEBUGS() << "listener coro waiting for second" << LL_ENDL;
                 data.append(llcoro::suspendUntilEventOnWithTimeout(pump, 0.1f, LLSD()));
@@ -297,7 +329,8 @@ namespace tut
         LL_DEBUGS() << "test() posting second" << LL_ENDL;
         LLSD second{llsd::map("desc", "second", "value", 1)};
         consumed = pump.post(second);
-        ensure("should have consumed second", consumed);
+        UNSCOPED_INFO("should have consumed second");
+        CHECK(consumed);
         // This is a key point: even though we've post()ed the value for which
         // the coroutine is waiting, it's actually still suspended until we
         // pause for some other reason. The coroutine will only pick up one
@@ -306,7 +339,8 @@ namespace tut
         LL_DEBUGS() << "test() posting third" << LL_ENDL;
         LLSD third{llsd::map("desc", "third", "value", 2)};
         consumed = pump.post(third);
-        ensure("should NOT yet have consumed third", ! consumed);
+        UNSCOPED_INFO("should NOT yet have consumed third");
+        CHECK_FALSE(consumed);
         // now just wait for coro to finish -- which it eventually will, given
         // that all its suspend calls have short timeouts.
         while (running)
@@ -315,22 +349,17 @@ namespace tut
             llcoro::suspendUntilTimeout(0.1f);
         }
         // okay, verify expected results
-        ensure_equals("should have received three values", data,
-                      llsd::array(first, second, third));
+        CHECK_THAT(data, ll_test::LLSDEquals(llsd::array(first, second, third)));
         LL_DEBUGS() << "test() done" << LL_ENDL;
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE_METHOD(lleventcoro_data, "coroutine: LLEventMailDrop gives a coroutine one value a wait", "[coroutine]")
     {
-        set_test_name("LLEventMailDrop");
-        tut::test<LLEventMailDrop>();
+        check_coro_consumes<LLEventMailDrop>();
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE_METHOD(lleventcoro_data, "coroutine: LLEventLogProxyFor<LLEventMailDrop> gives a coroutine one value a wait", "[coroutine]")
     {
-        set_test_name("LLEventLogProxyFor<LLEventMailDrop>");
-        tut::test< LLEventLogProxyFor<LLEventMailDrop> >();
+        check_coro_consumes< LLEventLogProxyFor<LLEventMailDrop> >();
     }
 }

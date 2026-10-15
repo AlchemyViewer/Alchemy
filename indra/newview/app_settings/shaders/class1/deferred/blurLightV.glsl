@@ -30,8 +30,12 @@ uniform vec2 screen_res;
 
 void main()
 {
-    //transform vertex
-    vec4 pos = vec4(position.xyz, 1.0);
-    gl_Position = pos;
-    vary_fragcoord = (pos.xy*0.5+0.5);
+    // On the far plane, as the light map's own pass is (sunLightV.glsl): only geometry is blurred, and the sky keeps
+    // the clear's white, which the blur's plane test never takes in anyway. Reverse-Z puts the far plane at ndc z 0.
+#ifdef REVERSE_Z
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+#else
+    gl_Position = vec4(position.xy, 1.0, 1.0);
+#endif
+    vary_fragcoord = (position.xy*0.5+0.5);
 }

@@ -38,6 +38,11 @@ namespace
     // as the viewer scrolls to them.
     const ALRegex LUAU_LOCATION(R"(^([^:]*):([0-9]+):\s*(.*)$)");
     const ALRegex LSL_LOCATION(R"(\((\d+), (\d+)\) : ([^:]+) : (.+))");
+    // Tailslide's, as the grid's LSL compiler for Luau's VM gives it: a
+    // one-based line, the level, the words; and the places they name,
+    // one-based line and column.
+    const ALRegex TAILSLIDE_LOCATION(R"(^\s*Line (\d+):\s*([A-Za-z]+):\s*(.*)$)");
+    const ALRegex TAILSLIDE_MENTION(R"(\((\d+), (\d+)\))");
     const ALRegex DEFAULT_STATE(R"(\s*default\s*\{)");
     // A frame of a Luau traceback: the chunk, bare -- a script's name,
     // spaces and all -- or as Lua quotes one, and its one-based line, then
@@ -81,6 +86,23 @@ namespace ALScriptMessages
                 place.message   = found.str(4);
                 return place;
             }
+        }
+        if (TAILSLIDE_LOCATION.match(line, &found))
+        {
+            place.line    = llmax(0, std::atoi(found.str(1).c_str()) - 1);
+            place.hasLine = true;
+            place.level   = found.str(2);
+            place.message = found.str(3);
+            TAILSLIDE_MENTION.forEach(place.message, [&place](const ALRegexMatch& named) {
+                Mention mention;
+                mention.at     = named.begin();
+                mention.length = named.length();
+                mention.line   = llmax(0, std::atoi(named.str(1).c_str()) - 1);
+                mention.column = llmax(0, std::atoi(named.str(2).c_str()) - 1);
+                place.mentions.push_back(mention);
+                return true;
+            });
+            return place;
         }
         place.level   = "ERROR";
         place.message = line;

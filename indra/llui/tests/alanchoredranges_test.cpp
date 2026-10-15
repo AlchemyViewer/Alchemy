@@ -26,12 +26,12 @@
 
 #include "alanchoredranges.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alanchoredranges_data
     {
@@ -53,41 +53,37 @@ namespace tut
             return out;
         }
     };
-    typedef test_group<alanchoredranges_data> alanchoredranges_group;
-    typedef alanchoredranges_group::object    alanchoredranges_object;
-    alanchoredranges_group                    alanchoredranges_instance("alanchoredranges");
 
-    template<> template<>
-    void alanchoredranges_object::test<1>()
+    TEST_CASE_METHOD(alanchoredranges_data, "alanchoredranges: ranges sort by start and ties keep the order they came in", "[alanchoredranges]")
     {
-        set_test_name("put in order by where they begin, those beginning together as given; one more after its equals");
         ALAnchoredRanges<Mark> marks;
         marks.assign({ { on(3, 0, 2), "c" }, { on(1, 4, 5), "b" }, { on(1, 4, 9), "b2" }, { on(0, 0, 1), "a" } });
-        ensure_equals("in order", names(marks), std::string("a,b,b2,c"));
+        CHECK(names(marks) == std::string("a,b,b2,c"));
         marks.insert({ on(1, 4, 6), "b3" });
-        ensure_equals("after its equals", names(marks), std::string("a,b,b2,b3,c"));
+        UNSCOPED_INFO("after its equals");
+        CHECK(names(marks) == std::string("a,b,b2,b3,c"));
     }
 
-    template<> template<>
-    void alanchoredranges_object::test<2>()
+    TEST_CASE_METHOD(alanchoredranges_data, "alanchoredranges: an edit drops ranges it cuts and moves only those after it", "[alanchoredranges]")
     {
-        set_test_name("an edit: those it cut through go, those after it move along, those before it stay");
         ALTextDocument         doc("zero\none two three\nfour\nfive");
         ALAnchoredRanges<Mark> marks;
         marks.assign({ { on(0, 0, 4), "zero" }, { on(1, 0, 3), "one" }, { on(1, 4, 7), "two" }, { on(1, 8, 13), "three" }, { on(2, 0, 4), "four" } });
         const ALTextDocument::Edit edit = doc.replace(on(1, 4, 7), "2\nTWO");
         const size_t               gone = marks.apply(edit);
-        ensure_equals("the one it cut through", gone, size_t(1));
-        ensure_equals("gone", names(marks), std::string("zero,one,three,four"));
-        ensure("before it: where it was", marks[1].range == on(1, 0, 3));
-        ensure("after it on its line: along the line it made", marks[2].range == on(2, 4, 9));
-        ensure("below it: a line down", marks[3].range == on(3, 0, 4));
+        UNSCOPED_INFO("the one it cut through");
+        REQUIRE(gone == size_t(1));
+        CHECK(names(marks) == std::string("zero,one,three,four"));
+        UNSCOPED_INFO("before it: where it was");
+        CHECK(marks[1].range == on(1, 0, 3));
+        UNSCOPED_INFO("after it on its line: along the line it made");
+        CHECK(marks[2].range == on(2, 4, 9));
+        UNSCOPED_INFO("below it: a line down");
+        CHECK(marks[3].range == on(3, 0, 4));
     }
 
-    template<> template<>
-    void alanchoredranges_object::test<3>()
+    TEST_CASE_METHOD(alanchoredranges_data, "alanchoredranges: a one-line edit skips later lines and onLine finds ranges from above", "[alanchoredranges]")
     {
-        set_test_name("an edit within a line: those on later lines not looked at; what is on a line found by it, a range from above included");
         ALTextDocument         doc("a\nb\nc\nd\ne");
         ALAnchoredRanges<Mark> marks;
         marks.assign({ { ALTextRange(ALTextPos(0, 0), ALTextPos(2, 1)), "tall" }, { on(1, 0, 1), "b" }, { on(3, 0, 1), "d" }, { on(4, 0, 1), "e" } });
@@ -98,8 +94,10 @@ namespace tut
                         return e.slide(m.range);
                     },
                     [](Mark&) {});
-        ensure("the tall one it landed in, and the one on its line: no more", asked == 2);
-        ensure_equals("the one it landed in gone", names(marks), std::string("b,d,e"));
+        UNSCOPED_INFO("the tall one it landed in, and the one on its line: no more");
+        CHECK(asked == 2);
+        UNSCOPED_INFO("the one it landed in gone");
+        CHECK(names(marks) == std::string("b,d,e"));
         marks.assign({ { ALTextRange(ALTextPos(0, 0), ALTextPos(2, 1)), "tall" }, { on(1, 0, 1), "b" }, { on(3, 0, 1), "d" } });
         const auto span = marks.onLine(2);
         std::string on_two;
@@ -107,13 +105,12 @@ namespace tut
         {
             on_two += it->name;
         }
-        ensure_equals("from above, and on the line", on_two, std::string("tallb"));
+        UNSCOPED_INFO("from above, and on the line");
+        CHECK(on_two == std::string("tallb"));
     }
 
-    template<> template<>
-    void alanchoredranges_object::test<4>()
+    TEST_CASE_METHOD(alanchoredranges_data, "alanchoredranges: a caller's slide rule places hints around typing and reports drops", "[alanchoredranges]")
     {
-        set_test_name("a rule of the caller's: places kept before or after what is typed at them, in order after; what goes told of");
         struct Hint
         {
             ALTextPos at;
@@ -138,31 +135,52 @@ namespace tut
                 return true;
             },
             [&gone](Hint& h) { gone.push_back(h.name); });
-        ensure("before stays, after moves", hints[0].name == "inside" && hints[1].name == "before" && hints[1].at == ALTextPos(0, 4) && hints[2].name == "after" &&
-                                                hints[2].at == ALTextPos(0, 7));
+        {
+            INFO("before stays, after moves");
+            REQUIRE(hints.size() == 3);
+            CHECK(hints[0].name == "inside");
+            CHECK(hints[1].name == "before");
+            CHECK(hints[1].at == ALTextPos(0, 4));
+            CHECK(hints[2].name == "after");
+            CHECK(hints[2].at == ALTextPos(0, 7));
+        }
         hints.apply(
             doc.replace(on(0, 0, 3), ""), [](Hint& h, const ALTextDocument::Edit& e) { return !(e.range.begin < h.at && h.at < e.range.end); },
             [&gone](Hint& h) { gone.push_back(h.name); });
-        ensure("what went, told of", gone == std::vector<std::string>({ "inside" }));
+        UNSCOPED_INFO("what went, told of");
+        CHECK(gone == std::vector<std::string>({ "inside" }));
     }
 
-    template<> template<>
-    void alanchoredranges_object::test<5>()
+    TEST_CASE_METHOD(alanchoredranges_data, "alanchoredranges: a followed index moves with its range or becomes -1 when it goes", "[alanchoredranges]")
     {
-        set_test_name("one followed through an edit: to where it is after, or none where it went");
         ALTextDocument                doc("aa bb cc\ndd ee");
         ALAnchoredRanges<ALTextRange> matches;
         matches.assign({ on(0, 0, 2), on(0, 3, 5), on(0, 6, 8), on(1, 0, 2), on(1, 3, 5) });
         S32 current = 2;
         matches.apply(doc.replace(on(0, 3, 5), "B"), &current);
-        ensure("the one before it gone, the current a place back", current == 1 && matches.size() == 4 && matches[1] == on(0, 5, 7));
+        {
+            INFO("the one before it gone, the current a place back");
+            CHECK(current == 1);
+            REQUIRE(matches.size() == 4);
+            CHECK(matches[1] == on(0, 5, 7));
+        }
         current = 3;
         matches.apply(doc.replace(on(0, 0, 0), "x"), &current);
-        ensure("past the edit's line, not looked at, and where it was", current == 3 && matches[3] == on(1, 3, 5));
+        {
+            INFO("past the edit's line, not looked at, and where it was");
+            CHECK(current == 3);
+            REQUIRE(matches.size() == 4);
+            CHECK(matches[3] == on(1, 3, 5));
+        }
         matches.apply(doc.replace(on(1, 3, 5), "E"), &current);
-        ensure("the current one cut through: none", current == -1 && matches.size() == 3);
+        {
+            INFO("the current one cut through: none");
+            CHECK(current == -1);
+            REQUIRE(matches.size() == 3);
+        }
         current = 2;
         matches.apply(doc.replace(on(0, 1, 2), ""), &current);
-        ensure("the one before it gone, below the edit's line: a place back", current == 1);
+        UNSCOPED_INFO("the one before it gone, below the edit's line: a place back");
+        CHECK(current == 1);
     }
 }

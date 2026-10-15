@@ -38,7 +38,7 @@
 #include <utility>
 #include <vector>
 
-namespace tut { struct alincludesearch_data; }
+namespace ll_test { struct alincludesearch_data; }
 
 // What finding an include asks of the world a script is in, which only the
 // viewer can answer -- its inventory, what an object holds -- and a test
@@ -240,7 +240,7 @@ public:
 private:
     // The require parity suite asks the search before LAD9 itself, as a
     // require found nowhere does (searchedBefore).
-    friend struct ::tut::alincludesearch_data;
+    friend struct ::ll_test::alincludesearch_data;
 
     // The places a SLua require is walked through, as this search sees
     // them now (alincludesearch.cpp).

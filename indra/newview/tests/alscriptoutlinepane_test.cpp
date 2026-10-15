@@ -38,7 +38,7 @@
 #include "llscrolllistitem.h"
 #include "lltextbox.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 
@@ -104,7 +104,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alscriptoutlinepane_data
     {
@@ -116,7 +116,7 @@ namespace tut
             ALScriptOutlinePane* found = window.find<ALScriptOutlinePane>("outline_pane");
             if (!found)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             return found;
         }
@@ -159,176 +159,231 @@ namespace tut
         std::string comment() { return pane()->list()->saysEmpty() ? pane()->list()->emptyWords() : std::string(); }
     };
 
-    typedef test_group<alscriptoutlinepane_data> alscriptoutlinepane_group;
-    typedef alscriptoutlinepane_group::object    alscriptoutlinepane_object;
-    alscriptoutlinepane_group                    alscriptoutlinepane_instance("alscriptoutlinepane");
-
-    template<> template<>
-    void alscriptoutlinepane_object::test<1>()
+    TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: only the front tab's symbols show as a tree and the window is told", "[alscriptoutlinepane]")
     {
-        set_test_name("the tab in front's symbols as a tree, marked and explained, the window told; another tab's, or none, not");
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         Doc&                 other   = tab("b");
         outline->show(other);
-        ensure("not in front: nothing", outline->list()->getItemCount() == 0 && told().shown.empty());
+        {
+            INFO("not in front: nothing");
+            CHECK(outline->list()->getItemCount() == 0);
+            CHECK(told().shown.empty());
+        }
         outline->show(doc);
-        ensure_equals("the tree", rows(), std::string("count, ^default, .touch_start, .state_entry, alpha"));
-        ensure_equals("told", joined(told().shown), std::string("a"));
+        REQUIRE(rows() == std::string("count, ^default, .touch_start, .state_entry, alpha"));
+        CHECK(joined(told().shown) == std::string("a"));
         const std::vector<LLScrollListItem*> items = outline->list()->getAllData();
-        ensure_equals("what it is", items[1]->getColumn(0)->getToolTip(), std::string("state"));
-        ensure_equals("and its declaration", items[0]->getColumn(1)->getToolTip(), std::string("variable\ninteger"));
-        ensure_equals("by its index", items[4]->getValue().asInteger(), 4);
-        ensure("nothing said over it", comment().empty());
+        const LLScrollListCell*              kind  = items[1]->getColumn(0);
+        const LLScrollListCell*              name  = items[0]->getColumn(1);
+        REQUIRE(kind != nullptr);
+        REQUIRE(name != nullptr);
+        UNSCOPED_INFO("what it is");
+        CHECK(kind->getToolTip() == std::string("state"));
+        UNSCOPED_INFO("and its declaration");
+        CHECK(name->getToolTip() == std::string("variable\ninteger"));
+        UNSCOPED_INFO("by its index");
+        CHECK(items[4]->getValue().asInteger() == 4);
+        CHECK(comment().empty());
 
         doc.outline.clear();
         outline->show(doc);
-        ensure_equals("nothing to outline", comment(), std::string("Nothing in this script to outline yet."));
+        CHECK(comment() == std::string("Nothing in this script to outline yet."));
         doc.loaded = false;
         outline->show(doc);
-        ensure_equals("not loaded yet", comment(), std::string("Still loading."));
+        CHECK(comment() == std::string("Still loading."));
     }
 
-    template<> template<>
-    void alscriptoutlinepane_object::test<2>()
+    TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: folds are kept by name through renumbering and left goes to the holder", "[alscriptoutlinepane]")
     {
-        set_test_name("folded shut and opened by the names down to it, which a check that numbers them anew keeps; left from a leaf to its holder");
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         outline->show(doc);
         outline->fold(1);
-        ensure_equals("shut", rows(), std::string("count, >default, alpha"));
-        ensure("kept by name", doc.outlineFolded.contains("default"));
-        ensure_equals("the row it was", chosen(), 1);
+        UNSCOPED_INFO("shut");
+        CHECK(rows() == std::string("count, >default, alpha"));
+        UNSCOPED_INFO("kept by name");
+        CHECK(doc.outlineFolded.contains("default"));
+        UNSCOPED_INFO("the row it was");
+        CHECK(chosen() == 1);
         outline->fold(1);
-        ensure_equals("open", rows(), std::string("count, ^default, .touch_start, .state_entry, alpha"));
+        UNSCOPED_INFO("open");
+        CHECK(rows() == std::string("count, ^default, .touch_start, .state_entry, alpha"));
         outline->fold(1, false);
-        ensure("already open: left so", !doc.outlineFolded.contains("default"));
+        UNSCOPED_INFO("already open: left so");
+        CHECK_FALSE(doc.outlineFolded.contains("default"));
         outline->fold(1, true);
         doc.outline.insert(doc.outline.begin(), entry("before", ALScriptSymbolKind::Variable, 0, 0));
         outline->show(doc);
-        ensure_equals("numbered anew, still shut", rows(), std::string("before, count, >default, alpha"));
+        UNSCOPED_INFO("numbered anew, still shut");
+        CHECK(rows() == std::string("before, count, >default, alpha"));
         outline->fold(2);
 
         outline->fold(4, true);
-        ensure_equals("from a leaf to what holds it", chosen(), 2);
-        ensure_equals("gone to as a row walked to is", joined(told().chosen), std::string("default"));
-        ensure("the list kept", !window.services().reveals.empty() && !window.services().reveals.back());
+        UNSCOPED_INFO("from a leaf to what holds it");
+        CHECK(chosen() == 2);
+        UNSCOPED_INFO("gone to as a row walked to is");
+        CHECK(joined(told().chosen) == std::string("default"));
+        {
+            INFO("the list kept");
+            REQUIRE_FALSE(window.services().reveals.empty());
+            CHECK_FALSE(window.services().reveals.back());
+        }
         outline->fold(0, true);
-        ensure_equals("a leaf at the top: nowhere", joined(told().chosen), std::string("default"));
+        UNSCOPED_INFO("a leaf at the top: nowhere");
+        CHECK(joined(told().chosen) == std::string("default"));
         outline->fold(4, false);
-        ensure_equals("right on a leaf: nothing", joined(told().chosen), std::string("default"));
+        UNSCOPED_INFO("right on a leaf: nothing");
+        CHECK(joined(told().chosen) == std::string("default"));
     }
 
-    template<> template<>
-    void alscriptoutlinepane_object::test<3>()
+    TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: the filter flattens the tree and the sort by name or kind is kept", "[alscriptoutlinepane]")
     {
-        set_test_name("through the filter, flat and unfoldable; sorted by name or kind under each holder, the window told");
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         LLFilterEditor*      filter  = window.find<LLFilterEditor>("outline_filter");
+        REQUIRE(filter != nullptr);
         filter->setText(std::string("ST"));
         filter->onCommit();
-        ensure_equals("each with the letters", rows(), std::string("touch_start, state_entry"));
+        UNSCOPED_INFO("each with the letters");
+        CHECK(rows() == std::string("touch_start, state_entry"));
         filter->setText(std::string("zz"));
         outline->show(doc);
-        ensure_equals("none", comment(), std::string("No symbol names match what you typed."));
+        CHECK(comment() == std::string("No symbol names match what you typed."));
         filter->setText(std::string());
 
         outline->setSortOrder("name");
         outline->show(doc);
-        ensure_equals("by name", rows(), std::string("alpha, count, ^default, .state_entry, .touch_start"));
-        ensure_equals("kept", outline->sortOrder(), std::string("name"));
+        UNSCOPED_INFO("by name");
+        CHECK(rows() == std::string("alpha, count, ^default, .state_entry, .touch_start"));
+        UNSCOPED_INFO("kept");
+        CHECK(outline->sortOrder() == std::string("name"));
         LLComboBox* sort = window.find<LLComboBox>("outline_sort");
+        REQUIRE(sort != nullptr);
         sort->selectByValue(LLSD("kind"));
         sort->onCommit();
-        ensure_equals("by kind, then name", rows(), std::string("count, alpha, ^default, .state_entry, .touch_start"));
-        ensure_equals("the window told", told().sorts, 1);
+        UNSCOPED_INFO("by kind, then name");
+        CHECK(rows() == std::string("count, alpha, ^default, .state_entry, .touch_start"));
+        CHECK(told().sorts == 1);
         filter->setText(std::string("t"));
         outline->show(doc);
-        ensure_equals("sorted through the filter too", rows(), std::string("count, state_entry, touch_start, default"));
+        UNSCOPED_INFO("sorted through the filter too");
+        CHECK(rows() == std::string("count, state_entry, touch_start, default"));
     }
 
-    template<> template<>
-    void alscriptoutlinepane_object::test<4>()
+    TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: the caret's symbol or its nearest shown holder is chosen", "[alscriptoutlinepane]")
     {
-        set_test_name("the symbol the caret is in chosen, or the nearest shown that holds it; none where it is in none");
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         outline->show(doc);
         doc.caret->crumbPath = { 1, 3 };
         outline->followCaret(doc);
-        ensure_equals("the innermost", chosen(), 3);
+        UNSCOPED_INFO("the innermost");
+        CHECK(chosen() == 3);
         outline->fold(1);
         outline->list()->deselectAllItems(true);
         doc.caret->crumbPath = { 1, 3 };
         outline->followCaret(doc);
-        ensure_equals("folded away: its holder", chosen(), 1);
+        UNSCOPED_INFO("folded away: its holder");
+        CHECK(chosen() == 1);
         doc.caret->crumbPath.clear();
         outline->followCaret(doc);
-        ensure_equals("in none", chosen(), -1);
+        UNSCOPED_INFO("in none");
+        CHECK(chosen() == -1);
         outline->list()->selectByValue(LLSD(0));
         doc.caret->crumbPath = { 9 };
         outline->followCaret(doc);
-        ensure_equals("not listed", chosen(), -1);
+        UNSCOPED_INFO("not listed");
+        CHECK(chosen() == -1);
         outline->fold(1);
         doc.caret->crumbPath = { 1, 2 };
         doc.outline[0].detail = "float";
         outline->show(doc);
-        ensure_equals("followed as it is shown", chosen(), 2);
-        ensure("going nowhere", told().chosen.empty());
+        UNSCOPED_INFO("followed as it is shown");
+        CHECK(chosen() == 2);
+        UNSCOPED_INFO("going nowhere");
+        CHECK(told().chosen.empty());
     }
 
-    template<> template<>
-    void alscriptoutlinepane_object::test<5>()
+    TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: the list is made again only when what it shows changes", "[alscriptoutlinepane]")
     {
-        set_test_name("a check that changes nothing shown leaves the list; a change makes it again; no tab, and it is made again whatever");
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         outline->show(doc);
         // A mark left on the first row, which a list made again does not have.
-        outline->list()->getFirstData()->getColumn(1)->setValue(LLSD("marked"));
+        const auto require_marked = [&]() {
+            LLScrollListItem* first = outline->list()->getFirstData();
+            REQUIRE(first != nullptr);
+            LLScrollListCell* words = first->getColumn(1);
+            REQUIRE(words != nullptr);
+            words->setValue(LLSD("marked"));
+        };
+        require_marked();
         outline->show(doc);
-        ensure_equals("the same rows", cell(outline->list()->getFirstData(), 1), std::string("marked"));
+        UNSCOPED_INFO("the same rows");
+        CHECK(cell(outline->list()->getFirstData(), 1) == std::string("marked"));
         doc.outline[0].detail = "float";
         outline->show(doc);
-        ensure("a detail changed: made again", cell(outline->list()->getFirstData(), 1) != "marked");
-        outline->list()->getFirstData()->getColumn(1)->setValue(LLSD("marked"));
+        UNSCOPED_INFO("a detail changed: made again");
+        CHECK(cell(outline->list()->getFirstData(), 1) != "marked");
+        require_marked();
         Doc& other = tab("b");
         other.outline[0].detail = "float";
         window.services().front = 1;
         outline->show(other);
-        ensure("another tab's, the same rows: made again", cell(outline->list()->getFirstData(), 1) != "marked");
+        UNSCOPED_INFO("another tab's, the same rows: made again");
+        CHECK(cell(outline->list()->getFirstData(), 1) != "marked");
         window.services().front = 0;
         outline->forget();
-        ensure("nothing listed", outline->list()->getItemCount() == 0);
+        CHECK(outline->list()->getItemCount() == 0);
         outline->show(doc);
-        ensure_equals("the same rows back", outline->list()->getItemCount(), 5);
+        UNSCOPED_INFO("the same rows back");
+        CHECK(outline->list()->getItemCount() == 5);
     }
 
-    template<> template<>
-    void alscriptoutlinepane_object::test<6>()
+    TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: choosing a row goes there and keys and arrow clicks fold", "[alscriptoutlinepane]")
     {
-        set_test_name("a row chosen gone to; return to type there, escape back without going; left and right fold; an arrow clicked folds");
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         outline->show(doc);
         ALPaneList* list = outline->list();
         list->selectByValue(LLSD(0));
         list->onCommit();
-        ensure("gone to", joined(told().chosen) == "count" && window.services().reveals.back() == false);
-        ensure("return", list->handleKeyHere(KEY_RETURN, MASK_NONE) && told().chosen.back() == "count editor");
-        ensure("the keyboard taken", window.services().reveals.back());
-        ensure("escape", list->handleKeyHere(KEY_ESCAPE, MASK_NONE) && told().chosen.size() == 2 && window.services().reveals.size() == 3);
-        ensure("with a key held: the list's", !list->handleKeyHere(KEY_RETURN, MASK_CONTROL) && told().chosen.size() == 2);
+        {
+            INFO("gone to");
+            CHECK(joined(told().chosen) == "count");
+            REQUIRE_FALSE(window.services().reveals.empty());
+            CHECK_FALSE(window.services().reveals.back());
+        }
+        {
+            INFO("return: gone to, to type there");
+            CHECK(list->handleKeyHere(KEY_RETURN, MASK_NONE));
+            CHECK(joined(told().chosen) == "count, count editor");
+        }
+        UNSCOPED_INFO("the keyboard taken");
+        CHECK(window.services().reveals.back());
+        {
+            INFO("escape: back without going");
+            CHECK(list->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            CHECK(told().chosen.size() == 2);
+            CHECK(window.services().reveals.size() == 3);
+        }
+        {
+            INFO("with a key held: the list's");
+            CHECK_FALSE(list->handleKeyHere(KEY_RETURN, MASK_CONTROL));
+            CHECK(told().chosen.size() == 2);
+        }
         list->selectByValue(LLSD(1));
-        ensure("left", list->handleKeyHere(KEY_LEFT, MASK_NONE) && doc.outlineFolded.contains("default"));
-        ensure("right", list->handleKeyHere(KEY_RIGHT, MASK_NONE) && !doc.outlineFolded.contains("default"));
+        CHECK(list->handleKeyHere(KEY_LEFT, MASK_NONE));
+        CHECK(doc.outlineFolded.contains("default"));
+        CHECK(list->handleKeyHere(KEY_RIGHT, MASK_NONE));
+        CHECK_FALSE(doc.outlineFolded.contains("default"));
 
         // The mouse only reaches what is shown.
         window.floater->setVisible(true);
         const LLRect              rect = list->getItemListRect();
         const LLScrollListColumn* icon = list->getColumn("icon");
+        REQUIRE(icon != nullptr);
         const auto                row  = [&](S32 at) {
             const LLScrollListItem* item = list->hitItem(rect.mLeft + 1, at);
             return item ? item->getValue().asInteger() : -1;
@@ -341,78 +396,98 @@ namespace tut
             --row_y;
         }
         row_y -= 2;
-        ensure_equals("row 1 found", row(row_y), 1);
+        UNSCOPED_INFO("row 1 found");
+        CHECK(row(row_y) == 1);
         list->localPointToOtherView(rect.mLeft + icon->getWidth() + list->getColumnPadding() + 2, row_y, &x, &y, outline);
-        ensure("an arrow clicked", outline->handleMouseDown(x, y, MASK_NONE));
-        ensure("folds", doc.outlineFolded.contains("default"));
+        UNSCOPED_INFO("an arrow clicked");
+        CHECK(outline->handleMouseDown(x, y, MASK_NONE));
+        CHECK(doc.outlineFolded.contains("default"));
         list->localPointToOtherView(rect.mRight - 4, row_y, &x, &y, outline);
         outline->handleMouseDown(x, y, MASK_NONE);
-        ensure("past it: not", doc.outlineFolded.contains("default"));
+        UNSCOPED_INFO("past it: not");
+        CHECK(doc.outlineFolded.contains("default"));
         // Row 0, a leaf, where an arrow would be: the list's, which chooses it.
         list->deselectAllItems(true);
         const S32 leaf_y = row_y + (rect.mTop - row_y) / 2 + 1;
         list->localPointToOtherView(rect.mLeft + icon->getWidth() + list->getColumnPadding() + 2, leaf_y, &x, &y, outline);
-        ensure_equals("a leaf row there", row(leaf_y), 0);
+        UNSCOPED_INFO("a leaf row there");
+        CHECK(row(leaf_y) == 0);
         outline->handleMouseDown(x, y, MASK_NONE);
-        ensure_equals("chosen by the list", chosen(), 0);
+        UNSCOPED_INFO("chosen by the list");
+        CHECK(chosen() == 0);
     }
 
-    template<> template<>
-    void alscriptoutlinepane_object::test<7>()
+    TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: out of sight it only tells the window and lists once seen", "[alscriptoutlinepane]")
     {
-        set_test_name("out of sight, only the window told; listed, and the caret followed, once it is seen");
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         window.floater->setVisible(false);
         outline->show(doc);
-        ensure("told", joined(told().shown) == "a");
-        ensure("not listed", outline->list()->getItemCount() == 0);
+        CHECK(joined(told().shown) == "a");
+        CHECK(outline->list()->getItemCount() == 0);
         outline->pump();
-        ensure("nor while unseen", outline->list()->getItemCount() == 0);
+        UNSCOPED_INFO("nor while unseen");
+        CHECK(outline->list()->getItemCount() == 0);
         window.floater->setVisible(true);
         outline->pump();
-        ensure_equals("seen: listed", rows(), std::string("count, ^default, .touch_start, .state_entry, alpha"));
+        UNSCOPED_INFO("seen: listed");
+        CHECK(rows() == std::string("count, ^default, .touch_start, .state_entry, alpha"));
 
         window.floater->setVisible(false);
         doc.caret->crumbPath = { 1, 3 };
         outline->followCaret(doc);
-        ensure_equals("not followed unseen", chosen(), -1);
+        UNSCOPED_INFO("not followed unseen");
+        CHECK(chosen() == -1);
         window.floater->setVisible(true);
         outline->pump();
-        ensure_equals("followed once seen", chosen(), 3);
+        UNSCOPED_INFO("followed once seen");
+        CHECK(chosen() == 3);
         outline->pump();
-        ensure_equals("and then left be", joined(told().shown), std::string("a, a, a"));
+        UNSCOPED_INFO("and then left be");
+        CHECK(joined(told().shown) == std::string("a, a, a"));
     }
 
-    template<> template<>
-    void alscriptoutlinepane_object::test<8>()
+    TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: a symbol added keeps the other rows and the choice", "[alscriptoutlinepane]")
     {
-        set_test_name("a symbol added among the others: its row made, the others the same rows where they were, the row chosen kept");
         ALScriptOutlinePane* outline = pane();
         Doc&                 doc     = tab("a");
         outline->show(doc);
         const std::vector<LLScrollListItem*> before = outline->list()->getAllData();
+        REQUIRE(before.size() == 5);
         doc.caret->crumbPath                        = { 4 };
         outline->followCaret(doc);
-        ensure_equals("alpha chosen", chosen(), 4);
+        UNSCOPED_INFO("alpha chosen");
+        CHECK(chosen() == 4);
         doc.outline.insert(doc.outline.begin() + 1, entry("beta", ALScriptSymbolKind::Function, 0, 1));
         doc.caret->crumbPath = { 5 };
         outline->show(doc);
-        ensure_equals("in its place", rows(), std::string("count, beta, ^default, .touch_start, .state_entry, alpha"));
+        UNSCOPED_INFO("in its place");
+        CHECK(rows() == std::string("count, beta, ^default, .touch_start, .state_entry, alpha"));
         const std::vector<LLScrollListItem*> after = outline->list()->getAllData();
-        ensure("the others the same rows", after.size() == 6 && after[0] == before[0] && after[2] == before[1] && after[5] == before[4]);
-        ensure_equals("alpha still chosen, by its new place", chosen(), 5);
+        {
+            INFO("the others the same rows");
+            REQUIRE(after.size() == 6);
+            CHECK(after[0] == before[0]);
+            CHECK(after[2] == before[1]);
+            CHECK(after[5] == before[4]);
+        }
+        UNSCOPED_INFO("alpha still chosen, by its new place");
+        CHECK(chosen() == 5);
     }
 
-    template<> template<>
-    void alscriptoutlinepane_object::test<9>()
+    TEST_CASE_METHOD(alscriptoutlinepane_data, "alscriptoutlinepane: the heading fits its word with the sort and filter after it", "[alscriptoutlinepane]")
     {
-        set_test_name("the heading as wide as its word, the sort and the filter after it in turn");
         ALScriptOutlinePane* outline = pane();
         const LLRect         head    = outline->getChild<LLView>("outline_head")->getRect();
         const LLRect         sort    = outline->getChild<LLView>("outline_sort")->getRect();
         const LLRect         filter  = outline->getChild<LLView>("outline_filter")->getRect();
-        ensure("the word fits", head.getWidth() >= outline->getChild<LLTextBox>("outline_head")->getTextPixelWidth());
-        ensure("in turn, apart", head.mRight < sort.mLeft && sort.mRight < filter.mLeft && filter.getWidth() >= 40);
+        UNSCOPED_INFO("the word fits");
+        CHECK(head.getWidth() >= outline->getChild<LLTextBox>("outline_head")->getTextPixelWidth());
+        {
+            INFO("in turn, apart");
+            CHECK(head.mRight < sort.mLeft);
+            CHECK(sort.mRight < filter.mLeft);
+            CHECK(filter.getWidth() >= 40);
+        }
     }
 }

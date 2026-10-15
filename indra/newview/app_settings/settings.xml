@@ -504,17 +504,6 @@
       <key>Value</key>
       <integer>1</integer>
     </map>
-    <key>AnalyzePerformance</key>
-    <map>
-      <key>Comment</key>
-      <string>Request performance analysis for a particular viewer run</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
     <key>AnimateTextures</key>
     <map>
       <key>Comment</key>
@@ -4748,28 +4737,6 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-    <key>LogMetrics</key>
-    <map>
-      <key>Comment</key>
-      <string>Log viewer metrics</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>String</string>
-      <key>Value</key>
-      <string/>
-    </map>
-    <key>LogPerformance</key>
-    <map>
-      <key>Comment</key>
-      <string>Log performance analysis for a particular viewer run</string>
-      <key>Persist</key>
-      <integer>0</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
-    </map>
     <key>LogTextureNetworkTraffic</key>
     <map>
       <key>Comment</key>
@@ -8595,28 +8562,6 @@
     <key>Value</key>
     <real>4.0</real>
   </map>
-  <key>RenderDeferredSpotShadowBias</key>
-  <map>
-    <key>Comment</key>
-    <string>Bias value for spot shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>-64.0</real>
-  </map>
-  <key>RenderDeferredSpotShadowOffset</key>
-  <map>
-    <key>Comment</key>
-    <string>Offset value for spot shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>0.8</real>
-  </map>
 
   <key>RenderShadowBias</key>
   <map>
@@ -8757,33 +8702,11 @@
     <key>Value</key>
     <real>1.0</real>
   </map>
-  <key>RenderDeferredTreeShadowBias</key>
-  <map>
-    <key>Comment</key>
-    <string>Bias value for tree shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>1.0</real>
-  </map>
-  <key>RenderDeferredTreeShadowOffset</key>
-  <map>
-    <key>Comment</key>
-    <string>Offset value for tree shadows (prevent shadow acne).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>1.0</real>
-  </map>
 
   <key>RenderHoverGlowEnable</key>
   <map>
     <key>Comment</key>
-    <string>DEPRECATED --- Show glow effect when hovering on interactive objects.</string>
+    <string>Show glow effect when hovering on interactive objects.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -8831,7 +8754,7 @@
   <key>RenderHighlightColor</key>
   <map>
     <key>Comment</key>
-    <string>Brightness of mouseover highlights.</string>
+    <string>Color of mouseover highlights.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
@@ -10233,17 +10156,6 @@
         <string>Boolean</string>
         <key>Value</key>
         <integer>0</integer>
-    </map>
-    <key>RenderUIBuffer</key>
-    <map>
-      <key>Comment</key>
-      <string>Cache ui render in a screen aligned buffer.</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>0</integer>
     </map>
     <key>RenderUnloadedAvatar</key>
     <map>

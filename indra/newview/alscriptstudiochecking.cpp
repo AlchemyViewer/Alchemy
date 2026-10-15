@@ -1422,7 +1422,7 @@ void ALScriptStudioChecking::slideProblems(Doc& doc, const ALTextDocument::Edit&
     auto slide = [&edit](auto& list) {
         list.erase(std::remove_if(list.begin(), list.end(),
                                   [&edit](auto& problem) {
-                                      if (!problem.file.empty())
+                                      if (!problem.file.empty() || problem.line < 0)
                                       {
                                           return false;
                                       }

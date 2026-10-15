@@ -26,40 +26,36 @@
 
 #include "almaxima.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct almaxima_data
     {
         // Every place's value, or a few of them for `sampled`, and the
         // greatest as looking at them all finds it.
-        static void same(const std::string& what, const ALMaxima<S32>& maxima, const std::vector<S32>& values, bool sampled = false)
+        static void require_same(const std::string& what, const ALMaxima<S32>& maxima, const std::vector<S32>& values, bool sampled = false)
         {
-            ensure_equals(what + ": size", maxima.size(), values.size());
+            INFO(what);
+            REQUIRE(maxima.size() == values.size());
             const size_t step = sampled ? values.size() / 7 + 1 : 1;
             for (size_t i = 0; i < values.size(); i += step)
             {
-                ensure_equals(what + ": at " + std::to_string(i), maxima.at(i), values[i]);
+                CAPTURE(i);
+                REQUIRE(maxima.at(i) == values[i]);
             }
-            ensure_equals(what + ": the greatest", maxima.most(), values.empty() ? 0 : *std::max_element(values.begin(), values.end()));
+            REQUIRE(maxima.most() == (values.empty() ? 0 : *std::max_element(values.begin(), values.end())));
         }
     };
 
-    typedef test_group<almaxima_data> almaxima_group;
-    typedef almaxima_group::object    almaxima_object;
-    almaxima_group                    almaxima_instance("almaxima");
-
-    template<> template<>
-    void almaxima_object::test<1>()
+    TEST_CASE_METHOD(almaxima_data, "almaxima: the greatest of none is zero and the next takes over when it is cut down", "[almaxima]")
     {
-        set_test_name("the greatest is the greatest of them all; nothing where there are none, and the next greatest where it is cut down");
         ALMaxima<S32> maxima;
-        same("none", maxima, {});
+        require_same("none", maxima, {});
         std::vector<S32> many;
         for (S32 i = 0; i < 1000; ++i)
         {
@@ -67,19 +63,17 @@ namespace tut
         }
         many[613] = 90;
         maxima.assign(many);
-        same("many blocks", maxima, many);
+        require_same("many blocks", maxima, many);
         many[613] = 10;
         maxima.set(613, 10);
-        same("the greatest cut down", maxima, many);
+        require_same("the greatest cut down", maxima, many);
         many[2] = 60;
         maxima.set(2, 60);
-        same("another raised past it", maxima, many);
+        require_same("another raised past it", maxima, many);
     }
 
-    template<> template<>
-    void almaxima_object::test<2>()
+    TEST_CASE_METHOD(almaxima_data, "almaxima: random sets and inserts and erases leave the greatest a full scan finds", "[almaxima]")
     {
-        set_test_name("numbers changed, put in and taken out anywhere, a few or many, leave the greatest that looking at them all finds");
         std::vector<S32> values(700, 1);
         ALMaxima<S32>    maxima;
         maxima.assign(values);
@@ -118,12 +112,13 @@ namespace tut
                 values.erase(values.begin() + static_cast<std::ptrdiff_t>(index), values.begin() + static_cast<std::ptrdiff_t>(index + taken));
                 maxima.erase(index, count);
             }
-            same("step " + std::to_string(step), maxima, values, true);
+            CAPTURE(step);
+            require_same("after a step", maxima, values, true);
         }
-        same("at the end, every place", maxima, values);
+        require_same("at the end, every place", maxima, values);
         maxima.erase(0, maxima.size());
-        same("all taken out", maxima, {});
+        require_same("all taken out", maxima, {});
         maxima.insert(0, { 2, 3 });
-        same("put in again", maxima, { 2, 3 });
+        require_same("put in again", maxima, { 2, 3 });
     }
 }

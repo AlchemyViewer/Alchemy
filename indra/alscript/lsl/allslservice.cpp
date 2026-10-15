@@ -1359,12 +1359,18 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
                 added += '\n';
             }
         }
+        // This service has them, whatever the table already held: a file
+        // all of whose names an earlier one loaded is loaded all the same.
+        mImpl->builtins = true;
         error.clear();
         if (added.empty())
         {
             return true;
         }
-        Tailslide::tailslide_init_builtins_from_data(added.c_str());
+        if (!Tailslide::tailslide_init_builtins_from_data(added.c_str()))
+        {
+            LL_WARNS("ScriptAnalysis") << "Some of the LSL definitions " << path << " adds could not be read and were left out" << LL_ENDL;
+        }
         // An event new here numbered as the runtime numbers it, or after
         // every event there already was: those numbered before keep theirs.
         int last = 0;
@@ -1389,16 +1395,15 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
             const int index = Luau::lslEventIndex(symbol->getName());
             symbol->setEventIndex(index > 0 ? index : ++last);
         }
-        mImpl->builtins = true;
         return true;
     }
     // Read here and handed over as text: a path Tailslide opened itself
     // went through the narrow fopen(), which Windows reads in the ANSI code
     // page. A file that is not there has nothing loaded, which is said here.
     // A line Tailslide cannot read -- a type it does not know, a constant it
-    // cannot parse -- it says so on stderr and skips, since the tailslide
-    // port's builtins-skip-unreadable.patch; before that it ended the
-    // process, over a file the grid sends.
+    // cannot parse -- it says so on stderr and skips, and its load then
+    // answers false, which the log is told of: the file is the grid's, and
+    // what it could read is loaded all the same.
     std::string text;
     {
         llifstream in(path, std::ios::in | std::ios::binary);
@@ -1411,7 +1416,10 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
         all << in.rdbuf();
         text = all.str();
     }
-    Tailslide::tailslide_init_builtins_from_data(text.c_str());
+    if (!Tailslide::tailslide_init_builtins_from_data(text.c_str()))
+    {
+        LL_WARNS("ScriptAnalysis") << "Some of the LSL definitions in " << path << " could not be read and were left out" << LL_ENDL;
+    }
     // Every event numbered as the runtime numbers it (Luau::lslEventIndex):
     // the grid's definitions list them in an order of their own, and what an
     // event's number goes into -- LSO's handled-events bits, the dispatch of

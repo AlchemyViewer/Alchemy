@@ -14,13 +14,14 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 #include "../almotionpredictor.h"
 
 #include <cmath>
 
-namespace tut
+namespace
 {
     struct predictor_data
     {
@@ -67,79 +68,66 @@ namespace tut
         }
     };
 
-    typedef test_group<predictor_data> predictor_group_t;
-    typedef predictor_group_t::object predictor_object_t;
-    tut::predictor_group_t predictor_group("ALMotionPredictor");
-
     // ---------------------------------------------------------------- cadence
 
-    template<> template<>
-    void predictor_object_t::test<1>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: one update establishes no rate", "[ALMotionPredictor]")
     {
-        set_test_name("one update establishes no rate");
-
-        ensure("nothing seen yet", !mPredictor.hasCadence());
+        UNSCOPED_INFO("nothing seen yet");
+        CHECK_FALSE(mPredictor.hasCadence());
 
         mPredictor.noteUpdate(100.0);
-        ensure("a single update is a timestamp, not a rate", !mPredictor.hasCadence());
+        UNSCOPED_INFO("a single update is a timestamp, not a rate");
+        CHECK_FALSE(mPredictor.hasCadence());
 
         mPredictor.noteUpdate(100.1);
-        ensure("a second update gives a rate", mPredictor.hasCadence());
-        ensure_approximately_equals("interval is the observed gap",
-                                    mPredictor.getUpdateInterval(), 0.1f, 16);
+        UNSCOPED_INFO("a second update gives a rate");
+        CHECK(mPredictor.hasCadence());
+        UNSCOPED_INFO("interval is the observed gap");
+        CHECK_THAT(mPredictor.getUpdateInterval(), ll_test::WithinBits(0.1f, 16));
     }
 
-    template<> template<>
-    void predictor_object_t::test<2>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: cadence converges on a steady rate", "[ALMotionPredictor]")
     {
-        set_test_name("cadence converges on a steady rate");
-
         feedCadence(0.1f);
-        ensure_approximately_equals("10 Hz", mPredictor.getUpdateInterval(), 0.1f, 16);
+        CHECK_THAT(mPredictor.getUpdateInterval(), ll_test::WithinBits(0.1f, 16));
 
         ALMotionPredictor slow;
         // Drive the second one directly so both start clean.
         F64 t = 100.0;
         for (S32 i = 0; i < 12; ++i) { slow.noteUpdate(t); t += 1.0; }
-        ensure_approximately_equals("1 Hz", slow.getUpdateInterval(), 1.0f, 16);
+        CHECK_THAT(slow.getUpdateInterval(), ll_test::WithinBits(1.0f, 16));
     }
 
-    template<> template<>
-    void predictor_object_t::test<3>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: silence is not folded back into the rate", "[ALMotionPredictor]")
     {
-        set_test_name("silence is not folded back into the rate");
-
         feedCadence(0.1f);
         const F32 before = mPredictor.getUpdateInterval();
 
         // The gap the window exists to detect must not move the threshold to wherever the object
         // already is, or an object can never be late.
         mPredictor.noteUpdate(200.0);
-        ensure_equals("a long gap is not evidence about a send rate",
-                      mPredictor.getUpdateInterval(), before);
+        UNSCOPED_INFO("a long gap is not evidence about a send rate");
+        CHECK(mPredictor.getUpdateInterval() == before);
 
         mPredictor.forgetCadence();
-        ensure("a handoff clears it", !mPredictor.hasCadence());
+        UNSCOPED_INFO("a handoff clears it");
+        CHECK_FALSE(mPredictor.hasCadence());
     }
 
     // ----------------------------------------------------------------- window
 
-    template<> template<>
-    void predictor_object_t::test<4>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: no observed cadence means no taper", "[ALMotionPredictor]")
     {
-        set_test_name("no observed cadence means no taper");
-
         mTuning.mCadenceAware = true;
         const ALMotionPredictor::Window w = mPredictor.phaseOutWindow(mTuning);
-        ensure("a ballistic object the sim never corrects keeps coasting", !w.isTapering());
-        ensure_equals("and keeps its full step", ALMotionPredictor::phaseOutFactor(60.f, w), 1.f);
+        UNSCOPED_INFO("a ballistic object the sim never corrects keeps coasting");
+        CHECK_FALSE(w.isTapering());
+        UNSCOPED_INFO("and keeps its full step");
+        CHECK(ALMotionPredictor::phaseOutFactor(60.f, w) == 1.f);
     }
 
-    template<> template<>
-    void predictor_object_t::test<5>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: window scales with the object's own update rate", "[ALMotionPredictor]")
     {
-        set_test_name("window scales with the object's own update rate");
-
         mTuning.mCadenceAware = true;
         struct { F32 mInterval; F32 mStart; F32 mEnd; } cases[] = {
             { 0.1f,  1.f,  3.f },   // ~10 Hz: floored at the configured phase-out time
@@ -154,18 +142,17 @@ namespace tut
             for (S32 i = 0; i < 12; ++i) { p.noteUpdate(t); t += c.mInterval; }
 
             const ALMotionPredictor::Window w = p.phaseOutWindow(mTuning);
-            ensure("tapers", w.isTapering());
-            ensure_approximately_equals("start", w.mStart, c.mStart, 16);
-            ensure_approximately_equals("end", w.mEnd, c.mEnd, 16);
-            ensure("taper span is preserved", w.mEnd - w.mStart >= 2.f - 1e-4f);
+            CAPTURE(c.mInterval);
+            REQUIRE(w.isTapering());
+            REQUIRE_THAT(w.mStart, ll_test::WithinBits(c.mStart, 16));
+            REQUIRE_THAT(w.mEnd, ll_test::WithinBits(c.mEnd, 16));
+            UNSCOPED_INFO("taper span is preserved");
+            REQUIRE(w.mEnd - w.mStart >= 2.f - 1e-4f);
         }
     }
 
-    template<> template<>
-    void predictor_object_t::test<6>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: a very slow mover is still bounded by the cap", "[ALMotionPredictor]")
     {
-        set_test_name("a very slow mover is still bounded by the cap");
-
         ALMotionPredictor p;
         F64 t = 100.0;
         for (S32 i = 0; i < 12; ++i) { p.noteUpdate(t); t += 2.4; }   // just inside credible
@@ -175,41 +162,39 @@ namespace tut
         mTuning.mCadenceFactor = 8.f;
 
         const ALMotionPredictor::Window w = p.phaseOutWindow(mTuning);
-        ensure("tapers", w.isTapering());
-        ensure_approximately_equals("clamped to the cap", w.mStart, mTuning.mCadenceCap, 16);
-        ensure_approximately_equals("and the taper still follows it",
-                                    w.mEnd, mTuning.mCadenceCap + 2.f, 16);
+        CHECK(w.isTapering());
+        CHECK_THAT(w.mStart, ll_test::WithinBits(mTuning.mCadenceCap, 16));
+        UNSCOPED_INFO("and the taper still follows it");
+        CHECK_THAT(w.mEnd, ll_test::WithinBits(mTuning.mCadenceCap + 2.f, 16));
     }
 
-    template<> template<>
-    void predictor_object_t::test<7>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: legacy mode ignores cadence entirely", "[ALMotionPredictor]")
     {
-        set_test_name("legacy mode ignores cadence entirely");
-
         // No cadence observed at all, yet the window still exists -- that is the default.
         const ALMotionPredictor::Window w = mPredictor.phaseOutWindow(mTuning);
-        ensure("tapers", w.isTapering());
-        ensure_approximately_equals("start", w.mStart, 1.f, 4);
-        ensure_approximately_equals("end", w.mEnd, 3.f, 4);
+        CHECK(w.isTapering());
+        CHECK_THAT(w.mStart, ll_test::WithinBits(1.f, 4));
+        CHECK_THAT(w.mEnd, ll_test::WithinBits(3.f, 4));
     }
 
     // ------------------------------------------------------------------- ramp
 
-    template<> template<>
-    void predictor_object_t::test<8>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: the phase-out ramp is continuous and monotone and bounded", "[ALMotionPredictor]")
     {
-        set_test_name("ramp is continuous, monotone and bounded");
-
         ALMotionPredictor::Window w;
         w.mStart = 1.f;
         w.mEnd   = 3.f;
 
-        ensure_equals("full before the window", ALMotionPredictor::phaseOutFactor(0.5f, w), 1.f);
-        ensure_equals("full at the start",      ALMotionPredictor::phaseOutFactor(1.f, w),  1.f);
-        ensure_equals("stopped at the end",     ALMotionPredictor::phaseOutFactor(3.f, w),  0.f);
-        ensure_equals("stopped after it",       ALMotionPredictor::phaseOutFactor(9.f, w),  0.f);
-        ensure_approximately_equals("halfway",
-                                    ALMotionPredictor::phaseOutFactor(2.f, w), 0.5f, 16);
+        UNSCOPED_INFO("full before the window");
+        CHECK(ALMotionPredictor::phaseOutFactor(0.5f, w) == 1.f);
+        UNSCOPED_INFO("full at the start");
+        CHECK(ALMotionPredictor::phaseOutFactor(1.f, w) == 1.f);
+        UNSCOPED_INFO("stopped at the end");
+        CHECK(ALMotionPredictor::phaseOutFactor(3.f, w) == 0.f);
+        UNSCOPED_INFO("stopped after it");
+        CHECK(ALMotionPredictor::phaseOutFactor(9.f, w) == 0.f);
+        UNSCOPED_INFO("halfway");
+        CHECK_THAT(ALMotionPredictor::phaseOutFactor(2.f, w), ll_test::WithinBits(0.5f, 16));
 
         // The step the two-branch form put in was about a third of full speed. Walking the ramp at
         // 240 fps, no single frame may drop by anything like that.
@@ -219,54 +204,48 @@ namespace tut
         for (F32 t = 0.f; t < 4.f; t += dt)
         {
             const F32 v = ALMotionPredictor::phaseOutFactor(t, w);
-            ensure("monotone non-increasing", v <= prev + 1e-6f);
+            CAPTURE(t);
+            REQUIRE(v <= prev + 1e-6f);
             worst = llmax(worst, prev - v);
             prev = v;
         }
-        ensure("no step in the curve", worst < 0.01f);
+        UNSCOPED_INFO("no step in the curve");
+        CHECK(worst < 0.01f);
     }
 
     // --------------------------------------------------------------- dt clamp
 
-    template<> template<>
-    void predictor_object_t::test<9>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: a stalled frame cannot carry an object the whole stall", "[ALMotionPredictor]")
     {
-        set_test_name("a stalled frame cannot carry an object the whole stall");
-
-        ensure_approximately_equals("an ordinary frame passes through",
-                                    ALMotionPredictor::clampFrameStep(1.f / 60.f, mTuning),
-                                    1.f / 60.f, 5);
-        ensure_equals("a 30 s pause is bounded",
-                      ALMotionPredictor::clampFrameStep(30.f, mTuning), mTuning.mMaxFrameStep);
-        ensure_equals("time never runs backwards",
-                      ALMotionPredictor::clampFrameStep(-1.f, mTuning), 0.f);
+        UNSCOPED_INFO("an ordinary frame passes through");
+        CHECK_THAT(ALMotionPredictor::clampFrameStep(1.f / 60.f, mTuning),
+                   ll_test::WithinBits(1.f / 60.f, 5));
+        UNSCOPED_INFO("a 30 s pause is bounded");
+        CHECK(ALMotionPredictor::clampFrameStep(30.f, mTuning) == mTuning.mMaxFrameStep);
+        UNSCOPED_INFO("time never runs backwards");
+        CHECK(ALMotionPredictor::clampFrameStep(-1.f, mTuning) == 0.f);
 
         mTuning.mMaxFrameStep = 0.f;
-        ensure_equals("zero disables the clamp",
-                      ALMotionPredictor::clampFrameStep(30.f, mTuning), 30.f);
+        UNSCOPED_INFO("zero disables the clamp");
+        CHECK(ALMotionPredictor::clampFrameStep(30.f, mTuning) == 30.f);
     }
 
     // ------------------------------------------------------------ integration
 
-    template<> template<>
-    void predictor_object_t::test<10>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: integration is independent of frame rate", "[ALMotionPredictor]")
     {
-        set_test_name("integration is independent of frame rate");
-
         const F32 reference = drop(60.f, 1.f);
         const F32 fps[] = { 30.f, 45.f, 90.f, 120.f, 144.f, 240.f, 300.f };
 
         for (F32 f : fps)
         {
-            ensure_approximately_equals("same fall at any frame rate", drop(f, 1.f), reference, 8);
+            CAPTURE(f);
+            REQUIRE_THAT(drop(f, 1.f), ll_test::WithinBits(reference, 8));
         }
     }
 
-    template<> template<>
-    void predictor_object_t::test<11>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: converting once reproduces the old per-frame form exactly", "[ALMotionPredictor]")
     {
-        set_test_name("converting once reproduces the old per-frame form exactly");
-
         // The viewer used to fold the timestep correction into every frame as
         //     (vel + 0.5 * (dt - PHYSICS_TIMESTEP) * accel) * dt
         // rather than converting the velocity once on arrival. Expanding both shows they are the
@@ -297,16 +276,13 @@ namespace tut
                 new_vel += accel * dt;
             }
 
-            ensure_approximately_equals("same trajectory as the form it replaces",
-                                        new_pos, old_pos, 20);
+            CAPTURE(f);
+            REQUIRE_THAT(new_pos, ll_test::WithinBits(old_pos, 20));
         }
     }
 
-    template<> template<>
-    void predictor_object_t::test<12>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: the timestep correction currently opposes the acceleration", "[ALMotionPredictor]")
     {
-        set_test_name("the timestep correction currently opposes the acceleration");
-
         // Characterisation, not endorsement. With the direction the viewer has always used, a
         // dropped object is handed an initial velocity *against* gravity of half a timestep's
         // worth -- so for the first ~11 ms it rises, and whether any given frame shows that
@@ -323,36 +299,33 @@ namespace tut
         drop(30.f, 0.2f, &first_at_30);
         drop(60.f, 0.2f, &first_at_60);
 
-        ensure("first frame is downward when the frame outlasts the correction",
-               first_at_30 < 0.f);
-        ensure("and upward when it does not -- this is the open question, not a feature",
-               first_at_60 > 0.f);
+        UNSCOPED_INFO("first frame is downward when the frame outlasts the correction");
+        CHECK(first_at_30 < 0.f);
+        UNSCOPED_INFO("and upward when it does not -- this is the open question, not a feature");
+        CHECK(first_at_60 > 0.f);
 
         const LLVector3 accel(0.f, 0.f, GRAVITY);
         const LLVector3 converted = ALMotionPredictor::finalVelocity(LLVector3::zero, accel);
-        ensure("the offset opposes the acceleration", converted.mV[VZ] * GRAVITY < 0.f);
+        UNSCOPED_INFO("the offset opposes the acceleration");
+        CHECK(converted.mV[VZ] * GRAVITY < 0.f);
     }
 
-    template<> template<>
-    void predictor_object_t::test<13>()
+    TEST_CASE_METHOD(predictor_data, "ALMotionPredictor: the sim timestep correction is small and only along the acceleration", "[ALMotionPredictor]")
     {
-        set_test_name("the sim timestep correction is applied once, and is small");
-
         const LLVector3 accel(0.f, 0.f, GRAVITY);
         const LLVector3 converted = ALMotionPredictor::finalVelocity(LLVector3::zero, accel);
 
         // Half a timestep of gravity, ~0.109 m/s. Direction is deliberately whatever the viewer
         // has always used; see SIGN_AVERAGE_TO_FINAL.
-        ensure_approximately_equals("offset magnitude",
-                                    fabsf(converted.mV[VZ]),
-                                    fabsf(0.5f * GRAVITY * ALMotionPredictor::SIM_TIMESTEP), 16);
-        ensure("horizontal axes untouched",
-               converted.mV[VX] == 0.f && converted.mV[VY] == 0.f);
+        CHECK_THAT(fabsf(converted.mV[VZ]),
+                   ll_test::WithinBits(fabsf(0.5f * GRAVITY * ALMotionPredictor::SIM_TIMESTEP), 16));
+        CHECK(converted.mV[VX] == 0.f);
+        CHECK(converted.mV[VY] == 0.f);
 
         // With no acceleration there is nothing to convert, which is the overwhelmingly common
         // case -- an avatar walking, a scripted mover at constant velocity.
         const LLVector3 walking(3.2f, 0.f, 0.f);
-        ensure_equals("unaccelerated velocity passes through untouched",
-                      ALMotionPredictor::finalVelocity(walking, LLVector3::zero), walking);
+        UNSCOPED_INFO("unaccelerated velocity passes through untouched");
+        CHECK(ALMotionPredictor::finalVelocity(walking, LLVector3::zero) == walking);
     }
 }

@@ -143,6 +143,26 @@ public:
     // the entry point has actually resolved, so callers may trust it directly. Absent on
     // macOS GL 4.1, which stays forward-Z.
     bool mHasClipControl = false;
+    // Compute shaders, shader storage buffers, image load/store and indirect dispatch: core in 4.3.
+    // Only true once every entry point the compute path calls has resolved (glDispatchCompute,
+    // glDispatchComputeIndirect, glMemoryBarrier, glBindImageTexture, glShaderStorageBlockBinding,
+    // glGetProgramResourceIndex, glGetProgramInterfaceiv, glGetProgramResourceName,
+    // glGetProgramResourceiv, glClearBufferSubData, glDrawArraysIndirect, glGetIntegeri_v), so
+    // callers may trust it directly. What the context can do, not whether the session uses it:
+    // see LLRender::sCompute.
+    bool mHasCompute = false;
+    // The compute limits, queried only where mHasCompute; 0 elsewhere.
+    S32 mMaxComputeWorkGroupCount[3] = {};
+    S32 mMaxComputeWorkGroupSize[3] = {};
+    S32 mMaxComputeWorkGroupInvocations = 0;
+    S32 mMaxComputeSharedMemorySize = 0;
+    S32 mMaxImageUnits = 0;
+    S32 mMaxShaderStorageBufferBindings = 0;
+    S32 mMaxVertexShaderStorageBlocks = 0;    // a conforming 4.3 may report 0
+    S32 mMaxFragmentShaderStorageBlocks = 0;
+    S32 mMaxComputeShaderStorageBlocks = 0;
+    S64 mMaxShaderStorageBlockSize = 0;
+    S32 mShaderStorageBufferOffsetAlignment = 0;
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;
@@ -209,6 +229,7 @@ public:
 private:
     void reloadExtensionsString();
     void initExtensions();
+    void initCompute();
     void initGLStates();
 };
 
@@ -223,13 +244,18 @@ void flush_glerror(); // Flush GL errors when we know we're handling them correc
 
 void log_glerror();
 // Validate every sampler the currently bound program declares against the state actually
-// bound to its texture unit: something bound at all, and no depth/compare mismatch in either
+// bound to its texture unit: something bound at all, no depth/compare mismatch in either
 // direction (non-shadow sampler over a compare-enabled depth texture, or a shadow sampler
-// without comparisons). Returns true when the state is sound.
+// without comparisons), and no integer one -- an integer sampler over a texture that is
+// neither integer nor read as its stencil, a float sampler over one that is, or an integer
+// texture under a filtering sampler, which leaves it incomplete. And every image against
+// its image unit: a float image over an integer format, or an integer one over the wrong
+// sign or a float format. Returns true when the state is sound.
 //
-// gDebugGL only -- returns true immediately otherwise. Intended for llassert() at draw
-// sites, the way LLVertexBuffer::validateRange is used, so it fails at the draw responsible
-// and names the uniform instead of leaving a driver warning to be traced back by hand.
+// gDebugGL only -- returns true immediately otherwise. Intended for llassert() at draw and
+// dispatch sites, the way LLVertexBuffer::validateRange is used, so it fails at the draw
+// responsible and names the uniform instead of leaving a driver warning to be traced back
+// by hand.
 bool validate_bound_samplers();
 
 // Drop the cached sampler enumeration for a program about to be deleted. GL is free to hand
@@ -319,6 +345,10 @@ public:
     static void initClass();
     static void restoreGL();
 
+    // Record a cap set with a raw glEnable/glDisable, so a scoped state does not take it for
+    // GL's default. The map describes the main context; call on the main thread only.
+    static void seedState(LLGLenum state, LLGLboolean enabled) { sStateMap[state] = enabled; }
+
     static void resetTextureStates();
     static void dumpStates();
 
@@ -334,6 +364,9 @@ public:
     enum { CURRENT_STATE = -2, DISABLED_STATE = 0, ENABLED_STATE = 1 };
     LLGLState(LLGLenum state, S32 enabled = CURRENT_STATE);
     ~LLGLState();
+    // A copy would restore the cap a second time.
+    LLGLState(const LLGLState&) = delete;
+    LLGLState& operator=(const LLGLState&) = delete;
     void setEnabled(S32 enabled);
     void enable() { setEnabled(ENABLED_STATE); }
     void disable() { setEnabled(DISABLED_STATE); }

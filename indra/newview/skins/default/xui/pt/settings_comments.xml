@@ -37,8 +37,6 @@
   <string>Permite que seu próprio tempo de renderização transforme seu avatar em impostor.</string>
   <key>AllowTapTapHoldRun</key>
   <string>Tocar duas vezes em uma tecla de direção e mantê-la pressionada faz o avatar correr.</string>
-  <key>AnalyzePerformance</key>
-  <string>Solicitar análise de desempenho para uma execução específica do viewer.</string>
   <key>AnimateTextures</key>
   <string>Ativar animação de texturas (depuração).</string>
   <key>AnimatedObjectsAllowLeftClick</key>
@@ -1041,12 +1039,8 @@
   <string>Registrar no chat do sistema sempre que uma oferta de inventário for recusada.</string>
   <key>LogMessages</key>
   <string>Registrar tráfego de rede.</string>
-  <key>LogMetrics</key>
-  <string>Registrar métricas do viewer.</string>
   <key>LogNearbyChat</key>
   <string>Registrar mensagens do Chat Próximo em arquivo. Usado no lugar de LogChat, com valor padrão "1".</string>
-  <key>LogPerformance</key>
-  <string>Registrar análise de desempenho para uma execução específica do viewer.</string>
   <key>LogShowHistory</key>
   <string>Exibir histórico no log.</string>
   <key>LogTextureDownloadsToSimulator</key>
@@ -1839,18 +1833,10 @@
   <string>Escalar de ruído para esconder banding na renderização diferida.</string>
   <key>RenderDeferredSSAO</key>
   <string>Executar o shader de oclusão de ambiente em espaço de tela no renderizador diferido.</string>
-  <key>RenderDeferredSpotShadowBias</key>
-  <string>Valor de viés para sombras de spot (previne shadow acne).</string>
-  <key>RenderDeferredSpotShadowOffset</key>
-  <string>Valor de deslocamento para sombras de spot (previne shadow acne).</string>
   <key>RenderDeferredSun</key>
   <string>Executar o shader de luz solar no renderizador diferido.</string>
   <key>RenderDeferredSunWash</key>
   <string>Quanto as luzes locais são apagadas pelo sol.</string>
-  <key>RenderDeferredTreeShadowBias</key>
-  <string>Valor de viés para sombras de árvores (previne shadow acne).</string>
-  <key>RenderDeferredTreeShadowOffset</key>
-  <string>Valor de deslocamento para sombras de árvores (previne shadow acne).</string>
   <key>RenderDelayCreation</key>
   <string>Limitar a criação de drawables.</string>
   <key>RenderDelayVBUpdate</key>
@@ -2197,8 +2183,6 @@
   <string>Renderizar a água como transparente. Definir como falso renderiza a água como opaca com uma textura simples aplicada.</string>
   <key>RenderTreeLODFactor</key>
   <string>Controla o nível de detalhe da vegetação (multiplicador para a área de tela atual ao calcular o nível de detalhe).</string>
-  <key>RenderUIBuffer</key>
-  <string>Armazenar em cache a renderização da interface em um buffer alinhado à tela.</string>
   <key>RenderUIInSnapshot</key>
   <string>Exibir a interface do usuário na captura.</string>
   <key>RenderUnloadedAvatar</key>

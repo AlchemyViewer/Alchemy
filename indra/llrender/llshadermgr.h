@@ -615,8 +615,38 @@ public:
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
         MOON_QUAD_V,                        //  "moonQuadV"  its up half-extent over its squared length
 
+        // Selection outlines, hover glow and wireframe (ALSelectionOutline)
+        SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535
+        SELECTION_PRIORITY,                 //  "selection_priority"  ALSelectionOutline::EPriority
+        SELECTION_SHOW_HIDDEN,              //  "selection_show_hidden"  1 where hidden parts are drawn dimmed
+        SELECTION_OUTLINED,                 //  "selection_outlined"  0 where the id pass holds it for its wireframe alone
+        SELECTION_SCENE_DEPTH,              //  "selection_scene_depth"  1 where the scene's depth decides what is hidden
+        OUTLINE_WIDTH,                      //  "outline_width"  the contour's width in pixels
+        OUTLINE_INNER_WIDTH,                //  "outline_inner_width"  the edges between objects' width in pixels
+        OUTLINE_GLOW_RADIUS,                //  "outline_glow_radius"  the hover glow's reach in pixels, 0 for none
+        OUTLINE_GLOW_BRIGHTNESS,            //  "outline_glow_brightness"  RenderHighlightBrightness
+        WIREFRAME_PASS,                     //  "wireframe_pass"  ALSelectionOutline::EWirePass
+        WIREFRAME_WIDTH,                    //  "wireframe_width"  the lines' width in pixels
+        SELECTION_ID_MAP,                   //  "selectionIdMap"  the id target, read by the passes after the id pass
+        SELECTION_JUMP_MAP,                 //  "selectionJumpMap"  the near sides of jumps the jump pass marks
+        SELECTION_TILE_MAP,                 //  "selectionTileMap"  the tile pass's record of each tile
+        SELECTION_PALETTE,                  //  "selectionPalette"  each id's visible and hidden colours
+        SELECTION_GLOW_REACH_MAP,           //  "selectionGlowReachMap"  the glowing ids within the glow's reach of each tile
+        SELECTION_GLOW_ROW_MAP,             //  "selectionGlowRowMap"  the nearest glowing texel along each texel's row
+
+        WATER_GLINT_ROUGHNESS,              //  "waterGlintRoughness"  the roughness of the sun's reflection on each wave face
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
+
+    // Shader storage blocks, by block name, set in initAttribsAndUniforms beside the uniforms. Each has fixed binding
+    // points, the same in every program that declares it, as the engine's uniform blocks have theirs: the entries
+    // take them in this order, an array of blocks one for each of its elements. A buffer bound at a block's point is
+    // there for every program, so a pass binds it once whatever it draws or dispatches between.
+    typedef enum
+    {                                       // Block name, element count
+        END_RESERVED_STORAGE_BLOCKS
+    } eGLSLReservedStorageBlocks;
     // clang-format on
 
     // singleton pattern implementation
@@ -629,10 +659,29 @@ public:
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
     bool    linkProgramObject(GLuint obj, bool suppress_errors = false, const std::string& shader_name = "unknown");
     bool    validateProgramObject(GLuint obj);
+    // Compile a shared object into mShaderObjects, which owns it from then on: programs attach it by name and never
+    // delete it, and an object it replaces under the same key is deleted. Returns the object, or 0.
     // `cache_key` overrides the map key the compiled object is stored under; empty means the
     // path. Shared objects are compiled once and attached by name, so a source that keys on a
     // compile-time variant axis is compiled once per axis value under distinct keys.
-    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string());
+    // `min_glsl_version` is the least #version the stage compiles at (430 to read storage blocks or images); 0 is the
+    // context's usual, and a compute stage is always 430. A context whose GLSL is below it fails the stage.
+    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string(), U32 min_glsl_version = 0);
+    // Compile a stage the caller owns and deletes, stored nowhere: what a program compiles of its own files. As
+    // loadShaderFile otherwise, from the class `shader_level` names down to the first that compiles.
+    GLuint compileShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, U32 min_glsl_version = 0);
+
+    // Delete a shader object. One still attached to a program is only flagged, and goes when the last program
+    // holding it detaches it.
+    static void deleteShaderObject(GLuint object);
+
+    // Shader objects compileShaderFile has made and deleteShaderObject has not yet deleted: the shared ones, plus any
+    // a program is still linking. A count that only grows is a leak.
+    static U32 sLiveObjects;
+
+    // The binding point of `element` of a reserved storage block (eGLSLReservedStorageBlocks), the same in every
+    // program; -1 for an index or element the table does not have.
+    S32 getStorageBlockBinding(S32 block, U32 element = 0) const;
 
     // Suffixes marking the axis copies of a shared object. Not legal path character sequences,
     // so they cannot collide with a real file.
@@ -687,17 +736,29 @@ public:
     // The "#define <STAGE>_SHADER 1" line loadShaderFile prepends for a stage.
     static const char* stageDefine(GLenum type);
 
+    // Delete every shared object and forget it. A program built on them goes on drawing, as a linked program needs
+    // none of its objects; one built afterwards needs them compiled again.
     void clearShaderObjects();
 
 public:
     // Compiled shared shader objects per stage, keyed by path -- or by the
-    // distinct key an axis copy was stored under (see loadShaderFile).
+    // distinct key an axis copy was stored under (see loadShaderFile). The
+    // manager owns them: unloading a program that attached one leaves it here.
     boost::unordered_flat_map<std::string, GLuint> mShaderObjects[STAGE_COUNT];
 
     //global (reserved slot) shader parameters
     std::vector<std::string> mReservedAttribs;
 
     std::vector<std::string> mReservedUniforms;
+
+    // The storage blocks, in eGLSLReservedStorageBlocks order: a block's name, and how many elements an array of it
+    // has (1 for a single block). Their binding points together stay within AL_NUM_STORAGE_BINDINGS.
+    struct ReservedStorageBlock
+    {
+        std::string mName;
+        U32         mCount = 1;
+    };
+    std::vector<ReservedStorageBlock> mReservedStorageBlocks;
 
     struct ProgramBinaryData
     {

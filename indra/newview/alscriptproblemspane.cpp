@@ -84,6 +84,11 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
             return;
         }
         made.rows.push_back(std::move(row));
+        // At no line: listed, and marked nowhere.
+        if (line < 0)
+        {
+            return;
+        }
         made.marks.emplace_back(line, mark);
         ALCodeEditor::Decoration decoration;
         const ALTextPos begin = text.clamp(ALTextPos(line, has_column ? column : 0));
@@ -113,7 +118,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     auto       analysed_error_near = [&](S32 line) {
         for (const ALScriptProblem& problem : doc.check->analysis)
         {
-            if (problem.severity == ALScriptProblem::Severity::Error && problem.file.empty() && std::abs(problem.line - line) <= 1)
+            if (line >= 0 && problem.severity == ALScriptProblem::Severity::Error && problem.file.empty() && std::abs(problem.line - line) <= 1)
             {
                 return true;
             }
@@ -201,7 +206,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     }
     for (const Doc::RuntimeProblem& problem : doc.runtime)
     {
-        const S32 line   = llmax(0, problem.line);
+        const S32 line   = problem.line;
         const S32 column = llmax(0, problem.column);
         // Said again and again, it is one problem, with how many times.
         std::string message = problem.message;
@@ -217,6 +222,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     if (!doc.check->definitionsError.empty())
     {
         Doc::Shown row;
+        row.line    = -1;
         row.level   = Doc::Level::Note;
         row.origin  = services.words("OriginDefinitions");
         row.message = doc.check->definitionsError;
@@ -242,6 +248,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         args["[LEFT]"]   = nearing ? fmt::format("{:f}", (F64)(weight.limit - weight.total) / 1024.0) : std::string();
         args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
         Doc::Shown row;
+        row.line    = -1;
         row.level   = Doc::Level::Warning;
         row.origin  = services.words("OriginWeight");
         const char* said = nearing                ? (weight.estimate ? "WeightNearEstimate" : "WeightNear")
@@ -934,6 +941,11 @@ std::string ALScriptProblemsPane::whereOf(const Doc* doc, const Doc::Shown& prob
                                      ? editor->document().displayColumn(ALTextPos(problem.line, problem.column), editor->getTabWidth())
                                      : problem.column;
     // The line as the tab's gutter counts it: a notecard's may be from 0.
+    // Nothing where it names none.
+    if (problem.line < 0)
+    {
+        return std::string();
+    }
     const S32 line = mServices->shownLine(problem.line, doc && doc->itemNotecard() && problem.file.empty());
     return problem.hasColumn ? fmt::format("{}:{}", line, column + 1) : std::to_string(line);
 }
@@ -969,8 +981,9 @@ std::string ALScriptProblemsPane::tipOf(const LLScrollListItem* item) const
     const std::string level = mServices->words(problem->level == Doc::Level::Error     ? "LevelError"
                                                : problem->level == Doc::Level::Warning ? "LevelWarning"
                                                                                        : "LevelNote");
-    std::string tip = level + "   \xC2\xB7   " + (!problem->file.empty() ? problem->fileName : doc ? doc->name : one ? one->name : std::string()) + ":" +
-                      whereOf(doc, *problem) + "\n" + problem->message;
+    const std::string where = whereOf(doc, *problem);
+    std::string tip = level + "   \xC2\xB7   " + (!problem->file.empty() ? problem->fileName : doc ? doc->name : one ? one->name : std::string()) +
+                      (where.empty() ? std::string() : ":" + where) + "\n" + problem->message;
     for (const ALScriptFix& fix : problem->fixes)
     {
         if (fix.kind == ALScriptFix::Kind::Fix)
@@ -1023,16 +1036,28 @@ void ALScriptProblemsPane::selectFirstError(bool checkers_only)
     mList->updateSort();
     const std::vector<LLScrollListItem*> rows     = mList->getAllData();
     const std::string                    compiler = mServices->words("OriginCompiler");
+    // One at a line first, which there is somewhere to go to; one at none,
+    // listed first, only where no error names a line.
+    std::optional<size_t> chosen;
     for (size_t i = 0; i < rows.size(); ++i)
     {
         const Doc::Shown* problem = shownOf(rows[i]->getValue());
         if (problem && problem->level == Doc::Level::Error && (!checkers_only || problem->origin != compiler))
         {
-            mList->selectNthItem(static_cast<S32>(i));
-            mList->scrollToShowSelected();
-            choose(true);
-            return;
+            if (problem->line < 0)
+            {
+                chosen = chosen ? chosen : i;
+                continue;
+            }
+            chosen = i;
+            break;
         }
+    }
+    if (chosen)
+    {
+        mList->selectNthItem(static_cast<S32>(*chosen));
+        mList->scrollToShowSelected();
+        choose(true);
     }
 }
 
@@ -1183,7 +1208,9 @@ void ALScriptProblemsPane::act(const std::string& action)
     const auto as_text = [this](const Doc& whose, const Doc::Shown& one) {
         const std::string name  = !one.fileName.empty() ? one.fileName : whose.name;
         const S32         line  = mServices->shownLine(one.line, whose.itemNotecard() && one.file.empty());
-        const std::string where = one.hasColumn ? fmt::format("{}:{}:{}", name, line, one.column + 1) : fmt::format("{}:{}", name, line);
+        const std::string where = one.line < 0      ? name
+                                  : one.hasColumn ? fmt::format("{}:{}:{}", name, line, one.column + 1)
+                                                  : fmt::format("{}:{}", name, line);
         const std::string level = one.level == Doc::Level::Error ? "error" : one.level == Doc::Level::Warning ? "warning" : "note";
         return where + ": " + level + ": " + one.message + " [" + one.origin + "]";
     };
