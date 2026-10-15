@@ -198,6 +198,8 @@ public:
     // Two images locked together, in address order rather than argument order, so two
     // threads locking the same pair from opposite sides take turns instead of waiting on
     // each other. An image passed as both is locked once, exclusively if either side asks.
+    // The order is only this pair's: a caller already holding one of the images has
+    // taken that one first, whatever its address.
     template<bool SHARED_FIRST, bool SHARED_SECOND>
     class DataLockPair
     {
@@ -216,7 +218,16 @@ public:
                 std::swap(mLow, mHigh);
             }
             mLow.lock();
-            mHigh.lock();
+            try
+            {
+                mHigh.lock();
+            }
+            catch (...)
+            {
+                // No destructor runs for a constructor that throws.
+                mLow.unlock();
+                throw;
+            }
         }
 
         DataLockPair(const DataLockPair&) = delete;

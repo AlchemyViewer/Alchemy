@@ -26,11 +26,15 @@
 
 #include "llimage.h"
 
+#include "altestfatal.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <thread>
 #include <type_traits>
 
@@ -119,6 +123,28 @@ namespace
         return !writer.finishesWithin(BLOCKED);
     }
 
+    // Holds the higher of two images while another thread locks them as a pair passed
+    // as given, and checks that thread has the lower one while it waits on the higher.
+    template <typename LOCK>
+    void checkLowerFirst(const LLPointer<LLImageRaw>& first, const LLPointer<LLImageRaw>& second)
+    {
+        const bool first_low = std::less<const LLImageBase*>()(first.get(), second.get());
+        const LLPointer<LLImageRaw>& low = first_low ? first : second;
+        const LLPointer<LLImageRaw>& high = first_low ? second : first;
+
+        std::optional<LLImageDataLock> held(std::in_place, high);
+        Worker locker([first, second]()
+            {
+                LOCK lock(first, second);
+            });
+        REQUIRE_FALSE(locker.finishesWithin(BLOCKED));
+        UNSCOPED_INFO("the higher image was locked first");
+        CHECK(writersExcluded(low));
+
+        held.reset();
+        CHECK(locker.finishesWithin(RELEASED));
+    }
+
     TEST_CASE("llimage: copies each way between two images do not deadlock", "[llimage]")
     {
         // A copy reads its source and writes its destination. Locked in argument order,
@@ -144,6 +170,18 @@ namespace
         UNSCOPED_INFO("copies the opposite way round deadlocked");
         CHECK(forward.finishesWithin(RELEASED));
         CHECK(backward.finishesWithin(RELEASED));
+    }
+
+    TEST_CASE("llimage: a pair takes the lower image first whichever way it is passed", "[llimage]")
+    {
+        // Two pairs that agree on the order cannot each hold what the other waits for,
+        // which the copies above find only by chance.
+        LLPointer<LLImageRaw> a = new LLImageRaw(8, 8, 4);
+        LLPointer<LLImageRaw> b = new LLImageRaw(8, 8, 4);
+        checkLowerFirst<LLImageDataCopyLock>(a, b);
+        checkLowerFirst<LLImageDataCopyLock>(b, a);
+        checkLowerFirst<LLImageDataLockPair>(a, b);
+        checkLowerFirst<LLImageDataLockPair>(b, a);
     }
 
     TEST_CASE("llimage: a copy lock reads one image and writes the other in either address order", "[llimage]")
@@ -176,6 +214,43 @@ namespace
         }
         UNSCOPED_INFO("the image stayed locked");
         CHECK_FALSE(writersExcluded(image));
+    }
+
+    TEST_CASE("llimage: a lock pair writes both images", "[llimage]")
+    {
+        LLPointer<LLImageRaw> a = new LLImageRaw(8, 8, 4);
+        LLPointer<LLImageRaw> b = new LLImageRaw(8, 8, 4);
+        {
+            LLImageDataLockPair lock(a, b);
+            CHECK(readersExcluded(a));
+            CHECK(readersExcluded(b));
+        }
+        CHECK_FALSE(writersExcluded(a));
+        CHECK_FALSE(writersExcluded(b));
+
+        {
+            LLImageDataLockPair lock(a, a);
+            CHECK(readersExcluded(a));
+        }
+        UNSCOPED_INFO("the image stayed locked");
+        CHECK_FALSE(writersExcluded(a));
+    }
+
+    TEST_CASE("llimage: a pair whose second lock fails lets go of its first", "[llimage]")
+    {
+        // A thread reading an image cannot also write it, and asserts. The pair has
+        // the lower image by then, and no destructor runs for a constructor that throws.
+        LLPointer<LLImageRaw> a = new LLImageRaw(8, 8, 4);
+        LLPointer<LLImageRaw> b = new LLImageRaw(8, 8, 4);
+        const bool a_low = std::less<const LLImageBase*>()(a.get(), b.get());
+        const LLPointer<LLImageRaw>& low = a_low ? a : b;
+        const LLPointer<LLImageRaw>& high = a_low ? b : a;
+        {
+            LLImageDataSharedLock reading(high);
+            CHECK_THROWS_AS(LLImageDataCopyLock(low, high), ll_test::FatalError);
+        }
+        UNSCOPED_INFO("the lower image was left locked");
+        CHECK_FALSE(writersExcluded(low));
     }
 
     TEST_CASE("llimage: a null side leaves the other locked alone", "[llimage]")
