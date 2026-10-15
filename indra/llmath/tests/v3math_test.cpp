@@ -37,6 +37,7 @@
 #include "../v3math.h"
 #include "../llquaternion.h"
 #include "../llquantize.h"
+#include "altestmatchers.h"
 
 
 namespace
@@ -565,9 +566,12 @@ namespace
         val3 = z1 + (z2 - z1)* val;
         LLVector3 vec3(x1,y1,z1),vec3a(x2,y2,z2);
         LLVector3 vec3b = lerp(vec3,vec3a,val);
-        CHECK(val1 ==vec3b.mV[VX]);
-        CHECK(val2 ==vec3b.mV[VY]);
-        CHECK(val3 ==vec3b.mV[VZ]);
+        // Within the rounding of the larger of the two terms each sums, which
+        // the library's lerp and this working of it may round differently.
+        auto terms = [&](F32 a, F32 b) { return llmax(fabsf(a), fabsf((b - a) * val)); };
+        CHECK_THAT(vec3b.mV[VX], ll_test::WithinRounding(val1, terms(x1, x2)));
+        CHECK_THAT(vec3b.mV[VY], ll_test::WithinRounding(val2, terms(y1, y2)));
+        CHECK_THAT(vec3b.mV[VZ], ll_test::WithinRounding(val3, terms(z1, z2)));
     }
 
     TEST_CASE("v3math_h: dist_vec and its squared and 2D forms", "[v3math_h]")

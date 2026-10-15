@@ -882,7 +882,11 @@ namespace
             REQUIRE(read_written(bytes, written));
             CHECK((S32)written.mConstraintType == (S32)CONSTRAINT_TYPE_PLANE);
             UNSCOPED_INFO("the direction it gave is normalized");
-            CHECK(written.mTargetDir == LLVector3(0.f, 0.f, 1.f));
+            // To the rounding of a unit vector: normalizing may take a
+            // reciprocal, which the tree lets round a step either way.
+            CHECK_THAT(written.mTargetDir.mV[VX], ll_test::WithinRounding(0.f, 1.f));
+            CHECK_THAT(written.mTargetDir.mV[VY], ll_test::WithinRounding(0.f, 1.f));
+            CHECK_THAT(written.mTargetDir.mV[VZ], ll_test::WithinRounding(1.f, 1.f));
         }
 
         // A name is read into fifteen of the sixteen bytes and stops there.

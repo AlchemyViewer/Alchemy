@@ -30,6 +30,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "../v3color.h"
+#include "altestmatchers.h"
 
 
 namespace
@@ -308,9 +309,12 @@ namespace
         val2 = g1 + (g2 - g1)* val;
         val3 = b1 + (b2 - b1)* val;
         LLColor3 llcolor3b = lerp(llcolor3,llcolor3a,val);
-        CHECK(val1 ==llcolor3b.mV[0]);
-        CHECK(val2 ==llcolor3b.mV[1]);
-        CHECK(val3 ==llcolor3b.mV[2]);
+        // Within the rounding of the larger of the two terms each sums, which
+        // the library's lerp and this working of it may round differently.
+        auto terms = [&](F32 a, F32 b) { return llmax(fabsf(a), fabsf((b - a) * val)); };
+        CHECK_THAT(llcolor3b.mV[0], ll_test::WithinRounding(val1, terms(r1, r2)));
+        CHECK_THAT(llcolor3b.mV[1], ll_test::WithinRounding(val2, terms(g1, g2)));
+        CHECK_THAT(llcolor3b.mV[2], ll_test::WithinRounding(val3, terms(b1, b2)));
     }
 
     TEST_CASE("v3color_h: distVec and distVec_squared", "[v3color_h]")

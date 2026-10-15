@@ -37,6 +37,7 @@
 #include "../m4math.h"
 #include "../m3math.h"
 #include "../llquaternion.h"
+#include "altestmatchers.h"
 
 namespace
 {
@@ -351,10 +352,12 @@ namespace
         LLVector4 vect(12.0f, 5.0f, 60.0f, 75.1f);
         LLQuaternion quat(2323.034f, 23.5f, 673.23f, 57667.5f);
         LLVector4 result = vect * quat;
-        CHECK(is_approx_equal(39928406016.0f, result.mV[0]));
-        CHECK(1457802240.0f >= result.mV[1]);
-        CHECK(1457800960.0f <= result.mV[1]);
-        CHECK(is_approx_equal(200580612096.0f, result.mV[2]));
+        // Each the exact rotation rounded to a float, within the rounding of
+        // the largest of the four terms it sums, which the order the compiler
+        // sums them in moves: 3.98e10, 9.06e9 and 2.00e11.
+        CHECK_THAT(result.mV[0], ll_test::WithinRounding(39928406016.0f, 3.98e10f));
+        CHECK_THAT(result.mV[1], ll_test::WithinRounding(1457802240.0f, 9.06e9f));
+        CHECK_THAT(result.mV[2], ll_test::WithinRounding(200580612096.0f, 2.00e11f));
         CHECK(result.mV[3] == 75.099998f);
 
         LLVector4 vect1(22.0f, 45.0f, 40.0f, 78.1f);

@@ -32,7 +32,9 @@
 #include <catch2/catch_tostring.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 
+#include <cmath>
 #include <cstddef>
+#include <limits>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -111,6 +113,19 @@ namespace ll_test
     WithinDistanceMatcher<T> WithinDistance(T expected, T distance)
     {
         return WithinDistanceMatcher<T>(expected, distance);
+    }
+
+    // Within the rounding of a value worked from terms as large as
+    // `magnitude`: four steps of the floating-point spacing there. The tree's
+    // floating point (00-Common.cmake) lets the compiler contract and reorder
+    // a computation differently each place it is worked, so a test's own
+    // working of a library's formula may differ from the library's in the
+    // last bits -- of its largest term, not of the value, since terms that
+    // cancel leave a small value their rounding.
+    template <typename F>
+    WithinDistanceMatcher<F> WithinRounding(F expected, F magnitude)
+    {
+        return WithinDistance(expected, F(4) * std::numeric_limits<F>::epsilon() * std::fabs(magnitude));
     }
 
     // ensure_equals on LLSD: the same type, and the same value all the way
