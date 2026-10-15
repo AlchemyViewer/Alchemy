@@ -112,7 +112,10 @@ protected:
     class LLCondition*  mRunCondition;
 
     std::thread        *mThreadp;
-    EThreadStatus       mStatus;
+    // Written by the thread as it ends, and read by whoever waits for it to:
+    // atomic, so that once a waiter reads it stopped, all the thread did
+    // before is seen done -- what shutdown() deletes after reading it.
+    std::atomic<EThreadStatus> mStatus;
     id_t                mID;
     LLTrace::ThreadRecorder* mRecorder;
 
