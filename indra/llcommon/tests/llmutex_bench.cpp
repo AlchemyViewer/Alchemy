@@ -40,7 +40,8 @@
 
 #include "altestbenchmark.h"
 
-#include <cstdint>
+#include <catch2/benchmark/catch_optimizer.hpp>
+
 #include <memory>
 #include <thread>
 #include <vector>
@@ -110,7 +111,9 @@ namespace
         BENCHMARK("construct and destroy, on the heap as an image is")
         {
             auto mutex = std::make_unique<LLSharedMutex>();
-            return reinterpret_cast<std::uintptr_t>(mutex.get());
+            // Keeps the allocation. Returning its address would too, but clang reads that
+            // as returning the address of the local unique_ptr.
+            Catch::Benchmark::keep_memory(mutex.get());
         };
 
         LLSharedMutex mutex;
