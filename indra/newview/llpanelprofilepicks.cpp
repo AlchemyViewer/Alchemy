@@ -285,7 +285,9 @@ void LLPanelProfilePicks::callbackDeletePick(const LLSD& notification, const LLS
         LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
         if (pick_panel && pick_panel->getPickId() == pick_id)
         {
+            // Let go by its tab, and kept by nothing else.
             mTabContainer->removeTabPanel(pick_panel);
+            pick_panel->die();
         }
 
         if (pick_id.notNull())
@@ -349,7 +351,8 @@ void LLPanelProfilePicks::processProperties(const LLAvatarData* avatar_picks)
         }
     }
 
-    mTabContainer->deleteAllTabs();
+    // The picks' panels are this one's, made again below.
+    mTabContainer->deleteAllTabs(true);
 
     LLAvatarData::picks_list_t::const_iterator it = avatar_picks->picks_list.begin();
     for (; avatar_picks->picks_list.end() != it; ++it)
@@ -434,7 +437,7 @@ void LLPanelProfilePicks::processProperties(const LLAvatarData* avatar_picks)
 void LLPanelProfilePicks::resetData()
 {
     resetLoading();
-    mTabContainer->deleteAllTabs();
+    mTabContainer->deleteAllTabs(true);
 }
 
 void LLPanelProfilePicks::updateButtons()

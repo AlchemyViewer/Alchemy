@@ -177,12 +177,16 @@ public:
 
     void        addTabPanel(LLPanel* panel);
     void        addTabPanel(const TabPanelParams& panel);
+    // Removing a tab, or all of them, lets its panel go without deleting it:
+    // the panel is its owner's again, who must keep it or have it die(). An
+    // owner that keeps none of them has deleteAllTabs() delete them, as it
+    // cannot reach them after.
     void        removeTabPanel( LLPanel* child );
     void        lockTabs(S32 num_tabs = 0);
     void        unlockTabs();
     S32         getNumLockedTabs() const { return mLockedTabCount; }
     void        enableTabButton(S32 which, bool enable);
-    void        deleteAllTabs();
+    void        deleteAllTabs(bool delete_panels = false);
     LLPanel*    getCurrentPanel();
     S32         getCurrentPanelIndex() const;
     S32         getTabCount() const;

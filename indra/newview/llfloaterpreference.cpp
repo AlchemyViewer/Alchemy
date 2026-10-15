@@ -584,6 +584,8 @@ bool LLFloaterPreference::postBuild()
     LLTabContainer* privacy_tabs = getChild<LLTabContainer>("privacy_tab_container");
     LLPanel* panel = getChild<LLPanel>("privacy_preferences_discord");
     privacy_tabs->removeTabPanel(panel);
+    // Let go by its tab, and wanted by nothing in a build without Discord.
+    panel->die();
 
     // General alone needs no tab row: hide it and give its room back to the page.
     privacy_tabs->setTabsHidden(true);
