@@ -3,8 +3,8 @@
 # LL's LSL compiler and LSO VM, restored from before ca08bd5aba removed
 # them: what emits LSO bytecode and CIL as LL's own does, and what runs the
 # LSO, a reference for the script tests and tools, never linked into the
-# viewer. The VM's library calls are answered by stand-ins a test gives. The parts that follow from the
-# grid's definitions -- the lexer's constants and events, the grammar's
+# viewer. The VM's library calls are answered by the test library
+# (tests/allsolibrary.h). The parts that follow from the grid's definitions -- the lexer's constants and events, the grammar's
 # events, the newer event nodes and the library table -- are written by
 # LL's own generator from lsl-definitions, as LL's build writes them, then
 # put through bison and flex.
@@ -172,17 +172,23 @@ endif()
 set_source_files_properties(${lscript_sources} PROPERTIES COMPILE_OPTIONS "${lscript_ieee_options}")
 
 # tests
+# The LSL library as the tests and the fuzzers run LL's VM with it.
+add_library(lscript_test_library OBJECT tests/allsolibrary.cpp)
+target_link_libraries(lscript_test_library PRIVATE al::flags lscript)
+set_target_properties(lscript_test_library PROPERTIES FOLDER "Tests/lscript")
+
 # LL's compiler over a handful of scripts, each to LSO and to CIL; and
 # Tailslide's LSO images and CIL, and the Mono weigher, held against LL's
-# compiler's over Tailslide's test scripts. One Catch2 binary, each file run
-# in a process of its own.
+# compiler's over Tailslide's test scripts; and LL's VM running scripts. One
+# Catch2 binary, each file run in a process of its own.
 al_add_test_binary(
   lscript_tests
   PROJECT lscript
-  SOURCES tests/allslreference_test.cpp tests/allslreferencecheck_test.cpp
-  SUPPORT alscript_test_checks llcommon_test_checks
+  SOURCES tests/allslreference_test.cpp tests/allslreferencecheck_test.cpp tests/allsovm_test.cpp
+  SUPPORT alscript_test_checks llcommon_test_checks lscript_test_library
   LIBRARIES lscript alscript llcommon
   DEFINES
     "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\""
     "AL_ALSCRIPT_TEST_DIR=\"${INDRA_SOURCE_DIR}/alscript/tests\""
+    "AL_LSCRIPT_REGRESSION_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/regressions\""
 )

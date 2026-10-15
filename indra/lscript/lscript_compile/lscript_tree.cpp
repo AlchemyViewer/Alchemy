@@ -783,6 +783,16 @@ LSCRIPTType get_type(LLScriptSimpleAssignable* sa)
     return result;
 }
 
+// A component of a vector or rotation constant in a list, read back from
+// the chunk it was just written to as the VM reads one, a component that is
+// not finite zero, but without the VM's math fault: set_fault writes to the
+// registers of a VM image, past the end of the chunk, which has none.
+static F32 constant_component(const U8 *chunk, S32 &offset)
+{
+    F32 value = std::bit_cast<F32>(bytestream2integer(chunk, offset));
+    return llfinite(value) ? value : 0.f;
+}
+
 void LLScriptSAVector::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompilePass pass, LSCRIPTPruneType ptype, BOOL &prunearg, LLScriptScope *scope, LSCRIPTType &type, LSCRIPTType basetype, U64 &count, LLScriptByteCodeChunk *chunk, LLScriptByteCodeChunk *heap, S32 stacksize, LLScriptScopeEntry *entry, S32 entrycount, LLScriptLibData **ldata)
 {
     if (gErrorToText.getErrors())
@@ -876,7 +886,9 @@ void LLScriptSAVector::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompile
             }
             LLVector3 vec;
             S32 offset = 0;
-            bytestream2vector(vec, list->mCodeChunk, offset);
+            vec.mV[VZ] = constant_component(list->mCodeChunk, offset);
+            vec.mV[VY] = constant_component(list->mCodeChunk, offset);
+            vec.mV[VX] = constant_component(list->mCodeChunk, offset);
             *ldata = new LLScriptLibData(vec);
             delete list;
             if (mNextp)
@@ -1042,7 +1054,10 @@ void LLScriptSAQuaternion::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCom
             }
             LLQuaternion quat;
             S32 offset = 0;
-            bytestream2quaternion(quat, list->mCodeChunk, offset);
+            quat.mQ[VS] = constant_component(list->mCodeChunk, offset);
+            quat.mQ[VZ] = constant_component(list->mCodeChunk, offset);
+            quat.mQ[VY] = constant_component(list->mCodeChunk, offset);
+            quat.mQ[VX] = constant_component(list->mCodeChunk, offset);
             *ldata = new LLScriptLibData(quat);
             delete list;
             if (mNextp)

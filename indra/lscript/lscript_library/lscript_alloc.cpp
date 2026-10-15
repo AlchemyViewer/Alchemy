@@ -109,8 +109,14 @@ S32 lsa_heap_top(U8 *heap_start, S32 maxtop)
 
 S32 lsa_heap_add_data(U8 *buffer, LLScriptLibData *data, S32 heapsize, BOOL b_delete)
 {
+    // With b_delete the data is the heap's whatever comes of it, a fault
+    // already raised too.
     if (get_register(buffer, LREG_FR))
+    {
+        if (b_delete)
+            delete data;
         return 1;
+    }
     LLScriptAllocEntry entry, nextentry;
     S32 hr = get_register(buffer, LREG_HR);
     S32 hp = get_register(buffer, LREG_HP);
@@ -1008,16 +1014,24 @@ S32 lsa_cmp_lists(U8 *buffer, S32 offset1, S32 offset2)
 }
 
 
+// data's elements are taken whatever comes of it: the callers let go of
+// them after, and where the add fails they are freed here.
 S32 lsa_preadd_lists(U8 *buffer, LLScriptLibData *data, S32 offset2, S32 heapsize)
 {
     if (get_register(buffer, LREG_FR))
+    {
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
+    }
     LLScriptLibData *list2 = lsa_get_data(buffer, offset2, TRUE);
 
     if (!list2)
     {
         set_fault(buffer, LSRF_HEAP_ERROR);
         delete list2;
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
     }
 
@@ -1025,6 +1039,8 @@ S32 lsa_preadd_lists(U8 *buffer, LLScriptLibData *data, S32 offset2, S32 heapsiz
     {
         set_fault(buffer, LSRF_HEAP_ERROR);
         delete list2;
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
     }
 
@@ -1043,16 +1059,23 @@ S32 lsa_preadd_lists(U8 *buffer, LLScriptLibData *data, S32 offset2, S32 heapsiz
 }
 
 
+// As lsa_preadd_lists, data's elements are taken whatever comes of it.
 S32 lsa_postadd_lists(U8 *buffer, S32 offset1, LLScriptLibData *data, S32 heapsize)
 {
     if (get_register(buffer, LREG_FR))
+    {
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
+    }
     LLScriptLibData *list1 = lsa_get_data(buffer, offset1, TRUE);
 
     if (!list1)
     {
         set_fault(buffer, LSRF_HEAP_ERROR);
         delete list1;
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
     }
 
@@ -1060,6 +1083,8 @@ S32 lsa_postadd_lists(U8 *buffer, S32 offset1, LLScriptLibData *data, S32 heapsi
     {
         set_fault(buffer, LSRF_HEAP_ERROR);
         delete list1;
+        delete data->mListp;
+        data->mListp = NULL;
         return 0;
     }
 

@@ -1779,6 +1779,9 @@ static S32 lsl_neg(S32 a) { return (S32)(0U - (U32)a); }
 // A shift by its count's low five bits, as the grid's x86 shifted: a count
 // past 31, or below 0, is undefined in C++.
 static S32 lsl_shift_count(S32 count) { return count & 31; }
+// A float made an integer as the grid's x86 truncated it: one that does not
+// fit, NaN among them, is the least integer, where C++ leaves it undefined.
+static S32 lsl_float_to_integer(F32 f) { return f >= -2147483648.f && f < 2147483648.f ? (S32)f : S32_MIN; }
 
 void integer_integer_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
 {
@@ -3454,7 +3457,7 @@ BOOL run_cast(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
             case LST_INTEGER:
                 {
                     F32 source = lscript_pop_float(buffer);
-                    S32 dest = (S32)source;
+                    S32 dest = lsl_float_to_integer(source);
                     lscript_push(buffer, dest);
                 }
                 break;
@@ -3867,7 +3870,11 @@ void lscript_stacktol_pop_variable(LLScriptLibData *data, U8 *buffer, char type)
     case LST_LIST:
         data->mType = LST_LIST;
         address = lscript_pop_int(buffer);
-        data->mListp = lsa_get_data(buffer, address, TRUE);
+        // A list in a list, which the heap refuses as nesting when the list
+        // is added. Its reference is let go and what was read of it freed:
+        // the element's mListp is the outer list's link, which run_stacktol
+        // sets over it.
+        delete lsa_get_data(buffer, address, TRUE);
         break;
     }
 }

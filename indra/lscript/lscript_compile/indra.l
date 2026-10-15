@@ -342,7 +342,12 @@ void count()
 
 void parse_string()
 {
-	S32 length = (S32)strlen(yytext);
+	// The token's length as flex matched it. A NUL in the literal, which
+	// flex matches as any other byte, ended strlen's count early: short of
+	// an escape the loops below walk, and with nothing but the opening
+	// quote before it, short of the quotes, the terminator written ahead of
+	// the string.
+	S32 length = (S32)yyleng;
 	length = length - 2; 
 	char *temp = yytext + 1;
 

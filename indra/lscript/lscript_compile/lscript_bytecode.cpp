@@ -75,7 +75,7 @@ void LLScriptJumpTable::addJump(char *name, S32 offset)
 
 
 LLScriptByteCodeChunk::LLScriptByteCodeChunk(BOOL b_need_jumps)
-: mCodeChunk(NULL), mCurrentOffset(0), mJumpTable(NULL)
+: mCodeChunk(NULL), mCurrentOffset(0), mJumpTable(NULL), mCapacity(0)
 {
     if (b_need_jumps)
     {
@@ -89,19 +89,30 @@ LLScriptByteCodeChunk::~LLScriptByteCodeChunk()
     delete mJumpTable;
 }
 
+// Room for size bytes past the chunk's end. Every add made a new buffer just
+// big enough and copied the chunk into it, which made building a chunk
+// quadratic in its length: a script of the 256 KiB the grid takes, whose
+// code is emitted whole before its size is checked, took minutes. The
+// buffer doubles instead; what lies past mCurrentOffset is no part of the
+// chunk. Any add leaves a buffer, as new U8[0] did for nothing added.
+void LLScriptByteCodeChunk::reserve(S32 size)
+{
+    const S32 needed = mCurrentOffset + size;
+    if (mCodeChunk && needed <= mCapacity)
+    {
+        return;
+    }
+    const S32 capacity = llmax(needed, mCapacity * 2, (S32)64);
+    U8 *temp = new U8[capacity];
+    copy_bytes(temp, mCodeChunk, mCurrentOffset);
+    delete [] mCodeChunk;
+    mCodeChunk = temp;
+    mCapacity = capacity;
+}
+
 void LLScriptByteCodeChunk::addByte(U8 byte)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + 1];
-        memcpy(temp, mCodeChunk, mCurrentOffset);   /* Flawfinder: ignore */
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[1];
-    }
+    reserve(1);
     *(mCodeChunk + mCurrentOffset++) = byte;
 }
 
@@ -115,68 +126,28 @@ void LLScriptByteCodeChunk::addU16(U16 data)
 
 void LLScriptByteCodeChunk::addBytes(const U8 *bytes, S32 size)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + size];
-        memcpy(temp, mCodeChunk, mCurrentOffset);   /* Flawfinder: ignore */
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[size];
-    }
+    reserve(size);
     copy_bytes(mCodeChunk + mCurrentOffset, bytes, size);
     mCurrentOffset += size;
 }
 
 void LLScriptByteCodeChunk::addBytes(const char *bytes, S32 size)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + size];
-        memcpy(temp, mCodeChunk, mCurrentOffset);       /*Flawfinder: ignore*/
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[size];
-    }
+    reserve(size);
     copy_bytes(mCodeChunk + mCurrentOffset, bytes, size);
     mCurrentOffset += size;
 }
 
 void LLScriptByteCodeChunk::addBytes(S32 size)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + size];
-        memcpy(temp, mCodeChunk, mCurrentOffset);   /*Flawfinder: ignore*/
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[size];
-    }
+    reserve(size);
     memset(mCodeChunk + mCurrentOffset, 0, size);
     mCurrentOffset += size;
 }
 
 void LLScriptByteCodeChunk::addBytesDontInc(S32 size)
 {
-    if (mCodeChunk)
-    {
-        U8 *temp = new U8[mCurrentOffset + size];
-        memcpy(temp, mCodeChunk, mCurrentOffset);       /*Flawfinder: ignore*/
-        delete [] mCodeChunk;
-        mCodeChunk = temp;
-    }
-    else
-    {
-        mCodeChunk = new U8[size];
-    }
+    reserve(size);
     memset(mCodeChunk + mCurrentOffset, 0, size);
 }
 
