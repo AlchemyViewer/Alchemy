@@ -65,7 +65,7 @@ const HttpService::OptionDescriptor HttpService::sOptionDesc[] =
     {   false,      false,      true,       false,      true    }       // PO_SSL_VERIFY_CALLBACK
 };
 HttpService * HttpService::sInstance(NULL);
-volatile HttpService::EState HttpService::sState(NOT_INITIALIZED);
+std::atomic<HttpService::EState> HttpService::sState(NOT_INITIALIZED);
 
 HttpService::HttpService()
     : mRequestQueue(NULL),
@@ -108,7 +108,7 @@ HttpService::~HttpService()
         if (mThread && RUNNING == sState)
         {
             // Failed to shutdown, expect problems ahead so do a hard termination.
-            LL_WARNS(LOG_CORE) << "Destroying HttpService with running thread.  Expect problems." << LL_NEWLINE << "State: " << S32(sState)
+            LL_WARNS(LOG_CORE) << "Destroying HttpService with running thread.  Expect problems." << LL_NEWLINE << "State: " << S32(sState.load())
                                << " Last policy: " << U32(mLastPolicy) << LL_ENDL;
 
             mThread->cancel();
