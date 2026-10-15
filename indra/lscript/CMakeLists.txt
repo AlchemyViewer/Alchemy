@@ -10,14 +10,22 @@
 # put through bison and flex.
 
 find_package(unofficial-lsl-definitions CONFIG REQUIRED)
-find_package(BISON)
+# Bison 3: the grammar's %destructor names a type, which bison 2.3, macOS's
+# own, cannot read. On macOS Homebrew's bison and flex are looked for first,
+# which it keeps off the path (brew install bison flex).
+if(APPLE)
+  foreach(homebrew IN ITEMS /opt/homebrew/opt /usr/local/opt)
+    list(APPEND CMAKE_PROGRAM_PATH ${homebrew}/bison/bin ${homebrew}/flex/bin)
+  endforeach()
+endif()
+find_package(BISON 3.0)
 find_package(FLEX)
 
 # What it needs that a test build may not have; without it the library is
 # left out and the configuration report says why.
 set(missing "")
 if(NOT BISON_FOUND)
-  list(APPEND missing "bison")
+  list(APPEND missing "bison 3")
 endif()
 if(NOT FLEX_FOUND)
   list(APPEND missing "flex")

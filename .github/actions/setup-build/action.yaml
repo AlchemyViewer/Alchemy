@@ -91,7 +91,7 @@ runs:
     - name: macOS Homebrew dependency install
       if: runner.os == 'macOS'
       shell: bash
-      run: brew install autoconf autoconf-archive automake libtool nasm unzip zip
+      run: brew install autoconf autoconf-archive automake bison flex libtool nasm unzip zip
 
     # The image carries the Xcodes besides the one the build uses and an
     # Android SDK, none of which the build reads. They go in the background,
