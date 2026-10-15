@@ -23,6 +23,7 @@ target_sources(
     alparamtype.cpp
     alrecoverystore.cpp
     alregex.cpp
+    alsanitizer.cpp
     alsavehistory.cpp
     alwatchedfile.cpp
     apply.cpp
@@ -128,6 +129,7 @@ target_sources(
         alrandmap.h
         alrecoverystore.h
         alregex.h
+        alsanitizer.h
         alsavehistory.h
         alsimd.h
         alwatchedfile.h

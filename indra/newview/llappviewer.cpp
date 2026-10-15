@@ -134,6 +134,7 @@
 #include "llavatarnamecache.h"
 #include "alrecovery.h"
 #include "alregex.h"
+#include "alsanitizer.h"
 #include "alscriptstudio.h"
 #include "alxmlmergelog.h"
 #include "lldiriterator.h"
@@ -3569,6 +3570,13 @@ bool LLAppViewer::initWindow()
     gViewerWindow = new LLViewerWindow(window_params);
 
     LL_INFOS("AppInit") << "gViewerwindow created." << LL_ENDL;
+
+    // With the GL driver loaded, what it keeps for the process is still its
+    // own when LeakSanitizer looks at exit, as in the gl tests.
+    if constexpr (LL::LEAK_SANITIZER)
+    {
+        LL::pinLoadedLibraries();
+    }
 
     // Need to load feature table before cheking to start watchdog.
     bool use_watchdog = false;
