@@ -231,7 +231,7 @@ namespace LLError
         Utilities for use by the unit tests of LLError itself.
     */
 
-    typedef LLPointer<LLRefCount> SettingsStoragePtr;
+    typedef LLPointer<LLThreadSafeRefCount> SettingsStoragePtr;
     LL_COMMON_API SettingsStoragePtr saveAndResetSettings();
     LL_COMMON_API void restoreSettings(SettingsStoragePtr pSettingsStorage);
 
