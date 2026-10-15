@@ -54,16 +54,23 @@ LLScriptJumpTable::~LLScriptJumpTable()
     delete_and_clear(mJumpMap);
 }
 
+// A label or jump of a name already in the table takes its place, as LSO
+// has it: only the last of several jumps to one label is patched, which
+// scripts on the grid rely on. The offset it replaces is deleted.
 void LLScriptJumpTable::addLabel(char *name, S32 offset)
 {
     char *temp = gScopeStringTable->addString(name);
-    mLabelMap[temp] = new S32(offset);
+    S32*& kept = mLabelMap[temp];
+    delete kept;
+    kept = new S32(offset);
 }
 
 void LLScriptJumpTable::addJump(char *name, S32 offset)
 {
     char *temp = gScopeStringTable->addString(name);
-    mJumpMap[temp] = new S32(offset);
+    S32*& kept = mJumpMap[temp];
+    delete kept;
+    kept = new S32(offset);
 }
 
 

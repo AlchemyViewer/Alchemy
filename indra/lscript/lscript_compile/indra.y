@@ -61,6 +61,11 @@
 %token <sval>			IDENTIFIER
 %token <sval>			STATE_DEFAULT
 
+/* The lexer's copy of a name or a string, which a rule hands on to the node it
+   makes and that node deletes. One bison throws away, recovering from an
+   error or giving up on the script, is deleted here, else nothing would. */
+%destructor { delete [] $$; } <sval>
+
 %token <ival>			INTEGER_CONSTANT
 %token <ival>			INTEGER_TRUE
 %token <ival>			INTEGER_FALSE
