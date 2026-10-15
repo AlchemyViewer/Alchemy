@@ -32,6 +32,7 @@ target_sources(
         altestlogreplay.h
         altestmatchers.h
         altestname.h
+        altestsanitizer.h
         alteststateguard.h
         altestteardown.h
         catch_and_store_what_in.h

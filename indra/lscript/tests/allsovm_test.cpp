@@ -20,6 +20,7 @@
 #include "linden_common.h"
 
 #include "allsovmrun.h"
+#include "altestsanitizer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -345,12 +346,16 @@ namespace
     // What a regression script's header says comes of it: the fault on its
     // "// expect fault: " line, none without one, and what it says on its
     // "// expect said: " lines, in order; or, with an "// expect refused: "
-    // line, that LL's compiler refuses it, saying that.
+    // line, that LL's compiler refuses it, saying that. A "// deeper than
+    // ThreadSanitizer follows" line says LL's compiler recurses on it past
+    // ll_test::THREAD_SANITIZER_FRAMES, so that a ThreadSanitizer build
+    // passes it over.
     struct Expected
     {
         std::string fault;
         Said        said;
         std::string refused;
+        bool        tooDeepForTsan = false;
     };
 
     Expected expectedOf(const std::string& text)
@@ -383,6 +388,10 @@ namespace
             {
                 expected.refused = value(REFUSED);
             }
+            else if (line == "// deeper than ThreadSanitizer follows")
+            {
+                expected.tooDeepForTsan = true;
+            }
         }
         return expected;
     }
@@ -409,6 +418,10 @@ namespace
             const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             REQUIRE_FALSE(text.empty());
             const Expected expected = expectedOf(text);
+            if (ll_test::THREAD_SANITIZER && expected.tooDeepForTsan)
+            {
+                continue;
+            }
             if (!expected.refused.empty())
             {
                 const ALLSLReference::Result lso = ALLSLReference::compile(text, ALLSLReference::Target::LSO);
