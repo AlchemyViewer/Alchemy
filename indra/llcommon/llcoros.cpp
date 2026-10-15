@@ -57,6 +57,9 @@
 #if (defined(BOOST_USE_ASAN) || defined(BOOST_USE_TSAN)) && !defined(BOOST_USE_UCONTEXT)
 #error "A sanitized build needs Boost.Context built for ucontext: see indra/cmake/triplets/alchemy-sanitizer.cmake"
 #endif
+#if defined(BOOST_USE_TSAN)
+#include <sanitizer/tsan_interface.h>
+#endif
 // other Linden headers
 #include "llapp.h"
 #include "lltimer.h"
@@ -396,6 +399,13 @@ void LLCoros::toplevel(std::string name, callable_t callable)
     CoroData corodata(name);
     // set it as current
     mCurrent.reset(&corodata);
+#if defined(BOOST_USE_TSAN)
+    // ThreadSanitizer names the coroutine a race was on, as it names a
+    // thread. Boost.Context gives each coroutine a fiber of TSan's own, and
+    // the one current here is this coroutine's; without BOOST_USE_TSAN it
+    // would be the thread's, which this would rename.
+    __tsan_set_fiber_name(__tsan_get_current_fiber(), name.c_str());
+#endif
 
 #ifdef LL_WINDOWS
     // can not use __try directly, toplevel requires unwinding, thus use of a wrapper
