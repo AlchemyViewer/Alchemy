@@ -183,6 +183,14 @@ set_source_files_properties(${lscript_sources} PROPERTIES COMPILE_OPTIONS "${lsc
 # The LSL library as the tests and the fuzzers run LL's VM with it.
 add_library(lscript_test_library OBJECT tests/allsolibrary.cpp)
 target_link_libraries(lscript_test_library PRIVATE al::flags lscript)
+# It answers as SLua's builtins do, signed zeros and all, which the viewer's
+# float flags would let the compiler drop: under -fno-signed-zeros Clang
+# folds "value == 0 ? 0 : value" to value, and llDumpList2String gave
+# -0.000000 on macOS.
+set_source_files_properties(
+  tests/allsolibrary.cpp
+  PROPERTIES COMPILE_OPTIONS "${lscript_ieee_options}"
+)
 set_target_properties(lscript_test_library PROPERTIES FOLDER "Tests/lscript")
 
 # LL's compiler over a handful of scripts, each to LSO and to CIL; and
