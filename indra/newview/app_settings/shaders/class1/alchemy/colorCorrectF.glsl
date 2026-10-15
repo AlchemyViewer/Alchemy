@@ -229,7 +229,7 @@ void main()
     diff.rgb = applyDither(diff.rgb, gl_FragCoord.xy);
 #endif
 
-    //debugExposure(diff.rgb);
+    //debugExposure(diff.rgb, vary_fragcoord);
     frag_color = diff;
 }
 
