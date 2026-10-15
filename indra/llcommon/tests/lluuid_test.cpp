@@ -48,6 +48,15 @@ namespace
     };
     static_assert(LLUUID(kConstexprBytes).mData[0]  == 0xde, "constexpr byte-array ctor copies bytes");
     static_assert(LLUUID(kConstexprBytes).mData[15] == 0x78, "constexpr byte-array ctor reaches last byte");
+
+    // A literal is parsed by the compiler, so a constant made from one is
+    // constant-initialised -- constinit compiles only if it is -- and no
+    // other file's statics can find it null before its turn.
+    constinit const LLUUID kLiteral("01020304-0506-0708-090A-0b0c0d0e0f10");
+    static_assert(LLUUID("01020304-0506-0708-090a-0b0c0d0e0f10").mData[0] == 0x01, "a literal parses at compile time");
+    static_assert(LLUUID("01020304-0506-0708-090a-0b0c0d0e0f10").mData[15] == 0x10, "past every dash to the last byte");
+    static_assert(LLUUID("01020304-0506-0708-090A-0B0C0D0E0F10").mData[9] == 0x0a, "upper-case digits");
+    static_assert(LLUUID("").mData[0] == 0, "an empty literal is null");
     static void fill_sample(LLUUID& id)
     {
         for (int i = 0; i < UUID_BYTES; ++i)
@@ -232,6 +241,26 @@ namespace
         fill_sample(id);
         CHECK_FALSE(id.set(std::string("not-a-uuid"), false));
         CHECK(id.isNull());
+    }
+
+    TEST_CASE("LLUUID: a literal parsed by the compiler matches set() and the rest still parse at run time", "[LLUUID]")
+    {
+        // kLiteral was made by the compiler, this one at run time from the same text.
+        LLUUID parsed;
+        CHECK(parsed.set(std::string("01020304-0506-0708-090A-0b0c0d0e0f10")));
+        CHECK(kLiteral == parsed);
+
+        // What the compiler declines the constructor still reads at run time,
+        // as set() does: the old 35-character form, and garbage, which is null.
+        const std::string broken = "01020304-0506-0708-090a0b0c0d0e0f10";
+        LLUUID from_broken;
+        from_broken.set(broken, false);
+        CHECK(from_broken.notNull());
+        CHECK(LLUUID(broken.c_str()) == from_broken);
+        const std::string garbage = "not-a-uuid";
+        CHECK(LLUUID(garbage.c_str()).isNull());
+        const char* none = nullptr;
+        CHECK(LLUUID(none).isNull());
     }
 
     // Equality / inequality for matching and one-byte-different UUIDs.
