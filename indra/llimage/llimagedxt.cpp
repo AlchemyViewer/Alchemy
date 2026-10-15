@@ -337,6 +337,8 @@ bool LLImageDXT::encodeDXT(const LLImageRaw* raw_image, F32 time, bool explicit_
 {
     llassert_always(raw_image);
 
+    LLImageDataCopyLock lock(raw_image, this);
+
     if (raw_image->isBufferInvalid())
     {
         setLastError("Invalid input, no buffer");
@@ -360,8 +362,6 @@ bool LLImageDXT::encodeDXT(const LLImageRaw* raw_image, F32 time, bool explicit_
         LL_ERRS() << "LLImageDXT::encode: Unhandled channel number: " << ncomponents << LL_ENDL;
         return 0;
     }
-
-    LLImageDataLock lock(this);
 
     S32 width = raw_image->getWidth();
     S32 height = raw_image->getHeight();

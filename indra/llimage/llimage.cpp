@@ -1943,6 +1943,8 @@ void LLImageRaw::addEmissive(LLImageRaw* src)
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
+    LLImageDataCopyLock lock(src, dst);
+
     if (!validateSrcAndDst(__FUNCTION__, src, dst))
     {
         return;

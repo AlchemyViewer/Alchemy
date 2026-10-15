@@ -684,6 +684,8 @@ bool LLImageJ2CKDU::encodeImpl(LLImageJ2C &base, const LLImageRaw &raw_image, co
     bool vflip = true;
     bool hflip = false;
 
+    LLImageDataCopyLock lock(&raw_image, &base);
+
     if (raw_image.isBufferInvalid())
     {
         base.setLastError("Invalid input, no buffer");

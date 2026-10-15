@@ -119,7 +119,8 @@ bool LLImageAVIF::decode(LLImageRaw* raw_image, F32 decode_time)
 {
     llassert_always(raw_image);
 
-    LLImageDataCopyLock lock(this, raw_image);
+    // Both written: the decode sets this image's size from the stream.
+    LLImageDataLockPair lock(this, raw_image);
 
     resetLastError();
 
