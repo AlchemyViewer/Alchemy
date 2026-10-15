@@ -48,6 +48,7 @@
 #include "llavatarappearancedefines.h"
 #include "lltexglobalcolor.h"
 #include "lldriverparam.h"
+#include "algputimer.h"
 #include "llviewertexlayer.h"
 #include "material_codes.h"     // LL_MCODE_END
 #include "llrigginginfo.h"
@@ -318,6 +319,8 @@ public:
 
     void placeProfileQuery();
     void readProfileQuery(S32 retries);
+    // whether a profile's GPU time is still to be read; another profile must wait for it
+    bool isProfilePending() const { return mGPUTimer.isPending(); }
 
     // get the GPU time in ms of rendering this avatar including all attachments
     // returns 0.f if this avatar has not been profiled using gPipeline.profileAvatar
@@ -590,13 +593,12 @@ private:
     S32         mNumInitFaces; //number of faces generated when creating the avatar drawable, does not inculde splitted faces due to long vertex buffer.
 
     // profile handle
-    U32 mGPUTimerQuery = 0;
+    ALGPUTimer mGPUTimer;
 
     // profile results
 
     // GPU render time in ms
     F32 mGPURenderTime = 0.f;
-    bool mGPUProfilePending = false;
 
     // CPU render time in ms
     F32 mCPURenderTime = 0.f;
