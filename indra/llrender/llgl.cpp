@@ -4183,52 +4183,6 @@ void LLGLDepthTest::checkState()
 
 
 
-LLGLSyncFence::LLGLSyncFence()
-{
-    mSync = 0;
-}
-
-LLGLSyncFence::~LLGLSyncFence()
-{
-    if (mSync)
-    {
-        glDeleteSync(mSync);
-    }
-}
-
-void LLGLSyncFence::placeFence()
-{
-    if (mSync)
-    {
-        glDeleteSync(mSync);
-    }
-    mSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-}
-
-bool LLGLSyncFence::isCompleted()
-{
-    bool ret = true;
-    if (mSync)
-    {
-        GLenum status = glClientWaitSync(mSync, 0, 1);
-        if (status == GL_TIMEOUT_EXPIRED)
-        {
-            ret = false;
-        }
-    }
-    return ret;
-}
-
-void LLGLSyncFence::wait()
-{
-    if (mSync)
-    {
-        while (glClientWaitSync(mSync, 0, FENCE_WAIT_TIME_NANOSECONDS) == GL_TIMEOUT_EXPIRED)
-        { //track the number of times we've waited here
-        }
-    }
-}
-
 #if LL_WINDOWS
 // Expose desired use of high-performance graphics processor to Optimus driver and to AMD driver
 // https://docs.nvidia.com/gameworks/content/technologies/desktop/optimus.htm

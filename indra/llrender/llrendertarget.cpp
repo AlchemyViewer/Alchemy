@@ -602,6 +602,8 @@ void LLRenderTarget::bindTarget()
     llassert(mFBO);
     llassert(!isBoundInStack());
 
+    // The pass drawing into the framebuffer bound before ends here.
+    gGL.queries().checkPassBoundary();
     glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
     sCurFBO = mFBO;
 
@@ -808,6 +810,7 @@ void LLRenderTarget::flush()
     else
     {
         sBoundTarget = nullptr;
+        gGL.queries().checkPassBoundary();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         sCurFBO = 0;
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);

@@ -471,34 +471,6 @@ public:
     virtual void updateGL() = 0;
 };
 
-const U32 FENCE_WAIT_TIME_NANOSECONDS = 1000;  //1 microsecond (despite the name's history)
-
-class LLGLFence
-{
-public:
-    virtual ~LLGLFence()
-    {
-    }
-
-    virtual void placeFence() = 0;
-    virtual bool isCompleted() = 0;
-    virtual void wait() = 0;
-};
-
-class LLGLSyncFence : public LLGLFence
-{
-public:
-    GLsync mSync;
-
-    LLGLSyncFence();
-    virtual ~LLGLSyncFence();
-
-    void placeFence();
-    bool isCompleted();
-    void wait();
-};
-
-
 #include "llglstates.h"
 
 void init_glstates();
