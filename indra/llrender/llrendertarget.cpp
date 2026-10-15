@@ -34,6 +34,7 @@
 #include "llimagegl.h"
 #include "llrender.h"
 #include "llgl.h"
+#include "llglslshader.h"
 #include "llglstates.h"
 
 #include <algorithm>
@@ -602,6 +603,10 @@ void LLRenderTarget::bindTarget()
     llassert(mFBO);
     llassert(!isBoundInStack());
 
+    // The pass drawing into the framebuffer bound before ends here, and a shader profile's queries with it; they count
+    // on for the pass that follows.
+    LLGLSLShader* profiled = LLGLSLShader::suspendProfileQuery();
+    gGL.queries().checkPassBoundary();
     glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
     sCurFBO = mFBO;
 
@@ -633,6 +638,8 @@ void LLRenderTarget::bindTarget()
 
     mPreviousRT = sBoundTarget;
     sBoundTarget = this;
+
+    LLGLSLShader::resumeProfileQuery(profiled);
 }
 
 void LLRenderTarget::clear(U32 mask_in)
@@ -808,6 +815,8 @@ void LLRenderTarget::flush()
     else
     {
         sBoundTarget = nullptr;
+        LLGLSLShader* profiled = LLGLSLShader::suspendProfileQuery();
+        gGL.queries().checkPassBoundary();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         sCurFBO = 0;
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
@@ -815,6 +824,7 @@ void LLRenderTarget::flush()
         sCurResY = gGLViewport[3];
         glReadBuffer(GL_BACK);
         glDrawBuffer(GL_BACK);
+        LLGLSLShader::resumeProfileQuery(profiled);
     }
 }
 

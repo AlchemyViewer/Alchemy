@@ -7,8 +7,8 @@ set(
   algputimer.cpp
   alimageslot.cpp
   alprimitiveplot.cpp
+  alquerypool.cpp
   alsamplerstate.cpp
-  alsamplesquery.cpp
   altexture3d.cpp
   altextureslot.cpp
   alfontcolrv1.cpp
@@ -46,8 +46,8 @@ set(
   algputimer.h
   alimageslot.h
   alprimitiveplot.h
+  alquerypool.h
   alsamplerstate.h
-  alsamplesquery.h
   altexture3d.h
   altextureslot.h
   alfontcolrv1.h
@@ -211,7 +211,11 @@ if(AL_BUILD_TESTS)
   #   by the matrices the draw syncs;
   # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its
   #   lifetime, and the readback and stream rings;
-  # - ALGPUTimer: one span timed at a time, and its query gone with it;
+  # - ALGPUTimer: one span timed at a time, as timestamps and as Elapsed
+  #   queries;
+  # - ALQueryPool: each kind's names kept to its target, a held target
+  #   refused, results read once their frame has ended, spans, release and
+  #   conditional draws;
   # - ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps
   #   it, and integer images.
   al_add_test_binary(
@@ -224,6 +228,7 @@ if(AL_BUILD_TESTS)
       tests/alimageslot_gl_test.cpp
       tests/alinfiniteprojection_gl_test.cpp
       tests/alinstanceddraw_gl_test.cpp
+      tests/alquerypool_gl_test.cpp
       tests/alrenderstate_gl_test.cpp
       tests/altessellation_gl_test.cpp
       tests/alwindowsdlheadless_test.cpp

@@ -413,7 +413,7 @@ void LLReflectionMapManager::update()
     {
         for (auto& probe : mProbes)
         {
-            probe->mOccluded = false;
+            probe->clearOcclusion();
         }
     }
 
@@ -549,7 +549,7 @@ void LLReflectionMapManager::update()
             // would otherwise start out culled by a query taken back when it still had
             // something to show, and need two more occlusion passes to say so -- on top of the
             // twelve it needs to regenerate.
-            probe->mOccluded = false;
+            probe->clearOcclusion();
         }
     }
 
@@ -709,7 +709,6 @@ void LLReflectionMapManager::refreshSettings()
     mRenderReflectionProbeLevel = gSavedSettings.getS32("RenderReflectionProbeLevel");
     mRenderReflectionProbeCount = gSavedSettings.getU32("RenderReflectionProbeCount");
     mRenderReflectionProbeDynamicAllocation = gSavedSettings.getS32("RenderReflectionProbeDynamicAllocation");
-    cleanupQueryPool();
 }
 
 LLReflectionMap* LLReflectionMapManager::addProbe(LLSpatialGroup* group)
@@ -757,25 +756,6 @@ U32 LLReflectionMapManager::probeMemory()
     // The SH coefficient strip is 9 x probes x RGBA16F -- tens of kilobytes, below the
     // resolution this reports in.
     return (mDynamicProbeCount * 6 * (mProbeResolution * mProbeResolution) * 4) / 1024 / 1024;
-}
-
-GLuint LLReflectionMapManager::allocateQuery()
-{
-    if (mQueryPool.empty())
-    {
-        GLuint query;
-        glGenQueries(1, &query);
-        return query;
-    }
-
-    GLuint query = mQueryPool.front();
-    mQueryPool.pop_front();
-    return query;
-}
-
-void LLReflectionMapManager::recycleQuery(GLuint query)
-{
-    mQueryPool.push_back(query);
 }
 
 struct CompareProbeDepth
@@ -1802,7 +1782,7 @@ void LLReflectionMapManager::initReflectionMaps()
             // them standing could not clear a probe that was stuck on either -- and this is the
             // path a teleport, a sky change or a probe-count change goes through, which is
             // exactly where someone would expect to get their probes back.
-            probe->mOccluded = false;
+            probe->clearOcclusion();
             probe->mInsideManualProbe = false;
         }
 
@@ -1876,21 +1856,8 @@ void LLReflectionMapManager::cleanup()
 
     mUBO.release();
 
-    cleanupQueryPool();
-
     // note: also called on teleport (not just shutdown), so make sure we're in a good "starting" state
     initCubeFree();
-}
-
-void LLReflectionMapManager::cleanupQueryPool()
-{
-    if (!mQueryPool.empty())
-    {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("cleanup query pool");
-        std::vector<GLuint> queries(mQueryPool.begin(), mQueryPool.end());
-        glDeleteQueries(static_cast<GLsizei>(queries.size()), queries.data());
-        mQueryPool.clear();
-    }
 }
 
 void LLReflectionMapManager::doOcclusion()
@@ -1912,7 +1879,7 @@ void LLReflectionMapManager::doOcclusion()
         // culled by a query taken while it had something to show, not by one taken before.
         if (probe->mCubeIndex == -1 || !probe->isRelevant())
         {
-            probe->mOccluded = false;
+            probe->clearOcclusion();
             continue;
         }
 

@@ -65,7 +65,6 @@ LLSceneMonitor::LLSceneMonitor() :
     mDiffTolerance(0.1f),
     mDiffState(WAITING_FOR_NEXT_DIFF),
     mDebugViewerVisible(false),
-    mQueryObject(0),
     mDiffPixelRatio(0.5f)
 {
     mFrames[0] = NULL;
@@ -96,11 +95,7 @@ void LLSceneMonitor::reset()
 
     unfreezeScene();
 
-    if(mQueryObject > 0)
-    {
-        LLOcclusionCullingGroup::releaseOcclusionQueryObjectName(mQueryObject, GL_SAMPLES_PASSED);
-        mQueryObject = 0;
-    }
+    mQuery = {};
 }
 
 void LLSceneMonitor::generateDitheringTexture(S32 width, S32 height)
@@ -291,10 +286,13 @@ void LLSceneMonitor::capture()
         force_capture = true;
     }
 
+    // Not while the last capture's difference is still being counted: a capture starts another, whose query would
+    // replace that one before it is read.
     if(mEnabled
         && (mRecordingTimer.getElapsedTimeF32() > scene_load_sample_time()
             || force_capture)
-        && last_capture_frame != gFrameCount)
+        && last_capture_frame != gFrameCount
+        && mDiffState != WAIT_ON_RESULT)
     {
         force_capture = false;
 
@@ -405,11 +403,6 @@ void LLSceneMonitor::calcDiffAggregate()
         return;
     }
 
-    if(!mQueryObject)
-    {
-        mQueryObject = LLOcclusionCullingGroup::getNewOcclusionQueryObjectName(GL_SAMPLES_PASSED);
-    }
-
     LLGLDepthTest depth(true, false, GL_ALWAYS);
     std::optional<LLGLSColorMask> no_color;
     if(!mDebugViewerVisible)
@@ -423,20 +416,21 @@ void LLSceneMonitor::calcDiffAggregate()
     gOneTextureFilterProgram.bind();
     gOneTextureFilterProgram.uniform1f(LLShaderMgr::TOLERANCE, mDiffTolerance);
 
+    ALQueryTicket query;
     if(mDiffState == EXECUTE_DIFF)
     {
-        glBeginQuery(GL_SAMPLES_PASSED, mQueryObject);
+        query = gGL.queries().begin(ALQueryKind::Samples);
     }
 
     gl_draw_scaled_target(0, 0, S32(mDiff->getWidth() * mDiffPixelRatio), S32(mDiff->getHeight() * mDiffPixelRatio), mDiff);
 
     if(mDiffState == EXECUTE_DIFF)
     {
-        // The quad is still batched in gGL; the query only counts what reaches the GPU before
-        // it ends.
-        gGL.flush();
-        glEndQuery(GL_SAMPLES_PASSED);
-        mDiffState = WAIT_ON_RESULT;
+        // end() draws the quad still batched in gGL first, so the query counts it. One the pool refused, its
+        // target held, leaves nothing to wait on.
+        gGL.queries().end(query);
+        mQuery = query;
+        mDiffState = query.isValid() ? WAIT_ON_RESULT : WAITING_FOR_NEXT_DIFF;
     }
 
     gOneTextureFilterProgram.unbind();
@@ -458,16 +452,18 @@ void LLSceneMonitor::fetchQueryResult()
     if(mDiffState == WAIT_ON_RESULT
         && !LLAppViewer::instance()->quitRequested())
     {
+        // In once the pool has read the frame the diff was drawn in, a frame or two on; one expired unread is dropped.
+        U64 count = 0;
+        const ALQueryPool::Status status = gGL.queries().result(mQuery, count);
+        if (status == ALQueryPool::Status::Pending)
+        {
+            return;
+        }
         mDiffState = WAITING_FOR_NEXT_DIFF;
 
-        GLuint available = 0;
-        glGetQueryObjectuiv(mQueryObject, GL_QUERY_RESULT_AVAILABLE, &available);
-        if(available)
+        if (status == ALQueryPool::Status::Ready)
         {
-            GLuint count = 0;
-            glGetQueryObjectuiv(mQueryObject, GL_QUERY_RESULT, &count);
-
-            mDiffResult = sqrtf(count * 0.5f / (mDiff->getWidth() * mDiff->getHeight() * mDiffPixelRatio * mDiffPixelRatio)); //0.5 -> (front face + back face)
+            mDiffResult = sqrtf((F32)count * 0.5f / (mDiff->getWidth() * mDiff->getHeight() * mDiffPixelRatio * mDiffPixelRatio)); //0.5 -> (front face + back face)
 
             LL_DEBUGS("SceneMonitor") << "Frame difference: " << mDiffResult << LL_ENDL;
             record(sFramePixelDiff, mDiffResult);

@@ -243,7 +243,6 @@ public:
     // arrive from createShader(), which needs a GL context.
     static std::set<LLGLSLShader*>& sInstances;
     static bool sProfileEnabled;
-    static bool sCanProfile;
 
     LLGLSLShader();
     ~LLGLSLShader();
@@ -297,25 +296,32 @@ public:
     static U32 sMaxGLTFMaterials;
     static U32 sMaxGLTFNodes;
 
-    static void initProfile();
+    // Profiles every bind until finishProfile(): each program's GPU time, the fragments it drew and the primitives it
+    // drew. The fragments and primitives are the pipeline statistics' fragment shader invocations and clipping input
+    // primitives where the context has them, which leaves the occlusion and primitives targets to the frame's own
+    // queries; samples passed and primitives generated elsewhere, or where `count_samples` asks for them. A profile
+    // still open is abandoned first.
+    static void initProfile(bool count_samples = false);
+    // Reads every bind's queries, waiting once for the GPU, adds them to each program's statistics, and reports them
+    // into `stats` where it is defined.
     static void finishProfile(LLSD& stats=sDefaultStats);
-
-    static void startProfile();
-    static void stopProfile();
+    // Ends the profile and gives back the targets it held, reading nothing: for a profile that cannot finish.
+    static void abandonProfile();
 
     void unload();
     void clearStats();
     void dumpStats(LLSD& stats);
 
-    // place query objects for profiling if profiling is enabled
-    // if for_runtime is true, will place timer query only whether or not profiling is enabled
-    void placeProfileQuery(bool for_runtime = false);
+    // Opens this program's queries for the draws that follow, while profiling.
+    void placeProfileQuery();
 
-    // Readback query objects if profiling is enabled
-    // If for_runtime is true, will readback timer query iff query is available
-    // Will return false if a query is pending (try again later)
-    // If force_read is true, will force an immediate readback (severe performance penalty)
-    bool readProfileQuery(bool for_runtime = false, bool force_read = false);
+    // Ends the queries the last placeProfileQuery() opened, if any are open. They are read by finishProfile().
+    static void endProfileQuery();
+
+    // A render pass ends (LLRenderTarget): the open queries of a profile end with it, as a query may not cross a pass,
+    // and the program they were counting is returned, to resume counting for the pass after. Null for none.
+    static LLGLSLShader* suspendProfileQuery();
+    static void          resumeProfileQuery(LLGLSLShader* shader);
 
     // Compile-time variant axes, passed to createShader() as a mask. They are built in this
     // order because each composes over the ones before it: a program asking for all three gets
@@ -480,6 +486,8 @@ public:
 
     // This is a compute program: its stage files are compute, which createShader reads off mShaderFiles.
     bool isCompute() const { return mIsCompute; }
+    // Whether the program has a tessellation stage, from its files.
+    bool isTessellated() const;
 
     // Run this program, bound, over groups_x * groups_y * groups_z work groups (LLRender::dispatchCompute).
     void dispatch(U32 groups_x, U32 groups_y = 1, U32 groups_z = 1);
@@ -556,18 +564,13 @@ public:
     bool mUsingBinaryProgram = false;
 
     //statistics for profiling shader performance
-    bool mProfilePending = false;
-    U32 mTimerQuery;
-    U32 mSamplesQuery;
-    U32 mPrimitivesQuery;
-
-    U64 mTimeElapsed;
+    U64 mTimeElapsed = 0;
     static U64 sTotalTimeElapsed;
-    U32 mTrianglesDrawn;
+    U32 mTrianglesDrawn = 0;
     static U32 sTotalTrianglesDrawn;
-    U64 mSamplesDrawn;
+    U64 mSamplesDrawn = 0;
     static U64 sTotalSamplesDrawn;
-    U32 mBinds;
+    U32 mBinds = 0;
     static U32 sTotalBinds;
 
     // This program expects its diffuse/base-colour texture already LINEAR: the bind decodes

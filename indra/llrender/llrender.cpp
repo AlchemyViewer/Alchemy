@@ -537,6 +537,15 @@ void LLRender::shutdown()
         mMatricesUBOHash[i] = 0xFFFFFFFFu;
     }
     mMatricesUBOBound = false;
+
+    // Its queries and fences, which it deletes only while the context is up.
+    mQueries.release();
+}
+
+void LLRender::endFrame()
+{
+    mQueries.endFrame();
+    ALUniformBuffer::endFrame();
 }
 
 void LLRender::clearSamplers()

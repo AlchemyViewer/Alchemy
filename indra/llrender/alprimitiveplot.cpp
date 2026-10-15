@@ -28,7 +28,6 @@
 
 #include "llgl.h"
 #include "llglheaders.h"
-#include "llglslshader.h"
 #include "llrender.h"
 
 void ALPrimitivePlot::plot()
@@ -39,19 +38,14 @@ void ALPrimitivePlot::plot()
     Frame& frame = mFrames[mFrame];
     if (frame.mCounted)
     {
+        const ALQueryPool& queries = gGL.queries();
         int64_t total = 0;
         bool    ready = true;
         for (U32 i = 0; i < frame.mSpans && ready; ++i)
         {
-            GLuint available = 0;
-            glGetQueryObjectuiv(frame.mQueries[i], GL_QUERY_RESULT_AVAILABLE, &available);
-            if (available)
-            {
-                GLuint count = 0;
-                glGetQueryObjectuiv(frame.mQueries[i], GL_QUERY_RESULT, &count);
-                total += count;
-            }
-            ready = available != 0;
+            U64 count = 0;
+            ready = queries.result(frame.mQueries[i], count) == ALQueryPool::Status::Ready;
+            total += (int64_t)count;
         }
         if (ready)
         {
@@ -67,43 +61,33 @@ void ALPrimitivePlot::begin()
 {
 #if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
     Frame& frame = mFrames[mFrame];
-    if (LLGLSLShader::sProfileEnabled)
-    {
-        frame.mCounted = false;
-    }
     if (!frame.mCounted || frame.mSpans == SPANS)
     {
         return;
     }
-    if (frame.mQueries[0] == 0)
+    mOpen = gGL.queries().begin(ALQueryKind::Primitives);
+    if (!mOpen.isValid())
     {
-        glGenQueries(SPANS, frame.mQueries);
+        // The frame's total would be short a span.
+        frame.mCounted = false;
+        return;
     }
-    gGL.flush();
-    glBeginQuery(GL_PRIMITIVES_GENERATED, frame.mQueries[frame.mSpans++]);
-    mActive = true;
+    frame.mQueries[frame.mSpans++] = mOpen;
 #endif
 }
 
 void ALPrimitivePlot::end()
 {
-    if (mActive)
-    {
-        gGL.flush();
-        glEndQuery(GL_PRIMITIVES_GENERATED);
-        mActive = false;
-    }
+    gGL.queries().end(mOpen);
+    mOpen = {};
 }
 
 void ALPrimitivePlot::release()
 {
+    // A span still open would hold the pool's primitives target.
     end();
     for (Frame& frame : mFrames)
     {
-        if (frame.mQueries[0] != 0)
-        {
-            glDeleteQueries(SPANS, frame.mQueries);
-        }
         frame = Frame();
     }
     mFrame = 0;

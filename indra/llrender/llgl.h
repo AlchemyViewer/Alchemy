@@ -146,6 +146,12 @@ public:
     // GL_EXT_depth_bounds_test: passing a fragment only where the depth already stored under it lies in a range.
     // Never core. Only true once glDepthBoundsEXT has resolved, so callers may trust it directly. See ALDepthBounds.
     bool mHasDepthBoundsTest = false;
+    // GL_ANY_SAMPLES_PASSED_CONSERVATIVE: core in 4.3, also GL_ARB_ES3_compatibility.
+    bool mHasConservativeOcclusion = false;
+    // GL_TIMESTAMP counts time: its GL_QUERY_COUNTER_BITS are not 0, which on Apple silicon they are.
+    bool mHasTimestampQuery = false;
+    // GL_ARB_pipeline_statistics_query's counters, such as GL_FRAGMENT_SHADER_INVOCATIONS: core in 4.6.
+    bool mHasPipelineStatistics = false;
     // Compute shaders, shader storage buffers, image load/store and indirect dispatch: core in 4.3.
     // Only true once every entry point the compute path calls has resolved (glDispatchCompute,
     // glDispatchComputeIndirect, glMemoryBarrier, glBindImageTexture, glShaderStorageBlockBinding,
@@ -233,6 +239,7 @@ private:
     void reloadExtensionsString();
     void initExtensions();
     void initCompute();
+    void initQueries();
     void initGLStates();
 };
 
@@ -463,34 +470,6 @@ public:
     }
     virtual void updateGL() = 0;
 };
-
-const U32 FENCE_WAIT_TIME_NANOSECONDS = 1000;  //1 microsecond (despite the name's history)
-
-class LLGLFence
-{
-public:
-    virtual ~LLGLFence()
-    {
-    }
-
-    virtual void placeFence() = 0;
-    virtual bool isCompleted() = 0;
-    virtual void wait() = 0;
-};
-
-class LLGLSyncFence : public LLGLFence
-{
-public:
-    GLsync mSync;
-
-    LLGLSyncFence();
-    virtual ~LLGLSyncFence();
-
-    void placeFence();
-    bool isCompleted();
-    void wait();
-};
-
 
 #include "llglstates.h"
 

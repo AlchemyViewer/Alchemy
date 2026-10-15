@@ -317,8 +317,12 @@ public:
     void markAttachmentComplexityDirty(const LLUUID& object_id, bool force_reset_attachment = false);
     void markBodyPartsComplexityDirty();
 
+    // A profile's GPU time is taken between these two.
     void placeProfileQuery();
-    void readProfileQuery(S32 retries);
+    void endProfileQuery();
+    // Takes the last profile's GPU time once its frame has been read, waiting for nothing. Once a frame, from
+    // idleUpdate().
+    void readProfileQuery();
     // whether a profile's GPU time is still to be read; another profile must wait for it
     bool isProfilePending() const { return mGPUTimer.isPending(); }
 

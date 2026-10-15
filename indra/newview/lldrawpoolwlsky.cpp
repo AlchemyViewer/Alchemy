@@ -141,12 +141,12 @@ static bool use_hdri_sky()
 // sea (LLPipeline::skyBehindWanted) while land hides all of it. The field, counted by the pipeline's query,
 // writing nothing: flat, and with waves raised by A as well, which counts a crest over a wall the flat field misses.
 // The flat copy stays for a camera between the plane and A above it, as on a deck in waves, which sees the raised one
-// from below or not at all. False when there is no program to draw them with, or while the shader profiler holds the
-// occlusion query target for the program it binds (LLGLSLShader::placeProfileQuery).
+// from below or not at all. False when there is no program to draw them with, or while the occlusion targets are
+// held, as a shader profile counting samples holds them (LLGLSLShader::initProfile).
 static bool query_water_in_view()
 {
     LLGLSLShader& field = gWaterFieldProgram;
-    if (!field.isComplete() || LLGLSLShader::sProfileEnabled)
+    if (!field.isComplete() || !gGL.queries().canBegin(ALQueryKind::Occlusion))
     {
         return false;
     }
@@ -156,7 +156,8 @@ static bool query_water_in_view()
         LLGLDepthTest depth(GL_TRUE, GL_FALSE);
         LLGLSColorMask no_color(false, false);
         LLGLDisable no_cull(GL_CULL_FACE);
-        gPipeline.mSkyBehindQuery.begin();
+        ALQueryScope query(gGL.queries(), ALQueryKind::Occlusion);
+        gPipeline.mSkyBehindQuery = query.ticket();
         field.uniform1f(LLShaderMgr::WATER_RAISE, 0.f);
         gPipeline.mWaterSurface.draw(field, false);
         const F32 raise = gPipeline.mWaterSurface.maxDisplacement();
@@ -165,11 +166,10 @@ static bool query_water_in_view()
             field.uniform1f(LLShaderMgr::WATER_RAISE, raise);
             gPipeline.mWaterSurface.draw(field, false);
         }
-        gPipeline.mSkyBehindQuery.end();
     }
     field.unbind();
     gPipeline.mSkyBehindQueryFrame = gFrameCount;
-    return true;
+    return gPipeline.mSkyBehindQuery.isValid();
 }
 
 void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const
@@ -259,10 +259,10 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
         if (sky_behind)
         {
             LL_PROFILE_GPU_ZONE("sky behind");
-            std::optional<ALSamplesQuery::Conditional> if_water;
+            std::optional<ALConditionalRender> if_water;
             if (queried)
             {
-                if_water.emplace(gPipeline.mSkyBehindQuery);
+                if_water.emplace(gGL.queries(), gPipeline.mSkyBehindQuery);
             }
             behind.bindTarget();
             behind.clear();

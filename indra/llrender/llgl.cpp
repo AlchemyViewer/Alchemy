@@ -2276,9 +2276,27 @@ bool LLGLManager::initGL()
 
     initCompute();
 
+    initQueries();
+
     initGLStates();
 
     return true;
+}
+
+// What the query targets past 4.1's can count, and whether the timestamps count at all. After initExtensions, which
+// loads glGetQueryiv.
+void LLGLManager::initQueries()
+{
+    mHasConservativeOcclusion = mGLVersion >= 4.29f || mGLExtensions.contains("GL_ARB_ES3_compatibility");
+    mHasPipelineStatistics    = mGLVersion >= 4.59f || mGLExtensions.contains("GL_ARB_pipeline_statistics_query");
+
+    GLint bits = 0;
+    glGetQueryiv(GL_TIMESTAMP, GL_QUERY_COUNTER_BITS, &bits);
+    mHasTimestampQuery = bits > 0;
+
+    LL_INFOS("RenderInit") << "Queries: conservative occlusion " << (mHasConservativeOcclusion ? "yes" : "no")
+                           << ", timestamps " << bits << " bits, pipeline statistics "
+                           << (mHasPipelineStatistics ? "yes" : "no") << LL_ENDL;
 }
 
 // Here rather than in initExtensions, whose version ladder returns before its end on any context below 4.6: this
@@ -4164,52 +4182,6 @@ void LLGLDepthTest::checkState()
 }
 
 
-
-LLGLSyncFence::LLGLSyncFence()
-{
-    mSync = 0;
-}
-
-LLGLSyncFence::~LLGLSyncFence()
-{
-    if (mSync)
-    {
-        glDeleteSync(mSync);
-    }
-}
-
-void LLGLSyncFence::placeFence()
-{
-    if (mSync)
-    {
-        glDeleteSync(mSync);
-    }
-    mSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-}
-
-bool LLGLSyncFence::isCompleted()
-{
-    bool ret = true;
-    if (mSync)
-    {
-        GLenum status = glClientWaitSync(mSync, 0, 1);
-        if (status == GL_TIMEOUT_EXPIRED)
-        {
-            ret = false;
-        }
-    }
-    return ret;
-}
-
-void LLGLSyncFence::wait()
-{
-    if (mSync)
-    {
-        while (glClientWaitSync(mSync, 0, FENCE_WAIT_TIME_NANOSECONDS) == GL_TIMEOUT_EXPIRED)
-        { //track the number of times we've waited here
-        }
-    }
-}
 
 #if LL_WINDOWS
 // Expose desired use of high-performance graphics processor to Optimus driver and to AMD driver

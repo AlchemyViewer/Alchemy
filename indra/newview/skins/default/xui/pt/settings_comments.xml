@@ -2003,8 +2003,6 @@
   <string>Desativar recursos que impedem o uso do nVidia nSight com o SL. Requer reinício.</string>
   <key>RenderObjectBump</key>
   <string>OBSOLETO (apenas TRUE é suportado) Mostrar bumpmapping em primitivas.</string>
-  <key>RenderOcclusionTimeout</key>
-  <string>Número máximo de quadros a aguardar em uma consulta de oclusão antes de lê-la de volta à força.</string>
   <key>RenderParcelSelection</key>
   <string>Exibir o contorno da parcela selecionada.</string>
   <key>RenderPerformanceTest</key>

@@ -309,9 +309,6 @@ public:
     void expandExtents(const LLVector4a* addingExtents, const LLXformMatrix& currentTransform);
     void shift(const LLVector4a &offset);
 
-    // TODO: this no longer appears to be called, figure out if it's important and if not remove it
-    void destroyGLState(bool keep_occlusion = false);
-
     void updateDistance(LLCamera& camera);
     F32 getUpdateUrgency() const;
     bool changeLOD();
