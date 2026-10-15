@@ -30,7 +30,13 @@ endif()
 # SUMMARY line, which the entry's output also holds for a child process whose
 # output is the test's. A sanitized run is slower, ThreadSanitizer's most of
 # all, and the timeouts are scaled to it. Suppressions are in test/sanitizers.
+#
+# AL_TEST_CRASH_ENVIRONMENT goes after that, for an entry whose case crashes
+# on purpose to check what the harness makes of a crash: there the sanitizers
+# leave SIGSEGV to Catch2's handler, and ThreadSanitizer does not report the
+# allocations that handler makes, as a crash's handler can hardly avoid.
 set(AL_TEST_SANITIZER_ENVIRONMENT "")
+set(AL_TEST_CRASH_ENVIRONMENT "")
 set(AL_TEST_FAIL_REGULAR_EXPRESSION "")
 set(AL_TEST_TIMEOUT_SCALE 1)
 if(AL_SANITIZING)
@@ -48,12 +54,17 @@ if(AL_SANITIZING)
       APPEND AL_TEST_SANITIZER_ENVIRONMENT
       "ASAN_OPTIONS=string_prepend:detect_leaks=0:allow_user_segv_handler=0:check_initialization_order=1:"
     )
+    list(APPEND AL_TEST_CRASH_ENVIRONMENT "ASAN_OPTIONS=string_append::handle_segv=0")
     set(AL_TEST_TIMEOUT_SCALE 3)
   endif()
   if("thread" IN_LIST AL_SANITIZERS)
     list(
       APPEND AL_TEST_SANITIZER_ENVIRONMENT
       "TSAN_OPTIONS=string_prepend:allow_user_segv_handler=0:second_deadlock_stack=1:suppressions='${suppressions}/tsan.supp':"
+    )
+    list(
+      APPEND AL_TEST_CRASH_ENVIRONMENT
+      "TSAN_OPTIONS=string_append::handle_segv=0:report_signal_unsafe=0"
     )
     set(AL_TEST_TIMEOUT_SCALE 10)
   endif()
