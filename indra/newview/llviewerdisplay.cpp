@@ -801,6 +801,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         // The queries of the frames the GPU has finished, read just before the cull asks for them: as late as they can
         // be, so that the GPU has had the mirrors and the geometry updates above to finish the last frame.
         gGL.queries().retire();
+        gPipeline.readAttachmentTimes();
 
         static LLCullResult result;
         LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;

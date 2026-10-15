@@ -137,6 +137,9 @@ public:
     // perform a profile of the given avatar
     // if profile_attachments is true, run a profile for each attachment
     void profileAvatar(LLVOAvatar* avatar, bool profile_attachments = false);
+    // Gives each attachment a profile timed its GPU time once its frame has been read, waiting for nothing. Once a
+    // frame, after the pool retires.
+    void readAttachmentTimes();
 
     // generate an impostor for the given avatar
     //  preview_avatar - if true, a preview window render is being performed
@@ -1028,6 +1031,9 @@ public:
     // the haze shades the water's pixels only then. An occlusion query of gGL's, asked in mSkyBehindQueryFrame.
     ALQueryTicket               mSkyBehindQuery;
     U32                         mSkyBehindQueryFrame = 0;
+
+    // The attachments profileAvatar() timed, with their spans of gGL's pool, until readAttachmentTimes() has them.
+    std::vector<std::pair<LLPointer<LLViewerObject>, ALQuerySpan>> mAttachmentSpans;
 
     // The water's layout around the main camera and its map of cell heights, laid out at the start of each main frame.
     ALWaterSurface              mWaterSurface;

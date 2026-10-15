@@ -211,7 +211,8 @@ if(AL_BUILD_TESTS)
   #   by the matrices the draw syncs;
   # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its
   #   lifetime, and the readback and stream rings;
-  # - ALGPUTimer: one span timed at a time, and its query gone with it;
+  # - ALGPUTimer: one span timed at a time, as timestamps and as Elapsed
+  #   queries;
   # - ALQueryPool: each kind's names kept to its target, a held target
   #   refused, results read once their frame has ended, spans, release and
   #   conditional draws;

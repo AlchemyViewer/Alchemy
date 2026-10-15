@@ -1317,6 +1317,7 @@ void LLPipeline::releaseGLBuffers()
     mWaterSurface.release();
     mDepthPyramid.release();
     mSkyBehindQuery = {};
+    mAttachmentSpans.clear();
     mSkyBehindQueryFrame = 0;
 
     if (mNoiseMap)
@@ -13647,8 +13648,8 @@ void LLPipeline::renderRiggedGroups(LLRenderPass* pass, U32 type, bool texture)
 
 void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
 {
-    if (!profile_attachments && avatar->isProfilePending())
-    { // the last profile's time is still on its way; another would throw it away
+    if (profile_attachments ? !mAttachmentSpans.empty() : avatar->isProfilePending())
+    { // the last profile's times are still on their way; another would throw them away
         return;
     }
 
@@ -13696,11 +13697,14 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
 
         avatar->mCPURenderTime = (F32)cpu_timer.getElapsedTimeF32() * 1000.f;
 
-        avatar->readProfileQuery(5); // allow up to 5 frames of latency
+        // read by the avatar's idleUpdate() once its frame has been
+        avatar->endProfileQuery();
     }
     else
     {
-        // profile attachments one at a time
+        // profile attachments one at a time, each in a span of gGL's pool, read by readAttachmentTimes() once their
+        // frame has been
+        ALQueryPool& queries = gGL.queries();
         LLVOAvatar::attachment_map_t::iterator iter;
         LLVOAvatar::attachment_map_t::iterator begin = avatar->mAttachmentPoints.begin();
         LLVOAvatar::attachment_map_t::iterator end = avatar->mAttachmentPoints.end();
@@ -13717,14 +13721,10 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
                 LLViewerObject* attached_object = attachment_iter->get();
                 if (attached_object)
                 {
-                    // use gDebugProgram to do the GPU queries
-                    gDebugProgram.clearStats();
-                    gDebugProgram.placeProfileQuery(true);
-
+                    ALQuerySpan span = queries.beginSpan();
                     generateImpostor(avatar, false, true, attached_object);
-                    gDebugProgram.readProfileQuery(true, true);
-
-                    attached_object->mGPURenderTime = gDebugProgram.mTimeElapsed / 1000000.f;
+                    queries.endSpan(span);
+                    mAttachmentSpans.emplace_back(attached_object, span);
                 }
             }
         }
@@ -13744,6 +13744,29 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     {
         cur_shader->bind();
     }
+}
+
+void LLPipeline::readAttachmentTimes()
+{
+    if (mAttachmentSpans.empty())
+    {
+        return;
+    }
+    const ALQueryPool& queries = gGL.queries();
+    std::erase_if(mAttachmentSpans, [&queries](const auto& timed)
+    {
+        U64 nanoseconds = 0;
+        switch (queries.result(timed.second, nanoseconds))
+        {
+        case ALQueryPool::Status::Ready:
+            timed.first->mGPURenderTime = nanoseconds / 1000000.f;
+            return true;
+        case ALQueryPool::Status::Expired:
+            return true;
+        default:
+            return false;
+        }
+    });
 }
 
 void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool for_profile, LLViewerObject* specific_attachment)

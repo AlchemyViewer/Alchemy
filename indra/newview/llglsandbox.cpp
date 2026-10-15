@@ -880,9 +880,10 @@ void LLSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& di
 // a struct rather than a class simply because every member is public.
 struct ShaderProfileHelper
 {
+    // The benchmark turns samples drawn into bandwidth, so it counts the samples themselves.
     ShaderProfileHelper()
     {
-        LLGLSLShader::initProfile();
+        LLGLSLShader::initProfile(true);
     }
     ~ShaderProfileHelper()
     {

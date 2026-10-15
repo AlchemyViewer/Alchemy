@@ -1,7 +1,7 @@
 /**
  * @file algputimer_gl_test.cpp
- * @brief ALGPUTimer on the hidden window: a span's time read back, one span at a time, and the query deleted with the
- *        timer.
+ * @brief ALGPUTimer on the hidden window: a span's time read back, one span at a time, as timestamps and as Elapsed
+ *        queries, and a time left unread past its frame's batch.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -26,12 +26,15 @@
 #include "linden_common.h"
 
 #include "../algputimer.h"
+#include "../alquerypool.h"
 #include "../llgl.h"
 #include "../llglheaders.h"
 
 #include "llheadlessgl_fixture.h"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <vector>
 
 namespace
 {
@@ -43,7 +46,30 @@ namespace
         return name;
     }
 
-    // A timer query left open goes with the case, so that the next case can open one.
+    // Puts the timestamps flag back however the case leaves.
+    struct TimestampFlag
+    {
+        explicit TimestampFlag(bool counts) : mHad(gGLManager.mHasTimestampQuery)
+        {
+            gGLManager.mHasTimestampQuery = mHad && counts;
+        }
+        ~TimestampFlag() { gGLManager.mHasTimestampQuery = mHad; }
+
+        bool mHad;
+    };
+
+    // The spans to try: timestamps where the context counts them, and Elapsed queries everywhere.
+    std::vector<bool> span_kinds()
+    {
+        std::vector<bool> kinds{ false };
+        if (gGLManager.mHasTimestampQuery)
+        {
+            kinds.push_back(true);
+        }
+        return kinds;
+    }
+
+    // The pool goes here, and a timer query left open, so that the next case can open one.
     struct algputimer_data
     {
         algputimer_data()
@@ -60,52 +86,48 @@ namespace
             {
                 glEndQuery(GL_TIME_ELAPSED);
             }
+            mPool.release();
         }
 
         ll_test::SharedGLScope mGL;
+        ALQueryPool mPool;
     };
 
 
     // A span's time is read once, and the timer then takes another span.
     TEST_CASE_METHOD(algputimer_data, "algputimer_gl: a span's time is read once, and the next span begins after it", "[algputimer_gl]")
     {
-        ALGPUTimer timer;
+        for (const bool timestamps : span_kinds())
         {
-            INFO("nothing is pending before the first span");
-            CHECK_FALSE(timer.isPending());
+            TimestampFlag flag(timestamps);
+            INFO((timestamps ? "timestamps" : "Elapsed queries"));
+            ALGPUTimer timer(&mPool);
             U64 ns = 0;
-            CHECK_FALSE(timer.poll(ns, true));
-        }
+            {
+                INFO("nothing is pending before the first span");
+                CHECK_FALSE(timer.isPending());
+                CHECK_FALSE(timer.poll(ns, true));
+            }
 
-        REQUIRE(timer.begin());
-        {
-            INFO("the span holds the context's timer query");
-            CHECK(timer.getQuery() != 0);
-            CHECK(openTimer() == (GLint)timer.getQuery());
-        }
-        timer.end();
-        {
-            INFO("the ended span's time is pending, and its query closed");
-            CHECK(timer.isPending());
-            CHECK(openTimer() == 0);
-        }
-
-        U64 ns = 0;
-        {
-            INFO("the time is read");
-            CHECK(timer.poll(ns, true));
-            CHECK_FALSE(timer.isPending());
-        }
-        {
-            INFO("and only once");
-            CHECK_FALSE(timer.poll(ns, true));
-        }
-
-        {
-            INFO("the next span begins and is read in its turn");
             REQUIRE(timer.begin());
             timer.end();
-            CHECK(timer.poll(ns, true));
+            {
+                INFO("the ended span's time is pending");
+                CHECK(timer.isPending());
+                CHECK(openTimer() == 0);
+            }
+            {
+                INFO("the time is read, and only once");
+                CHECK(timer.poll(ns, true));
+                CHECK_FALSE(timer.isPending());
+                CHECK_FALSE(timer.poll(ns, true));
+            }
+            {
+                INFO("the next span begins and is read in its turn");
+                REQUIRE(timer.begin());
+                timer.end();
+                CHECK(timer.poll(ns, true));
+            }
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }
@@ -114,69 +136,80 @@ namespace
     // refused, its end ends nothing, and another timer query can still begin.
     TEST_CASE_METHOD(algputimer_data, "algputimer_gl: a span cannot begin while the last one's time is pending", "[algputimer_gl]")
     {
-        ALGPUTimer timer;
-        REQUIRE(timer.begin());
-        timer.end();
-        REQUIRE(timer.isPending());
+        for (const bool timestamps : span_kinds())
+        {
+            TimestampFlag flag(timestamps);
+            INFO((timestamps ? "timestamps" : "Elapsed queries"));
+            ALGPUTimer timer(&mPool);
+            REQUIRE(timer.begin());
+            timer.end();
+            REQUIRE(timer.isPending());
 
-        {
-            INFO("the second span is refused");
-            CHECK_FALSE(timer.begin());
-        }
-        timer.end();
-        {
-            INFO("no timer query is left open");
-            CHECK(openTimer() == 0);
-        }
+            {
+                INFO("the second span is refused");
+                CHECK_FALSE(timer.begin());
+            }
+            timer.end();
+            {
+                INFO("no timer query is left open");
+                CHECK(openTimer() == 0);
+            }
 
-        // Another avatar's, or the shader profiler's.
-        GLuint other = 0;
-        glGenQueries(1, &other);
-        glBeginQuery(GL_TIME_ELAPSED, other);
-        {
-            INFO("another timer query begins");
-            CHECK(glGetError() == GL_NO_ERROR);
-        }
-        glEndQuery(GL_TIME_ELAPSED);
-        glDeleteQueries(1, &other);
+            // Another avatar's, or the shader profiler's.
+            GLuint other = 0;
+            glGenQueries(1, &other);
+            glBeginQuery(GL_TIME_ELAPSED, other);
+            {
+                INFO("another timer query begins");
+                CHECK(glGetError() == GL_NO_ERROR);
+            }
+            glEndQuery(GL_TIME_ELAPSED);
+            glDeleteQueries(1, &other);
 
-        {
-            INFO("the first span's time is still there to read");
-            U64 ns = 0;
-            CHECK(timer.poll(ns, true));
+            {
+                INFO("the first span's time is still there to read");
+                U64 ns = 0;
+                CHECK(timer.poll(ns, true));
+            }
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
-    // release() deletes the query, ending a span left open; the timer's destruction does the same.
-    TEST_CASE_METHOD(algputimer_data, "algputimer_gl: the query goes with release and with the timer", "[algputimer_gl]")
+    // A time is read without waiting once its frame has ended and the GPU finished it; one left unread until the pool
+    // has dropped its frame's results has expired, and frees the timer.
+    TEST_CASE_METHOD(algputimer_data, "algputimer_gl: a time is read once its frame is, and expires unread once its frame's results go", "[algputimer_gl]")
     {
-        GLuint name = 0;
+        ALGPUTimer timer(&mPool);
+        U64 ns = 0;
+        REQUIRE(timer.begin());
+        timer.end();
+        mPool.endFrame();
+        glFinish();
+        mPool.retire();
         {
-            ALGPUTimer timer;
-            REQUIRE(timer.begin());
-            timer.end();
-            name = timer.getQuery();
-            REQUIRE(glIsQuery(name) == GL_TRUE);
+            INFO("read without waiting once its frame has been");
+            CHECK(timer.poll(ns));
+            CHECK_FALSE(timer.isPending());
+        }
 
-            timer.release();
-            {
-                INFO("release deletes the query and drops the pending time");
-                CHECK(glIsQuery(name) == GL_FALSE);
-                CHECK(timer.getQuery() == 0);
-                CHECK_FALSE(timer.isPending());
-            }
-
-            {
-                INFO("a released timer times again");
-                REQUIRE(timer.begin());
-            }
-            name = timer.getQuery();
+        REQUIRE(timer.begin());
+        timer.end();
+        // Each frame times something else, so that each is read and its results kept in turn, until the timer's own
+        // frame's make way: its frame and RESULT_FRAMES more.
+        for (U32 frame = 0; frame <= ALQueryPool::RESULT_FRAMES; ++frame)
+        {
+            ALQuerySpan other = mPool.beginSpan();
+            mPool.endSpan(other);
+            mPool.endFrame();
+            glFinish();
+            mPool.retire();
         }
         {
-            INFO("the timer's destruction ends its open span and deletes its query");
-            CHECK(openTimer() == 0);
-            CHECK(glIsQuery(name) == GL_FALSE);
+            INFO("expired once its frame's results were dropped, and the timer free again");
+            CHECK_FALSE(timer.poll(ns));
+            CHECK_FALSE(timer.isPending());
+            CHECK(timer.begin());
+            timer.end();
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }
