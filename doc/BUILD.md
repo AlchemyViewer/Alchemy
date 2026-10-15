@@ -380,7 +380,7 @@ The registry's README covers CI and adding ports.
 | `AL_BUILD_CEF_PLUGIN`       | ON          | Chromium Embedded Framework (in-world web) |
 | `AL_BUILD_VLC_PLUGIN`       | OFF on Linux | VLC media plugin; on Linux GStreamer plays media, and VLC only with `MediaPluginForceVLC` |
 | `AL_BUILD_GSTREAMER_PLUGIN` | ON on Linux | GStreamer media plugin (Linux only): video, audio and the parcel stream |
-| `AL_BUILD_EXAMPLE_PLUGIN`   | ON          | Reference/example plugin                   |
+| `AL_BUILD_EXAMPLE_PLUGIN`   | OFF         | Reference/example plugin                   |
 
 ### Platform-specific
 

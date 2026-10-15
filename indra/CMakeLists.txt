@@ -66,7 +66,7 @@ set(BUILD_TESTING ${AL_BUILD_TESTS})
 option(AL_BUILD_DULLAHAN_EXAMPLE "Build the Dullahan OpenGL example application" OFF)
 
 # Plugin Build Options
-option(AL_BUILD_EXAMPLE_PLUGIN "Build support for SLPlugin example plugin" ON)
+option(AL_BUILD_EXAMPLE_PLUGIN "Build the example media plugin, a reference for writing one" OFF)
 option(AL_BUILD_CEF_PLUGIN "Build support for SLPlugin CEF web plugin." ON)
 # GStreamer plays media on Linux. VLC there is built only when asked for, and
 # used only with MediaPluginForceVLC.
