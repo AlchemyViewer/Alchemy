@@ -26,6 +26,7 @@
 
 #include "allslconsts.h"
 
+#include "allsldepth.h"
 #include "allsleffects.h"
 #include "allslservice.h"
 #include "allsltraits.h"
@@ -172,7 +173,7 @@ ALLSLConsts::Result ALLSLConsts::run(std::string_view text, const std::vector<De
     AL_SCRIPT_ENGINE_HELD;
     ScopedScriptParser parser(nullptr);
     const std::string  copy(text);
-    LSLScript*         script = parser.parseLSLBytes(copy.data(), static_cast<int>(copy.size()));
+    LSLScript*         script = ALLSLDepth::parse(parser, copy.data(), static_cast<int>(copy.size()));
     if (!script || parser.logger.getErrors())
     {
         return result;

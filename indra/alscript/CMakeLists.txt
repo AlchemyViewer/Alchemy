@@ -37,6 +37,7 @@ target_sources(
     lint/alscriptlintpass.cpp
     lint/alselenefilters.cpp
     lsl/allslconsts.cpp
+    lsl/allsldepth.cpp
     lsl/allsleffects.cpp
     lsl/allslexports.cpp
     lsl/allslservice.cpp
@@ -119,6 +120,7 @@ target_sources(
         lint/alscriptlintpass.h
         lint/alselenefilters.h
         lsl/allslconsts.h
+        lsl/allsldepth.h
         lsl/allsleffects.h
         lsl/allsleventtext.inc
         lsl/allslexports.h
@@ -286,6 +288,7 @@ if(AL_BUILD_TESTS)
       tests/alscriptenvelope_test.cpp
       tests/alscriptfixes_test.cpp
       tests/alscriptformatter_test.cpp
+      tests/alscripthostile_test.cpp
       tests/alscriptjoblane_test.cpp
       tests/alscriptlexicon_test.cpp
       tests/alscriptlintpass_test.cpp
@@ -308,6 +311,7 @@ if(AL_BUILD_TESTS)
       ${definitions_defines}
       ${templates_define}
       "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
+      "AL_LSCRIPT_REGRESSION_DIR=\"${INDRA_SOURCE_DIR}/lscript/tests/regressions\""
     RERUN newsolver
     RERUN_SOURCES
       tests/alluaufragment_test.cpp

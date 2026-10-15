@@ -27,6 +27,7 @@
 #include "alscriptweight.h"
 
 #include "alscriptengine.h"
+#include "allsldepth.h"
 #include "allslservice.h"
 #include "alluauservice.h"
 #include "alluausharedstart.h"
@@ -1501,10 +1502,11 @@ namespace ALScriptWeigh
         // A tree of its own: the compiler desugars the one it is given.
         Tailslide::ScopedScriptParser parser(nullptr);
         const std::string            text(source);
-        Tailslide::LSLScript*        script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+        bool                         deep   = false;
+        Tailslide::LSLScript*        script = ALLSLDepth::parse(parser, text.data(), static_cast<int>(text.size()), &deep);
         if (!script)
         {
-            weight.error = "it does not parse";
+            weight.error = deep ? "it nests too deeply" : "it does not parse";
             return weight;
         }
         // The passes Tailslide's own tool runs before it compiles, but its
@@ -1936,10 +1938,11 @@ namespace ALScriptWeigh
         AL_SCRIPT_ENGINE_HELD;
         Tailslide::ScopedScriptParser parser(nullptr);
         const std::string            text(source);
-        Tailslide::LSLScript*        script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+        bool                         deep   = false;
+        Tailslide::LSLScript*        script = ALLSLDepth::parse(parser, text.data(), static_cast<int>(text.size()), &deep);
         if (!script)
         {
-            weight.error = "it does not parse";
+            weight.error = deep ? "it nests too deeply" : "it does not parse";
             return weight;
         }
         script->collectSymbols();
@@ -1979,10 +1982,11 @@ namespace ALScriptWeigh
                 error = "the LSL builtins are not loaded";
                 return nullptr;
             }
-            Tailslide::LSLScript* script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+            bool                  deep   = false;
+            Tailslide::LSLScript* script = ALLSLDepth::parse(parser, text.data(), static_cast<int>(text.size()), &deep);
             if (!script)
             {
-                error = "it does not parse";
+                error = deep ? "it nests too deeply" : "it does not parse";
                 return nullptr;
             }
             script->collectSymbols();
@@ -2043,7 +2047,7 @@ namespace
     {
         Tailslide::ScopedScriptParser parser(nullptr);
         const std::string            text(source);
-        Tailslide::LSLScript*        script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+        Tailslide::LSLScript*        script = ALLSLDepth::parse(parser, text.data(), static_cast<int>(text.size()));
         if (!script)
         {
             return;

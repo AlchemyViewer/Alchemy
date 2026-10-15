@@ -30,6 +30,7 @@
 
 #include "alscriptengine.h"
 #include "alscriptstack.h"
+#include "allsldepth.h"
 #include "allsleffects.h"
 #include "allslservice.h"
 #include "allsltraits.h"
@@ -8470,7 +8471,7 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
     alScriptOnLargeStack([&]() {
         AL_SCRIPT_ENGINE_HELD;
         ScopedScriptParser parser(nullptr);
-        LSLScript*         script = parser.parseLSLBytes(lsl.data(), static_cast<int>(lsl.size()));
+        LSLScript*         script = ALLSLDepth::parse(parser, lsl.data(), static_cast<int>(lsl.size()));
         if (script)
         {
             script->collectSymbols();

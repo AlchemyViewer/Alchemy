@@ -79,6 +79,38 @@ namespace
         What what = Other;
     };
 
+    // The brackets and blocks open, innermost last, and where each block is
+    // among them. What block is innermost, and how many are open, is asked
+    // at every line and every bracket, and finding it by scanning the
+    // whole made formatting a script a hundred thousand brackets deep take
+    // most of a minute.
+    struct OpenStack
+    {
+        std::vector<Open>   entries;
+        std::vector<size_t> blocks;
+
+        bool  empty() const { return entries.empty(); }
+        Open& back() { return entries.back(); }
+        void  push_back(const Open& o)
+        {
+            if (!o.bracket)
+            {
+                blocks.push_back(entries.size());
+            }
+            entries.push_back(o);
+        }
+        void pop_back()
+        {
+            if (!entries.back().bracket)
+            {
+                blocks.pop_back();
+            }
+            entries.pop_back();
+        }
+        size_t      blocksOpen() const { return blocks.size(); }
+        const Open* innermostBlock() const { return blocks.empty() ? nullptr : &entries[blocks.back()]; }
+    };
+
     bool significant(const Token& t) { return t.kind != Kind::Space && t.kind != Kind::Comment; }
 
     // LSL's words that shape the code -- not its types, nor print, which
@@ -119,8 +151,34 @@ namespace
         }
     }
 
+    // How deep a line's indentation goes at most. A level is written for
+    // each block and bracket open, and a script nested a hundred thousand
+    // deep, a block a line, wrote gigabytes of blanks, on the main thread,
+    // which formats. A line deeper stands where this many levels put it.
+    constexpr S32 MAX_INDENT_LEVELS = 32;
+
+    // A line is broken at the width only where it has no more tokens than
+    // this, and no bracket deeper in than the indentation goes: breaking
+    // recurses a level for each bracket it goes into and measures the line
+    // afresh at each, which a long enough line, on the main thread's
+    // stack, does not come back from. A longer or deeper line is left as
+    // it is.
+    constexpr size_t WRAP_MAX_TOKENS = 2048;
+
+    // The options as given, kept to what the formatter can do: an indent of
+    // no more than sixteen columns and no less than none -- a negative one,
+    // times the levels, was the size of a string the length of the address
+    // space -- and no fewer blank lines in a row than none.
+    ALScriptFormatter::Options sanitized(ALScriptFormatter::Options options)
+    {
+        options.indent        = llclamp(options.indent, 0, 16);
+        options.maxBlankLines = llmax(options.maxBlankLines, 0);
+        return options;
+    }
+
     std::string indentText(const ALScriptFormatter::Options& options, S32 levels)
     {
+        levels = std::min(levels, MAX_INDENT_LEVELS);
         if (levels <= 0)
         {
             return std::string();
@@ -450,7 +508,7 @@ namespace
     // Each line's indentation from what is open at its start.
     void decide(std::vector<Line>& lines, bool lua)
     {
-        std::vector<Open> open;
+        OpenStack         open;
         bool              hang = false;
         // Luau: each `if` met and not yet done with, statement or
         // expression -- an expression's `then` and `else` open no block,
@@ -470,24 +528,8 @@ namespace
         // Whether the token before was the `else` of an if-expression,
         // after which another `if` is the same expression going on.
         bool afterElseExpression = false;
-        auto              blocksOpen = [&open]() {
-            size_t n = 0;
-            for (const Open& o : open)
-            {
-                n += o.bracket ? 0 : 1;
-            }
-            return n;
-        };
-        auto innermostBlock = [&open]() -> const Open* {
-            for (auto it = open.rbegin(); it != open.rend(); ++it)
-            {
-                if (!it->bracket)
-                {
-                    return &*it;
-                }
-            }
-            return nullptr;
-        };
+        auto              blocksOpen     = [&open]() { return open.blocksOpen(); };
+        auto              innermostBlock = [&open]() { return open.innermostBlock(); };
         auto isBlockCloser = [lua](const Token& t) {
             if (t.kind == Kind::Punct)
             {
@@ -723,13 +765,27 @@ namespace
         size_t              width  = 0;
         bool                vector = false;
         std::vector<size_t> commas;
+        // The groups directly inside it that may be broken -- closed, and
+        // no vector -- widest first.
+        std::vector<size_t> breakable;
+    };
+
+    // The groups of a line's tokens, and those at its top that may be
+    // broken, widest first.
+    struct Groups
+    {
+        std::vector<Group>  all;
+        std::vector<size_t> top;
+        // How deep its brackets go.
+        size_t              depth = 0;
     };
 
     // What the tokens' brackets are; none where they do not match, or one
     // is left open: a line that runs on over the next is not broken.
-    std::vector<Group> groupsOf(const std::vector<Token>& tokens, bool lua)
+    Groups groupsOf(const std::vector<Token>& tokens, bool lua)
     {
-        std::vector<Group>  groups;
+        Groups              found;
+        std::vector<Group>& groups = found.all;
         std::vector<size_t> open;
         const Token*        before = nullptr;
         for (size_t i = 0; i < tokens.size(); ++i)
@@ -753,6 +809,7 @@ namespace
                     group.vector = vector;
                     open.push_back(groups.size());
                     groups.push_back(std::move(group));
+                    found.depth = std::max(found.depth, open.size());
                 }
                 else if (t.text == ")" || t.text == "]" || t.text == "}")
                 {
@@ -763,7 +820,7 @@ namespace
                     const std::string_view opener = t.text == ")" ? "(" : t.text == "]" ? "[" : "{";
                     if (open.empty() || tokens[groups[open.back()].open].text != opener)
                     {
-                        return {};
+                        return Groups();
                     }
                     groups[open.back()].close = i;
                     open.pop_back();
@@ -782,16 +839,38 @@ namespace
         }
         if (!open.empty() && std::any_of(open.begin(), open.end(), [&groups](size_t g) { return !groups[g].vector; }))
         {
-            return {};
+            return Groups();
         }
-        for (Group& group : groups)
+        // Each group's width from the tokens' running sizes, and where it
+        // stands in its parent's breakable ones: once, rather than a scan
+        // of every token in it and of every group for each parent.
+        std::vector<size_t> upTo(tokens.size() + 1, 0);
+        for (size_t i = 0; i < tokens.size(); ++i)
         {
-            for (size_t i = group.open; group.close != std::string::npos && i <= group.close; ++i)
+            upTo[i + 1] = upTo[i] + tokens[i].text.size();
+        }
+        for (size_t g = 0; g < groups.size(); ++g)
+        {
+            Group& group = groups[g];
+            if (group.close == std::string::npos)
             {
-                group.width += tokens[i].text.size();
+                continue;
+            }
+            group.width = upTo[group.close + 1] - upTo[group.open];
+            if (!group.vector)
+            {
+                (group.parent == std::string::npos ? found.top : groups[group.parent].breakable).push_back(g);
             }
         }
-        return groups;
+        const auto widestFirst = [&groups](std::vector<size_t>& in) {
+            std::stable_sort(in.begin(), in.end(), [&groups](size_t a, size_t b) { return groups[a].width > groups[b].width; });
+        };
+        widestFirst(found.top);
+        for (Group& group : groups)
+        {
+            widestFirst(group.breakable);
+        }
+        return found;
     }
 
     // A line's tokens as lines of their own, each with how far in it is.
@@ -835,31 +914,25 @@ namespace
             out.push_back({ tokens, indent });
             return;
         }
-        const std::vector<Group> groups = groupsOf(tokens, options.lua);
-        const auto               pick   = [&groups](size_t parent, auto&& self) -> std::optional<size_t> {
-            std::vector<size_t> in;
-            for (size_t g = 0; g < groups.size(); ++g)
-            {
-                if (groups[g].parent == parent && !groups[g].vector && groups[g].close != std::string::npos)
-                {
-                    in.push_back(g);
-                }
-            }
-            std::stable_sort(in.begin(), in.end(), [&groups](size_t a, size_t b) { return groups[a].width > groups[b].width; });
+        const Groups              found  = groupsOf(tokens, options.lua);
+        const std::vector<Group>& groups = found.all;
+        // Recursing no deeper than the line's brackets, which wrapped()
+        // has held to the indentation's depth.
+        const auto pick = [&groups](const std::vector<size_t>& in, auto&& self) -> std::optional<size_t> {
             for (size_t g : in)
             {
                 if (!groups[g].commas.empty())
                 {
                     return g;
                 }
-                if (const std::optional<size_t> inner = self(g, self))
+                if (const std::optional<size_t> inner = self(groups[g].breakable, self))
                 {
                     return inner;
                 }
             }
             return std::nullopt;
         };
-        std::optional<size_t> chosen = pick(std::string::npos, pick);
+        std::optional<size_t> chosen = pick(found.top, pick);
         if (!chosen)
         {
             out.push_back({ tokens, indent });
@@ -924,6 +997,10 @@ namespace
             tokens = slice(tokens, 0, tokens.size() - 1);
         }
         if (std::any_of(tokens.begin(), tokens.end(), [](const Token& t) { return t.kind == Kind::Comment; }))
+        {
+            return text;
+        }
+        if (tokens.size() > WRAP_MAX_TOKENS || groupsOf(tokens, options.lua).depth > static_cast<size_t>(MAX_INDENT_LEVELS))
         {
             return text;
         }
@@ -1394,9 +1471,10 @@ namespace
 }
 
 // static
-std::string ALScriptFormatter::format(std::string_view text, const Options& options)
+std::string ALScriptFormatter::format(std::string_view text, const Options& asked)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Options     options         = sanitized(asked);
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
@@ -1405,9 +1483,10 @@ std::string ALScriptFormatter::format(std::string_view text, const Options& opti
 }
 
 // static
-std::string ALScriptFormatter::formatLines(std::string_view text, const Options& options, S32 first, S32 last)
+std::string ALScriptFormatter::formatLines(std::string_view text, const Options& asked, S32 first, S32 last)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Options     options         = sanitized(asked);
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
@@ -1416,9 +1495,10 @@ std::string ALScriptFormatter::formatLines(std::string_view text, const Options&
 }
 
 // static
-std::vector<std::string> ALScriptFormatter::formatEach(std::string_view text, const Options& options, S32 first, S32 last)
+std::vector<std::string> ALScriptFormatter::formatEach(std::string_view text, const Options& asked, S32 first, S32 last)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    const Options     options         = sanitized(asked);
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);

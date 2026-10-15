@@ -24,6 +24,7 @@
 
 #include "linden_common.h"
 
+#include "../lsl/allsldepth.h"
 #include "../lsl/allsltoslua.h"
 #include "../core/alscriptformatter.h"
 #include "../lint/alscriptfixes.h"
@@ -1100,6 +1101,9 @@ namespace
                                                           "logmessage_test.lsl", "nested_lists.lsl", "parserstackdepth3.lsl", "pathological_expression.lsl", "precluded_globals.lsl",
                                                           "print_no_shadowing.lsl", "print_type_bug.lsl", "rvalue_assignments.lsl", "scope1.lsl", "scope2.lsl",
                                                           "scope4.lsl", "type_error_no_assert.lsl", "void_return.lsl" };
+        // Those Tailslide parses but nested deeper than the studio walks a
+        // tree (allsldepth.h): refused with that said.
+        static const std::set<std::string> TOO_DEEP = { "parserstackdepth2.lsl" };
         const std::string dir = std::string(AL_ALSCRIPT_TEST_DIR) + "/tailslide/scripts";
         std::vector<std::string> files;
         for (const auto& entry : std::filesystem::recursive_directory_iterator(dir))
@@ -1125,6 +1129,12 @@ namespace
                 wrong += r.converted ? name + ": converted, and Tailslide refuses it\n" : "";
                 continue;
             }
+            if (TOO_DEEP.contains(name))
+            {
+                const bool said = !r.problems.empty() && ALLSLDepth::said(r.problems.front().message);
+                wrong += r.converted || !said ? name + ": not refused as too deep\n" : "";
+                continue;
+            }
             if (!r.converted)
             {
                 wrong += name + ": not converted: " + (r.problems.empty() ? std::string() : r.problems.front().message) + "\n";
@@ -1143,7 +1153,7 @@ namespace
         CAPTURE(wrong);
         CHECK(wrong.empty());
         UNSCOPED_INFO("those taken, converted");
-        CHECK(converted + REFUSED.size() == files.size());
+        CHECK(converted + REFUSED.size() + TOO_DEEP.size() == files.size());
     }
 
     TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: deprecated ll: SLua's own way where it means the same or llcompat noted", "[ALLSLToSLua]")
