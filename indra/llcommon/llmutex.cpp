@@ -158,173 +158,107 @@ bool LLMutex::trylock()
 //
 // LLSharedMutex
 //
+namespace
+{
+    // The shared locks this thread holds, and how many times it holds each. A thread
+    // holds few at once and none for long, so a short scan beats any lookup.
+    struct SharedHold
+    {
+        const LLSharedMutex* mMutex;
+        U32 mDepth;
+    };
+    constexpr U32 MAX_SHARED_HOLDS = 8;
+    thread_local SharedHold tSharedHolds[MAX_SHARED_HOLDS];
+    thread_local U32 tSharedHoldCount = 0;
+
+    SharedHold* findSharedHold(const LLSharedMutex* mutex)
+    {
+        for (U32 i = 0; i < tSharedHoldCount; ++i)
+        {
+            if (tSharedHolds[i].mMutex == mutex)
+            {
+                return &tSharedHolds[i];
+            }
+        }
+        return nullptr;
+    }
+}
+
 LLSharedMutex::LLSharedMutex()
-: mLockingThreads(2) // Reserve 2 slots in the map hash table
-, mIsShared(false)
+: mExclusiveOwner(LLThread::id_t())
+, mExclusiveDepth(0)
 {
-}
-
-bool LLSharedMutex::isLocked() const
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    std::lock_guard<std::mutex> lock(mLockMutex);
-
-    return !mLockingThreads.empty();
-}
-
-bool LLSharedMutex::isThreadLocked() const
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    LLThread::id_t current_thread = LLThread::currentID();
-    std::lock_guard<std::mutex> lock(mLockMutex);
-
-    const_iterator it = mLockingThreads.find(current_thread);
-    return it != mLockingThreads.end();
 }
 
 void LLSharedMutex::lockShared()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    LLThread::id_t current_thread = LLThread::currentID();
+    if (mExclusiveOwner.load(std::memory_order_relaxed) == LLThread::currentID())
+    {
+        // Inside this thread's exclusive hold, which already covers it.
+        ++mExclusiveDepth;
+        return;
+    }
 
-    mLockMutex.lock();
-    iterator it = mLockingThreads.find(current_thread);
-    if (it != mLockingThreads.end())
+    if (SharedHold* hold = findSharedHold(this))
     {
-        it->second++;
+        // Never back to the lock itself: SRW locks and libc++ queue a new reader behind
+        // a waiting writer, which would here be waiting on this thread.
+        ++hold->mDepth;
+        return;
     }
-    else
+
+    if (tSharedHoldCount == MAX_SHARED_HOLDS)
     {
-        // Acquire the mutex immediately if the mutex is not locked exclusively
-        // or enter a locking state if the mutex is already locked exclusively
-        mLockMutex.unlock();
-        mSharedMutex.lock_shared();
-        mLockMutex.lock();
-        // Continue after acquiring the mutex
-        mLockingThreads.emplace(std::make_pair(current_thread, 1));
-        mIsShared = true;
+        LL_ERRS() << "One thread holds " << MAX_SHARED_HOLDS << " shared locks at once" << LL_ENDL;
     }
-    mLockMutex.unlock();
+    mSharedMutex.lock_shared();
+    tSharedHolds[tSharedHoldCount++] = { this, 1 };
 }
 
 void LLSharedMutex::lockExclusive()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    LLThread::id_t current_thread = LLThread::currentID();
-
-    mLockMutex.lock();
-    iterator it = mLockingThreads.find(current_thread);
-    if (it != mLockingThreads.end())
+    const LLThread::id_t self = LLThread::currentID();
+    if (mExclusiveOwner.load(std::memory_order_relaxed) == self)
     {
-        if (mIsShared)
-        {
-            // The mutex is already locked in the current thread
-            // but this lock is SHARED (not EXCLISIVE)
-            // We can't lock it again, the lock stays shared
-            // This can lead to a collision (theoretically)
-            llassert_always(!"The current thread is already locked SHARED and can't be locked EXCLUSIVE");
-        }
-        it->second++;
-    }
-    else
-    {
-        // Acquire the mutex immediately if mLockingThreads is empty
-        // or enter a locking state if mLockingThreads is not empty
-        mLockMutex.unlock();
-        mSharedMutex.lock();
-        mLockMutex.lock();
-        // Continue after acquiring the mutex (and possible quitting the locking state)
-        mLockingThreads.emplace(std::make_pair(current_thread, 1));
-        mIsShared = false;
-    }
-    mLockMutex.unlock();
-}
-
-bool LLSharedMutex::trylockShared()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    LLThread::id_t current_thread = LLThread::currentID();
-    std::lock_guard<std::mutex> lock(mLockMutex);
-
-    iterator it = mLockingThreads.find(current_thread);
-    if (it != mLockingThreads.end())
-    {
-        it->second++;
-    }
-    else
-    {
-        if (!mSharedMutex.try_lock_shared())
-            return false;
-
-        mLockingThreads.emplace(std::make_pair(current_thread, 1));
-        mIsShared = true;
+        ++mExclusiveDepth;
+        return;
     }
 
-    return true;
-}
-
-bool LLSharedMutex::trylockExclusive()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    LLThread::id_t current_thread = LLThread::currentID();
-    std::lock_guard<std::mutex> lock(mLockMutex);
-
-    if (mLockingThreads.size() == 1 && mLockingThreads.begin()->first == current_thread)
-    {
-        mLockingThreads.begin()->second++;
-    }
-    else
-    {
-        if (!mSharedMutex.try_lock())
-            return false;
-
-        mLockingThreads.emplace(std::make_pair(current_thread, 1));
-        mIsShared = false;
-    }
-
-    return true;
+    // Under this thread's own shared hold, the exclusive lock would wait on it forever.
+    llassert_always(!findSharedHold(this));
+    mSharedMutex.lock();
+    mExclusiveOwner.store(self, std::memory_order_relaxed);
 }
 
 void LLSharedMutex::unlockShared()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    LLThread::id_t current_thread = LLThread::currentID();
-    std::lock_guard<std::mutex> lock(mLockMutex);
-
-    iterator it = mLockingThreads.find(current_thread);
-    if (it != mLockingThreads.end())
+    if (mExclusiveOwner.load(std::memory_order_relaxed) == LLThread::currentID())
     {
-        if (it->second > 1)
-        {
-            it->second--;
-        }
-        else
-        {
-            mLockingThreads.erase(it);
-            mSharedMutex.unlock_shared();
-        }
+        // A shared lock taken inside the exclusive hold.
+        unlockExclusive();
+        return;
+    }
+
+    SharedHold* hold = findSharedHold(this);
+    llassert(hold);
+    if (hold && --hold->mDepth == 0)
+    {
+        *hold = tSharedHolds[--tSharedHoldCount];
+        mSharedMutex.unlock_shared();
     }
 }
 
 void LLSharedMutex::unlockExclusive()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    LLThread::id_t current_thread = LLThread::currentID();
-    std::lock_guard<std::mutex> lock(mLockMutex);
-
-    iterator it = mLockingThreads.find(current_thread);
-    if (it != mLockingThreads.end())
+    llassert(mExclusiveOwner.load(std::memory_order_relaxed) == LLThread::currentID());
+    if (mExclusiveDepth > 0)
     {
-        if (it->second > 1)
-        {
-            it->second--;
-        }
-        else
-        {
-            mLockingThreads.erase(it);
-            mSharedMutex.unlock();
-        }
+        --mExclusiveDepth;
+        return;
     }
+
+    mExclusiveOwner.store(LLThread::id_t(), std::memory_order_relaxed);
+    mSharedMutex.unlock();
 }
 
 

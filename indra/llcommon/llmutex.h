@@ -79,22 +79,22 @@ protected:
 
 //============================================================================
 
+// A reader-writer lock either side may re-enter. A thread holding it exclusively may
+// take it again either way; a thread holding it shared may take it shared again, even
+// while a writer waits, but not exclusively, which would wait on its own hold. Readers
+// share nothing but the lock itself: a shared re-entry is found in a table of the shared
+// locks its thread holds, never in the mutex.
 class LL_COMMON_API LLSharedMutex
 {
 public:
     LLSharedMutex();
 
-    bool isLocked() const;
-    bool isThreadLocked() const;
-    bool isShared() const { return mIsShared; }
+    LLSharedMutex(const LLSharedMutex&) = delete;
+    LLSharedMutex& operator=(const LLSharedMutex&) = delete;
 
     void lockShared();
     void lockExclusive();
     template<bool SHARED> void lock();
-
-    bool trylockShared();
-    bool trylockExclusive();
-    template<bool SHARED> bool trylock();
 
     void unlockShared();
     void unlockExclusive();
@@ -102,12 +102,10 @@ public:
 
 private:
     std::shared_mutex mSharedMutex;
-    mutable std::mutex mLockMutex;
-    std::unordered_map<LLThread::id_t, U32> mLockingThreads;
-    bool mIsShared;
-
-    using iterator = std::unordered_map<LLThread::id_t, U32>::iterator;
-    using const_iterator = std::unordered_map<LLThread::id_t, U32>::const_iterator;
+    // The exclusive holder. Relaxed for the reason LLMutex::mLockingThread is.
+    std::atomic<LLThread::id_t> mExclusiveOwner;
+    // Owner-only: the holds the exclusive holder has taken beyond its first, either way.
+    U32 mExclusiveDepth;
 };
 
 template<>
@@ -120,18 +118,6 @@ template<>
 inline void LLSharedMutex::lock<false>()
 {
     lockExclusive();
-}
-
-template<>
-inline bool LLSharedMutex::trylock<true>()
-{
-    return trylockShared();
-}
-
-template<>
-inline bool LLSharedMutex::trylock<false>()
-{
-    return trylockExclusive();
 }
 
 template<>
@@ -246,6 +232,9 @@ public:
         if (mSharedMutex)
             mSharedMutex->lock<SHARED>();
     }
+
+    LLSharedMutexLockTemplate(const LLSharedMutexLockTemplate&) = delete;
+    LLSharedMutexLockTemplate& operator=(const LLSharedMutexLockTemplate&) = delete;
 
     ~LLSharedMutexLockTemplate()
     {

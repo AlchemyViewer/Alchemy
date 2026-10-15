@@ -337,4 +337,172 @@ namespace
         CHECK_FALSE(owned_after);
         CHECK_FALSE(mCond.isLocked());
     }
+
+    //------------------------------------------------------------------------
+    // LLSharedMutex
+    //------------------------------------------------------------------------
+
+    struct llsharedmutex_data
+    {
+        LLSharedMutex mMutex;
+
+        // Whether another thread is kept from taking the lock exclusively right now.
+        bool othersExcluded()
+        {
+            Worker writer([this]()
+                {
+                    mMutex.lockExclusive();
+                    mMutex.unlockExclusive();
+                });
+            return !writer.finishesWithin(BLOCKED);
+        }
+    };
+
+    TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: readers share and a writer waits for them", "[llsharedmutex]")
+    {
+        mMutex.lockShared();
+
+        Worker reader([this]()
+            {
+                mMutex.lockShared();
+                mMutex.unlockShared();
+            });
+        UNSCOPED_INFO("a second reader waited on the first");
+        CHECK(reader.finishesWithin(RELEASED));
+
+        std::atomic<bool> wrote{false};
+        Worker writer([&]()
+            {
+                mMutex.lockExclusive();
+                wrote = true;
+                mMutex.unlockExclusive();
+            });
+        CHECK_FALSE(writer.finishesWithin(BLOCKED));
+        CHECK_FALSE(wrote);
+
+        mMutex.unlockShared();
+        CHECK(writer.finishesWithin(RELEASED));
+        CHECK(wrote);
+    }
+
+    TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: a writer excludes readers", "[llsharedmutex]")
+    {
+        mMutex.lockExclusive();
+
+        Worker reader([this]()
+            {
+                mMutex.lockShared();
+                mMutex.unlockShared();
+            });
+        CHECK_FALSE(reader.finishesWithin(BLOCKED));
+
+        mMutex.unlockExclusive();
+        CHECK(reader.finishesWithin(RELEASED));
+    }
+
+    TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: a reader re-enters while a writer waits", "[llsharedmutex]")
+    {
+        // The deadlock the recursion tracking exists for. SRW locks and libc++ queue new
+        // readers behind a waiting writer, so a reader that went back to the lock itself
+        // would wait on a writer that is waiting on it.
+        std::atomic<bool> writer_started{false};
+        std::atomic<bool> first_held{false};
+        Worker reader([&]()
+            {
+                mMutex.lockShared();
+                first_held = true;
+                while (!writer_started)
+                {
+                    std::this_thread::yield();
+                }
+                // Let the writer reach the lock and queue on it.
+                std::this_thread::sleep_for(BLOCKED);
+                mMutex.lockShared();
+                mMutex.unlockShared();
+                mMutex.unlockShared();
+            });
+        while (!first_held)
+        {
+            std::this_thread::yield();
+        }
+        Worker writer([&]()
+            {
+                writer_started = true;
+                mMutex.lockExclusive();
+                mMutex.unlockExclusive();
+            });
+
+        UNSCOPED_INFO("the re-entering reader deadlocked behind the writer");
+        CHECK(reader.finishesWithin(RELEASED));
+        CHECK(writer.finishesWithin(RELEASED));
+    }
+
+    TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: exclusive re-enters and releases on the last unlock", "[llsharedmutex]")
+    {
+        mMutex.lockExclusive();
+        mMutex.lockExclusive();
+        mMutex.unlockExclusive();
+        UNSCOPED_INFO("released on the first of two unlocks");
+        CHECK(othersExcluded());
+        mMutex.unlockExclusive();
+        CHECK_FALSE(othersExcluded());
+    }
+
+    TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: shared nests inside exclusive without releasing it", "[llsharedmutex]")
+    {
+        // LLImageRaw's copies take the source shared, and the source may be the image
+        // they already hold exclusively.
+        mMutex.lockExclusive();
+        mMutex.lockShared();
+        mMutex.unlockShared();
+        UNSCOPED_INFO("the nested shared unlock released the exclusive hold");
+        CHECK(othersExcluded());
+        mMutex.unlockExclusive();
+        CHECK_FALSE(othersExcluded());
+    }
+
+    TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: shared re-entry releases on the last unlock", "[llsharedmutex]")
+    {
+        mMutex.lockShared();
+        mMutex.lockShared();
+        mMutex.unlockShared();
+        UNSCOPED_INFO("released on the first of two shared unlocks");
+        CHECK(othersExcluded());
+        mMutex.unlockShared();
+        CHECK_FALSE(othersExcluded());
+    }
+
+    TEST_CASE("llsharedmutex: shared holds on several mutexes release in any order", "[llsharedmutex]")
+    {
+        LLSharedMutex a;
+        LLSharedMutex b;
+        LLSharedMutex c;
+        auto excluded = [](LLSharedMutex& mutex)
+        {
+            Worker writer([&mutex]()
+                {
+                    mutex.lockExclusive();
+                    mutex.unlockExclusive();
+                });
+            return !writer.finishesWithin(BLOCKED);
+        };
+
+        a.lockShared();
+        b.lockShared();
+        c.lockShared();
+        b.lockShared();
+
+        b.unlockShared();
+        b.unlockShared();
+        CHECK_FALSE(excluded(b));
+        CHECK(excluded(a));
+        CHECK(excluded(c));
+
+        a.unlockShared();
+        CHECK_FALSE(excluded(a));
+        CHECK(excluded(c));
+
+        c.unlockShared();
+        CHECK_FALSE(excluded(c));
+    }
 }
