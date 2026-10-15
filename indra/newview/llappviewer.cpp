@@ -2370,9 +2370,11 @@ bool LLAppViewer::initThreads()
     // Image decoding
     LLAppViewer::sImageDecodeThread = new LLImageDecodeThread(enable_threads && true);
     LLAppViewer::sTextureCache = new LLTextureCache(enable_threads && true);
+    LLAppViewer::sTextureCache->start();
     LLAppViewer::sTextureFetch = new LLTextureFetch(LLAppViewer::getTextureCache(),
                                                     enable_threads && true,
                                                     app_metrics_qa_mode);
+    LLAppViewer::sTextureFetch->start();
 
     // general task background thread (LLPerfStats, etc)
     LLAppViewer::instance()->initGeneralThread();

@@ -46,14 +46,19 @@ LLQueuedThread::LLQueuedThread(const std::string& name, bool threaded, bool shou
     llassert(threaded); // not threaded implementation is deprecated
     mMainQueue = LL::WorkQueue::getInstance("mainloop");
 
+    // The thread starts when the owner calls start(), once the object is made.
+    if (mThreaded && should_pause)
+    {
+        pause();
+    }
+}
+
+// MAIN THREAD
+void LLQueuedThread::start()
+{
     if (mThreaded)
     {
-        if(should_pause)
-        {
-            pause() ; //call this before start the thread.
-        }
-
-        start();
+        LLThread::start();
     }
 }
 
@@ -552,10 +557,9 @@ bool LLQueuedThread::runCondition()
 // virtual
 void LLQueuedThread::run()
 {
-    // call checPause() immediately so we don't try to do anything before the class is fully constructed
+    // A queue made paused waits here until it is unpaused.
     checkPause();
     startThread();
-    mStarted = true;
 
 
     /*while (1)
