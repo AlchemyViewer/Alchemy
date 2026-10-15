@@ -5546,16 +5546,28 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         cutout_width = image_width;
         cutout_height = image_height;
 
-        // Then the render, as many times larger as allowed, down to once: no
-        // side past what the GL can target, and no more pixels than the largest
-        // snapshot the floater offers anyway (MAX_SNAPSHOT_IMAGE_SIZE by 4320).
-        // Every one of them carries the whole G-buffer, and the read-back has to
-        // fit LLImageBase's 256 MB allocation cap besides.
-        const S32 max_side = (S32)gGLManager.mGLMaxTextureSize;
+        // Then the render, as many times larger as allowed, down to once. The
+        // read-back is the render's size, and the screen targets are that with
+        // RenderResolutionDivisor or RenderResolutionMultiplier applied, so a
+        // multiplier of 2 is already twice the render each way. Neither may have
+        // a side past what the GL can target, nor more pixels than the largest
+        // snapshot the floater offers anyway (MAX_SNAPSHOT_IMAGE_SIZE by 4320):
+        // every screen pixel carries the whole G-buffer, and the read-back has
+        // to fit LLImageBase's 256 MB allocation cap besides.
+        const S64 max_side = (S64)gGLManager.mGLMaxTextureSize;
         constexpr S64 MAX_CUTOUT_RENDER_PIXELS = (S64)MAX_SNAPSHOT_IMAGE_SIZE * 4320;
+        const auto fits = [&](S32 supersample)
+        {
+            const U32 read_width = (U32)(image_width * supersample);
+            const U32 read_height = (U32)(image_height * supersample);
+            U32 screen_width = read_width;
+            U32 screen_height = read_height;
+            LLPipeline::scaleToRenderResolution(screen_width, screen_height);
+            return (S64)llmax(read_width, screen_width) <= max_side && (S64)llmax(read_height, screen_height) <= max_side &&
+                   llmax((S64)read_width * read_height, (S64)screen_width * screen_height) <= MAX_CUTOUT_RENDER_PIXELS;
+        };
         S32 supersample = (S32)cutout->mSupersample;
-        while (supersample > 1 && (image_width * supersample > max_side || image_height * supersample > max_side ||
-                                   (S64)image_width * image_height * supersample * supersample > MAX_CUTOUT_RENDER_PIXELS))
+        while (supersample > 1 && !fits(supersample))
         {
             --supersample;
         }

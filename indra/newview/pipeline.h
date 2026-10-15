@@ -110,6 +110,11 @@ public:
     //returns true if full size buffer allocated, false if some other size is allocated
     bool allocateScreenBuffer(U32 resX, U32 resY);
 
+    /// The size of the screen targets allocateScreenBuffer() makes for a view of
+    /// @a resX by @a resY: RenderResolutionDivisor applied, or else
+    /// RenderResolutionMultiplier.
+    static void scaleToRenderResolution(U32& resX, U32& resY);
+
     typedef enum {
         FBO_SUCCESS_FULLRES = 0,
         FBO_SUCCESS_LOWRES,

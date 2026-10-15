@@ -842,16 +842,7 @@ void LLPipeline::resizeScreenTexture()
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
         GLuint scaledResX = resX;
         GLuint scaledResY = resY;
-        if ( (RenderResolutionDivisor > 1) && (RenderResolutionDivisor < resX) && (RenderResolutionDivisor < resY) )
-        {
-            scaledResX /= RenderResolutionDivisor;
-            scaledResY /= RenderResolutionDivisor;
-        }
-        else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier != 1.f)
-        {
-            scaledResX = (GLuint)(scaledResX * RenderResolutionMultiplier);
-            scaledResY = (GLuint)(scaledResY * RenderResolutionMultiplier);
-        }
+        scaleToRenderResolution(scaledResX, scaledResY);
 // [/SL:KB]
 
 //      if (gResizeScreenTexture || (resX != mRT->screen.getWidth()) || (resY != mRT->screen.getHeight()))
@@ -874,6 +865,23 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY)
     eFBOStatus ret = doAllocateScreenBuffer(resX, resY);
 
     return ret == FBO_SUCCESS_FULLRES;
+}
+
+// static
+void LLPipeline::scaleToRenderResolution(U32& resX, U32& resY)
+{
+    if (RenderResolutionDivisor > 1 && RenderResolutionDivisor < resX && RenderResolutionDivisor < resY)
+    {
+        resX /= RenderResolutionDivisor;
+        resY /= RenderResolutionDivisor;
+    }
+// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
+    else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier != 1.f)
+    {
+        resX = (U32)(resX * RenderResolutionMultiplier);
+        resY = (U32)(resY * RenderResolutionMultiplier);
+    }
+// [/SL:KB]
 }
 
 
@@ -957,20 +965,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     mRT->width = resX;
     mRT->height = resY;
 
-    U32 res_mod = RenderResolutionDivisor;
-
-    if (res_mod > 1 && res_mod < resX && res_mod < resY)
-    {
-        resX /= res_mod;
-        resY /= res_mod;
-    }
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-    else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier != 1.f)
-    {
-        resX = (GLuint)(resX * RenderResolutionMultiplier);
-        resY = (GLuint)(resY * RenderResolutionMultiplier);
-    }
-// [/SL:KB]
+    scaleToRenderResolution(resX, resY);
 
     S32 shadow_detail = RenderShadowDetail;
     bool ssao = RenderDeferredSSAO;
