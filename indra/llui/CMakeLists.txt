@@ -693,6 +693,7 @@ if(AL_BUILD_TESTS)
       tests/llaccordionctrltab_test.cpp
       tests/llchatautocompletemodel_test.cpp
       tests/llcombobox_test.cpp
+      tests/llconsole_test.cpp
       tests/llemojidictionary_test.cpp
       tests/llfloater_test.cpp
       tests/llfocusmgr_test.cpp

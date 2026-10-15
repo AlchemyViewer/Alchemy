@@ -394,19 +394,24 @@ void LLConsole::updateClass()
 
 void LLConsole::update()
 {
+    // The lines are taken out under the lock and laid out after it is let go. Laying out
+    // draws glyphs, and a line logged meanwhile comes back to this buffer through its
+    // recorder, which takes the lock again.
+    std::deque<std::string> lines;
     {
         LLCoros::LockType lock(mMutex);
+        lines.swap(mLines);
+        mAddTimes.clear();
+    }
 
-        while (!mLines.empty())
-        {
-            mParagraphs.push_back(
-                Paragraph(  mLines.front(),
-                            LLColor4::white,
-                            mTimer.getElapsedTimeF64(),
-                            mFont,
-                            (F32)getRect().getWidth()));
-            mLines.pop_front();
-        }
+    for (std::string& line : lines)
+    {
+        mParagraphs.push_back(
+            Paragraph(  std::move(line),
+                        LLColor4::white,
+                        mTimer.getElapsedTimeF64(),
+                        mFont,
+                        (F32)getRect().getWidth()));
     }
 
     // remove old paragraphs which can't possibly be visible any more.  ::draw() will do something similar but more conservative - we do this here because ::draw() isn't guaranteed to ever be called!  (i.e. the console isn't visible)
