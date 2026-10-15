@@ -615,6 +615,9 @@ public:
     static bool sEnabledMedia;
 
     LLImageGLThread(LLWindow* window);
+    // Joins the thread first: run() uses the window and context after the
+    // queue closes.
+    ~LLImageGLThread() override;
 
     // post a function to be executed on the LLImageGL background thread
     template <typename CALLABLE>
