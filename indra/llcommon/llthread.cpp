@@ -536,7 +536,6 @@ void LLThread::setQuitting()
 // static
 LLThread::id_t LLThread::currentID()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     return std::this_thread::get_id();
 }
 
@@ -565,13 +564,11 @@ void LLThread::wakeLocked()
 
 void LLThread::lockData()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     mRunCondition->lock();
 }
 
 void LLThread::unlockData()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     mRunCondition->unlock();
 }
 

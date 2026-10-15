@@ -47,8 +47,6 @@ LLMutex::~LLMutex()
 
 void LLMutex::lock()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-
     // LLMutex is not coroutine aware and should not be used from a coroutine
     // If your code is running in a coroutine, you should use LLCoros::Mutex instead
     // NOTE:  If the stack trace you're staring at contains non-thread-safe code,
@@ -64,7 +62,12 @@ void LLMutex::lock()
         return;
     }
 
-    mMutex.lock();
+    if (!mMutex.try_lock())
+    {
+        // Only a lock that has to wait shows in a profile.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_THREAD("LLMutex contended");
+        mMutex.lock();
+    }
 
 #if MUTEX_DEBUG
     // Have to have the lock before we can access the debug info
@@ -79,8 +82,6 @@ void LLMutex::lock()
 
 void LLMutex::unlock()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-
     if (mCount > 0)
     { //not the root unlock
         mCount--;
@@ -101,7 +102,6 @@ void LLMutex::unlock()
 
 bool LLMutex::isLocked()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     if (!mMutex.try_lock())
     {
         return true;
@@ -129,7 +129,6 @@ LLThread::id_t LLMutex::lockingThread() const
 
 bool LLMutex::trylock()
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     if (isSelfLocked())
     { //redundant lock
         mCount++;
