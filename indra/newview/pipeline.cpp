@@ -11829,7 +11829,10 @@ void LLPipeline::doAtmospherics()
         }
 
         LLGLEnable blend(GL_BLEND);
-        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO, LLRender::BF_SOURCE_ALPHA);
+        // The haze dims the glow in the alpha as it dims what is lit. In a cutout frame the alpha is the subject's
+        // coverage, seeded before this pass, and haze in front of the subject leaves it no less covered.
+        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO,
+                      alphaWritesCoverage() ? LLRender::BF_ONE : LLRender::BF_SOURCE_ALPHA);
         // The caller's mask comes back for the pools drawn after the haze.
         LLGLSColorMask color_mask(true, true);
 
