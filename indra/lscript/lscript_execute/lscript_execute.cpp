@@ -1770,6 +1770,16 @@ void unknown_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
     printf("Unknown arithmetic operation!\n");
 }
 
+// LSL's integers are 32-bit two's complement and wrap, as they did on the
+// grid's servers: worked unsigned, where a signed overflow is undefined.
+static S32 lsl_add(S32 a, S32 b) { return (S32)((U32)a + (U32)b); }
+static S32 lsl_sub(S32 a, S32 b) { return (S32)((U32)a - (U32)b); }
+static S32 lsl_mul(S32 a, S32 b) { return (S32)((U32)a * (U32)b); }
+static S32 lsl_neg(S32 a) { return (S32)(0U - (U32)a); }
+// A shift by its count's low five bits, as the grid's x86 shifted: a count
+// past 31, or below 0, is undefined in C++.
+static S32 lsl_shift_count(S32 count) { return count & 31; }
+
 void integer_integer_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
 {
     S32 lside = lscript_pop_int(buffer);
@@ -1779,19 +1789,19 @@ void integer_integer_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
     switch(opcode)
     {
     case LOPC_ADD:
-        result = lside + rside;
+        result = lsl_add(lside, rside);
         break;
     case LOPC_SUB:
-        result = lside - rside;
+        result = lsl_sub(lside, rside);
         break;
     case LOPC_MUL:
-        result = lside * rside;
+        result = lsl_mul(lside, rside);
         break;
     case LOPC_DIV:
         if (rside){
             if( ( rside == -1 ) || ( rside == (S32) 0xffffffff ) )//    division by -1 can have funny results: multiplication is OK: SL-31252
             {
-                result = -1 * lside;
+                result = lsl_mul(-1, lside);
             }
             else
             {
@@ -1850,10 +1860,10 @@ void integer_integer_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
         result = (lside || rside);
         break;
     case LOPC_SHL:
-        result = (lside << rside);
+        result = (lside << lsl_shift_count(rside));
         break;
     case LOPC_SHR:
-        result = (lside >> rside);
+        result = (lside >> lsl_shift_count(rside));
         break;
     default:
         break;
@@ -2917,7 +2927,7 @@ void integer_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
     switch(opcode)
     {
     case LOPC_NEG:
-        result = -lside;
+        result = lsl_neg(lside);
         break;
     case LOPC_BITNOT:
         result = ~lside;

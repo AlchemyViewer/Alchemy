@@ -341,7 +341,9 @@ integer_constant
 	}
 	| '-' INTEGER_CONSTANT
 	{
-		$$ = -$2;
+		// LSL's integers wrap, so -2147483648 negates to itself: negated
+		// unsigned, where a signed negation of it is undefined.
+		$$ = (S32)(0U - (U32)$2);
 	}
 	;
 

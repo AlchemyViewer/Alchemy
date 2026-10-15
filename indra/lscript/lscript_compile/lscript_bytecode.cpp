@@ -34,6 +34,16 @@
 # pragma warning(disable: 4702) // unreachable code
 #endif
 
+// memcpy, for a source that may be an empty chunk's buffer, which is null
+// until something is added: a copy from null is undefined, even of nothing.
+static void copy_bytes(U8 *to, const void *from, S32 size)
+{
+    if (size > 0)
+    {
+        memcpy(to, from, size);     /*Flawfinder: ignore*/
+    }
+}
+
 LLScriptJumpTable::LLScriptJumpTable()
 {
 }
@@ -109,7 +119,7 @@ void LLScriptByteCodeChunk::addBytes(const U8 *bytes, S32 size)
     {
         mCodeChunk = new U8[size];
     }
-    memcpy(mCodeChunk + mCurrentOffset, bytes, size);/* Flawfinder: ignore */
+    copy_bytes(mCodeChunk + mCurrentOffset, bytes, size);
     mCurrentOffset += size;
 }
 
@@ -126,7 +136,7 @@ void LLScriptByteCodeChunk::addBytes(const char *bytes, S32 size)
     {
         mCodeChunk = new U8[size];
     }
-    memcpy(mCodeChunk + mCurrentOffset, bytes, size);   /*Flawfinder: ignore*/
+    copy_bytes(mCodeChunk + mCurrentOffset, bytes, size);
     mCurrentOffset += size;
 }
 
@@ -252,7 +262,7 @@ void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
         mCompleteCode = new U8[mTotalSize];
         memset(mCompleteCode, 0, mTotalSize);
 
-        memcpy(mCompleteCode, mRegisters->mCodeChunk, mRegisters->mCurrentOffset);
+        copy_bytes(mCompleteCode, mRegisters->mCodeChunk, mRegisters->mCurrentOffset);
         offset += mRegisters->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_IP, 0);
@@ -263,12 +273,12 @@ void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
 
         set_register(mCompleteCode, LREG_GVR, offset);
 
-        memcpy(mCompleteCode + offset, mGlobalVariables->mCodeChunk, mGlobalVariables->mCurrentOffset);     /*Flawfinder: ignore*/
+        copy_bytes(mCompleteCode + offset, mGlobalVariables->mCodeChunk, mGlobalVariables->mCurrentOffset);
         offset += mGlobalVariables->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_GFR, offset);
 
-        memcpy(mCompleteCode + offset, mGlobalFunctions->mCodeChunk, mGlobalFunctions->mCurrentOffset); /*Flawfinder: ignore*/
+        copy_bytes(mCompleteCode + offset, mGlobalFunctions->mCodeChunk, mGlobalFunctions->mCurrentOffset);
         offset += mGlobalFunctions->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_SR, offset);
@@ -287,12 +297,12 @@ void LLScriptScriptCodeChunk::build(LLFILE *efp, LLFILE *bcfp)
         }
         set_event_register(mCompleteCode, LREG_ER, bytestream2u64(mStates->mCodeChunk, default_state_offset), LSL2_CURRENT_MAJOR_VERSION);
 
-        memcpy(mCompleteCode + offset, mStates->mCodeChunk, mStates->mCurrentOffset);       /*Flawfinder: ignore*/
+        copy_bytes(mCompleteCode + offset, mStates->mCodeChunk, mStates->mCurrentOffset);
         offset += mStates->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_HR, offset);
 
-        memcpy(mCompleteCode + offset, mHeap->mCodeChunk, mHeap->mCurrentOffset);       /*Flawfinder: ignore*/
+        copy_bytes(mCompleteCode + offset, mHeap->mCodeChunk, mHeap->mCurrentOffset);
         offset += mHeap->mCurrentOffset;
 
         set_register(mCompleteCode, LREG_HP, offset);
