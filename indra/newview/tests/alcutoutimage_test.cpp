@@ -149,6 +149,38 @@ namespace
         closeTo("flat: the fill, black", texel(flat, 0)[0], 0, 0);
     }
 
+    // Resolved alone, a cutout is still premultiplied and has no fill: what is
+    // laid under it later, and whether it keeps alpha, takes no second render.
+    TEST_CASE("alcutoutimage: resolve leaves the cutout premultiplied and clipped for a fill to go under later", "[alcutoutimage]")
+    {
+        LLPointer<LLImageRaw> raw = image(4, 1, { { 255, 0, 0, 255 }, { 0, 0, 0, 0 }, { 10, 10, 10, 0 }, { 0, 0, 0, 0 } });
+        bool drawn = false;
+        REQUIRE(ALCutoutImage::resolve(*raw, 2, 1, &drawn));
+        CHECK(drawn);
+        REQUIRE(raw->getComponents() == 4);
+        REQUIRE(raw->getWidth() == 2);
+
+        const std::vector<U8> edge = texel(raw, 0);
+        closeTo("edge red, premultiplied", edge[0], 128, 3);
+        closeTo("edge half covered", edge[3], 128, 3);
+
+        const std::vector<U8> empty = texel(raw, 1);
+        closeTo("empty: the stray colour clipped", empty[0], 0, 0);
+        closeTo("empty: no coverage", empty[3], 0, 0);
+    }
+
+    // Laid over a fill with nowhere to put alpha, a cutout is the size it was
+    // resolved to: the rows are not padded for BMP, whose encoder pads its own.
+    TEST_CASE("alcutoutimage: laid over a fill without alpha a cutout keeps the width it was resolved to", "[alcutoutimage]")
+    {
+        LLPointer<LLImageRaw> raw = image(5, 1, { { 255, 0, 0, 255 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } });
+        REQUIRE(ALCutoutImage::layOverFill(*raw, LLColor4(1.f, 1.f, 1.f, 1.f), false));
+        CHECK(raw->getComponents() == 3);
+        CHECK(raw->getWidth() == 5);
+        CHECK(raw->getDataSize() == 5 * 3);
+        closeTo("the last texel is the fill", texel(raw, 4)[1], 255);
+    }
+
     // Only premultiplied RGBA is a cutout's read-back.
     TEST_CASE("alcutoutimage: a read-back of three components is refused", "[alcutoutimage]")
     {

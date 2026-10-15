@@ -58,11 +58,16 @@ std::optional<ALSnapshotCutout> ALSnapshotCutout::fromSettings(LLSnapshotModel::
     return cutout;
 }
 
-bool ALSnapshotCutout::operator==(const ALSnapshotCutout& other) const
+bool ALSnapshotCutout::drawsSameAs(const ALSnapshotCutout& other) const
 {
     return mTarget == other.mTarget
         && mIncludeSeated == other.mIncludeSeated
-        && mFill == other.mFill
-        && mKeepAlpha == other.mKeepAlpha
         && mSupersample == other.mSupersample;
+}
+
+bool ALSnapshotCutout::operator==(const ALSnapshotCutout& other) const
+{
+    return drawsSameAs(other)
+        && mFill == other.mFill
+        && mKeepAlpha == other.mKeepAlpha;
 }

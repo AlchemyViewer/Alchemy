@@ -37,7 +37,7 @@ namespace
     }
 }
 
-bool ALCutoutImage::resolveOverFill(LLImageRaw& raw, S32 width, S32 height, const LLColor4& fill, bool keep_alpha, bool* drawn)
+bool ALCutoutImage::resolve(LLImageRaw& raw, S32 width, S32 height, bool* drawn)
 {
     LLImageDataLock lock(&raw);
 
@@ -69,12 +69,21 @@ bool ALCutoutImage::resolveOverFill(LLImageRaw& raw, S32 width, S32 height, cons
 
     // Averaged while premultiplied, so an edge keeps its colour and loses only
     // its coverage.
-    if (!raw.scale(width, height))
+    return raw.scale(width, height);
+}
+
+bool ALCutoutImage::layOverFill(LLImageRaw& raw, const LLColor4& fill, bool keep_alpha)
+{
+    LLImageDataLock lock(&raw);
+
+    if (raw.getComponents() != 4 || raw.isBufferInvalid())
     {
         return false;
     }
 
     const F32 fill_alpha = llclamp(fill.mV[VALPHA], 0.f, 1.f);
+    const S32 width = raw.getWidth();
+    const S32 height = raw.getHeight();
     const S32 texels = width * height;
 
     // Composited in place: each texel is read whole before it is written, and
@@ -123,6 +132,11 @@ bool ALCutoutImage::resolveOverFill(LLImageRaw& raw, S32 width, S32 height, cons
     }
     raw.setSize(width, height, 3);
     return true;
+}
+
+bool ALCutoutImage::resolveOverFill(LLImageRaw& raw, S32 width, S32 height, const LLColor4& fill, bool keep_alpha, bool* drawn)
+{
+    return resolve(raw, width, height, drawn) && layOverFill(raw, fill, keep_alpha);
 }
 
 bool ALCutoutImage::scaleStraightAlpha(LLImageRaw& raw, S32 width, S32 height)

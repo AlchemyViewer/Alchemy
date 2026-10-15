@@ -53,6 +53,11 @@ struct ALSnapshotCutout
     /// Whether RLVa restricts vision now, which rules cutouts out.
     static bool blockedByRlv();
 
+    /// Whether @a other renders the same subject the same way. The fill and
+    /// whether alpha is kept are not part of that: they are how the rendered
+    /// cutout is laid down (ALCutoutImage::layOverFill), after the render.
+    bool drawsSameAs(const ALSnapshotCutout& other) const;
+
     bool operator==(const ALSnapshotCutout& other) const;
     bool operator!=(const ALSnapshotCutout& other) const { return !(*this == other); }
 };

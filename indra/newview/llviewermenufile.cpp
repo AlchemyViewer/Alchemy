@@ -73,6 +73,7 @@
 // linden libraries
 #include "llfilesystem.h"
 #include "llnotificationsutil.h"
+#include "alcutoutimage.h"
 #include "alrenderisolation.h"
 #include "alsnapshotcutout.h"
 #include "llsdserialize.h"
@@ -1111,6 +1112,10 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
                 // There, but out of the frame or past the draw distance: the
                 // image would be the fill alone.
                 LLNotificationsUtil::add("CutoutTargetMissing");
+                return true;
+            }
+            if (cutout && !ALCutoutImage::layOverFill(*raw, cutout->mFill, cutout->mKeepAlpha))
+            {
                 return true;
             }
 

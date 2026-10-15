@@ -192,6 +192,14 @@ private:
     std::string                 mFilterName;
     std::optional<ALSnapshotCutout> mCutout;
     bool                        mCutoutDrawn = true;
+    // The last cutout drawn, resolved and not yet over its fill: a change of
+    // fill or format lays it down again (mCutoutRelayOnly) instead of drawing
+    // the scene again.
+    LLPointer<LLImageRaw>       mCutoutResolved;
+    bool                        mCutoutRelayOnly = false;
+
+    // mPreviewImage from mCutoutResolved over the current cutout's fill.
+    bool layCutoutOverFill();
 
     static LLPointer<LLImageFormatted> sSaveLocalImage;
 

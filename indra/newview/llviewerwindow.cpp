@@ -5524,7 +5524,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     // A cutout is colour without the interface. It renders offscreen, always:
     // the tiled path reads the window's back buffer, which may have no alpha
     // or two bits of it. It renders a whole multiple larger than the image it
-    // makes, and averages down after (ALCutoutImage::resolveOverFill) -- its edges
+    // makes, and averages down after (ALCutoutImage::resolve) -- its edges
     // cannot come from anti-aliasing, which blends the subject into what is
     // to be left empty without telling the coverage.
     S32 cutout_width = 0;
@@ -5984,12 +5984,9 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     bool ret = true ;
     if (cutout)
     {
-        // Three components come out padded as below; four always fill whole words.
-        if (!cutout->mKeepAlpha)
-        {
-            cutout_width += (cutout_width * 3) % 4;
-        }
-        ret = ALCutoutImage::resolveOverFill(*raw, cutout_width, cutout_height, cutout->mFill, cutout->mKeepAlpha, cutout_drawn);
+        // Left premultiplied at the size asked for, not padded as below: the
+        // fill goes on after, and a BMP encoder pads its own rows.
+        ret = ALCutoutImage::resolve(*raw, cutout_width, cutout_height, cutout_drawn);
     }
     else
     {

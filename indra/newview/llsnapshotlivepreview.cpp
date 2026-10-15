@@ -158,16 +158,49 @@ F32 LLSnapshotLivePreview::getImageAspect()
 
 void LLSnapshotLivePreview::setCutout(const std::optional<ALSnapshotCutout>& cutout)
 {
-    if (cutout != mCutout)
+    if (cutout == mCutout)
     {
-        mCutout = cutout;
+        return;
+    }
+
+    // A new fill or format, with the same subject drawn the same way, lays
+    // the cutout already drawn over the fill again; a render already waiting
+    // for something else still happens.
+    const bool relay_only = cutout && mCutout && cutout->drawsSameAs(*mCutout) && mCutoutResolved.notNull()
+        && (getSnapshotUpToDate() || mCutoutRelayOnly);
+    mCutout = cutout;
+    if (!relay_only)
+    {
         // Nothing is known of a cutout until it is drawn.
         mCutoutDrawn = true;
-        // A little later rather than now: a colour dragged across the fill's
-        // wheel is many changes a second, and each is a whole render.
-        constexpr F32 CUTOUT_CHANGE_DELAY = 0.25f;
-        updateSnapshot(true, true, CUTOUT_CHANGE_DELAY);
     }
+
+    // A little later rather than now: a colour dragged across the fill's
+    // wheel is many changes a second, and each is laid down and encoded anew.
+    constexpr F32 CUTOUT_CHANGE_DELAY = 0.25f;
+    updateSnapshot(true, true, CUTOUT_CHANGE_DELAY);
+    mCutoutRelayOnly = relay_only;
+}
+
+bool LLSnapshotLivePreview::layCutoutOverFill()
+{
+    if (!mCutout || mCutoutResolved.isNull())
+    {
+        return false;
+    }
+
+    LLPointer<LLImageRaw> image;
+    {
+        LLImageDataSharedLock lock(mCutoutResolved);
+        image = new LLImageRaw(mCutoutResolved->getData(), mCutoutResolved->getWidth(), mCutoutResolved->getHeight(),
+                               mCutoutResolved->getComponents());
+    }
+    if (image->isBufferInvalid() || !ALCutoutImage::layOverFill(*image, mCutout->mFill, mCutout->mKeepAlpha))
+    {
+        return false;
+    }
+    mPreviewImage = image;
+    return true;
 }
 
 void LLSnapshotLivePreview::updateSnapshot(bool new_snapshot, bool new_thumbnail, F32 delay)
@@ -185,6 +218,9 @@ void LLSnapshotLivePreview::updateSnapshot(bool new_snapshot, bool new_thumbnail
             mFallAnimTimer.start();
         }
         mSnapshotUpToDate = false;
+        // A new snapshot is a render, unless setCutout says after this that
+        // only the fill or the format changed.
+        mCutoutRelayOnly = false;
 
         // Update snapshot source rect depending on whether we keep the aspect ratio.
         LLRect& rect = mImageRect[mCurImageIndex];
@@ -766,16 +802,31 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
             previewp->mPreviewImage = new LLImageRaw;
         }
 
-        previewp->mSnapshotActive = true;
+        // Only the cutout's fill or format changed: the cutout already drawn
+        // is laid down again, and nothing is rendered.
+        bool produced = false;
+        if (previewp->mCutoutRelayOnly)
+        {
+            previewp->mCutoutRelayOnly = false;
+            previewp->setImageScaled(false);
+            produced = previewp->layCutoutOverFill();
+        }
 
-        previewp->setVisible(false);
-        previewp->setEnabled(false);
+        if (!produced)
+        {
+            previewp->mSnapshotActive = true;
 
-        previewp->getWindow()->incBusyCount();
-        previewp->setImageScaled(false);
+            previewp->setVisible(false);
+            previewp->setEnabled(false);
 
-        // grab the raw image
-        if (gViewerWindow->rawSnapshot(
+            previewp->getWindow()->incBusyCount();
+            previewp->setImageScaled(false);
+
+            // A render replaces the cutout last drawn, whatever it draws.
+            previewp->mCutoutResolved = nullptr;
+
+            // grab the raw image
+            produced = gViewerWindow->rawSnapshot(
                 previewp->mPreviewImage,
                 previewp->getWidth(),
                 previewp->getHeight(),
@@ -789,7 +840,20 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
                 previewp->mSnapshotBufferType,
                 previewp->getMaxImageSize(),
                 previewp->mCutout ? &*previewp->mCutout : nullptr,
-                &previewp->mCutoutDrawn))
+                &previewp->mCutoutDrawn);
+
+            if (produced && previewp->mCutout)
+            {
+                // A cutout comes back resolved and not yet over its fill. It is
+                // kept that way, and the preview is a copy laid over the fill.
+                previewp->mCutoutResolved = previewp->mPreviewImage;
+                produced = previewp->layCutoutOverFill();
+            }
+
+            previewp->getWindow()->decBusyCount();
+        }
+
+        if (produced)
         {
             // Invalidate/delete any existing encoded image
             previewp->mPreviewImageEncoded = NULL;
@@ -811,7 +875,6 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
             previewp->setThumbnailImageSize();
             previewp->generateThumbnailImage(true) ;
         }
-        previewp->getWindow()->decBusyCount();
         previewp->setVisible(use_freeze_frame && previewp->mAllowFullScreenPreview); // only show fullscreen preview when in freeze frame mode
         previewp->mSnapshotActive = false;
         LL_DEBUGS("Snapshot") << "done creating snapshot" << LL_ENDL;
