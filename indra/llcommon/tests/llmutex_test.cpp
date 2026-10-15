@@ -22,6 +22,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
@@ -37,24 +38,27 @@ namespace
     static_assert(!std::is_copy_constructible_v<LLMutexTrylock> && !std::is_copy_assignable_v<LLMutexTrylock>);
 
     // Runs a body on a thread of its own and says whether it has returned. A body
-    // still blocked when the worker goes out of scope is a deadlock the test has
-    // already reported; its thread is detached rather than joined so the run ends.
+    // still blocked when the worker goes out of scope is left to finish without it:
+    // a deadlock the test has already reported, or a probe kept out of a lock the
+    // test still holds. The thread owns the flag it sets, and a probe owns what it
+    // locks, so both outlive the worker.
     class Worker
     {
     public:
         template <typename FUNC>
         explicit Worker(FUNC&& body)
-        : mThread([this, body = std::forward<FUNC>(body)]() mutable
+        : mDone(std::make_shared<std::atomic<bool>>(false))
+        , mThread([done = mDone, body = std::forward<FUNC>(body)]() mutable
             {
                 body();
-                mDone = true;
+                *done = true;
             })
         {
         }
 
         ~Worker()
         {
-            if (mDone)
+            if (*mDone)
             {
                 mThread.join();
             }
@@ -67,7 +71,7 @@ namespace
         bool finishesWithin(std::chrono::milliseconds limit)
         {
             const auto deadline = std::chrono::steady_clock::now() + limit;
-            while (!mDone)
+            while (!*mDone)
             {
                 if (std::chrono::steady_clock::now() > deadline)
                 {
@@ -79,7 +83,7 @@ namespace
         }
 
     private:
-        std::atomic<bool> mDone{false};
+        std::shared_ptr<std::atomic<bool>> mDone;
         std::thread mThread;
     };
 
@@ -390,19 +394,27 @@ namespace
     // LLSharedMutex
     //------------------------------------------------------------------------
 
+    // Whether another thread is kept from taking a lock exclusively right now. The
+    // writer holds its own reference, since a blocked one outlives the call.
+    bool writerExcluded(std::shared_ptr<LLSharedMutex> mutex)
+    {
+        Worker writer([mutex]()
+            {
+                mutex->lockExclusive();
+                mutex->unlockExclusive();
+            });
+        return !writer.finishesWithin(BLOCKED);
+    }
+
     struct llsharedmutex_data
     {
-        LLSharedMutex mMutex;
+        std::shared_ptr<LLSharedMutex> mShared = std::make_shared<LLSharedMutex>();
+        LLSharedMutex& mMutex = *mShared;
 
         // Whether another thread is kept from taking the lock exclusively right now.
         bool othersExcluded()
         {
-            Worker writer([this]()
-                {
-                    mMutex.lockExclusive();
-                    mMutex.unlockExclusive();
-                });
-            return !writer.finishesWithin(BLOCKED);
+            return writerExcluded(mShared);
         }
     };
 
@@ -558,35 +570,26 @@ namespace
 
     TEST_CASE("llsharedmutex: shared holds on several mutexes release in any order", "[llsharedmutex]")
     {
-        LLSharedMutex a;
-        LLSharedMutex b;
-        LLSharedMutex c;
-        auto excluded = [](LLSharedMutex& mutex)
-        {
-            Worker writer([&mutex]()
-                {
-                    mutex.lockExclusive();
-                    mutex.unlockExclusive();
-                });
-            return !writer.finishesWithin(BLOCKED);
-        };
+        auto a = std::make_shared<LLSharedMutex>();
+        auto b = std::make_shared<LLSharedMutex>();
+        auto c = std::make_shared<LLSharedMutex>();
 
-        a.lockShared();
-        b.lockShared();
-        c.lockShared();
-        b.lockShared();
+        a->lockShared();
+        b->lockShared();
+        c->lockShared();
+        b->lockShared();
 
-        b.unlockShared();
-        b.unlockShared();
-        CHECK_FALSE(excluded(b));
-        CHECK(excluded(a));
-        CHECK(excluded(c));
+        b->unlockShared();
+        b->unlockShared();
+        CHECK_FALSE(writerExcluded(b));
+        CHECK(writerExcluded(a));
+        CHECK(writerExcluded(c));
 
-        a.unlockShared();
-        CHECK_FALSE(excluded(a));
-        CHECK(excluded(c));
+        a->unlockShared();
+        CHECK_FALSE(writerExcluded(a));
+        CHECK(writerExcluded(c));
 
-        c.unlockShared();
-        CHECK_FALSE(excluded(c));
+        c->unlockShared();
+        CHECK_FALSE(writerExcluded(c));
     }
 }

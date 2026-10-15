@@ -30,6 +30,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <thread>
 #include <type_traits>
 
@@ -42,24 +43,27 @@ namespace
     static_assert(!std::is_copy_constructible_v<LLImageDataLockPair> && !std::is_copy_assignable_v<LLImageDataLockPair>);
 
     // Runs a body on a thread of its own and says whether it has returned. A body
-    // still blocked when the worker goes out of scope is a deadlock the test has
-    // already reported; its thread is detached rather than joined so the run ends.
+    // still blocked when the worker goes out of scope is left to finish without it:
+    // a deadlock the test has already reported, or a probe kept out of an image the
+    // test still holds. The thread owns the flag it sets, and a probe owns the image
+    // it locks, so both outlive the worker.
     class Worker
     {
     public:
         template <typename FUNC>
         explicit Worker(FUNC&& body)
-        : mThread([this, body = std::forward<FUNC>(body)]() mutable
+        : mDone(std::make_shared<std::atomic<bool>>(false))
+        , mThread([done = mDone, body = std::forward<FUNC>(body)]() mutable
             {
                 body();
-                mDone = true;
+                *done = true;
             })
         {
         }
 
         ~Worker()
         {
-            if (mDone)
+            if (*mDone)
             {
                 mThread.join();
             }
@@ -72,7 +76,7 @@ namespace
         bool finishesWithin(std::chrono::milliseconds limit)
         {
             const auto deadline = std::chrono::steady_clock::now() + limit;
-            while (!mDone)
+            while (!*mDone)
             {
                 if (std::chrono::steady_clock::now() > deadline)
                 {
@@ -84,7 +88,7 @@ namespace
         }
 
     private:
-        std::atomic<bool> mDone{false};
+        std::shared_ptr<std::atomic<bool>> mDone;
         std::thread mThread;
     };
 
