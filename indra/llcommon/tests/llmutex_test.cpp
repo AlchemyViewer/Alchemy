@@ -520,7 +520,8 @@ namespace
     TEST_CASE_METHOD(llsharedmutex_data, "llsharedmutex: a writer gets in while readers keep overlapping", "[llsharedmutex]")
     {
         // A lock that lets new readers in past a waiting writer, as glibc's default rwlock
-        // does, keeps the writer out for as long as the readers overlap.
+        // does, keeps the writer out for as long as the readers overlap. The SRW lock lets
+        // them in only when it wakes the writer, so under load it fails here now and then.
         std::atomic<bool> stop{false};
         auto read = [&]()
         {
