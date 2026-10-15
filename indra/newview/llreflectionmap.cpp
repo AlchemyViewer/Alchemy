@@ -423,7 +423,8 @@ bool LLReflectionMap::isRelevant() const
 void LLReflectionMap::doOcclusion(const LLVector4a& eye)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
-    if (LLGLSLShader::sProfileEnabled)
+    // Not while a shader profile holds the occlusion targets: the probe keeps what its last query said.
+    if (!gGL.queries().canBegin(ALQueryKind::Occlusion))
     {
         return;
     }

@@ -141,12 +141,12 @@ static bool use_hdri_sky()
 // sea (LLPipeline::skyBehindWanted) while land hides all of it. The field, counted by the pipeline's query,
 // writing nothing: flat, and with waves raised by A as well, which counts a crest over a wall the flat field misses.
 // The flat copy stays for a camera between the plane and A above it, as on a deck in waves, which sees the raised one
-// from below or not at all. False when there is no program to draw them with, or while the shader profiler holds the
-// occlusion query target for the program it binds (LLGLSLShader::placeProfileQuery).
+// from below or not at all. False when there is no program to draw them with, or while the occlusion targets are
+// held, as a shader profile counting samples holds them (LLGLSLShader::initProfile).
 static bool query_water_in_view()
 {
     LLGLSLShader& field = gWaterFieldProgram;
-    if (!field.isComplete() || LLGLSLShader::sProfileEnabled)
+    if (!field.isComplete() || !gGL.queries().canBegin(ALQueryKind::Occlusion))
     {
         return false;
     }

@@ -28,7 +28,6 @@
 
 #include "llgl.h"
 #include "llglheaders.h"
-#include "llglslshader.h"
 #include "llrender.h"
 
 void ALPrimitivePlot::plot()
@@ -62,10 +61,6 @@ void ALPrimitivePlot::begin()
 {
 #if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
     Frame& frame = mFrames[mFrame];
-    if (LLGLSLShader::sProfileEnabled)
-    {
-        frame.mCounted = false;
-    }
     if (!frame.mCounted || frame.mSpans == SPANS)
     {
         return;

@@ -31,9 +31,9 @@
 /// begin() and end() runs inside its own Primitives query of gGL's pool. plot(), once a frame before the frame's first
 /// span, reads the spans issued FRAMES - 1 frames before the last, which the pool still holds: a frame whose results are
 /// not all in, or one a span of which the pool refused, is left out of the track, and a frame that issued none plots 0.
-/// A frame with more spans than SPANS draws the rest uncounted. Nothing is issued without Tracy, while no profiler is
-/// connected, or while the shader profiler holds the query target for the programs it binds
-/// (LLGLSLShader::placeProfileQuery).
+/// A frame with more spans than SPANS draws the rest uncounted. Nothing is issued without Tracy, or while no profiler
+/// is connected, and a frame is left out while the pool holds the target, as a shader profile counting primitives
+/// generated holds it (LLGLSLShader::initProfile).
 class ALPrimitivePlot
 {
 public:

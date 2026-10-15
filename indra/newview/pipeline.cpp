@@ -3265,6 +3265,25 @@ void LLPipeline::doOcclusion(LLCamera& camera)
     LL_PROFILE_GPU_ZONE("doOcclusion");
     llassert(!gCubeSnapshot);
 
+    // Not while a shader profile holds the occlusion targets, which would refuse every box drawn for a query. The
+    // groups the cull marked to be asked are let go, so that the next cull marks them again: one left marked is never
+    // marked, and so never asked, again.
+    if (!gGL.queries().canBegin(ALQueryKind::Occlusion))
+    {
+        for (LLCullResult::sg_iterator iter = sCull->beginOcclusionGroups(); iter != sCull->endOcclusionGroups(); ++iter)
+        {
+            (*iter)->clearOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION);
+        }
+        for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+        {
+            if (LLVOCachePartition* vo_part = region->getVOCachePartition())
+            {
+                vo_part->resetOccluders();
+            }
+        }
+        return;
+    }
+
     if (sReflectionProbesEnabled && sUseOcclusion > 1 && !LLPipeline::sShadowRender && !gCubeSnapshot)
     {
         LLGLSColorMask color_mask(false, false);
@@ -4642,7 +4661,8 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
         }
     }
 
-    bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion && !LLGLSLShader::sProfileEnabled;
+    // doOcclusion() stands down itself while a shader profile holds the occlusion targets.
+    bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion;
 
     setupHWLights();
 
