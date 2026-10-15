@@ -1108,6 +1108,9 @@ LLActionThread::LLActionThread(const std::string& name)
 
 LLActionThread::~LLActionThread()
 {
+    // Stopped before mFinished goes: a thread seen finished may still be notifying
+    // its waiters through it.
+    shutdown();
 }
 
 void LLActionThread::waitFinished()
