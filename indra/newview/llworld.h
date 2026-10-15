@@ -39,7 +39,6 @@
 #include "llstring.h"
 #include "llviewerpartsim.h"
 #include "llviewertexture.h"
-#include "llvowater.h"
 
 #include <vector>
 
@@ -155,12 +154,6 @@ public:
     F32 getLandFarClip() const;
     void setLandFarClip(const F32 far_clip);
 
-    LLViewerTexture *getDefaultWaterTexture();
-    void updateWaterObjects();
-    // Rebuild the hole and edge water once, on the next updateVisibilities(),
-    // however many regions arrive or leave before then.
-    void requestWaterObjectsUpdate();
-
     void waterHeightRegionInfo(std::string const& sim_name, F32 water_height);
     void shiftRegions(const LLVector3& offset);
 
@@ -170,8 +163,6 @@ public:
     void getInfo(LLSD& info);
     U32  getNumOfActiveCachedObjects() const {return mNumOfActiveCachedObjects;}
     void logObjectCacheInfo() const;
-
-    void clearAllVisibleObjects();
 
     CapUrlMatches getCapURLMatches(const std::string& cap_url);
     bool isCapURLMapped(const std::string& cap_url);
@@ -216,13 +207,7 @@ public:
     // return max GPU time
     F32 getNearbyAvatarsAndMaxGPUTime(std::vector<LLVOAvatar*> &valid_nearby_avs);
 
-    // The edge water's outer rectangle in agent space, whether or not its patches are in view; false with none.
-    bool getEdgeWaterBounds(LLVector3& min_agent, LLVector3& max_agent) const;
-
 private:
-    void clearHoleWaterObjects();
-    void clearEdgeWaterObjects();
-
     region_list_t   mActiveRegionList;
     region_list_t   mRegionList;
     region_list_t   mVisibleRegionList;
@@ -244,28 +229,6 @@ private:
     S32 mLastPacketsLost;
     U32 mNumOfActiveCachedObjects;
     U64MicrosecondsImplicit mSpaceTimeUSec;
-
-    ////////////////////////////
-    //
-    // Data for "Fake" objects
-    //
-
-    std::list<LLPointer<LLVOWater> > mHoleWaterObjects;
-    // What the hole water was built for, so an update that would build the same patches keeps them.
-    struct HoleWaterKey
-    {
-        U64 mAgentRegion = 0;
-        F32 mWaterHeight = 0.f;
-        bool mTransparent = false;
-        std::vector<S32> mRects; // each patch's global x, y, width and height in metres, four to a patch
-        bool operator==(const HoleWaterKey&) const = default;
-    };
-    HoleWaterKey mHoleWaterKey;
-    bool mWaterObjectsDirty = false;
-    static const S32 EDGE_WATER_OBJECTS_COUNT = 8;
-    LLPointer<LLVOWater> mEdgeWaterObjects[EDGE_WATER_OBJECTS_COUNT];
-
-    LLPointer<LLViewerTexture> mDefaultWaterTexturep;
 };
 
 

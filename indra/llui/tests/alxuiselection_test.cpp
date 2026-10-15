@@ -30,9 +30,9 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alxuiselection_data
     {
@@ -78,54 +78,52 @@ namespace tut
         };
     };
 
-    typedef test_group<alxuiselection_data> alxuiselection_test;
-    typedef alxuiselection_test::object     alxuiselection_object;
-    tut::alxuiselection_test alxuiselection_testgroup("alxuiselection");
-
     // A path names a view by its ancestors' names, with an ordinal for a
     // repeated name in creation order, and resolves back to the same view.
-    template<> template<>
-    void alxuiselection_object::test<1>()
+    TEST_CASE_METHOD(alxuiselection_data, "alxuiselection: a path names a view by ancestor names with an ordinal for repeats", "[alxuiselection]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Tree t;
         ALXUISelection::path_t path;
 
-        ensure("root", ALXUISelection::pathOf(t.root.get(), t.root.get(), path));
-        ensure("the root's path is empty", path.empty());
-        ensure_equals("and resolves to itself", ALXUISelection::resolve(t.root.get(), path), t.root.get());
+        CHECK(ALXUISelection::pathOf(t.root.get(), t.root.get(), path));
+        CHECK(path.empty());
+        UNSCOPED_INFO("the root's empty path resolves to the root");
+        CHECK(ALXUISelection::resolve(t.root.get(), path) == t.root.get());
 
-        ensure("ok1", ALXUISelection::pathOf(t.ok1, t.root.get(), path));
-        ensure_equals("the first of a name has no ordinal", ALXUISelection::toString(path), std::string("body/ok"));
-        ensure("ok2", ALXUISelection::pathOf(t.ok2, t.root.get(), path));
-        ensure_equals("the second carries one", ALXUISelection::toString(path), std::string("body/ok#1"));
-        ensure("cancel", ALXUISelection::pathOf(t.cancel, t.root.get(), path));
-        ensure_equals("cancel", ALXUISelection::toString(path), std::string("body/cancel"));
-        ensure("root ok", ALXUISelection::pathOf(t.root_ok, t.root.get(), path));
-        ensure_equals("a name under a different parent is its own", ALXUISelection::toString(path), std::string("ok"));
+        CHECK(ALXUISelection::pathOf(t.ok1, t.root.get(), path));
+        UNSCOPED_INFO("the first of a name has no ordinal");
+        CHECK(ALXUISelection::toString(path) == std::string("body/ok"));
+        CHECK(ALXUISelection::pathOf(t.ok2, t.root.get(), path));
+        UNSCOPED_INFO("the second carries one");
+        CHECK(ALXUISelection::toString(path) == std::string("body/ok#1"));
+        CHECK(ALXUISelection::pathOf(t.cancel, t.root.get(), path));
+        CHECK(ALXUISelection::toString(path) == std::string("body/cancel"));
+        CHECK(ALXUISelection::pathOf(t.root_ok, t.root.get(), path));
+        UNSCOPED_INFO("a name under a different parent is its own");
+        CHECK(ALXUISelection::toString(path) == std::string("ok"));
 
-        ensure_equals("body/ok", ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("body/ok")), t.ok1);
-        ensure_equals("body/ok#1", ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("body/ok#1")), t.ok2);
-        ensure_equals("ok", ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("ok")), t.root_ok);
-        ensure("a path nothing has resolves to nothing",
-               ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("body/ok#2")) == nullptr);
-        ensure("nor does a wrong parent",
-               ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("cancel/ok")) == nullptr);
+        CHECK(ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("body/ok")) == t.ok1);
+        CHECK(ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("body/ok#1")) == t.ok2);
+        CHECK(ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("ok")) == t.root_ok);
+        UNSCOPED_INFO("a path nothing has resolves to nothing");
+        CHECK(ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("body/ok#2")) == nullptr);
+        UNSCOPED_INFO("nor does a wrong parent");
+        CHECK(ALXUISelection::resolve(t.root.get(), ALXUISelection::fromString("cancel/ok")) == nullptr);
 
         std::unique_ptr<LLView> stranger(view("stranger", nullptr));
-        ensure("a view outside the root has no path", !ALXUISelection::pathOf(stranger.get(), t.root.get(), path));
+        UNSCOPED_INFO("a view outside the root has no path");
+        CHECK_FALSE(ALXUISelection::pathOf(stranger.get(), t.root.get(), path));
     }
 
-    // Observers hear a change once, and a selection outlives the tree.
-    template<> template<>
-    void alxuiselection_object::test<2>()
+    TEST_CASE_METHOD(alxuiselection_data, "alxuiselection: observers hear each change once and a selection outlives its tree", "[alxuiselection]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALXUISelection selection;
         int selection_changes = 0;
@@ -141,27 +139,27 @@ namespace tut
             selection.select(path);
             selection.setHover(path);
         }
-        ensure_equals("selecting twice is one change", selection_changes, 1);
-        ensure_equals("hover", hover_changes, 1);
-        ensure("selected", selection.hasSelection());
+        UNSCOPED_INFO("selecting twice is one change");
+        CHECK(selection_changes == 1);
+        CHECK(hover_changes == 1);
+        CHECK(selection.hasSelection());
 
         Tree rebuilt;
-        ensure_equals("the path resolves in a tree built after the first was destroyed",
-                      ALXUISelection::resolve(rebuilt.root.get(), selection.selection()), rebuilt.ok2);
+        UNSCOPED_INFO("the path resolves in a tree built after the first was destroyed");
+        CHECK(ALXUISelection::resolve(rebuilt.root.get(), selection.selection()) == rebuilt.ok2);
 
         selection.clearSelection();
         selection.clearSelection();
-        ensure_equals("clearing twice is one change", selection_changes, 2);
-        ensure("cleared", !selection.hasSelection());
+        UNSCOPED_INFO("clearing twice is one change");
+        CHECK(selection_changes == 2);
+        CHECK_FALSE(selection.hasSelection());
         selection.clearHover();
-        ensure_equals("hover cleared", hover_changes, 2);
-        ensure("no hover", !selection.hasHover());
+        UNSCOPED_INFO("hover cleared");
+        CHECK(hover_changes == 2);
+        CHECK_FALSE(selection.hasHover());
     }
 
-    // More than one thing selected, with one of them still the one every
-    // pane is about.
-    template<> template<>
-    void alxuiselection_object::test<3>()
+    TEST_CASE_METHOD(alxuiselection_data, "alxuiselection: a multiple selection keeps the first as the one the panes are about", "[alxuiselection]")
     {
         ALXUISelection selection;
         const ALXUISelection::path_t one = ALXUISelection::fromString("a");
@@ -169,70 +167,82 @@ namespace tut
         const ALXUISelection::path_t three = ALXUISelection::fromString("c");
 
         selection.select(one);
-        ensure_equals("one thing", selection.selectedCount(), 1);
-        ensure("and it is the one", selection.isSelected(one));
+        CHECK(selection.selectedCount() == 1);
+        CHECK(selection.isSelected(one));
 
         selection.selectAlso(two);
-        ensure_equals("two things", selection.selectedCount(), 2);
-        ensure("both are selected", selection.isSelected(one) && selection.isSelected(two));
-        ensure_equals("the panes are still about the first",
-                      ALXUISelection::toString(selection.selection()), std::string("a"));
+        CHECK(selection.selectedCount() == 2);
+        CHECK(selection.isSelected(one));
+        CHECK(selection.isSelected(two));
+        UNSCOPED_INFO("the panes are still about the first");
+        CHECK(ALXUISelection::toString(selection.selection()) == std::string("a"));
 
         // The same one again takes it out: a shift-click is a switch.
         selection.selectAlso(two);
-        ensure_equals("one thing again", selection.selectedCount(), 1);
-        ensure("and it is not that one", !selection.isSelected(two));
+        CHECK(selection.selectedCount() == 1);
+        CHECK_FALSE(selection.isSelected(two));
 
         // The one the panes are about cannot take itself out; there would be
         // nothing left for them to be about.
         selection.selectAlso(one);
-        ensure_equals("still one thing", selection.selectedCount(), 1);
-        ensure("and still that one", selection.isSelected(one));
+        CHECK(selection.selectedCount() == 1);
+        CHECK(selection.isSelected(one));
 
         // Choosing one thing is choosing one thing.
         selection.selectAlso(two);
         selection.selectAlso(three);
-        ensure_equals("three things", selection.selectedCount(), 3);
+        CHECK(selection.selectedCount() == 3);
         selection.select(three);
-        ensure_equals("a plain choice replaces the lot", selection.selectedCount(), 1);
-        ensure("with the one chosen", selection.isSelected(three));
-        ensure("and nothing else", !selection.isSelected(one) && !selection.isSelected(two));
+        UNSCOPED_INFO("a plain choice replaces the lot");
+        CHECK(selection.selectedCount() == 1);
+        CHECK(selection.isSelected(three));
+        CHECK_FALSE(selection.isSelected(one));
+        CHECK_FALSE(selection.isSelected(two));
 
         selection.selectAlso(one);
         selection.clearSelection();
-        ensure_equals("cleared, there is nothing", selection.selectedCount(), 0);
-        ensure("not even the one", !selection.isSelected(three));
+        CHECK(selection.selectedCount() == 0);
+        UNSCOPED_INFO("not even the one");
+        CHECK_FALSE(selection.isSelected(three));
     }
 
     // A name can carry a '#' of its own -- the menu item "Forbid Give to
     // #RLV" does -- so only digits after the last one are an ordinal, and a
     // step is otherwise all name. Written and read back, a step means what
     // it meant.
-    template<> template<>
-    void alxuiselection_object::test<4>()
+    TEST_CASE_METHOD(alxuiselection_data, "alxuiselection: only digits after the last hash in a step are an ordinal", "[alxuiselection]")
     {
         std::string_view name;
         S32 ordinal = -1;
-        ensure("a hash with letters after it is no ordinal",
-               !ALXUISelection::splitOrdinal("Forbid Give to #RLV", name, ordinal));
-        ensure_equals("and the name is the whole of it", std::string(name), std::string("Forbid Give to #RLV"));
-        ensure_equals("with no ordinal", ordinal, 0);
+        UNSCOPED_INFO("a hash with letters after it is no ordinal");
+        CHECK_FALSE(ALXUISelection::splitOrdinal("Forbid Give to #RLV", name, ordinal));
+        UNSCOPED_INFO("and the name is the whole of it");
+        CHECK(std::string(name) == std::string("Forbid Give to #RLV"));
+        CHECK(ordinal == 0);
 
         const std::string second = ALXUISelection::step("Forbid Give to #RLV", 1);
-        ensure_equals("the second of that name", second, std::string("Forbid Give to #RLV#1"));
-        ensure("reads back", ALXUISelection::splitOrdinal(second, name, ordinal));
-        ensure_equals("as the name", std::string(name), std::string("Forbid Give to #RLV"));
-        ensure_equals("and the ordinal", ordinal, 1);
+        UNSCOPED_INFO("the second of that name");
+        CHECK(second == std::string("Forbid Give to #RLV#1"));
+        UNSCOPED_INFO("reads back");
+        CHECK(ALXUISelection::splitOrdinal(second, name, ordinal));
+        CHECK(std::string(name) == std::string("Forbid Give to #RLV"));
+        CHECK(ordinal == 1);
 
-        ensure("a hash at the end is no ordinal either", !ALXUISelection::splitOrdinal("odd#", name, ordinal));
-        ensure_equals("and the name keeps it", std::string(name), std::string("odd#"));
-        ensure("nor is one with nothing after it in a longer step",
-               ALXUISelection::splitOrdinal("odd##2", name, ordinal));
-        ensure_equals("where the name keeps its own", std::string(name), std::string("odd#"));
-        ensure_equals("and the ordinal is the last", ordinal, 2);
+        UNSCOPED_INFO("a hash at the end is no ordinal either");
+        CHECK_FALSE(ALXUISelection::splitOrdinal("odd#", name, ordinal));
+        UNSCOPED_INFO("and the name keeps it");
+        CHECK(std::string(name) == std::string("odd#"));
+        UNSCOPED_INFO("nor is one with nothing after it in a longer step");
+        CHECK(ALXUISelection::splitOrdinal("odd##2", name, ordinal));
+        UNSCOPED_INFO("where the name keeps its own");
+        CHECK(std::string(name) == std::string("odd#"));
+        UNSCOPED_INFO("and the ordinal is the last");
+        CHECK(ordinal == 2);
 
         const ALXUISelection::path_t path = ALXUISelection::fromString("a/b#2/c");
-        ensure_equals("a path splits on the slashes alone", path.size(), 3u);
-        ensure_equals("and joins back", ALXUISelection::toString(path), std::string("a/b#2/c"));
+        UNSCOPED_INFO("a path splits on the slashes alone");
+        CHECK(path.size() == 3u);
+        UNSCOPED_INFO("and joins back");
+        CHECK(ALXUISelection::toString(path) == std::string("a/b#2/c"));
     }
 }

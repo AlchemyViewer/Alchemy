@@ -44,20 +44,14 @@
 #include "../lltreeiterators.h"
 #include "../llpointer.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 /*****************************************************************************
-*   tut test group
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
-    struct iter_data
-    {
-    };
-    typedef test_group<iter_data> iter_group;
-    typedef iter_group::object iter_object;
-    tut::iter_group ig("LLTreeIterators");
-} // namespace tut
+} // anonymous namespace
 
 namespace
 {
@@ -231,10 +225,9 @@ private:
 
 } // anonymous namespace
 
-namespace tut
+namespace
 {
-    template<> template<>
-    void iter_object::test<1>()
+    TEST_CASE("LLTreeIterators: LLLinkedIter walks a non-refcounted list", "[LLTreeIterators]")
     {
 //      set_test_name("LLLinkedIter -- non-refcounted class");
         PlainNode* last(new PlainNode("c"));
@@ -251,10 +244,9 @@ namespace tut
              pni != end; ++pni)
         {
 //          std::cout << (*pni)->name() << '\n';
-            ensure("LLLinkedIter<PlainNode>(NULL)", false);
+            FAIL("LLLinkedIter<PlainNode>(NULL) should not iterate");
         }
-        ensure(desc1,
-               verify(desc1,
+        CHECK(verify(desc1,
                       boost::make_iterator_range(LLLinkedIter<PlainNode>(first,
                                                                          boost::bind(&PlainNode::mNext, _1)),
                                                  LLLinkedIter<PlainNode>()),
@@ -263,8 +255,7 @@ namespace tut
 //      std::cout << desc2 << ":\n";
 //      for (LLLinkedIter<PlainNode> pni(first, boost::bind(&PlainNode::next, _1)); ! (pni == end); ++pni)
 //          std::cout << (**pni).name() << '\n';
-        ensure(desc2,
-               verify(desc2,
+        CHECK(verify(desc2,
                       boost::make_iterator_range(LLLinkedIter<PlainNode>(first,
                                                                          boost::bind(&PlainNode::next, _1)),
                                                  LLLinkedIter<PlainNode>()),
@@ -276,11 +267,11 @@ namespace tut
         }
         {
             LLLinkedIter<PlainNode> pni(first, boost::bind(&PlainNode::next, _1));
-            ensure_equals("first",  (*pni++)->name(), "a");
-            ensure_equals("second", (*pni  )->name(), "b");
+            CHECK((*pni++)->name() == "a");
+            CHECK((*pni  )->name() == "b");
         }
     }
-} // tut
+} // anonymous namespace
 
 namespace
 {
@@ -335,10 +326,9 @@ RCNode::~RCNode()
 
 } // anonymous namespace
 
-namespace tut
+namespace
 {
-    template<> template<>
-    void iter_object::test<2>()
+    TEST_CASE("LLTreeIterators: LLLinkedIter keeps a refcounted list alive", "[LLTreeIterators]")
     {
 //      set_test_name("LLLinkedIter -- refcounted class");
         LLLinkedIter<RCNode> rcni, end2;
@@ -350,20 +340,20 @@ namespace tut
             rcni = LLLinkedIter<RCNode>(head, boost::bind(&RCNode::next, _1));
         }
 //      std::cout << "Now the LLLinkedIter<RCNode> is the only remaining reference to RCNode chain\n";
-        ensure_equals(last_RCNode_destroyed, "");
-        ensure(rcni != end2);
-        ensure_equals((*rcni)->name(), "x");
+        CHECK(last_RCNode_destroyed == "");
+        REQUIRE(rcni != end2);
+        CHECK((*rcni)->name() == "x");
         ++rcni;
-        ensure_equals(last_RCNode_destroyed, "x");
-        ensure(rcni != end2);
-        ensure_equals((*rcni)->name(), "y");
+        CHECK(last_RCNode_destroyed == "x");
+        REQUIRE(rcni != end2);
+        CHECK((*rcni)->name() == "y");
         ++rcni;
-        ensure_equals(last_RCNode_destroyed, "y");
-        ensure(rcni != end2);
-        ensure_equals((*rcni)->name(), "z");
+        CHECK(last_RCNode_destroyed == "y");
+        REQUIRE(rcni != end2);
+        CHECK((*rcni)->name() == "z");
         ++rcni;
-        ensure_equals(last_RCNode_destroyed, "z");
-        ensure(rcni == end2);
+        CHECK(last_RCNode_destroyed == "z");
+        CHECK(rcni == end2);
     }
 }
 
@@ -1093,26 +1083,24 @@ bool LLTreeIter_tests(const std::string& nodename,
 
 } // anonymous namespace
 
-namespace tut
+namespace
 {
-    template<> template<>
-    void iter_object::test<3>()
+    TEST_CASE("LLTreeIterators: LLTreeRootIter and LLTreeWalkIter visit each tree in order", "[LLTreeIterators]")
     {
 //      set_test_name("LLTreeIter tests");
-        ensure(LLTreeIter_tests<TreeNode, TreeNode::child_iterator>
+        CHECK(LLTreeIter_tests<TreeNode, TreeNode::child_iterator>
                                ("TreeNode",
                                 boost::bind(&TreeNode::getParent, _1),
                                 boost::bind(&TreeNode::child_begin, _1),
                                 boost::bind(&TreeNode::child_end, _1)));
-        ensure(LLTreeIter_tests<PlainTree, LLLinkedIter<PlainTree> >
+        CHECK(LLTreeIter_tests<PlainTree, LLLinkedIter<PlainTree> >
                                ("PlainTree",
                                 boost::bind(&PlainTree::mParent, _1),
                                 PlainTree_child_begin,
                                 PlainTree_child_end));
     }
 
-    template<> template<>
-    void iter_object::test<4>()
+    TEST_CASE("LLTreeIterators: getRootRange() runs from a node to the root", "[LLTreeIterators]")
     {
 //      set_test_name("getRootRange() tests");
         // This test function illustrates the looping techniques described in the
@@ -1133,8 +1121,7 @@ namespace tut
         {
 //          std::cout << node->name() << '\n';
         }
-        ensure(desc1,
-               verify(desc1, getRootRange<LLTreeIter::UP>(tnB2b), RootExpected<LLTreeIter::UP>()));
+        CHECK(verify(desc1, getRootRange<LLTreeIter::UP>(tnB2b), RootExpected<LLTreeIter::UP>()));
 
         EnhancedTreeNodePtr etnroot(example_tree<EnhancedTreeNode>());
         EnhancedTreeNodePtr etnB2b(get_B2b<EnhancedTreeNode, EnhancedTreeNode::child_iterator>
@@ -1158,12 +1145,10 @@ namespace tut
         {
 //          std::cout << node->name() << '\n';
         }
-        ensure(desc2,
-               verify(desc2, etnB2b->getRootRange<LLTreeIter::UP>(), RootExpected<LLTreeIter::UP>()));
+        CHECK(verify(desc2, etnB2b->getRootRange<LLTreeIter::UP>(), RootExpected<LLTreeIter::UP>()));
     }
 
-    template<> template<>
-    void iter_object::test<5>()
+    TEST_CASE("LLTreeIterators: getWalkRange() walks each kind of tree in each order", "[LLTreeIterators]")
     {
 //      set_test_name("getWalkRange() tests");
         // This test function doesn't illustrate the looping permutations for
@@ -1173,36 +1158,30 @@ namespace tut
         // TreeNode, using helper function
         TreeNodePtr tnroot(example_tree<TreeNode>());
         std::string desc_tnpre("getWalkRange<LLTreeIter::DFS_PRE>(tnroot)");
-        ensure(desc_tnpre,
-               verify(desc_tnpre,
+        CHECK(verify(desc_tnpre,
                       getWalkRange<LLTreeIter::DFS_PRE>(tnroot),
                       WalkExpected<LLTreeIter::DFS_PRE>()));
         std::string desc_tnpost("getWalkRange<LLTreeIter::DFS_POST>(tnroot)");
-        ensure(desc_tnpost,
-               verify(desc_tnpost,
+        CHECK(verify(desc_tnpost,
                       getWalkRange<LLTreeIter::DFS_POST>(tnroot),
                       WalkExpected<LLTreeIter::DFS_POST>()));
         std::string desc_tnb("getWalkRange<LLTreeIter::BFS>(tnroot)");
-        ensure(desc_tnb,
-               verify(desc_tnb,
+        CHECK(verify(desc_tnb,
                       getWalkRange<LLTreeIter::BFS>(tnroot),
                       WalkExpected<LLTreeIter::BFS>()));
 
         // EnhancedTreeNode, using method
         EnhancedTreeNodePtr etnroot(example_tree<EnhancedTreeNode>());
         std::string desc_etnpre("etnroot->getWalkRange<LLTreeIter::DFS_PRE>()");
-        ensure(desc_etnpre,
-               verify(desc_etnpre,
+        CHECK(verify(desc_etnpre,
                       etnroot->getWalkRange<LLTreeIter::DFS_PRE>(),
                       WalkExpected<LLTreeIter::DFS_PRE>()));
         std::string desc_etnpost("etnroot->getWalkRange<LLTreeIter::DFS_POST>()");
-        ensure(desc_etnpost,
-               verify(desc_etnpost,
+        CHECK(verify(desc_etnpost,
                       etnroot->getWalkRange<LLTreeIter::DFS_POST>(),
                       WalkExpected<LLTreeIter::DFS_POST>()));
         std::string desc_etnb("etnroot->getWalkRange<LLTreeIter::BFS>()");
-        ensure(desc_etnb,
-               verify(desc_etnb,
+        CHECK(verify(desc_etnb,
                       etnroot->getWalkRange<LLTreeIter::BFS>(),
                       WalkExpected<LLTreeIter::BFS>()));
 
@@ -1210,19 +1189,16 @@ namespace tut
         PlainTree* ptroot(example_tree<PlainTree>());
         Cleanup<PlainTree*> cleanup(ptroot);
         std::string desc_ptpre("getWalkRange<LLTreeIter::DFS_PRE>(ptroot)");
-        ensure(desc_ptpre,
-               verify(desc_ptpre,
+        CHECK(verify(desc_ptpre,
                       getWalkRange<LLTreeIter::DFS_PRE>(ptroot),
                       WalkExpected<LLTreeIter::DFS_PRE>()));
         std::string desc_ptpost("getWalkRange<LLTreeIter::DFS_POST>(ptroot)");
-        ensure(desc_ptpost,
-               verify(desc_ptpost,
+        CHECK(verify(desc_ptpost,
                       getWalkRange<LLTreeIter::DFS_POST>(ptroot),
                       WalkExpected<LLTreeIter::DFS_POST>()));
         std::string desc_ptb("getWalkRange<LLTreeIter::BFS>(ptroot)");
-        ensure(desc_ptb,
-               verify(desc_ptb,
+        CHECK(verify(desc_ptb,
                       getWalkRange<LLTreeIter::BFS>(ptroot),
                       WalkExpected<LLTreeIter::BFS>()));
     }
-} // tut
+} // anonymous namespace

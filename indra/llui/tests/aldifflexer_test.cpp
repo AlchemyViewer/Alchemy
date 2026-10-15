@@ -26,7 +26,7 @@
 
 #include "aldifflexer.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <string>
@@ -36,7 +36,7 @@
 #  define LLUI_TEST_APP_DIR ""
 #endif
 
-namespace tut
+namespace
 {
     struct aldifflexer_data
     {
@@ -66,29 +66,29 @@ namespace tut
             return out;
         }
     };
-    typedef test_group<aldifflexer_data> aldifflexer_group;
-    typedef aldifflexer_group::object    aldifflexer_object;
-    aldifflexer_group                    aldifflexer_instance("aldifflexer");
 
-    template<> template<>
-    void aldifflexer_object::test<1>()
+    TEST_CASE_METHOD(aldifflexer_data, "aldifflexer: regions mark strings and comments and carry a block comment on", "[aldifflexer]")
     {
-        set_test_name("a line's strings and comments, the rest code; a block comment's lines its own, from the state the line before left");
-        ensure("the LSL grammar", lsl != nullptr);
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         ALDiffLexer                    lexer(lsl);
         const std::vector<std::string> lines = { "llSay(0, \"hi there\"); // greet", "/* a note", "   over lines */ x = 1;" };
         const auto&                    regions = lexer.regions(lines);
-        ensure_equals("as many as the lines", regions.size(), lines.size());
-        ensure_equals("a call, its string, a comment", drawn(lines[0], regions[0]), std::string("ccccccccc" "ssssssssss" "ccc" "########"));
-        ensure_equals("a block comment opened", drawn(lines[1], regions[1]), std::string(9, '#'));
-        ensure_equals("and closed on the next", drawn(lines[2], regions[2]), std::string(16, '#') + std::string(7, 'c'));
-        ensure_equals("all read", lexer.lastRead(), 3);
+        REQUIRE(regions.size() == lines.size());
+        UNSCOPED_INFO("a call, its string, a comment");
+        CHECK(drawn(lines[0], regions[0]) == std::string("ccccccccc" "ssssssssss" "ccc" "########"));
+        UNSCOPED_INFO("a block comment opened");
+        CHECK(drawn(lines[1], regions[1]) == std::string(9, '#'));
+        UNSCOPED_INFO("and closed on the next");
+        CHECK(drawn(lines[2], regions[2]) == std::string(16, '#') + std::string(7, 'c'));
+        UNSCOPED_INFO("all read");
+        CHECK(lexer.lastRead() == 3);
     }
 
-    template<> template<>
-    void aldifflexer_object::test<2>()
+    TEST_CASE_METHOD(aldifflexer_data, "aldifflexer: an edit is read again only until a line starts as it did", "[aldifflexer]")
     {
-        set_test_name("read again after an edit only from it until a line starts as it did; the same as read afresh; two texts kept, the last answer left as it was");
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         std::vector<std::string> text;
         for (S32 n = 0; n < 200; ++n)
         {
@@ -96,25 +96,41 @@ namespace tut
         }
         ALDiffLexer lexer(lsl);
         lexer.regions(text);
-        ensure_equals("all of it at first", lexer.lastRead(), 200);
+        UNSCOPED_INFO("all of it at first");
+        CHECK(lexer.lastRead() == 200);
         lexer.regions(text);
-        ensure_equals("the same again: nothing", lexer.lastRead(), 0);
+        UNSCOPED_INFO("the same again: nothing");
+        CHECK(lexer.lastRead() == 0);
 
         std::vector<std::string> edited = text;
         edited[100]                     = "llSay(0, \"changed\");";
         const auto& again               = lexer.regions(edited);
-        ensure("a line changed: it alone, give or take the next", lexer.lastRead() >= 1 && lexer.lastRead() <= 2);
+        {
+            INFO("a line changed: it alone, give or take the next");
+            CHECK(lexer.lastRead() >= 1);
+            CHECK(lexer.lastRead() <= 2);
+        }
         ALDiffLexer fresh(lsl);
-        ensure("as read afresh", again == fresh.regions(edited));
+        UNSCOPED_INFO("as read afresh");
+        CHECK(again == fresh.regions(edited));
 
         // A block comment opened at the top: read on until it closes.
         std::vector<std::string> opened = edited;
         opened[0]                       = "/* opened";
         opened[5]                       = "closed */";
         const auto& commented           = lexer.regions(opened);
-        ensure("read through the comment, and not much past it", lexer.lastRead() >= 6 && lexer.lastRead() <= 8);
+        {
+            INFO("read through the comment, and not much past it");
+            CHECK(lexer.lastRead() >= 6);
+            CHECK(lexer.lastRead() <= 8);
+        }
         ALDiffLexer fresh2(lsl);
-        ensure("as read afresh, the comment's lines its", commented == fresh2.regions(opened) && commented[3].size() == 1 && commented[3][0].region == Region::Comment);
+        {
+            INFO("as read afresh, the comment's lines its");
+            CHECK(commented == fresh2.regions(opened));
+            REQUIRE(commented[3].size() == 1);
+            CHECK(commented[3][0].region == Region::Comment);
+        }
 
         // A line put in and one taken out.
         std::vector<std::string> moved = opened;
@@ -122,7 +138,11 @@ namespace tut
         moved.erase(moved.begin() + 150);
         const auto& shifted = lexer.regions(moved);
         ALDiffLexer fresh3(lsl);
-        ensure("lines put in and taken out: as read afresh", shifted == fresh3.regions(moved) && lexer.lastRead() < 120);
+        {
+            INFO("lines put in and taken out: as read afresh");
+            CHECK(shifted == fresh3.regions(moved));
+            CHECK(lexer.lastRead() < 120);
+        }
 
         // Two texts asked for in turn, as a comparison does: each kept, and
         // the first answer still what it was after the second.
@@ -130,18 +150,23 @@ namespace tut
         const auto&  left  = pair.regions(text);
         const auto   kept  = left;
         const auto&  right = pair.regions(edited);
-        ensure("the left answer left as it was", left == kept && &left != &right);
+        {
+            INFO("the left answer left as it was");
+            CHECK(left == kept);
+            CHECK(&left != &right);
+        }
         pair.regions(text);
-        ensure("the left kept: nothing read", pair.lastRead() == 0);
+        UNSCOPED_INFO("the left kept: nothing read");
+        CHECK(pair.lastRead() == 0);
         pair.regions(edited);
-        ensure("nor the right", pair.lastRead() == 0);
+        UNSCOPED_INFO("nor the right");
+        CHECK(pair.lastRead() == 0);
     }
 
-    template<> template<>
-    void aldifflexer_object::test<3>()
+    TEST_CASE_METHOD(aldifflexer_data, "aldifflexer: three hundred random edits to two texts in turn each read as afresh", "[aldifflexer]")
     {
-        set_test_name("edit after edit -- lines changed, put in, taken out, comments opened and closed -- each answer as read afresh, two texts in turn");
-        ensure("the LSL grammar", lsl != nullptr);
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         const std::vector<std::string> kinds = { "integer v = 1; // a note", "string s = \"a /* not a comment */\";", "/* opened", "still in it",
                                                  "closed */ x = 2;", "llSay(0, \"line\");", "", "    if (x) { y(); }" };
         U32        seed = 12345;
@@ -160,6 +185,7 @@ namespace tut
         ALDiffLexer lexer(lsl);
         for (S32 round = 0; round < 300; ++round)
         {
+            CAPTURE(round);
             std::vector<std::string>& text = texts[round % 2];
             const size_t              at   = next(static_cast<U32>(text.size()));
             switch (next(3))
@@ -179,16 +205,17 @@ namespace tut
             }
             const auto& read = lexer.regions(text);
             ALDiffLexer fresh(lsl);
-            ensure("as read afresh", read == fresh.regions(text));
-            ensure("the other text still known", lexer.regions(texts[(round + 1) % 2]) == fresh.regions(texts[(round + 1) % 2]));
+            UNSCOPED_INFO("as read afresh");
+            REQUIRE(read == fresh.regions(text));
+            UNSCOPED_INFO("the other text still known");
+            REQUIRE(lexer.regions(texts[(round + 1) % 2]) == fresh.regions(texts[(round + 1) % 2]));
         }
     }
 
-    template<> template<>
-    void aldifflexer_object::test<4>()
+    TEST_CASE_METHOD(aldifflexer_data, "aldifflexer: a text read after another reads only the lines that differ", "[aldifflexer]")
     {
-        set_test_name("a text read against another that differs from it here and there all through: only the lines that differ, or start otherwise, read; as read afresh");
-        ensure("the LSL grammar", lsl != nullptr);
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         std::vector<std::string> left;
         for (S32 n = 0; n < 400; ++n)
         {
@@ -204,11 +231,14 @@ namespace tut
         right[200] = "llOwnerSay(\"changed\");";
         ALDiffLexer lexer(lsl);
         lexer.regions(left);
-        ensure_equals("the first read whole", lexer.lastRead(), 400);
+        UNSCOPED_INFO("the first read whole");
+        CHECK(lexer.lastRead() == 400);
         const auto& read = lexer.regions(right);
-        ensure("only the lines that differ read: " + std::to_string(lexer.lastRead()), lexer.lastRead() <= 6);
+        UNSCOPED_INFO("only the lines that differ read");
+        CHECK(lexer.lastRead() <= 6);
         ALDiffLexer fresh(lsl);
-        ensure("as read afresh", read == fresh.regions(right));
+        UNSCOPED_INFO("as read afresh");
+        CHECK(read == fresh.regions(right));
 
         // Read again in place, as a comparison asks for its left and then
         // its right typed in two places a hundred lines apart: the lines
@@ -218,9 +248,11 @@ namespace tut
         apart[250]                     = "integer two;";
         lexer.regions(left);
         const auto& again              = lexer.regions(apart);
-        ensure("the two read, those between taken: " + std::to_string(lexer.lastRead()), lexer.lastRead() <= 3);
+        UNSCOPED_INFO("the two read, those between taken");
+        CHECK(lexer.lastRead() <= 3);
         ALDiffLexer fresh_apart(lsl);
-        ensure("as read afresh", again == fresh_apart.regions(apart));
+        UNSCOPED_INFO("as read afresh");
+        CHECK(again == fresh_apart.regions(apart));
 
         // A comment opened above lines the same: each of those starts
         // otherwise, and is read, to the first that closes it (line 52).
@@ -231,16 +263,23 @@ namespace tut
         twice.regions(left);
         const auto& commented = twice.regions(opened);
         ALDiffLexer fresh2(lsl);
-        ensure("as read afresh, a comment's lines its", commented == fresh2.regions(opened) && commented[30].size() == 1 &&
-                                                            commented[30][0].region == ALTextDiff::Region::Comment);
-        ensure("those in it read, to where it closes: " + std::to_string(twice.lastRead()), twice.lastRead() >= 31 && twice.lastRead() <= 34);
+        {
+            INFO("as read afresh, a comment's lines its");
+            CHECK(commented == fresh2.regions(opened));
+            REQUIRE(commented[30].size() == 1);
+            CHECK(commented[30][0].region == ALTextDiff::Region::Comment);
+        }
+        {
+            INFO("those in it read, to where it closes");
+            CHECK(twice.lastRead() >= 31);
+            CHECK(twice.lastRead() <= 34);
+        }
     }
 
-    template<> template<>
-    void aldifflexer_object::test<5>()
+    TEST_CASE_METHOD(aldifflexer_data, "aldifflexer: blanks and case are let go of in code but not in strings", "[aldifflexer]")
     {
-        set_test_name("blanks and case let go of by LSL's grammar: a string's its own, the code's let go of; the same in a line's words");
-        ensure("the LSL grammar", lsl != nullptr);
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         ALDiffLexer         lexer(lsl);
         ALTextDiff::Options options;
         options.like.ignoreWhitespace = true;
@@ -251,10 +290,14 @@ namespace tut
         const auto same = [&options](const std::string& left, const std::string& right) {
             return ALTextDiff::lines({ left }, { right }, options) == std::vector<ALTextDiff::Run>{ ALTextDiff::Run{ ALTextDiff::Kind::Same, 0, 0, 1 } };
         };
-        ensure("blanks in a string: a change", !same("llSay(0, \"a  b\");", "llSay(0, \"a b\");"));
-        ensure("a string's case: a change", !same("llSay(0, \"Hello\");", "llSay(0, \"hello\");"));
-        ensure("blanks in the code: none", same("llSay(0,  \"a b\");", "llSay(0, \"a b\");"));
-        ensure("the code's case: none", same("LLSAY(0, \"a b\");", "llSay(0, \"a b\");"));
+        UNSCOPED_INFO("blanks in a string: a change");
+        CHECK_FALSE(same("llSay(0, \"a  b\");", "llSay(0, \"a b\");"));
+        UNSCOPED_INFO("a string's case: a change");
+        CHECK_FALSE(same("llSay(0, \"Hello\");", "llSay(0, \"hello\");"));
+        UNSCOPED_INFO("blanks in the code: none");
+        CHECK(same("llSay(0,  \"a b\");", "llSay(0, \"a b\");"));
+        UNSCOPED_INFO("the code's case: none");
+        CHECK(same("LLSAY(0, \"a b\");", "llSay(0, \"a b\");"));
 
         ALTextDiff::spans_t            left, right;
         const std::vector<std::string> was = { "llSay(0, \"a  b\");" };
@@ -262,14 +305,17 @@ namespace tut
         const ALTextDiff::regions_t    was_regions = lexer.regions(was)[0];
         const ALTextDiff::regions_t    now_regions = lexer.regions(now)[0];
         ALTextDiff::words(was[0], now[0], left, right, options, &was_regions, &now_regions);
-        ensure("in words, the string's blanks marked, the code's not", left == ALTextDiff::spans_t{ { 11, 13 } } && right == ALTextDiff::spans_t{ { 12, 13 } });
+        {
+            INFO("in words, the string's blanks marked, the code's not");
+            CHECK(left == ALTextDiff::spans_t{ { 11, 13 } });
+            CHECK(right == ALTextDiff::spans_t{ { 12, 13 } });
+        }
     }
 
-    template<> template<>
-    void aldifflexer_object::test<6>()
+    TEST_CASE_METHOD(aldifflexer_data, "aldifflexer: reread numbers each text and says what it was read again from", "[aldifflexer]")
     {
-        set_test_name("what it says it read again: each text it holds numbered; one read again in place of another said to be from it, every line from the end of the edit on, or from past a comment it opened, read as it was; one read whole from none; regions it does not hold, nothing");
-        ensure("the LSL grammar", lsl != nullptr);
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         std::vector<std::string> left;
         for (S32 n = 0; n < 100; ++n)
         {
@@ -285,11 +331,21 @@ namespace tut
         const auto&              right_read = lexer.regions(right);
         const ALTextDiff::Reread left_said  = lexer.reread(left_read);
         const ALTextDiff::Reread right_said = lexer.reread(right_read);
-        ensure("each numbered, read whole", left_said.text > 0 && right_said.text > 0 && left_said.text != right_said.text && left_said.was == 0 &&
-                                                right_said.was == 0);
+        {
+            INFO("each numbered, read whole");
+            CHECK(left_said.text > 0);
+            CHECK(right_said.text > 0);
+            CHECK(left_said.text != right_said.text);
+            CHECK(left_said.was == 0);
+            CHECK(right_said.was == 0);
+        }
         lexer.regions(left);
         lexer.regions(right);
-        ensure("held: as they were", lexer.reread(left_read).text == left_said.text && lexer.reread(right_read).text == right_said.text);
+        {
+            INFO("held: as they were");
+            CHECK(lexer.reread(left_read).text == left_said.text);
+            CHECK(lexer.reread(right_read).text == right_said.text);
+        }
 
         // Typed in on the right, reading nothing after it otherwise: read
         // again in its place, from it, each line from the one after the edit
@@ -299,11 +355,17 @@ namespace tut
         lexer.regions(left);
         const auto&              typed_read = lexer.regions(typed);
         const ALTextDiff::Reread typed_said = lexer.reread(typed_read);
-        ensure("in the right's place", &typed_read == &right_read);
-        ensure("from the right, the lines after the edit as they were", typed_said.text != right_said.text && typed_said.was == right_said.text &&
-                                                                            typed_said.same == 51);
+        UNSCOPED_INFO("in the right's place");
+        CHECK(&typed_read == &right_read);
+        {
+            INFO("from the right, the lines after the edit as they were");
+            CHECK(typed_said.text != right_said.text);
+            CHECK(typed_said.was == right_said.text);
+            CHECK(typed_said.same == 51);
+        }
         ALDiffLexer fresh(lsl);
-        ensure("as read afresh", typed_read == fresh.regions(typed));
+        UNSCOPED_INFO("as read afresh");
+        CHECK(typed_read == fresh.regions(typed));
 
         // A comment opened above line 25, which closes it: the lines down to
         // it read otherwise, and those after as they were.
@@ -312,11 +374,17 @@ namespace tut
         lexer.regions(left);
         const auto&              opened_read = lexer.regions(opened);
         const ALTextDiff::Reread opened_said = lexer.reread(opened_read);
-        ensure_equals("from the line after the comment's close", opened_said.same, 26);
-        ensure("from the text typed", opened_said.was == typed_said.text);
+        UNSCOPED_INFO("from the line after the comment's close");
+        CHECK(opened_said.same == 26);
+        UNSCOPED_INFO("from the text typed");
+        CHECK(opened_said.was == typed_said.text);
         ALDiffLexer fresh_opened(lsl);
-        ensure("as read afresh, the comment's lines its", opened_read == fresh_opened.regions(opened) && opened_read[23].size() == 1 &&
-                                                               opened_read[23][0].region == ALTextDiff::Region::Comment);
+        {
+            INFO("as read afresh, the comment's lines its");
+            CHECK(opened_read == fresh_opened.regions(opened));
+            REQUIRE(opened_read[23].size() == 1);
+            CHECK(opened_read[23][0].region == ALTextDiff::Region::Comment);
+        }
 
         // A line put in near the top: those after it as they were, moved
         // along.
@@ -325,9 +393,14 @@ namespace tut
         lexer.regions(left);
         const auto&              put_read = lexer.regions(put);
         const ALTextDiff::Reread put_said = lexer.reread(put_read);
-        ensure("from the text opened, from the line after the one put in", put_said.was == opened_said.text && put_said.same == 6);
+        {
+            INFO("from the text opened, from the line after the one put in");
+            CHECK(put_said.was == opened_said.text);
+            CHECK(put_said.same == 6);
+        }
         ALDiffLexer fresh_put(lsl);
-        ensure("as read afresh", put_read == fresh_put.regions(put));
+        UNSCOPED_INFO("as read afresh");
+        CHECK(put_read == fresh_put.regions(put));
 
         // Most of it another: read whole, from none.
         std::vector<std::string> other;
@@ -338,17 +411,22 @@ namespace tut
         lexer.regions(left);
         const auto&              other_read = lexer.regions(other);
         const ALTextDiff::Reread other_said = lexer.reread(other_read);
-        ensure("read whole: from none, numbered anew", other_said.was == 0 && other_said.text > put_said.text);
-        ensure("the left, asked for each time, as it was", lexer.reread(left_read).text == left_said.text);
+        {
+            INFO("read whole: from none, numbered anew");
+            CHECK(other_said.was == 0);
+            CHECK(other_said.text > put_said.text);
+        }
+        UNSCOPED_INFO("the left, asked for each time, as it was");
+        CHECK(lexer.reread(left_read).text == left_said.text);
         const std::vector<ALTextDiff::regions_t> copied = other_read;
-        ensure_equals("regions it does not hold: nothing", lexer.reread(copied).text, U64(0));
+        UNSCOPED_INFO("regions it does not hold: nothing");
+        CHECK(lexer.reread(copied).text == U64(0));
     }
 
-    template<> template<>
-    void aldifflexer_object::test<7>()
+    TEST_CASE_METHOD(aldifflexer_data, "aldifflexer: told what an edit knows it reads again in place comparing no line", "[aldifflexer]")
     {
-        set_test_name("told what an edit knows of the texts asked for: the one it holds as it is, and the edit of the other read again in its place, no line compared to find either, as read afresh and said of as where the edit is found; told of a text it does not hold, or of one it would not read in the place of, as where it is told nothing");
-        ensure("the LSL grammar", lsl != nullptr);
+        UNSCOPED_INFO("the LSL grammar");
+        REQUIRE(lsl != nullptr);
         std::vector<std::string> left;
         for (S32 n = 0; n < 100; ++n)
         {
@@ -374,21 +452,35 @@ namespace tut
         typed[50] += " // typed";
         const U64   compared   = told.linesCompared();
         const auto& left_again = told.regions(left, ALTextDiff::Known{ left_text, 100, 0 });
-        ensure("the left as it holds it, nothing read", &left_again == &left_read && told.lastRead() == 0);
+        {
+            INFO("the left as it holds it, nothing read");
+            CHECK(&left_again == &left_read);
+            CHECK(told.lastRead() == 0);
+        }
         const auto& typed_read = told.regions(typed, ALTextDiff::Known{ right_text, 50, 49 });
-        ensure_equals("no line compared to know either", told.linesCompared() - compared, U64(0));
-        ensure("the right read again in its place, the line typed alone: " + std::to_string(told.lastRead()),
-               &typed_read == &right_read && told.lastRead() >= 1 && told.lastRead() <= 2);
+        UNSCOPED_INFO("no line compared to know either");
+        CHECK(told.linesCompared() - compared == U64(0));
+        {
+            INFO("the right read again in its place, the line typed alone");
+            CHECK(&typed_read == &right_read);
+            CHECK(told.lastRead() >= 1);
+            CHECK(told.lastRead() <= 2);
+        }
         ALDiffLexer fresh(lsl);
-        ensure("as read afresh", typed_read == fresh.regions(typed));
+        UNSCOPED_INFO("as read afresh");
+        CHECK(typed_read == fresh.regions(typed));
         const U64                found_was  = found.linesCompared();
         found.regions(left);
         const ALTextDiff::Reread found_said = found.reread(found.regions(typed));
-        ensure("not told: every line of both compared with those held: " + std::to_string(found.linesCompared() - found_was),
-               found.linesCompared() - found_was >= 200);
+        UNSCOPED_INFO("not told: every line of both compared with those held");
+        CHECK(found.linesCompared() - found_was >= 200);
         const ALTextDiff::Reread typed_said = told.reread(typed_read);
-        ensure("said of as where the edit is found: from the right, the lines after the edit as they were",
-               typed_said.was == right_text && typed_said.same == 51 && found_said.same == 51);
+        {
+            INFO("said of as where the edit is found: from the right, the lines after the edit as they were");
+            CHECK(typed_said.was == right_text);
+            CHECK(typed_said.same == 51);
+            CHECK(found_said.same == 51);
+        }
 
         // A comment opened above line 25, which closes it: told, the lines
         // down to it read otherwise, and said so.
@@ -397,12 +489,19 @@ namespace tut
         told.regions(left, ALTextDiff::Known{ left_text, 100, 0 });
         const auto&              opened_read = told.regions(opened, ALTextDiff::Known{ typed_said.text, 20, 79 });
         const ALTextDiff::Reread opened_said = told.reread(opened_read);
-        ensure_equals("from the line after the comment's close", opened_said.same, 26);
-        ensure("from the text typed", opened_said.was == typed_said.text);
+        UNSCOPED_INFO("from the line after the comment's close");
+        CHECK(opened_said.same == 26);
+        UNSCOPED_INFO("from the text typed");
+        CHECK(opened_said.was == typed_said.text);
         ALDiffLexer fresh_opened(lsl);
-        ensure("as read afresh, the comment's lines its", opened_read == fresh_opened.regions(opened) && opened_read[23].size() == 1 &&
-                                                               opened_read[23][0].region == ALTextDiff::Region::Comment);
-        ensure_equals("still no line compared", told.linesCompared() - compared, U64(0));
+        {
+            INFO("as read afresh, the comment's lines its");
+            CHECK(opened_read == fresh_opened.regions(opened));
+            REQUIRE(opened_read[23].size() == 1);
+            CHECK(opened_read[23][0].region == ALTextDiff::Region::Comment);
+        }
+        UNSCOPED_INFO("still no line compared");
+        CHECK(told.linesCompared() - compared == U64(0));
 
         // Told of a text it does not hold, and of the one asked for last,
         // which it would not read in the place of: found, as told nothing.
@@ -411,15 +510,19 @@ namespace tut
         told.regions(left, ALTextDiff::Known{ left_text, 100, 0 });
         const auto& unknown_read = told.regions(other, ALTextDiff::Known{ right_text, 60, 39 });
         ALDiffLexer fresh_other(lsl);
-        ensure("a text it does not hold: as read afresh", unknown_read == fresh_other.regions(other));
-        ensure("found by comparing", told.linesCompared() - compared > 0);
+        UNSCOPED_INFO("a text it does not hold: as read afresh");
+        CHECK(unknown_read == fresh_other.regions(other));
+        UNSCOPED_INFO("found by comparing");
+        CHECK(told.linesCompared() - compared > 0);
         const U64   other_text = told.reread(unknown_read).text;
         const U64   before     = told.linesCompared();
         std::vector<std::string> last = other;
         last[70]                      = "integer seventy;";
         const auto& last_read = told.regions(last, ALTextDiff::Known{ other_text, 70, 29 });
         ALDiffLexer fresh_last(lsl);
-        ensure("the one asked for last: as read afresh", last_read == fresh_last.regions(last));
-        ensure("found by comparing", told.linesCompared() > before);
+        UNSCOPED_INFO("the one asked for last: as read afresh");
+        CHECK(last_read == fresh_last.regions(last));
+        UNSCOPED_INFO("found by comparing");
+        CHECK(told.linesCompared() > before);
     }
 }

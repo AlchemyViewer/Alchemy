@@ -262,6 +262,42 @@ ALMasterIndex::Heard ALMasterIndex::heardSaved(const LLUUID& object, const LLUUI
     return Heard::Differing;
 }
 
+bool ALMasterIndex::renamed(const LLUUID& object, const LLUUID& item, const std::string& name)
+{
+    const ALMasterLink* was = mLinks.of(object, item);
+    if (!was || name.empty() || was->itemName == name)
+    {
+        return false;
+    }
+    ALMasterLink now = *was;
+    now.itemName     = name;
+    mLinks.put(now);
+    changed(Write::Soon, Tell::Now);
+    return true;
+}
+
+bool ALMasterIndex::chosen(const LLUUID& object, const LLUUID& item, const std::optional<std::string>& target,
+                           const std::optional<std::optional<LLUUID>>& experience)
+{
+    const ALMasterLink* was = mLinks.of(object, item);
+    if (!was || ((!target || *target == was->target) && (!experience || *experience == was->experience)))
+    {
+        return false;
+    }
+    ALMasterLink now = *was;
+    if (target)
+    {
+        now.target = *target;
+    }
+    if (experience)
+    {
+        now.experience = *experience;
+    }
+    mLinks.put(now);
+    changed(Write::Now, Tell::Now);
+    return true;
+}
+
 bool ALMasterIndex::finished(const LLUUID& object, const LLUUID& item, const ALMasterLink& updated)
 {
     const ALMasterLink* was = mLinks.of(object, item);

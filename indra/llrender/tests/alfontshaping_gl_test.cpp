@@ -33,7 +33,7 @@
 #include "llfonttest_helpers.h"
 #include "llheadlessgl_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <hb.h>
 
@@ -41,15 +41,13 @@
 #include <string>
 #include <vector>
 
-namespace tut
-{
 namespace
 {
     using namespace ll_test;
 
     // GL-backed group: monospace shaping ends up rendering glyphs through
     // getGlyphInfoByIndex → renderAndCreateGlyph → atlas → gGL.bind on
-    // the test 3 (kerning) path. Wrapped in a separate fixture that
+    // the kerning path (the GPOS case below). Wrapped in a separate fixture that
     // pulls in the headless GL context so the rasterizer can
     // satisfy the bind.
     struct alfontshaping_gl_data
@@ -58,10 +56,6 @@ namespace
         ll_test::FontStateScope font_scope;
     };
 
-    typedef test_group<alfontshaping_gl_data> alfontshaping_gl_test;
-    typedef alfontshaping_gl_test::object     alfontshaping_gl_object;
-    tut::alfontshaping_gl_test alfontshaping_gl_testcase("ALFontShapingGL");
-}
 
     // Strict-monospace (ligatures off): shape "AB" through DejaVuSansMono.
     // Routes through HB with the kFixedWidthStrict feature plan
@@ -69,65 +63,55 @@ namespace
     // produces one glyph per codepoint with bit-exact FT mXAdvance and
     // zero positioning offsets — same contract the retired bypass
     // enforced. Pins the cell-alignment invariant.
-    template<> template<>
-    void alfontshaping_gl_object::test<1>()
+    TEST_CASE_METHOD(alfontshaping_gl_data, "ALFontShapingGL: strict monospace shapes AB to equal FT cell advances and no offsets", "[ALFontShapingGL]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSansMono.woff2";
         if (!fileExists(path))
-            skip("DejaVuSansMono.woff2 not present");
+            SKIP("DejaVuSansMono.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSansMono loaded", ft.notNull());
-        ensure("DejaVuSansMono is fixed-width", ft->isFixedWidth());
-        ensure("monospace ligatures default off",
-               !ft->getAllowMonospaceLigatures());
+        REQUIRE(ft.notNull());
+        CHECK(ft->isFixedWidth());
+        CHECK_FALSE(ft->getAllowMonospaceLigatures());
 
         const Text s = text('A','B');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        ensure_equals("AB produces 2 glyphs through HB strict-mono path",
-                      out.size(), 2u);
-        ensure("each shaped glyph has positive advance",
-               out[0].x_advance > 0.f && out[1].x_advance > 0.f);
-        ensure_equals("strict-mono: A and B advances are equal",
-                      out[0].x_advance, out[1].x_advance);
+        REQUIRE(out.size() == 2u);
+        CHECK(out[0].x_advance > 0.f);
+        CHECK(out[1].x_advance > 0.f);
+        CHECK(out[0].x_advance == out[1].x_advance);
         // HB output for monospace ASCII matches FT mXAdvance bit-exact
         // under the strict feature plan (verified by the long-line
-        // probe in test 20).
-        ensure_equals("strict-mono glyph[0] advance == ft->getXAdvance('A')",
-                      out[0].x_advance, ft->getXAdvance(L'A'));
+        // cell-alignment probe in alfontshaping_test.cpp).
+        CHECK(out[0].x_advance == ft->getXAdvance(L'A'));
         // Strict-mono path also forces zero positioning offsets, since
         // monospace ASCII triggers no GPOS adjustments under the
         // feature plan (kern, mark, mkmk all suppressed for ASCII).
-        ensure_equals("strict-mono glyph[0] x_offset is zero",
-                      out[0].x_offset, 0.f);
-        ensure_equals("strict-mono glyph[0] y_offset is zero",
-                      out[0].y_offset, 0.f);
+        CHECK(out[0].x_offset == 0.f);
+        CHECK(out[0].y_offset == 0.f);
     }
 
     // Programmer-mono opt-in via setAllowMonospaceLigatures(true).
     // Routes through HB with the kFixedWidthLigaturesOk feature plan
     // (kern off, ligatures allowed). Cell alignment invariant on the
     // pre-ligation columns still holds.
-    template<> template<>
-    void alfontshaping_gl_object::test<2>()
+    TEST_CASE_METHOD(alfontshaping_gl_data, "ALFontShapingGL: monospace with ligatures allowed keeps AV on equal cell advances", "[ALFontShapingGL]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSansMono.woff2";
         if (!fileExists(path))
-            skip("DejaVuSansMono.woff2 not present");
+            SKIP("DejaVuSansMono.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSansMono loaded", ft.notNull());
+        REQUIRE(ft.notNull());
         ft->setAllowMonospaceLigatures(true);
-        ensure("ligatures-on toggle applied",
-               ft->getAllowMonospaceLigatures());
+        CHECK(ft->getAllowMonospaceLigatures());
 
         const Text s = text('A','V'); // AV is a classic kerned pair
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        ensure_equals("AV produces 2 glyphs through HB", out.size(), 2u);
-        ensure("each shaped glyph has positive advance",
-               out[0].x_advance > 0.f && out[1].x_advance > 0.f);
-        ensure_equals("HB-monospace-with-ligatures: A and V advances are equal",
-                      out[0].x_advance, out[1].x_advance);
+        REQUIRE(out.size() == 2u);
+        CHECK(out[0].x_advance > 0.f);
+        CHECK(out[1].x_advance > 0.f);
+        CHECK(out[0].x_advance == out[1].x_advance);
     }
 
     // HB GPOS plumbing: shape "AV" (classic Latin kerned pair) through
@@ -135,16 +119,15 @@ namespace
     // (not the legacy `kern` table), so the observable signal is that
     // the AV-as-pair advance differs from the sum of solo-A and solo-V
     // advances. A regression that disabled GPOS unconditionally would
-    // make these equal. Skip if no Latin kern pair fires (test
-    // verifies nothing then).
-    template<> template<>
-    void alfontshaping_gl_object::test<3>()
+    // make these equal for every pair. DejaVuSans's GPOS kerns several
+    // of them (AV among them), so none kerning fails the case.
+    TEST_CASE_METHOD(alfontshaping_gl_data, "ALFontShapingGL: GPOS kerning reaches HB shaping for some Latin pair in DejaVuSans", "[ALFontShapingGL]")
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
-            skip("DejaVuSans.woff2 not present");
+            SKIP("DejaVuSans.woff2 not present");
         LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSans loaded", ft.notNull());
+        REQUIRE(ft.notNull());
 
         // Try a handful of classic kerned pairs; pick the first that
         // shows a measurable kern. DejaVu's GPOS coverage varies.
@@ -176,10 +159,7 @@ namespace
                 break;
             }
         }
-        if (!found_kerned)
-            skip("DejaVuSans lacks a measurable Latin kern pair");
-
-        ensure("at least one Latin kern pair fired through HB GPOS",
-               found_kerned);
+        UNSCOPED_INFO("some pair advances differently shaped together than its halves shaped alone");
+        CHECK(found_kerned);
     }
 }

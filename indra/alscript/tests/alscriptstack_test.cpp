@@ -28,7 +28,7 @@
 
 #include "../preprocessor/alpreprocessor.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <stdexcept>
 #include <thread>
@@ -56,24 +56,14 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
-    struct alscriptstack_data
+    TEST_CASE("alscriptstack: the work runs on the asking thread and what it throws comes back", "[alscriptstack]")
     {
-    };
-
-    typedef test_group<alscriptstack_data> alscriptstack_group;
-    typedef alscriptstack_group::object    alscriptstack_object;
-    alscriptstack_group                    alscriptstack_instance("alscriptstack");
-
-    template<> template<>
-    void alscriptstack_object::test<1>()
-    {
-        set_test_name("the work runs, on the thread that asked, and what it throws comes back");
         const std::thread::id asking = std::this_thread::get_id();
         std::thread::id       ran;
         alScriptOnLargeStack([&]() { ran = std::this_thread::get_id(); });
-        ensure("on the same thread", ran == asking);
+        CHECK(ran == asking);
 
         bool caught = false;
         try
@@ -84,17 +74,17 @@ namespace tut
         {
             caught = std::string(e.what()) == "from below";
         }
-        ensure("thrown again once back", caught);
+        UNSCOPED_INFO("thrown again once back");
+        CHECK(caught);
     }
 
-    template<> template<>
-    void alscriptstack_object::test<2>()
+    TEST_CASE("alscriptstack: a pool thread with a half megabyte stack goes eight megabytes deep", "[alscriptstack]")
     {
-        set_test_name("a pool's thread, whose own stack is half a megabyte on a Mac, goes eight megabytes deep");
         int         got = -1;
         std::thread worker([&]() { alScriptOnLargeStack([&]() { got = descend(8000); }); });
         worker.join();
-        ensure_equals("all the way down and back", got, 8000);
+        UNSCOPED_INFO("all the way down and back");
+        CHECK(got == 8000);
 
         // And the preprocessor as deep as its own bounds let a script go,
         // on such a thread.
@@ -117,13 +107,15 @@ namespace tut
             });
         });
         preprocessing.join();
-        ensure("expanded, within the bound", !result.overran && result.text.find("1;") != std::string::npos);
+        {
+            INFO("expanded, within the bound");
+            CHECK_FALSE(result.overran);
+            CHECK(result.text.find("1;") != std::string::npos);
+        }
     }
 
-    template<> template<>
-    void alscriptstack_object::test<3>()
+    TEST_CASE("alscriptstack: the stack is kept between jobs and a nested job runs where it stands", "[alscriptstack]")
     {
-        set_test_name("the thread's stack kept from one job to the next, and a job begun inside another run on it where it stands");
         int         first = -1, second = -1, nested = -1;
         bool        threw = false;
         std::thread worker([&]() {
@@ -143,9 +135,13 @@ namespace tut
             });
         });
         worker.join();
-        ensure_equals("the first all the way", first, 8000);
-        ensure("a throw between", threw);
-        ensure_equals("the second, on the same stack", second, 4000);
-        ensure_equals("and one inside it", nested, 3000);
+        UNSCOPED_INFO("the first all the way");
+        CHECK(first == 8000);
+        UNSCOPED_INFO("a throw between");
+        CHECK(threw);
+        UNSCOPED_INFO("the second, on the same stack");
+        CHECK(second == 4000);
+        UNSCOPED_INFO("and one inside it");
+        CHECK(nested == 3000);
     }
 }

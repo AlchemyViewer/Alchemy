@@ -40,7 +40,7 @@
 #include "alscriptstudio_fixture.h"
 #include "llfocusmgr.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <set>
@@ -231,7 +231,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudiochecking_data
     {
@@ -286,7 +286,7 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             weighing = std::make_unique<al_studio_test::StudioWeighing>(services);
             unit     = std::make_unique<ALScriptStudioChecking>(services, studio, studio, weighing->unit, studio);
@@ -356,38 +356,52 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptstudiochecking_data> alscriptstudiochecking_group;
-    typedef alscriptstudiochecking_group::object    alscriptstudiochecking_object;
-    alscriptstudiochecking_group                    alscriptstudiochecking_instance("alscriptstudiochecking");
-
-    template<> template<>
-    void alscriptstudiochecking_object::test<1>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: a check waits for typing to rest then asks of the text as it stands", "[alscriptstudiochecking]")
     {
-        set_test_name("a check waits while typing goes on and is asked once it rests, of the text as it stands, with the window's settings");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         checking.schedule(doc);
         const F64 due = doc.check->analysisDue;
-        ensure("due a moment on", due > 1.0);
+        UNSCOPED_INFO("due a moment on");
+        CHECK(due > 1.0);
         checking.pump(due - 0.1);
-        ensure("not yet", studio.asks.empty());
+        UNSCOPED_INFO("not yet");
+        REQUIRE(studio.asks.empty());
         doc.editor->insertText("x");
         checking.schedule(doc);
         checking.pump(due);
-        ensure("typed again: waits again", studio.asks.empty() && doc.check->analysisDue > due);
+        {
+            INFO("typed again: waits again");
+            REQUIRE(studio.asks.empty());
+            CHECK(doc.check->analysisDue > due);
+        }
         checking.pump(doc.check->analysisDue);
-        ensure_equals("asked once", studio.asks.size(), size_t(1));
+        UNSCOPED_INFO("asked once");
+        REQUIRE(studio.asks.size() == size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
-        ensure("a check of the text as it stands",
-               asked.kind == Kind::Check && asked.id == "a" && asked.version == version(doc) && *asked.text == doc.editor->text());
-        ensure("with the window's settings", asked.hintTypes);
-        ensure("remembered", doc.check->requestedVersion == version(doc) && doc.check->analysisDue == 0.0);
+        {
+            INFO("a check of the text as it stands");
+            CHECK(asked.kind == Kind::Check);
+            CHECK(asked.id == "a");
+            CHECK(asked.version == version(doc));
+            REQUIRE(asked.text);
+            CHECK(*asked.text == doc.editor->text());
+        }
+        UNSCOPED_INFO("with the window's settings");
+        CHECK(asked.hintTypes);
+        {
+            INFO("remembered");
+            CHECK(doc.check->requestedVersion == version(doc));
+            CHECK(doc.check->analysisDue == 0.0);
+        }
         checking.pump(1e9);
-        ensure_equals("once", studio.asks.size(), size_t(1));
+        UNSCOPED_INFO("once");
+        REQUIRE(studio.asks.size() == size_t(1));
         checking.schedule(doc, true);
         checking.pump(1.0);
-        ensure_equals("at once", studio.asks.size(), size_t(2));
-        // A notecard is checked here, as scripts read it (test 20).
+        UNSCOPED_INFO("at once");
+        REQUIRE(studio.asks.size() == size_t(2));
+        // A notecard is checked here, as scripts read it (the notecard case below).
         doc.notecard = true;
         checking.schedule(doc, true);
         checking.pump(1e9);
@@ -396,14 +410,18 @@ namespace tut
         checking.schedule(doc, true);
         doc.loaded = true;
         checking.pump(1e9);
-        ensure_equals("a notecard, or a tab not loaded: never asked of the analyzers", studio.asks.size(), size_t(2));
+        UNSCOPED_INFO("a notecard, or a tab not loaded: never asked of the analyzers");
+        REQUIRE(studio.asks.size() == size_t(2));
         doc.notecard = true;
         checking.ask(doc, Kind::Hover, ALTextPos(0, 8), ALTextPos(0, 8));
-        ensure_equals("a notecard not asked about", studio.asks.size(), size_t(2));
+        UNSCOPED_INFO("a notecard not asked about");
+        REQUIRE(studio.asks.size() == size_t(2));
         preprocessing = true;
-        ensure("nor preprocessed", !checking.preprocessed(doc));
+        UNSCOPED_INFO("nor preprocessed");
+        CHECK_FALSE(checking.preprocessed(doc));
         doc.notecard = false;
-        ensure("a script is", checking.preprocessed(doc));
+        UNSCOPED_INFO("a script is");
+        CHECK(checking.preprocessed(doc));
         // A question of the text as it stands shares the one copy every
         // other question of that text holds; one of a text typed in since
         // has its own.
@@ -412,17 +430,23 @@ namespace tut
         studio.asks.clear();
         checking.ask(doc, Kind::Hover, ALTextPos(0, 1), ALTextPos(0, 1));
         checking.ask(doc, Kind::Signature, ALTextPos(0, 1), ALTextPos(0, 1));
-        ensure("the same text shared, not copied", studio.asks.size() == 2 && studio.asks[1].request.text == studio.asks[0].request.text);
+        {
+            INFO("the same text shared, not copied");
+            REQUIRE(studio.asks.size() == 2);
+            CHECK(studio.asks[1].request.text == studio.asks[0].request.text);
+        }
         doc.editor->insertText("x");
         checking.ask(doc, Kind::Hover, ALTextPos(0, 1), ALTextPos(0, 1));
-        ensure("a newer text its own", studio.asks.back().request.text != studio.asks[0].request.text &&
-                                           *studio.asks.back().request.text == doc.editor->text());
+        {
+            INFO("a newer text its own");
+            REQUIRE(studio.asks.back().request.text);
+            REQUIRE(studio.asks.back().request.text != studio.asks[0].request.text);
+            CHECK(*studio.asks.back().request.text == doc.editor->text());
+        }
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<2>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: a check's answer is taken and one for a text since typed in dropped", "[alscriptstudiochecking]")
     {
-        set_test_name("a check's answer taken -- problems, outline, the window told -- one of a text since typed in dropped");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         checking.schedule(doc, true);
@@ -432,51 +456,92 @@ namespace tut
         entry.name     = "count";
         result.outline = { entry };
         doc.editor->insertText("x");
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(result);
-        ensure("of another text: dropped", doc.check->analysis.empty() && studio.told.empty());
+        {
+            INFO("of another text: dropped");
+            REQUIRE(doc.check->analysis.empty());
+            REQUIRE(studio.told.empty());
+        }
         result.version = version(doc);
         studio.asks[0].answered(result);
-        ensure("taken", doc.check->analysis.size() == 1 && doc.check->analysisVersion == version(doc) && doc.outline.size() == 1);
-        ensure_equals("LSL's lints as chosen", gLintsApplied, 1);
-        ensure_equals("told", joined(studio.told), std::string("problems a, outline a"));
+        {
+            INFO("taken");
+            REQUIRE(doc.check->analysis.size() == 1);
+            CHECK(doc.check->analysisVersion == version(doc));
+            REQUIRE(doc.outline.size() == 1);
+        }
+        UNSCOPED_INFO("LSL's lints as chosen");
+        CHECK(gLintsApplied == 1);
+        UNSCOPED_INFO("told");
+        CHECK(joined(studio.told) == std::string("problems a, outline a"));
         result.understood = false;
         result.outline.clear();
         result.problems.clear();
         studio.asks[0].answered(result);
-        ensure("past mending: the outline kept", doc.check->analysis.empty() && doc.outline.size() == 1);
+        {
+            INFO("past mending: the outline kept");
+            REQUIRE(doc.check->analysis.empty());
+            REQUIRE(doc.outline.size() == 1);
+        }
         doc.language.lua = true;
         studio.asks[0].answered(result);
-        ensure_equals("Luau's chosen by its configuration", gLintsApplied, 2);
+        UNSCOPED_INFO("Luau's chosen by its configuration");
+        CHECK(gLintsApplied == 2);
         unit.reset();
         result.problems = { problem(1, "late") };
         studio.asks[0].answered(result);
-        ensure("gone: nothing taken", doc.check->analysis.empty());
+        UNSCOPED_INFO("gone: nothing taken");
+        REQUIRE(doc.check->analysis.empty());
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<3>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: a preprocessed question waits on the expansion and maps back to source", "[alscriptstudiochecking]")
     {
-        set_test_name("preprocessed: the question waits on the expansion, one of a kind replacing the last; the answer read back to the source");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         preprocessing                    = true;
         checking.ask(doc, Kind::Inspect, ALTextPos(0, 8), ALTextPos(0, 8));
         checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
-        ensure("expanded once", expansions.size() == 1 && studio.asks.empty() && doc.check->waiting.size() == 2);
-        ensure("the last of a kind", doc.check->waiting[0].at == ALTextPos(3, 20));
+        {
+            INFO("expanded once");
+            REQUIRE(expansions.size() == 1);
+            REQUIRE(studio.asks.empty());
+            REQUIRE(doc.check->waiting.size() == 2);
+        }
+        UNSCOPED_INFO("the last of a kind");
+        CHECK(doc.check->waiting[0].at == ALTextPos(3, 20));
         doc.editor->insertText("//");
         expansions[0].second(expansion(SCRIPT));
-        ensure("of another text: the questions go", doc.check->waiting.empty() && studio.asks.empty() && !doc.expanded.valid);
+        {
+            INFO("of another text: the questions go");
+            REQUIRE(doc.check->waiting.empty());
+            REQUIRE(studio.asks.empty());
+            CHECK_FALSE(doc.expanded.valid);
+        }
         doc.editor->undoJournal().undo();
         doc.editor->setText(SCRIPT);
         checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
         expansions.back().second(expansion(SCRIPT));
-        ensure("taken", doc.expanded.valid && doc.expanded.version == version(doc) && doc.check->expansions == 1);
-        ensure_equals("then asked", studio.asks.size(), size_t(1));
-        ensure("of the expansion, at its place", *studio.asks[0].request.text == *doc.expanded.text && studio.asks[0].request.line == 4);
-        ensure("the include's line passed over", studio.asks[0].request.passedOver == (std::vector<std::pair<S32, S32>>{ { 0, 0 } }));
-        ensure_equals("the problems shown with it", joined(studio.told), std::string("problems a"));
+        {
+            INFO("taken");
+            REQUIRE(doc.expanded.valid);
+            CHECK(doc.expanded.version == version(doc));
+            CHECK(doc.check->expansions == 1);
+        }
+        UNSCOPED_INFO("then asked");
+        REQUIRE(studio.asks.size() == size_t(1));
+        {
+            INFO("of the expansion, at its place");
+            REQUIRE(studio.asks[0].request.text);
+            REQUIRE(doc.expanded.text);
+            CHECK(*studio.asks[0].request.text == *doc.expanded.text);
+            CHECK(studio.asks[0].request.line == 4);
+        }
+        UNSCOPED_INFO("the include's line passed over");
+        CHECK(studio.asks[0].request.passedOver == (std::vector<std::pair<S32, S32>>{ { 0, 0 } }));
+        UNSCOPED_INFO("the problems shown with it");
+        CHECK(joined(studio.told) == std::string("problems a"));
         ALScriptAnalysis::Result result;
         result.kind    = Kind::Inspect;
         result.id      = "a";
@@ -484,26 +549,35 @@ namespace tut
         result.line    = 4;
         result.column  = 20;
         studio.asks[0].answered(result);
-        ensure_equals("at the source's place", studio.told.back(), std::string("inspect a 3:20"));
+        REQUIRE_FALSE(studio.told.empty());
+        UNSCOPED_INFO("at the source's place");
+        CHECK(studio.told.back() == std::string("inspect a 3:20"));
         result.line = 0;
         const size_t told = studio.told.size();
         studio.asks[0].answered(result);
-        ensure("in the include: nowhere of the script's", studio.told.size() == told);
+        UNSCOPED_INFO("in the include: nowhere of the script's");
+        REQUIRE(studio.told.size() == told);
         checking.ask(doc, Kind::Inspect, ALTextPos(0, 0), ALTextPos(0, 0));
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         doc.check->expansions += 1;
         doc.expanded.generation += 1;
+        REQUIRE(studio.asks.size() == size_t(3));
         studio.asks[2].answered(answer(doc));
-        ensure("an answer of an expansion since replaced: the check asked again", doc.check->analysisDue == 1.0 &&
-               doc.check->analysis.empty());
+        {
+            INFO("an answer of an expansion since replaced: the check asked again");
+            CHECK(doc.check->analysisDue == 1.0);
+            REQUIRE(doc.check->analysis.empty());
+        }
         preprocessing = false;
         studio.asks[1].answered(result);
-        ensure("read plain now: dropped", studio.told.size() == told);
+        UNSCOPED_INFO("read plain now: dropped");
+        REQUIRE(studio.told.size() == told);
         checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
         preprocessing = true;
         result.line   = 3;
         studio.asks.back().answered(result);
-        ensure("asked plain, read expanded now: dropped", studio.told.size() == told);
+        UNSCOPED_INFO("asked plain, read expanded now: dropped");
+        REQUIRE(studio.told.size() == told);
 
         // An expansion of an older text is expanded again; a place a
         // directive holds is asked nothing; a stretch it carries as it
@@ -511,12 +585,15 @@ namespace tut
         const size_t expanded = expansions.size();
         doc.editor->insertText(" ");
         checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
-        ensure("an older expansion: expanded again", expansions.size() == expanded + 1);
+        UNSCOPED_INFO("an older expansion: expanded again");
+        REQUIRE(expansions.size() == expanded + 1);
         doc.editor->setText("#define X\n" + SCRIPT);
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
-        ensure("one still out: not another yet", expansions.size() == expanded + 1);
+        UNSCOPED_INFO("one still out: not another yet");
+        REQUIRE(expansions.size() == expanded + 1);
         expansions.back().second(expansion(SCRIPT));
-        ensure("it answered of an older text: the next, for the text as it is", expansions.size() == expanded + 2);
+        UNSCOPED_INFO("it answered of an older text: the next, for the text as it is");
+        REQUIRE(expansions.size() == expanded + 2);
         ALPreprocessor::Result directive = expansion(SCRIPT);
         directive.map                    = ALSourceMap();
         directive.map.addFile("a", "object:a");
@@ -533,10 +610,15 @@ namespace tut
         expansions.back().second(directive);
         const size_t asks = studio.asks.size();
         checking.ask(doc, Kind::Hover, ALTextPos(0, 3), ALTextPos(0, 3));
-        ensure("on the directive: nothing asked", studio.asks.size() == asks);
+        UNSCOPED_INFO("on the directive: nothing asked");
+        REQUIRE(studio.asks.size() == asks);
         checking.ask(doc, Kind::Actions, ALTextPos(1, 8), ALTextPos(1, 13));
-        ensure("a stretch kept", studio.asks.size() == asks + 1 && studio.asks.back().request.line == 0 &&
-                                     studio.asks.back().request.endColumn == 13);
+        {
+            INFO("a stretch kept");
+            REQUIRE(studio.asks.size() == asks + 1);
+            CHECK(studio.asks.back().request.line == 0);
+            CHECK(studio.asks.back().request.endColumn == 13);
+        }
         unit.reset();
         doc.editor->insertText(" ");
         make();
@@ -545,17 +627,20 @@ namespace tut
         ALScriptStudioChecking* gone = unit.release();
         delete gone;
         expansions.back().second(expansion(SCRIPT));
-        ensure("gone before its expansion came: nothing", expansions.size() == stale_expansions + 1 && studio.asks.size() == asks + 1);
+        {
+            INFO("gone before its expansion came: nothing");
+            REQUIRE(expansions.size() == stale_expansions + 1);
+            REQUIRE(studio.asks.size() == asks + 1);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<4>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: an expansion's problems map back to the source or the include's file", "[alscriptstudiochecking]")
     {
-        set_test_name("a check of an expansion: problems back in the source, an include's kept by its file without fixes, its unused not said, one in generated code said so");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         preprocessing                    = true;
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        REQUIRE(expansions.size() == size_t(1));
         expansions[0].second(expansion(SCRIPT));
         ALScriptProblem own = problem(4, "own");
         own.fixes           = { fix("Put right", 4, 0, 3, "abc") };
@@ -576,54 +661,87 @@ namespace tut
         mine.span.endLine      = 1;
         theirs.name            = "helper";
         result.outline         = { mine, theirs };
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(result);
         const ALScriptProblems& got = doc.check->analysis;
-        ensure_equals("the include's unused dropped", got.size(), size_t(4));
-        ensure("not an error of that code", got[2].message == "an error with that code");
-        ensure("own: in the source, its fix too", got[0].line == 3 && got[0].file.empty() && got[0].fixes.size() == 1 &&
-               got[0].fixes[0].edits[0].line == 3);
-        ensure("the include's: by its file, no fixes", got[1].file == "disk:/lib.lsl" && got[1].line == 2 && got[1].fixes.empty());
-        ensure("nowhere: no fixes", got[3].fixes.empty());
-        ensure("and said to be in code the preprocessor made, at the expansion's line", got[3].file == Doc::GENERATED && got[3].line == 9);
-        ensure("the include's symbol not outlined", doc.outline.size() == 1 && doc.outline[0].name == "count" &&
-               doc.outline[0].nameSpan.line == 0);
+        UNSCOPED_INFO("the include's unused dropped");
+        REQUIRE(got.size() == size_t(4));
+        UNSCOPED_INFO("not an error of that code");
+        CHECK(got[2].message == "an error with that code");
+        {
+            INFO("own: in the source, its fix too");
+            CHECK(got[0].line == 3);
+            REQUIRE(got[0].file.empty());
+            REQUIRE(got[0].fixes.size() == 1);
+            REQUIRE_FALSE(got[0].fixes[0].edits.empty());
+            CHECK(got[0].fixes[0].edits[0].line == 3);
+        }
+        {
+            INFO("the include's: by its file, no fixes");
+            CHECK(got[1].file == "disk:/lib.lsl");
+            CHECK(got[1].line == 2);
+            REQUIRE(got[1].fixes.empty());
+        }
+        UNSCOPED_INFO("nowhere: no fixes");
+        REQUIRE(got[3].fixes.empty());
+        {
+            INFO("and said to be in code the preprocessor made, at the expansion's line");
+            CHECK(got[3].file == Doc::GENERATED);
+            CHECK(got[3].line == 9);
+        }
+        {
+            INFO("the include's symbol not outlined");
+            REQUIRE(doc.outline.size() == 1);
+            CHECK(doc.outline[0].name == "count");
+            CHECK(doc.outline[0].nameSpan.line == 0);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<5>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: an include's file checked with a state after it keeps only its problems", "[alscriptstudiochecking]")
     {
-        set_test_name("an include's file, checked with a state after it: what is said of the state, and of its unused, not the include's");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("disk:/lib.lsl", "integer helper;\nhelp() { }\n");
         doc.file                         = "/lib.lsl";
         doc.editor->setSyntax("lsl");
-        ensure("a fragment", checking.lslFragment(doc));
-        ensure("kept for the text it was asked of", doc.check->fragment && doc.check->fragment->first == doc.editor->document().version() &&
-                                                        doc.check->fragment->second);
+        CHECK(checking.lslFragment(doc));
+        {
+            INFO("kept for the text it was asked of");
+            REQUIRE(doc.check->fragment);
+            CHECK(doc.check->fragment->first == doc.editor->document().version());
+            CHECK(doc.check->fragment->second);
+        }
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
-        ensure("a state put after it", *studio.asks[0].request.text == doc.editor->text() + "\ndefault{state_entry(){}}\n");
+        REQUIRE(studio.asks.size() == size_t(1));
+        REQUIRE(studio.asks[0].request.text);
+        UNSCOPED_INFO("a state put after it");
+        CHECK(*studio.asks[0].request.text == doc.editor->text() + "\ndefault{state_entry(){}}\n");
         ALScriptProblem unused = problem(0, "helper unused", ALScriptProblem::Severity::Warning);
         unused.code            = "LocalUnused";
         ALScriptOutlineEntry state;
         state.name          = "default";
         state.nameSpan.line = 4;
         studio.asks[0].answered(answer(doc, { problem(1, "own"), problem(4, "in the state"), unused }));
-        ensure("only its own", doc.check->analysis.size() == 1 && doc.check->analysis[0].message == "own");
+        {
+            INFO("only its own");
+            REQUIRE(doc.check->analysis.size() == 1);
+            CHECK(doc.check->analysis[0].message == "own");
+        }
         ALScriptAnalysis::Result outlined = answer(doc);
         outlined.outline                  = { state };
         studio.asks[0].answered(outlined);
-        ensure("nor the state outlined", doc.outline.empty());
+        UNSCOPED_INFO("nor the state outlined");
+        REQUIRE(doc.outline.empty());
         doc.editor->setText("integer helper;\ndefault\n{\n}\n");
-        ensure("with a state: a script", !checking.lslFragment(doc));
+        UNSCOPED_INFO("with a state: a script");
+        CHECK_FALSE(checking.lslFragment(doc));
         doc.file.clear();
         doc.editor->setText("integer helper;\n");
-        ensure("not a file: a script", !checking.lslFragment(doc));
+        UNSCOPED_INFO("not a file: a script");
+        CHECK_FALSE(checking.lslFragment(doc));
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<6>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: an undeclared name is offered an include or what is near is fetched", "[alscriptstudiochecking]")
     {
-        set_test_name("a name nothing declares offered an include that declares it; one nothing in hand gives fetched from what is near");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         preprocessing                    = true;
@@ -646,44 +764,65 @@ namespace tut
         ALScriptAnalysis::Result result = answer(doc, { undeclared, other });
         result.problems[0].line = 4;
         result.problems[1].line = 4;
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(result);
+        REQUIRE(doc.check->analysis.size() == size_t(2));
         const ALScriptProblem& given = doc.check->analysis[0];
-        ensure_equals("offered", given.fixes.size(), size_t(1));
-        ensure("the include put in, preferred", given.fixes[0].preferred &&
-               given.fixes[0].edits[0].text.find("#include \"lib.lsl\"") != std::string::npos);
-        ensure("nothing gives the other", doc.check->analysis[1].fixes.empty());
-        ensure_equals("what is near fetched", nearby.size(), size_t(1));
+        UNSCOPED_INFO("offered");
+        REQUIRE(given.fixes.size() == size_t(1));
+        {
+            INFO("the include put in, preferred");
+            CHECK(given.fixes[0].preferred);
+            REQUIRE_FALSE(given.fixes[0].edits.empty());
+            CHECK(given.fixes[0].edits[0].text.find("#include \"lib.lsl\"") != std::string::npos);
+        }
+        UNSCOPED_INFO("nothing gives the other");
+        REQUIRE(doc.check->analysis[1].fixes.empty());
+        UNSCOPED_INFO("what is near fetched");
+        REQUIRE(nearby.size() == size_t(1));
         const size_t asks = studio.asks.size();
         nearby[0]();
         checking.pump(1.0);
-        ensure_equals("and checked again once it is in", studio.asks.size(), asks + 1);
+        UNSCOPED_INFO("and checked again once it is in");
+        REQUIRE(studio.asks.size() == asks + 1);
         preprocessing = false;
         doc.check->analysisDue = 0.0;
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(doc, { undeclared }));
-        ensure("not preprocessed: nothing to include with", doc.check->analysis[0].fixes.empty() && nearby.size() == 1);
+        {
+            INFO("not preprocessed: nothing to include with");
+            REQUIRE(doc.check->analysis.size() == size_t(1));
+            REQUIRE(doc.check->analysis[0].fixes.empty());
+            REQUIRE(nearby.size() == 1);
+        }
         preprocessing = true;
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         ALScriptAnalysis::Result given_all = answer(doc, { undeclared });
         given_all.problems[0].line         = 4;
         studio.asks.back().answered(given_all);
-        ensure("all given: nothing fetched", !doc.check->analysis[0].fixes.empty() && nearby.size() == 1);
+        {
+            INFO("all given: nothing fetched");
+            REQUIRE(doc.check->analysis.size() == size_t(1));
+            REQUIRE_FALSE(doc.check->analysis[0].fixes.empty());
+            REQUIRE(nearby.size() == 1);
+        }
         // What is in reach found anew on the index's thread: the script
         // checked again.
         doc.check->analysisDue = 0.0;
-        ensure("a reach new to it told", (bool)modulesReady);
+        UNSCOPED_INFO("a reach new to it told");
+        REQUIRE((bool)modulesReady);
         modulesReady();
-        ensure("checked again", doc.check->analysisDue > 0.0);
+        UNSCOPED_INFO("checked again");
+        CHECK(doc.check->analysisDue > 0.0);
         doc.check->analysisDue = 0.0;
         unit.reset();
         nearby[0]();
-        ensure("gone: nothing asked", doc.check->analysisDue == 0.0);
+        UNSCOPED_INFO("gone: nothing asked");
+        CHECK(doc.check->analysisDue == 0.0);
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<7>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: a NOLINT comment drops a problem and preprocessor words are explained", "[alscriptstudiochecking]")
     {
-        set_test_name("what a comment says is not wanted dropped, a comment offered for the rest; the preprocessor's words and a require explained");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a", "integer a; // NOLINT\ninteger b;\nswitch (a) { }\n");
         ALScriptProblem         quiet    = problem(0, "a unused", ALScriptProblem::Severity::Warning);
@@ -696,12 +835,19 @@ namespace tut
         ALScriptProblem theirs           = parse;
         theirs.file                      = "disk:/lib.lsl";
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer(doc, { quiet, said, parse, theirs }));
-        ensure_equals("the one a comment quiets dropped", doc.check->analysis.size(), size_t(3));
-        ensure_equals("an include's not explained here", doc.check->analysis[2].message, std::string("syntax error"));
-        ensure("the other offered a comment", doc.check->analysis[0].fixes.size() == 1 &&
-                                                  doc.check->analysis[0].fixes[0].kind == ALScriptFix::Kind::Suppress);
-        ensure("the switch explained", doc.check->analysis[1].message.find("syntax error PreprocHintSwitch [WORD]=switch") == 0);
+        UNSCOPED_INFO("the one a comment quiets dropped");
+        REQUIRE(doc.check->analysis.size() == size_t(3));
+        UNSCOPED_INFO("an include's not explained here");
+        CHECK(doc.check->analysis[2].message == std::string("syntax error"));
+        {
+            INFO("the other offered a comment");
+            REQUIRE(doc.check->analysis[0].fixes.size() == 1);
+            CHECK(doc.check->analysis[0].fixes[0].kind == ALScriptFix::Kind::Suppress);
+        }
+        UNSCOPED_INFO("the switch explained");
+        CHECK(doc.check->analysis[1].message.find("syntax error PreprocHintSwitch [WORD]=switch") == 0);
         preprocessing = true;
         switches      = true;
         doc.expanded.valid = false;
@@ -712,20 +858,26 @@ namespace tut
         plain.map.finish();
         expansions.back().second(plain);
         studio.asks.back().answered(answer(doc, { parse }));
-        ensure_equals("its transform on: not", doc.check->analysis[0].message, std::string("syntax error"));
+        REQUIRE(doc.check->analysis.size() == size_t(1));
+        UNSCOPED_INFO("its transform on: not");
+        CHECK(doc.check->analysis[0].message == std::string("syntax error"));
 
         preprocessing       = false;
         Doc& lua            = tab("b", "local x = require(\"lib\")\n");
         lua.language.lua    = true;
         checking.ask(lua, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(lua));
-        ensure("a require the preprocessor does not run over, warned of",
-               lua.check->analysis.size() == 1 && lua.check->analysis[0].message == "RequireNotPreprocessed [NAME]=lib");
+        {
+            INFO("a require the preprocessor does not run over, warned of");
+            REQUIRE(lua.check->analysis.size() == 1);
+            CHECK(lua.check->analysis[0].message == "RequireNotPreprocessed [NAME]=lib");
+        }
         preprocessing = true;
         checking.ask(lua, Kind::Check, ALTextPos(), ALTextPos());
         expansions.back().second(plain);
         studio.asks.back().answered(answer(lua));
-        ensure("preprocessed: not", lua.check->analysis.empty());
+        UNSCOPED_INFO("preprocessed: not");
+        REQUIRE(lua.check->analysis.empty());
 
         // `inline` is taken off whenever the preprocessor runs, the
         // extensions on or not: said as the preprocessor's alone.
@@ -733,7 +885,9 @@ namespace tut
         Doc& marked   = tab("m", "integer f() inline { return 1; }\n");
         checking.ask(marked, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
-        ensure("inline explained: " + marked.check->analysis[0].message, marked.check->analysis[0].message.find("syntax error PreprocHintInline [WORD]=inline") == 0);
+        REQUIRE(marked.check->analysis.size() == size_t(1));
+        UNSCOPED_INFO("inline explained: " << marked.check->analysis[0].message);
+        CHECK(marked.check->analysis[0].message.find("syntax error PreprocHintInline [WORD]=inline") == 0);
         preprocessing         = true;
         marked.expanded.valid = false;
         checking.ask(marked, Kind::Check, ALTextPos(), ALTextPos());
@@ -743,83 +897,121 @@ namespace tut
         stripped.map.finish();
         expansions.back().second(stripped);
         studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
-        ensure_equals("preprocessing, the extensions off: not", marked.check->analysis[0].message, std::string("syntax error"));
+        REQUIRE(marked.check->analysis.size() == size_t(1));
+        UNSCOPED_INFO("preprocessing, the extensions off: not");
+        CHECK(marked.check->analysis[0].message == std::string("syntax error"));
 
         // And so is `const`, before a type anywhere on the line.
         preprocessing = false;
         Doc& constant = tab("c", "f(const integer n) { }\n");
         checking.ask(constant, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks.back().answered(answer(constant, { problem(0, "syntax error") }));
-        ensure("const explained: " + constant.check->analysis[0].message,
-               constant.check->analysis[0].message.find("syntax error PreprocHintConst [WORD]=const") == 0);
+        REQUIRE(constant.check->analysis.size() == size_t(1));
+        UNSCOPED_INFO("const explained: " << constant.check->analysis[0].message);
+        CHECK(constant.check->analysis[0].message.find("syntax error PreprocHintConst [WORD]=const") == 0);
 
         // A script with a directive is preprocessed, the setting off or
         // on: the grid could compile it no other way.
         Doc&         directive = tab("d", "  #define MAX 15\ndefault { state_entry() { } }\n");
         const size_t expanded  = expansions.size();
-        ensure("preprocessed for its directive", checking.preprocessed(directive) &&
-                                                     checking.preprocessedWhy(directive) == ALPreprocessor::Wanted::Directives);
+        {
+            INFO("preprocessed for its directive");
+            CHECK(checking.preprocessed(directive));
+            CHECK(checking.preprocessedWhy(directive) == ALPreprocessor::Wanted::Directives);
+        }
         checking.ask(directive, Kind::Check, ALTextPos(), ALTextPos());
-        ensure("expanded, not read as code", expansions.size() == expanded + 1);
-        ensure("an envelope first", [&] {
+        UNSCOPED_INFO("expanded, not read as code");
+        REQUIRE(expansions.size() == expanded + 1);
+        UNSCOPED_INFO("an envelope no reason of its own: its directives still");
+        CHECK([&] {
             directive.envelope = ALScriptEnvelope();
-            const bool first   = checking.preprocessedWhy(directive) == ALPreprocessor::Wanted::Enveloped;
+            const bool why     = checking.preprocessedWhy(directive) == ALPreprocessor::Wanted::Directives;
             directive.envelope.reset();
-            return first;
+            return why;
         }());
 
         // A # line that is no directive, the script not preprocessed: the
         // preprocessor's to explain, and nothing put in where the parser
         // stopped.
         Doc& stray = tab("e", "# 15\ndefault { state_entry() { } }\n");
-        ensure("not preprocessed", !checking.preprocessed(stray));
+        UNSCOPED_INFO("not preprocessed");
+        CHECK_FALSE(checking.preprocessed(stray));
         checking.ask(stray, Kind::Check, ALTextPos(), ALTextPos());
         ALScriptProblem missing = problem(0, "Missing '('.");
         missing.fixes.push_back(fix("Insert '('", 0, 2, 2, "("));
         studio.asks.back().answered(answer(stray, { missing, problem(1, "syntax error") }));
-        ensure("the line explained: " + (stray.check->analysis.empty() ? std::string() : stray.check->analysis[0].message),
-               stray.check->analysis.size() == 2 && stray.check->analysis[0].message == "Missing '('. PreprocHintDirective" &&
-                   stray.check->analysis[0].fixes.empty());
-        ensure_equals("a line of code: as the parser said", stray.check->analysis[1].message, std::string("syntax error"));
+        {
+            INFO("the line explained: " << (stray.check->analysis.empty() ? std::string() : stray.check->analysis[0].message));
+            REQUIRE(stray.check->analysis.size() == 2);
+            CHECK(stray.check->analysis[0].message == "Missing '('. PreprocHintDirective");
+            REQUIRE(stray.check->analysis[0].fixes.empty());
+        }
+        UNSCOPED_INFO("a line of code: as the parser said");
+        CHECK(stray.check->analysis[1].message == std::string("syntax error"));
         preprocessing = true;
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<8>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: a fix is made as one undo step or refused where the text moved on", "[alscriptstudiochecking]")
     {
-        set_test_name("a fix made as one step and checked again; refused where the text has moved on or its places are past the end");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         const U32               v        = version(doc);
-        ensure("made", checking.applyFix(doc, fix("Rename it", 0, 8, 13, "total"), v));
-        ensure_equals("in the text", doc.editor->document().line(0), std::string("integer total;"));
-        ensure_equals("one step", doc.editor->undoJournal().undoLabel(), std::string("fix"));
-        ensure("said, checked again", services.statuses.back() == "Rename it" && doc.check->analysisDue == 1.0);
+        UNSCOPED_INFO("made");
+        CHECK(checking.applyFix(doc, fix("Rename it", 0, 8, 13, "total"), v));
+        UNSCOPED_INFO("in the text");
+        CHECK(doc.editor->document().line(0) == std::string("integer total;"));
+        UNSCOPED_INFO("one step");
+        CHECK(doc.editor->undoJournal().undoLabel() == std::string("fix"));
+        {
+            INFO("said, checked again");
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(services.statuses.back() == "Rename it");
+            CHECK(doc.check->analysisDue == 1.0);
+        }
         doc.check->analysisDue = 0.0;
-        ensure("moved on: refused", !checking.applyFix(doc, fix("Again", 0, 8, 13, "sum"), v));
-        ensure("said, checked again", services.statuses.back() == "FixStale" && services.statusFailures.back() &&
-               doc.check->analysisDue == 1.0);
-        ensure("past the end: refused", !checking.applyFix(doc, fix("Far", 40, 0, 1, "x"), version(doc)));
+        UNSCOPED_INFO("moved on: refused");
+        CHECK_FALSE(checking.applyFix(doc, fix("Again", 0, 8, 13, "sum"), v));
+        {
+            INFO("said, checked again");
+            CHECK(services.statuses.back() == "FixStale");
+            CHECK(services.statusFailures.back());
+            CHECK(doc.check->analysisDue == 1.0);
+        }
+        UNSCOPED_INFO("past the end: refused");
+        CHECK_FALSE(checking.applyFix(doc, fix("Far", 40, 0, 1, "x"), version(doc)));
         ALScriptFix refactor = fix("Extract", 0, 0, 7, "float");
         refactor.kind        = ALScriptFix::Kind::Refactor;
-        ensure("a refactor", checking.applyFix(doc, refactor, version(doc)) && doc.editor->undoJournal().undoLabel() == "refactor");
+        {
+            INFO("a refactor");
+            CHECK(checking.applyFix(doc, refactor, version(doc)));
+            CHECK(doc.editor->undoJournal().undoLabel() == "refactor");
+        }
         doc.modifiable = false;
-        ensure("not to be changed: refused", !checking.applyFix(doc, fix("No", 0, 0, 1, "x"), version(doc)));
+        UNSCOPED_INFO("not to be changed: refused");
+        CHECK_FALSE(checking.applyFix(doc, fix("No", 0, 0, 1, "x"), version(doc)));
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<9>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: Fix All waits for a check and asks before making many fixes in one step", "[alscriptstudiochecking]")
     {
-        set_test_name("Fix All: after the check where the text is not checked yet, one made at once, many asked first and made as one step");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         checking.askFixAll(doc, Doc::FixPick{});
-        ensure("not checked: checked first", doc.check->fixAllAfterCheck.has_value() && services.statuses.back() == "FixChecking [NAME]=a");
+        {
+            INFO("not checked: checked first");
+            REQUIRE(doc.check->fixAllAfterCheck.has_value());
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(services.statuses.back() == "FixChecking [NAME]=a");
+        }
         checking.pump(1.0);
         ALScriptProblem one = problem(0, "one");
         one.fixes           = { fix("First", 0, 0, 7, "float") };
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer(doc, { one }));
-        ensure("then made", doc.editor->document().line(0) == "float count;" && !doc.check->fixAllAfterCheck);
+        {
+            INFO("then made");
+            CHECK(doc.editor->document().line(0) == "float count;");
+            REQUIRE_FALSE(doc.check->fixAllAfterCheck);
+        }
 
         checking.pump(1.0);
         ALScriptProblem two = problem(3, "two");
@@ -829,53 +1021,80 @@ namespace tut
         one.fixes             = { fix("First", 0, 0, 5, "integer") };
         studio.asks.back().answered(answer(doc, { one, two, risky }));
         checking.askFixAll(doc, Doc::FixPick{});
-        ensure("asked", (bool)studio.confirm && studio.confirmed["FIXES"].asString() == "Fixes [COUNT]=2");
-        ensure("with what is left", studio.confirmed["LEFT"].asString() == " FixesLeft [COUNT]=1");
+        {
+            INFO("asked");
+            REQUIRE((bool)studio.confirm);
+            CHECK(studio.confirmed["FIXES"].asString() == "Fixes [COUNT]=2");
+        }
+        UNSCOPED_INFO("with what is left");
+        CHECK(studio.confirmed["LEFT"].asString() == " FixesLeft [COUNT]=1");
         studio.confirm();
-        ensure("made", doc.editor->document().line(0) == "integer count;" &&
-               doc.editor->document().line(3) == "    touch_start() { count = 1; }");
-        ensure("as one step", doc.editor->undoJournal().undoLabel() == "fix" && services.statuses.back() == "FixesMade [COUNT]=2");
+        {
+            INFO("made");
+            CHECK(doc.editor->document().line(0) == "integer count;");
+            CHECK(doc.editor->document().line(3) == "    touch_start() { count = 1; }");
+        }
+        {
+            INFO("as one step");
+            CHECK(doc.editor->undoJournal().undoLabel() == "fix");
+            CHECK(services.statuses.back() == "FixesMade [COUNT]=2");
+        }
         checking.pump(1.0);
         studio.asks.back().answered(answer(doc));
         checking.askFixAll(doc, Doc::FixPick{});
-        ensure_equals("none", services.statuses.back(), std::string("FixNone"));
+        CHECK(services.statuses.back() == std::string("FixNone"));
         unit.reset();
         studio.confirm();
-        ensure("gone: nothing", doc.editor->document().line(0) == "integer count;");
+        UNSCOPED_INFO("gone: nothing");
+        CHECK(doc.editor->document().line(0) == "integer count;");
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<10>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: fixesOn lists a line's fixes only for the text they were made in", "[alscriptstudiochecking]")
     {
-        set_test_name("a line's fixes as the editor lists them, of the text they were made in; and the problem a value is");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         ALScriptProblem         one      = problem(0, "one");
         one.fixes                        = { fix("First", 0, 0, 7, "float") };
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer(doc, { one, problem(2, "two") }));
-        ensure("asked for, made with the next frame", studio.waiting.count("a") == 1 && doc.shown().empty());
+        {
+            INFO("asked for, made with the next frame");
+            REQUIRE(studio.waiting.count("a") == 1);
+            REQUIRE(doc.shown().empty());
+        }
         std::vector<ALCodeEditor::Fix> fixes;
         checking.fixesOn(doc, 0, fixes);
-        ensure("made first: one", studio.waiting.empty() && fixes.size() == 1 && fixes[0].title == "First" &&
-               fixes[0].edits[0].second == "float");
+        {
+            INFO("made first: one");
+            REQUIRE(studio.waiting.empty());
+            REQUIRE(fixes.size() == 1);
+            CHECK(fixes[0].title == "First");
+            REQUIRE_FALSE(fixes[0].edits.empty());
+            CHECK(fixes[0].edits[0].second == "float");
+        }
         const Doc::Shown* shown = checking.shownOf(fixes[0].value);
-        ensure("its problem", shown && shown->message == "one");
+        {
+            INFO("its problem");
+            REQUIRE(shown);
+            CHECK(shown->message == "one");
+        }
         fixes.clear();
         checking.fixesOn(doc, 2, fixes);
-        ensure("none on another line", fixes.empty());
+        UNSCOPED_INFO("none on another line");
+        REQUIRE(fixes.empty());
         doc.editor->insertText("x");
         checking.fixesOn(doc, 0, fixes);
-        ensure("typed in since: none", fixes.empty());
+        UNSCOPED_INFO("typed in since: none");
+        REQUIRE(fixes.empty());
         LLSD gone;
         gone["doc"] = "b";
-        ensure("another tab's: none", !checking.shownOf(gone));
+        UNSCOPED_INFO("another tab's: none");
+        REQUIRE_FALSE(checking.shownOf(gone));
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<11>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: changed preprocessor settings re-expand every tab a moment later", "[alscriptstudiochecking]")
     {
-        set_test_name("the preprocessor's settings changed: a moment on, every tab expanded afresh, run for a save, taught its words, checked");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         Doc&                    lua      = tab("b");
@@ -886,25 +1105,40 @@ namespace tut
         checking.settingsChanged(false, 10.0);
         checking.settingsChanged(true, 10.1);
         checking.pump(10.2);
-        ensure("not yet", doc.expanded.valid);
+        UNSCOPED_INFO("not yet");
+        CHECK(doc.expanded.valid);
         checking.pump(10.1 + 0.35);
-        ensure("afresh", !doc.expanded.valid && !doc.weighing->sent);
-        ensure_equals("run for a save", joined(studio.told), std::string("run a, run b"));
-        ensure("checked", doc.check->analysisDue == 0.0 && expansions.size() == 2);
+        {
+            INFO("afresh");
+            CHECK_FALSE(doc.expanded.valid);
+            CHECK_FALSE(doc.weighing->sent);
+        }
+        UNSCOPED_INFO("run for a save");
+        CHECK(joined(studio.told) == std::string("run a, run b"));
+        {
+            INFO("checked");
+            CHECK(doc.check->analysisDue == 0.0);
+            REQUIRE(expansions.size() == 2);
+        }
         studio.told.clear();
         checking.pump(20.0);
-        ensure("once", studio.told.empty());
+        UNSCOPED_INFO("once");
+        REQUIRE(studio.told.empty());
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<12>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: refactors reaching past the text are dropped and other answers handed on", "[alscriptstudiochecking]")
     {
-        set_test_name("refactors offered at the caret, those reaching past the text dropped; other answers handed on or given the editor");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         checking.ask(doc, Kind::Actions, ALTextPos(0, 8), ALTextPos(0, 13));
-        ensure("a stretch", studio.asks[0].request.endColumn == 13);
-        ensure("kept, to offer them over", doc.check->actionsAsked.begin == ALTextPos(0, 8) && doc.check->actionsAsked.end == ALTextPos(0, 13));
+        REQUIRE(studio.asks.size() == size_t(1));
+        UNSCOPED_INFO("a stretch");
+        CHECK(studio.asks[0].request.endColumn == 13);
+        {
+            INFO("kept, to offer them over");
+            CHECK(doc.check->actionsAsked.begin == ALTextPos(0, 8));
+            CHECK(doc.check->actionsAsked.end == ALTextPos(0, 13));
+        }
         ALScriptAnalysis::Result result;
         result.kind    = Kind::Actions;
         result.id      = "a";
@@ -916,12 +1150,17 @@ namespace tut
         straddle.edits[0].endLine = 9;
         result.actions       = { inside, beyond, straddle };
         studio.asks[0].answered(result);
-        ensure("kept",
-               doc.check->actions.size() == 1 && doc.check->actions[0].title == "Rename" && doc.check->actionsVersion == version(doc));
+        {
+            INFO("kept");
+            REQUIRE(doc.check->actions.size() == 1);
+            CHECK(doc.check->actions[0].title == "Rename");
+            CHECK(doc.check->actionsVersion == version(doc));
+        }
         result.version = version(doc) + 1;
         result.actions = { beyond };
         studio.asks[0].answered(result);
-        ensure("of another text: dropped", doc.check->actions.size() == 1);
+        UNSCOPED_INFO("of another text: dropped");
+        REQUIRE(doc.check->actions.size() == 1);
         checking.ask(doc, Kind::References, ALTextPos(0, 8), ALTextPos(0, 8));
         ALScriptAnalysis::Result refs;
         refs.kind    = Kind::References;
@@ -930,20 +1169,25 @@ namespace tut
         refs.line    = 0;
         refs.column  = 8;
         studio.asks.back().answered(refs);
-        ensure_equals("handed on", studio.told.back(), std::string("references a 0:8"));
+        REQUIRE_FALSE(studio.told.empty());
+        UNSCOPED_INFO("handed on");
+        CHECK(studio.told.back() == std::string("references a 0:8"));
         doc.language.compileTarget = "none";
         const size_t asks          = studio.asks.size();
         checking.ask(doc, Kind::Weigh, ALTextPos(), ALTextPos());
-        ensure("nothing to weigh for: not asked", studio.asks.size() == asks);
+        UNSCOPED_INFO("nothing to weigh for: not asked");
+        REQUIRE(studio.asks.size() == asks);
         doc.language.compileTarget = "mono";
         checking.ask(doc, Kind::Weigh, ALTextPos(), ALTextPos());
-        ensure("weighed for its targets", studio.asks.size() == asks + 1 && studio.asks.back().request.targets.size() == 1);
+        {
+            INFO("weighed for its targets");
+            REQUIRE(studio.asks.size() == asks + 1);
+            REQUIRE(studio.asks.back().request.targets.size() == 1);
+        }
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<13>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: one expansion at a time while typing and then one for the latest text", "[alscriptstudiochecking]")
     {
-        set_test_name("preprocessed, typed in while an expansion is out: one at a time, then one for the latest text, not one a key");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         preprocessing                    = true;
@@ -952,85 +1196,118 @@ namespace tut
         checking.ask(doc, Kind::Signature, ALTextPos(0, 2), ALTextPos(0, 2));
         doc.editor->insertText(" ");
         checking.ask(doc, Kind::Signature, ALTextPos(0, 3), ALTextPos(0, 3));
-        ensure_equals("one on its way, not one a key", expansions.size(), size_t(1));
+        UNSCOPED_INFO("one on its way, not one a key");
+        REQUIRE(expansions.size() == size_t(1));
         expansions[0].second(expansion(doc.editor->text()));
-        ensure_equals("the next, for the text as it is now", expansions.size(), size_t(2));
-        ensure("the latest question still waiting", doc.check->waiting.size() == 1 && doc.check->waiting[0].at == ALTextPos(0, 3) && studio.asks.empty());
+        UNSCOPED_INFO("the next, for the text as it is now");
+        REQUIRE(expansions.size() == size_t(2));
+        {
+            INFO("the latest question still waiting");
+            REQUIRE(doc.check->waiting.size() == 1);
+            CHECK(doc.check->waiting[0].at == ALTextPos(0, 3));
+            REQUIRE(studio.asks.empty());
+        }
         expansions[1].second(expansion(doc.editor->text()));
-        ensure_equals("then asked, once", studio.asks.size(), size_t(1));
-        ensure("of the latest", studio.asks[0].request.version == version(doc));
+        UNSCOPED_INFO("then asked, once");
+        REQUIRE(studio.asks.size() == size_t(1));
+        UNSCOPED_INFO("of the latest");
+        CHECK(studio.asks[0].request.version == version(doc));
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<14>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: the front tab is weighed with its check and a tab behind only checked", "[alscriptstudiochecking]")
     {
-        set_test_name("the tab in front weighed with its check, in the one job, and its weights handed on; a tab behind checked alone");
         ALScriptStudioChecking& checking = make();
         Doc&                    a        = tab("a");
         Doc&                    b        = tab("b");
         studio.front                     = "a";
         checking.ask(a, Kind::Check, ALTextPos(), ALTextPos());
         checking.ask(b, Kind::Check, ALTextPos(), ALTextPos());
-        ensure_equals("both asked", studio.asks.size(), size_t(2));
-        ensure("the front one with its targets", studio.asks[0].request.front && studio.asks[0].request.targets.size() == 1);
-        ensure("and noted as asked for", a.weighing->askedFor == version(a));
-        ensure("the other without", !studio.asks[1].request.front && studio.asks[1].request.targets.empty() && b.weighing->askedFor != version(b));
+        UNSCOPED_INFO("both asked");
+        REQUIRE(studio.asks.size() == size_t(2));
+        {
+            INFO("the front one with its targets");
+            CHECK(studio.asks[0].request.front);
+            REQUIRE(studio.asks[0].request.targets.size() == 1);
+        }
+        UNSCOPED_INFO("and noted as asked for");
+        CHECK(a.weighing->askedFor == version(a));
+        {
+            INFO("the other without");
+            CHECK_FALSE(studio.asks[1].request.front);
+            REQUIRE(studio.asks[1].request.targets.empty());
+            CHECK(b.weighing->askedFor != version(b));
+        }
         ALScriptAnalysis::Result weighed = answer(a, {});
         ALScriptWeight           weight;
         weight.target   = ALScriptWeight::Target::Mono;
         weight.total    = 100;
         weighed.weights = { weight };
         studio.asks[0].answered(weighed);
-        ensure_equals("its problems shown", joined(studio.told), std::string("problems a, outline a"));
-        ensure("its weights handed on with the check", a.weighing->weight && a.weighing->weight->total == 100);
+        UNSCOPED_INFO("its problems shown");
+        CHECK(joined(studio.told) == std::string("problems a, outline a"));
+        {
+            INFO("its weights handed on with the check");
+            REQUIRE(a.weighing->weight);
+            CHECK(a.weighing->weight->total == 100);
+        }
         studio.told.clear();
         studio.asks[1].answered(answer(b, {}));
-        ensure_equals("none for the other", joined(studio.told), std::string("problems b, outline b"));
+        UNSCOPED_INFO("none for the other");
+        CHECK(joined(studio.told) == std::string("problems b, outline b"));
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<15>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: relint refilters LSL's last check and rechecks SLua or edited tabs", "[alscriptstudiochecking]")
     {
-        set_test_name("the lints chosen again: an LSL tab's last check filtered afresh, nothing asked; an SLua tab, or a text since typed in, checked again");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         checking.schedule(doc, true);
         checking.pump(1.0);
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks[0].answered(answer(doc, { problem(0, "wrong"), problem(1, "unused", ALScriptProblem::Severity::Warning) }));
-        ensure_equals("both taken", doc.check->analysis.size(), size_t(2));
+        UNSCOPED_INFO("both taken");
+        REQUIRE(doc.check->analysis.size() == size_t(2));
         studio.told.clear();
         gWarningsOff = true;
         checking.relint(doc);
-        ensure_equals("nothing asked", studio.asks.size(), size_t(1));
-        ensure("the warning filtered out", doc.check->analysis.size() == 1 && doc.check->analysis[0].message == "wrong");
-        ensure_equals("and shown", joined(studio.told), std::string("problems a"));
+        UNSCOPED_INFO("nothing asked");
+        REQUIRE(studio.asks.size() == size_t(1));
+        {
+            INFO("the warning filtered out");
+            REQUIRE(doc.check->analysis.size() == 1);
+            CHECK(doc.check->analysis[0].message == "wrong");
+        }
+        UNSCOPED_INFO("and shown");
+        CHECK(joined(studio.told) == std::string("problems a"));
         gWarningsOff = false;
         checking.relint(doc);
-        ensure_equals("back again, from what the check said", doc.check->analysis.size(), size_t(2));
+        UNSCOPED_INFO("back again, from what the check said");
+        REQUIRE(doc.check->analysis.size() == size_t(2));
         doc.editor->insertText("x");
         checking.relint(doc);
         checking.pump(2.0);
-        ensure_equals("typed in since: checked again", studio.asks.size(), size_t(2));
+        UNSCOPED_INFO("typed in since: checked again");
+        REQUIRE(studio.asks.size() == size_t(2));
         Doc& lua          = tab("b");
         lua.language.lua  = true;
         const size_t asks = studio.asks.size();
         checking.relint(lua);
         checking.pump(3.0);
-        ensure_equals("SLua: checked again", studio.asks.size(), asks + 1);
+        UNSCOPED_INFO("SLua: checked again");
+        REQUIRE(studio.asks.size() == asks + 1);
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<16>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: SLua with requires is checked apart with its modules and its bundle", "[alscriptstudiochecking]")
     {
-        set_test_name("SLua with requires: the analyzers asked of the script apart, its modules and which require reaches which, the bundle to weigh; a module's problem in its file");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         doc.language.lua                 = true;
         doc.editor->setText("local util = require(\"util\")\nprint(util.x)\n");
         preprocessing = true;
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
-        ensure_equals("expanded", expansions.size(), size_t(1));
-        ensure("apart asked for", expansions[0].first.apart);
+        UNSCOPED_INFO("expanded");
+        REQUIRE(expansions.size() == size_t(1));
+        UNSCOPED_INFO("apart asked for");
+        CHECK(expansions[0].first.apart);
         ALPreprocessor::Result result;
         result.map.addFile("a", "object:a");
         result.map.addFile("util", "object:util");
@@ -1067,13 +1344,29 @@ namespace tut
         result.apart.modules.push_back(util);
         result.resolved.push_back({ "", "util", true, "object:util" });
         expansions[0].second(result);
-        ensure_equals("asked", studio.asks.size(), size_t(1));
+        UNSCOPED_INFO("asked");
+        REQUIRE(studio.asks.size() == size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
-        ensure("of the script apart", *asked.text == doc.editor->text());
-        ensure("with its module", asked.modules && asked.modules->modules.size() == 1 && asked.modules->modules[0].key == "object:util");
-        ensure("and which require reaches it",
-               asked.modules->reaches.size() == 1 && asked.modules->reaches[0].name == "util" && asked.modules->reaches[0].key == "object:util");
-        ensure("the bundle to weigh", asked.bundle && *asked.bundle == result.text);
+        REQUIRE(asked.text);
+        UNSCOPED_INFO("of the script apart");
+        CHECK(*asked.text == doc.editor->text());
+        {
+            INFO("with its module");
+            REQUIRE(asked.modules);
+            REQUIRE(asked.modules->modules.size() == 1);
+            CHECK(asked.modules->modules[0].key == "object:util");
+        }
+        {
+            INFO("and which require reaches it");
+            REQUIRE(asked.modules->reaches.size() == 1);
+            CHECK(asked.modules->reaches[0].name == "util");
+            CHECK(asked.modules->reaches[0].key == "object:util");
+        }
+        {
+            INFO("the bundle to weigh");
+            REQUIRE(asked.bundle);
+            CHECK(*asked.bundle == result.text);
+        }
         // What the checker said of the module, in the module's lines: in
         // its file, where its map puts it.
         ALScriptProblem in_module = problem(1, "wrong in util");
@@ -1085,14 +1378,14 @@ namespace tut
             mapped |= p.message == "wrong in util" && p.file == "object:util" && p.line == 11 && p.fixes.empty();
             own |= p.message == "wrong here" && p.file.empty() && p.line == 1;
         }
-        ensure("the module's, in its file's lines", mapped);
-        ensure("the script's own, in its", own);
+        UNSCOPED_INFO("the module's, in its file's lines");
+        CHECK(mapped);
+        UNSCOPED_INFO("the script's own, in its");
+        CHECK(own);
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<17>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: a name declared const is said to be const where it is inspected", "[alscriptstudiochecking]")
     {
-        set_test_name("a name declared const, which the analyzers read with the word taken off, is said to be const where it is inspected");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         preprocessing                    = true;
@@ -1100,7 +1393,11 @@ namespace tut
         // `count` declared const: in the expansion, a line down.
         ALPreprocessor::Result expanded = expansion(SCRIPT);
         expanded.consts                 = { { "count", 1, 8, false } };
+        REQUIRE(expansions.size() == size_t(1));
         expansions[0].second(expanded);
+        // The check, asked once the expansion came: what each inspect
+        // below is asked after.
+        REQUIRE(studio.asks.size() == size_t(1));
         const auto inspect = [&](S32 line, S32 column, const std::string& label) {
             checking.ask(doc, Kind::Inspect, ALTextPos(0, 8), ALTextPos(0, 8));
             ALScriptAnalysis::Result result = answer(doc);
@@ -1115,14 +1412,14 @@ namespace tut
             studio.asks.back().answered(result);
             return studio.labels.empty() ? std::string() : studio.labels.back();
         };
-        ensure_equals("said const", inspect(1, 8, "integer count"), std::string("const integer count"));
-        ensure_equals("another name is not", inspect(0, 8, "integer helper"), std::string("integer helper"));
+        UNSCOPED_INFO("said const");
+        CHECK(inspect(1, 8, "integer count") == std::string("const integer count"));
+        UNSCOPED_INFO("another name is not");
+        CHECK(inspect(0, 8, "integer helper") == std::string("integer helper"));
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<18>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: the front tab is checked when due and others one a frame oldest first", "[alscriptstudiochecking]")
     {
-        set_test_name("the tab in front checked as soon as it is due; the others one a frame, the one due longest first");
         ALScriptStudioChecking& checking = make();
         Doc&                    a        = tab("a");
         Doc&                    b        = tab("b");
@@ -1138,21 +1435,26 @@ namespace tut
         {
             asked += one.request.id;
         }
-        ensure_equals("in front, and the one due longest", asked, std::string("ca"));
+        UNSCOPED_INFO("in front, and the one due longest");
+        CHECK(asked == std::string("ca"));
         checking.pump(1.0);
-        ensure("then the next", studio.asks.size() == 3 && studio.asks[2].request.id == "b");
+        {
+            INFO("then the next");
+            REQUIRE(studio.asks.size() == 3);
+            CHECK(studio.asks[2].request.id == "b");
+        }
         checking.pump(1.0);
-        ensure_equals("and none again", studio.asks.size(), size_t(3));
+        UNSCOPED_INFO("and none again");
+        REQUIRE(studio.asks.size() == size_t(3));
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<19>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: the inspector reuses the tip's answer for the same word and text", "[alscriptstudiochecking]")
     {
-        set_test_name("the tip and the inspector ask the same question: the second of a word, as the text stands, told what the first was");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         checking.ask(doc, Kind::Hover, ALTextPos(0, 8), ALTextPos(0, 8));
-        ensure_equals("the tip asks", studio.asks.size(), size_t(1));
+        UNSCOPED_INFO("the tip asks");
+        REQUIRE(studio.asks.size() == size_t(1));
         ALScriptAnalysis::Result said;
         said.kind        = Kind::Hover;
         said.id          = "a";
@@ -1163,21 +1465,26 @@ namespace tut
         said.hover.label = "integer count";
         studio.asks[0].answered(said);
         checking.ask(doc, Kind::Inspect, ALTextPos(0, 10), ALTextPos(0, 10));
-        ensure_equals("the inspector, of the same word: not asked", studio.asks.size(), size_t(1));
-        ensure_equals("but told", studio.told.back(), std::string("inspect a 0:10"));
-        ensure_equals("what the tip was", studio.labels.back(), std::string("integer count"));
+        UNSCOPED_INFO("the inspector, of the same word: not asked");
+        REQUIRE(studio.asks.size() == size_t(1));
+        REQUIRE_FALSE(studio.told.empty());
+        UNSCOPED_INFO("but told");
+        CHECK(studio.told.back() == std::string("inspect a 0:10"));
+        REQUIRE_FALSE(studio.labels.empty());
+        UNSCOPED_INFO("what the tip was");
+        CHECK(studio.labels.back() == std::string("integer count"));
         checking.ask(doc, Kind::Inspect, ALTextPos(1, 0), ALTextPos(1, 0));
-        ensure_equals("another word: asked", studio.asks.size(), size_t(2));
+        UNSCOPED_INFO("another word: asked");
+        REQUIRE(studio.asks.size() == size_t(2));
         doc.editor->setCaret(ALTextPos(0, 0));
         doc.editor->insertText(" ");
         checking.ask(doc, Kind::Inspect, ALTextPos(0, 10), ALTextPos(0, 10));
-        ensure_equals("typed in since: asked", studio.asks.size(), size_t(3));
+        UNSCOPED_INFO("typed in since: asked");
+        REQUIRE(studio.asks.size() == size_t(3));
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<20>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: a notecard is checked as scripts read it and outlined only as JSON", "[alscriptstudiochecking]")
     {
-        set_test_name("a notecard checked as scripts read it, with no analyzer asked: its items making every line EOF, a line past 1024 bytes; outlined as JSON only");
         ALScriptStudioChecking& checking = make();
         const std::string long_line(1030, 'x');
         Doc& card    = tab("card", "one " + ALNotecardItems::charOf(0) + "\n" + long_line + "\n");
@@ -1189,33 +1496,48 @@ namespace tut
         card.items->loaded({ LLPointer<LLInventoryItem>(new LLInventoryItem()) });
         checking.schedule(card, true);
         checking.pump(2.0);
-        ensure("no analyzer asked", studio.asks.empty());
-        ensure_equals("two", card.check->analysis.size(), size_t(2));
-        ensure("the items, at the first", card.check->analysis[0].line == 0 && card.check->analysis[0].column == 4 &&
-                                              card.check->analysis[0].severity == ALScriptProblem::Severity::Warning);
-        ensure("the long line, from where it is cut", card.check->analysis[1].line == 1 && card.check->analysis[1].column == 1024 &&
-                                                          card.check->analysis[1].endColumn == 1030);
-        ensure("no outline as plain text", card.outline.empty());
+        UNSCOPED_INFO("no analyzer asked");
+        REQUIRE(studio.asks.empty());
+        REQUIRE(card.check->analysis.size() == size_t(2));
+        {
+            INFO("the items, at the first");
+            CHECK(card.check->analysis[0].line == 0);
+            CHECK(card.check->analysis[0].column == 4);
+            CHECK(card.check->analysis[0].severity == ALScriptProblem::Severity::Warning);
+        }
+        {
+            INFO("the long line, from where it is cut");
+            CHECK(card.check->analysis[1].line == 1);
+            CHECK(card.check->analysis[1].column == 1024);
+            CHECK(card.check->analysis[1].endColumn == 1030);
+        }
+        UNSCOPED_INFO("no outline as plain text");
+        REQUIRE(card.outline.empty());
 
         card.items.reset();
         card.grammar = "json";
         card.editor->setText("{ \"door\": { \"speed\": 2 } }\n");
         checking.schedule(card, true);
         checking.pump(3.0);
-        ensure("nothing to say", card.check->analysis.empty());
-        ensure("its keys outlined", card.outline.size() == 2 && card.outline[0].name == "door" && card.outline[1].name == "speed");
+        UNSCOPED_INFO("nothing to say");
+        REQUIRE(card.check->analysis.empty());
+        {
+            INFO("its keys outlined");
+            REQUIRE(card.outline.size() == 2);
+            CHECK(card.outline[0].name == "door");
+            CHECK(card.outline[1].name == "speed");
+        }
 
         Doc& file     = tab("disk", "{ \"a\": 1 }\n");
         file.file     = "/tmp/a.json";
         file.notecard = true;
         checking.schedule(file, true);
-        ensure("a text file on disk is not checked", file.check->analysisDue <= 0.0);
+        UNSCOPED_INFO("a text file on disk is not checked");
+        CHECK(file.check->analysisDue <= 0.0);
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<21>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: Fix All previewed beside the text applies as one step unless it changed", "[alscriptstudiochecking]")
     {
-        set_test_name("Fix All previewed: the text after beside the text now, Apply offered, made as one step; not over a text changed since");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         // Asked before the check, asked again once it has answered.
@@ -1226,18 +1548,35 @@ namespace tut
         ALScriptProblem two = problem(3, "two");
         two.fixes           = { fix("Second", 3, 4, 15, "touch_start") };
         const std::string before = doc.editor->wholeText();
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks.back().answered(answer(doc, { one, two }));
-        ensure("asked, with a preview", (bool)studio.preview);
+        UNSCOPED_INFO("asked, with a preview");
+        REQUIRE((bool)studio.preview);
         studio.preview();
-        ensure("nothing made yet", doc.editor->wholeText() == before);
+        UNSCOPED_INFO("nothing made yet");
+        CHECK(doc.editor->wholeText() == before);
+        REQUIRE_FALSE(studio.told.empty());
         const std::string& compared = studio.told.back();
-        ensure("the text now beside it after" + compared,
-               compared.rfind("compare a: " + before + " | float count;", 0) == 0 && compared.find("    touch_start() { count = 1; }") != std::string::npos &&
-                   compared.find("(CompareNow | FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos);
-        ensure("Apply offered", services.reports.back().actions == Names{ "apply_fixes" } && services.reports.back().doc == "a");
-        ensure("made", checking.applyPreviewed(doc) && doc.editor->document().line(0) == "float count;" &&
-                           doc.editor->undoJournal().undoLabel() == "fix");
-        ensure("once", !checking.applyPreviewed(doc));
+        {
+            INFO("the text now beside it after: " << compared);
+            CHECK(compared.rfind("compare a: " + before + " | float count;", 0) == 0);
+            REQUIRE(compared.find("    touch_start() { count = 1; }") != std::string::npos);
+            REQUIRE(compared.find("(CompareNow | FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos);
+        }
+        {
+            INFO("Apply offered");
+            REQUIRE_FALSE(services.reports.empty());
+            CHECK(services.reports.back().actions == Names{ "apply_fixes" });
+            CHECK(services.reports.back().doc == "a");
+        }
+        {
+            INFO("made");
+            CHECK(checking.applyPreviewed(doc));
+            CHECK(doc.editor->document().line(0) == "float count;");
+            CHECK(doc.editor->undoJournal().undoLabel() == "fix");
+        }
+        UNSCOPED_INFO("once");
+        CHECK_FALSE(checking.applyPreviewed(doc));
 
         checking.pump(1.0);
         ALScriptProblem three = problem(0, "three");
@@ -1247,18 +1586,25 @@ namespace tut
         studio.preview = nullptr;
         studio.asks.back().answered(answer(doc, { three, four }));
         checking.askFixAll(doc, Doc::FixPick{});
-        ensure("asked again", (bool)studio.preview);
+        UNSCOPED_INFO("asked again");
+        REQUIRE((bool)studio.preview);
         studio.preview();
         doc.editor->setText("default {}\n");
-        ensure("changed since: not made", !checking.applyPreviewed(doc) && doc.editor->wholeText() == "default {}\n");
-        ensure("said", services.statuses.back() == "FixAllChangedSince" && services.statusFailures.back());
+        {
+            INFO("changed since: not made");
+            CHECK_FALSE(checking.applyPreviewed(doc));
+            CHECK(doc.editor->wholeText() == "default {}\n");
+        }
+        {
+            INFO("said");
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(services.statuses.back() == "FixAllChangedSince");
+            CHECK(services.statusFailures.back());
+        }
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<22>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: each LSL comment in an SLua script is a note to see to and none in LSL", "[alscriptstudiochecking]")
     {
-        set_test_name("each LSL comment in an SLua script a note to see to, before the check's own: Done, and the lint's fix of the line it "
-                      "stands over with it; read again, not twice; none in LSL");
         ALScriptStudioChecking& checking = make();
         const std::string       text     = "local s = \"abc\"\n"
                                            "-- LSL: llcompat.GetSubString takes indexes from 0, as LSL did; ll.GetSubString takes them from 1.\n"
@@ -1273,33 +1619,54 @@ namespace tut
         compat.source          = ALScriptProblem::Source::Lint;
         compat.code            = "SlCompatCall";
         compat.fixes           = { fix("Write it ll.GetSubString(s, 1, 3)", 2, 6, 36, "ll.GetSubString(s, 1, 3)") };
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks.back().answered(answer(doc, { compat }));
         const ALScriptProblems& said = doc.check->analysis;
-        ensure_equals("two notes, then the lint", said.size(), size_t(3));
-        ensure("the notes first", said[0].key == "SluaNote" && said[0].line == 1 && said[1].key == "SluaNote" && said[1].line == 3 &&
-                                      said[2].code == "SlCompatCall");
-        ensure("the lint's fix with the note's", said[0].fixes.size() == 2 && said[0].fixes[0].preferred &&
-                                                     said[0].fixes[0].title == "Write it ll.GetSubString(s, 1, 3), and take the note out");
-        ensure("the other: Done alone", said[1].fixes.size() == 1 && !said[1].fixes[0].preferred);
-        ensure("made", checking.applyFix(doc, said[0].fixes[0], version(doc)) &&
-                           doc.editor->wholeText() == "local s = \"abc\"\nprint(ll.GetSubString(s, 1, 3))\n-- LSL: something else\nprint(s)\n");
+        UNSCOPED_INFO("two notes, then the lint");
+        REQUIRE(said.size() == size_t(3));
+        {
+            INFO("the notes first");
+            CHECK(said[0].key == "SluaNote");
+            CHECK(said[0].line == 1);
+            CHECK(said[1].key == "SluaNote");
+            CHECK(said[1].line == 3);
+            CHECK(said[2].code == "SlCompatCall");
+        }
+        {
+            INFO("the lint's fix with the note's");
+            REQUIRE(said[0].fixes.size() == 2);
+            CHECK(said[0].fixes[0].preferred);
+            CHECK(said[0].fixes[0].title == "Write it ll.GetSubString(s, 1, 3), and take the note out");
+        }
+        {
+            INFO("the other: Done alone");
+            REQUIRE(said[1].fixes.size() == 1);
+            CHECK_FALSE(said[1].fixes[0].preferred);
+        }
+        {
+            INFO("made");
+            CHECK(checking.applyFix(doc, said[0].fixes[0], version(doc)));
+            CHECK(doc.editor->wholeText() == "local s = \"abc\"\nprint(ll.GetSubString(s, 1, 3))\n-- LSL: something else\nprint(s)\n");
+        }
 
         checking.pump(2.0);
         studio.asks.back().answered(answer(doc));
-        ensure("read again: the one left, once", doc.check->analysis.size() == 1 && doc.check->analysis[0].line == 2);
+        {
+            INFO("read again: the one left, once");
+            REQUIRE(doc.check->analysis.size() == 1);
+            CHECK(doc.check->analysis[0].line == 2);
+        }
 
         Doc& lsl = tab("b", "// -- LSL: not SLua\ndefault { state_entry() {} }\n");
         checking.schedule(lsl, true);
         checking.pump(3.0);
         studio.asks.back().answered(answer(lsl));
-        ensure("none in LSL", lsl.check->analysis.empty());
+        UNSCOPED_INFO("none in LSL");
+        REQUIRE(lsl.check->analysis.empty());
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<23>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: Fix All of what LSL left previews when unsafe and asks when all safe", "[alscriptstudiochecking]")
     {
-        set_test_name("what is left from LSL fixed: every preferred fix of it, not another problem's; seen first where any could change "
-                      "what the script does, asked as Fix All asks where none could");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         doc.language.lua                 = true;
@@ -1315,17 +1682,29 @@ namespace tut
         const ALScriptProblem zero   = lint(0, "SlZeroIndex", fix("First", 0, 0, 7, "float", false));
         const ALScriptProblem paren  = lint(3, "SlParenCondition", fix("Second", 3, 4, 15, "touch_start", true));
         const ALScriptProblem shadow = lint(1, "LocalShadow", fix("Third", 1, 0, 1, "x", true));
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks.back().answered(answer(doc, { zero, paren, shadow }));
         Doc::FixPick pick;
         pick.migration = true;
         studio.preview = nullptr;
         checking.askFixAll(doc, pick);
-        ensure("not asked: seen", !studio.preview);
+        UNSCOPED_INFO("not asked: seen");
+        REQUIRE_FALSE(studio.preview);
+        REQUIRE_FALSE(studio.told.empty());
         const std::string& compared = studio.told.back();
-        ensure("the two from LSL, not the other: " + compared, compared.find("FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos &&
-                                                                   compared.find("float count;") != std::string::npos);
-        ensure("Apply offered", services.reports.back().actions == Names{ "apply_fixes" });
-        ensure("made", checking.applyPreviewed(doc) && doc.editor->document().line(0) == "float count;");
+        {
+            INFO("the two from LSL, not the other: " << compared);
+            REQUIRE(compared.find("FixAllAfter [FIXES]=Fixes [COUNT]=2") != std::string::npos);
+            REQUIRE(compared.find("float count;") != std::string::npos);
+        }
+        REQUIRE_FALSE(services.reports.empty());
+        UNSCOPED_INFO("Apply offered");
+        CHECK(services.reports.back().actions == Names{ "apply_fixes" });
+        {
+            INFO("made");
+            CHECK(checking.applyPreviewed(doc));
+            CHECK(doc.editor->document().line(0) == "float count;");
+        }
 
         Doc& safe       = tab("b");
         safe.language.lua = true;
@@ -1336,13 +1715,12 @@ namespace tut
         studio.asks.back().answered(answer(safe, { first, second }));
         studio.preview = nullptr;
         checking.askFixAll(safe, pick);
-        ensure("all safe: asked as Fix All asks", (bool)studio.preview);
+        UNSCOPED_INFO("all safe: asked as Fix All asks");
+        REQUIRE((bool)studio.preview);
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<24>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: an unsafe fix of what LSL left is previewed and made by Apply", "[alscriptstudiochecking]")
     {
-        set_test_name("what is left from LSL put right where a fix could change the script: previewed beside the text, and made by Apply");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a", "local t = {}\nif #t then print(1) end\n");
         doc.language.lua                 = true;
@@ -1352,22 +1730,35 @@ namespace tut
         truth.source          = ALScriptProblem::Source::Lint;
         truth.code            = "SlNumberTruth";
         truth.fixes           = { fix("Compare it: #t ~= 0", 1, 3, 5, "#t ~= 0", false) };
+        REQUIRE(studio.asks.size() == size_t(1));
         studio.asks.back().answered(answer(doc, { truth }));
         Doc::FixPick pick;
         pick.migration = true;
         checking.askFixAll(doc, pick);
-        ensure("previewed, not asked", !studio.preview && studio.told.back().rfind("compare a: ", 0) == 0);
-        ensure("Apply offered", services.reports.back().actions == Names{ "apply_fixes" });
-        ensure("made by Apply", checking.applyPreviewed(doc));
-        ensure_equals("put right", doc.editor->document().line(1), std::string("if #t ~= 0 then print(1) end"));
-        ensure("Apply again: nothing waiting, and said", !checking.applyPreviewed(doc) && services.statuses.back() == "FixAllNotPreviewed" &&
-                                                            services.statusFailures.back());
+        {
+            INFO("previewed, not asked");
+            REQUIRE_FALSE(studio.preview);
+            REQUIRE_FALSE(studio.told.empty());
+            CHECK(studio.told.back().rfind("compare a: ", 0) == 0);
+        }
+        REQUIRE_FALSE(services.reports.empty());
+        UNSCOPED_INFO("Apply offered");
+        CHECK(services.reports.back().actions == Names{ "apply_fixes" });
+        UNSCOPED_INFO("made by Apply");
+        CHECK(checking.applyPreviewed(doc));
+        UNSCOPED_INFO("put right");
+        CHECK(doc.editor->document().line(1) == std::string("if #t ~= 0 then print(1) end"));
+        {
+            INFO("Apply again: nothing waiting, and said");
+            CHECK_FALSE(checking.applyPreviewed(doc));
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(services.statuses.back() == "FixAllNotPreviewed");
+            CHECK(services.statusFailures.back());
+        }
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<25>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: a require alias fix names its folder only once its edit takes", "[alscriptstudiochecking]")
     {
-        set_test_name("a fix that moves a require onto a SLua alias of the studio's own names the folder once its edit is sure to take, and is refused with nothing changed where the name is another folder's");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         std::vector<std::string> named;
@@ -1379,9 +1770,12 @@ namespace tut
         ALScriptFix moved = fix("Name /inc as the SLua alias @inc, and require it as '@inc/util'", 0, 8, 13, "total", false);
         moved.key         = "ScriptFixRequireAlias";
         moved.args        = { "@inc/util", "inc", "/inc" };
-        ensure("made", checking.applyFix(doc, moved, version(doc)));
-        ensure("the folder named", named == std::vector<std::string>{ "inc=/inc" });
-        ensure_equals("and the text", doc.editor->document().line(0), std::string("integer total;"));
+        UNSCOPED_INFO("made");
+        CHECK(checking.applyFix(doc, moved, version(doc)));
+        UNSCOPED_INFO("the folder named");
+        CHECK(named == std::vector<std::string>{ "inc=/inc" });
+        UNSCOPED_INFO("and the text");
+        CHECK(doc.editor->document().line(0) == std::string("integer total;"));
         ALScriptFix taken = fix("Name /lib as the SLua alias @inc, and require it as '@inc/util'", 0, 8, 13, "other", false);
         taken.key         = "ScriptFixRequireAlias";
         taken.args        = { "@inc/util", "inc", "/lib" };
@@ -1389,34 +1783,51 @@ namespace tut
         // change, or that it would take past its limit.
         named.clear();
         doc.editor->setReadOnly(true);
-        ensure("not made", !checking.applyFix(doc, taken, version(doc)));
-        ensure("and nothing named", named.empty());
+        UNSCOPED_INFO("not made");
+        CHECK_FALSE(checking.applyFix(doc, taken, version(doc)));
+        UNSCOPED_INFO("and nothing named");
+        REQUIRE(named.empty());
         doc.editor->setReadOnly(false);
         ALScriptFix longer   = taken;
         longer.edits[0].text = "a_name_longer_than_the_text_has_room_for";
         doc.editor->setMaxBytes(doc.editor->document().byteCount());
-        ensure("past the limit: not made", !checking.applyFix(doc, longer, version(doc)));
-        ensure("nor named", named.empty());
+        UNSCOPED_INFO("past the limit: not made");
+        CHECK_FALSE(checking.applyFix(doc, longer, version(doc)));
+        UNSCOPED_INFO("nor named");
+        REQUIRE(named.empty());
         doc.editor->setMaxBytes(0);
         free             = false;
         const U32 was_at = version(doc);
-        ensure("the name another folder's: refused", !checking.applyFix(doc, taken, version(doc)));
-        ensure("asked", named == std::vector<std::string>{ "inc=/lib" });
-        ensure("said", services.statuses.back().find("AliasTaken [NAME]=inc") == 0 && services.statusFailures.back());
-        ensure("nothing changed", version(doc) == was_at && doc.editor->document().line(0) == "integer total;");
-        ensure("nothing to redo", !doc.editor->undoJournal().canRedo());
+        UNSCOPED_INFO("the name another folder's: refused");
+        CHECK_FALSE(checking.applyFix(doc, taken, version(doc)));
+        UNSCOPED_INFO("asked");
+        CHECK(named == std::vector<std::string>{ "inc=/lib" });
+        {
+            INFO("said");
+            REQUIRE_FALSE(services.statuses.empty());
+            CHECK(services.statuses.back().find("AliasTaken [NAME]=inc") == 0);
+            CHECK(services.statusFailures.back());
+        }
+        {
+            INFO("nothing changed");
+            CHECK(version(doc) == was_at);
+            CHECK(doc.editor->document().line(0) == "integer total;");
+        }
+        UNSCOPED_INFO("nothing to redo");
+        CHECK_FALSE(doc.editor->undoJournal().canRedo());
         ALScriptFix plain = fix("Require it as './util'", 0, 8, 13, "sum", false);
         plain.key         = "ScriptFixRequireAs";
         plain.args        = { "./util" };
         named.clear();
-        ensure("a plain one names nothing", checking.applyFix(doc, plain, version(doc)) && named.empty());
+        {
+            INFO("a plain one names nothing");
+            CHECK(checking.applyFix(doc, plain, version(doc)));
+            REQUIRE(named.empty());
+        }
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<26>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: an include's file keeps its old answer until relexed to its end", "[alscriptstudiochecking]")
     {
-        set_test_name("an include's file asked of again after an edit that changes how every line after it starts: what it was, while the text "
-                      "is lexed to its end a slice at a time, then what it is; a check sent of the text as it stands");
         ALScriptStudioChecking& checking = make();
         std::string             text;
         for (S32 i = 0; i < 3000; ++i)
@@ -1426,34 +1837,43 @@ namespace tut
         Doc& doc = tab("disk:/lib.lsl", text);
         doc.file = "/lib.lsl";
         doc.editor->setSyntax("lsl");
-        ensure("a fragment", checking.lslFragment(doc));
+        CHECK(checking.lslFragment(doc));
         ALSyntaxHighlighter& highlighter = doc.editor->highlighter();
         const S32            last        = doc.editor->document().lineCount() - 1;
 
         // A string opened at the top runs on to the end: every line after
         // it starts in it.
         doc.editor->document().insert(ALTextPos(0, 0), "\"");
-        ensure("asked again at once: a fragment", checking.lslFragment(doc));
+        UNSCOPED_INFO("asked again at once: a fragment");
+        CHECK(checking.lslFragment(doc));
         highlighter.tokens(last);
-        ensure("the text not lexed to its end for it: " + std::to_string(highlighter.lastLexed()) + " of " + std::to_string(last + 1) + " left",
-               highlighter.lastLexed() > last / 2);
-        ensure("nor kept for the text as it stands", doc.check->fragment->first != version(doc));
-        ensure("lexed to its end: what it is, kept", checking.lslFragment(doc) && doc.check->fragment->first == version(doc));
+        UNSCOPED_INFO("the text not lexed to its end for it: " << highlighter.lastLexed() << " of " << last + 1 << " left");
+        CHECK(highlighter.lastLexed() > last / 2);
+        REQUIRE(doc.check->fragment);
+        UNSCOPED_INFO("nor kept for the text as it stands");
+        CHECK(doc.check->fragment->first != version(doc));
+        {
+            INFO("lexed to its end: what it is, kept");
+            CHECK(checking.lslFragment(doc));
+            CHECK(doc.check->fragment->first == version(doc));
+        }
 
         // A state at the end of a text set whole: still lexed when the check
         // is asked, which sends it as it stands, with no state put after it.
         doc.editor->setText(text + "default\n{\n    state_entry() { }\n}\n");
         checking.lslFragment(doc);
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
-        ensure_equals("asked once", studio.asks.size(), size_t(1));
-        ensure("of the script as it stands", *studio.asks[0].request.text == doc.editor->text());
-        ensure("and a script now", !checking.lslFragment(doc));
+        UNSCOPED_INFO("asked once");
+        REQUIRE(studio.asks.size() == size_t(1));
+        REQUIRE(studio.asks[0].request.text);
+        UNSCOPED_INFO("of the script as it stands");
+        CHECK(*studio.asks[0].request.text == doc.editor->text());
+        UNSCOPED_INFO("and a script now");
+        CHECK_FALSE(checking.lslFragment(doc));
     }
 
-    template<> template<>
-    void alscriptstudiochecking_object::test<27>()
+    TEST_CASE_METHOD(alscriptstudiochecking_data, "alscriptstudiochecking: a require alias fix is held to the byte limit leaving out a composition", "[alscriptstudiochecking]")
     {
-        set_test_name("a fix that moves a require onto a SLua alias of the studio's own is held to the text's limit as its edit is, without a composition standing in the text");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         std::vector<std::string> named;
@@ -1466,19 +1886,25 @@ namespace tut
         ALCodeEditor& editor = *doc.editor;
         editor.setCaret(editor.document().end());
         editor.preeditor().updatePreedit("xyz", LLPreeditor::segment_lengths_t{ 3 }, LLPreeditor::standouts_t{ false }, 3);
-        ensure("composing", editor.hasPreedit());
+        UNSCOPED_INFO("composing");
+        CHECK(editor.hasPreedit());
         editor.setMaxBytes(SCRIPT.size() + 2);
 
         ALScriptFix longer = fix("Name /inc as the SLua alias @inc, and require it as '@inc/util'", 0, 8, 13, "counter_", false);
         longer.key         = "ScriptFixRequireAlias";
         longer.args        = { "@inc/util", "inc", "/inc" };
-        ensure("three more: past the limit, not made", !checking.applyFix(doc, longer, version(doc)));
-        ensure("nor named", named.empty());
+        UNSCOPED_INFO("three more: past the limit, not made");
+        CHECK_FALSE(checking.applyFix(doc, longer, version(doc)));
+        UNSCOPED_INFO("nor named");
+        REQUIRE(named.empty());
         ALScriptFix moved   = longer;
         moved.edits[0].text = "counter";
-        ensure("two more: made", checking.applyFix(doc, moved, version(doc)));
-        ensure("the folder named", named == std::vector<std::string>{ "inc=/inc" });
-        ensure_equals("and the text, the composition gone", editor.text(), "integer counter" + SCRIPT.substr(13));
+        UNSCOPED_INFO("two more: made");
+        CHECK(checking.applyFix(doc, moved, version(doc)));
+        UNSCOPED_INFO("the folder named");
+        CHECK(named == std::vector<std::string>{ "inc=/inc" });
+        UNSCOPED_INFO("and the text, the composition gone");
+        CHECK(editor.text() == "integer counter" + SCRIPT.substr(13));
         editor.setMaxBytes(0);
     }
 }

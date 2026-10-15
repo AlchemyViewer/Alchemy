@@ -57,6 +57,11 @@ float eyeDistance(float depth);
 // selectionAlphaF.glsl
 float faceAlpha(vec2 texcoord);
 bool isCutOut(float alpha);
+bool keepsCut();
+
+// selectionContrastF.glsl
+vec4 backdropColour(vec2 pixel, bool masked);
+vec3 contrastColour(vec3 colour, vec4 back);
 
 void main()
 {
@@ -70,7 +75,7 @@ void main()
         slope = fwidth(own);
     }
     float alpha = faceAlpha(wire_texcoord);
-    if (isCutOut(alpha))
+    if (isCutOut(alpha) && !keepsCut())
     {
         discard;
     }
@@ -98,5 +103,6 @@ void main()
     {
         discard;
     }
-    frag_color = vec4(colour.rgb, colour.a * coverage);
+    // Shifted from what lies behind the line, its own object and all, where the lines are shifted.
+    frag_color = vec4(contrastColour(colour.rgb, backdropColour(window_pos, false)), colour.a * coverage);
 }

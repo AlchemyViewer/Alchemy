@@ -21,7 +21,7 @@
 // (pacify clang)
 static std::ostream& operator<<(std::ostream& out, const std::set<std::string>& strset);
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 static std::string clog;
 static std::set<std::string> dlog;
@@ -106,9 +106,9 @@ private:
 } // anonymous namespace
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
     struct llheteromap_data
     {
@@ -118,15 +118,9 @@ namespace tut
             dlog.clear();
         }
     };
-    typedef test_group<llheteromap_data> llheteromap_group;
-    typedef llheteromap_group::object object;
-    llheteromap_group llheteromapgrp("llheteromap");
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(llheteromap_data, "llheteromap: obtain creates each type once and the map destroys them all", "[llheteromap]")
     {
-        set_test_name("create, get, delete");
-
         {
             LLHeteroMap map;
 
@@ -145,24 +139,24 @@ namespace tut
             {
                 // verify each instance
                 Chalk& chalk = map.obtain<Chalk>();
-                ensure_equals(chalk.name, "Chalk");
+                CHECK(chalk.name == "Chalk");
 
                 Cheese& cheese = map.obtain<Cheese>();
-                ensure_equals(cheese.name, "Cheese");
+                CHECK(cheese.name == "Cheese");
 
                 Chowdah& chowdah = map.obtain<Chowdah>();
-                ensure_equals(chowdah.name, "Chowdah");
+                CHECK(chowdah.name == "Chowdah");
             }
         } // destroy map
 
         // Chalk, Cheese and Chowdah should have been created in specific order
-        ensure_equals(clog, "aeo");
+        CHECK(clog == "aeo");
 
         // We don't care what order they're destroyed in, as long as each is
         // appropriately destroyed.
         std::set<std::string> dtorset;
         for (const char* cp = "aeo"; *cp; ++cp)
             dtorset.insert(std::string(1, *cp));
-        ensure_equals(dlog, dtorset);
+        CHECK(dlog == dtorset);
     }
-} // namespace tut
+} // anonymous namespace

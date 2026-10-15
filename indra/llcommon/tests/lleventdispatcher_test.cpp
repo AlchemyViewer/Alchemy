@@ -17,7 +17,8 @@
 // std headers
 // external library headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 #include "lleventfilter.h"
 #include "llsd.h"
 #include "llsdutil.h"
@@ -320,14 +321,14 @@ void freenb(NPARAMSb)
 } // anonymous namespace
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
-    static void ensure_has(const std::string& outer, const std::string& inner)
+    static void require_contains(const std::string& outer, const std::string& inner)
     {
-        ensure(stringize("'", outer, "' does not contain '", inner, "'"),
-               outer.find(inner) != std::string::npos);
+        CAPTURE(outer, inner);
+        REQUIRE(outer.find(inner) != std::string::npos);
     }
 
     template <typename CALLABLE>
@@ -335,7 +336,7 @@ namespace tut
     {
         std::string what =
             catch_what<LLEventDispatcher::DispatchError>(std::forward<CALLABLE>(func));
-        ensure_has(what, exc_frag);
+        require_contains(what, exc_frag);
         return what;
     }
 
@@ -383,8 +384,8 @@ namespace tut
             // first several params are required, last couple optional
             partial_offset(3)
         {
-            // This object is reconstructed for every test<n> method. But
-            // clear global variables every time too.
+            // This object is reconstructed for every test case. But clear
+            // global variables every time too.
             ::clear();
 
             const char* abs[] = { "a", "b" };
@@ -635,13 +636,11 @@ namespace tut
             DescMap forgotten(descs.begin(), descs.end());
             for (LLEventDispatcher::NameDesc nd: work)
             {
+                CAPTURE(nd.first);
                 DescMap::iterator found = forgotten.find(nd.first);
-                ensure(stringize("LLEventDispatcher records function '", nd.first,
-                                 "' we didn't enter"),
-                       found != forgotten.end());
-                ensure_equals(stringize("LLEventDispatcher desc '", nd.second,
-                                        "' doesn't match what we entered: '", found->second, "'"),
-                              nd.second, found->second);
+                UNSCOPED_INFO("LLEventDispatcher records a function we didn't enter");
+                REQUIRE(found != forgotten.end());
+                REQUIRE(nd.second == found->second);
                 // found in our map the name from LLEventDispatcher, good, erase
                 // our map entry
                 forgotten.erase(found);
@@ -656,21 +655,22 @@ namespace tut
                     out << delim << fme.first;
                     delim = ", ";
                 }
-                throw failure(out.str());
+                FAIL(out.str());
             }
         }
 
         Vars* varsfor(const std::string& name)
         {
+            CAPTURE(name);
             VarsMap::const_iterator found = funcvars.find(name);
-            ensure(stringize("No Vars* for ", name), found != funcvars.end());
-            ensure(stringize("NULL Vars* for ", name), found->second);
+            REQUIRE(found != funcvars.end());
+            REQUIRE(found->second);
             return found->second;
         }
 
         std::string call_exc(const std::string& func, const LLSD& args, const std::string& exc_frag)
         {
-            return tut::call_exc(
+            return ::call_exc(
                 [this, func, args]()
                 {
                     if (func.empty())
@@ -687,13 +687,14 @@ namespace tut
 
         void call_logerr(const std::string& func, const LLSD& args, const std::string& frag)
         {
-            tut::call_logerr([this, func, args](){ work(func, args); }, frag);
+            ::call_logerr([this, func, args](){ work(func, args); }, frag);
         }
 
         LLSD getMetadata(const std::string& name)
         {
+            CAPTURE(name);
             LLSD meta(work.getMetadata(name));
-            ensure(stringize("No metadata for ", name), meta.isDefined());
+            REQUIRE(meta.isDefined());
             return meta;
         }
 
@@ -711,29 +712,12 @@ namespace tut
             return map;
         }
 
-        // If I call this ensure_equals(), it blocks visibility of all other
-        // ensure_equals() overloads. Normally I could say 'using
-        // baseclass::ensure_equals;' and fix that, but I don't know what the
-        // base class is!
-        void ensure_llsd(const std::string& msg, const LLSD& actual, const LLSD& expected, U32 bits)
+        void require_llsd_equals(const LLSD& actual, const LLSD& expected, U32 bits)
         {
-            std::ostringstream out;
-            if (! msg.empty())
-            {
-                out << msg << ": ";
-            }
-            out << "expected " << expected << ", actual " << actual;
-            ensure(out.str(), llsd_equals(actual, expected, bits));
-        }
-
-        void ensure_llsd(const LLSD& actual, const LLSD& expected, U32 bits)
-        {
-            ensure_llsd("", actual, expected, bits);
+            CAPTURE(expected, actual);
+            REQUIRE(llsd_equals(actual, expected, bits));
         }
     };
-    typedef test_group<lleventdispatcher_data> lleventdispatcher_group;
-    typedef lleventdispatcher_group::object object;
-    lleventdispatcher_group lleventdispatchergrp("lleventdispatcher");
 
     // Call cases:
     // - (try_call | call) (explicit name | event key) (real | bogus) name
@@ -756,10 +740,8 @@ namespace tut
     // - (Free function | non-static method), map style, (no | arbitrary) params,
     //   (empty | full | partial (array | map)) defaults
 
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: map-style registration with non-array params", "[lleventdispatcher]")
     {
-        set_test_name("map-style registration with non-array params");
         // Pass "param names" as scalar or as map
         LLSD attempts(llsd::array(17, LLSDMap("pi", 3.14)("two", 2)));
         for (LLSD ae: inArray(attempts))
@@ -767,97 +749,81 @@ namespace tut
             std::string threw = catch_what<std::exception>([this, &ae](){
                     work.add("freena_err", "freena", freena, ae);
                 });
-            ensure_has(threw, "must be an array");
+            require_contains(threw, "must be an array");
         }
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: map-style registration with badly-formed defaults", "[lleventdispatcher]")
     {
-        set_test_name("map-style registration with badly-formed defaults");
         std::string threw = catch_what<std::exception>([this](){
                 work.add("freena_err", "freena", freena, llsd::array("a", "b"), 17);
             });
-        ensure_has(threw, "must be a map or an array");
+        require_contains(threw, "must be a map or an array");
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: map-style registration with too many array defaults", "[lleventdispatcher]")
     {
-        set_test_name("map-style registration with too many array defaults");
         std::string threw = catch_what<std::exception>([this](){
                 work.add("freena_err", "freena", freena,
                          llsd::array("a", "b"),
                          llsd::array(17, 0.9, "gack"));
             });
-        ensure_has(threw, "shorter than");
+        require_contains(threw, "shorter than");
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: map-style registration with too many map defaults", "[lleventdispatcher]")
     {
-        set_test_name("map-style registration with too many map defaults");
         std::string threw = catch_what<std::exception>([this](){
                 work.add("freena_err", "freena", freena,
                          llsd::array("a", "b"),
                          LLSDMap("b", 17)("foo", 3.14)("bar", "sinister"));
             });
-        ensure_has(threw, "nonexistent params");
-        ensure_has(threw, "foo");
-        ensure_has(threw, "bar");
+        require_contains(threw, "nonexistent params");
+        require_contains(threw, "foo");
+        require_contains(threw, "bar");
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: query all lists every registered name and desc", "[lleventdispatcher]")
     {
-        set_test_name("query all");
         verify_descs();
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: query all after remove() omits only the removed name", "[lleventdispatcher]")
     {
-        set_test_name("query all with remove()");
-        ensure("remove('bogus') returned true", ! work.remove("bogus"));
-        ensure("remove('real') returned false", work.remove("free1"));
+        CHECK_FALSE(work.remove("bogus"));
+        CHECK(work.remove("free1"));
         // Of course, remove that from 'descs' too...
         descs.erase("free1");
         verify_descs();
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: getDispatchKey() returns the key it was built with", "[lleventdispatcher]")
     {
-        set_test_name("getDispatchKey()");
-        ensure_equals(work.getDispatchKey(), "op");
+        CHECK(work.getDispatchKey() == "op");
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: query Callables with/out required params", "[lleventdispatcher]")
     {
-        set_test_name("query Callables with/out required params");
         LLSD names(llsd::array("free1", "Dmethod1", "Dcmethod1", "method1"));
         for (LLSD nm: inArray(names))
         {
             LLSD metadata(getMetadata(nm));
-            ensure_equals("name mismatch", metadata["name"], nm);
-            ensure_equals(metadata["desc"].asString(), descs[nm]);
-            ensure("should not have required structure", metadata["required"].isUndefined());
-            ensure("should not have optional", metadata["optional"].isUndefined());
+            REQUIRE_THAT(metadata["name"], ll_test::LLSDEquals(nm));
+            REQUIRE(metadata["desc"].asString() == descs[nm]);
+            REQUIRE(metadata["required"].isUndefined());
+            REQUIRE(metadata["optional"].isUndefined());
 
             std::string name_req(nm.asString() + "_req");
             metadata = getMetadata(name_req);
-            ensure_equals(metadata["name"].asString(), name_req);
-            ensure_equals(metadata["desc"].asString(), descs[name_req]);
-            ensure_equals("required mismatch", required, metadata["required"]);
-            ensure("should not have optional", metadata["optional"].isUndefined());
+            REQUIRE(metadata["name"].asString() == name_req);
+            REQUIRE(metadata["desc"].asString() == descs[name_req]);
+            REQUIRE_THAT(metadata["required"], ll_test::LLSDEquals(required));
+            REQUIRE(metadata["optional"].isUndefined());
         }
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: query array-style functions/methods", "[lleventdispatcher]")
     {
-        set_test_name("query array-style functions/methods");
         // Associate each registered name with expected arity.
         LLSD expected(llsd::array
                       (llsd::array
@@ -875,39 +841,33 @@ namespace tut
                 req[arity - 1] = LLSD();
             for (LLSD nm: inArray(names))
             {
+                CAPTURE(nm);
                 LLSD metadata(getMetadata(nm));
-                ensure_equals("name mismatch", metadata["name"], nm);
-                ensure_equals(metadata["desc"].asString(), descs[nm]);
-                ensure_equals(stringize("mismatched required for ", nm.asString()),
-                              metadata["required"], req);
-                ensure("should not have optional", metadata["optional"].isUndefined());
+                REQUIRE_THAT(metadata["name"], ll_test::LLSDEquals(nm));
+                REQUIRE(metadata["desc"].asString() == descs[nm]);
+                REQUIRE_THAT(metadata["required"], ll_test::LLSDEquals(req));
+                REQUIRE(metadata["optional"].isUndefined());
             }
         }
     }
 
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: query map-style no-params functions/methods", "[lleventdispatcher]")
     {
-        set_test_name("query map-style no-params functions/methods");
         // - (Free function | non-static method), map style, no params (ergo
         //   no defaults)
         LLSD names(llsd::array("free0_map", "smethod0_map", "method0_map"));
         for (LLSD nm: inArray(names))
         {
             LLSD metadata(getMetadata(nm));
-            ensure_equals("name mismatch", metadata["name"], nm);
-            ensure_equals(metadata["desc"].asString(), descs[nm]);
-            ensure("should not have required",
-                   (metadata["required"].isUndefined() || metadata["required"].size() == 0));
-            ensure("should not have optional", metadata["optional"].isUndefined());
+            REQUIRE_THAT(metadata["name"], ll_test::LLSDEquals(nm));
+            REQUIRE(metadata["desc"].asString() == descs[nm]);
+            REQUIRE((metadata["required"].isUndefined() || metadata["required"].size() == 0));
+            REQUIRE(metadata["optional"].isUndefined());
         }
     }
 
-    template<> template<>
-    void object::test<11>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: full array defaults and full map defaults give the same metadata", "[lleventdispatcher]")
     {
-        set_test_name("query map-style arbitrary-params functions/methods: "
-                      "full array defaults vs. full map defaults");
         // With functions registered with no defaults ("_allreq" suffixes),
         // there is of course no difference between array defaults and map
         // defaults. (We don't even bother registering with LLSD::emptyArray()
@@ -926,26 +886,23 @@ namespace tut
         {
             LLSD adft(eq[0]);
             LLSD mdft(eq[1]);
+            CAPTURE(adft, mdft);
             // We can't just compare the results of the two getMetadata()
             // calls, because they contain ["name"], which are different. So
             // capture them, verify that each ["name"] is as expected, then
             // remove for comparing the rest.
             LLSD ameta(getMetadata(adft));
             LLSD mmeta(getMetadata(mdft));
-            ensure_equals("adft name", adft, ameta["name"]);
-            ensure_equals("mdft name", mdft, mmeta["name"]);
+            REQUIRE_THAT(ameta["name"], ll_test::LLSDEquals(adft));
+            REQUIRE_THAT(mmeta["name"], ll_test::LLSDEquals(mdft));
             ameta.erase("name");
             mmeta.erase("name");
-            ensure_equals(stringize("metadata for ", adft.asString(),
-                                    " vs. ", mdft.asString()),
-                          ameta, mmeta);
+            REQUIRE_THAT(ameta, ll_test::LLSDEquals(mmeta));
         }
     }
 
-    template<> template<>
-    void object::test<12>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: query map-style arbitrary-params functions/methods", "[lleventdispatcher]")
     {
-        set_test_name("query map-style arbitrary-params functions/methods");
         // - (Free function | non-static method), map style, arbitrary params,
         //   (empty | full | partial (array | map)) defaults
 
@@ -1043,47 +1000,40 @@ namespace tut
             // Loop through 'names'
             for (LLSD nm: inArray(names))
             {
+                CAPTURE(nm);
                 LLSD metadata(getMetadata(nm));
-                ensure_equals("name mismatch", metadata["name"], nm);
-                ensure_equals(nm.asString(), metadata["desc"].asString(), descs[nm]);
-                ensure_equals(stringize(nm, " required mismatch"),
-                              metadata["required"], required);
-                ensure_equals(stringize(nm, " optional mismatch"),
-                              metadata["optional"], optional);
+                REQUIRE_THAT(metadata["name"], ll_test::LLSDEquals(nm));
+                REQUIRE(metadata["desc"].asString() == descs[nm]);
+                REQUIRE_THAT(metadata["required"], ll_test::LLSDEquals(required));
+                REQUIRE_THAT(metadata["optional"], ll_test::LLSDEquals(optional));
             }
         }
     }
 
-    template<> template<>
-    void object::test<13>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: try_call() returns whether it found the name", "[lleventdispatcher]")
     {
-        set_test_name("try_call()");
-        ensure("try_call(bogus name, LLSD()) returned true", ! work.try_call("freek", LLSD()));
-        ensure("try_call(bogus name) returned true", ! work.try_call(LLSDMap("op", "freek")));
-        ensure("try_call(real name, LLSD()) returned false", work.try_call("free0_array", LLSD()));
-        ensure("try_call(real name) returned false", work.try_call(LLSDMap("op", "free0_map")));
+        CHECK_FALSE(work.try_call("freek", LLSD()));
+        CHECK_FALSE(work.try_call(LLSDMap("op", "freek")));
+        CHECK(work.try_call("free0_array", LLSD()));
+        CHECK(work.try_call(LLSDMap("op", "free0_map")));
     }
 
-    template<> template<>
-    void object::test<14>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: call with bad name", "[lleventdispatcher]")
     {
-        set_test_name("call with bad name");
         call_exc("freek", LLSD(), "not found");
         std::string threw = call_exc("", LLSDMap("op", "freek"), "bad");
-        ensure_has(threw, "op");
-        ensure_has(threw, "freek");
+        require_contains(threw, "op");
+        require_contains(threw, "freek");
     }
 
-    template<> template<>
-    void object::test<15>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: call with event key", "[lleventdispatcher]")
     {
-        set_test_name("call with event key");
         // We don't need a separate test for operator()(string, LLSD) with
         // valid name, because all the rest of the tests exercise that case.
         // The one we don't exercise elsewhere is operator()(LLSD) with valid
         // name, so here it is.
         work(LLSDMap("op", "free0_map"));
-        ensure_equals(g.i, 17);
+        CHECK(g.i == 17);
     }
 
     // Cannot be defined inside function body... remind me again why we use C++...  :-P
@@ -1096,10 +1046,8 @@ namespace tut
         };
     } // anonymous namespace
 
-    template<> template<>
-    void object::test<16>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: call Callables", "[lleventdispatcher]")
     {
-        set_test_name("call Callables");
         CallablesTriple tests[] =
         {
             { "free1",     "free1_req",     g.llsd },
@@ -1119,22 +1067,19 @@ namespace tut
             // Should be able to pass 'answer' to Callables registered
             // without 'required'.
             work(tr.name, answer);
-            ensure_equals("answer mismatch", tr.llsd, answer);
+            REQUIRE_THAT(tr.llsd, ll_test::LLSDEquals(answer));
             // Should NOT be able to pass 'answer' to Callables registered
             // with 'required'.
             call_logerr(tr.name_req, answer, "bad request");
             // But SHOULD be able to pass 'matching' to Callables registered
             // with 'required'.
             work(tr.name_req, matching);
-            ensure_equals("matching mismatch", tr.llsd, matching);
+            REQUIRE_THAT(tr.llsd, ll_test::LLSDEquals(matching));
         }
     }
 
-    template<> template<>
-    void object::test<17>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: passing wrong args to (map | array)-style registrations", "[lleventdispatcher]")
     {
-        set_test_name("passing wrong args to (map | array)-style registrations");
-
         // Pass scalar/map to array-style functions, scalar/array to map-style
         // functions. It seems pointless to repeat this with every variation:
         // (free function | non-static method), (no | arbitrary) args. We
@@ -1155,10 +1100,8 @@ namespace tut
 //      call_exc("free0_map", llsd::array("a", "b"), map_exc);
     }
 
-    template<> template<>
-    void object::test<18>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: call no-args functions", "[lleventdispatcher]")
     {
-        set_test_name("call no-args functions");
         LLSD names(llsd::array
                    ("free0_array", "free0_map",
                     "smethod0_array", "smethod0_map",
@@ -1168,14 +1111,14 @@ namespace tut
             // Look up the Vars instance for this function.
             Vars* vars(varsfor(name));
             // Both the global and stack Vars instances are automatically
-            // cleared at the start of each test<n> method. But since we're
+            // cleared at the start of each test case. But since we're
             // calling these things several different times in the same
-            // test<n> method, manually reset the Vars between each.
+            // test case, manually reset the Vars between each.
             *vars = Vars();
-            ensure_equals(vars->i, 0);
+            REQUIRE(vars->i == 0);
             // call function with empty array (or LLSD(), should be equivalent)
             work(name, LLSD());
-            ensure_equals(vars->i, 17);
+            REQUIRE(vars->i == 17);
         }
     }
 
@@ -1185,10 +1128,8 @@ namespace tut
                              LLSDMap("a", "smethodna_array")("b", "smethodnb_array"),
                              LLSDMap("a", "methodna_array") ("b", "methodnb_array")));
 
-    template<> template<>
-    void object::test<19>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: call array-style functions with wrong-length arrays", "[lleventdispatcher]")
     {
-        set_test_name("call array-style functions with wrong-length arrays");
         // Could have different wrong-length arrays for *na and for *nb, but
         // since they both take 5 params...
         LLSD tooshort(llsd::array("this", "array", "too", "short"));
@@ -1207,10 +1148,8 @@ namespace tut
         }
     }
 
-    template<> template<>
-    void object::test<20>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: call array-style functions with right-size arrays", "[lleventdispatcher]")
     {
-        set_test_name("call array-style functions with right-size arrays");
         std::vector<U8> binary;
         for (size_t h(0x01), i(0); i < 5; h+= 0x22, ++i)
         {
@@ -1235,34 +1174,33 @@ namespace tut
         {
             for (LLSD::String a: ab)
             {
+                CAPTURE(funcsab[a], a);
                 // Reset the Vars instance before each call
                 Vars* vars(varsfor(funcsab[a]));
                 *vars = Vars();
                 work(funcsab[a], args[a]);
-                ensure_llsd(stringize(funcsab[a].asString(), ": expect[\"", a, "\"] mismatch"),
-                            vars->inspect(), expect[a], 7); // 7 bits ~= 2 decimal digits
+                require_llsd_equals(vars->inspect(), expect[a], 7); // 7 bits ~= 2 decimal digits
             }
         }
     }
 
-    template<> template<>
-    void object::test<21>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: passing LLSD() to a const char* param sends NULL", "[lleventdispatcher]")
     {
-        set_test_name("verify that passing LLSD() to const char* sends NULL");
-
-        ensure_equals("Vars::cp init", v.cp, "");
+        UNSCOPED_INFO("Vars::cp init");
+        CHECK(v.cp == "");
         work("methodna_map_mdft", LLSDMap("cp", LLSD()));
-        ensure_equals("passing LLSD()", v.cp, "NULL");
+        UNSCOPED_INFO("passing LLSD()");
+        CHECK(v.cp == "NULL");
         work("methodna_map_mdft", LLSDMap("cp", ""));
-        ensure_equals("passing \"\"", v.cp, "''");
+        UNSCOPED_INFO("passing \"\"");
+        CHECK(v.cp == "''");
         work("methodna_map_mdft", LLSDMap("cp", "non-NULL"));
-        ensure_equals("passing \"non-NULL\"", v.cp, "'non-NULL'");
+        UNSCOPED_INFO("passing \"non-NULL\"");
+        CHECK(v.cp == "'non-NULL'");
     }
 
-    template<> template<>
-    void object::test<22>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: call map-style functions with (full | oversized) (arrays | maps)", "[lleventdispatcher]")
     {
-        set_test_name("call map-style functions with (full | oversized) (arrays | maps)");
         const char binary[] = "\x99\x88\x77\x66\x55";
         LLSD array_full(LLSDMap
                         ("a", llsd::array(false, 255, 98.6, 1024.5, "pointer"))
@@ -1276,11 +1214,11 @@ namespace tut
               "array_overfull: ", array_overfull);
         // We rather hope that LLDate::now() will generate a timestamp
         // distinct from the one it generated in the constructor, moments ago.
-        ensure_not_equals("Timestamps too close",
-                          array_full["b"][2].asDate(), dft_array_full["b"][2].asDate());
+        UNSCOPED_INFO("Timestamps too close");
+        CHECK(array_full["b"][2].asDate() != dft_array_full["b"][2].asDate());
         // We /insist/ that LLUUID::generateNewID() do so.
-        ensure_not_equals("UUID collision",
-                          array_full["b"][1].asUUID(), dft_array_full["b"][1].asUUID());
+        UNSCOPED_INFO("UUID collision");
+        CHECK(array_full["b"][1].asUUID() != dft_array_full["b"][1].asUUID());
         LLSD map_full, map_overfull;
         for (LLSD::String a: ab)
         {
@@ -1329,12 +1267,12 @@ namespace tut
             {
                 for (LLSD::String name: inArray(names[a]))
                 {
+                    CAPTURE(name, a);
                     // Reset the Vars instance
                     Vars* vars(varsfor(name));
                     *vars = Vars();
                     work(name, args[a]);
-                    ensure_llsd(stringize(name, ": expect[\"", a, "\"] mismatch"),
-                                vars->inspect(), expect[a], 7); // 7 bits, 2 decimal digits
+                    require_llsd_equals(vars->inspect(), expect[a], 7); // 7 bits, 2 decimal digits
                     // intercept LL_WARNS for the two overfull cases?
                 }
             }
@@ -1379,89 +1317,71 @@ namespace tut
         };
     } // anonymous namespace
 
-    template<> template<>
-    void object::test<23>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: string result", "[lleventdispatcher]")
     {
-        set_test_name("string result");
         DispatchResult service;
         LLSD result{ service("strfunc", "a string") };
-        ensure_equals("strfunc() mismatch", result.asString(), "got a string");
+        CHECK(result.asString() == "got a string");
     }
 
-    template<> template<>
-    void object::test<24>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: void result", "[lleventdispatcher]")
     {
-        set_test_name("void result");
         DispatchResult service;
         LLSD result{ service("voidfunc", LLSD()) };
-        ensure("voidfunc() returned defined", result.isUndefined());
+        CHECK(result.isUndefined());
     }
 
-    template<> template<>
-    void object::test<25>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: Integer result", "[lleventdispatcher]")
     {
-        set_test_name("Integer result");
         DispatchResult service;
         LLSD result{ service("intfunc", -17) };
-        ensure_equals("intfunc() mismatch", result.asInteger(), 17);
+        CHECK(result.asInteger() == 17);
     }
 
-    template<> template<>
-    void object::test<26>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: LLSD echo", "[lleventdispatcher]")
     {
-        set_test_name("LLSD echo");
         DispatchResult service;
         LLSD result{ service("llsdfunc", llsd::map("op", "llsdfunc", "reqid", 17)) };
-        ensure_equals("llsdfunc() mismatch", result,
-                      llsd::map("op", "llsdfunc", "reqid", 17, "with", "string"));
+        CHECK_THAT(result,
+                      ll_test::LLSDEquals(llsd::map("op", "llsdfunc", "reqid", 17, "with", "string")));
     }
 
-    template<> template<>
-    void object::test<27>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: map LLSD result", "[lleventdispatcher]")
     {
-        set_test_name("map LLSD result");
         DispatchResult service;
         LLSD result{ service("mapfunc", llsd::array(-12, "value")) };
-        ensure_equals("mapfunc() mismatch", result, llsd::map("i", 12, "str", "got value"));
+        CHECK_THAT(result, ll_test::LLSDEquals(llsd::map("i", 12, "str", "got value")));
     }
 
-    template<> template<>
-    void object::test<28>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: array LLSD result", "[lleventdispatcher]")
     {
-        set_test_name("array LLSD result");
         DispatchResult service;
         LLSD result{ service("arrayfunc", llsd::array(-8, "word")) };
-        ensure_equals("arrayfunc() mismatch", result, llsd::array(8, "got word"));
+        CHECK_THAT(result, ll_test::LLSDEquals(llsd::array(8, "got word")));
     }
 
-    template<> template<>
-    void object::test<29>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: a listener error without a reply pump throws", "[lleventdispatcher]")
     {
-        set_test_name("listener error, no reply");
         DispatchResult service;
-        tut::call_exc(
+        ::call_exc(
             [&service]()
             { service.post(llsd::map("op", "nosuchfunc", "reqid", 17)); },
             "nosuchfunc");
     }
 
-    template<> template<>
-    void object::test<30>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: listener error with reply", "[lleventdispatcher]")
     {
-        set_test_name("listener error with reply");
         DispatchResult service;
         LLCaptureListener<LLSD> result;
         service.post(llsd::map("op", "nosuchfunc", "reqid", 17, "reply", result.getName()));
         LLSD reply{ result.get() };
-        ensure("no reply", reply.isDefined());
-        ensure_equals("reqid not echoed", reply["reqid"].asInteger(), 17);
-        ensure_has(reply["error"].asString(), "nosuchfunc");
+        REQUIRE(reply.isDefined());
+        CHECK(reply["reqid"].asInteger() == 17);
+        require_contains(reply["error"].asString(), "nosuchfunc");
     }
 
-    template<> template<>
-    void object::test<31>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: listener call to void function", "[lleventdispatcher]")
     {
-        set_test_name("listener call to void function");
         DispatchResult service;
         LLCaptureListener<LLSD> result;
         result.set("non-empty");
@@ -1471,14 +1391,13 @@ namespace tut
                              "op", func,
                              "reqid", 17,
                              "reply", result.getName()));
-            ensure_equals("reply from " + func, result.get().asString(), "non-empty");
+            CAPTURE(func);
+            REQUIRE(result.get().asString() == "non-empty");
         }
     }
 
-    template<> template<>
-    void object::test<32>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: listener call to string function", "[lleventdispatcher]")
     {
-        set_test_name("listener call to string function");
         DispatchResult service;
         LLCaptureListener<LLSD> result;
         service.post(llsd::map(
@@ -1487,14 +1406,12 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        ensure_equals("reqid not echoed", reply["reqid"].asInteger(), 17);
-        ensure_equals("bad reply from strfunc", reply["data"].asString(), "got a string");
+        CHECK(reply["reqid"].asInteger() == 17);
+        CHECK(reply["data"].asString() == "got a string");
     }
 
-    template<> template<>
-    void object::test<33>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: listener call to map function", "[lleventdispatcher]")
     {
-        set_test_name("listener call to map function");
         DispatchResult service;
         LLCaptureListener<LLSD> result;
         service.post(llsd::map(
@@ -1503,15 +1420,13 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        ensure_equals("reqid not echoed", reply["reqid"].asInteger(), 17);
-        ensure_equals("bad i from mapfunc", reply["i"].asInteger(), 7);
-        ensure_equals("bad str from mapfunc", reply["str"], "got value");
+        CHECK(reply["reqid"].asInteger() == 17);
+        CHECK(reply["i"].asInteger() == 7);
+        CHECK(reply["str"] == "got value");
     }
 
-    template<> template<>
-    void object::test<34>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: batched map success", "[lleventdispatcher]")
     {
-        set_test_name("batched map success");
         DispatchResult service;
         LLCaptureListener<LLSD> result;
         service.post(llsd::map(
@@ -1523,22 +1438,18 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        ensure_equals("reqid not echoed", reply["reqid"].asInteger(), 17);
+        CHECK(reply["reqid"].asInteger() == 17);
         reply.erase("reqid");
-        ensure_equals(
-            "bad map batch",
-            reply,
-            llsd::map(
+        CHECK_THAT(reply,
+            ll_test::LLSDEquals(llsd::map(
                 "strfunc", "got some string",
                 "intfunc", -2,
                 "voidfunc", LLSD(),
-                "arrayfunc", llsd::array(5, "got other string")));
+                "arrayfunc", llsd::array(5, "got other string"))));
     }
 
-    template<> template<>
-    void object::test<35>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: batched map error", "[lleventdispatcher]")
     {
-        set_test_name("batched map error");
         DispatchResult service;
         LLCaptureListener<LLSD> result;
         service.post(llsd::map(
@@ -1552,28 +1463,24 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        ensure_equals("reqid not echoed", reply["reqid"].asInteger(), 17);
+        CHECK(reply["reqid"].asInteger() == 17);
         reply.erase("reqid");
         auto error{ reply["error"].asString() };
         reply.erase("error");
-        ensure_has(error, "badfunc");
-        ensure_has(error, "missing");
-        ensure_equals(
-            "bad partial batch",
-            reply,
-            llsd::map(
+        require_contains(error, "badfunc");
+        require_contains(error, "missing");
+        CHECK_THAT(reply,
+            ll_test::LLSDEquals(llsd::map(
                 "strfunc", "got some string",
                 "intfunc", -2,
                 "voidfunc", LLSD(),
-                "arrayfunc", llsd::array(5, "got other string")));
+                "arrayfunc", llsd::array(5, "got other string"))));
     }
 
-    template<> template<>
-    void object::test<36>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: batched map exception", "[lleventdispatcher]")
     {
-        set_test_name("batched map exception");
         DispatchResult service;
-        auto error = tut::call_exc(
+        auto error = ::call_exc(
             [&service]()
             {
                 service.post(llsd::map(
@@ -1588,13 +1495,11 @@ namespace tut
                 // no "reply"
             },
             "badfunc");
-        ensure_has(error, "missing");
+        require_contains(error, "missing");
     }
 
-    template<> template<>
-    void object::test<37>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: batched array success", "[lleventdispatcher]")
     {
-        set_test_name("batched array success");
         DispatchResult service;
         LLCaptureListener<LLSD> result;
         service.post(llsd::map(
@@ -1612,23 +1517,19 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        ensure_equals("reqid not echoed", reply["reqid"].asInteger(), 17);
+        CHECK(reply["reqid"].asInteger() == 17);
         reply.erase("reqid");
-        ensure_equals(
-            "bad array batch",
-            reply,
-            llsd::map(
+        CHECK_THAT(reply,
+            ll_test::LLSDEquals(llsd::map(
                 "data", llsd::array(
                     "got some string",
                     -2,
                     llsd::array(5, "got other string"),
-                    LLSD())));
+                    LLSD()))));
     }
 
-    template<> template<>
-    void object::test<38>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: batched array error", "[lleventdispatcher]")
     {
-        set_test_name("batched array error");
         DispatchResult service;
         LLCaptureListener<LLSD> result;
         service.post(llsd::map(
@@ -1646,22 +1547,20 @@ namespace tut
                          "reqid", 17,
                          "reply", result.getName()));
         LLSD reply{ result.get() };
-        ensure_equals("reqid not echoed", reply["reqid"].asInteger(), 17);
+        CHECK(reply["reqid"].asInteger() == 17);
         reply.erase("reqid");
         auto error{ reply["error"] };
         reply.erase("error");
-        ensure_has(error, "[1]");
-        ensure_has(error, "unsupported");
-        ensure_equals("bad array batch", reply,
-                      llsd::map("data", llsd::array("got some string")));
+        require_contains(error, "[1]");
+        require_contains(error, "unsupported");
+        CHECK_THAT(reply,
+                      ll_test::LLSDEquals(llsd::map("data", llsd::array("got some string"))));
     }
 
-    template<> template<>
-    void object::test<39>()
+    TEST_CASE_METHOD(lleventdispatcher_data, "lleventdispatcher: batched array exception", "[lleventdispatcher]")
     {
-        set_test_name("batched array exception");
         DispatchResult service;
-        auto error = tut::call_exc(
+        auto error = ::call_exc(
             [&service]()
             {
                 service.post(llsd::map(
@@ -1680,6 +1579,6 @@ namespace tut
                 // no "reply"
             },
             "[1]");
-        ensure_has(error, "unsupported");
+        require_contains(error, "unsupported");
     }
-} // namespace tut
+} // anonymous namespace

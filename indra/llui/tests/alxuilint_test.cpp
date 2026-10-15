@@ -42,12 +42,12 @@
 #include "lldir.h"
 #include "llfile.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <cstring>
 
-namespace tut
+namespace
 {
     // Every element here is a panel. The rules that read the document
     // read it whatever the tag is, and a widget that draws text cannot be
@@ -68,11 +68,7 @@ namespace tut
         // would have.
         alxuilint_data()
         {
-            static bool loaded = false;
-            if (ui.ok() && !loaded)
-            {
-                loaded = LLUIColorTable::instance().loadFromSettings();
-            }
+            ll_test::loadSkinColours(ui);
         }
 
         struct Run
@@ -180,193 +176,199 @@ namespace tut
         };
     };
 
-    typedef test_group<alxuilint_data> alxuilint_test;
-    typedef alxuilint_test::object     alxuilint_object;
-    tut::alxuilint_test alxuilint_testgroup("alxuilint");
-
-    // A clean file carries nothing.
-    template<> template<>
-    void alxuilint_object::test<1>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: a clean file has no findings", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        ensure("builds", run.build(
+        REQUIRE(run.build(
             "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"40\"/>\n"
             "  <panel name=\"b\" left=\"100\" top=\"0\" width=\"90\" height=\"40\"/>"));
-        ensure_equals("a clean file has no findings: " + run.describe(), (S32)run.lint.findings().size(), 0);
+        UNSCOPED_INFO("findings: " + run.describe());
+        CHECK((S32)run.lint.findings().size() == 0);
     }
 
     // Two siblings shown together that intersect, against two where one
     // is hidden, which files do on purpose.
-    template<> template<>
-    void alxuilint_object::test<2>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: intersecting shown siblings overlap and a hidden one is an alternative", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"40\"/>\n"
                 "  <panel name=\"b\" left=\"40\" top=\"0\" width=\"90\" height=\"40\"/>"));
-            ensure_equals("one overlap: " + run.describe(), run.count(ALXUILint::Rule::Overlap), 1);
-            ensure_equals("and no alternatives", run.count(ALXUILint::Rule::Alternatives), 0);
-            ensure_equals("named for the pair", run.first(ALXUILint::Rule::Overlap)->what, std::string("a"));
-            ensure_equals("with the element's path",
-                          ALXUISelection::toString(run.first(ALXUILint::Rule::Overlap)->path), std::string("a"));
+            UNSCOPED_INFO("one overlap: " + run.describe());
+            REQUIRE(run.count(ALXUILint::Rule::Overlap) == 1);
+            CHECK(run.count(ALXUILint::Rule::Alternatives) == 0);
+            UNSCOPED_INFO("named for the pair");
+            CHECK(run.first(ALXUILint::Rule::Overlap)->what == std::string("a"));
+            CHECK(ALXUISelection::toString(run.first(ALXUILint::Rule::Overlap)->path) == std::string("a"));
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"40\"/>\n"
                 "  <panel name=\"b\" left=\"40\" top=\"0\" width=\"90\" height=\"40\" visible=\"false\"/>"));
-            ensure_equals("stacked alternatives are a note: " + run.describe(),
-                          run.count(ALXUILint::Rule::Alternatives), 1);
-            ensure_equals("and not an overlap", run.count(ALXUILint::Rule::Overlap), 0);
-            ensure_equals("a note", (int)run.first(ALXUILint::Rule::Alternatives)->severity,
+            UNSCOPED_INFO("stacked alternatives are a note: " + run.describe());
+            REQUIRE(run.count(ALXUILint::Rule::Alternatives) == 1);
+            CHECK(run.count(ALXUILint::Rule::Overlap) == 0);
+            CHECK((int)run.first(ALXUILint::Rule::Alternatives)->severity ==
                           (int)ALXUILint::Severity::Note);
         }
     }
 
     // A child outside its parent, an empty rect, and two siblings of one
     // name, each exactly once.
-    template<> template<>
-    void alxuilint_object::test<3>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: an outside child and an empty rect and a repeated name each found once", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"150\" top=\"0\" width=\"90\" height=\"40\"/>"));
-            ensure_equals("out of bounds: " + run.describe(), run.count(ALXUILint::Rule::OutOfBounds), 1);
+            UNSCOPED_INFO("out of bounds: " + run.describe());
+            CHECK(run.count(ALXUILint::Rule::OutOfBounds) == 1);
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"0\" height=\"40\"/>"));
-            ensure_equals("empty rect: " + run.describe(), run.count(ALXUILint::Rule::EmptyRect), 1);
+            UNSCOPED_INFO("empty rect: " + run.describe());
+            CHECK(run.count(ALXUILint::Rule::EmptyRect) == 1);
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"40\" height=\"20\"/>\n"
                 "  <panel name=\"a\" left=\"0\" top=\"50\" width=\"40\" height=\"20\"/>"));
-            ensure_equals("one collision for two of a name: " + run.describe(),
-                          run.count(ALXUILint::Rule::NameCollision), 1);
-            ensure_equals("reported on the second",
-                          ALXUISelection::toString(run.first(ALXUILint::Rule::NameCollision)->path), std::string("a#1"));
+            UNSCOPED_INFO("one collision for two of a name: " + run.describe());
+            REQUIRE(run.count(ALXUILint::Rule::NameCollision) == 1);
+            UNSCOPED_INFO("reported on the second");
+            CHECK(ALXUISelection::toString(run.first(ALXUILint::Rule::NameCollision)->path) == std::string("a#1"));
         }
     }
 
     // The reference rules: a font, a colour and a control nobody has, and
     // a callback no registry knows.
-    template<> template<>
-    void alxuilint_object::test<4>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: reference rules flag a font colour control or callback nobody has", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" font=\"NoSuchFont\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>"));
-            ensure_equals("dangling font: " + run.describe(), run.count(ALXUILint::Rule::DanglingFont), 1);
+            UNSCOPED_INFO("dangling font: " + run.describe());
+            CHECK(run.count(ALXUILint::Rule::DanglingFont) == 1);
         }
         {
             // The names every shipped file uses answer to the registry
             // rather than to the four legacy ones.
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" font=\"SansSerif\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>\n"
                 "  <panel name=\"b\" font=\"SansSerifSmall\" left=\"0\" top=\"30\" width=\"90\" height=\"20\"/>\n"
                 "  <panel name=\"c\" font=\"Monospace\" left=\"0\" top=\"60\" width=\"90\" height=\"20\"/>"));
-            ensure_equals("a font fonts.xml declares is not dangling: " + run.describe(),
-                          run.count(ALXUILint::Rule::DanglingFont), 0);
+            UNSCOPED_INFO("a font fonts.xml declares is not dangling: " + run.describe());
+            CHECK(run.count(ALXUILint::Rule::DanglingFont) == 0);
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" bg_opaque_color=\"NoSuchColour\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>"));
-            ensure_equals("dangling colour: " + run.describe(), run.count(ALXUILint::Rule::DanglingColor), 1);
+            UNSCOPED_INFO("dangling colour: " + run.describe());
+            CHECK(run.count(ALXUILint::Rule::DanglingColor) == 1);
         }
         {
             // A literal is not a name and is passed over, and so is a
             // colour the table has.
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" bg_opaque_color=\"1 1 1 1\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>\n"
                 "  <panel name=\"b\" bg_opaque_color=\"White\" left=\"0\" top=\"40\" width=\"90\" height=\"20\"/>"));
-            ensure_equals("neither is dangling: " + run.describe(), run.count(ALXUILint::Rule::DanglingColor), 0);
+            UNSCOPED_INFO("neither is dangling: " + run.describe());
+            CHECK(run.count(ALXUILint::Rule::DanglingColor) == 0);
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" control_name=\"NoSuchSetting\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>"));
-            ensure_equals("control missing: " + run.describe(), run.count(ALXUILint::Rule::ControlMissing), 1);
+            UNSCOPED_INFO("control missing: " + run.describe());
+            CHECK(run.count(ALXUILint::Rule::ControlMissing) == 1);
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" control_name=\"UIScrollbarSize\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>"));
-            ensure_equals("a setting a group has is not missing: " + run.describe(),
-                          run.count(ALXUILint::Rule::ControlMissing), 0);
+            UNSCOPED_INFO("a setting a group has is not missing: " + run.describe());
+            CHECK(run.count(ALXUILint::Rule::ControlMissing) == 0);
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"20\">\n"
                 "    <panel.commit_callback function=\"NoSuch.Function\"/>\n"
                 "  </panel>", /*decisive=*/true));
-            ensure_equals("callback not registered: " + run.describe(),
-                          run.count(ALXUILint::Rule::CallbackNotRegistered), 1);
-            ensure_equals("decisive here", (int)run.first(ALXUILint::Rule::CallbackNotRegistered)->severity,
+            UNSCOPED_INFO("callback not registered: " + run.describe());
+            REQUIRE(run.count(ALXUILint::Rule::CallbackNotRegistered) == 1);
+            UNSCOPED_INFO("decisive here");
+            CHECK((int)run.first(ALXUILint::Rule::CallbackNotRegistered)->severity ==
                           (int)ALXUILint::Severity::Error);
         }
         {
             Run run;
-            ensure("builds", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"90\" height=\"20\">\n"
                 "    <panel.commit_callback function=\"NoSuch.Function\"/>\n"
                 "  </panel>", /*decisive=*/false));
-            ensure_equals("advisory in a shell build", (int)run.first(ALXUILint::Rule::CallbackNotRegistered)->severity,
+            UNSCOPED_INFO("callback not registered: " + run.describe());
+            REQUIRE(run.count(ALXUILint::Rule::CallbackNotRegistered) == 1);
+            UNSCOPED_INFO("advisory in a shell build");
+            CHECK((int)run.first(ALXUILint::Rule::CallbackNotRegistered)->severity ==
                           (int)ALXUILint::Severity::Note);
         }
     }
 
     // The counts a collapsed row shows: a finding is counted on its
     // element and on every ancestor.
-    template<> template<>
-    void alxuilint_object::test<5>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: a finding is counted on its element and on every ancestor", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        ensure("builds", run.build(
+        REQUIRE(run.build(
             "  <panel name=\"outer\" left=\"0\" top=\"0\" width=\"150\" height=\"80\">\n"
             "    <panel name=\"t\" font=\"NoSuchFont\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>\n"
             "  </panel>"));
-        ensure_equals("one finding: " + run.describe(), (S32)run.lint.findings().size(), 1);
-        ensure_equals("on the element", run.lint.countUnder(ALXUISelection::fromString("outer/t")), 1);
-        ensure_equals("on its parent", run.lint.countUnder(ALXUISelection::fromString("outer")), 1);
-        ensure_equals("and on the root", run.lint.countUnder(ALXUISelection::path_t()), 1);
-        ensure_equals("nowhere else", run.lint.countUnder(ALXUISelection::fromString("nobody")), 0);
+        UNSCOPED_INFO("one finding: " + run.describe());
+        CHECK((S32)run.lint.findings().size() == 1);
+        UNSCOPED_INFO("on the element");
+        CHECK(run.lint.countUnder(ALXUISelection::fromString("outer/t")) == 1);
+        UNSCOPED_INFO("on its parent");
+        CHECK(run.lint.countUnder(ALXUISelection::fromString("outer")) == 1);
+        UNSCOPED_INFO("and on the root");
+        CHECK(run.lint.countUnder(ALXUISelection::path_t()) == 1);
+        UNSCOPED_INFO("nowhere else");
+        CHECK(run.lint.countUnder(ALXUISelection::fromString("nobody")) == 0);
     }
 
     // The rules that read the catalog rather than a build: a template
     // written under a root that is not the tag it configures, and a layer
     // that did not parse.
-    template<> template<>
-    void alxuilint_object::test<6>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: catalog rules find a template under another root and an unparsable layer", "[alxuilint]")
     {
         // A tree of the test's own, removed as it ends.
         const ll_test::TempDir temp("alxuilint_catalog_test");
@@ -406,40 +408,44 @@ namespace tut
             parse_errors += f.rule == ALXUILint::Rule::ParseError;
             if (f.rule == ALXUILint::Rule::TemplateRootMismatch)
             {
-                ensure_equals("the root that was written", f.what, std::string("checkbox"));
+                UNSCOPED_INFO("the root that was written");
+                REQUIRE(f.what == std::string("checkbox"));
                 // The parser reads the root's attributes whatever it is
                 // called, so this is worth a look and not a defect.
-                ensure_equals("a note", (int)f.severity, (int)ALXUILint::Severity::Note);
+                REQUIRE((int)f.severity == (int)ALXUILint::Severity::Note);
             }
         }
-        ensure_equals("one template written under another tag", mismatches, 1);
-        ensure_equals("and one layer that did not parse", parse_errors, 1);
+        UNSCOPED_INFO("one template written under another tag");
+        CHECK(mismatches == 1);
+        UNSCOPED_INFO("and one layer that did not parse");
+        CHECK(parse_errors == 1);
     }
 
     // A layout panel has one dimension the stack reads -- the one along the
     // axis the stack runs -- and three names for it. A name for the other axis
     // sets that same parameter, and two names on one panel are one value.
-    template<> template<>
-    void alxuilint_object::test<7>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: a layout panel dimension named on the cross axis is reported", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         Run run;
-        ensure("built", run.build(
+        REQUIRE(run.build(
             "<layout_stack name=\"stack\" orientation=\"horizontal\" left=\"0\" top=\"0\" width=\"200\" height=\"100\">\n"
             "  <layout_panel name=\"across\" min_height=\"20\"/>\n"
             "  <layout_panel name=\"twice\" min_width=\"30\" min_height=\"40\"/>\n"
             "  <layout_panel name=\"along\" min_width=\"50\"/>\n"
             "</layout_stack>"));
 
-        ensure_equals(run.describe(), run.count(ALXUILint::Rule::LayoutDimension), 2);
+        UNSCOPED_INFO(run.describe());
+        CHECK(run.count(ALXUILint::Rule::LayoutDimension) == 2);
 
         const ALXUILint::Finding* first = run.first(ALXUILint::Rule::LayoutDimension);
-        ensure("the cross-axis name is the one reported", first != nullptr);
-        ensure_equals("named by attribute", first->what, std::string("min_height"));
+        REQUIRE(first != nullptr);
+        UNSCOPED_INFO("the cross-axis name is the one reported");
+        CHECK(first->what == std::string("min_height"));
     }
 
     // An attribute written as the value the element already carries. The
@@ -447,52 +453,53 @@ namespace tut
     // built from, so this is a thing the tool could not say at all until it
     // did. Worth a look rather than a fault: a number written where a reader
     // would otherwise have to know it is a reasonable thing to write.
-    template<> template<>
-    void alxuilint_object::test<8>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: an attribute written as its default is a note to take it out", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         Run run;
-        ensure("built", run.build(
+        REQUIRE(run.build(
             "<panel name=\"root\" left=\"0\" top=\"0\" width=\"200\" height=\"100\">\n"
             "  <button name=\"said\" left=\"0\" top=\"0\" width=\"80\" height=\"23\"/>\n"
             "  <button name=\"quiet\" left=\"0\" top=\"40\" width=\"80\"/>\n"
             "</panel>"));
 
-        ensure_equals(run.describe(), run.count(ALXUILint::Rule::WroteTheDefault), 1);
+        UNSCOPED_INFO(run.describe());
+        CHECK(run.count(ALXUILint::Rule::WroteTheDefault) == 1);
         const ALXUILint::Finding* said = run.first(ALXUILint::Rule::WroteTheDefault);
-        ensure("the one that wrote it is the one reported", said != nullptr);
-        ensure_equals("named by attribute", said->what, std::string("height"));
-        ensure("and it is worth a look rather than a fault",
-               said->severity == ALXUILint::Severity::Note);
-        ensure("which is one attribute away from not being said at all",
-               said->fix.did == ALXUILint::Fix::Do::TakeAttributeOut);
+        REQUIRE(said != nullptr);
+        UNSCOPED_INFO("named by attribute");
+        CHECK(said->what == std::string("height"));
+        UNSCOPED_INFO("and it is worth a look rather than a fault");
+        CHECK(said->severity == ALXUILint::Severity::Note);
+        UNSCOPED_INFO("which is one attribute away from not being said at all");
+        CHECK(said->fix.did == ALXUILint::Fix::Do::TakeAttributeOut);
     }
 
     // A finding that says what right would be. A name one slip from a real
     // one was meant to be that one; a name near nothing is a name nothing
     // reads; and an element outside what holds it moves by a delta the rule
     // has already worked out to say how far outside it is.
-    template<> template<>
-    void alxuilint_object::test<9>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: unknown attributes and an outside child each offer the fix for them", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         Run run;
-        ensure("built", run.build(
+        REQUIRE(run.build(
             "<panel name=\"root\" left=\"0\" top=\"0\" width=\"200\" height=\"100\">\n"
             "  <button name=\"slip\" left=\"0\" top=\"0\" width=\"80\" tool_tp=\"near\"/>\n"
             "  <button name=\"nothing\" left=\"0\" top=\"30\" width=\"80\" qqzzxw=\"far\"/>\n"
             "  <panel name=\"out\" left=\"150\" top=\"60\" width=\"90\" height=\"20\"/>\n"
             "</panel>"));
 
-        ensure_equals(run.describe(), run.count(ALXUILint::Rule::UnknownAttribute), 2);
+        UNSCOPED_INFO(run.describe());
+        CHECK(run.count(ALXUILint::Rule::UnknownAttribute) == 2);
 
         const ALXUILint::Finding* slip = nullptr;
         const ALXUILint::Finding* nothing = nullptr;
@@ -503,123 +510,135 @@ namespace tut
             if (f.what == "qqzzxw") { nothing = &f; }
         }
 
-        ensure("the near one is found", slip != nullptr);
-        ensure("and is offered the spelling it meant",
-               slip->fix.did == ALXUILint::Fix::Do::SpellAttribute);
-        ensure_equals("which is the real name", slip->fix.spelling, std::string("tool_tip"));
+        REQUIRE(slip != nullptr);
+        UNSCOPED_INFO("the near one is offered the spelling it meant");
+        CHECK(slip->fix.did == ALXUILint::Fix::Do::SpellAttribute);
+        UNSCOPED_INFO("which is the real name");
+        CHECK(slip->fix.spelling == std::string("tool_tip"));
 
-        ensure("the far one is found", nothing != nullptr);
-        ensure("and there is nothing to be but gone",
-               nothing->fix.did == ALXUILint::Fix::Do::TakeAttributeOut);
+        REQUIRE(nothing != nullptr);
+        UNSCOPED_INFO("the far one can only be taken out");
+        CHECK(nothing->fix.did == ALXUILint::Fix::Do::TakeAttributeOut);
 
         const ALXUILint::Finding* out = run.first(ALXUILint::Rule::OutOfBounds);
-        ensure("the one outside is found", out != nullptr);
-        ensure("and can be moved in", out->fix.did == ALXUILint::Fix::Do::MoveInside);
-        ensure_equals("by exactly how far outside it is", out->fix.dx, -40);
-        ensure_equals("and not at all on the axis it is inside on", out->fix.dy, 0);
+        REQUIRE(out != nullptr);
+        UNSCOPED_INFO("the one outside can be moved in");
+        CHECK(out->fix.did == ALXUILint::Fix::Do::MoveInside);
+        UNSCOPED_INFO("by exactly how far outside it is");
+        CHECK(out->fix.dx == -40);
+        UNSCOPED_INFO("and not at all on the axis it is inside on");
+        CHECK(out->fix.dy == 0);
     }
 
     // Something wider than what holds it leaves by the far edge whichever
     // way it goes, so there is no move to offer: a fix that does not fix it
     // is worse than none, because it is a button that says it will.
-    template<> template<>
-    void alxuilint_object::test<10>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: something wider than its parent is reported with no move offered", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         Run run;
-        ensure("built", run.build(
+        REQUIRE(run.build(
             "<panel name=\"wider\" left=\"10\" top=\"0\" width=\"300\" height=\"20\"/>"));
 
         const ALXUILint::Finding* out = run.first(ALXUILint::Rule::OutOfBounds);
-        ensure("it is still reported", out != nullptr);
-        ensure("and offers nothing", out->fix.did == ALXUILint::Fix::Do::Nothing);
+        UNSCOPED_INFO("it is still reported");
+        REQUIRE(out != nullptr);
+        UNSCOPED_INFO("and offers nothing");
+        CHECK(out->fix.did == ALXUILint::Fix::Do::Nothing);
     }
 
     // A fix that fixes the wrong thing writes its wrongness into the file
     // instead of reporting it, so what each of them puts in the file is
     // watched byte for byte. These two write an attribute.
-    template<> template<>
-    void alxuilint_object::test<11>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: attribute fixes take out a default or respell a slip and undo whole", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         // Written as the value it already carries: it comes off, and the
         // whitespace that separated it comes off with it.
         {
             Run run;
-            ensure("built", run.build(
+            REQUIRE(run.build(
                 "  <button name=\"said\" left=\"0\" top=\"0\" width=\"80\" height=\"23\"/>"));
             const ALXUILint::Finding* f = run.first(ALXUILint::Rule::WroteTheDefault);
-            ensure("found", f != nullptr);
+            REQUIRE(f != nullptr);
 
             ALXUIEdit edit;
-            ensure("loads the same bytes", edit.loadBuffer(run.source));
-            ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
-            ensure_equals("the height is gone and nothing else moved", edit.text(),
+            REQUIRE(edit.loadBuffer(run.source));
+            CHECK(f->applyFix(edit, run.anchorFor(f->path)));
+            UNSCOPED_INFO("the height is gone and nothing else moved");
+            CHECK(edit.text() ==
                 "<panel name=\"root\" layout=\"topleft\" width=\"200\" height=\"100\">\n"
                 "  <button name=\"said\" left=\"0\" top=\"0\" width=\"80\"/>\n"
                 "</panel>\n");
-            ensure("as one step", edit.undo());
-            ensure_equals("put back whole", edit.text(), run.source);
+            UNSCOPED_INFO("as one step");
+            CHECK(edit.undo());
+            UNSCOPED_INFO("put back whole");
+            CHECK(edit.text() == run.source);
         }
 
         // A name one slip from a real one: the name changes where it stands
         // and the author's value is untouched.
         {
             Run run;
-            ensure("built", run.build(
+            REQUIRE(run.build(
                 "  <button name=\"slip\" left=\"0\" top=\"0\" width=\"80\" tool_tp=\"near\"/>"));
             const ALXUILint::Finding* f = run.first(ALXUILint::Rule::UnknownAttribute);
-            ensure("found", f != nullptr);
-            ensure("and it is the one", f->fix.did == ALXUILint::Fix::Do::SpellAttribute);
+            REQUIRE(f != nullptr);
+            CHECK(f->fix.did == ALXUILint::Fix::Do::SpellAttribute);
 
             ALXUIEdit edit;
-            ensure("loads the same bytes", edit.loadBuffer(run.source));
-            ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
-            ensure_equals("spelt right, in place", edit.text(),
+            REQUIRE(edit.loadBuffer(run.source));
+            CHECK(f->applyFix(edit, run.anchorFor(f->path)));
+            UNSCOPED_INFO("spelt right, in place");
+            CHECK(edit.text() ==
                 "<panel name=\"root\" layout=\"topleft\" width=\"200\" height=\"100\">\n"
                 "  <button name=\"slip\" left=\"0\" top=\"0\" width=\"80\" tool_tip=\"near\"/>\n"
                 "</panel>\n");
-            ensure("as one step", edit.undo());
-            ensure_equals("put back whole", edit.text(), run.source);
+            UNSCOPED_INFO("as one step");
+            CHECK(edit.undo());
+            UNSCOPED_INFO("put back whole");
+            CHECK(edit.text() == run.source);
         }
     }
 
     // And these two write a number, worked out from where the element is in
     // the tree that was built. The attribute that moves is the one the author
     // used: no positioning form is ever converted into another.
-    template<> template<>
-    void alxuilint_object::test<12>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: move and widen fixes write their number to the attribute the author used", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         {
             Run run;
-            ensure("built", run.build(
+            REQUIRE(run.build(
                 "  <panel name=\"out\" left=\"150\" top=\"60\" width=\"90\" height=\"20\"/>"));
             const ALXUILint::Finding* f = run.first(ALXUILint::Rule::OutOfBounds);
-            ensure("found", f != nullptr);
-            ensure_equals("forty pixels over", f->fix.dx, -40);
+            REQUIRE(f != nullptr);
+            CHECK(f->fix.dx == -40);
 
             ALXUIEdit edit;
-            ensure("loads the same bytes", edit.loadBuffer(run.source));
-            ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
-            ensure_equals("the left it was written with is the left that moved", edit.text(),
+            REQUIRE(edit.loadBuffer(run.source));
+            CHECK(f->applyFix(edit, run.anchorFor(f->path)));
+            UNSCOPED_INFO("the left it was written with is the left that moved");
+            CHECK(edit.text() ==
                 "<panel name=\"root\" layout=\"topleft\" width=\"200\" height=\"100\">\n"
                 "  <panel name=\"out\" left=\"110\" top=\"60\" width=\"90\" height=\"20\"/>\n"
                 "</panel>\n");
-            ensure("as one step", edit.undo());
-            ensure_equals("put back whole", edit.text(), run.source);
+            UNSCOPED_INFO("as one step");
+            CHECK(edit.undo());
+            UNSCOPED_INFO("put back whole");
+            CHECK(edit.text() == run.source);
         }
 
         // How wide the text needs to be is the font's answer and not this
@@ -627,23 +646,27 @@ namespace tut
         // is being watched is that it lands on `width` and nowhere else.
         {
             Run run;
-            ensure("built", run.build(
+            REQUIRE(run.build(
                 "  <text name=\"long\" left=\"0\" top=\"0\" width=\"10\" height=\"16\">A good deal of text</text>"));
             const ALXUILint::Finding* f = run.first(ALXUILint::Rule::Truncation);
-            ensure("found: " + run.describe(), f != nullptr);
-            ensure("and it can be widened", f->fix.did == ALXUILint::Fix::Do::WidenBy);
-            ensure("by something", f->fix.dx > 0);
+            UNSCOPED_INFO("found: " + run.describe());
+            REQUIRE(f != nullptr);
+            CHECK(f->fix.did == ALXUILint::Fix::Do::WidenBy);
+            CHECK(f->fix.dx > 0);
 
             ALXUIEdit edit;
-            ensure("loads the same bytes", edit.loadBuffer(run.source));
-            ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
-            ensure_equals("only the width moved", edit.text(),
+            REQUIRE(edit.loadBuffer(run.source));
+            CHECK(f->applyFix(edit, run.anchorFor(f->path)));
+            UNSCOPED_INFO("only the width moved");
+            CHECK(edit.text() ==
                 "<panel name=\"root\" layout=\"topleft\" width=\"200\" height=\"100\">\n"
                 "  <text name=\"long\" left=\"0\" top=\"0\" width=\"" + std::to_string(10 + f->fix.dx)
                 + "\" height=\"16\">A good deal of text</text>\n"
                 "</panel>\n");
-            ensure("as one step", edit.undo());
-            ensure_equals("put back whole", edit.text(), run.source);
+            UNSCOPED_INFO("as one step");
+            CHECK(edit.undo());
+            UNSCOPED_INFO("put back whole");
+            CHECK(edit.text() == run.source);
         }
     }
 
@@ -651,16 +674,15 @@ namespace tut
     // and the file's own root sits where the tool put it. Both are still
     // reported; neither is offered a fix, because the fix would write a
     // number nothing reads.
-    template<> template<>
-    void alxuilint_object::test<13>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: children a stack lays out are reported but offered no fix", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         Run run;
-        ensure("built", run.build(
+        REQUIRE(run.build(
             "  <layout_stack name=\"stack\" orientation=\"vertical\" left=\"0\" top=\"0\""
             " width=\"200\" height=\"60\">\n"
             "    <layout_panel name=\"tall\" auto_resize=\"false\" height=\"40\"/>\n"
@@ -673,11 +695,12 @@ namespace tut
             if (f.rule == ALXUILint::Rule::OutOfBounds || f.rule == ALXUILint::Rule::Truncation)
             {
                 ++placed;
-                ensure("nothing a stack places is offered a move",
-                       f.fix.did == ALXUILint::Fix::Do::Nothing);
+                UNSCOPED_INFO("nothing a stack places is offered a move");
+                REQUIRE(f.fix.did == ALXUILint::Fix::Do::Nothing);
             }
         }
-        ensure("and there is one to have refused: " + run.describe(), placed > 0);
+        UNSCOPED_INFO("and there is one to have refused: " + run.describe());
+        CHECK(placed > 0);
     }
 
     // A name that exists, works, and should not be used. The block registered
@@ -685,59 +708,62 @@ namespace tut
     // working -- and a person wrote down which of them to write. Nothing is
     // broken, so it is worth a look rather than a fault, and it is one edit
     // from being right.
-    template<> template<>
-    void alxuilint_object::test<14>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: a deprecated attribute name is a note offering the name to write", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         Run run;
-        ensure("built", run.build(
+        REQUIRE(run.build(
             "  <text name=\"old\" left=\"0\" top=\"0\" width=\"80\" height=\"20\""
             " word_wrap=\"true\">Hello</text>\n"
             "  <text name=\"new\" left=\"0\" top=\"30\" width=\"80\" height=\"20\""
             " wrap=\"true\">Hello</text>"));
 
-        ensure_equals(run.describe(), run.count(ALXUILint::Rule::DeprecatedAttribute), 1);
+        UNSCOPED_INFO(run.describe());
+        CHECK(run.count(ALXUILint::Rule::DeprecatedAttribute) == 1);
         const ALXUILint::Finding* f = run.first(ALXUILint::Rule::DeprecatedAttribute);
-        ensure("found", f != nullptr);
-        ensure_equals("the old spelling is the one reported", f->what, std::string("word_wrap"));
-        ensure("nothing is broken, so it is worth a look",
-               f->severity == ALXUILint::Severity::Note);
-        ensure("and it offers the name to write instead",
-               f->fix.did == ALXUILint::Fix::Do::SpellAttribute);
-        ensure_equals("which is the one the notes name", f->fix.spelling, std::string("wrap"));
+        REQUIRE(f != nullptr);
+        UNSCOPED_INFO("the old spelling is the one reported");
+        CHECK(f->what == std::string("word_wrap"));
+        UNSCOPED_INFO("nothing is broken, so it is worth a look");
+        CHECK(f->severity == ALXUILint::Severity::Note);
+        UNSCOPED_INFO("and it offers the name to write instead");
+        CHECK(f->fix.did == ALXUILint::Fix::Do::SpellAttribute);
+        UNSCOPED_INFO("which is the one the notes name");
+        CHECK(f->fix.spelling == std::string("wrap"));
 
         // Applied, it is the same edit as any other spelling fix.
         ALXUIEdit edit;
-        ensure("loads the same bytes", edit.loadBuffer(run.source));
-        ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
-        ensure("the old name is gone",
-               edit.text().find("word_wrap=\"true\"") == std::string::npos);
-        ensure("and the new one is where it was",
-               edit.text().find("wrap=\"true\">Hello</text>") != std::string::npos);
+        REQUIRE(edit.loadBuffer(run.source));
+        CHECK(f->applyFix(edit, run.anchorFor(f->path)));
+        UNSCOPED_INFO("the old name is gone");
+        CHECK(edit.text().find("word_wrap=\"true\"") == std::string::npos);
+        UNSCOPED_INFO("and the new one is where it was");
+        CHECK(edit.text().find("wrap=\"true\">Hello</text>") != std::string::npos);
     }
 
     // An element already carrying both names is not one to write a second of:
     // two of a name on one element is one value chosen by the parser.
-    template<> template<>
-    void alxuilint_object::test<15>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: an element carrying both the old and new name is offered no fix", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         Run run;
-        ensure("built", run.build(
+        REQUIRE(run.build(
             "  <text name=\"both\" left=\"0\" top=\"0\" width=\"80\" height=\"20\""
             " word_wrap=\"true\" wrap=\"true\">Hello</text>"));
 
         const ALXUILint::Finding* f = run.first(ALXUILint::Rule::DeprecatedAttribute);
-        ensure("still reported", f != nullptr);
-        ensure("but there is nothing to offer", f->fix.did == ALXUILint::Fix::Do::Nothing);
+        UNSCOPED_INFO("still reported");
+        REQUIRE(f != nullptr);
+        UNSCOPED_INFO("but there is nothing to offer");
+        CHECK(f->fix.did == ALXUILint::Fix::Do::Nothing);
     }
 
     // A file an element names is a file the catalog has or has not. The
@@ -748,12 +774,11 @@ namespace tut
     // the skins the fixture stands on rather than from the catalog asked
     // here: so the file named is a real one, the catalog is a directory of
     // this test's own, and whether the catalog has the name is the question.
-    template<> template<>
-    void alxuilint_object::test<16>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: a file name the catalog lacks is reported and one it has is not", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         // A tree of the test's own, removed as it ends.
         const ll_test::TempDir temp("alxuilint_file_test");
@@ -772,7 +797,7 @@ namespace tut
         }
         ALXUICatalog has_it;
         has_it.scan(skins);
-        ensure("the catalog has the file", has_it.find(REAL) != nullptr);
+        REQUIRE(has_it.find(REAL) != nullptr);
         ALXUICatalog has_not;
 
         const std::string body = std::string("  <panel name=\"a\" filename=\"") + REAL
@@ -780,130 +805,154 @@ namespace tut
         {
             Run run;
             run.catalog = &has_it;
-            ensure("builds", run.build(body));
-            ensure("the panel was built", run.panel->getChildCount() > 0);
-            ensure_equals("a file the catalog has: " + run.describe(), run.count(ALXUILint::Rule::FileMissing), 0);
+            REQUIRE(run.build(body));
+            UNSCOPED_INFO("the panel was built");
+            CHECK(run.panel->getChildCount() > 0);
+            UNSCOPED_INFO("a file the catalog has: " + run.describe());
+            CHECK(run.count(ALXUILint::Rule::FileMissing) == 0);
         }
         {
             Run run;
             run.catalog = &has_not;
-            ensure("builds", run.build(body));
-            ensure_equals("and one it has not: " + run.describe(), run.count(ALXUILint::Rule::FileMissing), 1);
-            ensure_equals("named", run.first(ALXUILint::Rule::FileMissing)->what, std::string("filename"));
+            CHECK(run.build(body));
+            UNSCOPED_INFO("and one it has not: " + run.describe());
+            REQUIRE(run.count(ALXUILint::Rule::FileMissing) == 1);
+            CHECK(run.first(ALXUILint::Rule::FileMissing)->what == std::string("filename"));
         }
     }
 
     // Every finding names its sentence and the names in it, and says it
     // as the file has it, filled: what a person reads and what a filter
     // matches are the same words.
-    template<> template<>
-    void alxuilint_object::test<17>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: every finding says its sentence key filled with its names", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        ensure("builds", run.build(
+        REQUIRE(run.build(
             "  <panel name=\"a\" tool_tp=\"slip\" left=\"0\" top=\"0\" width=\"300\" height=\"20\"/>\n"
             "  <panel name=\"a\" left=\"0\" top=\"30\" width=\"20\" height=\"0\"/>\n"
             "  <panel name=\"b\" color=\"NoSuchColour\" left=\"0\" top=\"40\" width=\"20\" height=\"20\"/>"));
-        ensure("there are findings to check: " + run.describe(), !run.lint.findings().empty());
+        UNSCOPED_INFO("there are findings to check: " + run.describe());
+        REQUIRE_FALSE(run.lint.findings().empty());
         for (const ALXUILint::Finding& f : run.lint.findings())
         {
-            ensure("every finding names its sentence: " + f.message, !f.key.empty());
-            ensure("and the sentence is one the lint asks for: " + f.key,
-                   std::any_of(ALXUILint::keys().begin(), ALXUILint::keys().end(),
+            UNSCOPED_INFO("every finding names its sentence: " + f.message);
+            REQUIRE_FALSE(f.key.empty());
+            UNSCOPED_INFO("and the sentence is one the lint asks for: " + f.key);
+            REQUIRE(std::any_of(ALXUILint::keys().begin(), ALXUILint::keys().end(),
                                [&f](const char* key) { return f.key == key; }));
-            ensure_equals("and the words are that sentence, filled: " + f.key,
-                          f.message, ALXUILint::wording(f.key, f.args));
-            ensure("which is not the key said bare: " + f.message, f.message.rfind(f.key, 0) != 0);
+            UNSCOPED_INFO("and the words are that sentence, filled: " + f.key);
+            REQUIRE(f.message == ALXUILint::wording(f.key, f.args));
+            UNSCOPED_INFO("which is not the key said bare: " + f.message);
+            REQUIRE(f.message.rfind(f.key, 0) != 0);
         }
 
         const ALXUILint::Finding* slip = run.first(ALXUILint::Rule::UnknownAttribute);
-        ensure("the slip was found", slip != nullptr);
-        ensure_equals("as the sentence with the spelling in it", slip->key, std::string("LintUnknownAttributeSlip"));
-        ensure_equals("which names the tag", slip->args.at("[TAG]")(), std::string("panel"));
-        ensure_equals("the name", slip->args.at("[NAME]")(), std::string("tool_tp"));
-        ensure_equals("and the one meant", slip->args.at("[MEANT]")(), std::string("tool_tip"));
+        REQUIRE(slip != nullptr);
+        UNSCOPED_INFO("as the sentence with the spelling in it");
+        CHECK(slip->key == std::string("LintUnknownAttributeSlip"));
+        UNSCOPED_INFO("which names the tag");
+        CHECK(slip->args.at("[TAG]")() == std::string("panel"));
+        UNSCOPED_INFO("the name");
+        CHECK(slip->args.at("[NAME]")() == std::string("tool_tp"));
+        UNSCOPED_INFO("and the one meant");
+        CHECK(slip->args.at("[MEANT]")() == std::string("tool_tip"));
 
         const ALXUILint::Finding* empty = run.first(ALXUILint::Rule::EmptyRect);
-        ensure("the empty rect was found", empty != nullptr);
-        ensure_equals("with its height", empty->args.at("[HEIGHT]")(), std::string("0"));
+        REQUIRE(empty != nullptr);
+        UNSCOPED_INFO("with its height");
+        CHECK(empty->args.at("[HEIGHT]")() == std::string("0"));
     }
 
     // Every sentence the lint can ask for, every rule and every severity
     // is a line in xui_lint.xml, so nothing it says arrives as the bare
     // name of a line nobody wrote.
-    template<> template<>
-    void alxuilint_object::test<18>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: every sentence rule and severity has a line in xui_lint.xml", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const LLStringUtil::format_map_t none;
         for (const char* key : ALXUILint::keys())
         {
             const std::string said = ALXUILint::wording(key, none);
-            ensure("the file has a line for " + std::string(key), !said.empty() && said != key);
+            {
+                INFO("the file has a line for " << key);
+                REQUIRE_FALSE(said.empty());
+                REQUIRE(said != key);
+            }
         }
         for (U8 i = 0; i <= (U8)ALXUILint::Rule::FileMissing; ++i)
         {
             const ALXUILint::Rule rule = (ALXUILint::Rule)i;
             const std::string label = ALXUILint::ruleLabel(rule);
-            ensure("the file names the rule " + std::string(ALXUILint::ruleKey(rule)),
-                   !label.empty() && label != ALXUILint::ruleKey(rule));
+            {
+                INFO("the file names the rule " << ALXUILint::ruleKey(rule));
+                REQUIRE_FALSE(label.empty());
+                REQUIRE(label != ALXUILint::ruleKey(rule));
+            }
             ALXUILint::Rule back;
-            ensure("and the rule's name comes back to it",
-                   ALXUILint::ruleNamed(ALXUILint::ruleName(rule), back) && back == rule);
+            {
+                INFO("and the rule's name comes back to it");
+                REQUIRE(ALXUILint::ruleNamed(ALXUILint::ruleName(rule), back));
+                REQUIRE(back == rule);
+            }
         }
         for (ALXUILint::Severity severity : { ALXUILint::Severity::Error, ALXUILint::Severity::Warning,
                                               ALXUILint::Severity::Note })
         {
             const std::string label = ALXUILint::severityLabel(severity);
-            ensure("the file names the severity " + std::string(ALXUILint::severityKey(severity)),
-                   !label.empty() && label != ALXUILint::severityKey(severity));
+            {
+                INFO("the file names the severity " << ALXUILint::severityKey(severity));
+                REQUIRE_FALSE(label.empty());
+                REQUIRE(label != ALXUILint::severityKey(severity));
+            }
         }
 
         // And a line, filled: the brackets take the names the finding gives.
         LLStringUtil::format_map_t args;
         args["[WIDTH]"] = "3";
         args["[HEIGHT]"] = "4";
-        ensure_equals("filled", ALXUILint::wording("LintEmptyRect", args), std::string("shown with a rect of 3 by 4"));
+        UNSCOPED_INFO("filled");
+        CHECK(ALXUILint::wording("LintEmptyRect", args) == std::string("shown with a rect of 3 by 4"));
     }
 
     // An overlap is reported on the element's own path. The second of two
     // siblings of one name is the second of them, and a finding that named
     // the first would badge and select the wrong element.
-    template<> template<>
-    void alxuilint_object::test<19>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: an overlap is reported on the element's own path", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        ensure("builds", run.build(
+        REQUIRE(run.build(
             "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"20\" height=\"20\"/>\n"
             "  <panel name=\"a\" left=\"100\" top=\"0\" width=\"20\" height=\"20\"/>\n"
             "  <panel name=\"b\" left=\"110\" top=\"0\" width=\"20\" height=\"20\"/>"));
-        ensure_equals("one overlap: " + run.describe(), run.count(ALXUILint::Rule::Overlap), 1);
+        UNSCOPED_INFO("one overlap: " + run.describe());
+        REQUIRE(run.count(ALXUILint::Rule::Overlap) == 1);
         const ALXUILint::Finding* overlap = run.first(ALXUILint::Rule::Overlap);
-        ensure_equals("on the second of the name", ALXUISelection::toString(overlap->path),
+        UNSCOPED_INFO("on the second of the name");
+        CHECK(ALXUISelection::toString(overlap->path) ==
                       ALXUISelection::step("a", 1));
-        ensure_equals("with the other named", overlap->args.at("[OTHER]")(), std::string("b"));
+        UNSCOPED_INFO("with the other named");
+        CHECK(overlap->args.at("[OTHER]")() == std::string("b"));
     }
 
     // What the merge dropped is a warning on the element it was looked for
     // under, and what it rescued is a note on the element it landed on:
     // applied, and holding only until the base grows another of the name.
-    template<> template<>
-    void alxuilint_object::test<20>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: a merge drop is a warning and a merge rescue a note on where it landed", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         const std::string base_xml =
             "<floater name=\"f\">\n"
@@ -915,8 +964,8 @@ namespace tut
             "</floater>\n";
         LLXMLNodePtr base;
         LLXMLNodePtr layer;
-        ensure("parses", LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base)
-                      && LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
+        REQUIRE(LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base));
+        REQUIRE(LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
         ALXUIOverlay overlay;
         overlay.layerParsed(0, "floater_x.xml");
         overlay.layerParsed(1, "de/floater_x.xml");
@@ -935,48 +984,67 @@ namespace tut
             if (f.rule == ALXUILint::Rule::OverlayDrop)   { drop = &f; }
             if (f.rule == ALXUILint::Rule::OverlayRescue) { rescue = &f; }
         }
-        ensure("the attribute the base lacks is a drop", drop != nullptr);
-        ensure("which is a warning", drop->severity == ALXUILint::Severity::Warning);
-        ensure_equals("in the layer's file", drop->file, std::string("de/floater_x.xml"));
-        ensure_equals("naming the attribute", drop->what, std::string("extra"));
-        ensure_equals("in the sentence's words", drop->message, ALXUILint::wording("LintDropAttribute", drop->args));
+        UNSCOPED_INFO("the attribute the base lacks is a drop");
+        REQUIRE(drop != nullptr);
+        CHECK(drop->severity == ALXUILint::Severity::Warning);
+        UNSCOPED_INFO("in the layer's file");
+        CHECK(drop->file == std::string("de/floater_x.xml"));
+        CHECK(drop->what == std::string("extra"));
+        UNSCOPED_INFO("in the sentence's words");
+        CHECK(drop->message == ALXUILint::wording("LintDropAttribute", drop->args));
 
-        ensure("the value applied where the base moved it is a rescue", rescue != nullptr);
-        ensure("which is a note", rescue->severity == ALXUILint::Severity::Note);
-        ensure_equals("on the element it landed on", ALXUISelection::toString(rescue->path), std::string("stack/note"));
-        ensure_equals("saying where it was written", rescue->args.at("[FROM]")(), std::string("note"));
-        ensure_equals("and where it went", rescue->args.at("[TO]")(), std::string("stack/note"));
-        ensure_equals("in the layer's file", rescue->file, std::string("de/floater_x.xml"));
-        ensure_equals("on the line it was written", rescue->line, 2);
-        ensure("under a rule with a name", std::string(ALXUILint::ruleName(rescue->rule)) == "overlay rescue");
+        UNSCOPED_INFO("the value applied where the base moved it is a rescue");
+        REQUIRE(rescue != nullptr);
+        CHECK(rescue->severity == ALXUILint::Severity::Note);
+        UNSCOPED_INFO("on the element it landed on");
+        CHECK(ALXUISelection::toString(rescue->path) == std::string("stack/note"));
+        UNSCOPED_INFO("saying where it was written");
+        CHECK(rescue->args.at("[FROM]")() == std::string("note"));
+        UNSCOPED_INFO("and where it went");
+        CHECK(rescue->args.at("[TO]")() == std::string("stack/note"));
+        UNSCOPED_INFO("in the layer's file");
+        CHECK(rescue->file == std::string("de/floater_x.xml"));
+        UNSCOPED_INFO("on the line it was written");
+        CHECK(rescue->line == 2);
+        UNSCOPED_INFO("under a rule with a name");
+        CHECK(std::string(ALXUILint::ruleName(rescue->rule)) == "overlay rescue");
         ALXUILint::Rule back;
-        ensure("that comes back", ALXUILint::ruleNamed("overlay rescue", back) && back == ALXUILint::Rule::OverlayRescue);
+        {
+            INFO("that comes back");
+            CHECK(ALXUILint::ruleNamed("overlay rescue", back));
+            CHECK(back == ALXUILint::Rule::OverlayRescue);
+        }
     }
 
     // A parameter element and a widget under one parent sharing a name: the
     // merge matches by name whatever the tag, and a path of names cannot
     // tell them apart. Two widgets of a name are the collision rule's, and
     // two parameter elements are the merge's own duplicate.
-    template<> template<>
-    void alxuilint_object::test<21>()
+    TEST_CASE_METHOD(alxuilint_data, "alxuilint: a parameter element and a widget sharing a name are one collision", "[alxuilint]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Run run;
-        ensure("builds", run.build(
+        REQUIRE(run.build(
             "  <string name=\"shared\">Hello</string>\n"
             "  <panel name=\"shared\" left=\"0\" top=\"0\" width=\"20\" height=\"20\"/>\n"
             "  <string name=\"alone\">Alone</string>\n"
             "  <panel name=\"other\" left=\"40\" top=\"0\" width=\"20\" height=\"20\"/>"));
-        ensure_equals("one collision: " + run.describe(), run.count(ALXUILint::Rule::NameCollision), 1);
+        UNSCOPED_INFO("one collision: " + run.describe());
+        REQUIRE(run.count(ALXUILint::Rule::NameCollision) == 1);
         const ALXUILint::Finding* f = run.first(ALXUILint::Rule::NameCollision);
-        ensure_equals("said as the parameter sentence", f->key, std::string("LintNameCollisionParameter"));
-        ensure_equals("naming the name", f->what, std::string("shared"));
-        ensure_equals("the parameter element", f->args.at("[TAG]")(), std::string("string"));
-        ensure_equals("and the widget", f->args.at("[OTHER]")(), std::string("panel"));
-        ensure_equals("under the parent", f->args.at("[PARENT]")(), std::string("root"));
-        ensure("on the parent's path, since a path cannot name the pair", f->path.empty());
+        UNSCOPED_INFO("said as the parameter sentence");
+        CHECK(f->key == std::string("LintNameCollisionParameter"));
+        CHECK(f->what == std::string("shared"));
+        UNSCOPED_INFO("the parameter element");
+        CHECK(f->args.at("[TAG]")() == std::string("string"));
+        UNSCOPED_INFO("and the widget");
+        CHECK(f->args.at("[OTHER]")() == std::string("panel"));
+        UNSCOPED_INFO("under the parent");
+        CHECK(f->args.at("[PARENT]")() == std::string("root"));
+        UNSCOPED_INFO("on the parent's path, since a path cannot name the pair");
+        CHECK(f->path.empty());
     }
 }

@@ -608,22 +608,6 @@ private:
 };
 
 
-//spatial partition for water (implemented in LLVOWater.cpp)
-class LLWaterPartition : public LLSpatialPartition
-{
-public:
-    LLWaterPartition(LLViewerRegion* regionp);
-    virtual void getGeometry(LLSpatialGroup* group) {  }
-    virtual void addGeometryCount(LLSpatialGroup* group, U32 &vertex_count, U32& index_count) { }
-};
-
-//spatial partition for hole and edge water (implemented in LLVOWater.cpp)
-class LLVoidWaterPartition : public LLWaterPartition
-{
-public:
-    LLVoidWaterPartition(LLViewerRegion* regionp);
-};
-
 //spatial partition for terrain (impelmented in LLVOSurfacePatch.cpp)
 class LLTerrainPartition : public LLSpatialPartition
 {

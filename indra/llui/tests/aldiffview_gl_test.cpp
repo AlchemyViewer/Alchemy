@@ -24,6 +24,7 @@
 
 #include "linden_common.h"
 
+#include "llfonttextcache.h"
 #include "llglheaders.h"
 
 #include "aluigl_fixture.h"
@@ -36,9 +37,10 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -82,7 +84,7 @@ namespace
     bool inked(U8 r, U8 g, U8 b) { return r > 110 && g > 110 && b > 110; }
 }
 
-namespace tut
+namespace
 {
     struct aldiffview_gl_data
     {
@@ -104,27 +106,35 @@ namespace tut
             }
         }
 
-        // Forty lines, the third changed and the thirty-first, a line put
-        // in after the fifth: the run between folded. The sides in colours
-        // of their own, which the headless colour table has none of.
-        ALDiffView& make()
+        // Forty lines, the third changed and the thirty-first -- or the one
+        // asked for -- and a line put in after the fifth: the run between
+        // folded.
+        static std::pair<std::string, std::string> texts(S32 changed = 30)
         {
-            // The fonts' glyphs in textures, once there is a context.
-            if (!ll_test::HeadlessUI::get(/*gl_textures=*/true).ok())
-            {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
-            }
             std::string left;
             std::string right;
             for (S32 i = 0; i < 40; ++i)
             {
                 left += "line " + std::to_string(i) + "\n";
-                right += (i == 2 ? std::string("two") : i == 30 ? std::string("thirty") : "line " + std::to_string(i)) + "\n";
+                right += (i == 2 ? std::string("two") : i == changed ? std::string("thirty") : "line " + std::to_string(i)) + "\n";
                 if (i == 4)
                 {
                     right += "added\n";
                 }
             }
+            return { left, right };
+        }
+
+        // The texts above, the sides in colours of their own, which the
+        // headless colour table has none of.
+        ALDiffView& make()
+        {
+            // The fonts' glyphs in textures, once there is a context.
+            if (!ll_test::HeadlessUI::get(/*gl_textures=*/true).ok())
+            {
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            }
+            const auto [left, right] = texts();
             ALCodeEditor::Params side(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
             const LLColor4       ink(0.85f, 0.85f, 0.85f, 1.f);
             const LLColor4       ground(0.12f, 0.12f, 0.14f, 1.f);
@@ -170,18 +180,14 @@ namespace tut
             return b;
         }
     };
-    typedef test_group<aldiffview_gl_data> aldiffview_gl_group;
-    typedef aldiffview_gl_group::object    aldiffview_gl_object;
-    aldiffview_gl_group                    aldiffview_gl_instance("aldiffview_gl");
 
-    template<> template<>
-    void aldiffview_gl_object::test<1>()
+    TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: the change holding the caret is outlined across each side", "[aldiffview_gl]")
     {
-        set_test_name("the change the caret is in is outlined on each side, across the text; none while it is in none");
         ALDiffView& d = make();
         d.right()->setFocus(true);
         d.goToChange(true);
-        ensure_equals("in the first change", d.changeAtCaret(), 0);
+        UNSCOPED_INFO("in the first change");
+        CHECK(d.changeAtCaret() == 0);
         const std::vector<U8> outlined = drawn(d);
         for (ALCodeEditor* side : { d.left(), d.right() })
         {
@@ -189,47 +195,94 @@ namespace tut
             const S32  width = b.right - b.left - 8;
             const S32  edge  = llmax(count(outlined, b.left + 4, b.right - 4, b.top - 2, b.top + 1, yellow),
                                      count(outlined, b.left + 4, b.right - 4, b.bottom - 1, b.bottom + 2, yellow));
-            ensure("its edge drawn across the text, on " + side->getName(), edge >= width / 2);
+            UNSCOPED_INFO("its edge drawn across the text on " << side->getName());
+            REQUIRE(edge >= width / 2);
         }
 
         d.right()->goTo(ALTextPos(0, 0));
-        ensure_equals("in none", d.changeAtCaret(), -1);
+        UNSCOPED_INFO("in none");
+        CHECK(d.changeAtCaret() == -1);
         const std::vector<U8> plain = drawn(d);
         const Band            b     = band(d.right(), 2, 2);
-        ensure("no edge", count(plain, b.left + 4, b.right - 4, b.top - 2, b.top + 1, yellow) < (b.right - b.left) / 4);
+        UNSCOPED_INFO("no edge");
+        CHECK(count(plain, b.left + 4, b.right - 4, b.top - 2, b.top + 1, yellow) < (b.right - b.left) / 4);
     }
 
-    template<> template<>
-    void aldiffview_gl_object::test<2>()
+    TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: a folded run's gap row says how many lines it stands for and goes once the run opens", "[aldiffview_gl]")
     {
-        set_test_name("a folded run's row, a gap above the line after it, has how many it stands for said over it; opened, it is gone");
         ALDiffView& d = make();
-        ensure_equals("one run folded", d.foldedCount(), 1);
+        CHECK(d.foldedCount() == 1);
         // The right's lines: 0-1, the change at 2, 3-4, the line put in at
         // 5, context 6-8, the run 9-27, and its row the gap above 28.
         const S32      under  = 28;
         ALTextLayout&  layout = d.right()->layout();
-        ensure("the row a gap", layout.gapRows(under) == 1 && layout.hidden(9) && layout.hidden(27));
+        {
+            INFO("the row a gap");
+            CHECK(layout.gapRows(under) == 1);
+            CHECK(layout.hidden(9));
+            CHECK(layout.hidden(27));
+        }
         Band b      = band(d.right(), under, under);
         b.bottom    = b.top;
         b.top       = b.top + layout.gapHeight(under);
         const std::vector<U8> folded = drawn(d);
-        ensure("words over it", count(folded, b.left, b.right, b.bottom + 1, b.top - 1, inked) > 20);
+        UNSCOPED_INFO("words over it");
+        CHECK(count(folded, b.left, b.right, b.bottom + 1, b.top - 1, inked) > 20);
+
+        // The run a line longer, its row the gap above the line after it:
+        // the words over that row say another count, so they differ.
+        const S32 lower = under + 1;
+        {
+            const auto [left, right] = texts(31);
+            d.setTexts(left, right);
+        }
+        CHECK(layout.gapRows(lower) == 1);
+        Band c   = band(d.right(), lower, lower);
+        c.bottom = c.top;
+        c.top    = c.top + layout.gapHeight(lower);
+        const std::vector<U8> longer = drawn(d);
+        // Pixel for pixel up the two rows from their bottoms.
+        S32 differing = 0;
+        for (S32 up = 1; up < b.top - b.bottom; ++up)
+        {
+            const S32 was = b.bottom + up;
+            const S32 now = c.bottom + up;
+            if (was < 0 || was >= H || now < 0 || now >= H)
+            {
+                continue;
+            }
+            for (S32 x = llmax(0, b.left); x < llmin(W, b.right); ++x)
+            {
+                const size_t i = (static_cast<size_t>(was) * W + x) * 4;
+                const size_t j = (static_cast<size_t>(now) * W + x) * 4;
+                differing += folded[i] != longer[j] || folded[i + 1] != longer[j + 1] || folded[i + 2] != longer[j + 2] ? 1 : 0;
+            }
+        }
+        UNSCOPED_INFO("another count over a run a line longer");
+        CHECK(differing > 0);
+        {
+            const auto [left, right] = texts();
+            d.setTexts(left, right);
+        }
+
         d.right()->goTo(ALTextPos(12, 0));
-        ensure_equals("opened", d.foldedCount(), 0);
-        ensure("its row gone", layout.gapRows(under) == 0 && !layout.hidden(12));
+        UNSCOPED_INFO("opened");
+        CHECK(d.foldedCount() == 0);
+        {
+            INFO("its row gone");
+            CHECK(layout.gapRows(under) == 0);
+            CHECK_FALSE(layout.hidden(12));
+        }
     }
 
-    template<> template<>
-    void aldiffview_gl_object::test<3>()
+    TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: a bracketed range draws a band across a wider gap between the sides", "[aldiffview_gl]")
     {
-        set_test_name("ranges bracketed across a wider gap: a band from a line on the left to the three on the right it became; none for a pair level line for line");
         ALDiffView& d = make();
         const S32   narrow = d.right()->getRect().mLeft - d.left()->getRect().mRight;
         // An LSL line that became three of SLua, then one that became one.
         d.setTexts("default\n{\n    if (a) b();\n    c();\n}", "if a then\n    b()\nend\nc()", { { 2, 2, 0, 2 }, { 3, 3, 3, 3 } });
         const S32 gap = d.right()->getRect().mLeft - d.left()->getRect().mRight;
-        ensure("the gap wider", gap > narrow);
+        CHECK(gap > narrow);
         const std::vector<U8> drawn_now = drawn(d);
         // The gap's columns, inside its edges, down the rows of each range.
         const S32  from   = d.left()->getRect().mRight + 1;
@@ -238,21 +291,23 @@ namespace tut
         const auto lit    = [](U8 r, U8 g, U8 b) { return r > 8 || g > 8 || b > 8; };
         const Band block  = band(d.right(), 0, 2);
         const Band single = band(d.right(), 3, 3);
-        ensure("a band beside the if's three lines", count(drawn_now, from, to, block.bottom + 2, block.top - 2, lit) > (to - from) * 4);
-        ensure("nothing beside the call level with its own", count(drawn_now, from, to, single.bottom + 2, single.top - 2, lit) == 0);
+        UNSCOPED_INFO("a band beside the if's three lines");
+        CHECK(count(drawn_now, from, to, block.bottom + 2, block.top - 2, lit) > (to - from) * 4);
+        UNSCOPED_INFO("nothing beside the call level with its own");
+        CHECK(count(drawn_now, from, to, single.bottom + 2, single.top - 2, lit) == 0);
         d.setTexts("a();\nb();", "a()\nb()", { { 0, 0, 0, 0 }, { 1, 1, 1, 1 } });
-        ensure("ranges all level line for line: no bands, the gap as narrow as ever", d.right()->getRect().mLeft - d.left()->getRect().mRight == narrow);
+        UNSCOPED_INFO("ranges all level line for line: no bands, the gap as narrow as ever");
+        CHECK(d.right()->getRect().mLeft - d.left()->getRect().mRight == narrow);
     }
 
-    template<> template<>
-    void aldiffview_gl_object::test<4>()
+    TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: the caret on an LSL line edges the SLua it became and its own row", "[aldiffview_gl]")
     {
-        set_test_name("the caret on an LSL line washes the SLua it became, an edge down its left, and the line's own rows; none where it is in no range");
         ALDiffView& d = make();
         d.setTexts("default\n{\n    if (a) b();\n    c();\n}", "if a then\n    b()\nend\nc()", { { 2, 2, 0, 2 }, { 3, 3, 3, 3 } });
         d.left()->setFocus(true);
         d.left()->goTo(ALTextPos(2, 0));
-        ensure_equals("linked to the if", d.linkedRange(), 0);
+        UNSCOPED_INFO("linked to the if");
+        CHECK(d.linkedRange() == 0);
         const std::vector<U8> linked = drawn(d);
         // The edge's blue over the sides' dark ground.
         const auto blue  = [](U8 r, U8 g, U8 b) { return b > 150 && b > r + 40; };
@@ -260,21 +315,24 @@ namespace tut
         const Band after = band(d.right(), 3, 3);
         // Inside the change's outline, which the caret's line is also in.
         const S32 edge = block.left + ALDiffView::LINKED_INSET;
-        ensure("an edge down the three SLua lines", count(linked, edge, edge + ALDiffView::LINKED_EDGE, block.bottom + 1, block.top - 1, blue) >= (block.top - block.bottom - 2));
-        ensure("none beside the call after", count(linked, edge, edge + ALDiffView::LINKED_EDGE, after.bottom + 1, after.top - 1, blue) == 0);
+        UNSCOPED_INFO("an edge down the three SLua lines");
+        CHECK(count(linked, edge, edge + ALDiffView::LINKED_EDGE, block.bottom + 1, block.top - 1, blue) >= (block.top - block.bottom - 2));
+        UNSCOPED_INFO("none beside the call after");
+        CHECK(count(linked, edge, edge + ALDiffView::LINKED_EDGE, after.bottom + 1, after.top - 1, blue) == 0);
         const Band own = band(d.left(), 2, 2);
-        ensure("and down the LSL line's own row", count(linked, own.left + ALDiffView::LINKED_INSET, own.left + ALDiffView::LINKED_INSET + ALDiffView::LINKED_EDGE,
+        UNSCOPED_INFO("and down the LSL line's own row");
+        CHECK(count(linked, own.left + ALDiffView::LINKED_INSET, own.left + ALDiffView::LINKED_INSET + ALDiffView::LINKED_EDGE,
                                                         own.bottom + 1, own.top - 1, blue) > 0);
         d.left()->goTo(ALTextPos(0, 0));
-        ensure_equals("in none", d.linkedRange(), -1);
+        UNSCOPED_INFO("in none");
+        CHECK(d.linkedRange() == -1);
         const std::vector<U8> plain = drawn(d);
-        ensure("no edge", count(plain, edge, edge + ALDiffView::LINKED_EDGE, block.bottom + 1, block.top - 1, blue) == 0);
+        UNSCOPED_INFO("no edge");
+        CHECK(count(plain, edge, edge + ALDiffView::LINKED_EDGE, block.bottom + 1, block.top - 1, blue) == 0);
     }
 
-    template<> template<>
-    void aldiffview_gl_object::test<5>()
+    TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: a merge conflict is edged on each side but ours's own change is not", "[aldiffview_gl]")
     {
-        set_test_name("a merge's conflict edged down its rows on each side; ours's own change not");
         ALDiffView&       d      = make();
         const std::string base   = "zero\none\ntwo\nthree\nfour\nfive\nsix\nseven";
         const std::string theirs = "zero\none\ntwo\nthree\nfour\nfive\nsix theirs\nseven";
@@ -288,19 +346,22 @@ namespace tut
         const Band left   = band(d.left(), 6, 6);
         const Band own    = band(d.right(), 2, 2);
         const S32  edge   = ALDiffView::CONFLICT_EDGE;
-        ensure("no edge before a merge", count(drawn(d), right.left, right.left + edge, right.bottom + 1, right.top - 1, orange) == 0);
+        UNSCOPED_INFO("no edge before a merge");
+        CHECK(count(drawn(d), right.left, right.left + edge, right.bottom + 1, right.top - 1, orange) == 0);
         d.setMergeBase(base);
         const std::vector<U8> merged = drawn(d);
-        ensure("down the conflict on the right", count(merged, right.left, right.left + edge, right.bottom + 1, right.top - 1, orange) >= right.top - right.bottom - 2);
-        ensure("and on the left", count(merged, left.left, left.left + edge, left.bottom + 1, left.top - 1, orange) >= left.top - left.bottom - 2);
-        ensure("not down ours's own change", count(merged, own.left, own.left + edge, own.bottom + 1, own.top - 1, orange) == 0);
+        UNSCOPED_INFO("down the conflict on the right");
+        CHECK(count(merged, right.left, right.left + edge, right.bottom + 1, right.top - 1, orange) >= right.top - right.bottom - 2);
+        UNSCOPED_INFO("and on the left");
+        CHECK(count(merged, left.left, left.left + edge, left.bottom + 1, left.top - 1, orange) >= left.top - left.bottom - 2);
+        UNSCOPED_INFO("not down ours's own change");
+        CHECK(count(merged, own.left, own.left + edge, own.bottom + 1, own.top - 1, orange) == 0);
     }
 
-    template<> template<>
-    void aldiffview_gl_object::test<6>()
+    TEST_CASE_METHOD(aldiffview_gl_data, "aldiffview_gl: range bands draw in the same number of batches however many there are", "[aldiffview_gl]")
     {
-        set_test_name("the bands in sight drawn in two batches however many there are: their grounds in one, their edges in the other");
-        ALDiffView& d = make();
+        ALDiffView& d      = make();
+        const S32   narrow = d.right()->getRect().mLeft - d.left()->getRect().mRight;
         // Eight lines the same on each side, ranges of two lines each, level:
         // a band each, which line up nothing the lines would not, so the
         // sides are drawn alike whatever bands there are.
@@ -309,21 +370,59 @@ namespace tut
         {
             text += (n ? "\n" : "") + ("same " + std::to_string(n));
         }
-        // How many draws the comparison makes, drawn once already: what is
-        // put in a texture the first time it is drawn, put in.
-        const auto draws = [&](const ALTextDiff::ranges_t& ranges) {
-            d.setTexts(text, text, ranges);
-            drawn(d);
+        // How many draws a frame of the comparison makes, and what it drew.
+        std::vector<U8> shown;
+        const auto      frame = [&]() {
             gGL.pushUIMatrix();
             const U32 before = LLRender::sUICalls;
-            drawn(d);
-            const U32 made = LLRender::sUICalls - before;
+            shown            = drawn(d);
+            const U32 made   = LLRender::sUICalls - before;
             gGL.popUIMatrix();
             return made;
         };
-        const U32 two  = draws({ { 0, 1, 0, 1 }, { 4, 5, 4, 5 } });
-        const U32 four = draws({ { 0, 1, 0, 1 }, { 2, 3, 2, 3 }, { 4, 5, 4, 5 }, { 6, 7, 6, 7 } });
-        ensure("drawn", two > 0);
-        ensure_equals("as many draws for four bands as for two", four, two);
+        // How many a frame makes once no text in it is put together anew:
+        // drawn until a frame rebuilds none, at most eight times. A frame
+        // that adds glyphs to the font's cache moves it under every text
+        // drawn before them, and each of those is rebuilt on the next frame,
+        // so a frame can make as many draws as the one before and still not
+        // be the frame that settles.
+        const auto draws = [&](const ALTextDiff::ranges_t& ranges) {
+            d.setTexts(text, text, ranges);
+            for (S32 tries = 0; tries < 8; ++tries)
+            {
+                const U64 rebuilt = LLFontTextCache::regenCount();
+                const U32 made    = frame();
+                if (LLFontTextCache::regenCount() == rebuilt)
+                {
+                    return made;
+                }
+            }
+            FAIL("no frame drew without rebuilding a text");
+            return 0U;
+        };
+        // The bands drawn in the frame counted: the gap widened for them, and
+        // its columns lit beside each band's rows.
+        const auto lit    = [](U8 r, U8 g, U8 b) { return r > 8 || g > 8 || b > 8; };
+        const auto banded = [&](const ALTextDiff::ranges_t& ranges) {
+            UNSCOPED_INFO("the gap widened for the bands");
+            CHECK(d.right()->getRect().mLeft - d.left()->getRect().mRight > narrow);
+            const S32 from = d.left()->getRect().mRight + 1;
+            const S32 to   = d.right()->getRect().mLeft - 1;
+            for (const ALTextDiff::Range& range : ranges)
+            {
+                const Band rows = band(d.right(), range.rightFirst, range.rightLast);
+                UNSCOPED_INFO("a band beside the right's lines from " << range.rightFirst);
+                CHECK(count(shown, from, to, rows.bottom + 2, rows.top - 2, lit) > (to - from) * 4);
+            }
+        };
+        const ALTextDiff::ranges_t two_bands  = { { 0, 1, 0, 1 }, { 4, 5, 4, 5 } };
+        const ALTextDiff::ranges_t four_bands = { { 0, 1, 0, 1 }, { 2, 3, 2, 3 }, { 4, 5, 4, 5 }, { 6, 7, 6, 7 } };
+        const U32                  two        = draws(two_bands);
+        banded(two_bands);
+        const U32 four = draws(four_bands);
+        banded(four_bands);
+        CHECK(two > 0);
+        UNSCOPED_INFO("as many draws for four bands as for two");
+        CHECK(four == two);
     }
 }

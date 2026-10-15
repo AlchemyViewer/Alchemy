@@ -41,7 +41,7 @@
 #include <typeinfo>
 // external library headers
 // other Linden headers
-#include "lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace
 {
@@ -123,7 +123,7 @@ std::string asteroidStation(Asteroid& rock, SpaceStation& dock)
 } // anonymous namespace
 
 /*------------------------------- Test code --------------------------------*/
-namespace tut
+namespace
 {
     struct dispatch_data
     {
@@ -152,12 +152,8 @@ namespace tut
         CommercialShip dummyCommercial;
         SpaceStation dummyStation;
     };
-    typedef test_group<dispatch_data> dispatch_group;
-    typedef dispatch_group::object dispatch_object;
-    tut::dispatch_group ddgr("double dispatch");
 
-    template<> template<>
-    void dispatch_object::test<1>()
+    TEST_CASE_METHOD(dispatch_data, "double dispatch: symmetric Type entries match subclasses in either order", "[double_dispatch]")
     {
         // Describe param types using explicit DD::Type objects
         // (order-sensitive add() variant)
@@ -168,24 +164,23 @@ namespace tut
         dispatcher.add(DD::Type<Asteroid>(), DD::Type<SpaceStation>(), asteroidStation, true);
 
         // Try colliding them.
-        ensure_equals(dispatcher(*home, *tug),        // reverse params, SpaceShip subclass
+        CHECK(dispatcher(*home, *tug) ==        // reverse params, SpaceShip subclass
                       "shipStation");
-        ensure_equals(dispatcher(*patrol, *home),     // forward params, SpaceShip subclass
+        CHECK(dispatcher(*patrol, *home) ==     // forward params, SpaceShip subclass
                       "shipStation");
-        ensure_equals(dispatcher(*obstacle, *home),   // forward params
+        CHECK(dispatcher(*obstacle, *home) ==   // forward params
                       "asteroidStation");
-        ensure_equals(dispatcher(*home, *obstacle),   // reverse params
+        CHECK(dispatcher(*home, *obstacle) ==   // reverse params
                       "asteroidStation");
-        ensure_equals(dispatcher(*tug, *obstacle),    // forward params, SpaceShip subclass
+        CHECK(dispatcher(*tug, *obstacle) ==    // forward params, SpaceShip subclass
                       "shipAsteroid");
-        ensure_equals(dispatcher(*obstacle, *patrol), // reverse params, SpaceShip subclass
+        CHECK(dispatcher(*obstacle, *patrol) == // reverse params, SpaceShip subclass
                       // won't use militaryShipAsteroid() because it was added
                       // in wrong order
                       "shipAsteroid");
     }
 
-    template<> template<>
-    void dispatch_object::test<2>()
+    TEST_CASE_METHOD(dispatch_data, "double dispatch: a specific Type entry added before a general one wins", "[double_dispatch]")
     {
         // Describe param types using explicit DD::Type objects
         // (order-sensitive add() variant)
@@ -195,12 +190,11 @@ namespace tut
         dispatcher.add(DD::Type<SpaceShip>(), DD::Type<SpaceStation>(), shipStation, true);
         dispatcher.add(DD::Type<Asteroid>(), DD::Type<SpaceStation>(), asteroidStation, true);
 
-        ensure_equals(dispatcher(*patrol, *obstacle), "militaryShipAsteroid");
-        ensure_equals(dispatcher(*tug, *obstacle), "shipAsteroid");
+        CHECK(dispatcher(*patrol, *obstacle) == "militaryShipAsteroid");
+        CHECK(dispatcher(*tug, *obstacle) == "shipAsteroid");
     }
 
-    template<> template<>
-    void dispatch_object::test<3>()
+    TEST_CASE_METHOD(dispatch_data, "double dispatch: prototype entries match the most specific pair in their order only", "[double_dispatch]")
     {
         // Describe param types with actual prototype instances
         // (order-insensitive add() variant)
@@ -209,13 +203,12 @@ namespace tut
         dispatcher.add(dummyShip, dummyStation, shipStation);
         dispatcher.add(dummyAsteroid, dummyStation, asteroidStation);
 
-        ensure_equals(dispatcher(*patrol, *obstacle), "militaryShipAsteroid");
-        ensure_equals(dispatcher(*tug, *obstacle), "shipAsteroid");
-        ensure_equals(dispatcher(*obstacle, *patrol), "");
+        CHECK(dispatcher(*patrol, *obstacle) == "militaryShipAsteroid");
+        CHECK(dispatcher(*tug, *obstacle) == "shipAsteroid");
+        CHECK(dispatcher(*obstacle, *patrol) == "");
     }
 
-    template<> template<>
-    void dispatch_object::test<4>()
+    TEST_CASE_METHOD(dispatch_data, "double dispatch: prototype entries match the most specific in any add order", "[double_dispatch]")
     {
         // Describe param types with actual prototype instances
         // (order-insensitive add() variant)
@@ -226,19 +219,18 @@ namespace tut
         dispatcher.add(dummyShip, dummyStation, shipStation);
         dispatcher.add(dummyAsteroid, dummyStation, asteroidStation);
 
-        ensure_equals(dispatcher(*patrol, *obstacle), "militaryShipAsteroid");
-        ensure_equals(dispatcher(*tug, *obstacle), "shipAsteroid");
+        CHECK(dispatcher(*patrol, *obstacle) == "militaryShipAsteroid");
+        CHECK(dispatcher(*tug, *obstacle) == "shipAsteroid");
     }
 
-    template<> template<>
-    void dispatch_object::test<5>()
+    TEST_CASE_METHOD(dispatch_data, "double dispatch: the templated add matches the most specific in any add order", "[double_dispatch]")
     {
         dispatcher.add<SpaceShip, Asteroid>(shipAsteroid);
         dispatcher.add<MilitaryShip, Asteroid>(militaryShipAsteroid);
         dispatcher.add<SpaceShip, SpaceStation>(shipStation);
         dispatcher.add<Asteroid, SpaceStation>(asteroidStation);
 
-        ensure_equals(dispatcher(*patrol, *obstacle), "militaryShipAsteroid");
-        ensure_equals(dispatcher(*tug, *obstacle), "shipAsteroid");
+        CHECK(dispatcher(*patrol, *obstacle) == "militaryShipAsteroid");
+        CHECK(dispatcher(*tug, *obstacle) == "shipAsteroid");
     }
-} // namespace tut
+} // anonymous namespace

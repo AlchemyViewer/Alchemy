@@ -29,29 +29,25 @@
 // Tests related to newer C++ features, for verifying support across compilers and platforms
 
 #include "linden_common.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+#include <type_traits>
+
+namespace
 {
-
-struct cpp_features_test {};
-typedef test_group<cpp_features_test> cpp_features_test_t;
-typedef cpp_features_test_t::object cpp_features_test_object_t;
-tut::cpp_features_test_t tut_cpp_features_test("LLCPPFeatures");
 
 // bracket initializers
 // Can initialize containers or values using curly brackets
-template<> template<>
-void cpp_features_test_object_t::test<1>()
+TEST_CASE("LLCPPFeatures: bracket initializers set values and containers", "[LLCPPFeatures]")
 {
     S32 explicit_val{3};
-    ensure(explicit_val==3);
+    CHECK(explicit_val==3);
 
     S32 default_val{};
-    ensure(default_val==0);
+    CHECK(default_val==0);
 
     std::vector<S32> fibs{1,1,2,3,5};
-    ensure(fibs[4]==5);
+    CHECK(fibs[4]==5);
 }
 
 // auto
@@ -59,20 +55,19 @@ void cpp_features_test_object_t::test<1>()
 // https://en.cppreference.com/w/cpp/language/auto
 //
 // Can use auto in place of a more complex type specification, if the compiler can infer the type
-template<> template<>
-void cpp_features_test_object_t::test<2>()
+TEST_CASE("LLCPPFeatures: auto deduces an element and an iterator type", "[LLCPPFeatures]")
 {
     std::vector<S32> numbers{3,6,9};
 
     // auto element
     auto& aval = numbers[1];
-    ensure("auto element", aval==6);
+    CHECK(aval==6);
 
     // auto iterator (non-const)
     auto it = numbers.rbegin();
     *it += 1;
     S32 val = *it;
-    ensure("auto iterator", val==10);
+    CHECK(val==10);
 }
 
 // range for
@@ -80,8 +75,7 @@ void cpp_features_test_object_t::test<2>()
 // https://en.cppreference.com/w/cpp/language/range-for
 //
 // Can iterate over containers without explicit iterator
-template<> template<>
-void cpp_features_test_object_t::test<3>()
+TEST_CASE("LLCPPFeatures: range for walks a container or a C array", "[LLCPPFeatures]")
 {
 
     // Traditional iterator for with container
@@ -95,7 +89,7 @@ void cpp_features_test_object_t::test<3>()
         auto& n = *it;
         n *= 2;
     }
-    ensure("iterator for vector", numbers[2]==18);
+    CHECK(numbers[2]==18);
 
     // Range for with container
     //
@@ -107,7 +101,7 @@ void cpp_features_test_object_t::test<3>()
     {
         n *= 2;
     }
-    ensure("range for vector", numbersb[2]==18);
+    CHECK(numbersb[2]==18);
 
     // Range for over a C-style array.
     //
@@ -119,7 +113,7 @@ void cpp_features_test_object_t::test<3>()
     {
         sum += v;
     }
-    ensure("for C-array", sum==31);
+    CHECK(sum==31);
 }
 
 // override specifier
@@ -134,13 +128,12 @@ void cpp_features_test_object_t::test<3>()
 // * Some compilers require that any class using override must use it consistently for all functions.
 //   This makes switching a class to use override a lot more work.
 
-namespace
-{
 
 class Foo
 {
 public:
-    virtual bool is_happy() const = 0;
+    // Not happy itself, so that a happy answer through a Foo is Bar's.
+    virtual bool is_happy() const { return false; }
 };
 
 class Bar: public Foo
@@ -153,13 +146,13 @@ public:
     // bool is_happx() override { return true; }
 };
 
-} // anonymous namespace
 
-template<> template<>
-void cpp_features_test_object_t::test<4>()
+TEST_CASE("LLCPPFeatures: an override specifier marks a virtual override", "[LLCPPFeatures]")
 {
+    // Asked through its base, which only an override answers.
     Bar b;
-    ensure("override", b.is_happy());
+    const Foo& as_foo = b;
+    CHECK(as_foo.is_happy());
 }
 
 // final
@@ -168,13 +161,13 @@ void cpp_features_test_object_t::test<4>()
 // virtual function cannot be overridden in a derived class or that a
 // class cannot be inherited from."
 
-namespace
-{
 
 class Vehicle
 {
 public:
-    virtual bool has_wheels() const = 0;
+    // No wheels itself, so that wheels through a Vehicle are the final
+    // override's.
+    virtual bool has_wheels() const { return false; }
 };
 
 class WheeledVehicle: public Vehicle
@@ -190,13 +183,14 @@ public:
     // virtual bool has_wheels() override const { return true; }
 };
 
-} // anonymous namespace
 
-template<> template<>
-void cpp_features_test_object_t::test<5>()
+TEST_CASE("LLCPPFeatures: a class derives from one with a final override", "[LLCPPFeatures]")
 {
+    // Asked through the root, a Bicycle answers with the final override it
+    // inherits.
     Bicycle bi;
-    ensure("final", bi.has_wheels());
+    const Vehicle& as_vehicle = bi;
+    CHECK(as_vehicle.has_wheels());
 }
 
 // deleted function declaration
@@ -213,8 +207,6 @@ void cpp_features_test_object_t::test<5>()
 // * Makes the intention clear
 // * Creates an error sooner, at compile time
 
-namespace
-{
 
 class DoNotCopy
 {
@@ -223,14 +215,15 @@ public:
     DoNotCopy(const DoNotCopy& ref) = delete;
 };
 
-} // anonymous namespace
 
-template<> template<>
-void cpp_features_test_object_t::test<6>()
+// Default construction is checked by compiling; the copy is asked of the
+// type, since a copy written out would not compile.
+TEST_CASE("LLCPPFeatures: a deleted copy constructor forbids copies but not default construction", "[LLCPPFeatures]")
 {
     DoNotCopy nc; // OK, default constructor
     //DoNotCopy nc2(nc); // No, can't copy
     //DoNotCopy nc3 = nc; // No, this also calls copy constructor (even though it looks like an assignment)
+    CHECK_FALSE(std::is_copy_constructible_v<DoNotCopy>);
 }
 
 // defaulted function declaration
@@ -241,8 +234,6 @@ void cpp_features_test_object_t::test<6>()
 // and are happy with the default implementation the compiler will make (memberwise copy).
 // Now you can explicitly declare that too.
 // Usage: I guess it makes the intent clearer, but otherwise not obviously useful.
-namespace
-{
 
 class DefaultCopyOK
 {
@@ -254,17 +245,15 @@ private:
     S32 mVal;
 };
 
-} // anonymous namespace
 
-template<> template<>
-void cpp_features_test_object_t::test<7>()
+TEST_CASE("LLCPPFeatures: a defaulted copy constructor copies the members", "[LLCPPFeatures]")
 {
     DefaultCopyOK d; // OK
     DefaultCopyOK d2(d); // OK
     DefaultCopyOK d3 = d; // OK
-    ensure("default copy d", d.val()==123);
-    ensure("default copy d2", d.val()==d2.val());
-    ensure("default copy d3", d.val()==d3.val());
+    CHECK(d.val()==123);
+    CHECK(d.val()==d2.val());
+    CHECK(d.val()==d3.val());
 }
 
 // initialize class members inline
@@ -276,8 +265,6 @@ void cpp_features_test_object_t::test<7>()
 // It is preferred to skip creating a constructor if all the work can be done by inline initialization:
 // http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines.html#c45-dont-define-a-default-constructor-that-only-initializes-data-members-use-in-class-member-initializers-instead
 //
-namespace
-{
 
 class InitInline
 {
@@ -299,17 +286,15 @@ public:
     S32 mBar = 20;
 };
 
-} // anonymous namespace
 
-template<> template<>
-void cpp_features_test_object_t::test<8>()
+TEST_CASE("LLCPPFeatures: inline member initializers give defaults a constructor overrides", "[LLCPPFeatures]")
 {
     InitInline ii;
-    ensure("init member inline 1", ii.mFoo==10);
+    CHECK(ii.mFoo==10);
 
     InitInlineWithConstructor iici;
-    ensure("init member inline 2", iici.mFoo==10);
-    ensure("init member inline 3", iici.mBar==25);
+    CHECK(iici.mFoo==10);
+    CHECK(iici.mBar==25);
 }
 
 // constexpr
@@ -317,8 +302,6 @@ void cpp_features_test_object_t::test<8>()
 // https://en.cppreference.com/w/cpp/language/constexpr
 //
 // Various things can be computed at compile time, and flagged as constexpr.
-namespace
-{
 
 constexpr S32 compute2() { return 2; }
 
@@ -334,17 +317,15 @@ constexpr S32 ce_factorial(S32 n)
     }
 }
 
-} // anonymous namespace
 
-template<> template<>
-void cpp_features_test_object_t::test<9>()
+TEST_CASE("LLCPPFeatures: constexpr functions compute values", "[LLCPPFeatures]")
 {
     S32 val = compute2();
-    ensure("constexpr 1", val==2);
+    CHECK(val==2);
 
     // Compile-time factorial. You used to need complex templates to do something this useless.
     S32 fac5 = ce_factorial(5);
-    ensure("constexpr 2", fac5==120);
+    CHECK(fac5==120);
 }
 
 // static assert
@@ -353,16 +334,15 @@ void cpp_features_test_object_t::test<9>()
 //
 // You can add asserts to be checked at compile time. The thing to be checked must be a constexpr.
 // There are two forms:
-// * static_assert(expr);
+// * static_assert(expr); (since C++17)
 // * static_assert(expr, message);
 //
-// Currently only the 2-parameter form works on windows. The 1-parameter form needs a flag we don't set.
+// The case's checks are the compiler's: it passes by compiling, and then by returning.
 
-template<> template<>
-void cpp_features_test_object_t::test<10>()
+TEST_CASE("LLCPPFeatures: static_assert checks a constexpr at compile time", "[LLCPPFeatures]")
 {
-    // static_assert(ce_factorial(6)==720); No, needs a flag we don't currently set.
-    static_assert(ce_factorial(6)==720, "bad factorial"); // OK
+    static_assert(ce_factorial(6)==720);
+    static_assert(ce_factorial(6)==720, "bad factorial");
 }
 
 // type aliases
@@ -376,11 +356,10 @@ void cpp_features_test_object_t::test<10>()
 template<typename T>
 using stringmap = std::map<std::string, T>;
 
-template<> template<>
-void cpp_features_test_object_t::test<11>()
+TEST_CASE("LLCPPFeatures: a template type alias names a map type", "[LLCPPFeatures]")
 {
     stringmap<S32> name_counts{ {"alice", 3}, {"bob", 2} };
-    ensure("type alias", name_counts["bob"]==2);
+    CHECK(name_counts["bob"]==2);
 }
 
 // Other possibilities:
@@ -413,4 +392,4 @@ void cpp_features_test_object_t::test<11>()
 
 // string_view
 
-} // namespace tut
+} // anonymous namespace

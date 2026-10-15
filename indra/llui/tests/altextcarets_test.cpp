@@ -26,7 +26,7 @@
 
 #include "altextcarets.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
@@ -61,140 +61,150 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
-    struct altextcarets_data
+    TEST_CASE("altextcarets: a caret is pushed past typing; typing at a selection's edge goes outside", "[altextcarets]")
     {
-    };
-    typedef test_group<altextcarets_data> altextcarets_group;
-    typedef altextcarets_group::object    altextcarets_object;
-    altextcarets_group                    altextcarets_instance("altextcarets");
-
-    template<> template<>
-    void altextcarets_object::test<1>()
-    {
-        set_test_name("a caret is pushed past what is typed at it; a selection keeps what it held, what goes in at either edge outside it");
         ALTextDocument doc("abcdef");
         // Typed at 2.
         ALTextDocument::Edit typed = doc.insert(ALTextPos(0, 2), "XY");
-        ensure_equals("a caret at it pushed past", said(ALTextCarets::slid(caret(0, 2), typed)), said(caret(0, 4)));
-        ensure_equals("one before it stays", said(ALTextCarets::slid(caret(0, 1), typed)), said(caret(0, 1)));
-        ensure_equals("one after it moves along", said(ALTextCarets::slid(caret(0, 5), typed)), said(caret(0, 7)));
-        ensure_equals("a selection that begins at it is pushed whole", said(ALTextCarets::slid(sel(0, 2, 4), typed)), said(sel(0, 4, 6)));
-        ensure_equals("one that ends at it stays, what went in after it", said(ALTextCarets::slid(sel(0, 0, 2), typed)), said(sel(0, 0, 2)));
-        ensure_equals("and backwards the same, the caret still at its start", said(ALTextCarets::slid(sel(0, 2, 0), typed)), said(sel(0, 2, 0)));
-        ensure_equals("one over it grows by it", said(ALTextCarets::slid(sel(0, 1, 3), typed)), said(sel(0, 1, 5)));
-        ensure_equals("and keeps its way", said(ALTextCarets::slid(sel(0, 3, 1), typed)), said(sel(0, 5, 1)));
+        UNSCOPED_INFO("a caret at it pushed past");
+        CHECK(said(ALTextCarets::slid(caret(0, 2), typed)) == said(caret(0, 4)));
+        UNSCOPED_INFO("one before it stays");
+        CHECK(said(ALTextCarets::slid(caret(0, 1), typed)) == said(caret(0, 1)));
+        UNSCOPED_INFO("one after it moves along");
+        CHECK(said(ALTextCarets::slid(caret(0, 5), typed)) == said(caret(0, 7)));
+        UNSCOPED_INFO("a selection that begins at it is pushed whole");
+        CHECK(said(ALTextCarets::slid(sel(0, 2, 4), typed)) == said(sel(0, 4, 6)));
+        UNSCOPED_INFO("one that ends at it stays, what went in after it");
+        CHECK(said(ALTextCarets::slid(sel(0, 0, 2), typed)) == said(sel(0, 0, 2)));
+        UNSCOPED_INFO("and backwards the same, the caret still at its start");
+        CHECK(said(ALTextCarets::slid(sel(0, 2, 0), typed)) == said(sel(0, 2, 0)));
+        UNSCOPED_INFO("one over it grows by it");
+        CHECK(said(ALTextCarets::slid(sel(0, 1, 3), typed)) == said(sel(0, 1, 5)));
+        UNSCOPED_INFO("and keeps its way");
+        CHECK(said(ALTextCarets::slid(sel(0, 3, 1), typed)) == said(sel(0, 5, 1)));
 
         // "abXYcdef": "Ycd" taken.
         ALTextDocument::Edit taken = doc.remove(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 6)));
-        ensure_equals("a caret in what was taken goes to where it began", said(ALTextCarets::slid(caret(0, 5), taken)), said(caret(0, 3)));
-        ensure_equals("a selection over its start is cut back to it", said(ALTextCarets::slid(sel(0, 1, 4), taken)), said(sel(0, 1, 3)));
-        ensure_equals("one over its end loses what it took", said(ALTextCarets::slid(sel(0, 7, 4), taken)), said(sel(0, 4, 3)));
-        ensure_equals("one inside it a caret where it began", said(ALTextCarets::slid(sel(0, 4, 5), taken)), said(caret(0, 3)));
+        UNSCOPED_INFO("a caret in what was taken goes to where it began");
+        CHECK(said(ALTextCarets::slid(caret(0, 5), taken)) == said(caret(0, 3)));
+        UNSCOPED_INFO("a selection over its start is cut back to it");
+        CHECK(said(ALTextCarets::slid(sel(0, 1, 4), taken)) == said(sel(0, 1, 3)));
+        UNSCOPED_INFO("one over its end loses what it took");
+        CHECK(said(ALTextCarets::slid(sel(0, 7, 4), taken)) == said(sel(0, 4, 3)));
+        UNSCOPED_INFO("one inside it a caret where it began");
+        CHECK(said(ALTextCarets::slid(sel(0, 4, 5), taken)) == said(caret(0, 3)));
     }
 
-    template<> template<>
-    void altextcarets_object::test<2>()
+    TEST_CASE("altextcarets: overlapping selections merge and a caret merges with what it touches", "[altextcarets]")
     {
-        set_test_name("those that overlap become one, and so do a caret and what it touches; two selections that only touch stay two");
         ALTextCarets carets;
         carets.assign({ sel(0, 0, 3), sel(0, 3, 6) });
-        ensure_equals("two side by side stay two", said(carets.selections()), said(std::vector<ALTextRange>{ sel(0, 0, 3), sel(0, 3, 6) }));
+        UNSCOPED_INFO("two side by side stay two");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ sel(0, 0, 3), sel(0, 3, 6) }));
         carets.assign({ sel(0, 0, 4), sel(0, 3, 6) });
-        ensure_equals("two over each other one", said(carets.selections()), said(sel(0, 0, 6)));
+        UNSCOPED_INFO("two over each other one");
+        CHECK(said(carets.selections()) == said(sel(0, 0, 6)));
         carets.assign({ sel(0, 0, 3), caret(0, 3) });
-        ensure_equals("a caret at a selection's end in it", said(carets.selections()), said(sel(0, 0, 3)));
+        UNSCOPED_INFO("a caret at a selection's end in it");
+        CHECK(said(carets.selections()) == said(sel(0, 0, 3)));
         carets.assign({ caret(1, 2), sel(1, 6, 2) });
-        ensure_equals("one at its start too, the selection's way kept", said(carets.selections()), said(sel(1, 6, 2)));
+        UNSCOPED_INFO("one at its start too, the selection's way kept");
+        CHECK(said(carets.selections()) == said(sel(1, 6, 2)));
         carets.assign({ caret(2, 1), caret(2, 1), caret(0, 1) });
-        ensure_equals("two carets at one place one, in order", said(carets.selections()), said(std::vector<ALTextRange>{ caret(0, 1), caret(2, 1) }));
+        UNSCOPED_INFO("two carets at one place one, in order");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(2, 1) }));
         carets.assign({ sel(0, 0, 2), sel(0, 1, 4), sel(0, 3, 8), caret(0, 10) });
-        ensure_equals("a run of overlaps one, the one after them not", said(carets.selections()),
-                      said(std::vector<ALTextRange>{ sel(0, 0, 8), caret(0, 10) }));
+        UNSCOPED_INFO("a run of overlaps one, the one after them not");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ sel(0, 0, 8), caret(0, 10) }));
         carets.add(caret(0, 8));
-        ensure_equals("one more added merges as it goes in", said(carets.selections()), said(std::vector<ALTextRange>{ sel(0, 0, 8), caret(0, 10) }));
+        UNSCOPED_INFO("one more added merges as it goes in");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ sel(0, 0, 8), caret(0, 10) }));
         carets.add(caret(0, 9));
-        ensure_equals("and one in a gap stays", carets.size(), static_cast<size_t>(3));
+        UNSCOPED_INFO("and one in a gap stays");
+        REQUIRE(carets.size() == static_cast<size_t>(3));
     }
 
-    template<> template<>
-    void altextcarets_object::test<3>()
+    TEST_CASE("altextcarets: merge folds what the main selection meets into it and keeps its way", "[altextcarets]")
     {
-        set_test_name("the main selection takes in any it meets, and keeps its way; a caret as main takes the way of what it took in");
         ALTextCarets carets;
         carets.assign({ caret(0, 2), sel(0, 5, 8), caret(3, 0) });
         ALTextRange main = sel(0, 5, 0);
-        ensure("the main one as it was", !carets.merge(main));
-        ensure_equals("and still so", said(main), said(sel(0, 5, 0)));
-        ensure_equals("the caret it covers taken in, not the selection it only touches", said(carets.selections()),
-                      said(std::vector<ALTextRange>{ sel(0, 5, 8), caret(3, 0) }));
+        UNSCOPED_INFO("the main one as it was");
+        CHECK_FALSE(carets.merge(main));
+        CHECK(said(main) == said(sel(0, 5, 0)));
+        UNSCOPED_INFO("the caret it covers taken in, not the selection it only touches");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ sel(0, 5, 8), caret(3, 0) }));
 
         main = sel(0, 2, 6);
-        ensure("changed again", carets.merge(main));
-        ensure_equals("over the selection now, its own way kept", said(main), said(sel(0, 2, 8)));
-        ensure_equals("the others left", said(carets.selections()), said(caret(3, 0)));
+        UNSCOPED_INFO("changed again");
+        CHECK(carets.merge(main));
+        UNSCOPED_INFO("over the selection now, its own way kept");
+        CHECK(said(main) == said(sel(0, 2, 8)));
+        UNSCOPED_INFO("the others left");
+        CHECK(said(carets.selections()) == said(caret(3, 0)));
 
         carets.assign({ sel(1, 9, 3) });
         main = caret(1, 9);
-        ensure("a caret at a selection's end changed", carets.merge(main));
-        ensure_equals("it is the selection, run its way", said(main), said(sel(1, 9, 3)));
-        ensure("nothing else", carets.empty());
+        UNSCOPED_INFO("a caret at a selection's end changed");
+        CHECK(carets.merge(main));
+        UNSCOPED_INFO("it is the selection, run its way");
+        CHECK(said(main) == said(sel(1, 9, 3)));
+        UNSCOPED_INFO("nothing else");
+        REQUIRE(carets.empty());
 
         carets.assign({ caret(5, 0) });
         main = caret(0, 0);
-        ensure("apart, nothing changes", !carets.merge(main));
-        ensure_equals("and nothing goes", carets.size(), static_cast<size_t>(1));
+        UNSCOPED_INFO("apart, nothing changes");
+        CHECK_FALSE(carets.merge(main));
+        UNSCOPED_INFO("and nothing goes");
+        REQUIRE(carets.size() == static_cast<size_t>(1));
     }
 
-    template<> template<>
-    void altextcarets_object::test<4>()
+    TEST_CASE("altextcarets: apply slides carets along an edit and merges those it brings together", "[altextcarets]")
     {
-        set_test_name("an edit slides each along, those it brought together merged; those before it and below it untouched");
         ALTextDocument doc("one two three\nfour five\nsix");
         ALTextCarets   carets;
         carets.assign({ caret(0, 1), caret(0, 5), sel(0, 8, 11), caret(1, 2), caret(2, 1) });
         // "two thr" taken: the caret in it and the selection's start go to
         // where it began, and meet.
         carets.apply(doc.remove(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 11))));
-        ensure_equals("cut back and merged", said(carets.selections()),
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(1, 2), caret(2, 1) }));
+        UNSCOPED_INFO("cut back and merged");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(1, 2), caret(2, 1) }));
         // A line put in above the second: those below move down a line.
         carets.apply(doc.insert(ALTextPos(1, 0), "new\n"));
-        ensure_equals("moved down", said(carets.selections()),
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(2, 2), caret(3, 1) }));
+        UNSCOPED_INFO("moved down");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(2, 2), caret(3, 1) }));
         // A line joined to the one before: the caret on it goes onto that one.
         carets.apply(doc.remove(ALTextRange(ALTextPos(2, 4), ALTextPos(3, 0))));
-        ensure_equals("onto the line it was joined to", said(carets.selections()),
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(2, 2), caret(2, 5) }));
-        ensure_equals("the text as the carets have it", doc.text(), std::string("one ee\nnew\nfoursix"));
+        UNSCOPED_INFO("onto the line it was joined to");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), caret(2, 2), caret(2, 5) }));
+        UNSCOPED_INFO("the text as the carets have it");
+        CHECK(doc.text() == std::string("one ee\nnew\nfoursix"));
     }
 
-    template<> template<>
-    void altextcarets_object::test<5>()
+    TEST_CASE("altextcarets: a batch slides each caret by the stretches before it", "[altextcarets]")
     {
-        set_test_name("a batch's stretches slide each by the stretches before it; a caret in one goes to where it begins");
         ALTextDocument doc("a b c d e");
         ALTextCarets   carets;
         carets.assign({ caret(0, 1), caret(0, 3), sel(0, 4, 5), caret(0, 9) });
         // "b" made "BB", and "d" made "" -- the caret at 3 is right after b.
         carets.apply(doc.replaceMany({ { ALTextRange(ALTextPos(0, 2), ALTextPos(0, 3)), "BB" }, { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 7)), "" } }));
-        ensure_equals("each along by what went before it", said(carets.selections()),
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), sel(0, 5, 6), caret(0, 9) }));
-        ensure_equals("the text", doc.text(), std::string("a BB c  e"));
+        UNSCOPED_INFO("each along by what went before it");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), sel(0, 5, 6), caret(0, 9) }));
+        CHECK(doc.text() == std::string("a BB c  e"));
         // Text put in at the selection's start and at its end: it keeps
         // what it held; the caret at the end of the text pushed.
         carets.apply(doc.replaceMany({ { ALTextRange(ALTextPos(0, 5), ALTextPos(0, 5)), "<" }, { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 6)), ">" },
                                        { ALTextRange(ALTextPos(0, 9), ALTextPos(0, 9)), "!" } }));
-        ensure_equals("the selection still over c alone, the last caret past the !", said(carets.selections()),
-                      said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), sel(0, 6, 7), caret(0, 12) }));
-        ensure_equals("the text again", doc.text(), std::string("a BB <c>  e!"));
+        UNSCOPED_INFO("the selection still over c alone, the last caret past the !");
+        CHECK(said(carets.selections()) == said(std::vector<ALTextRange>{ caret(0, 1), caret(0, 4), sel(0, 6, 7), caret(0, 12) }));
+        CHECK(doc.text() == std::string("a BB <c>  e!"));
     }
 
-    template<> template<>
-    void altextcarets_object::test<6>()
+    TEST_CASE("altextcarets: onLine gives the carets that begin on a line or reach it from above", "[altextcarets]")
     {
-        set_test_name("those that may lie on a line: one that began above and reaches it, and those that begin on it");
         ALTextCarets carets;
         carets.assign({ caret(0, 0), ALTextRange(ALTextPos(4, 2), ALTextPos(1, 3)), caret(2, 0), caret(2, 4), caret(3, 1) });
         const auto on = [&](S32 line) {
@@ -210,9 +220,11 @@ namespace tut
             return said(out);
         };
         // The long one takes in what it covers.
-        ensure_equals("all, merged", carets.size(), static_cast<size_t>(2));
-        ensure_equals("line 0", on(0), said(caret(0, 0)));
-        ensure_equals("line 2 is the long one's", on(2), said(ALTextRange(ALTextPos(4, 2), ALTextPos(1, 3))));
-        ensure_equals("line 5 nothing", on(5), std::string());
+        UNSCOPED_INFO("all, merged");
+        REQUIRE(carets.size() == static_cast<size_t>(2));
+        CHECK(on(0) == said(caret(0, 0)));
+        UNSCOPED_INFO("line 2 is the long one's");
+        CHECK(on(2) == said(ALTextRange(ALTextPos(4, 2), ALTextPos(1, 3))));
+        CHECK(on(5) == std::string());
     }
 }

@@ -27,10 +27,8 @@
 #include "../llfontgl.h"
 #include "../llrender2dutils.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
-{
 namespace
 {
     struct lluitransform_data
@@ -61,30 +59,23 @@ namespace
         }
     };
 
-    typedef test_group<lluitransform_data> lluitransform_test;
-    typedef lluitransform_test::object     lluitransform_object;
-    tut::lluitransform_test lluitransform_testgroup("lluitransform");
-}
 
-    // With nothing pushed, a local rect is where it says it is.
-    template<> template<>
-    void lluitransform_object::test<1>()
+    TEST_CASE_METHOD(lluitransform_data, "lluitransform: with nothing pushed a local rect is where it says it is", "[lluitransform]")
     {
         const LLRect local(10, 40, 110, 20);
         const LLRect screen = LLRender2D::toScreen(local);
-        ensure_equals("untransformed, it is itself " + where(screen), where(screen), where(local));
+        CHECK(where(screen) == where(local));
     }
 
     // An offset moves it, which is all this ever did.
-    template<> template<>
-    void lluitransform_object::test<2>()
+    TEST_CASE_METHOD(lluitransform_data, "lluitransform: an offset moves a rect and keeps its size", "[lluitransform]")
     {
         LLFontGL::sCurOrigin.set(7, 13);
         const LLRect screen = LLRender2D::toScreen(LLRect(10, 40, 110, 20));
-        ensure_equals("moved by the offset", screen.mLeft, 17);
-        ensure_equals("in both directions", screen.mBottom, 33);
-        ensure_equals("keeping its width", screen.getWidth(), 100);
-        ensure_equals("and its height", screen.getHeight(), 20);
+        CHECK(screen.mLeft == 17);
+        CHECK(screen.mBottom == 33);
+        CHECK(screen.getWidth() == 100);
+        CHECK(screen.getHeight() == 20);
     }
 
     // A scale grows it about the screen origin, and the offset is scaled with
@@ -92,36 +83,41 @@ namespace
     // arithmetic the renderer does to every one of them. Clipping used to
     // apply the offset and not the scale, so a scissor sat where the drawing
     // would have been at a hundred per cent.
-    template<> template<>
-    void lluitransform_object::test<3>()
+    TEST_CASE_METHOD(lluitransform_data, "lluitransform: a scale grows a rect about the screen origin and scales the offset", "[lluitransform]")
     {
         LLFontGL::sCurOrigin.set(10, 20);
         LLFontGL::sCurScaleX = 2.f;
         LLFontGL::sCurScaleY = 2.f;
 
         const LLRect screen = LLRender2D::toScreen(LLRect(0, 50, 100, 0));
-        ensure_equals("the near edge is the scaled offset", screen.mLeft, 20);
-        ensure_equals("and so is the bottom", screen.mBottom, 40);
-        ensure_equals("the far edge is scaled too", screen.mRight, 220);
-        ensure_equals("the rect is twice the size", screen.getWidth(), 200);
-        ensure_equals("in both directions", screen.getHeight(), 100);
+        {
+            INFO("the near edges are the scaled offset");
+            CHECK(screen.mLeft == 20);
+            CHECK(screen.mBottom == 40);
+        }
+        UNSCOPED_INFO("the far edge is scaled too");
+        CHECK(screen.mRight == 220);
+        {
+            INFO("the rect is twice the size");
+            CHECK(screen.getWidth() == 200);
+            CHECK(screen.getHeight() == 100);
+        }
     }
 
     // The two axes are independent, because the renderer's are.
-    template<> template<>
-    void lluitransform_object::test<4>()
+    TEST_CASE_METHOD(lluitransform_data, "lluitransform: the two axes scale independently", "[lluitransform]")
     {
         LLFontGL::sCurScaleX = 3.f;
         LLFontGL::sCurScaleY = 1.f;
 
         const LLRect screen = LLRender2D::toScreen(LLRect(0, 10, 10, 0));
-        ensure_equals("across", screen.getWidth(), 30);
-        ensure_equals("down is left alone", screen.getHeight(), 10);
+        CHECK(screen.getWidth() == 30);
+        UNSCOPED_INFO("down is left alone");
+        CHECK(screen.getHeight() == 10);
     }
 
     // A point and a rect agree, since the rect is two points.
-    template<> template<>
-    void lluitransform_object::test<5>()
+    TEST_CASE_METHOD(lluitransform_data, "lluitransform: a point and a rect's corner land in the same place", "[lluitransform]")
     {
         LLFontGL::sCurOrigin.set(4, 6);
         LLFontGL::sCurScaleX = 1.5f;
@@ -130,19 +126,21 @@ namespace
         F32 x = 0.f;
         F32 y = 0.f;
         LLRender2D::toScreen(20.f, 30.f, x, y);
-        ensure_equals("across", (S32)ll_round(x), 36);
-        ensure_equals("down", (S32)ll_round(y), 90);
+        CHECK((S32)ll_round(x) == 36);
+        CHECK((S32)ll_round(y) == 90);
 
         const LLRect screen = LLRender2D::toScreen(LLRect(20, 30, 20, 30));
-        ensure_equals("the rect's corner is the same point", screen.mLeft, 36);
-        ensure_equals("and the same on the other axis", screen.mBottom, 90);
+        {
+            INFO("the rect's corner is the same point");
+            CHECK(screen.mLeft == 36);
+            CHECK(screen.mBottom == 90);
+        }
     }
 
     // A scale keeps the origin it was pushed at: what is under it is drawn
     // larger where it already was, rather than being carried away from the
     // window's corner in proportion to how far along it had got.
-    template<> template<>
-    void lluitransform_object::test<6>()
+    TEST_CASE_METHOD(lluitransform_data, "lluitransform: a scale keeps the origin it was pushed at", "[lluitransform]")
     {
         LLRender2D::pushMatrix();
         LLRender2D::translate(300.f, 200.f);
@@ -151,20 +149,25 @@ namespace
         F32 x = 0.f;
         F32 y = 0.f;
         LLRender2D::toScreen(0.f, 0.f, x, y);
-        ensure_equals("the corner it was pushed at is where it was", ll_round(x), 300);
-        ensure_equals("on both axes", ll_round(y), 200);
+        {
+            INFO("the corner it was pushed at is where it was");
+            CHECK(ll_round(x) == 300);
+            CHECK(ll_round(y) == 200);
+        }
 
         LLRender2D::toScreen(50.f, 40.f, x, y);
-        ensure_equals("and what is on it is twice as far along", ll_round(x), 400);
-        ensure_equals("in both directions", ll_round(y), 280);
+        {
+            INFO("what is on it is twice as far along");
+            CHECK(ll_round(x) == 400);
+            CHECK(ll_round(y) == 280);
+        }
 
         LLRender2D::popMatrix();
     }
 
     // Taking the frame off takes the scale with it, and what it did to the
     // offset to keep the origin.
-    template<> template<>
-    void lluitransform_object::test<7>()
+    TEST_CASE_METHOD(lluitransform_data, "lluitransform: popMatrix takes off the frame's scale and what it did to the offset", "[lluitransform]")
     {
         LLRender2D::pushMatrix();
         LLRender2D::translate(30.f, 40.f);
@@ -175,9 +178,16 @@ namespace
         F32 x = 0.f;
         F32 y = 0.f;
         LLRender2D::toScreen(10.f, 10.f, x, y);
-        ensure_equals("the offset is the one the frame was pushed on", ll_round(x), 40);
-        ensure_equals("on both axes", ll_round(y), 50);
-        ensure_equals("and the scale is off with it", LLFontGL::sCurScaleX, 1.f);
+        {
+            INFO("the offset is the one the frame was pushed on");
+            CHECK(ll_round(x) == 40);
+            CHECK(ll_round(y) == 50);
+        }
+        {
+            INFO("the scale is off with it");
+            CHECK(LLFontGL::sCurScaleX == 1.f);
+            CHECK(LLFontGL::sCurScaleY == 1.f);
+        }
 
         LLRender2D::popMatrix();
     }

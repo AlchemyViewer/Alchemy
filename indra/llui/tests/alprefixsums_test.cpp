@@ -26,25 +26,16 @@
 
 #include "alprefixsums.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alprefixsums_data
     {
-        // What the sums should say, added up the long way.
-        static S32 before(const std::vector<S32>& values, size_t index)
-        {
-            S32 sum = 0;
-            for (size_t i = 0; i < index && i < values.size(); ++i)
-            {
-                sum += values[i];
-            }
-            return sum;
-        }
+        // The place a sum reaches, found the long way.
         static size_t reach(const std::vector<S32>& values, S32 sum)
         {
             size_t at  = 0;
@@ -59,19 +50,21 @@ namespace tut
 
         // Every place's sum and value, and the place each sum reaches; or,
         // `sampled`, a few of each, for a long run.
-        static void same(const std::string& what, const ALPrefixSums<S32>& sums, const std::vector<S32>& values, bool sampled = false)
+        static void require_same(const std::string& what, const ALPrefixSums<S32>& sums, const std::vector<S32>& values, bool sampled = false)
         {
-            ensure_equals(what + ": size", sums.size(), values.size());
+            INFO(what);
+            REQUIRE(sums.size() == values.size());
             const size_t step = sampled ? values.size() / 7 + 1 : 1;
             S32          sum  = 0;
             for (size_t i = 0; i <= values.size(); ++i)
             {
                 if (i % step == 0 || i == values.size())
                 {
-                    ensure_equals(what + ": before " + std::to_string(i), sums.before(i), sum);
+                    CAPTURE(i);
+                    REQUIRE(sums.before(i) == sum);
                     if (i < values.size())
                     {
-                        ensure_equals(what + ": at " + std::to_string(i), sums.at(i), values[i]);
+                        REQUIRE(sums.at(i) == values[i]);
                     }
                 }
                 if (i < values.size())
@@ -79,43 +72,39 @@ namespace tut
                     sum += values[i];
                 }
             }
-            ensure_equals(what + ": total", sums.total(), sum);
+            REQUIRE(sums.total() == sum);
             for (S32 s = -1; s <= sum + 2; s += sampled ? sum / 11 + 1 : 1)
             {
-                ensure_equals(what + ": reach " + std::to_string(s), sums.reach(s), reach(values, s));
+                CAPTURE(s);
+                REQUIRE(sums.reach(s) == reach(values, s));
             }
         }
     };
 
-    typedef test_group<alprefixsums_data> alprefixsums_group;
-    typedef alprefixsums_group::object    alprefixsums_object;
-    alprefixsums_group                    alprefixsums_instance("alprefixsums");
-
-    template<> template<>
-    void alprefixsums_object::test<1>()
+    TEST_CASE_METHOD(alprefixsums_data, "alprefixsums: before and reach match a plain sum for none and one and many values", "[alprefixsums]")
     {
-        set_test_name("the sums before every place, and the place every sum reaches, are what adding up finds; nothing and one are runs too");
         ALPrefixSums<S32> sums;
-        same("none", sums, {});
+        require_same("none", sums, {});
         sums.assign({ 3, 0, 0, 2 });
-        ensure_equals("past the run of nothing", sums.reach(3), size_t(3));
-        ensure_equals("within the first", sums.reach(2), size_t(0));
-        ensure_equals("past them all", sums.reach(5), size_t(4));
+        UNSCOPED_INFO("past the run of nothing");
+        CHECK(sums.reach(3) == size_t(3));
+        UNSCOPED_INFO("within the first");
+        CHECK(sums.reach(2) == size_t(0));
+        UNSCOPED_INFO("past them all");
+        CHECK(sums.reach(5) == size_t(4));
         sums.assign({ 4 });
-        same("one", sums, { 4 });
+        require_same("one", sums, { 4 });
         std::vector<S32> many;
         for (S32 i = 0; i < 1000; ++i)
         {
             many.push_back((i * 7) % 5);
         }
         sums.assign(many);
-        same("many blocks", sums, many);
+        require_same("many blocks", sums, many);
     }
 
-    template<> template<>
-    void alprefixsums_object::test<2>()
+    TEST_CASE_METHOD(alprefixsums_data, "alprefixsums: sums stay right through 4000 random edits of any size", "[alprefixsums]")
     {
-        set_test_name("numbers changed, put in and taken out anywhere, a few or many, leave the sums adding up finds");
         std::vector<S32>  values(700, 1);
         ALPrefixSums<S32> sums;
         sums.assign(values);
@@ -152,12 +141,13 @@ namespace tut
                 values.erase(values.begin() + static_cast<std::ptrdiff_t>(index), values.begin() + static_cast<std::ptrdiff_t>(index + taken));
                 sums.erase(index, count);
             }
-            same("step " + std::to_string(step), sums, values, true);
+            CAPTURE(step);
+            require_same("after a step", sums, values, true);
         }
-        same("at the end, every place", sums, values);
+        require_same("at the end, every place", sums, values);
         sums.erase(0, sums.size());
-        same("all taken out", sums, {});
+        require_same("all taken out", sums, {});
         sums.insert(0, { 2, 3 });
-        same("put in again", sums, { 2, 3 });
+        require_same("put in again", sums, { 2, 3 });
     }
 }

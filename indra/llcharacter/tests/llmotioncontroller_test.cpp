@@ -26,7 +26,8 @@
 
 #include "llmotioncontroller.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 
 namespace
 {
@@ -38,22 +39,11 @@ namespace
     constexpr S32 FRAMES_PER_QUANTUM = 16;
 }
 
-namespace tut
-{
 namespace
 {
-    struct llmotioncontroller_data
-    {
-    };
-    typedef test_group<llmotioncontroller_data> llmotioncontroller_test;
-    typedef llmotioncontroller_test::object llmotioncontroller_object;
-    tut::llmotioncontroller_test llmotioncontroller_testcase("LLMotionController");
-}
-
     typedef LLMotionController::QuantumStep QuantumStep;
 
-    template<> template<>
-    void llmotioncontroller_object::test<1>()
+    TEST_CASE("LLMotionController: computeQuantumStep crosses one boundary per quantum of wall time", "[LLMotionController]")
     {
         // Animation time has to track wall time. Run a clock for ten seconds
         // at the largest quantum the viewer hands out, a quarter second, and
@@ -74,11 +64,11 @@ namespace
                 last_count = q.count;
             }
         }
-        ensure_equals("ten seconds at a quarter-second quantum crosses forty boundaries", crossings, 40);
+        UNSCOPED_INFO("ten seconds at a quarter-second quantum crosses forty boundaries");
+        CHECK(crossings == 40);
     }
 
-    template<> template<>
-    void llmotioncontroller_object::test<2>()
+    TEST_CASE("LLMotionController: the quantized target stays at most one quantum ahead of real time", "[LLMotionController]")
     {
         // The quantized clock runs one quantum ahead of real time, never more
         // and never behind: the pose it computes is the target the frames in
@@ -91,13 +81,15 @@ namespace
             continuous += dt;
             const QuantumStep q = LLMotionController::computeQuantumStep(continuous, step, 0);
             const F32 target = q.count * step;
-            ensure("target is ahead of real time", target > continuous);
-            ensure("target is no more than one quantum ahead", target <= continuous + step + 1e-5f);
+            CAPTURE(frame);
+            UNSCOPED_INFO("target is ahead of real time");
+            REQUIRE(target > continuous);
+            UNSCOPED_INFO("target is no more than one quantum ahead");
+            REQUIRE(target <= continuous + step + 1e-5f);
         }
     }
 
-    template<> template<>
-    void llmotioncontroller_object::test<3>()
+    TEST_CASE("LLMotionController: interp never falls within a quantum and quanta have equal frames", "[LLMotionController]")
     {
         // Within a quantum interp climbs from zero toward one and never comes
         // back; crossing a boundary is reported exactly once, and every
@@ -111,41 +103,48 @@ namespace
         {
             continuous += FRAME;
             const QuantumStep q = LLMotionController::computeQuantumStep(continuous, QUANTUM, last_count);
-            ensure("interp is at least zero", q.interp >= 0.f);
-            ensure("interp is below one", q.interp < 1.f);
+            CAPTURE(frame);
+            REQUIRE(q.interp >= 0.f);
+            REQUIRE(q.interp < 1.f);
             if (q.advanced)
             {
-                ensure_equals("advanced means the count moved by one", q.count, last_count + 1);
-                ensure_equals("a quantum is the same number of frames every time", frames_in_quantum, FRAMES_PER_QUANTUM);
+                UNSCOPED_INFO("advanced means the count moved by one");
+                REQUIRE(q.count == last_count + 1);
+                UNSCOPED_INFO("a quantum is the same number of frames every time");
+                REQUIRE(frames_in_quantum == FRAMES_PER_QUANTUM);
                 frames_in_quantum = 0;
                 last_count = q.count;
             }
             else
             {
-                ensure("interp does not go backwards inside a quantum", q.interp >= last_interp);
+                UNSCOPED_INFO("interp does not go backwards inside a quantum");
+                REQUIRE(q.interp >= last_interp);
             }
             last_interp = q.interp;
             ++frames_in_quantum;
         }
     }
 
-    template<> template<>
-    void llmotioncontroller_object::test<4>()
+    TEST_CASE("LLMotionController: time at or before zero heads for the first boundary", "[LLMotionController]")
     {
         // Time before the first quantum boundary heads for the first boundary,
         // and time before zero is treated as zero.
         const QuantumStep at_start = LLMotionController::computeQuantumStep(0.f, QUANTUM, 0);
-        ensure_equals("the first target is the first boundary", at_start.count, 1);
-        ensure_equals("nothing of the quantum has elapsed", at_start.interp, 0.f);
-        ensure("a fresh clock has advanced from nowhere", at_start.advanced);
+        UNSCOPED_INFO("the first target is the first boundary");
+        REQUIRE(at_start.count == 1);
+        UNSCOPED_INFO("nothing of the quantum has elapsed");
+        CHECK(at_start.interp == 0.f);
+        UNSCOPED_INFO("a fresh clock has advanced from nowhere");
+        CHECK(at_start.advanced);
 
         const QuantumStep before = LLMotionController::computeQuantumStep(-1.f, QUANTUM, 1);
-        ensure_equals("negative time does not run the count backwards", before.count, 1);
-        ensure_equals("nor does it produce a negative interp", before.interp, 0.f);
+        UNSCOPED_INFO("negative time does not run the count backwards");
+        REQUIRE(before.count == 1);
+        UNSCOPED_INFO("nor does it produce a negative interp");
+        CHECK(before.interp == 0.f);
     }
 
-    template<> template<>
-    void llmotioncontroller_object::test<5>()
+    TEST_CASE("LLMotionController: quantumInterpolant keeps the blended pose on the linear track", "[LLMotionController]")
     {
         // The blender lerps from wherever the pose is now toward the target. To
         // track real time it needs the fraction of the distance still to go,
@@ -159,41 +158,51 @@ namespace
         {
             const F32 u = LLMotionController::quantumInterpolant(interp, last_interp);
             pose = lerp(pose, target, u);
-            ensure_approximately_equals("the pose sits on the linear track", pose, target * interp, 16);
+            CAPTURE(interp);
+            UNSCOPED_INFO("the pose sits on the linear track");
+            REQUIRE_THAT(pose, ll_test::WithinBits(target * interp, 16));
             last_interp = interp;
         }
-        ensure_approximately_equals("the pose has arrived at the boundary", pose, target, 16);
+        UNSCOPED_INFO("the pose has arrived at the boundary");
+        CHECK_THAT(pose, ll_test::WithinBits(target, 16));
     }
 
-    template<> template<>
-    void llmotioncontroller_object::test<7>()
+    TEST_CASE("LLMotionController: quantumInterpolant is zero with no progress and one at the end", "[LLMotionController]")
+    {
+        // The edges: no progress is no movement, reaching the end is all of
+        // the way, and a clock already at the end has nothing left to move.
+        UNSCOPED_INFO("no progress moves nothing");
+        CHECK(LLMotionController::quantumInterpolant(0.3f, 0.3f) == 0.f);
+        UNSCOPED_INFO("reaching the end moves all the way");
+        CHECK(LLMotionController::quantumInterpolant(1.f, 0.3f) == 1.f);
+        UNSCOPED_INFO("at the end already is all the way");
+        CHECK(LLMotionController::quantumInterpolant(0.5f, 1.f) == 1.f);
+        UNSCOPED_INFO("from nothing to something is that fraction");
+        CHECK(LLMotionController::quantumInterpolant(0.25f, 0.f) == 0.25f);
+    }
+
+    TEST_CASE("LLMotionController: quantizeTimeStep lands on sixteenths up to a quarter", "[LLMotionController]")
     {
         // The requested quantum is a smooth function of size and crowd and
         // would move a little every frame. It lands on sixteenths, never
         // finer than one and never coarser than a quarter, and anything under
         // a sixteenth is not worth quantizing at all.
-        ensure_equals("a quarter stays a quarter", LLMotionController::quantizeTimeStep(0.25f), 0.25f);
-        ensure_equals("more than a quarter is capped", LLMotionController::quantizeTimeStep(0.4f), 0.25f);
-        ensure_equals("a fifth rounds down to three sixteenths", LLMotionController::quantizeTimeStep(0.2f), 0.1875f);
-        ensure_equals("just under an eighth is a sixteenth", LLMotionController::quantizeTimeStep(0.124f), 0.0625f);
-        ensure_equals("a twentieth is too fine to bother with", LLMotionController::quantizeTimeStep(0.05f), 0.f);
-        ensure_equals("nothing asked for is nothing", LLMotionController::quantizeTimeStep(0.f), 0.f);
-        ensure_equals("a negative request is nothing", LLMotionController::quantizeTimeStep(-1.f), 0.f);
+        CHECK(LLMotionController::quantizeTimeStep(0.25f) == 0.25f);
+        UNSCOPED_INFO("more than a quarter is capped");
+        CHECK(LLMotionController::quantizeTimeStep(0.4f) == 0.25f);
+        UNSCOPED_INFO("a fifth rounds down to three sixteenths");
+        CHECK(LLMotionController::quantizeTimeStep(0.2f) == 0.1875f);
+        UNSCOPED_INFO("just under an eighth is a sixteenth");
+        CHECK(LLMotionController::quantizeTimeStep(0.124f) == 0.0625f);
+        UNSCOPED_INFO("a twentieth is too fine to bother with");
+        CHECK(LLMotionController::quantizeTimeStep(0.05f) == 0.f);
+        CHECK(LLMotionController::quantizeTimeStep(0.f) == 0.f);
+        CHECK(LLMotionController::quantizeTimeStep(-1.f) == 0.f);
 
         // Every rung is exact in binary, so a clock stepping by one is exact.
         F32 t = 0.f;
         for (S32 i = 0; i < 64; ++i) { t += LLMotionController::quantizeTimeStep(0.0625f); }
-        ensure_equals("sixty-four sixteenths is exactly four", t, 4.f);
-    }
-
-    template<> template<>
-    void llmotioncontroller_object::test<6>()
-    {
-        // The edges: no progress is no movement, reaching the end is all of
-        // the way, and a clock already at the end has nothing left to move.
-        ensure_equals("no progress moves nothing", LLMotionController::quantumInterpolant(0.3f, 0.3f), 0.f);
-        ensure_equals("reaching the end moves all the way", LLMotionController::quantumInterpolant(1.f, 0.3f), 1.f);
-        ensure_equals("at the end already is all the way", LLMotionController::quantumInterpolant(0.5f, 1.f), 1.f);
-        ensure_equals("from nothing to something is that fraction", LLMotionController::quantumInterpolant(0.25f, 0.f), 0.25f);
+        UNSCOPED_INFO("sixty-four sixteenths is exactly four");
+        CHECK(t == 4.f);
     }
 }

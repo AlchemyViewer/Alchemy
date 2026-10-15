@@ -26,128 +26,168 @@
 
 #include "alkeymap.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <set>
 #include <string>
 
-namespace tut
+namespace
 {
     struct alkeymap_data
     {
         typedef ALEditorCommand C;
     };
-    typedef test_group<alkeymap_data> alkeymap_group;
-    typedef alkeymap_group::object    alkeymap_object;
-    alkeymap_group                    alkeymap_instance("alkeymap");
 
-    template<> template<>
-    void alkeymap_object::test<1>()
+    TEST_CASE_METHOD(alkeymap_data, "alkeymap: every command has a name of its own that finds it again", "[alkeymap]")
     {
-        set_test_name("every command has a name of its own, and is found again by it");
         std::set<std::string> names;
         for (size_t i = 1; i < static_cast<size_t>(C::COUNT); ++i)
         {
             const C           command = static_cast<C>(i);
             const std::string name    = alEditorCommandName(command);
-            ensure("named", !name.empty() && name != "none");
-            ensure("once", names.insert(name).second);
-            ensure("found again", alEditorCommandFromName(name) == command);
+            CAPTURE(i, name);
+            REQUIRE_FALSE(name.empty());
+            REQUIRE(name != "none");
+            UNSCOPED_INFO("a name no other command has");
+            REQUIRE(names.insert(name).second);
+            REQUIRE(alEditorCommandFromName(name) == command);
         }
-        ensure("a name no command has", !alEditorCommandFromName("frobnicate"));
-        ensure("none is no command to find", !alEditorCommandFromName("none"));
+        CHECK_FALSE(alEditorCommandFromName("frobnicate"));
+        UNSCOPED_INFO("none is no command to find");
+        CHECK_FALSE(alEditorCommandFromName("none"));
     }
 
-    template<> template<>
-    void alkeymap_object::test<2>()
+    TEST_CASE_METHOD(alkeymap_data, "alkeymap: a key needs exactly its modifiers; a rebind replaces and an unbind frees", "[alkeymap]")
     {
-        set_test_name("a key is looked up with exactly its modifiers; binding it again replaces; unbinding it frees it");
         ALKeymap map;
         map.bind('K', MASK_CONTROL, C::DeleteLine);
-        ensure("found", map.lookup('K', MASK_CONTROL) == C::DeleteLine);
-        ensure("not with Shift too", map.lookup('K', MASK_CONTROL | MASK_SHIFT) == C::None);
-        ensure("nor without Control", map.lookup('K', MASK_NONE) == C::None);
+        CHECK(map.lookup('K', MASK_CONTROL) == C::DeleteLine);
+        UNSCOPED_INFO("not with Shift too");
+        CHECK(map.lookup('K', MASK_CONTROL | MASK_SHIFT) == C::None);
+        UNSCOPED_INFO("nor without Control");
+        CHECK(map.lookup('K', MASK_NONE) == C::None);
         map.bind('K', MASK_CONTROL, C::Cut);
-        ensure("replaced", map.lookup('K', MASK_CONTROL) == C::Cut && map.bindings().size() == 1);
+        {
+            INFO("replaced");
+            CHECK(map.lookup('K', MASK_CONTROL) == C::Cut);
+            CHECK(map.bindings().size() == 1);
+        }
         map.bind(KEY_F5, MASK_NONE, C::Cut);
         KEY  key  = KEY_NONE;
         MASK mask = MASK_NONE;
-        ensure("its first key", map.keysFor(C::Cut, key, mask) && key == 'K' && mask == MASK_CONTROL);
+        {
+            INFO("its first key");
+            CHECK(map.keysFor(C::Cut, key, mask));
+            CHECK(key == 'K');
+            CHECK(mask == MASK_CONTROL);
+        }
         map.unbind('K', MASK_CONTROL);
-        ensure("freed", map.lookup('K', MASK_CONTROL) == C::None);
-        ensure("its other key now first", map.keysFor(C::Cut, key, mask) && key == KEY_F5);
-        ensure("none for a command with none", !map.keysFor(C::Paste, key, mask));
+        CHECK(map.lookup('K', MASK_CONTROL) == C::None);
+        {
+            INFO("its other key now first");
+            CHECK(map.keysFor(C::Cut, key, mask));
+            CHECK(key == KEY_F5);
+        }
+        UNSCOPED_INFO("none for a command with none");
+        CHECK_FALSE(map.keysFor(C::Paste, key, mask));
     }
 
-    template<> template<>
-    void alkeymap_object::test<3>()
+    // The everyday keys, Backspace and Return under Shift as well, each key
+    // bound once, and off the Mac no Control-Alt with a key that types.
+    TEST_CASE_METHOD(alkeymap_data, "alkeymap: the standard keys bind the everyday commands and each key once", "[alkeymap]")
     {
-        set_test_name("the standard keys: the everyday ones, Shift-Backspace and Shift-Return, and no Control-Alt with a key that types off the Mac");
         const ALKeymap map = ALKeymap::standard();
-        ensure("undo", map.lookup('Z', MASK_CONTROL) == C::Undo);
-        ensure("find", map.lookup('F', MASK_CONTROL) == C::Find);
-        ensure("Backspace", map.lookup(KEY_BACKSPACE, MASK_NONE) == C::DeleteLeft);
-        ensure("and under Shift", map.lookup(KEY_BACKSPACE, MASK_SHIFT) == C::DeleteLeft);
-        ensure("Return", map.lookup(KEY_RETURN, MASK_NONE) == C::NewLine);
-        ensure("and under Shift", map.lookup(KEY_RETURN, MASK_SHIFT) == C::NewLine);
+        CHECK(map.lookup('Z', MASK_CONTROL) == C::Undo);
+        CHECK(map.lookup('F', MASK_CONTROL) == C::Find);
+        CHECK(map.lookup(KEY_BACKSPACE, MASK_NONE) == C::DeleteLeft);
+        CHECK(map.lookup(KEY_BACKSPACE, MASK_SHIFT) == C::DeleteLeft);
+        CHECK(map.lookup(KEY_RETURN, MASK_NONE) == C::NewLine);
+        CHECK(map.lookup(KEY_RETURN, MASK_SHIFT) == C::NewLine);
         KEY  key  = KEY_NONE;
         MASK mask = MASK_NONE;
-        ensure("the menu shows Backspace alone", map.keysFor(C::DeleteLeft, key, mask) && mask == MASK_NONE);
+        {
+            INFO("the menu shows Backspace alone");
+            CHECK(map.keysFor(C::DeleteLeft, key, mask));
+            CHECK(mask == MASK_NONE);
+        }
         std::set<std::pair<KEY, MASK>> seen;
         for (const ALKeymap::Binding& binding : map.bindings())
         {
-            ensure("each key once", seen.insert({ binding.key, binding.mask }).second);
+            UNSCOPED_INFO("each key once");
+            REQUIRE(seen.insert({ binding.key, binding.mask }).second);
 #if !LL_DARWIN
             // Control and Alt together is AltGr on many a keyboard, which
             // types.
             const bool types = binding.key >= 0x20 && binding.key < 0x80;
-            ensure(std::string("no Control-Alt ") + static_cast<char>(binding.key),
-                   !types || (binding.mask & (MASK_CONTROL | MASK_ALT)) != (MASK_CONTROL | MASK_ALT));
+            UNSCOPED_INFO("no Control-Alt " << static_cast<char>(binding.key));
+            REQUIRE((!types || (binding.mask & (MASK_CONTROL | MASK_ALT)) != (MASK_CONTROL | MASK_ALT)));
 #endif
         }
     }
 
-    template<> template<>
-    void alkeymap_object::test<4>()
+    // The Mac's conventions there, and the others' elsewhere; a key that
+    // needs no Fn is the one shown first.
+    TEST_CASE_METHOD(alkeymap_data, "alkeymap: find next and replace and folding keep each platform's conventions", "[alkeymap]")
     {
-        set_test_name("the Mac's conventions there, and the others' elsewhere: find next, replace, folding, and keys that need no Fn shown first");
         const ALKeymap map = ALKeymap::standard();
         KEY            key  = KEY_NONE;
         MASK           mask = MASK_NONE;
 #if LL_DARWIN
-        ensure("Command-G the next match", map.lookup('G', MASK_CONTROL) == C::FindNext);
-        ensure("Shift-Command-G the one before", map.lookup('G', MASK_CONTROL | MASK_SHIFT) == C::FindPrevious);
-        ensure("Command-H left to the system", map.lookup('H', MASK_CONTROL) == C::None);
-        ensure("Command-Option-F replaces", map.lookup('F', MASK_CONTROL | MASK_ALT) == C::Replace);
-        ensure("Command-Option-[ folds", map.lookup('[', MASK_CONTROL | MASK_ALT) == C::Fold);
-        ensure("Command-Shift-[ left to the tabs", map.lookup('[', MASK_CONTROL | MASK_SHIFT) == C::None);
-        ensure("a definition shown as Control-Command-J", map.keysFor(C::GoToDefinition, key, mask) && key == 'J' && mask == (MASK_CONTROL | MASK_MAC_CONTROL));
-        ensure("F12 still", map.lookup(KEY_F12, MASK_NONE) == C::GoToDefinition);
-        ensure("Command-semicolon the next misspelling", map.lookup(';', MASK_CONTROL) == C::NextMisspelling);
-        ensure("Option with an arrow a word", map.lookup(KEY_LEFT, MASK_ALT) == C::MoveWordLeft);
+        UNSCOPED_INFO("Command-G the next match");
+        CHECK(map.lookup('G', MASK_CONTROL) == C::FindNext);
+        UNSCOPED_INFO("Shift-Command-G the one before");
+        CHECK(map.lookup('G', MASK_CONTROL | MASK_SHIFT) == C::FindPrevious);
+        UNSCOPED_INFO("Command-H left to the system");
+        CHECK(map.lookup('H', MASK_CONTROL) == C::None);
+        UNSCOPED_INFO("Command-Option-F replaces");
+        CHECK(map.lookup('F', MASK_CONTROL | MASK_ALT) == C::Replace);
+        UNSCOPED_INFO("Command-Option-[ folds");
+        CHECK(map.lookup('[', MASK_CONTROL | MASK_ALT) == C::Fold);
+        UNSCOPED_INFO("Command-Shift-[ left to the tabs");
+        CHECK(map.lookup('[', MASK_CONTROL | MASK_SHIFT) == C::None);
+        {
+            INFO("a definition shown as Control-Command-J");
+            CHECK(map.keysFor(C::GoToDefinition, key, mask));
+            CHECK(key == 'J');
+            CHECK(mask == (MASK_CONTROL | MASK_MAC_CONTROL));
+        }
+        UNSCOPED_INFO("F12 still");
+        CHECK(map.lookup(KEY_F12, MASK_NONE) == C::GoToDefinition);
+        UNSCOPED_INFO("Command-semicolon the next misspelling");
+        CHECK(map.lookup(';', MASK_CONTROL) == C::NextMisspelling);
+        UNSCOPED_INFO("Option with an arrow a word");
+        CHECK(map.lookup(KEY_LEFT, MASK_ALT) == C::MoveWordLeft);
 #else
-        ensure("Alt with an arrow left to whoever holds the editor, for back", map.lookup(KEY_LEFT, MASK_ALT) == C::None);
-        ensure("Control-H replaces", map.lookup('H', MASK_CONTROL) == C::Replace);
-        ensure("Control-Shift-[ folds", map.lookup('[', MASK_CONTROL | MASK_SHIFT) == C::Fold);
-        ensure("F3 the next match, shown", map.keysFor(C::FindNext, key, mask) && key == KEY_F3);
+        UNSCOPED_INFO("Alt with an arrow left to whoever holds the editor, for back");
+        CHECK(map.lookup(KEY_LEFT, MASK_ALT) == C::None);
+        UNSCOPED_INFO("Control-H replaces");
+        CHECK(map.lookup('H', MASK_CONTROL) == C::Replace);
+        UNSCOPED_INFO("Control-Shift-[ folds");
+        CHECK(map.lookup('[', MASK_CONTROL | MASK_SHIFT) == C::Fold);
+        UNSCOPED_INFO("F3 the next match, shown");
+        CHECK((map.keysFor(C::FindNext, key, mask) && key == KEY_F3));
 #endif
     }
 
-    template<> template<>
-    void alkeymap_object::test<5>()
+    TEST_CASE_METHOD(alkeymap_data, "alkeymap: the keypad's slash KEY_DIVIDE looks up and binds as the slash key", "[alkeymap]")
     {
-        set_test_name("the keypad's slash is heard as the slash key: KEY_DIVIDE comments as '/' does, and binds as '/'");
         ALKeymap map = ALKeymap::standard();
-        ensure("Control with the slash key as '/'", map.lookup('/', MASK_CONTROL) == C::ToggleComment);
-        ensure("and as KEY_DIVIDE", map.lookup(KEY_DIVIDE, MASK_CONTROL) == C::ToggleComment);
-        ensure("KEY_DIVIDE on its own nothing", map.lookup(KEY_DIVIDE, MASK_NONE) == C::None);
+        CHECK(map.lookup('/', MASK_CONTROL) == C::ToggleComment);
+        CHECK(map.lookup(KEY_DIVIDE, MASK_CONTROL) == C::ToggleComment);
+        CHECK(map.lookup(KEY_DIVIDE, MASK_NONE) == C::None);
 
         map.unbind(KEY_DIVIDE, MASK_CONTROL);
-        ensure("unbound as either", map.lookup('/', MASK_CONTROL) == C::None);
+        UNSCOPED_INFO("unbound as either");
+        CHECK(map.lookup('/', MASK_CONTROL) == C::None);
         map.unbind('7', MASK_CONTROL | MASK_SHIFT);
         map.bind(KEY_DIVIDE, MASK_CONTROL | MASK_ALT, C::ToggleComment);
         KEY  key  = KEY_NONE;
         MASK mask = MASK_NONE;
-        ensure("bound as KEY_DIVIDE, kept and shown as '/'", map.keysFor(C::ToggleComment, key, mask) && key == '/' && mask == (MASK_CONTROL | MASK_ALT));
+        {
+            INFO("bound as KEY_DIVIDE, kept and shown as '/'");
+            CHECK(map.keysFor(C::ToggleComment, key, mask));
+            CHECK(key == '/');
+            CHECK(mask == (MASK_CONTROL | MASK_ALT));
+        }
     }
 }

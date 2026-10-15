@@ -25,7 +25,7 @@
 
 #include "../preprocessor/alsourcemap.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace
 {
@@ -43,20 +43,10 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
-    struct alsourcemap_data
+    TEST_CASE("alsourcemap: verbatim tokens in a run are one segment; a macro or line or file starts anew", "[alsourcemap]")
     {
-    };
-
-    typedef test_group<alsourcemap_data> alsourcemap_group;
-    typedef alsourcemap_group::object    alsourcemap_object;
-    alsourcemap_group                    alsourcemap_instance("alsourcemap");
-
-    template<> template<>
-    void alsourcemap_object::test<1>()
-    {
-        set_test_name("verbatim tokens that carry on from one another are one segment; a macro's product, another line or another file start their own");
         ALSourceMap map;
         map.addFile("script", "script");
         map.addFile("lib", "disk:/lib");
@@ -67,19 +57,39 @@ namespace tut
         map.add(segment(0, 14, 1, 0, 0, 12));      // ; -- not where the last left off
         map.add(segment(1, 0, 4, 1, 0, 0));        // another file
         map.finish();
-        ensure("the first three one", map.toSource(0, 8).column == 8 && map.toSource(0, 0).line == 0);
+        {
+            INFO("the first three one");
+            CHECK(map.toSource(0, 8).column == 8);
+            CHECK(map.toSource(0, 0).line == 0);
+        }
         ALSourceMap::Loc begin, end;
-        ensure("one stretch copied as it stands", map.verbatimSpan(0, 0, 9, begin, end) && begin.column == 0 && end.column == 9);
-        ensure("the macro's to its invocation", map.toSource(0, 11).line == 3 && map.toSource(0, 11).column == 2);
-        ensure("the next its own", map.toSource(0, 14).column == 12);
-        ensure("the other file's", map.toSource(1, 2).file == 1 && map.toSource(1, 2).column == 2);
-        ensure("and back", map.toExpanded(0, 0, 8).line == 0 && map.toExpanded(0, 0, 8).column == 8);
+        {
+            INFO("one stretch copied as it stands");
+            CHECK(map.verbatimSpan(0, 0, 9, begin, end));
+            CHECK(begin.column == 0);
+            CHECK(end.column == 9);
+        }
+        {
+            INFO("the macro's to its invocation");
+            CHECK(map.toSource(0, 11).line == 3);
+            CHECK(map.toSource(0, 11).column == 2);
+        }
+        UNSCOPED_INFO("the next its own");
+        CHECK(map.toSource(0, 14).column == 12);
+        {
+            INFO("the other file's");
+            CHECK(map.toSource(1, 2).file == 1);
+            CHECK(map.toSource(1, 2).column == 2);
+        }
+        {
+            INFO("and back");
+            CHECK(map.toExpanded(0, 0, 8).line == 0);
+            CHECK(map.toExpanded(0, 0, 8).column == 8);
+        }
     }
 
-    template<> template<>
-    void alsourcemap_object::test<2>()
+    TEST_CASE("alsourcemap: the segment at or before a column on a long line; nothing on a line with none", "[alsourcemap]")
     {
-        set_test_name("a long line of a macro's products looked up: the segment at or before the column, the first before any, nothing on a line with none");
         ALSourceMap map;
         map.addFile("script", "script");
         for (S32 i = 0; i < 3000; ++i)
@@ -88,17 +98,23 @@ namespace tut
         }
         map.add(segment(2, 0, 3, 0, 5, 0));
         map.finish();
-        ensure_equals("the first", map.toSource(0, 4).column, 0);
-        ensure_equals("in the middle", map.toSource(0, 4 + 1500 * 3 + 1).column, 1500);
-        ensure_equals("before any: the first", map.toSource(0, 1).column, 0);
-        ensure_equals("past the last: the last", map.toSource(0, 20000).column, 2999);
-        ensure("a line with none: nowhere", !map.toSource(1, 0).found() && map.toSource(2, 1).found());
+        UNSCOPED_INFO("the first");
+        CHECK(map.toSource(0, 4).column == 0);
+        UNSCOPED_INFO("in the middle");
+        CHECK(map.toSource(0, 4 + 1500 * 3 + 1).column == 1500);
+        UNSCOPED_INFO("before any: the first");
+        CHECK(map.toSource(0, 1).column == 0);
+        UNSCOPED_INFO("past the last: the last");
+        CHECK(map.toSource(0, 20000).column == 2999);
+        {
+            INFO("a line with none: nowhere");
+            CHECK_FALSE(map.toSource(1, 0).found());
+            CHECK(map.toSource(2, 1).found());
+        }
     }
 
-    template<> template<>
-    void alsourcemap_object::test<3>()
+    TEST_CASE("alsourcemap: a map composed through another reads a stretch through each inner segment", "[alsourcemap]")
     {
-        set_test_name("a map read through another: one copied stretch over several of the other's segments read through each, exact where they are");
         // The inner map: its output line 0 is `abc` from the script's line
         // 4, then `MACRO` a macro made at line 9 column 1, then `xyz` from
         // the include's line 2.
@@ -116,26 +132,43 @@ namespace tut
         outer.add(segment(1, 0, 3, 0, 7, 0));
         outer.finish();
         const ALSourceMap through = outer.composed(inner);
-        ensure("the script's own, exact", through.toSource(0, 3).file == 0 && through.toSource(0, 3).line == 4 && through.toSource(0, 3).column == 1);
-        ensure("the macro's, to its invocation", through.toSource(0, 7).line == 9 && through.toSource(0, 7).column == 1);
-        ensure("the include's, exact", through.toSource(0, 11).file == 1 && through.toSource(0, 11).column == 1);
-        ensure("a line the inner has nothing for: dropped", !through.toSource(1, 0).found());
+        {
+            INFO("the script's own, exact");
+            CHECK(through.toSource(0, 3).file == 0);
+            CHECK(through.toSource(0, 3).line == 4);
+            CHECK(through.toSource(0, 3).column == 1);
+        }
+        {
+            INFO("the macro's, to its invocation");
+            CHECK(through.toSource(0, 7).line == 9);
+            CHECK(through.toSource(0, 7).column == 1);
+        }
+        {
+            INFO("the include's, exact");
+            CHECK(through.toSource(0, 11).file == 1);
+            CHECK(through.toSource(0, 11).column == 1);
+        }
+        UNSCOPED_INFO("a line the inner has nothing for: dropped");
+        CHECK_FALSE(through.toSource(1, 0).found());
         ALSourceMap::Loc begin, end;
-        ensure("the copied stretches stay verbatim", through.verbatimSpan(0, 2, 5, begin, end) && !through.verbatimSpan(0, 5, 10, begin, end));
+        {
+            INFO("the copied stretches stay verbatim");
+            CHECK(through.verbatimSpan(0, 2, 5, begin, end));
+            CHECK_FALSE(through.verbatimSpan(0, 5, 10, begin, end));
+        }
     }
 
-    template<> template<>
-    void alsourcemap_object::test<4>()
+    TEST_CASE("alsourcemap: a text mapped to itself: every line its own even the last without a newline", "[alsourcemap]")
     {
-        set_test_name("a text mapped to itself: every line its own, the last without a newline too");
         const ALSourceMap map = ALSourceMap::identity("one\ntwo three\nlast", "same");
-        ensure("named", map.files().size() == 1 && map.files()[0].name == "same");
-        ensure("each line", map.toSource(1, 5).line == 1 && map.toSource(1, 5).column == 5 && map.toSource(2, 2).line == 2);
+        REQUIRE(map.files().size() == 1);
+        CHECK(map.files()[0].name == "same");
+        CHECK(map.toSource(1, 5).line == 1);
+        CHECK(map.toSource(1, 5).column == 5);
+        CHECK(map.toSource(2, 2).line == 2);
     }
-    template<> template<>
-    void alsourcemap_object::test<5>()
+    TEST_CASE("alsourcemap: a verbatim stretch on a long line: the first segment to reach the column", "[alsourcemap]")
     {
-        set_test_name("a verbatim stretch found on a long line: the first segment that reaches the column, as a walk from the line's start finds it");
         ALSourceMap map;
         map.addFile("script", "script");
         // A long line of alternating pieces: a macro's product, then a
@@ -150,11 +183,25 @@ namespace tut
         map.finish();
         ALSourceMap::Loc begin, end;
         const S32        at = 7 * 250 + 4;
-        ensure("within a token copied, deep in the line", map.verbatimSpan(0, at + 1, at + 3, begin, end) && begin.line == 1 && begin.column == 2501 && end.column == 2503);
-        ensure("an insertion just after it goes with it", map.verbatimSpan(0, at + 3, at + 3, begin, end) && begin.column == 2503);
-        ensure("an insertion just before it goes with the macro's product before it", !map.verbatimSpan(0, at, at, begin, end));
-        ensure("and so does a stretch from its first column", !map.verbatimSpan(0, at, at + 3, begin, end));
-        ensure("into the macro's product after it: not the source's", !map.verbatimSpan(0, at + 1, at + 5, begin, end));
-        ensure("past the line's end", !map.verbatimSpan(0, out + 2, out + 3, begin, end));
+        {
+            INFO("within a token copied, deep in the line");
+            REQUIRE(map.verbatimSpan(0, at + 1, at + 3, begin, end));
+            CHECK(begin.line == 1);
+            CHECK(begin.column == 2501);
+            CHECK(end.column == 2503);
+        }
+        {
+            INFO("an insertion just after it goes with it");
+            CHECK(map.verbatimSpan(0, at + 3, at + 3, begin, end));
+            CHECK(begin.column == 2503);
+        }
+        UNSCOPED_INFO("an insertion just before it goes with the macro's product before it");
+        CHECK_FALSE(map.verbatimSpan(0, at, at, begin, end));
+        UNSCOPED_INFO("and so does a stretch from its first column");
+        CHECK_FALSE(map.verbatimSpan(0, at, at + 3, begin, end));
+        UNSCOPED_INFO("into the macro's product after it: not the source's");
+        CHECK_FALSE(map.verbatimSpan(0, at + 1, at + 5, begin, end));
+        UNSCOPED_INFO("past the line's end");
+        CHECK_FALSE(map.verbatimSpan(0, out + 2, out + 3, begin, end));
     }
 }

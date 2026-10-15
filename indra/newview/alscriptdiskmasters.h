@@ -35,6 +35,7 @@
 
 #include <boost/signals2.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <memory>
 #include <optional>
@@ -183,8 +184,15 @@ public:
     std::vector<Outcome> takeUnheard();
     // An outcome told: to the windows listening, or, with none, to the
     // toasts and kept. A send's as it ends, and what came of a question
-    // about many at once.
-    void tell(const Outcome& outcome);
+    // about many at once. Its script by its name now, where that is known.
+    void tell(Outcome outcome);
+    // A linked item's name as it is now, heard -- renamed in the studio, or
+    // listed by its prim since -- which its link takes, for what is said of
+    // it next.
+    void named(const ALScriptRef& ref, const std::string& name);
+    // What a linked script's next send sets, picked in its file's tab: its
+    // compile target, and its experience (null for none), each where given.
+    void chosen(const ALScriptRef& ref, const std::optional<std::string>& target, const std::optional<std::optional<LLUUID>>& experience);
 
     // The folders a script on disk may read from, as its includes and
     // requires do -- the include folders, what a configuration on disk
@@ -198,6 +206,10 @@ public:
     // The item a link names, as the world has it now; null where it is out
     // of reach or gone.
     static LLInventoryItem* itemOf(const ALScriptRef& ref);
+    // Whether a prim holds a linked script: kept in the world while it is
+    // out of sight, as a selected one is, so that a save of its file finds
+    // it (LLViewerRegion::killObject). False before the links are read.
+    static bool holdsLinked(const LLUUID& prim);
 
 private:
     // The index of the account in hand: read the first time it is asked
@@ -205,7 +217,8 @@ private:
     ALMasterIndex* links();
     // The index changed: what is watched, and whoever listens told.
     void           changed();
-    // What is watched, as the links stand now.
+    // What is watched, and the prims held (holdsLinked), as the links
+    // stand now.
     void           rewatch();
     // A save of a linked script heard from elsewhere.
     void heardSaved(const ALScriptSaved& saved);
@@ -221,6 +234,7 @@ private:
     std::unique_ptr<ALMasterIndex>     mIndex;
     boost::signals2::scoped_connection mIndexConnection;
     boost::signals2::scoped_connection mSavedConnection;
+    boost::signals2::scoped_connection mContentsConnection;
     boost::signals2::scoped_connection mEnabledConnection;
     boost::signals2::scoped_connection mQuietConnection;
     outcome_signal_t                   mOutcome;
@@ -234,4 +248,5 @@ private:
     std::unique_ptr<ALScriptMasterAdopt>                                      mAdopt;
     std::unique_ptr<ALScriptMasterToasts>                                     mToasts;
     std::vector<Outcome>                                                      mUnheard;
+    boost::unordered_flat_set<LLUUID>                                         mHolding;
 };

@@ -19,7 +19,7 @@
 // std headers
 // external library headers
 // other Linden headers
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace
 {
@@ -89,21 +89,12 @@ struct OtherCallback
 } // anonymous namespace
 
 /*****************************************************************************
-*   TUT
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
-    struct classic_callback_data
+    TEST_CASE("classic_callback: ClassicCallback adapts C++ callables to a C callback", "[classic_callback]")
     {
-    };
-    typedef test_group<classic_callback_data> classic_callback_group;
-    typedef classic_callback_group::object object;
-    classic_callback_group classic_callbackgrp("classic_callback");
-
-    template<> template<>
-    void object::test<1>()
-    {
-        set_test_name("ClassicCallback");
         // engage someAPI(MyCallback())
         auto ccb{ makeClassicCallback<callback_t>(MyCallback()) };
         someAPI(ccb.get_callback(), ccb.get_userdata());
@@ -113,13 +104,15 @@ namespace tut
         MyCallback mcb;
         ClassicCallback<callback_t, void*, MyCallback&> ccb2(mcb);
         someAPI(ccb2.get_callback(), ccb2.get_userdata());
-        ensure_equals("failed to call through ClassicCallback", mcb.mMsg, "called");
+        UNSCOPED_INFO("failed to call through ClassicCallback");
+        CHECK(mcb.mMsg == "called");
 
         // try with HeapClassicCallback
         mcb.mMsg.clear();
         auto hcbp{ makeHeapClassicCallback<callback_t>(mcb) };
         someAPI(hcbp->get_callback(), hcbp->get_userdata());
-        ensure_equals("failed to call through HeapClassicCallback", mcb.mMsg, "called");
+        UNSCOPED_INFO("failed to call through HeapClassicCallback");
+        CHECK(mcb.mMsg == "called");
 
         // lambda
         // The tricky thing here is that a lambda is an unspecified type, so
@@ -130,7 +123,8 @@ namespace tut
                 [&mcb](const char* msg, void*)
                 { mcb.callback_with_extra("extra", msg); }));
         someAPI(xcb.get_callback(), xcb.get_userdata());
-        ensure_equals("failed to call lambda", mcb.mMsg, "extra called");
+        UNSCOPED_INFO("failed to call lambda");
+        CHECK(mcb.mMsg == "extra called");
 
         // engage otherAPI(OtherCallback())
         OtherCallback ocb;
@@ -141,9 +135,9 @@ namespace tut
         // effect.
         auto occb{ makeClassicCallback<complex_callback>(std::move(ocb)) };
         std::string result{ otherAPI(occb.get_callback(), occb.get_userdata()) };
-        ensure_equals("failed to return callback result", result, "hello back!");
-        ensure_equals("failed to set int", sData.mi, 17);
-        ensure_equals("failed to set string", sData.ms, "hello world");
-        ensure_equals("failed to set double", sData.mf, 3.0);
+        CHECK(result == "hello back!");
+        CHECK(sData.mi == 17);
+        CHECK(sData.ms == "hello world");
+        CHECK(sData.mf == 3.0);
     }
-} // namespace tut
+} // anonymous namespace

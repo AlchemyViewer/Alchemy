@@ -34,7 +34,7 @@
 #include "llsd.h"
 #include "llsdparam.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 //
 // Types under test. These live at namespace scope because a block's parameter
@@ -129,10 +129,10 @@ struct ChoiceOfThings : public LLInitParam::ChoiceBlock<ChoiceOfThings>
     {}
 };
 
-// The same, built only by test 9. A choice block starts with its first
-// alternative chosen only when it is the first of its type, the one whose
-// construction builds the type's descriptor: with a type of its own, test 9
-// sees that whatever ran before it.
+// The same, built only by the case on choosing one alternative. A choice block
+// starts with its first alternative chosen only when it is the first of its
+// type, the one whose construction builds the type's descriptor: with a type of
+// its own, that case sees that whatever ran before it.
 struct FirstChoiceOfThings : public LLInitParam::ChoiceBlock<FirstChoiceOfThings>
 {
     Alternative<S32>            number;
@@ -235,132 +235,107 @@ struct PointChoice : public LLInitParam::ChoiceBlock<PointChoice>
 
 } // anonymous namespace
 
-namespace tut
+namespace
 {
-    struct llinitparam_data
+    TEST_CASE("llinitparam: fresh block reports defaults and nothing provided", "[llinitparam]")
     {
-    };
-    typedef test_group<llinitparam_data> llinitparam_group;
-    typedef llinitparam_group::object object;
-    llinitparam_group llinitparamgrp("llinitparam");
-
-    template<> template<>
-    void object::test<1>()
-    {
-        set_test_name("fresh block reports defaults and nothing provided");
-
         SimpleBlock block;
 
-        ensure("nothing provided yet", !block.name.isProvided());
-        ensure("nothing provided yet", !block.count.isProvided());
-        ensure_equals("declared default survives", block.count(), 7);
-        ensure_equals("declared default survives", block.flag(), false);
-        ensure("block itself is not provided", !block.isProvided());
+        CHECK_FALSE(block.name.isProvided());
+        CHECK_FALSE(block.count.isProvided());
+        CHECK(block.count() == 7);
+        CHECK_FALSE(block.flag());
+        CHECK_FALSE(block.isProvided());
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE("llinitparam: assignment marks a parameter provided", "[llinitparam]")
     {
-        set_test_name("assignment marks a parameter provided");
-
         SimpleBlock block;
         block.count = 42;
 
-        ensure("assignment provides", block.count.isProvided());
-        ensure_equals("assignment stores", block.count(), 42);
-        ensure("sibling untouched", !block.flag.isProvided());
-        ensure("block became provided", block.isProvided());
+        CHECK(block.count.isProvided());
+        CHECK(block.count() == 42);
+        CHECK_FALSE(block.flag.isProvided());
+        CHECK(block.isProvided());
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE("llinitparam: Mandatory gates validation and Optional does not", "[llinitparam]")
     {
-        set_test_name("Mandatory gates validation, Optional does not");
-
         SimpleBlock block;
-        ensure("missing mandatory fails validation", !block.validateBlock(false));
+        UNSCOPED_INFO("missing mandatory fails validation");
+        CHECK_FALSE(block.validateBlock(false));
 
         block.name = std::string("widget");
-        ensure("supplied mandatory passes validation", block.validateBlock(false));
+        CHECK(block.validateBlock(false));
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE("llinitparam: derived block sees its own and its base's parameters", "[llinitparam]")
     {
-        set_test_name("derived block sees its own and its base's parameters");
-
         DerivedBlock block;
         block.count = 3;    // declared on SimpleBlock
         block.scale = 2.f;  // declared on DerivedBlock
 
-        ensure_equals("base parameter readable", block.count(), 3);
-        ensure_equals("derived parameter readable", block.scale(), 2.f);
+        CHECK(block.count() == 3);
+        CHECK(block.scale() == 2.f);
 
         // The base's Mandatory is aggregated into the derived table, so it
         // still gates the derived block's validation.
-        ensure("inherited mandatory still required", !block.validateBlock(false));
+        UNSCOPED_INFO("inherited mandatory still required");
+        CHECK_FALSE(block.validateBlock(false));
         block.name = std::string("derived");
-        ensure("inherited mandatory satisfied", block.validateBlock(false));
+        CHECK(block.validateBlock(false));
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE("llinitparam: named values resolve by name and by number", "[llinitparam]")
     {
-        set_test_name("named values resolve by name and by number");
-
         S32 value = 0;
-        ensure("known name resolves", TestNames::getValueFromName("two", value));
-        ensure_equals("known name resolves to its value", value, 2);
-        ensure("unknown name does not resolve", !TestNames::getValueFromName("nine", value));
+        CHECK(TestNames::getValueFromName("two", value));
+        CHECK(value == 2);
+        CHECK_FALSE(TestNames::getValueFromName("nine", value));
 
         SimpleBlock block;
         block.named = std::string("one");
-        ensure_equals("assignment by name sets the value", block.named(), 1);
-        ensure_equals("assignment by name records the name", block.named.getValueName(), std::string("one"));
+        CHECK(block.named() == 1);
+        CHECK(block.named.getValueName() == std::string("one"));
 
         block.named = 2;
-        ensure_equals("assignment by value sets the value", block.named(), 2);
-        ensure("assignment by value clears the name", block.named.getValueName().empty());
+        CHECK(block.named() == 2);
+        CHECK(block.named.getValueName().empty());
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE("llinitparam: Multiple counts elements and enforces its range", "[llinitparam]")
     {
-        set_test_name("Multiple counts elements and enforces its range");
-
         OuterBlock block;
-        ensure("empty list is below AtLeast<2>", !block.list.isValid());
-        ensure_equals("empty list has no elements", block.list.size(), size_t(0));
+        UNSCOPED_INFO("empty list is below AtLeast<2>");
+        CHECK_FALSE(block.list.isValid());
+        CHECK(block.list.size() == size_t(0));
 
         block.list.add(10);
-        ensure("one element is still below AtLeast<2>", !block.list.isValid());
+        UNSCOPED_INFO("one element is still below AtLeast<2>");
+        CHECK_FALSE(block.list.isValid());
 
         block.list.add(20);
-        ensure("two elements satisfy AtLeast<2>", block.list.isValid());
-        ensure_equals("elements are kept in order", block.list()[0](), 10);
-        ensure_equals("elements are kept in order", block.list()[1](), 20);
+        UNSCOPED_INFO("two elements satisfy AtLeast<2>");
+        REQUIRE(block.list.isValid());
+        CHECK(block.list()[0]() == 10);
+        CHECK(block.list()[1]() == 20);
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE("llinitparam: a parameter that is a block is provided by its children", "[llinitparam]")
     {
-        set_test_name("a parameter that is a block is provided by its children");
-
         OuterBlock block;
-        ensure("untouched sub-block is not provided", !block.inner.isProvided());
+        CHECK_FALSE(block.inner.isProvided());
 
         block.inner.a = 5;
-        ensure("setting a child provides the sub-block", block.inner.isProvided());
-        ensure("and provides the enclosing block", block.isProvided());
-        ensure_equals("child value readable", block.inner.a(), 5);
-        ensure_equals("sibling child keeps its default", block.inner.b(), 0);
+        CHECK(block.inner.isProvided());
+        CHECK(block.isProvided());
+        CHECK(block.inner.a() == 5);
+        UNSCOPED_INFO("sibling child keeps its default");
+        CHECK(block.inner.b() == 0);
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE("llinitparam: fillFrom yields to what is already provided and overwriteFrom does not", "[llinitparam]")
     {
-        set_test_name("fillFrom yields to what is already provided, overwriteFrom does not");
-
         SimpleBlock source;
         source.count = 100;
         source.flag = true;
@@ -369,37 +344,33 @@ namespace tut
         destination.count = 1;
 
         destination.fillFrom(source);
-        ensure_equals("fillFrom leaves a provided value alone", destination.count(), 1);
-        ensure_equals("fillFrom supplies an absent value", destination.flag(), true);
+        CHECK(destination.count() == 1);
+        UNSCOPED_INFO("fillFrom supplies an absent value");
+        CHECK(destination.flag());
 
         destination.overwriteFrom(source);
-        ensure_equals("overwriteFrom replaces a provided value", destination.count(), 100);
+        CHECK(destination.count() == 100);
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE("llinitparam: choosing one alternative unprovides the other", "[llinitparam]")
     {
-        set_test_name("choosing one alternative unprovides the other");
-
         FirstChoiceOfThings choice;
-        ensure("first declared alternative is chosen initially", choice.number.isChosen());
+        UNSCOPED_INFO("first declared alternative is chosen initially");
+        CHECK(choice.number.isChosen());
 
         choice.text = std::string("hello");
-        ensure("assignment chooses", choice.text.isChosen());
-        ensure("and unchooses the previous alternative", !choice.number.isChosen());
-        ensure("the displaced alternative is no longer provided", !choice.number.isProvided());
-        ensure_equals("the chosen alternative reads back", choice.text(), std::string("hello"));
+        CHECK(choice.text.isChosen());
+        CHECK_FALSE(choice.number.isChosen());
+        CHECK_FALSE(choice.number.isProvided());
+        CHECK(choice.text() == std::string("hello"));
 
         choice.number = 3;
-        ensure("choosing back works", choice.number.isChosen());
-        ensure("and displaces the other", !choice.text.isProvided());
+        CHECK(choice.number.isChosen());
+        CHECK_FALSE(choice.text.isProvided());
     }
 
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE("llinitparam: scalars survive an LLSD round-trip", "[llinitparam]")
     {
-        set_test_name("scalars survive an LLSD round-trip");
-
         SimpleBlock written;
         written.name = std::string("round");
         written.count = 55;
@@ -409,24 +380,21 @@ namespace tut
         LLParamSDParser parser;
         parser.writeSD(sd, written);
 
-        ensure("provided scalars are written", sd.has("count"));
-        ensure_equals("written value is the one set", sd["count"].asInteger(), 55);
+        REQUIRE(sd.has("count"));
+        CHECK(sd["count"].asInteger() == 55);
 
         SimpleBlock read;
         LLParamSDParser reader;
         reader.readSD(sd, read);
 
-        ensure_equals("string survives", read.name(), std::string("round"));
-        ensure_equals("integer survives", read.count(), 55);
-        ensure_equals("boolean survives", read.flag(), true);
-        ensure("reading marks parameters provided", read.count.isProvided());
+        CHECK(read.name() == std::string("round"));
+        CHECK(read.count() == 55);
+        CHECK(read.flag());
+        CHECK(read.count.isProvided());
     }
 
-    template<> template<>
-    void object::test<11>()
+    TEST_CASE("llinitparam: nested blocks and lists survive an LLSD round-trip", "[llinitparam]")
     {
-        set_test_name("nested blocks and lists survive an LLSD round-trip");
-
         OuterBlock written;
         written.inner.a = 11;
         written.inner.b = 22;
@@ -438,24 +406,22 @@ namespace tut
         LLParamSDParser parser;
         parser.writeSD(sd, written);
 
-        ensure("sub-block is written under its own name", sd.has("inner"));
-        ensure_equals("sub-block child is written", sd["inner"]["a"].asInteger(), 11);
+        REQUIRE(sd.has("inner"));
+        CHECK(sd["inner"]["a"].asInteger() == 11);
 
         OuterBlock read;
         LLParamSDParser reader;
         reader.readSD(sd, read);
 
-        ensure_equals("nested value survives", read.inner.a(), 11);
-        ensure_equals("nested value survives", read.inner.b(), 22);
-        ensure_equals("list length survives", read.list.size(), size_t(3));
-        ensure_equals("list order survives", read.list()[2](), 3);
+        CHECK(read.inner.a() == 11);
+        CHECK(read.inner.b() == 22);
+        REQUIRE(read.list.size() == size_t(3));
+        UNSCOPED_INFO("list order survives");
+        CHECK(read.list()[2]() == 3);
     }
 
-    template<> template<>
-    void object::test<12>()
+    TEST_CASE("llinitparam: a named value round-trips as its name and not its number", "[llinitparam]")
     {
-        set_test_name("a named value round-trips as its name, not its number");
-
         SimpleBlock written;
         written.named = std::string("two");
 
@@ -463,21 +429,18 @@ namespace tut
         LLParamSDParser parser;
         parser.writeSD(sd, written);
 
-        ensure_equals("the name is what gets written", sd["named"].asString(), std::string("two"));
+        CHECK(sd["named"].asString() == std::string("two"));
 
         SimpleBlock read;
         LLParamSDParser reader;
         reader.readSD(sd, read);
 
-        ensure_equals("the name resolves back to its value", read.named(), 2);
-        ensure_equals("and the name is remembered", read.named.getValueName(), std::string("two"));
+        CHECK(read.named() == 2);
+        CHECK(read.named.getValueName() == std::string("two"));
     }
 
-    template<> template<>
-    void object::test<13>()
+    TEST_CASE("llinitparam: a synonym reaches the same parameter", "[llinitparam]")
     {
-        set_test_name("a synonym reaches the same parameter");
-
         LLSD sd;
         sd["w"] = 64;
 
@@ -485,15 +448,12 @@ namespace tut
         LLParamSDParser parser;
         parser.readSD(sd, block);
 
-        ensure("the synonym provided the parameter", block.width.isProvided());
-        ensure_equals("through to the same storage", block.width(), 64);
+        CHECK(block.width.isProvided());
+        CHECK(block.width() == 64);
     }
 
-    template<> template<>
-    void object::test<14>()
+    TEST_CASE("llinitparam: an Ignored parameter is accepted and discarded", "[llinitparam]")
     {
-        set_test_name("an Ignored parameter is accepted and discarded");
-
         LLSD sd;
         sd["kept"] = 5;
         sd["gone"] = 6;
@@ -502,33 +462,29 @@ namespace tut
         LLParamSDParser parser;
         parser.readSD(sd, block);
 
-        ensure_equals("the live parameter is read", block.kept(), 5);
-        ensure("the block is valid despite the ignored key", block.validateBlock(false));
+        CHECK(block.kept() == 5);
+        UNSCOPED_INFO("the block is valid despite the ignored key");
+        CHECK(block.validateBlock(false));
     }
 
-    template<> template<>
-    void object::test<15>()
+    TEST_CASE("llinitparam: a custom value can be set whole or by component", "[llinitparam]")
     {
-        set_test_name("a custom value can be set whole or by component");
-
         PointBlock whole;
         whole.point.set(TestPoint(3, 4));
-        ensure_equals("whole assignment reaches the value", whole.point().mX, 3);
-        ensure_equals("whole assignment reaches the value", whole.point().mY, 4);
-        ensure_equals("and splats out to the components", whole.point.x(), 3);
+        CHECK(whole.point().mX == 3);
+        CHECK(whole.point().mY == 4);
+        UNSCOPED_INFO("whole assignment splats out to the components");
+        CHECK(whole.point.x() == 3);
 
         PointBlock components;
         components.point.x = 8;
         components.point.y = 9;
-        ensure_equals("component assignment builds the value", components.point().mX, 8);
-        ensure_equals("component assignment builds the value", components.point().mY, 9);
+        CHECK(components.point().mX == 8);
+        CHECK(components.point().mY == 9);
     }
 
-    template<> template<>
-    void object::test<16>()
+    TEST_CASE("llinitparam: a custom value round-trips through its components", "[llinitparam]")
     {
-        set_test_name("a custom value round-trips through its components");
-
         PointBlock written;
         written.point.x = 12;
         written.point.y = 34;
@@ -541,24 +497,21 @@ namespace tut
         LLParamSDParser reader;
         reader.readSD(sd, read);
 
-        ensure_equals("x survives", read.point().mX, 12);
-        ensure_equals("y survives", read.point().mY, 34);
+        CHECK(read.point().mX == 12);
+        CHECK(read.point().mY == 34);
     }
 
-    template<> template<>
-    void object::test<17>()
+    TEST_CASE("llinitparam: a Lazy sub-block stays absent until something fills it", "[llinitparam]")
     {
-        set_test_name("a Lazy sub-block stays absent until something fills it");
-
         // Lazy<> keeps its block on the heap rather than deriving from it, so
         // an untouched one costs a pointer and serialises to nothing at all.
         OuterBlock untouched;
-        ensure("lazy sub-block starts unprovided", !untouched.lazy_inner.isProvided());
+        CHECK_FALSE(untouched.lazy_inner.isProvided());
 
         LLSD empty_sd;
         LLParamSDParser empty_parser;
         empty_parser.writeSD(empty_sd, untouched);
-        ensure("an unfilled lazy block writes nothing", !empty_sd.has("lazy_inner"));
+        CHECK_FALSE(empty_sd.has("lazy_inner"));
 
         LLSD sd;
         sd["lazy_inner"]["a"] = 77;
@@ -567,63 +520,30 @@ namespace tut
         LLParamSDParser parser;
         parser.readSD(sd, filled);
 
-        ensure("parsing into it provides it", filled.lazy_inner.isProvided());
-        ensure_equals("and the value is reachable", filled.lazy_inner().a(), 77);
+        CHECK(filled.lazy_inner.isProvided());
+        CHECK(filled.lazy_inner().a() == 77);
     }
 
-    template<> template<>
-    void object::test<18>()
+    TEST_CASE("llinitparam: copying a block carries values and provided-ness", "[llinitparam]")
     {
-        set_test_name("copying a block carries values and provided-ness");
-
         SimpleBlock original;
         original.name = std::string("copy me");
         original.count = 99;
 
         SimpleBlock copy(original);
 
-        ensure_equals("values copy", copy.count(), 99);
-        ensure_equals("values copy", copy.name(), std::string("copy me"));
-        ensure("provided-ness copies", copy.count.isProvided());
-        ensure("unprovided stays unprovided", !copy.flag.isProvided());
+        CHECK(copy.count() == 99);
+        CHECK(copy.name() == std::string("copy me"));
+        CHECK(copy.count.isProvided());
+        CHECK_FALSE(copy.flag.isProvided());
 
         // The copy must own its storage: changing it must not disturb the original.
         copy.count = 1;
-        ensure_equals("the original is untouched", original.count(), 99);
+        CHECK(original.count() == 99);
     }
 
-    template<> template<>
-    void object::test<20>()
+    TEST_CASE("llinitparam: the descriptor registry sees every block that has been built", "[llinitparam]")
     {
-        set_test_name("merging reports whether it actually took anything");
-
-        // The return value is what tells a caller its block changed. A
-        // Multiple<> used to answer yes unconditionally, so any block holding
-        // one looked modified by a merge that moved nothing.
-        OuterBlock empty_source;
-        OuterBlock destination;
-        ensure("filling from an empty block changes nothing",
-               !destination.fillFrom(empty_source));
-        ensure_equals("and leaves the list alone", destination.list.size(), size_t(0));
-
-        OuterBlock source;
-        source.list.add(1);
-        source.list.add(2);
-        ensure("filling from a block with values does change it",
-               destination.fillFrom(source));
-        ensure_equals("which arrive in the destination", destination.list.size(), size_t(2));
-
-        // Already-filled destination, still-empty source.
-        ensure("an empty source still changes nothing",
-               !destination.fillFrom(empty_source));
-        ensure_equals("and does not disturb what is there", destination.list.size(), size_t(2));
-    }
-
-    template<> template<>
-    void object::test<19>()
-    {
-        set_test_name("the descriptor registry sees every block that has been built");
-
         // Constructing a block is what registers its parameters, so touch one
         // of each kind declared above before counting.
         SimpleBlock simple;
@@ -635,32 +555,50 @@ namespace tut
         const std::vector<LLInitParam::BlockDescriptor*>& all =
             LLInitParam::BlockDescriptor::getAllDescriptors();
 
-        ensure("every constructed block type registered", all.size() >= 5);
+        UNSCOPED_INFO("every constructed block type registered");
+        CHECK(all.size() >= 5);
 
         size_t named_entries = 0;
         for (const LLInitParam::BlockDescriptor* descriptor : all)
         {
             named_entries += descriptor->namedParams().size();
         }
-        ensure("the tables hold the parameters we declared", named_entries >= 12);
+        UNSCOPED_INFO("the tables hold the parameters we declared");
+        CHECK(named_entries >= 12);
 
         // DerivedBlock aggregates SimpleBlock's four parameters on top of its
         // own, which is the duplication the census exists to measure.
-        ensure_equals("a derived block carries its base's parameters too",
-                      DerivedBlock::getBlockDescriptor().namedParams().size(),
-                      SimpleBlock::getBlockDescriptor().namedParams().size() + 1);
+        CHECK(DerivedBlock::getBlockDescriptor().namedParams().size() ==
+                    SimpleBlock::getBlockDescriptor().namedParams().size() + 1);
 
         const std::string report = LLInitParam::BlockDescriptor::getStatsReport();
-        ensure("the census reports something", !report.empty());
-        ensure("the census names what it counted",
-               report.find("block types registered") != std::string::npos);
+        CHECK_FALSE(report.empty());
+        CHECK(report.find("block types registered") != std::string::npos);
     }
 
-    template<> template<>
-    void object::test<21>()
+    TEST_CASE("llinitparam: merging reports whether it actually took anything", "[llinitparam]")
     {
-        set_test_name("a value filling in its own components is not a choice");
+        // The return value is what tells a caller its block changed. A
+        // Multiple<> used to answer yes unconditionally, so any block holding
+        // one looked modified by a merge that moved nothing.
+        OuterBlock empty_source;
+        OuterBlock destination;
+        CHECK_FALSE(destination.fillFrom(empty_source));
+        CHECK(destination.list.size() == size_t(0));
 
+        OuterBlock source;
+        source.list.add(1);
+        source.list.add(2);
+        CHECK(destination.fillFrom(source));
+        CHECK(destination.list.size() == size_t(2));
+
+        // Already-filled destination, still-empty source.
+        CHECK_FALSE(destination.fillFrom(empty_source));
+        CHECK(destination.list.size() == size_t(2));
+    }
+
+    TEST_CASE("llinitparam: a value filling in its own components is not a choice", "[llinitparam]")
+    {
         // TestPoint fills x and y from its value as it is built. That must
         // read as the block keeping itself consistent, not as someone
         // supplying a point.
@@ -674,33 +612,27 @@ namespace tut
 
         PointChoice choice;
 
-        ensure("nothing has been chosen yet", !choice.point.isChosen());
-        ensure("nothing has been chosen yet", !choice.scalar.isChosen());
+        CHECK_FALSE(choice.point.isChosen());
+        CHECK_FALSE(choice.scalar.isChosen());
     }
 
-    template<> template<>
-    void object::test<22>()
+    TEST_CASE("llinitparam: providing an alternative still chooses it", "[llinitparam]")
     {
-        set_test_name("providing an alternative still chooses it");
-
         PointChoice choice;
         choice.scalar = 5;
-        ensure("the provided alternative is the choice", choice.scalar.isChosen());
-        ensure_equals("and reads back", choice.scalar(), 5);
+        CHECK(choice.scalar.isChosen());
+        CHECK(choice.scalar() == 5);
 
         // Reaching into the components of the other alternative counts as
         // providing it, the same way assigning the whole value would.
         choice.point.x = 3;
-        ensure("the later alternative takes over", choice.point.isChosen());
-        ensure("and the earlier one steps down", !choice.scalar.isChosen());
-        ensure_equals("the component drives the value", choice.point().mX, 3);
+        CHECK(choice.point.isChosen());
+        CHECK_FALSE(choice.scalar.isChosen());
+        CHECK(choice.point().mX == 3);
     }
 
-    template<> template<>
-    void object::test<23>()
+    TEST_CASE("llinitparam: merging does not hand the choice to a value with components", "[llinitparam]")
     {
-        set_test_name("merging does not hand the choice to a value with components");
-
         // A choice merges as a unit: the destination takes the source's
         // choice, and an alternative the source never provided is passed over
         // rather than visited -- which matters here because visiting the point
@@ -712,8 +644,8 @@ namespace tut
         PointChoice destination;
         destination.fillFrom(source);
 
-        ensure("the source's choice carried over", destination.scalar.isChosen());
-        ensure("the untouched alternative did not seize it", !destination.point.isChosen());
-        ensure_equals("and the value came with it", destination.scalar(), 5);
+        CHECK(destination.scalar.isChosen());
+        CHECK_FALSE(destination.point.isChosen());
+        CHECK(destination.scalar() == 5);
     }
 }

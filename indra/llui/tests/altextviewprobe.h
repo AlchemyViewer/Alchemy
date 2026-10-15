@@ -25,6 +25,7 @@
 #ifndef AL_ALTEXTVIEWPROBE_H
 #define AL_ALTEXTVIEWPROBE_H
 
+#include "altextruler.h"
 #include "altextview.h"
 
 #include "llrect.h"
@@ -50,6 +51,8 @@ namespace ll_test
         // The rows and the gaps in sight, as the view walks them to draw.
         static void visibleRows(ALTextView& view, const LLRect& text, const std::function<void(S32, S32, S32)>& visit) { view.forEachVisibleRow(text, visit); }
         static void visibleGaps(ALTextView& view, const LLRect& text, const std::function<void(S32, S32, S32)>& visit) { view.forEachVisibleGap(text, visit); }
+        // The window over a map, as it is drawn.
+        static void mapWindow(ALTextRuler& ruler, S32& top, S32& bottom) { ruler.mapWindow(ruler.getLocalRect(), top, bottom); }
         // What a frame does before it draws, of what a test reaches:
         // Next Misspelling gone on with, and the primary selection offered.
         static void nextFrame(ALTextView& view)

@@ -30,56 +30,39 @@
 #include "lluuid.h"
 #include "v3math.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 
-namespace tut
+namespace
 {
-    struct alcrashreporter_data
+    TEST_CASE("alcrashreporter: the release is the package at a version plus a build", "[alcrashreporter]")
     {
-    };
-
-    typedef test_group<alcrashreporter_data> alcrashreporter_group;
-    typedef alcrashreporter_group::object object;
-    alcrashreporter_group alcrashreportergrp("alcrashreporter");
-
-    template<> template<>
-    void object::test<1>()
-    {
-        set_test_name("the release is the package at a version plus a build");
-        ensure_equals(ALCrashReporter::releaseName(26, 4, 0, 64033), "alchemy@26.4.0+64033");
+        CHECK(ALCrashReporter::releaseName(26, 4, 0, 64033) == "alchemy@26.4.0+64033");
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE("alcrashreporter: a location is the region and whole metres", "[alcrashreporter]")
     {
-        set_test_name("a location is the region and whole metres");
-        ensure_equals(ALCrashReporter::locationTag("Hippotropolis", LLVector3(128.4f, 63.6f, 22.5f)),
+        CHECK(ALCrashReporter::locationTag("Hippotropolis", LLVector3(128.4f, 63.6f, 22.5f)) ==
                       "Hippotropolis/128/64/23");
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE("alcrashreporter: a location keeps the region's own spelling", "[alcrashreporter]")
     {
-        set_test_name("a location keeps the region's own spelling");
-        ensure_equals(ALCrashReporter::locationTag("Ye Olde Region", LLVector3(0.f, 0.f, 0.f)),
+        CHECK(ALCrashReporter::locationTag("Ye Olde Region", LLVector3(0.f, 0.f, 0.f)) ==
                       "Ye Olde Region/0/0/0");
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE("alcrashreporter: the run id is one string for the whole run", "[alcrashreporter]")
     {
-        set_test_name("the run id is one string for the whole run");
         const std::string& first = ALCrashReporter::runId();
-        ensure_equals("a UUID", first.size(), 36u);
-        ensure_equals("stable", ALCrashReporter::runId(), first);
+        UNSCOPED_INFO("a UUID");
+        CHECK(first.size() == 36u);
+        CHECK(ALCrashReporter::runId() == first);
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE("alcrashreporter: the previous run is read from its static debug file", "[alcrashreporter]")
     {
-        set_test_name("the previous run is read from its static debug file");
         LLSD info;
         info["RunId"] = "6f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c";
         info["SLLog"] = "/logs/Alchemy.crash";
@@ -90,147 +73,152 @@ namespace tut
         info["FatalMessage"] = "LL_ERRS: something";
 
         ALCrashReporter::PreviousRun run = ALCrashReporter::previousRun(info);
-        ensure_equals(run.runId, "6f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c");
-        ensure_equals(run.logFile, "/logs/Alchemy.crash");
-        ensure_equals(run.userSettingsFile, "/settings/settings.xml");
-        ensure_equals(run.accountSettingsFile, "/settings/ye_olde/settings_per_account.xml");
-        ensure_equals("underscores become spaces", run.agentName, "Ye Olde Avatar");
-        ensure_equals(run.region, "Hippotropolis");
-        ensure_equals(run.fatalMessage, "LL_ERRS: something");
+        CHECK(run.runId == "6f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c");
+        CHECK(run.logFile == "/logs/Alchemy.crash");
+        CHECK(run.userSettingsFile == "/settings/settings.xml");
+        CHECK(run.accountSettingsFile == "/settings/ye_olde/settings_per_account.xml");
+        UNSCOPED_INFO("underscores become spaces");
+        CHECK(run.agentName == "Ye Olde Avatar");
+        CHECK(run.region == "Hippotropolis");
+        CHECK(run.fatalMessage == "LL_ERRS: something");
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE("alcrashreporter: a file from before run ids reads as empty fields", "[alcrashreporter]")
     {
-        set_test_name("a file from before run ids reads as empty fields");
         ALCrashReporter::PreviousRun run = ALCrashReporter::previousRun(LLSD());
-        ensure("no run id", run.runId.empty());
-        ensure("no log", run.logFile.empty());
-        ensure("no name", run.agentName.empty());
+        CHECK(run.runId.empty());
+        CHECK(run.logFile.empty());
+        CHECK(run.agentName.empty());
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE("alcrashreporter: consent is a sentinel file that allowing makes and withdrawing removes", "[alcrashreporter]")
     {
-        set_test_name("consent is a sentinel file: recorded, seen, withdrawn");
         // A name of this run's own: another run of the tests may be at it.
         const std::string sentinel =
             (std::filesystem::temp_directory_path() / ("alcrashreporter_test_consent_" + LLUUID::generateNewID().asString())).string();
 
         ALCrashReporter::recordConsent(sentinel, false);
-        ensure("absent to begin with", !ALCrashReporter::consentRecorded(sentinel));
+        UNSCOPED_INFO("absent to begin with");
+        CHECK_FALSE(ALCrashReporter::consentRecorded(sentinel));
 
         ALCrashReporter::recordConsent(sentinel, true);
-        ensure("present once allowed", ALCrashReporter::consentRecorded(sentinel));
+        UNSCOPED_INFO("present once allowed");
+        CHECK(ALCrashReporter::consentRecorded(sentinel));
         ALCrashReporter::recordConsent(sentinel, true);
-        ensure("allowing twice keeps it", ALCrashReporter::consentRecorded(sentinel));
+        UNSCOPED_INFO("allowing twice keeps it");
+        CHECK(ALCrashReporter::consentRecorded(sentinel));
 
         ALCrashReporter::recordConsent(sentinel, false);
-        ensure("gone once withdrawn", !ALCrashReporter::consentRecorded(sentinel));
+        UNSCOPED_INFO("gone once withdrawn");
+        CHECK_FALSE(ALCrashReporter::consentRecorded(sentinel));
         ALCrashReporter::recordConsent(sentinel, false);
-        ensure("withdrawing twice is quiet", !ALCrashReporter::consentRecorded(sentinel));
+        UNSCOPED_INFO("withdrawing twice is quiet");
+        CHECK_FALSE(ALCrashReporter::consentRecorded(sentinel));
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE("alcrashreporter: a location written into a buffer is the same or cut to fit", "[alcrashreporter]")
     {
-        set_test_name("a location written into a buffer is the same, or cut to fit");
         const LLVector3 position(128.4f, -63.6f, 22.5f);
         char buffer[64];
         size_t length = ALCrashReporter::locationTag(buffer, sizeof(buffer), "Hippotropolis", position);
-        ensure_equals("whole", std::string(buffer, length), "Hippotropolis/128/-64/23");
-        ensure_equals("terminated", buffer[length], '\0');
+        REQUIRE(length < sizeof(buffer));
+        CHECK(std::string(buffer, length) == "Hippotropolis/128/-64/23");
+        CHECK(buffer[length] == '\0');
 
         char small[12];
         length = ALCrashReporter::locationTag(small, sizeof(small), "Hippotropolis", position);
-        ensure_equals("cut", std::string(small, length), "Hippotropol");
-        ensure_equals("cut and terminated", small[length], '\0');
+        REQUIRE(length < sizeof(small));
+        CHECK(std::string(small, length) == "Hippotropol");
+        CHECK(small[length] == '\0');
 
         length = ALCrashReporter::locationTag(small, sizeof(small), "Ahern", position);
-        ensure_equals("cut in the numbers", std::string(small, length), "Ahern/128/-");
+        REQUIRE(length < sizeof(small));
+        UNSCOPED_INFO("cut in the numbers");
+        CHECK(std::string(small, length) == "Ahern/128/-");
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE("alcrashreporter: an event id is its 32 hex digits however it is spelled", "[alcrashreporter]")
     {
-        set_test_name("an event id is its 32 hex digits however it is spelled");
-        ensure_equals("dashed", ALCrashReporter::compactEventId("0123ABCD-89ab-cdef-0123-456789ABCDEF"),
+        CHECK(ALCrashReporter::compactEventId("0123ABCD-89ab-cdef-0123-456789ABCDEF") ==
                       "0123abcd89abcdef0123456789abcdef");
-        ensure_equals("braced", ALCrashReporter::compactEventId("{0123abcd-89ab-cdef-0123-456789abcdef}"),
+        CHECK(ALCrashReporter::compactEventId("{0123abcd-89ab-cdef-0123-456789abcdef}") ==
                       "0123abcd89abcdef0123456789abcdef");
-        ensure_equals("already compact", ALCrashReporter::compactEventId("0123abcd89abcdef0123456789abcdef"),
+        CHECK(ALCrashReporter::compactEventId("0123abcd89abcdef0123456789abcdef") ==
                       "0123abcd89abcdef0123456789abcdef");
-        ensure("too short", ALCrashReporter::compactEventId("0123abcd").empty());
-        ensure("not hex", ALCrashReporter::compactEventId("0123abcd89abcdef0123456789abcdeg").empty());
-        ensure("empty", ALCrashReporter::compactEventId("").empty());
+        UNSCOPED_INFO("too short");
+        CHECK(ALCrashReporter::compactEventId("0123abcd").empty());
+        UNSCOPED_INFO("not hex");
+        CHECK(ALCrashReporter::compactEventId("0123abcd89abcdef0123456789abcdeg").empty());
+        CHECK(ALCrashReporter::compactEventId("").empty());
     }
 
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE("alcrashreporter: a freeze's report is recorded for the next run to take once", "[alcrashreporter]")
     {
-        set_test_name("a freeze's report is recorded for the next run, which takes it once");
         // Names of this run's own, here and below: another run of the tests may be at it.
         const std::string record =
             (std::filesystem::temp_directory_path() / ("alcrashreporter_test_last_report_" + LLUUID::generateNewID().asString())).string();
         ALCrashReporter::takeRecordedReport(record);
-        ensure("nothing to begin with", !ALCrashReporter::takeRecordedReport(record));
+        UNSCOPED_INFO("nothing to begin with");
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
 
         ALCrashReporter::recordReport(record, { "freeze", "0123abcd89abcdef0123456789abcdef" });
         const auto taken = ALCrashReporter::takeRecordedReport(record);
-        ensure("taken", taken.has_value());
-        ensure_equals("kind", taken->kind, "freeze");
-        ensure_equals("id", taken->eventId, "0123abcd89abcdef0123456789abcdef");
-        ensure("once", !ALCrashReporter::takeRecordedReport(record));
+        REQUIRE(taken.has_value());
+        CHECK(taken->kind == "freeze");
+        CHECK(taken->eventId == "0123abcd89abcdef0123456789abcdef");
+        UNSCOPED_INFO("taken only once");
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
 
         ALCrashReporter::recordReport(record, { "lunch", "0123abcd89abcdef0123456789abcdef" });
-        ensure("an unknown kind is not a report", !ALCrashReporter::takeRecordedReport(record));
+        UNSCOPED_INFO("an unknown kind is not a report");
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
         ALCrashReporter::recordReport(record, { "crash", "nonsense" });
-        ensure("nor is a broken id", !ALCrashReporter::takeRecordedReport(record));
+        UNSCOPED_INFO("nor is a broken id");
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
     }
 
-    template<> template<>
-    void object::test<11>()
+    TEST_CASE("alcrashreporter: the nil UUID is no event however it is spelled", "[alcrashreporter]")
     {
-        set_test_name("the nil UUID is no event, however it is spelled");
-        ensure("dashed", ALCrashReporter::compactEventId("00000000-0000-0000-0000-000000000000").empty());
-        ensure("braced", ALCrashReporter::compactEventId("{00000000-0000-0000-0000-000000000000}").empty());
-        ensure("compact", ALCrashReporter::compactEventId("00000000000000000000000000000000").empty());
-        ensure_equals("one digit set is an event",
-                      ALCrashReporter::compactEventId("00000000-0000-0000-0000-000000000001"),
+        CHECK(ALCrashReporter::compactEventId("00000000-0000-0000-0000-000000000000").empty());
+        CHECK(ALCrashReporter::compactEventId("{00000000-0000-0000-0000-000000000000}").empty());
+        CHECK(ALCrashReporter::compactEventId("00000000000000000000000000000000").empty());
+        UNSCOPED_INFO("one digit set is an event");
+        CHECK(ALCrashReporter::compactEventId("00000000-0000-0000-0000-000000000001") ==
                       "00000000000000000000000000000001");
 
         const std::string record =
             (std::filesystem::temp_directory_path() / ("alcrashreporter_test_nil_report_" + LLUUID::generateNewID().asString())).string();
         ALCrashReporter::recordReport(record, { "freeze", "00000000000000000000000000000000" });
-        ensure("a nil report is not taken", !ALCrashReporter::takeRecordedReport(record));
+        UNSCOPED_INFO("a nil report is not taken");
+        CHECK_FALSE(ALCrashReporter::takeRecordedReport(record));
     }
 
-    template<> template<>
-    void object::test<12>()
+    TEST_CASE("alcrashreporter: a crash found at start is the previous run's only if it carries its id", "[alcrashreporter]")
     {
-        set_test_name("a crash found at start is the previous run's only when it carries that run's id");
         const std::string_view event = "0123abcd-89ab-cdef-0123-456789abcdef";
         const std::string_view previous = "6f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c";
 
         const auto crash = ALCrashReporter::previousRunCrash(event, previous, previous);
-        ensure("the previous run's", crash.has_value());
-        ensure_equals("a crash", crash->kind, "crash");
-        ensure_equals("its id", crash->eventId, "0123abcd89abcdef0123456789abcdef");
-        ensure("the run id however it is spelled",
-               ALCrashReporter::previousRunCrash(event, "6F4B1B2E9D8C4D0FA5B72C3E4F5A6B7C", previous).has_value());
+        UNSCOPED_INFO("the previous run's");
+        REQUIRE(crash.has_value());
+        CHECK(crash->kind == "crash");
+        CHECK(crash->eventId == "0123abcd89abcdef0123456789abcdef");
+        UNSCOPED_INFO("the run id however it is spelled");
+        CHECK(ALCrashReporter::previousRunCrash(event, "6F4B1B2E9D8C4D0FA5B72C3E4F5A6B7C", previous).has_value());
 
-        ensure("another run's", !ALCrashReporter::previousRunCrash(event, "7f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c",
+        UNSCOPED_INFO("another run's");
+        CHECK_FALSE(ALCrashReporter::previousRunCrash(event, "7f4b1b2e-9d8c-4d0f-a5b7-2c3e4f5a6b7c",
                                                                    previous));
-        ensure("one that carries no run id", !ALCrashReporter::previousRunCrash(event, "", previous));
-        ensure("any, when the previous run is not known", !ALCrashReporter::previousRunCrash(event, previous, ""));
-        ensure("one filed as nothing",
-               !ALCrashReporter::previousRunCrash("00000000-0000-0000-0000-000000000000", previous, previous));
+        UNSCOPED_INFO("one that carries no run id");
+        CHECK_FALSE(ALCrashReporter::previousRunCrash(event, "", previous));
+        UNSCOPED_INFO("any when the previous run is not known");
+        CHECK_FALSE(ALCrashReporter::previousRunCrash(event, previous, ""));
+        UNSCOPED_INFO("one filed as nothing");
+        CHECK_FALSE(ALCrashReporter::previousRunCrash("00000000-0000-0000-0000-000000000000", previous, previous));
     }
 
-    template<> template<>
-    void object::test<13>()
+    TEST_CASE("alcrashreporter: a record replaces the last whole and leaves nothing beside it", "[alcrashreporter]")
     {
-        set_test_name("a record is written whole over the last, and nothing is left beside it");
         const std::filesystem::path dir =
             std::filesystem::temp_directory_path() / ("alcrashreporter_test_records_" + LLUUID::generateNewID().asString());
         std::filesystem::create_directories(dir);
@@ -242,19 +230,25 @@ namespace tut
 
         ALCrashReporter::recordReport(record, { "freeze", "0123abcd89abcdef0123456789abcdef" });
         ALCrashReporter::recordReport(record, { "crash", "fedcba9876543210fedcba9876543210" });
-        ensure_equals("the record alone", entries(), 1);
+        UNSCOPED_INFO("the record alone");
+        CHECK(entries() == 1);
         const auto taken = ALCrashReporter::takeRecordedReport(record);
-        ensure("taken", taken.has_value());
-        ensure_equals("the later kind", taken->kind, "crash");
-        ensure_equals("the later id", taken->eventId, "fedcba9876543210fedcba9876543210");
-        ensure_equals("nothing once taken", entries(), 0);
+        REQUIRE(taken.has_value());
+        UNSCOPED_INFO("the later kind");
+        CHECK(taken->kind == "crash");
+        UNSCOPED_INFO("the later id");
+        CHECK(taken->eventId == "fedcba9876543210fedcba9876543210");
+        UNSCOPED_INFO("nothing once taken");
+        CHECK(entries() == 0);
 
         // A record that cannot be put in place leaves nothing written.
         const std::filesystem::path blocked = dir / "blocked";
         std::filesystem::create_directories(blocked / "inside");
         ALCrashReporter::recordReport(blocked.string(), { "freeze", "0123abcd89abcdef0123456789abcdef" });
-        ensure_equals("only what was there", entries(), 1);
-        ensure("still a directory", std::filesystem::is_directory(blocked));
+        UNSCOPED_INFO("only what was there");
+        CHECK(entries() == 1);
+        UNSCOPED_INFO("still a directory");
+        CHECK(std::filesystem::is_directory(blocked));
 
         std::filesystem::remove_all(dir);
     }

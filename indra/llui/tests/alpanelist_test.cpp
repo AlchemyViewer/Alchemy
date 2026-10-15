@@ -34,13 +34,13 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <optional>
 #include <string>
 #include <vector>
 
-namespace tut
+namespace
 {
     struct alpanelist_data
     {
@@ -56,7 +56,7 @@ namespace tut
         {
             if (!ui.ok())
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             ALPaneList::Params p(LLUICtrlFactory::getDefaultParams<ALPaneList>());
             p.name = "pane";
@@ -92,14 +92,9 @@ namespace tut
             return out;
         }
     };
-    typedef test_group<alpanelist_data> alpanelist_group;
-    typedef alpanelist_group::object    alpanelist_object;
-    tut::alpanelist_group               alpanelist_instance("alpanelist");
 
-    template<> template<>
-    void alpanelist_object::test<1>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: left and right fold the row chosen and a press on its arrow turns it", "[alpanelist]")
     {
-        set_test_name("left and right fold and open the row chosen, a press on its arrow turns it, by the owner's rule; other keys are the list's");
         ALPaneList& l = make();
         add("one", 0);
         add("two", 0);
@@ -108,34 +103,61 @@ namespace tut
             return value["group"].asString() + (folded ? (*folded ? " shut" : " open") : " turned");
         };
         l.setFocus(true);
-        ensure("no fold: left is the list's", !l.handleKeyHere(KEY_LEFT, MASK_NONE) || asked.empty());
+        // With no fold to ask, left on the row chosen goes on to the list,
+        // which takes it as any list does.
+        l.selectFirstItem();
+        UNSCOPED_INFO("no fold: left is the list's");
+        CHECK(l.handleKeyHere(KEY_LEFT, MASK_NONE));
         l.setFold([&](const LLSD& value, std::optional<bool> folded) { asked.push_back(said(value, folded)); },
                   [](const LLScrollListItem*, S32 x) { return x < 20; });
         l.deselectAllItems();
         l.handleKeyHere(KEY_LEFT, MASK_NONE);
-        ensure("nothing chosen: nothing asked", asked.empty());
+        UNSCOPED_INFO("nothing chosen: nothing asked");
+        CHECK(asked.empty());
         l.selectFirstItem();
-        ensure("left shuts", l.handleKeyHere(KEY_LEFT, MASK_NONE) && asked.back() == "0 shut");
-        ensure("right opens", l.handleKeyHere(KEY_RIGHT, MASK_NONE) && asked.back() == "0 open");
+        {
+            INFO("left shuts");
+            CHECK(l.handleKeyHere(KEY_LEFT, MASK_NONE));
+            REQUIRE_FALSE(asked.empty());
+            CHECK(asked.back() == "0 shut");
+        }
+        {
+            INFO("right opens");
+            CHECK(l.handleKeyHere(KEY_RIGHT, MASK_NONE));
+            CHECK(asked.back() == "0 open");
+        }
         l.handleKeyHere(KEY_LEFT, MASK_SHIFT);
-        ensure_equals("with a key held, the list's", asked.size(), size_t(2));
+        UNSCOPED_INFO("with a key held, the list's");
+        REQUIRE(asked.size() == size_t(2));
         l.handleKeyHere(KEY_DOWN, MASK_NONE);
-        ensure_equals("another key is the list's: it moved on", l.getFirstSelected()->getColumn(0)->getValue().asString(),
-                      std::string("two"));
+        {
+            INFO("another key is the list's: it moved on");
+            REQUIRE(l.getFirstSelected());
+            CHECK(l.getFirstSelected()->getColumn(0)->getValue().asString() == std::string("two"));
+        }
         const LLRect first = l.getCellRect(0, 0);
-        ensure("a press on the arrow turns its row",
-               l.handleMouseDown(first.mLeft + 5, first.getCenterY(), MASK_NONE) && asked.back() == "0 turned");
-        ensure_equals("and chooses nothing", l.getFirstSelected()->getColumn(0)->getValue().asString(), std::string("two"));
+        {
+            INFO("a press on the arrow turns its row");
+            CHECK(l.handleMouseDown(first.mLeft + 5, first.getCenterY(), MASK_NONE));
+            CHECK(asked.back() == "0 turned");
+        }
+        {
+            INFO("and chooses nothing");
+            REQUIRE(l.getFirstSelected());
+            CHECK(l.getFirstSelected()->getColumn(0)->getValue().asString() == std::string("two"));
+        }
         l.handleMouseDown(first.mLeft + 40, first.getCenterY(), MASK_NONE);
         l.handleMouseUp(first.mLeft + 40, first.getCenterY(), MASK_NONE);
-        ensure("a press past it chooses the row", asked.size() == 3 && l.getFirstSelectedIndex() == 0);
+        {
+            INFO("a press past it chooses the row");
+            CHECK(asked.size() == 3);
+            CHECK(l.getFirstSelectedIndex() == 0);
+        }
         l.setFocus(false);
     }
 
-    template<> template<>
-    void alpanelist_object::test<2>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: a column sort sorts within each group and leaves groups and headings be", "[alpanelist]")
     {
-        set_test_name("a sort by a column sorts within each group, the groups in their own order and each heading over its rows");
         ALPaneList& l = make();
         l.setGrouping([](const LLScrollListItem* item, S32& group, bool& heading) {
             group   = item->getValue()["group"].asInteger();
@@ -147,26 +169,29 @@ namespace tut
         add("Alpha", 1, true);
         add("a2", 1);
         add("a1", 1);
-        ensure_equals("as added, unsorted", order(), std::string("Zed b2 b1 Alpha a2 a1"));
+        UNSCOPED_INFO("as added, unsorted");
+        CHECK(order() == std::string("Zed b2 b1 Alpha a2 a1"));
         l.sortByColumnIndex(0, true);
-        ensure_equals("up, within each group", order(), std::string("Zed b1 b2 Alpha a1 a2"));
+        UNSCOPED_INFO("up, within each group");
+        CHECK(order() == std::string("Zed b1 b2 Alpha a1 a2"));
         l.sortByColumnIndex(0, false);
-        ensure_equals("down, within each group, the groups as they were", order(), std::string("Zed b2 b1 Alpha a2 a1"));
-        // The rows' own comparison, where the owner gives one: by length,
-        // then by words.
+        UNSCOPED_INFO("down, within each group, the groups as they were");
+        CHECK(order() == std::string("Zed b2 b1 Alpha a2 a1"));
+        // The rows' own comparison, where the owner gives one: here the
+        // words the other way round, so that a sort up comes out within
+        // each group as the words' own order would down.
         l.setComparison([](S32, const LLScrollListItem* a, const LLScrollListItem* b) {
             const std::string x = a->getColumn(0)->getValue().asString();
             const std::string y = b->getColumn(0)->getValue().asString();
             return x < y ? 1 : x > y ? -1 : 0;
         });
         l.sortByColumnIndex(0, true);
-        ensure_equals("the owner's comparison", order(), std::string("Zed b2 b1 Alpha a2 a1"));
+        UNSCOPED_INFO("the owner's comparison");
+        CHECK(order() == std::string("Zed b2 b1 Alpha a2 a1"));
     }
 
-    template<> template<>
-    void alpanelist_object::test<3>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: a press moved past the dead zone is offered once as a drag", "[alpanelist]")
     {
-        set_test_name("a row pressed and moved past the dead zone is offered as a drag, once; within it, refused, or with no starter, the list chooses as it would");
         ALPaneList& l = make();
         add("one", 0);
         add("two", 0);
@@ -180,31 +205,44 @@ namespace tut
             return agree;
         });
         l.handleMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
-        ensure_equals("the row pressed is chosen", l.getFirstSelectedIndex(), 0);
+        UNSCOPED_INFO("the row pressed is chosen");
+        CHECK(l.getFirstSelectedIndex() == 0);
         l.handleHover(first.getCenterX() + 1, first.getCenterY(), MASK_NONE);
-        ensure_equals("a tremble is no drag", asked, 0);
+        UNSCOPED_INFO("a tremble is no drag");
+        CHECK(asked == 0);
         l.handleHover(third.getCenterX(), third.getCenterY(), MASK_NONE);
-        ensure_equals("moved on, a drag offered", asked, 1);
-        ensure("of what was chosen, nothing else chosen on the way", l.getFirstSelectedIndex() == 0 && l.getAllSelected().size() == 1);
+        UNSCOPED_INFO("moved on, a drag offered");
+        CHECK(asked == 1);
+        {
+            INFO("of what was chosen, nothing else chosen on the way");
+            CHECK(l.getFirstSelectedIndex() == 0);
+            CHECK(l.getAllSelected().size() == 1);
+        }
         l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
 
         agree = false;
         l.handleMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
         l.handleHover(third.getCenterX(), third.getCenterY(), MASK_NONE);
-        ensure("refused, the list chooses where the pointer went", asked == 2 && l.getFirstSelectedIndex() == 2);
+        {
+            INFO("refused, the list chooses where the pointer went");
+            CHECK(asked == 2);
+            CHECK(l.getFirstSelectedIndex() == 2);
+        }
         l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
 
         l.setDragStarter(nullptr);
         l.handleMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
         l.handleHover(third.getCenterX(), third.getCenterY(), MASK_NONE);
-        ensure("with no starter, as any list", asked == 2 && l.getFirstSelectedIndex() == 2);
+        {
+            INFO("with no starter, as any list");
+            CHECK(asked == 2);
+            CHECK(l.getFirstSelectedIndex() == 2);
+        }
         l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
     }
 
-    template<> template<>
-    void alpanelist_object::test<4>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: a press keeps a multiple choice for a drag; a release narrows it", "[alpanelist]")
     {
-        set_test_name("a plain press on one of several chosen rows keeps them all for a drag, which is told the row pressed; let go without one, it chooses its row alone");
         ALPaneList& l = make();
         l.setAllowMultipleSelection(true);
         add("one", 1);
@@ -224,27 +262,36 @@ namespace tut
         });
         click(0, MASK_NONE);
         click(2, MASK_CONTROL);
-        ensure_equals("two chosen", l.getNumSelected(), 2);
+        CHECK(l.getNumSelected() == 2);
         const LLRect second = l.getCellRect(1, 0);
         const LLRect third  = l.getCellRect(2, 0);
         l.handleMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
-        ensure_equals("pressed, both stay chosen while it may be a drag", l.getNumSelected(), 2);
+        UNSCOPED_INFO("pressed, both stay chosen while it may be a drag");
+        CHECK(l.getNumSelected() == 2);
         l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
-        ensure("let go where it was, its row alone", l.getNumSelected() == 1 && l.getFirstSelectedIndex() == 2);
-        ensure_equals("and no drag", asked, 0);
+        {
+            INFO("let go where it was, its row alone");
+            CHECK(l.getNumSelected() == 1);
+            CHECK(l.getFirstSelectedIndex() == 2);
+        }
+        UNSCOPED_INFO("and no drag");
+        CHECK(asked == 0);
 
         click(0, MASK_CONTROL);
-        ensure_equals("both again", l.getNumSelected(), 2);
+        CHECK(l.getNumSelected() == 2);
         l.handleMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
         l.handleHover(second.getCenterX(), second.getCenterY(), MASK_NONE);
-        ensure("a drag of both, told the row pressed", asked == 1 && chosen_then == 2 && pressed_group == 3);
+        {
+            INFO("a drag of both, told the row pressed");
+            CHECK(asked == 1);
+            CHECK(chosen_then == 2);
+            CHECK(pressed_group == 3);
+        }
         l.handleMouseUp(second.getCenterX(), second.getCenterY(), MASK_NONE);
     }
 
-    template<> template<>
-    void alpanelist_object::test<5>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: a drag over a row gives the drop handler its value and takes its answer", "[alpanelist]")
     {
-        set_test_name("what is dragged over a row is offered to the drop handler with the row's value, over no row with none, and its answer is the list's");
         ALPaneList& l = make();
         add("one", 1);
         add("two", 2);
@@ -265,21 +312,36 @@ namespace tut
         const LLRect second = l.getCellRect(1, 0);
         EAcceptance  accept = ACCEPT_NO;
         std::string  tip;
-        ensure("over a row, taken", l.handleDragAndDrop(second.getCenterX(), second.getCenterY(), MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip));
-        ensure("with its value", defined && group == 2 && !dropped && accept == ACCEPT_YES_MULTI);
-        ensure_equals("the row it goes to lit, not the one under it", l.getHighlightedItemInx(), 0);
+        UNSCOPED_INFO("over a row, taken");
+        CHECK(l.handleDragAndDrop(second.getCenterX(), second.getCenterY(), MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip));
+        {
+            INFO("with its value");
+            CHECK(defined);
+            CHECK(group == 2);
+            CHECK_FALSE(dropped);
+            CHECK(accept == ACCEPT_YES_MULTI);
+        }
+        UNSCOPED_INFO("the row it goes to lit, not the one under it");
+        CHECK(l.getHighlightedItemInx() == 0);
         l.handleDragAndDrop(second.getCenterX(), second.getCenterY(), MASK_NONE, true, DAD_NOTECARD, nullptr, &accept, tip);
-        ensure("and dropped", dropped && group == 2);
+        {
+            INFO("and dropped");
+            CHECK(dropped);
+            CHECK(group == 2);
+        }
         const LLRect rows = l.getItemListRect();
         l.handleDragAndDrop(rows.getCenterX(), rows.mBottom + 12, MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip);
-        ensure("over no row, none", !defined && accept == ACCEPT_NO);
-        ensure_equals("and nothing lit", l.getHighlightedItemInx(), -1);
+        {
+            INFO("over no row, none");
+            CHECK_FALSE(defined);
+            CHECK(accept == ACCEPT_NO);
+        }
+        UNSCOPED_INFO("and nothing lit");
+        CHECK(l.getHighlightedItemInx() == -1);
     }
 
-    template<> template<>
-    void alpanelist_object::test<6>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: with the keyboard the list holds the Edit menu and deletes nothing", "[alpanelist]")
     {
-        set_test_name("with the keyboard, the list has the Edit menu's commands, and none of them deletes; without it, it lets them go");
         // What had them before: the world's selection, say, whose Delete
         // deletes a prim.
         struct World final : public LLEditMenuHandler
@@ -292,17 +354,19 @@ namespace tut
         add("one", 0);
         pane.selectFirstItem();
         pane.setFocus(true);
-        ensure("the list's while it has the keyboard", LLEditMenuHandler::gEditMenuHandler == &pane);
-        ensure("and a Delete there is nothing's", !LLEditMenuHandler::gEditMenuHandler->canDoDelete());
-        ensure("a copy is the rows'", LLEditMenuHandler::gEditMenuHandler->canCopy());
+        UNSCOPED_INFO("the list's while it has the keyboard");
+        CHECK(LLEditMenuHandler::gEditMenuHandler == &pane);
+        UNSCOPED_INFO("and a Delete there is nothing's");
+        CHECK_FALSE(LLEditMenuHandler::gEditMenuHandler->canDoDelete());
+        UNSCOPED_INFO("a copy is the rows'");
+        CHECK(LLEditMenuHandler::gEditMenuHandler->canCopy());
         pane.setFocus(false);
-        ensure("let go of with it", LLEditMenuHandler::gEditMenuHandler == nullptr);
+        UNSCOPED_INFO("let go of with the keyboard");
+        CHECK(LLEditMenuHandler::gEditMenuHandler == nullptr);
     }
 
-    template<> template<>
-    void alpanelist_object::test<7>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: return and a double-click go to the row chosen and escape goes back", "[alpanelist]")
     {
-        set_test_name("return and a double-click go to the row chosen, escape goes back; with a key held, or unset, they are the list's own");
         ALPaneList& l = make();
         add("one", 0);
         add("two", 0);
@@ -310,20 +374,32 @@ namespace tut
         l.setGo([&]() { ++went; });
         l.setBack([&]() { ++back; });
         l.selectFirstItem();
-        ensure("return goes", l.handleKeyHere(KEY_RETURN, MASK_NONE) && went == 1);
-        ensure("escape goes back", l.handleKeyHere(KEY_ESCAPE, MASK_NONE) && back == 1);
+        {
+            INFO("return goes");
+            CHECK(l.handleKeyHere(KEY_RETURN, MASK_NONE));
+            CHECK(went == 1);
+        }
+        {
+            INFO("escape goes back");
+            CHECK(l.handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            CHECK(back == 1);
+        }
         l.handleKeyHere(KEY_RETURN, MASK_CONTROL);
         l.handleKeyHere(KEY_ESCAPE, MASK_SHIFT);
-        ensure("with a key held, neither", went == 1 && back == 1);
+        {
+            INFO("with a key held, neither");
+            CHECK(went == 1);
+            CHECK(back == 1);
+        }
         const LLRect row = l.getCellRect(1, 0);
         l.handleDoubleClick(row.getCenterX(), row.getCenterY(), MASK_NONE);
-        ensure_equals("a double-click goes", went, 2);
+        CHECK(went == 2);
     }
 
-    template<> template<>
-    void alpanelist_object::test<8>()
+    // A column nothing is in and a row nobody can choose are left out, and a
+    // long cell steps out of line.
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: the rows as text are lined up under their headings", "[alpanelist]")
     {
-        set_test_name("the rows as text: under their headings, lined up, a column nothing is in and a row nobody can choose left out, a long cell stepping out of line");
         ALPaneList& l = make();
         l.deleteAllItems();
         LLScrollListColumn::Params where;
@@ -351,6 +427,7 @@ namespace tut
             value["columns"][3]["column"] = "empty";
             value["columns"][3]["value"]  = "";
             LLScrollListItem* item        = l.addElement(value);
+            REQUIRE(item);
             item->setEnabled(enabled);
         };
         row("A heading", "", false);
@@ -359,19 +436,19 @@ namespace tut
         row(std::string(60, 'x'), "far", true);
         const std::string text = l.asText(l.getAllData());
         const std::string pad(40, ' ');
-        ensure_equals("headings, then a line a row; the unnamed column by its name; the long one out of line",
-                      text, "Text" + pad + std::string(6, ' ') + "Where   At\n"
+        UNSCOPED_INFO("headings, then a line a row; the unnamed column by its name; the long one out of line");
+        CHECK(text == "Text" + pad + std::string(6, ' ') + "Where   At\n"
                             "short" + pad + std::string(5, ' ') + "line 3  1\n"
                             "two lines" + pad + std::string(1, ' ') + "line 4  1\n" + std::string(60, 'x') + "  far     1\n");
         l.setCopyCaption([]() { return std::string("Found here"); });
-        ensure("the caption over them", l.asText(l.getAllData()).rfind("Found here\n\nText", 0) == 0);
-        ensure("no rows, no text", l.asText({}).empty());
+        UNSCOPED_INFO("the caption over them");
+        CHECK(l.asText(l.getAllData()).rfind("Found here\n\nText", 0) == 0);
+        UNSCOPED_INFO("no rows, no text");
+        CHECK(l.asText({}).empty());
     }
 
-    template<> template<>
-    void alpanelist_object::test<9>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: a copyable list copies the rows chosen or a cell or every row", "[alpanelist]")
     {
-        set_test_name("a copyable list copies the rows chosen on control-C and from its menu, the cell right-clicked, every row, and chooses them all");
         ALPaneList& l = make();
         l.setAllowMultipleSelection(true);
         add("one", 0);
@@ -386,60 +463,82 @@ namespace tut
         clipboard.copyToClipboard(std::string("before"), 0, 6);
         l.selectFirstItem();
         l.handleKeyHere('C', MASK_CONTROL);
-        ensure_equals("not copyable: nothing copied", copied(), std::string("before"));
+        UNSCOPED_INFO("not copyable: nothing copied");
+        CHECK(copied() == std::string("before"));
         const LLRect second = l.getCellRect(1, 0);
         l.handleRightMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE);
-        ensure("nor a right-click its to answer", l.getFirstSelectedIndex() == 0);
+        UNSCOPED_INFO("nor a right-click its to answer");
+        CHECK(l.getFirstSelectedIndex() == 0);
 
         l.setCopyable(true);
-        ensure("control-C taken", l.handleKeyHere('C', MASK_CONTROL));
-        ensure_equals("the row chosen, as a table", copied(), std::string("Text\none\n"));
+        CHECK(l.handleKeyHere('C', MASK_CONTROL));
+        UNSCOPED_INFO("the row chosen, as a table");
+        CHECK(copied() == std::string("Text\none\n"));
 
         const LLRect third = l.getCellRect(2, 0);
         l.handleRightMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
-        ensure("a right-click chooses the row under it", l.getFirstSelectedIndex() == 2 && l.getNumSelected() == 1);
-        ensure("the cell under it can be copied", l.copyActionEnabled("copy_cell"));
+        {
+            INFO("a right-click chooses the row under it");
+            CHECK(l.getFirstSelectedIndex() == 2);
+            CHECK(l.getNumSelected() == 1);
+        }
+        CHECK(l.copyActionEnabled("copy_cell"));
         l.copyAction("copy_cell");
-        ensure_equals("the cell, as it is", copied(), std::string("three"));
+        UNSCOPED_INFO("the cell, as it is");
+        CHECK(copied() == std::string("three"));
         l.copyAction("select_all");
-        ensure_equals("all chosen", l.getNumSelected(), 3);
+        CHECK(l.getNumSelected() == 3);
         const LLRect first = l.getCellRect(0, 0);
         l.handleRightMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
-        ensure_equals("a right-click inside the choice keeps it", l.getNumSelected(), 3);
+        UNSCOPED_INFO("a right-click inside the choice keeps it");
+        CHECK(l.getNumSelected() == 3);
         l.copyAction("copy");
-        ensure_equals("the rows chosen", copied(), std::string("Text\none\ntwo\nthree\n"));
+        CHECK(copied() == std::string("Text\none\ntwo\nthree\n"));
         l.deselectAllItems();
-        ensure("nothing chosen, no rows to copy", !l.copyActionEnabled("copy") && l.copyActionEnabled("copy_all"));
+        {
+            INFO("nothing chosen, no rows to copy");
+            CHECK_FALSE(l.copyActionEnabled("copy"));
+            CHECK(l.copyActionEnabled("copy_all"));
+        }
         clipboard.copyToClipboard(std::string("before"), 0, 6);
         l.copyAction("copy_all");
-        ensure_equals("every row", copied(), std::string("Text\none\ntwo\nthree\n"));
+        CHECK(copied() == std::string("Text\none\ntwo\nthree\n"));
         const LLRect rows = l.getItemListRect();
         l.handleRightMouseDown(rows.getCenterX(), rows.mBottom + 2, MASK_NONE);
-        ensure("off the rows, no cell to copy", !l.copyActionEnabled("copy_cell"));
+        UNSCOPED_INFO("off the rows, no cell to copy");
+        CHECK_FALSE(l.copyActionEnabled("copy_cell"));
     }
 
-    template<> template<>
-    void alpanelist_object::test<10>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: a list with no rows says so in its owner's words where the rows would be", "[alpanelist]")
     {
-        set_test_name("a list with no rows says so where the rows would be, in its owner's words; with rows, or nothing to say, it does not");
         ALPaneList& l = make();
-        ensure("nothing to say, nothing said", !l.saysEmpty());
+        UNSCOPED_INFO("nothing to say, nothing said");
+        CHECK_FALSE(l.saysEmpty());
         l.setEmpty("Nothing found.", "Try other words.");
-        ensure("no rows: said", l.saysEmpty() && l.emptyWords() == "Nothing found.");
+        {
+            INFO("no rows: said");
+            CHECK(l.saysEmpty());
+            CHECK(l.emptyWords() == "Nothing found.");
+        }
         const ALEmptyState* empty = l.findChild<ALEmptyState>("empty");
-        ensure("where the rows would be", empty && empty->getRect() == l.getItemListRect());
+        {
+            INFO("where the rows would be");
+            REQUIRE(empty);
+            CHECK(empty->getRect() == l.getItemListRect());
+        }
         add("one", 0);
-        ensure("a row: not", !l.saysEmpty());
+        UNSCOPED_INFO("a row: not");
+        CHECK_FALSE(l.saysEmpty());
         l.deleteAllItems();
-        ensure("emptied again: said", l.saysEmpty());
+        UNSCOPED_INFO("emptied again: said");
+        CHECK(l.saysEmpty());
         l.setEmpty("", "");
-        ensure("no words: not", !l.saysEmpty());
+        UNSCOPED_INFO("no words: not");
+        CHECK_FALSE(l.saysEmpty());
     }
 
-    template<> template<>
-    void alpanelist_object::test<11>()
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: Shift-F10 and the Menu key right-click the row chosen if there is one", "[alpanelist]")
     {
-        set_test_name("Shift-F10 and the Menu key do what a right click on the row chosen would; with none chosen, nothing");
         ALPaneList& l = make();
         add("one", 0);
         add("two", 0);
@@ -449,18 +548,24 @@ namespace tut
             const LLScrollListItem* hit = l.hitItem(x, y);
             clicked.push_back(hit ? hit->getColumn(0)->getValue().asString() : std::string());
         });
-        ensure("none chosen: left", !l.handleKeyHere(KEY_F10, MASK_SHIFT) && clicked.empty());
+        {
+            INFO("none chosen: left");
+            CHECK_FALSE(l.handleKeyHere(KEY_F10, MASK_SHIFT));
+            CHECK(clicked.empty());
+        }
         l.selectNthItem(1);
-        ensure("Shift-F10", l.handleKeyHere(KEY_F10, MASK_SHIFT));
-        ensure("the Menu key", l.handleKeyHere(KEY_CONTEXT_MENU, MASK_NONE));
-        ensure("each on the row chosen", clicked == std::vector<std::string>({ "two", "two" }));
-        ensure("which stays chosen", l.getFirstSelectedIndex() == 1);
+        CHECK(l.handleKeyHere(KEY_F10, MASK_SHIFT));
+        CHECK(l.handleKeyHere(KEY_CONTEXT_MENU, MASK_NONE));
+        UNSCOPED_INFO("each on the row chosen");
+        CHECK(clicked == std::vector<std::string>({ "two", "two" }));
+        UNSCOPED_INFO("which stays chosen");
+        CHECK(l.getFirstSelectedIndex() == 1);
     }
 
-    template<> template<>
-    void alpanelist_object::test<12>()
+    // Choosing again on a double-click's release would take the keyboard
+    // back from where the double-click sent it.
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: a double-click's release chooses nothing but a later click's does", "[alpanelist]")
     {
-        set_test_name("a double-click's release chooses nothing again, which would take the keyboard back from where it went; a later click's does");
         ALPaneList& l = make();
         add("one", 0);
         add("two", 0);
@@ -470,21 +575,27 @@ namespace tut
         const LLRect row = l.getCellRect(1, 0);
         l.handleMouseDown(row.getCenterX(), row.getCenterY(), MASK_NONE);
         l.handleMouseUp(row.getCenterX(), row.getCenterY(), MASK_NONE);
-        ensure_equals("the first click chooses", chosen, 1);
+        UNSCOPED_INFO("the first click chooses");
+        CHECK(chosen == 1);
         l.handleDoubleClick(row.getCenterX(), row.getCenterY(), MASK_NONE);
         l.handleMouseUp(row.getCenterX(), row.getCenterY(), MASK_NONE);
-        ensure_equals("the double-click goes", went, 1);
-        ensure_equals("and its release chooses nothing", chosen, 1);
-        ensure("nor holds the mouse", !l.hasMouseCapture());
+        UNSCOPED_INFO("the double-click goes");
+        CHECK(went == 1);
+        UNSCOPED_INFO("and its release chooses nothing");
+        CHECK(chosen == 1);
+        UNSCOPED_INFO("nor holds the mouse");
+        CHECK_FALSE(l.hasMouseCapture());
         l.handleMouseDown(row.getCenterX(), row.getCenterY(), MASK_NONE);
         l.handleMouseUp(row.getCenterX(), row.getCenterY(), MASK_NONE);
-        ensure_equals("a click after chooses again", chosen, 2);
+        UNSCOPED_INFO("a click after chooses again");
+        CHECK(chosen == 2);
     }
 
-    template<> template<>
-    void alpanelist_object::test<13>()
+    // Rows by key: the same rows made again only where a cell changed, what
+    // is chosen kept; gone ones taken out, new ones made, all in the order
+    // given.
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: rows set by key remake only changed cells and keep what is chosen", "[alpanelist]")
     {
-        set_test_name("rows by key: the same rows made again only where a cell changed, what is chosen kept; gone ones taken out, new ones made, all in the order given");
         ALPaneList& l   = make();
         const auto  row = [](const std::string& key, const std::string& text) {
             ALPaneList::Row one;
@@ -497,33 +608,69 @@ namespace tut
             return one;
         };
         l.setRows({ row("a", "alpha"), row("b", "beta"), row("c", "gamma") });
-        ensure_equals("listed", order(), std::string("alpha beta gamma"));
-        LLScrollListItem* b      = l.rowWithKey("b");
+        CHECK(order() == std::string("alpha beta gamma"));
+        LLScrollListItem* b = l.rowWithKey("b");
+        LLScrollListItem* c = l.rowWithKey("c");
+        REQUIRE(b);
+        REQUIRE(c);
         LLScrollListCell* b_cell = b->getColumn(0);
-        LLScrollListCell* c_cell = l.rowWithKey("c")->getColumn(0);
+        LLScrollListCell* c_cell = c->getColumn(0);
         l.selectNthItem(1);
         l.setRows({ row("a", "alpha"), row("b", "beta"), row("c", "gamma 2") });
-        ensure("the same rows", l.rowWithKey("b") == b && b->getColumn(0) == b_cell);
-        ensure("the changed cell made again", l.rowWithKey("c")->getColumn(0) != c_cell && order() == "alpha beta gamma 2");
-        ensure("still chosen", l.getFirstSelected() == b);
+        {
+            INFO("the same rows");
+            REQUIRE(l.rowWithKey("b") == b);
+            CHECK(b->getColumn(0) == b_cell);
+        }
+        {
+            INFO("the changed cell made again");
+            const LLScrollListItem* c_now = l.rowWithKey("c");
+            REQUIRE(c_now);
+            CHECK(c_now->getColumn(0) != c_cell);
+            CHECK(order() == "alpha beta gamma 2");
+        }
+        UNSCOPED_INFO("still chosen");
+        CHECK(l.getFirstSelected() == b);
 
         l.setRows({ row("b", "beta"), row("c", "gamma 2"), row("d", "delta") });
-        ensure_equals("one gone, one after", order(), std::string("beta gamma 2 delta"));
-        ensure("the same row, chosen", l.rowWithKey("b") == b && l.getFirstSelected() == b && l.keyOf(b) == "b");
+        UNSCOPED_INFO("one gone, one after");
+        CHECK(order() == std::string("beta gamma 2 delta"));
+        {
+            INFO("the same row, chosen");
+            CHECK(l.rowWithKey("b") == b);
+            CHECK(l.getFirstSelected() == b);
+            CHECK(l.keyOf(b) == "b");
+        }
 
         l.setRows({ row("d", "delta"), row("x", "chi"), row("b", "beta") });
-        ensure_equals("moved, and one between", order(), std::string("delta chi beta"));
-        ensure("the same row, still chosen", l.rowWithKey("b") == b && l.getFirstSelected() == b);
-        ensure("gone: nothing by it", !l.rowWithKey("c") && l.keyOf(nullptr).empty());
+        UNSCOPED_INFO("moved, and one between");
+        CHECK(order() == std::string("delta chi beta"));
+        {
+            INFO("the same row, still chosen");
+            CHECK(l.rowWithKey("b") == b);
+            CHECK(l.getFirstSelected() == b);
+        }
+        {
+            INFO("gone: nothing by it");
+            CHECK_FALSE(l.rowWithKey("c"));
+            CHECK(l.keyOf(nullptr).empty());
+        }
         l.setRows({});
-        ensure("none", l.getItemCount() == 0 && !l.rowWithKey("d"));
+        {
+            INFO("none");
+            CHECK(l.getItemCount() == 0);
+            CHECK_FALSE(l.rowWithKey("d"));
+        }
         add("loose", 0);
         l.setRows({ row("e", "epsilon") });
-        ensure_equals("a row not its own: made again", order(), std::string("epsilon"));
+        UNSCOPED_INFO("a row not its own: made again");
+        CHECK(order() == std::string("epsilon"));
         l.setRows({ row("e", "epsilon"), row("e", "twice") });
-        ensure_equals("a key twice: made again, both listed", order(), std::string("epsilon twice"));
+        UNSCOPED_INFO("a key twice: made again, both listed");
+        CHECK(order() == std::string("epsilon twice"));
         l.setRows({ row("e", "epsilon") });
-        ensure_equals("and then again", order(), std::string("epsilon"));
+        UNSCOPED_INFO("and then again");
+        CHECK(order() == std::string("epsilon"));
 
         // Its tip made as the pointer rests on it.
         std::vector<std::string> asked;
@@ -533,6 +680,40 @@ namespace tut
         });
         l.setRows({ row("f", "phi") });
         const LLRect rows = l.getItemListRect();
-        ensure("over the row: its tip", l.handleToolTip(rows.mLeft + 4, rows.mTop - 4, MASK_NONE) && asked == std::vector<std::string>{ "f" });
+        {
+            INFO("over the row: its tip");
+            CHECK(l.handleToolTip(rows.mLeft + 4, rows.mTop - 4, MASK_NONE));
+            CHECK(asked == std::vector<std::string>{ "f" });
+        }
+    }
+
+    TEST_CASE_METHOD(alpanelist_data, "alpanelist: rows set by key that are fewer end where the last one does", "[alpanelist]")
+    {
+        ALPaneList& l   = make();
+        const auto  row = [](S32 i) {
+            ALPaneList::Row one;
+            one.key   = llformat("k%d", i);
+            one.value = LLSD(one.key);
+            LLScrollListCell::Params cell;
+            cell.column = "text";
+            cell.value  = one.key;
+            one.cells.push_back(cell);
+            return one;
+        };
+        std::vector<ALPaneList::Row> many;
+        for (S32 i = 0; i < 40; ++i)
+        {
+            many.push_back(row(i));
+        }
+        l.setRows(many);
+        l.setScrollPos(30);
+        REQUIRE(l.getScrollPos() > 0);
+        // Tapple's: the problems filtered to a few, the list kept in place.
+        l.setRows({ row(0), row(1), row(2), row(3), row(4) });
+        {
+            INFO("the same rows kept, scrolled back to the first");
+            CHECK(l.getItemCount() == 5);
+            CHECK(l.getScrollPos() == 0);
+        }
     }
 }

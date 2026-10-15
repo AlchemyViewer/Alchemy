@@ -131,9 +131,6 @@ public:
     // getFar() stays the draw distance.
     void setProjectionFar(F32 projection_far) { mProjectionFar = projection_far; }
     F32 getProjectionFar() const { return mProjectionFar; }
-    // Whether the main view's projection is infinite; unlike getProjectionFar(), probe captures never change it.
-    void setMainViewInfinite(bool infinite) { mMainViewInfinite = infinite; }
-    bool isMainViewInfinite() const { return mMainViewInfinite; }
 
 protected:
     static LLTrace::CountStatHandle<> sVelocityStat;
@@ -155,7 +152,6 @@ protected:
     F32                 mZoomFactor;
     S16                 mZoomSubregion;
     F32                 mProjectionFar = FINITE_PROJECTION_FAR;
-    bool                mMainViewInfinite = false;
 
 public:
 };

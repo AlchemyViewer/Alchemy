@@ -38,9 +38,9 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alimagefield_data
     {
@@ -75,42 +75,34 @@ namespace tut
         }
     };
 
-    typedef test_group<alimagefield_data> alimagefield_group;
-    typedef alimagefield_group::object alimagefield_object;
-    alimagefield_group alimagefield_instance("alimagefield");
-
-    // The value is the name, whichever way it arrives, and typing one
-    // commits it.
-    template<> template<>
-    void alimagefield_object::test<1>()
+    TEST_CASE_METHOD(alimagefield_data, "alimagefield: the value is the name however it arrives and typing one commits it", "[alimagefield]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALImageField* field = make();
         field->setValue("PushButton_Off");
-        ensure_equals("holds the name", field->getValue().asString(), std::string("PushButton_Off"));
+        CHECK(field->getValue().asString() == std::string("PushButton_Off"));
 
         S32 commits = 0;
         field->setCommitCallback([&](LLUICtrl*, const LLSD&) { ++commits; });
         LLLineEditor* text = field->getChild<LLLineEditor>("text");
         text->setText(std::string("Icon_Close"));
         text->onCommit();
-        ensure_equals("typing commits", commits, 1);
-        ensure_equals("and the name follows", field->getValue().asString(), std::string("Icon_Close"));
+        CHECK(commits == 1);
+        CHECK(field->getValue().asString() == std::string("Icon_Close"));
         field->die();
     }
 
     // The swatch opens the popover over the caller's pictures, under their
     // headings; choosing one is what the popover would write, and closing
     // it writes it.
-    template<> template<>
-    void alimagefield_object::test<2>()
+    TEST_CASE_METHOD(alimagefield_data, "alimagefield: the swatch opens a gallery of the caller's pictures on the field's name", "[alimagefield]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALImageField* field = make();
         field->setChoices(&alimagefield_data::choices);
@@ -121,29 +113,28 @@ namespace tut
         field->handleMouseDown(4, 10, MASK_NONE);
 
         ALSpecimenList* gallery = gFloaterView->findChild<ALSpecimenList>("images", true);
-        ensure("the popover has the gallery", gallery != nullptr);
-        ensure("as cells", gallery->cells());
-        ensure_equals("with every picture offered", gallery->count(), size_t(3));
-        ensure_equals("open on the field's name", gallery->chosen(), std::string("PushButton_Off"));
+        REQUIRE(gallery != nullptr);
+        CHECK(gallery->cells());
+        UNSCOPED_INFO("with every picture offered");
+        CHECK(gallery->count() == size_t(3));
+        UNSCOPED_INFO("open on the field's name");
+        CHECK(gallery->chosen() == std::string("PushButton_Off"));
         ALPopover* popover = gallery->getParentByType<ALPopover>();
-        ensure("in a popover", popover != nullptr);
+        REQUIRE(popover != nullptr);
 
         // Nothing chosen yet: closing keeps what the field had and says
         // nothing.
         popover->settle();
-        ensure_equals("no change, no commit", commits, 0);
-        ensure_equals("same name", field->getValue().asString(), std::string("PushButton_Off"));
+        CHECK(commits == 0);
+        CHECK(field->getValue().asString() == std::string("PushButton_Off"));
         field->die();
     }
 
-    // The tool that edits a picture is a button in the popover, given the
-    // name that was chosen.
-    template<> template<>
-    void alimagefield_object::test<3>()
+    TEST_CASE_METHOD(alimagefield_data, "alimagefield: the popover's edit button hands the editor the chosen name", "[alimagefield]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALImageField* field = make();
         field->setChoices(&alimagefield_data::choices);
@@ -153,19 +144,17 @@ namespace tut
         field->handleMouseDown(4, 10, MASK_NONE);
 
         LLUICtrl* edit = gFloaterView->findChild<LLUICtrl>("edit", true);
-        ensure("the popover offers the tool", edit != nullptr);
+        REQUIRE(edit != nullptr);
         edit->onCommit();
-        ensure_equals("which is given the name", edited, std::string("Icon_Close"));
+        CHECK(edited == std::string("Icon_Close"));
         field->die();
     }
 
-    template<> template<>
-    void alimagefield_object::test<4>()
+    TEST_CASE_METHOD(alimagefield_data, "alimagefield: a picture chosen commits on settle but not on escape or the field dying", "[alimagefield]")
     {
-        set_test_name("a picture chosen in the popover is the field's once it settles, not where it is escaped; a field going with it up escapes it");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLLineEditor::Params lp(LLUICtrlFactory::getDefaultParams<LLLineEditor>());
         lp.name                 = "elsewhere";
@@ -184,24 +173,41 @@ namespace tut
         };
 
         ALSpecimenList* gallery = open();
-        ensure("open", gallery != nullptr);
+        REQUIRE(gallery != nullptr);
         gallery->choose("Icon_Close");
-        gallery->getParentByType<ALPopover>()->escape();
-        ensure("escaped: no change, no commit", commits == 0 && field->getValue().asString() == "PushButton_Off");
+        ALPopover* popover = gallery->getParentByType<ALPopover>();
+        REQUIRE(popover != nullptr);
+        popover->escape();
+        {
+            INFO("escaped: no change, no commit");
+            CHECK(commits == 0);
+            CHECK(field->getValue().asString() == "PushButton_Off");
+        }
 
         gallery = open();
+        REQUIRE(gallery != nullptr);
         gallery->choose("Icon_Close");
-        gallery->getParentByType<ALPopover>()->settle();
-        ensure("settled: the one chosen, committed", commits == 1 && field->getValue().asString() == "Icon_Close");
+        popover = gallery->getParentByType<ALPopover>();
+        REQUIRE(popover != nullptr);
+        popover->settle();
+        {
+            INFO("settled: the one chosen, committed");
+            CHECK(commits == 1);
+            CHECK(field->getValue().asString() == "Icon_Close");
+        }
 
         elsewhere->setFocus(true);
         gallery = open();
-        ensure("the popover has the keyboard", gFocusMgr.getKeyboardFocus() != elsewhere);
+        REQUIRE(gallery != nullptr);
+        UNSCOPED_INFO("the popover has the keyboard");
+        CHECK(gFocusMgr.getKeyboardFocus() != elsewhere);
         gallery->choose("PushButton_Over");
         field->die();
         LLMortician::updateClass();
-        ensure("the field gone: the popover escaped, the keyboard back where it was", gFocusMgr.getKeyboardFocus() == elsewhere);
-        ensure_equals("and nothing more committed", commits, 1);
+        UNSCOPED_INFO("the field gone: the popover escaped, the keyboard back where it was");
+        CHECK(gFocusMgr.getKeyboardFocus() == elsewhere);
+        UNSCOPED_INFO("and nothing more committed");
+        CHECK(commits == 1);
         gFocusMgr.setKeyboardFocus(nullptr);
         elsewhere->die();
     }

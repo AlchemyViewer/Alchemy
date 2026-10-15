@@ -1359,6 +1359,9 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
                 added += '\n';
             }
         }
+        // This service has them, whatever the table already held: a file
+        // all of whose names an earlier one loaded is loaded all the same.
+        mImpl->builtins = true;
         error.clear();
         if (added.empty())
         {
@@ -1392,7 +1395,6 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
             const int index = Luau::lslEventIndex(symbol->getName());
             symbol->setEventIndex(index > 0 ? index : ++last);
         }
-        mImpl->builtins = true;
         return true;
     }
     // Read here and handed over as text: a path Tailslide opened itself

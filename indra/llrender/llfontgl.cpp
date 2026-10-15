@@ -32,7 +32,6 @@
 #include "llfontgl.h"
 
 // Linden library includes
-#include "llfasttimer.h"
 #include "llfontfreetype.h"
 #include "llfontbitmapcache.h"
 #include "llfontregistry.h"
@@ -1965,20 +1964,22 @@ void LLFontGL::initClass(F32 screen_dpi, F32 x_scale, F32 y_scale,
                          bool create_gl_textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    sVertDPI = (F32)llfloor(screen_dpi * y_scale);
-    sHorizDPI = (F32)llfloor(screen_dpi * x_scale);
-    sScaleX = x_scale;
-    sScaleY = y_scale;
-    sAppDir = app_dir;
-
     // Single-shot: bail if the registry was already created via either
     // overload. Reload-with-explicit-path isn't supported — the test
-    // caller initializes once.
+    // caller initializes once. Ignored whole: the fonts already made were
+    // made at the DPI and scale they have, which a second call must not
+    // change under them.
     if (sFontRegistry)
     {
         LL_WARNS() << "LLFontGL::initClass(explicit path) called with an existing registry; ignoring" << LL_ENDL;
         return;
     }
+
+    sVertDPI = (F32)llfloor(screen_dpi * y_scale);
+    sHorizDPI = (F32)llfloor(screen_dpi * x_scale);
+    sScaleX = x_scale;
+    sScaleY = y_scale;
+    sAppDir = app_dir;
 
     sFontRegistry = new LLFontRegistry(create_gl_textures);
     sFontRegistry->parseFontInfoFromFile(fonts_xml_path, font_overrides);

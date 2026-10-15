@@ -33,7 +33,7 @@
 
 #include "../../llui/tests/alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <map>
 #include <string>
@@ -46,7 +46,7 @@ void LLOpenFilteredFolders::doItem(LLFolderViewItem* item) {}
 void LLSelectFirstFilteredItem::doFolder(LLFolderViewFolder* folder) {}
 void LLSelectFirstFilteredItem::doItem(LLFolderViewItem* item) {}
 
-namespace tut
+namespace
 {
     struct alscriptexplorertree_data
     {
@@ -78,7 +78,7 @@ namespace tut
         {
             if (!ui.ok())
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             LLPanel::Params p(LLUICtrlFactory::getDefaultParams<LLPanel>());
             p.name = "explorer_tree";
@@ -171,14 +171,9 @@ namespace tut
             return LLSD();
         }
     };
-    typedef test_group<alscriptexplorertree_data> alscriptexplorertree_group;
-    typedef alscriptexplorertree_group::object    alscriptexplorertree_object;
-    tut::alscriptexplorertree_group               alscriptexplorertree_instance("alscriptexplorertree");
 
-    template<> template<>
-    void alscriptexplorertree_object::test<1>()
+    TEST_CASE_METHOD(alscriptexplorertree_data, "alscriptexplorertree: rows nest by object and prim and empty prims gather under their own row", "[alscriptexplorertree]")
     {
-        set_test_name("rows become a tree: an object at the top, a linkset's prims in it, those holding nothing under a row of their own, and each item in its prim, or in an object of one prim");
         ALScriptExplorerTree& t     = make();
         const LLUUID          house = object(10, "House", 3);
         const LLUUID          chair = object(20, "Chair");
@@ -189,23 +184,42 @@ namespace tut
         holds(id(12), {});
         holds(chair, { "sit.lsl", "notes" });
         show();
-        ensure("the objects at the top", t.parentOf(objectRow(house)).isUndefined() && t.parentOf(objectRow(chair)).isUndefined());
-        ensure("a prim in its object", llsd_equals(t.parentOf(primRow(house, id(10))), objectRow(house)));
-        ensure("an item in its prim", llsd_equals(t.parentOf(itemRow("a.lsl")), primRow(house, id(10))));
-        ensure("the prims holding nothing under their own row", llsd_equals(t.parentOf(primRow(house, id(11))), emptiesRow(house)) &&
-                                                                     llsd_equals(t.parentOf(primRow(house, id(12))), emptiesRow(house)));
-        ensure("in an object of one prim, the object holds them", llsd_equals(t.parentOf(itemRow("sit.lsl")), objectRow(chair)) &&
-                                                                        t.has(itemRow("notes")));
-        ensure("each as the owner said", t.label(primRow(house, id(10))) == "House" && t.suffix(itemRow("a.lsl")) == " (running)" &&
-                                              t.suffix(itemRow("notes")).empty());
-        ensure("open as the rows say: the object open, the prims holding nothing folded", t.isOpen(objectRow(house)) && !t.isOpen(emptiesRow(house)));
-        ensure("and nothing told of it: it was the rows' doing", folds.empty());
+        {
+            INFO("the objects at the top");
+            REQUIRE(t.parentOf(objectRow(house)).isUndefined());
+            REQUIRE(t.parentOf(objectRow(chair)).isUndefined());
+        }
+        UNSCOPED_INFO("a prim in its object");
+        CHECK(llsd_equals(t.parentOf(primRow(house, id(10))), objectRow(house)));
+        UNSCOPED_INFO("an item in its prim");
+        CHECK(llsd_equals(t.parentOf(itemRow("a.lsl")), primRow(house, id(10))));
+        {
+            INFO("the prims holding nothing under their own row");
+            CHECK(llsd_equals(t.parentOf(primRow(house, id(11))), emptiesRow(house)));
+            CHECK(llsd_equals(t.parentOf(primRow(house, id(12))), emptiesRow(house)));
+        }
+        {
+            INFO("in an object of one prim, the object holds them");
+            CHECK(llsd_equals(t.parentOf(itemRow("sit.lsl")), objectRow(chair)));
+            REQUIRE(t.has(itemRow("notes")));
+        }
+        {
+            INFO("each as the owner said");
+            CHECK(t.label(primRow(house, id(10))) == "House");
+            CHECK(t.suffix(itemRow("a.lsl")) == " (running)");
+            REQUIRE(t.suffix(itemRow("notes")).empty());
+        }
+        {
+            INFO("open as the rows say: the object open, the prims holding nothing folded");
+            CHECK(t.isOpen(objectRow(house)));
+            CHECK_FALSE(t.isOpen(emptiesRow(house)));
+        }
+        UNSCOPED_INFO("and nothing told of it: it was the rows' doing");
+        REQUIRE(folds.empty());
     }
 
-    template<> template<>
-    void alscriptexplorertree_object::test<2>()
+    TEST_CASE_METHOD(alscriptexplorertree_data, "alscriptexplorertree: showing again updates rows in place and drops the ones gone", "[alscriptexplorertree]")
     {
-        set_test_name("told again, a row is kept -- what is chosen stays chosen -- and changed in place; a row gone goes with what it held; a prim no longer holding nothing moves out from under that row");
         ALScriptExplorerTree& t     = make();
         const LLUUID          house = object(10, "House", 3);
         const LLUUID          chair = object(20, "Chair");
@@ -216,30 +230,46 @@ namespace tut
         holds(id(12), {});
         holds(chair, { "sit.lsl" });
         show();
-        ensure("chosen", t.choose(itemRow("a.lsl"), false) && t.chosen().size() == 1);
+        CHECK(t.choose(itemRow("a.lsl"), false));
+        REQUIRE(t.chosen().size() == 1);
         state = "stopped";
         show();
-        ensure("still chosen, told again", t.chosen().size() == 1 && llsd_equals(t.chosen().front(), itemRow("a.lsl")));
-        ensure("its state changed in place", t.suffix(itemRow("a.lsl")) == " (stopped)");
+        {
+            INFO("still chosen, told again");
+            REQUIRE(t.chosen().size() == 1);
+            CHECK(llsd_equals(t.chosen().front(), itemRow("a.lsl")));
+        }
+        UNSCOPED_INFO("its state changed in place");
+        CHECK(t.suffix(itemRow("a.lsl")) == " (stopped)");
 
         holds(id(11), { "b.lsl" });
         show();
-        ensure("one alone holding nothing: no row for them", !t.has(emptiesRow(house)));
-        ensure("both prims in the object again", llsd_equals(t.parentOf(primRow(house, id(11))), objectRow(house)) &&
-                                                      llsd_equals(t.parentOf(primRow(house, id(12))), objectRow(house)));
-        ensure("and what they hold in them", llsd_equals(t.parentOf(itemRow("b.lsl")), primRow(house, id(11))));
+        UNSCOPED_INFO("one alone holding nothing: no row for them");
+        REQUIRE_FALSE(t.has(emptiesRow(house)));
+        {
+            INFO("both prims in the object again");
+            CHECK(llsd_equals(t.parentOf(primRow(house, id(11))), objectRow(house)));
+            CHECK(llsd_equals(t.parentOf(primRow(house, id(12))), objectRow(house)));
+        }
+        UNSCOPED_INFO("and what they hold in them");
+        CHECK(llsd_equals(t.parentOf(itemRow("b.lsl")), primRow(house, id(11))));
 
         selected = { chair };
         show();
-        ensure("an object gone, with all it held", !t.has(objectRow(house)) && !t.has(primRow(house, id(10))) && !t.has(itemRow("a.lsl")));
-        ensure("what was chosen in it let go of", t.chosen().empty());
-        ensure("the rest kept", t.has(itemRow("sit.lsl")));
+        {
+            INFO("an object gone, with all it held");
+            REQUIRE_FALSE(t.has(objectRow(house)));
+            REQUIRE_FALSE(t.has(primRow(house, id(10))));
+            REQUIRE_FALSE(t.has(itemRow("a.lsl")));
+        }
+        UNSCOPED_INFO("what was chosen in it let go of");
+        REQUIRE(t.chosen().empty());
+        UNSCOPED_INFO("the rest kept");
+        REQUIRE(t.has(itemRow("sit.lsl")));
     }
 
-    template<> template<>
-    void alscriptexplorertree_object::test<3>()
+    TEST_CASE_METHOD(alscriptexplorertree_data, "alscriptexplorertree: a person's fold is told and kept and the rows' folds are not told", "[alscriptexplorertree]")
     {
-        set_test_name("a folder folded by a person tells the owner, and stays folded while the rows say nothing new of it; the rows folding or opening it tell nothing");
         ALScriptExplorerTree& t     = make();
         const LLUUID          house = object(10, "House", 2);
         selected                    = { house };
@@ -248,22 +278,34 @@ namespace tut
         holds(id(11), { "b.lsl" });
         show();
         t.toggle(objectRow(house));
-        ensure("folded, and told", !t.isOpen(objectRow(house)) && folds.size() == 1 && folds[0].second);
+        {
+            INFO("folded, and told");
+            CHECK_FALSE(t.isOpen(objectRow(house)));
+            REQUIRE(folds.size() == 1);
+            CHECK(folds[0].second);
+        }
         show("b");
-        ensure("a filter's rows say it open, as they did: it stays as the person left it", !t.isOpen(objectRow(house)));
+        UNSCOPED_INFO("a filter's rows say it open, as they did: it stays as the person left it");
+        CHECK_FALSE(t.isOpen(objectRow(house)));
         show();
         model.fold(house, false, true);
         show();
-        ensure("the rows fold it: nothing told", !t.isOpen(objectRow(house)) && folds.size() == 1);
+        {
+            INFO("the rows fold it: nothing told");
+            CHECK_FALSE(t.isOpen(objectRow(house)));
+            REQUIRE(folds.size() == 1);
+        }
         model.fold(house, false, false);
         show();
-        ensure("and open it", t.isOpen(objectRow(house)) && folds.size() == 1);
+        {
+            INFO("and open it");
+            CHECK(t.isOpen(objectRow(house)));
+            REQUIRE(folds.size() == 1);
+        }
     }
 
-    template<> template<>
-    void alscriptexplorertree_object::test<4>()
+    TEST_CASE_METHOD(alscriptexplorertree_data, "alscriptexplorertree: choosing a shown row opens what holds it and tells the owner", "[alscriptexplorertree]")
     {
-        set_test_name("a row chosen opens what holds it, as a person would, which the owner is told of; one not shown is not chosen");
         ALScriptExplorerTree& t     = make();
         const LLUUID          house = object(10, "House", 2);
         selected                    = { house };
@@ -272,20 +314,28 @@ namespace tut
         holds(id(11), { "b.lsl" });
         model.fold(id(11), true, true);
         show();
-        ensure("folded as the rows say", !t.isOpen(primRow(house, id(11))));
-        ensure("chosen", t.choose(itemRow("b.lsl"), false));
-        ensure("what holds it opened", t.isOpen(primRow(house, id(11))));
-        ensure("and the owner told, to ask what it holds", folds.size() == 1 && !folds[0].second &&
-                                                              llsd_equals(folds[0].first, primRow(house, id(11))));
-        ensure("nothing chosen that is not a row", !t.choose(itemRow("nothing"), false) && t.chosen().size() == 1);
+        UNSCOPED_INFO("folded as the rows say");
+        CHECK_FALSE(t.isOpen(primRow(house, id(11))));
+        CHECK(t.choose(itemRow("b.lsl"), false));
+        UNSCOPED_INFO("what holds it opened");
+        CHECK(t.isOpen(primRow(house, id(11))));
+        {
+            INFO("and the owner told, to ask what it holds");
+            REQUIRE(folds.size() == 1);
+            CHECK_FALSE(folds[0].second);
+            CHECK(llsd_equals(folds[0].first, primRow(house, id(11))));
+        }
+        {
+            INFO("nothing chosen that is not a row");
+            CHECK_FALSE(t.choose(itemRow("nothing"), false));
+            REQUIRE(t.chosen().size() == 1);
+        }
         t.chooseNone();
-        ensure("none", t.chosen().empty());
+        REQUIRE(t.chosen().empty());
     }
 
-    template<> template<>
-    void alscriptexplorertree_object::test<5>()
+    TEST_CASE_METHOD(alscriptexplorertree_data, "alscriptexplorertree: keyboard focus goes to the folder view and escape passes through", "[alscriptexplorertree]")
     {
-        set_test_name("the keyboard given to the tree is where the folder view hears it, not the panel; and escape goes on past the panel, not taken to leave nothing with the keyboard");
         ALScriptExplorerTree& t     = make();
         const LLUUID          house = object(10, "House", 2);
         selected                    = { house };
@@ -293,22 +343,29 @@ namespace tut
         holds(id(10), { "a.lsl" });
         holds(id(11), { "b.lsl" });
         show();
-        ensure("chosen, with the keyboard", t.choose(objectRow(house), true));
+        UNSCOPED_INFO("chosen, with the keyboard");
+        CHECK(t.choose(objectRow(house), true));
         LLView* focus = dynamic_cast<LLView*>(gFocusMgr.getKeyboardFocus());
-        ensure("in the tree, not the panel itself", focus && focus != &t && t.hasFocus());
+        {
+            INFO("in the tree, not the panel itself");
+            REQUIRE(focus);
+            CHECK(focus != &t);
+            CHECK(t.hasFocus());
+        }
         // What the folder view does with the arrows goes by its layout, which
         // a test without the viewer's fonts cannot make; F2 it takes whatever
         // is chosen, which says the keys reach it.
-        ensure("F2 is the folder view's", focus->handleKey(KEY_F2, MASK_NONE, false));
-        ensure("escape not taken", !focus->handleKey(KEY_ESCAPE, MASK_NONE, false));
-        ensure("the keyboard still there", t.hasFocus());
+        UNSCOPED_INFO("F2 is the folder view's");
+        CHECK(focus->handleKey(KEY_F2, MASK_NONE, false));
+        UNSCOPED_INFO("escape not taken");
+        CHECK_FALSE(focus->handleKey(KEY_ESCAPE, MASK_NONE, false));
+        UNSCOPED_INFO("the keyboard still there");
+        CHECK(t.hasFocus());
         gFocusMgr.setKeyboardFocus(nullptr);
     }
 
-    template<> template<>
-    void alscriptexplorertree_object::test<6>()
+    TEST_CASE_METHOD(alscriptexplorertree_data, "alscriptexplorertree: only an item may be dragged out and the owner starts the drag", "[alscriptexplorertree]")
     {
-        set_test_name("an item may be dragged out, which the owner starts; a prim or an object may not");
         ALScriptExplorerTree& t     = make();
         const LLUUID          house = object(10, "House");
         selected                    = { house };
@@ -324,12 +381,25 @@ namespace tut
         t.setHooks(std::move(hooks));
         // The folder view drags only from a row that says it may move; the
         // press and the move themselves want a window this has none of.
-        ensure("chosen", t.choose(itemRow("a.lsl"), false));
+        CHECK(t.choose(itemRow("a.lsl"), false));
         LLFolderViewItem* item = t.folderView()->getCurSelectedItem();
-        ensure("an item may move", item && item->isMovable());
-        ensure("and the drag is the owner's", t.folderView()->startDrag() && drags == 1);
-        ensure("chosen", t.choose(objectRow(house), false));
-        ensure("an object may not", !t.folderView()->getCurSelectedItem()->isMovable());
+        {
+            INFO("an item may move");
+            REQUIRE(item);
+            CHECK(item->isMovable());
+        }
+        {
+            INFO("and the drag is the owner's");
+            CHECK(t.folderView()->startDrag());
+            CHECK(drags == 1);
+        }
+        CHECK(t.choose(objectRow(house), false));
+        item = t.folderView()->getCurSelectedItem();
+        {
+            INFO("an object may not");
+            REQUIRE(item);
+            CHECK_FALSE(item->isMovable());
+        }
         gFocusMgr.setKeyboardFocus(nullptr);
     }
 }

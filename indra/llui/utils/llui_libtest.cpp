@@ -51,7 +51,7 @@
 #include <iostream>
 #include <map>
 
-// *TODO: switch to using TUT
+// *TODO: make this a test
 // *TODO: teach Parabuild about this program, run automatically after full builds
 
 // I believe these must be globals, not stack variables.  JC

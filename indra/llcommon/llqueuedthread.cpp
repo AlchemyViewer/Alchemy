@@ -287,7 +287,7 @@ bool LLQueuedThread::addRequest(QueuedRequest* req)
 #endif
     unlockData();
 
-    llassert(!mDataLock->isSelfLocked());
+    llassert(!mRunCondition->isSelfLocked());
     mRequestQueue.post([this, req]() { processRequest(req); });
 
     return true;
@@ -494,7 +494,7 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 
                 unlockData();
 
-                llassert(!mDataLock->isSelfLocked());
+                llassert(!mRunCondition->isSelfLocked());
 
 #if 0
                 // try again on next frame

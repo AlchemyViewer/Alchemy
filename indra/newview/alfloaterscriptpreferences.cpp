@@ -77,7 +77,7 @@ namespace
     // back on Cancel.
     const char* const SETTINGS[] = {
         "ALScriptStudioTheme",       "ALScriptStudioFontFamily",   "ALScriptStudioFontSize",
-        "ALScriptStudioFontStyle",   "ALScriptStudioKeymap",       "ALScriptStudioRestoreTabs",
+        "ALScriptStudioFontStyle",   "ALScriptStudioKeymap",       "ALScriptStudioRestoreTabs",   "ALScriptStudioPanesWiden",
         "ALScriptStudioPreflight",   "ALScriptPreprocEnabled",     "ALScriptPreprocSwitch",
         "ALScriptPreprocLazyLists",  "ALScriptPreprocCompress",    "ALScriptPreprocOptimizer",
         "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings",
@@ -95,6 +95,7 @@ namespace
         "ALScriptTemplateLSL",       "ALScriptTemplateSLua",       "ALScriptPreprocDefines",    "ExternalEditor",
         "ALScriptConvertLLTimers",   "ALScriptConvertDetectedTable", "ALScriptConvertSLuaCalls", "ALScriptConvertIdioms",
         "ALScriptConvertHandlerFields", "ALScriptConvertTypes",    "ALScriptConvertComments",   "ALScriptConvertKeepComments",
+        "ALScriptConvertKeyTextAny", "ALScriptConvertUuidKeys",
     };
 
     // What each preset of Convert to SLua sets: SLua's own ways, or as
@@ -102,6 +103,7 @@ namespace
     // the scripter's either way.
     const std::pair<const char*, bool> CONVERT_MODERN[] = {
         { "ALScriptConvertLLTimers", true }, { "ALScriptConvertDetectedTable", true }, { "ALScriptConvertSLuaCalls", true }, { "ALScriptConvertIdioms", true },
+        { "ALScriptConvertUuidKeys", true },
     };
 
     // The places an include is looked for, as the setting spells them.

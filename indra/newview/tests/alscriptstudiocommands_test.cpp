@@ -26,11 +26,11 @@
 
 #include "../alscriptstudiocommands.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 
-namespace tut
+namespace
 {
     struct alscriptstudiocommands_data
     {
@@ -39,82 +39,99 @@ namespace tut
         std::vector<std::string> done;
     };
 
-    typedef test_group<alscriptstudiocommands_data> alscriptstudiocommands_group;
-    typedef alscriptstudiocommands_group::object    alscriptstudiocommands_object;
-    alscriptstudiocommands_group                    alscriptstudiocommands_instance("alscriptstudiocommands");
-
-    template<> template<>
-    void alscriptstudiocommands_object::test<1>()
+    TEST_CASE_METHOD(alscriptstudiocommands_data, "alscriptstudiocommands: a command runs by name and reports enabled and checked state", "[alscriptstudiocommands]")
     {
-        set_test_name("a command run by name, enabled where it says so or says nothing, and on where it is a toggle that is");
         bool can  = false;
         bool wrap = true;
-        ensure("registered", commands.add("save", [this]() { done.push_back("save"); }, [&can]() { return can; }));
-        ensure("and a toggle", commands.add("word_wrap", [&wrap]() { wrap = !wrap; }, nullptr, [&wrap]() { return wrap; }));
-        ensure("and one saying nothing of either", commands.add("close", [this]() { done.push_back("close"); }));
+        UNSCOPED_INFO("registered");
+        CHECK(commands.add("save", [this]() { done.push_back("save"); }, [&can]() { return can; }));
+        UNSCOPED_INFO("and a toggle");
+        CHECK(commands.add("word_wrap", [&wrap]() { wrap = !wrap; }, nullptr, [&wrap]() { return wrap; }));
+        UNSCOPED_INFO("and one saying nothing of either");
+        CHECK(commands.add("close", [this]() { done.push_back("close"); }));
 
-        ensure("known", commands.has("save") && commands.has("word_wrap") && commands.has("close"));
-        ensure("not enabled while it says it cannot", !commands.enabled("save"));
+        REQUIRE(commands.has("save"));
+        REQUIRE(commands.has("word_wrap"));
+        REQUIRE(commands.has("close"));
+        UNSCOPED_INFO("not enabled while it says it cannot");
+        CHECK_FALSE(commands.enabled("save"));
         can = true;
-        ensure("enabled once it can", commands.enabled("save"));
-        ensure("one saying nothing, always", commands.enabled("close"));
+        UNSCOPED_INFO("enabled once it can");
+        CHECK(commands.enabled("save"));
+        UNSCOPED_INFO("one saying nothing, always");
+        CHECK(commands.enabled("close"));
         commands.run("save");
         commands.run("close");
-        ensure("each run", done == std::vector<std::string>{ "save", "close" });
+        CHECK(done == std::vector<std::string>{ "save", "close" });
 
-        ensure("the toggle on", commands.checked("word_wrap"));
+        UNSCOPED_INFO("the toggle on");
+        CHECK(commands.checked("word_wrap"));
         commands.run("word_wrap");
-        ensure("and off", !commands.checked("word_wrap") && !wrap);
-        ensure("no toggle is off", !commands.checked("save"));
-        ensure("nothing unknown asked", commands.unknownAsked().empty());
+        {
+            INFO("and off");
+            CHECK_FALSE(commands.checked("word_wrap"));
+            CHECK_FALSE(wrap);
+        }
+        UNSCOPED_INFO("no toggle is off");
+        CHECK_FALSE(commands.checked("save"));
+        UNSCOPED_INFO("nothing unknown asked");
+        REQUIRE(commands.unknownAsked().empty());
     }
 
-    template<> template<>
-    void alscriptstudiocommands_object::test<2>()
+    TEST_CASE_METHOD(alscriptstudiocommands_data, "alscriptstudiocommands: a name registers once and keeps its first command", "[alscriptstudiocommands]")
     {
-        set_test_name("a name is registered once, and keeps what it was registered with first");
-        ensure("the first", commands.add("save", [this]() { done.push_back("first"); }));
-        ensure("the second refused", !commands.add("save", [this]() { done.push_back("second"); }));
-        ensure("unlisted the same", !commands.addUnlisted("save", [this]() { done.push_back("third"); }));
+        CHECK(commands.add("save", [this]() { done.push_back("first"); }));
+        UNSCOPED_INFO("the second refused");
+        CHECK_FALSE(commands.add("save", [this]() { done.push_back("second"); }));
+        UNSCOPED_INFO("unlisted the same");
+        CHECK_FALSE(commands.addUnlisted("save", [this]() { done.push_back("third"); }));
         commands.run("save");
-        ensure("the first's", done == std::vector<std::string>{ "first" });
-        ensure("an unlisted one is a command like any", commands.addUnlisted("reveal", [this]() { done.push_back("reveal"); }));
+        UNSCOPED_INFO("the first's");
+        REQUIRE(done == std::vector<std::string>{ "first" });
+        UNSCOPED_INFO("an unlisted one is a command like any");
+        CHECK(commands.addUnlisted("reveal", [this]() { done.push_back("reveal"); }));
         commands.run("reveal");
-        ensure_equals("run", done.back(), std::string("reveal"));
+        CHECK(done.back() == std::string("reveal"));
         std::vector<std::string> names = commands.names();
         std::sort(names.begin(), names.end());
-        ensure("every name, once", names == std::vector<std::string>{ "reveal", "save" });
+        UNSCOPED_INFO("every name, once");
+        CHECK(names == std::vector<std::string>{ "reveal", "save" });
     }
 
-    template<> template<>
-    void alscriptstudiocommands_object::test<3>()
+    TEST_CASE_METHOD(alscriptstudiocommands_data, "alscriptstudiocommands: an unknown name does nothing and is reported once", "[alscriptstudiocommands]")
     {
-        set_test_name("a name nothing registered does nothing, cannot be done, is off, and is said once");
         commands.run("no_such");
-        ensure("not enabled", !commands.enabled("no_such"));
-        ensure("off", !commands.checked("no_such"));
-        ensure("not done by a key", !commands.runIfEnabled("no_such"));
-        ensure("nor known", !commands.has("no_such"));
-        ensure("said once however often asked", commands.unknownAsked() == std::vector<std::string>{ "no_such" });
+        CHECK_FALSE(commands.enabled("no_such"));
+        CHECK_FALSE(commands.checked("no_such"));
+        UNSCOPED_INFO("not done by a key");
+        CHECK_FALSE(commands.runIfEnabled("no_such"));
+        REQUIRE_FALSE(commands.has("no_such"));
+        UNSCOPED_INFO("said once however often asked");
+        CHECK(commands.unknownAsked() == std::vector<std::string>{ "no_such" });
         commands.enabled("another");
-        ensure("and another once more", commands.unknownAsked() == std::vector<std::string>{ "no_such", "another" });
+        UNSCOPED_INFO("and another once more");
+        CHECK(commands.unknownAsked() == std::vector<std::string>{ "no_such", "another" });
     }
 
-    template<> template<>
-    void alscriptstudiocommands_object::test<4>()
+    TEST_CASE_METHOD(alscriptstudiocommands_data, "alscriptstudiocommands: a key or an ex command does a command only where it can be done now", "[alscriptstudiocommands]")
     {
-        set_test_name("a key or an ex command does a command only where it can be done now");
         bool can = false;
         commands.add("format", [this]() { done.push_back("format"); }, [&can]() { return can; });
-        ensure("not while it cannot", !commands.runIfEnabled("format") && done.empty());
+        {
+            INFO("not while it cannot");
+            CHECK_FALSE(commands.runIfEnabled("format"));
+            REQUIRE(done.empty());
+        }
         can = true;
-        ensure("once it can", commands.runIfEnabled("format") && done == std::vector<std::string>{ "format" });
+        {
+            INFO("once it can");
+            CHECK(commands.runIfEnabled("format"));
+            CHECK(done == std::vector<std::string>{ "format" });
+        }
     }
 
-    template<> template<>
-    void alscriptstudiocommands_object::test<5>()
+    TEST_CASE_METHOD(alscriptstudiocommands_data, "alscriptstudiocommands: a command may register others as it runs", "[alscriptstudiocommands]")
     {
-        set_test_name("a command may register others as it runs");
         commands.add("first", [this]() {
             // Enough to move the table's own storage about.
             for (int i = 0; i < 64; ++i)
@@ -124,8 +141,10 @@ namespace tut
             done.push_back("first");
         });
         commands.run("first");
-        ensure("ran to its end", done == std::vector<std::string>{ "first" });
+        UNSCOPED_INFO("ran to its end");
+        REQUIRE(done == std::vector<std::string>{ "first" });
         commands.run("made_63");
-        ensure_equals("and what it made runs", done.back(), std::string("made"));
+        UNSCOPED_INFO("and what it made runs");
+        CHECK(done.back() == std::string("made"));
     }
 }

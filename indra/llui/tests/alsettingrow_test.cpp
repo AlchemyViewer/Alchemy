@@ -45,12 +45,12 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <string>
 
-namespace tut
+namespace
 {
     struct alsettingrow_data
     {
@@ -181,18 +181,13 @@ namespace tut
         }
     };
 
-    typedef test_group<alsettingrow_data> alsettingrow_test;
-    typedef alsettingrow_test::object     alsettingrow_object;
-    tut::alsettingrow_test alsettingrow_testgroup("alsettingrow");
-
     // A slider row becomes a setting row by changing its tag, so every one of
     // the slider's attributes has to be read by the name a slider writes.
-    template<> template<>
-    void alsettingrow_object::test<1>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: XUI reads every slider attribute by the slider's own names", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         const std::string source =
@@ -200,60 +195,65 @@ namespace tut
             " increment=\"0.05\" decimal_digits=\"3\" text_width=\"56\" show_text=\"true\""
             " can_edit_text=\"false\" show_reset=\"false\" control_name=\"RenderBloomKnee\"/>\n";
         LLXMLNodePtr node;
-        ensure("parses", LLXMLNode::parseBuffer(source.data(), source.size(), node));
+        REQUIRE(LLXMLNode::parseBuffer(source.data(), source.size(), node));
 
         ALSettingRow::Params p;
         LLXUIParser parser;
         parser.readXUI(node, p, "setting_row_test.xml");
-        ensure_equals("label", p.label(), std::string("Knee"));
-        ensure_equals("label_width", p.label_width(), 120);
-        ensure("min_val", closeTo(p.min_value(), -1.0));
-        ensure("max_val", closeTo(p.max_value(), 2.0));
-        ensure("increment", closeTo(p.increment(), 0.05));
-        ensure_equals("decimal_digits", p.decimal_digits(), 3);
-        ensure("text_width said", p.text_width.isProvided());
-        ensure_equals("text_width", p.text_width(), 56);
-        ensure("can_edit_text", !p.can_edit_text());
-        ensure("show_reset", !p.show_reset());
-        ensure_equals("control_name", p.control_name(), std::string("RenderBloomKnee"));
+        CHECK(p.label() == std::string("Knee"));
+        CHECK(p.label_width() == 120);
+        CHECK(closeTo(p.min_value(), -1.0));
+        CHECK(closeTo(p.max_value(), 2.0));
+        CHECK(closeTo(p.increment(), 0.05));
+        CHECK(p.decimal_digits() == 3);
+        CHECK(p.text_width.isProvided());
+        CHECK(p.text_width() == 56);
+        CHECK_FALSE(p.can_edit_text());
+        CHECK_FALSE(p.show_reset());
+        CHECK(p.control_name() == std::string("RenderBloomKnee"));
 
         // And what a file leaves out is what every Lightbox row writes today.
         ALSettingRow::Params defaults;
-        ensure_equals("label_width defaults to the rows' 140", defaults.label_width(), 140);
-        ensure("can_edit_text defaults on", defaults.can_edit_text());
-        ensure("show_reset defaults on", defaults.show_reset());
-        ensure("text_width is not said unless said", !defaults.text_width.isProvided());
-        ensure("a scalar unless said otherwise", defaults.components().empty() && defaults.part() == -1);
+        UNSCOPED_INFO("label_width defaults to the rows' 140");
+        CHECK(defaults.label_width() == 140);
+        CHECK(defaults.can_edit_text());
+        CHECK(defaults.show_reset());
+        CHECK_FALSE(defaults.text_width.isProvided());
+        {
+            INFO("a scalar unless said otherwise");
+            CHECK(defaults.components().empty());
+            CHECK(defaults.part() == -1);
+        }
 
         // A vector's letters and a part's index, by the names a row writes.
         const std::string vector_source = "<setting_row name=\"v\" components=\"R G B\" part=\"1\" letter_width=\"18\"/>\n";
         LLXMLNodePtr      vector_node;
-        ensure("a vector parses", LLXMLNode::parseBuffer(vector_source.data(), vector_source.size(), vector_node));
+        REQUIRE(LLXMLNode::parseBuffer(vector_source.data(), vector_source.size(), vector_node));
         ALSettingRow::Params vector_p;
         parser.readXUI(vector_node, vector_p, "setting_row_test.xml");
-        ensure_equals("components", vector_p.components(), std::string("R G B"));
-        ensure_equals("part", vector_p.part(), 1);
-        ensure_equals("letter_width", vector_p.letter_width(), 18);
-        ensure_equals("a letter's width unless said", defaults.letter_width(), 10);
+        CHECK(vector_p.components() == std::string("R G B"));
+        CHECK(vector_p.part() == 1);
+        CHECK(vector_p.letter_width() == 18);
+        UNSCOPED_INFO("a letter's width unless said");
+        CHECK(defaults.letter_width() == 10);
     }
 
     // Bound both ways, and a commit is one write: the row writes the setting,
     // the setting's signal comes back to the row, and nothing writes it again.
-    template<> template<>
-    void alsettingrow_object::test<2>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: a row follows its setting and a commit writes it once", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLControlVariable* control = setting("SettingRowTestBinding", 0.5f);
         ALSettingRow* r = row("SettingRowTestBinding");
-        ensure("the row reads the setting", closeTo(r->getValue().asReal(), 0.5));
+        CHECK(closeTo(r->getValue().asReal(), 0.5));
 
         control->set(LLSD(0.75));
-        ensure("and follows it", closeTo(r->getValue().asReal(), 0.75));
-        ensure("the slider shows it", closeTo(r->getSlider()->getValueF32(), 0.75));
+        CHECK(closeTo(r->getValue().asReal(), 0.75));
+        CHECK(closeTo(r->getSlider()->getValueF32(), 0.75));
 
         S32 writes = 0;
         boost::signals2::scoped_connection watching = control->getSignal()->connect(
@@ -263,122 +263,124 @@ namespace tut
 
         r->getSlider()->setValue(0.25f);
         r->getSlider()->onCommit();
-        ensure("the slider's value reaches the setting", closeTo(control->getValue().asReal(), 0.25));
-        ensure_equals("written once", writes, 1);
-        ensure_equals("and the row says so once", commits, 1);
+        CHECK(closeTo(control->getValue().asReal(), 0.25));
+        CHECK(writes == 1);
+        CHECK(commits == 1);
         r->die();
     }
 
     // The row is the only thing bound, so a walk for what a panel is bound to
     // finds one setting per row and not one per part of it.
-    template<> template<>
-    void alsettingrow_object::test<3>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: only the row itself is bound and none of its parts", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         setting("SettingRowTestBinding", 0.5f);
         ALSettingRow* r = row("SettingRowTestBinding");
-        ensure("the row is bound", r->getControlVariable() != nullptr);
-        ensure_equals("and nothing in it is", boundUnder(r), 0);
+        CHECK(r->getControlVariable() != nullptr);
+        CHECK(boundUnder(r) == 0);
         r->die();
     }
 
     // The reset button is there while there is something to reset, pressing it
     // puts the default back and goes, and the row does not say it committed:
     // what cares about the setting heard the setting change.
-    template<> template<>
-    void alsettingrow_object::test<4>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: reset shows when changed and restores the default without a commit", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLControlVariable* control = setting("SettingRowTestReset", 0.5f);
         ALSettingRow* r = row("SettingRowTestReset");
-        ensure("hidden at the default", !r->getResetButton()->getVisible());
+        UNSCOPED_INFO("hidden at the default");
+        CHECK_FALSE(r->getResetButton()->getVisible());
 
         control->set(LLSD(0.8));
-        ensure("shown once changed", r->getResetButton()->getVisible());
-        ensure("and the row says so", r->isModified());
+        UNSCOPED_INFO("shown once changed");
+        CHECK(r->getResetButton()->getVisible());
+        CHECK(r->isModified());
 
         S32 commits = 0;
         r->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         r->getResetButton()->onCommit();
-        ensure("the default is back", closeTo(control->getValue().asReal(), 0.5));
-        ensure("the slider shows it", closeTo(r->getSlider()->getValueF32(), 0.5));
-        ensure("the button has gone", !r->getResetButton()->getVisible());
-        ensure_equals("and the row did not commit", commits, 0);
+        CHECK(closeTo(control->getValue().asReal(), 0.5));
+        CHECK(closeTo(r->getSlider()->getValueF32(), 0.5));
+        CHECK_FALSE(r->getResetButton()->getVisible());
+        UNSCOPED_INFO("the row did not commit");
+        CHECK(commits == 0);
         r->die();
     }
 
     // As shown, not as stored: a value that rounds to the default at the
     // row's decimals is the default as far as anyone looking can tell, so a
     // drag that came back to it does not leave a reset button lit.
-    template<> template<>
-    void alsettingrow_object::test<5>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: a value that rounds to the default as shown lights no reset", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLControlVariable* control = setting("SettingRowTestRounding", 0.7f);
         ALSettingRow* r = row("SettingRowTestRounding", 0.f, 1.f, 2);
 
         control->set(LLSD(0.6999999));
-        ensure("not the default to the letter", !control->isDefault());
-        ensure("but not modified as shown", !r->isModified());
-        ensure("so no button", !r->getResetButton()->getVisible());
+        UNSCOPED_INFO("not the default to the letter");
+        CHECK_FALSE(control->isDefault());
+        UNSCOPED_INFO("but not modified as shown");
+        CHECK_FALSE(r->isModified());
+        CHECK_FALSE(r->getResetButton()->getVisible());
 
         control->set(LLSD(0.69));
-        ensure("a change that shows, shows it", r->getResetButton()->getVisible());
+        UNSCOPED_INFO("a change that shows, shows it");
+        CHECK(r->getResetButton()->getVisible());
         r->die();
     }
 
     // The button's place is kept whether it shows or not, at any width: the
     // slider ends where it always ends, so nothing moves when the button
     // appears, and a row and the rows above it line up.
-    template<> template<>
-    void alsettingrow_object::test<6>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: the reset button's slot is kept at the right at any width", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALSettingRow* r = row(std::string());
         const S32 width = r->getRect().getWidth();
         const S32 slot = ALSettingRow::RESET_SIZE + ALSettingRow::RESET_GAP;
-        ensure_equals("the button at the right edge", r->getResetButton()->getRect().mRight, width);
-        ensure_equals("the slider ends before its slot", r->getSlider()->getRect().mRight, width - slot);
+        CHECK(r->getResetButton()->getRect().mRight == width);
+        CHECK(r->getSlider()->getRect().mRight == width - slot);
 
         r->reshape(width + 50, r->getRect().getHeight());
-        ensure_equals("still at the right edge, wider", r->getResetButton()->getRect().mRight, width + 50);
-        ensure_equals("and the slider still before it", r->getSlider()->getRect().mRight, width + 50 - slot);
+        CHECK(r->getResetButton()->getRect().mRight == width + 50);
+        CHECK(r->getSlider()->getRect().mRight == width + 50 - slot);
         r->die();
     }
 
     // Greyed as one thing: the slider, its label and value, and the button,
     // whether by hand or by the control the row's enabled_control names.
-    template<> template<>
-    void alsettingrow_object::test<7>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: disabling by hand or by enabled_control greys slider and button", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         setting("SettingRowTestBinding", 0.5f);
         ALSettingRow* r = row("SettingRowTestBinding");
         r->setEnabled(false);
-        ensure("the slider greys", !r->getSlider()->getEnabled());
-        ensure("and the button", !r->getResetButton()->getEnabled());
+        CHECK_FALSE(r->getSlider()->getEnabled());
+        CHECK_FALSE(r->getResetButton()->getEnabled());
         r->setEnabled(true);
-        ensure("and both come back", r->getSlider()->getEnabled() && r->getResetButton()->getEnabled());
+        CHECK(r->getSlider()->getEnabled());
+        CHECK(r->getResetButton()->getEnabled());
         r->die();
 
         LLControlVariable* gate = config().getControl("SettingRowTestGate").get();
@@ -390,9 +392,14 @@ namespace tut
         ALSettingRow::Params p = params("SettingRowTestBinding");
         p.enabled_controls.enabled = "SettingRowTestGate";
         ALSettingRow* gated = LLUICtrlFactory::create<ALSettingRow>(p);
-        ensure("open while the gate is", gated->getSlider()->getEnabled());
+        UNSCOPED_INFO("open while the gate is");
+        CHECK(gated->getSlider()->getEnabled());
         gate->set(LLSD(false));
-        ensure("greyed when it closes", !gated->getSlider()->getEnabled() && !gated->getResetButton()->getEnabled());
+        {
+            INFO("greyed when it closes");
+            CHECK_FALSE(gated->getSlider()->getEnabled());
+            CHECK_FALSE(gated->getResetButton()->getEnabled());
+        }
         gate->set(LLSD(true));
         gated->die();
     }
@@ -400,38 +407,36 @@ namespace tut
     // Bound to nothing it is still a slider: it takes and gives a value and
     // says when it changed -- which is all the vector rows need of a control --
     // and it never offers a reset it has nothing to reset with.
-    template<> template<>
-    void alsettingrow_object::test<8>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: an unbound row takes and gives a value and never offers a reset", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALSettingRow* r = row(std::string());
         r->setValue(LLSD(0.4));
-        ensure("takes a value", closeTo(r->getValue().asReal(), 0.4));
+        CHECK(closeTo(r->getValue().asReal(), 0.4));
 
         S32 commits = 0;
         r->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         r->getSlider()->setValue(0.6f);
         r->getSlider()->onCommit();
-        ensure_equals("says when it changed", commits, 1);
-        ensure("and gives the new value", closeTo(r->getValue().asReal(), 0.6));
-        ensure("never a reset", !r->getResetButton()->getVisible());
-        ensure("nor a claim to be modified", !r->isModified());
+        CHECK(commits == 1);
+        CHECK(closeTo(r->getValue().asReal(), 0.6));
+        CHECK_FALSE(r->getResetButton()->getVisible());
+        CHECK_FALSE(r->isModified());
         r->die();
     }
 
     // The value box is wide enough for every number the range holds. A
     // slider sizes it from the maximum's logarithm, which under 1 has no room
     // for the leading zero; the row sizes it itself there, and only there.
-    template<> template<>
-    void alsettingrow_object::test<9>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: the value box fits a leading zero under 1 and matches a slider over", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         const auto slider_like = [](F32 max_value)
@@ -453,16 +458,19 @@ namespace tut
         LLSliderCtrl* plain_small = slider_like(0.05f);
         LLLineEditor* row_box = valueBoxOf(small->getSlider());
         LLLineEditor* plain_box = valueBoxOf(plain_small);
-        ensure("both have a value box", row_box && plain_box);
-        ensure("under 1, the row's is wider than a slider's " + std::to_string(row_box->getRect().getWidth())
-                   + " > " + std::to_string(plain_box->getRect().getWidth()),
-               row_box->getRect().getWidth() > plain_box->getRect().getWidth());
+        REQUIRE(row_box);
+        REQUIRE(plain_box);
+        UNSCOPED_INFO("under 1, the row's is wider than a slider's");
+        CHECK(row_box->getRect().getWidth() > plain_box->getRect().getWidth());
 
         ALSettingRow* large = row(std::string(), 0.f, 10.f, 3);
         LLSliderCtrl* plain_large = slider_like(10.f);
-        ensure_equals("over 1, exactly a slider's",
-                      valueBoxOf(large->getSlider())->getRect().getWidth(),
-                      valueBoxOf(plain_large)->getRect().getWidth());
+        LLLineEditor* large_box = valueBoxOf(large->getSlider());
+        LLLineEditor* plain_large_box = valueBoxOf(plain_large);
+        REQUIRE(large_box);
+        REQUIRE(plain_large_box);
+        UNSCOPED_INFO("over 1, exactly a slider's");
+        CHECK(large_box->getRect().getWidth() == plain_large_box->getRect().getWidth());
 
         small->die();
         plain_small->die();
@@ -470,40 +478,38 @@ namespace tut
         plain_large->die();
     }
 
-    // Found by its name and lit up by it, the way a slider is.
-    template<> template<>
-    void alsettingrow_object::test<10>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: a row is found and highlighted by its label as a slider is", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         ALSettingRow* r = row(std::string());
-        ensure("searched for by its label", r->getSearchText().find("Strength") != std::string::npos);
-        ensure_equals("which it can say", r->getLabel(), std::string("Strength"));
+        CHECK(r->getSearchText().find("Strength") != std::string::npos);
+        CHECK(r->getLabel() == std::string("Strength"));
         LLTextBox* box = r->getLabelBox();
-        ensure("and point at", box != nullptr);
-        ensure_equals("the text box that shows it", box->getText(), std::string("Strength"));
+        REQUIRE(box != nullptr);
+        CHECK(box->getText() == std::string("Strength"));
         // The column every row's label takes when the file does not say: a
         // default the slider did not get would have it measure the word.
-        ensure_equals("as wide as the rows' label column", box->getRect().getWidth(), 140);
+        UNSCOPED_INFO("as wide as the rows' label column");
+        CHECK(box->getRect().getWidth() == 140);
 
         r->setHighlighted(true);
-        ensure("lit, the slider's label is lit", r->getSlider()->getHighlighted());
+        CHECK(r->getSlider()->getHighlighted());
         r->setHighlighted(false);
-        ensure("and out again", !r->getSlider()->getHighlighted());
+        CHECK_FALSE(r->getSlider()->getHighlighted());
         r->die();
     }
 
     // A reset button that goes away with the keyboard in it would leave the
     // keyboard nowhere.
-    template<> template<>
-    void alsettingrow_object::test<11>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: a reset button that hides gives up the keyboard", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLControlVariable* control = setting("SettingRowTestFocus", 0.5f);
@@ -511,23 +517,22 @@ namespace tut
         gFloaterView->addChild(r);
         control->set(LLSD(0.9));
         r->getResetButton()->setFocus(true);
-        ensure("the button has the keyboard", r->getResetButton()->hasFocus());
+        CHECK(r->getResetButton()->hasFocus());
 
         control->resetToDefault(true);
-        ensure("gone", !r->getResetButton()->getVisible());
-        ensure("and the keyboard with it", !r->getResetButton()->hasFocus());
+        CHECK_FALSE(r->getResetButton()->getVisible());
+        CHECK_FALSE(r->getResetButton()->hasFocus());
         r->die();
     }
 
     // An owner can take the reset: the button asks it instead of resetting,
     // once, with the row, and the row does nothing itself -- the owner that
     // took it is the one that resets.
-    template<> template<>
-    void alsettingrow_object::test<12>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: a reset handler is asked instead and may reset the row itself", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLControlVariable* control = setting("SettingRowTestHandler", 0.5f);
@@ -542,15 +547,17 @@ namespace tut
             asked_by = from;
         });
         r->getResetButton()->onCommit();
-        ensure_equals("the owner is asked once", asked, 1);
-        ensure("with the row", asked_by == r);
-        ensure("and the row did not reset it itself", closeTo(control->getValue().asReal(), 0.9));
+        CHECK(asked == 1);
+        CHECK(asked_by == r);
+        UNSCOPED_INFO("and the row did not reset it itself");
+        CHECK(closeTo(control->getValue().asReal(), 0.9));
 
         // The owner resetting is a reset like any other.
         r->setResetHandler([](ALSettingRow* from) { from->getControlVariable()->resetToDefault(true); });
         r->getResetButton()->onCommit();
-        ensure("reset by the owner", closeTo(control->getValue().asReal(), 0.5));
-        ensure("and the button gone", !r->getResetButton()->getVisible());
+        UNSCOPED_INFO("reset by the owner");
+        CHECK(closeTo(control->getValue().asReal(), 0.5));
+        CHECK_FALSE(r->getResetButton()->getVisible());
         r->die();
     }
 
@@ -558,12 +565,11 @@ namespace tut
     // names a slider writes: a setting that is dear to apply waits for the
     // release. The callbacks are named in the file, so they are resolved
     // against the registrar in scope while the row is built.
-    template<> template<>
-    void alsettingrow_object::test<13>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: mouse_down and mouse_up callbacks from XUI tell a drag's ends", "[alsettingrow]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         setting("SettingRowTestHeld", 0.5f);
@@ -580,25 +586,31 @@ namespace tut
             "  <setting_row.mouse_up_callback function=\"SettingRowTest.Up\"/>\n"
             "</setting_row>\n";
         LLXMLNodePtr node;
-        ensure("parses", LLXMLNode::parseBuffer(source.data(), source.size(), node));
+        REQUIRE(LLXMLNode::parseBuffer(source.data(), source.size(), node));
         ALSettingRow::Params p(LLUICtrlFactory::getDefaultParams<ALSettingRow>());
         LLXUIParser parser;
         parser.readXUI(node, p, "setting_row_test.xml");
-        ensure("press said", p.mouse_down_callback.isProvided());
-        ensure("release said", p.mouse_up_callback.isProvided());
+        CHECK(p.mouse_down_callback.isProvided());
+        CHECK(p.mouse_up_callback.isProvided());
         p.rect = LLRect(0, 18, 360, 0);
 
         ALSettingRow* r = LLUICtrlFactory::create<ALSettingRow>(p);
         gFloaterView->addChild(r);
-        LLSlider* bar = nullptr;
-        for (LLView* child : *r->getSlider()->getChildList())
+        // The track a row's slider presses on.
+        const auto barOf = [](ALSettingRow* of)
         {
-            if (LLSlider* candidate = ALViewType::as<LLSlider>(child))
+            LLSlider* bar = nullptr;
+            for (LLView* child : *of->getSlider()->getChildList())
             {
-                bar = candidate;
+                if (LLSlider* candidate = ALViewType::as<LLSlider>(child))
+                {
+                    bar = candidate;
+                }
             }
-        }
-        ensure("the row's slider has a bar", bar != nullptr);
+            return bar;
+        };
+        LLSlider* bar = barOf(r);
+        REQUIRE(bar != nullptr);
 
         // On the track and off the thumb, which sits at the middle for 0.5:
         // a press on the thumb measures the skin's thumb image, and the
@@ -606,26 +618,34 @@ namespace tut
         const S32 x = 1;
         const S32 y = bar->getRect().getHeight() / 2;
         bar->handleMouseDown(x, y, MASK_NONE);
-        ensure_equals("the press is told once", pressed, 1);
-        ensure_equals("and no release yet", released, 0);
+        CHECK(pressed == 1);
+        CHECK(released == 0);
         bar->handleMouseUp(x, y, MASK_NONE);
-        ensure_equals("the release is told once", released, 1);
-        ensure_equals("and no second press", pressed, 1);
+        CHECK(released == 1);
+        CHECK(pressed == 1);
 
-        // A row that names neither is a row like every other.
+        // A row that names neither is a row like every other: a press and a
+        // release on its track are heard by neither callback.
         ALSettingRow* plain = row("SettingRowTestHeld");
-        ensure("no press asked for", !params("SettingRowTestHeld").mouse_down_callback.isProvided());
+        gFloaterView->addChild(plain);
+        LLSlider* plain_bar = barOf(plain);
+        REQUIRE(plain_bar != nullptr);
+        plain_bar->handleMouseDown(x, plain_bar->getRect().getHeight() / 2, MASK_NONE);
+        plain_bar->handleMouseUp(x, plain_bar->getRect().getHeight() / 2, MASK_NONE);
+        {
+            INFO("the plain row's ends are not heard");
+            CHECK(pressed == 1);
+            CHECK(released == 1);
+        }
         plain->die();
         r->die();
     }
 
-    template<> template<>
-    void alsettingrow_object::test<14>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: a vector row shows a lettered box per part and writes only that part", "[alsettingrow]")
     {
-        set_test_name("a vector's row: its caption and a lettered box per part showing the setting; a box typed in writes its part and keeps the rest");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLControlVariable*   control = vector("SettingRowTestWeights", LLVector3(1.f, 0.5f, 0.7f));
         ALSettingRow::Params p       = params("SettingRowTestWeights");
@@ -634,29 +654,48 @@ namespace tut
         p.label_width                = 110;
         p.components                 = "R G";
         ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
-        ensure("no slider", r->getSlider() == nullptr);
-        ensure("its caption, which names it", r->getLabelBox() && r->getLabelBox()->getText() == "Lum weights");
+        CHECK(r->getSlider() == nullptr);
+        REQUIRE(r->getLabelBox());
+        CHECK(r->getLabelBox()->getText() == "Lum weights");
         LLSpinCtrl* red   = r->findChild<LLSpinCtrl>("weights.R");
         LLSpinCtrl* green = r->findChild<LLSpinCtrl>("weights.G");
-        ensure("a box per letter", red && green && !r->findChild<LLSpinCtrl>("weights.B"));
-        ensure("after the caption, as wide as a number", red->getRect().mLeft == 110 && red->getRect().getWidth() == 68);
-        ensure_equals("side by side", green->getRect().mLeft, red->getRect().mRight + 4);
-        ensure("the setting in them", closeTo(red->getValue().asReal(), 1.0) && closeTo(green->getValue().asReal(), 0.5));
+        {
+            INFO("a box per letter");
+            REQUIRE(red);
+            REQUIRE(green);
+            CHECK_FALSE(r->findChild<LLSpinCtrl>("weights.B"));
+        }
+        {
+            INFO("after the caption, as wide as a number");
+            CHECK(red->getRect().mLeft == 110);
+            CHECK(red->getRect().getWidth() == 68);
+        }
+        CHECK(green->getRect().mLeft == red->getRect().mRight + 4);
+        CHECK(closeTo(red->getValue().asReal(), 1.0));
+        CHECK(closeTo(green->getValue().asReal(), 0.5));
         bool lettered = false;
         for (LLView* child : *red->getChildList())
         {
             const LLTextBox* letter = ALViewType::as<LLTextBox>(child);
             lettered                = lettered || (letter && letter->getText() == "R");
         }
-        ensure("each named by its letter beside it, which scrubs", lettered && red->getScrub());
-        ensure("with no caption under it", !r->findChild<LLTextBox>("weights.R_caption"));
+        {
+            INFO("each named by its letter beside it, which scrubs");
+            CHECK(lettered);
+            CHECK(red->getScrub());
+        }
+        UNSCOPED_INFO("with no caption under it");
+        CHECK_FALSE(r->findChild<LLTextBox>("weights.R_caption"));
         r->setFocus(true);
-        ensure("the keyboard to the first box", red->hasFocus() || gFocusMgr.childHasKeyboardFocus(red));
+        UNSCOPED_INFO("the keyboard to the first box");
+        CHECK((red->hasFocus() || gFocusMgr.childHasKeyboardFocus(red)));
         r->setFocus(false);
         r->setHighlighted(true);
-        ensure("lit, its caption is", r->getLabelBox()->ll::ui::SearchableControl::getHighlighted());
+        UNSCOPED_INFO("lit, its caption is");
+        CHECK(r->getLabelBox()->ll::ui::SearchableControl::getHighlighted());
         r->setHighlighted(false);
-        ensure("the row's value is its parts", closeTo(r->getValue()[1].asReal(), 0.5));
+        UNSCOPED_INFO("the row's value is its parts");
+        CHECK(closeTo(r->getValue()[1].asReal(), 0.5));
 
         S32 writes = 0;
         boost::signals2::scoped_connection watching = control->getSignal()->connect(
@@ -665,28 +704,30 @@ namespace tut
         r->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         green->setValue(LLSD(0.25));
         green->onCommit();
-        ensure("its part written, the rest as they stood", sameParts(control->getValue(), 1.0, 0.25, 0.7));
-        ensure_equals("written once", writes, 1);
-        ensure_equals("committed once", commits, 1);
+        UNSCOPED_INFO("its part written, the rest as they stood");
+        CHECK(sameParts(control->getValue(), 1.0, 0.25, 0.7));
+        CHECK(writes == 1);
+        CHECK(commits == 1);
 
         control->set(LLSD().with(0, 0.5).with(1, 0.25).with(2, 0.3));
-        ensure("a change from elsewhere shown", closeTo(red->getValue().asReal(), 0.5));
+        UNSCOPED_INFO("a change from elsewhere shown");
+        CHECK(closeTo(red->getValue().asReal(), 0.5));
         green->setValue(LLSD(0.5));
         green->onCommit();
-        ensure("a part no box shows kept", sameParts(control->getValue(), 0.5, 0.5, 0.3));
+        UNSCOPED_INFO("a part no box shows kept");
+        CHECK(sameParts(control->getValue(), 0.5, 0.5, 0.3));
 
         r->setEnabled(false);
-        ensure("disabled with the row", !red->getEnabled() && !green->getEnabled());
+        CHECK_FALSE(red->getEnabled());
+        CHECK_FALSE(green->getEnabled());
         r->die();
     }
 
-    template<> template<>
-    void alsettingrow_object::test<15>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: a vector row resets the whole setting when a shown part differs", "[alsettingrow]")
     {
-        set_test_name("a vector's row resets while a part it shows differs, and says the default's parts; the whole setting goes back");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         resetWords();
         LLControlVariable*   control = vector("SettingRowTestCentre", LLVector3(0.f, 0.f, 0.f));
@@ -695,50 +736,77 @@ namespace tut
         p.components                 = "X Y";
         p.letter_width               = 18;
         ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
+        const LLSpinCtrl* x_box      = r->findChild<LLSpinCtrl>("centre.X");
+        REQUIRE(x_box != nullptr);
         const LLTextBox* letter      = nullptr;
-        for (LLView* child : *r->findChild<LLSpinCtrl>("centre.X")->getChildList())
+        for (LLView* child : *x_box->getChildList())
         {
             letter = letter ? letter : ALViewType::as<LLTextBox>(child);
         }
-        ensure("the letters as wide as said", letter && letter->getRect().getWidth() == 18);
-        ensure("hidden at the default", !r->getResetButton()->getVisible());
+        {
+            INFO("the letters as wide as said");
+            REQUIRE(letter);
+            CHECK(letter->getRect().getWidth() == 18);
+        }
+        UNSCOPED_INFO("hidden at the default");
+        CHECK_FALSE(r->getResetButton()->getVisible());
         control->set(LLSD().with(0, 0.0).with(1, 0.0).with(2, 0.4));
-        ensure("a part it does not show is not its difference", !r->isModified() && !r->getResetButton()->getVisible());
+        {
+            INFO("a part it does not show is not its difference");
+            CHECK_FALSE(r->isModified());
+            CHECK_FALSE(r->getResetButton()->getVisible());
+        }
         control->set(LLSD().with(0, 0.0).with(1, 0.3).with(2, 0.4));
-        ensure("shown once a part it shows differs", r->isModified() && r->getResetButton()->getVisible());
-        ensure("saying the default's parts", r->getResetButton()->getToolTip().find("0.00, 0.00") != std::string::npos);
+        {
+            INFO("shown once a part it shows differs");
+            CHECK(r->isModified());
+            CHECK(r->getResetButton()->getVisible());
+        }
+        UNSCOPED_INFO("saying the default's parts");
+        CHECK(r->getResetButton()->getToolTip().find("0.00, 0.00") != std::string::npos);
         r->getResetButton()->onCommit();
-        ensure("the whole setting back", sameParts(control->getValue(), 0.0, 0.0, 0.0));
-        ensure("the boxes show it", closeTo(r->findChild<LLSpinCtrl>("centre.Y")->getValue().asReal(), 0.0));
+        UNSCOPED_INFO("the whole setting back");
+        CHECK(sameParts(control->getValue(), 0.0, 0.0, 0.0));
+        const LLSpinCtrl* y_box = r->findChild<LLSpinCtrl>("centre.Y");
+        REQUIRE(y_box != nullptr);
+        UNSCOPED_INFO("the boxes show it");
+        CHECK(closeTo(y_box->getValue().asReal(), 0.0));
         r->die();
     }
 
-    template<> template<>
-    void alsettingrow_object::test<16>()
+    TEST_CASE_METHOD(alsettingrow_data, "alsettingrow: a one-part row writes and compares and resets only its part", "[alsettingrow]")
     {
-        set_test_name("one part's row is a slider over its part: it writes, compares and resets that part and leaves the others");
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         resetWords();
         LLControlVariable*   control = vector("SettingRowTestEffect", LLVector3(0.8f, 1.f, 0.f));
         ALSettingRow::Params p       = params("SettingRowTestEffect", 0.f, 2.f);
         p.part                       = 1;
         ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
-        ensure("a slider", r->getSlider() != nullptr);
-        ensure("over its part", closeTo(r->getSlider()->getValueF32(), 1.0));
+        REQUIRE(r->getSlider() != nullptr);
+        UNSCOPED_INFO("over its part");
+        CHECK(closeTo(r->getSlider()->getValueF32(), 1.0));
         r->getSlider()->setValue(0.5f);
         r->getSlider()->onCommit();
-        ensure("its part written, the others kept", sameParts(control->getValue(), 0.8, 0.5, 0.0));
-        ensure("its part differs", r->isModified() && r->getResetButton()->getVisible());
-        ensure("saying its default", r->getResetButton()->getToolTip().find("1.00") != std::string::npos);
+        UNSCOPED_INFO("its part written, the others kept");
+        CHECK(sameParts(control->getValue(), 0.8, 0.5, 0.0));
+        {
+            INFO("its part differs");
+            CHECK(r->isModified());
+            CHECK(r->getResetButton()->getVisible());
+        }
+        UNSCOPED_INFO("saying its default");
+        CHECK(r->getResetButton()->getToolTip().find("1.00") != std::string::npos);
 
         control->set(LLSD().with(0, 0.2).with(1, 1.0).with(2, 0.0));
-        ensure("another part differing is not its difference", !r->isModified());
+        UNSCOPED_INFO("another part differing is not its difference");
+        CHECK_FALSE(r->isModified());
         control->set(LLSD().with(0, 0.2).with(1, 0.5).with(2, 0.0));
         r->getResetButton()->onCommit();
-        ensure("its part back, the other part left", sameParts(control->getValue(), 0.2, 1.0, 0.0));
+        UNSCOPED_INFO("its part back, the other part left");
+        CHECK(sameParts(control->getValue(), 0.2, 1.0, 0.0));
         r->die();
     }
 }

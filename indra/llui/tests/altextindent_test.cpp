@@ -28,11 +28,11 @@
 
 #include "alsyntaxgrammar.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     using namespace ALTextIndent;
 
@@ -47,8 +47,9 @@ namespace tut
             for (const char* name : { "lsl", "slua" })
             {
                 std::string error;
-                ensure(std::string(name) + " loads: " + error,
-                       library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/" + name + ".xml", error));
+                const bool  loaded = library.loadFile(std::string(LLUI_TEST_APP_DIR) + "/app_settings/syntax/" + name + ".xml", error);
+                INFO(name << " loads: " << error);
+                REQUIRE(loaded);
             }
             spaces.softTabs = true;
             spaces.tabWidth = 4;
@@ -76,9 +77,10 @@ namespace tut
         }
         // A command at one selection, as its groups make it: the text left,
         // and where the selection goes, where its group places it.
-        static std::string applied(const std::string& text, const std::vector<ALTextEditing::Group>& groups, std::optional<ALTextRange>& placed)
+        static std::string require_applied(const std::string& text, const std::vector<ALTextEditing::Group>& groups, std::optional<ALTextRange>& placed)
         {
             const ALTextEditing::Combined                    combined = ALTextEditing::combine(groups, 1);
+            REQUIRE(combined.selections.size() == 1);
             ALTextDocument                                   doc(text);
             std::vector<std::pair<ALTextRange, std::string>> edits;
             for (const Replacement& one : combined.replacements)
@@ -97,91 +99,109 @@ namespace tut
         }
     };
 
-    typedef test_group<altextindent_data> altextindent_group;
-    typedef altextindent_group::object    altextindent_object;
-    altextindent_group                    altextindent_instance("altextindent");
-
-    template<> template<>
-    void altextindent_object::test<1>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: a tab's text and a level in or out are written in the blanks in use", "[altextindent]")
     {
-        set_test_name("a tab's text, and a level in and out in the blank it is written in");
         const ALTextDocument doc("ab\n\tx");
-        ensure_equals("a hard tab", tabText(doc, ALTextPos(0, 1), tabs), std::string("\t"));
-        ensure_equals("spaces to the next stop", tabText(doc, ALTextPos(0, 1), spaces), std::string("   "));
-        ensure_equals("from past a tab", tabText(doc, ALTextPos(1, 1), spaces), std::string("    "));
+        UNSCOPED_INFO("a hard tab");
+        CHECK(tabText(doc, ALTextPos(0, 1), tabs) == std::string("\t"));
+        UNSCOPED_INFO("spaces to the next stop");
+        CHECK(tabText(doc, ALTextPos(0, 1), spaces) == std::string("   "));
+        UNSCOPED_INFO("from past a tab");
+        CHECK(tabText(doc, ALTextPos(1, 1), spaces) == std::string("    "));
 
-        ensure_equals("a level in, as tabs are typed", indentUnit("", tabs), std::string("\t"));
-        ensure_equals("in spaces", indentUnit("", spaces), std::string("    "));
-        ensure_equals("as the indentation around it is written", indentUnit("\t", spaces), std::string("\t"));
-        ensure_equals("a level out of spaces", outdented("        ", spaces), std::string("    "));
-        ensure_equals("of tabs, in tabs", outdented("\t\t", spaces), std::string("\t"));
-        ensure_equals("never past none", outdented("  ", spaces), std::string());
+        UNSCOPED_INFO("a level in, as tabs are typed");
+        CHECK(indentUnit("", tabs) == std::string("\t"));
+        UNSCOPED_INFO("in spaces");
+        CHECK(indentUnit("", spaces) == std::string("    "));
+        UNSCOPED_INFO("as the indentation around it is written");
+        CHECK(indentUnit("\t", spaces) == std::string("\t"));
+        UNSCOPED_INFO("a level out of spaces");
+        CHECK(outdented("        ", spaces) == std::string("    "));
+        UNSCOPED_INFO("of tabs, in tabs");
+        CHECK(outdented("\t\t", spaces) == std::string("\t"));
+        UNSCOPED_INFO("never past none");
+        CHECK(outdented("  ", spaces) == std::string());
     }
 
-    template<> template<>
-    void altextindent_object::test<2>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: indentLines leaves empty lines and moves the selection with line starts", "[altextindent]")
     {
-        set_test_name("lines indented and outdented, the empty left, the caret and the anchor moved with their lines' starts");
         const std::string text = "a\n\nb\n  c";
         const ALTextDocument doc(text);
         std::optional<ALTextRange> placed;
-        ensure_equals("each line with anything on it a level in",
-                      applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 1), ALTextPos(3, 3)) }, true, spaces), placed),
-                      std::string("    a\n\n    b\n      c"));
-        ensure("the anchor moved with its line, and the caret too", placed == ALTextRange(ALTextPos(0, 5), ALTextPos(3, 7)));
-        ensure_equals("a tab where tabs are typed", applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)) }, true, tabs), placed),
-                      std::string("\ta\n\nb\n  c"));
+        {
+            INFO("each line with anything on it a level in");
+            CHECK(require_applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 1), ALTextPos(3, 3)) }, true, spaces), placed) ==
+                  std::string("    a\n\n    b\n      c"));
+        }
+        UNSCOPED_INFO("the anchor moved with its line, and the caret too");
+        CHECK(placed == ALTextRange(ALTextPos(0, 5), ALTextPos(3, 7)));
+        {
+            INFO("a tab where tabs are typed");
+            CHECK(require_applied(text, indentLines(doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)) }, true, tabs), placed) ==
+                  std::string("\ta\n\nb\n  c"));
+        }
 
         const std::string   deep = "\tx\n      y\n  z";
         const ALTextDocument deep_doc(deep);
-        ensure_equals("a tab, or up to a level of spaces, out",
-                      applied(deep, indentLines(deep_doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(2, 1)) }, false, spaces), placed),
-                      std::string("x\n  y\nz"));
-        ensure("the caret never before its line's start", placed && placed->end == ALTextPos(2, 0));
+        {
+            INFO("a tab, or up to a level of spaces, out");
+            CHECK(require_applied(deep, indentLines(deep_doc, { ALTextRange(ALTextPos(0, 0), ALTextPos(2, 1)) }, false, spaces), placed) ==
+                  std::string("x\n  y\nz"));
+        }
+        {
+            INFO("the caret never before its line's start");
+            REQUIRE(placed);
+            CHECK(placed->end == ALTextPos(2, 0));
+        }
     }
 
-    template<> template<>
-    void altextindent_object::test<3>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: splitLine keeps indentation and goes in under an opener or splits braces", "[altextindent]")
     {
-        set_test_name("Return: the new line indented as the one it leaves, a level in under what opens a block, and a bracket closed on a line of its own");
         const ALSyntaxGrammar* lsl  = grammar("lsl");
         const ALSyntaxGrammar* slua = grammar("slua");
-        ensure("grammars", lsl && slua);
+        REQUIRE(lsl);
+        REQUIRE(slua);
 
         const std::string    plain = "    x = 1;";
         const ALTextDocument plain_doc(plain);
         const Split          kept  = splitLine(plain_doc, ALTextRange(ALTextPos(0, 10), ALTextPos(0, 10)), lsl, spaces);
-        ensure_equals("the indentation kept", kept.text, std::string("\n    "));
-        ensure("the caret after it", !kept.caret);
+        UNSCOPED_INFO("the indentation kept");
+        CHECK(kept.text == std::string("\n    "));
+        UNSCOPED_INFO("the caret after it");
+        CHECK_FALSE(kept.caret);
 
         const std::string    opens = "\tdefault {";
         const ALTextDocument opens_doc(opens);
         const Split          in    = splitLine(opens_doc, ALTextRange(ALTextPos(0, 10), ALTextPos(0, 10)), lsl, spaces);
-        ensure_equals("a level in, in the blank written", in.text, std::string("\n\t\t"));
+        UNSCOPED_INFO("a level in, in the blank written");
+        CHECK(in.text == std::string("\n\t\t"));
 
         const std::string    pair = "if x then end";
         const ALTextDocument pair_doc(pair);
         const Split          between = splitLine(pair_doc, ALTextRange(ALTextPos(0, 9), ALTextPos(0, 9)), slua, spaces);
-        ensure_equals("a word closing is no bracket: it goes down with the caret", between.text, std::string("\n    "));
-        ensure("its blank taken with it", between.range == ALTextRange(ALTextPos(0, 9), ALTextPos(0, 10)));
+        UNSCOPED_INFO("a word closing is no bracket: it goes down with the caret");
+        CHECK(between.text == std::string("\n    "));
+        UNSCOPED_INFO("its blank taken with it");
+        CHECK(between.range == ALTextRange(ALTextPos(0, 9), ALTextPos(0, 10)));
 
         const std::string    braces = "  f() {}";
         const ALTextDocument braces_doc(braces);
         const Split          split  = splitLine(braces_doc, ALTextRange(ALTextPos(0, 7), ALTextPos(0, 7)), lsl, spaces);
-        ensure_equals("the closing bracket on a line of its own", applied(braces, Replacement{ split.range, split.text }),
+        UNSCOPED_INFO("the closing bracket on a line of its own");
+        CHECK(applied(braces, Replacement{ split.range, split.text }) ==
                       std::string("  f() {\n      \n  }"));
-        ensure("the caret on the line between", split.caret == std::optional<ALTextPos>(ALTextPos(1, 6)));
+        UNSCOPED_INFO("the caret on the line between");
+        CHECK(split.caret == std::optional<ALTextPos>(ALTextPos(1, 6)));
 
         const std::string    blank = "    ";
         const ALTextDocument blank_doc(blank);
         const Split          none  = splitLine(blank_doc, ALTextRange(ALTextPos(0, 4), ALTextPos(0, 4)), lsl, spaces);
-        ensure_equals("a line of blanks keeps none", applied(blank, Replacement{ none.range, none.text }), std::string("\n    "));
+        UNSCOPED_INFO("a line of blanks keeps none");
+        CHECK(applied(blank, Replacement{ none.range, none.text }) == std::string("\n    "));
     }
 
-    template<> template<>
-    void altextindent_object::test<4>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: a closing word typed brings its line out and back if the word goes on", "[altextindent]")
     {
-        set_test_name("a line closing a block brought out as it is finished, only ever further out, and put back where the word goes on");
         const ALSyntaxGrammar* slua = grammar("slua");
         const ALSyntaxGrammar* lsl  = grammar("lsl");
 
@@ -189,24 +209,33 @@ namespace tut
         const ALTextDocument doc(text);
         const ALTextPos      after_end(2, 7);
         const Outdent        out = outdentAsTyped(doc, after_end, after_end, 'd', slua, none(), AutoOutdent(), spaces);
-        ensure("brought out", out.replacement.has_value());
-        ensure_equals("level with what opened the block", applied(text, *out.replacement), std::string("if x then\n    y()\nend"));
-        ensure("the word kept, with the caret where the line's coming out leaves it",
-               out.next.line == 2 && out.next.column == 3 && out.next.indent == "    ");
+        UNSCOPED_INFO("brought out");
+        REQUIRE(out.replacement.has_value());
+        UNSCOPED_INFO("level with what opened the block");
+        CHECK(applied(text, *out.replacement) == std::string("if x then\n    y()\nend"));
+        {
+            INFO("the word kept, with the caret where the line's coming out leaves it");
+            CHECK(out.next.line == 2);
+            CHECK(out.next.column == 3);
+            CHECK(out.next.indent == "    ");
+        }
 
         // The word goes on -- `endp` -- and is a name: back where it was.
         const std::string    name = "if x then\n    y()\nendp";
         const ALTextDocument name_doc(name);
         const Outdent back = outdentAsTyped(name_doc, ALTextPos(2, 4), ALTextPos(2, 4), 'p', slua, none(), out.next, spaces);
-        ensure("put back", back.replacement.has_value());
-        ensure_equals("where it was typed", applied(name, *back.replacement), std::string("if x then\n    y()\n    endp"));
-        ensure("and nothing kept", back.next.line < 0);
+        UNSCOPED_INFO("put back");
+        REQUIRE(back.replacement.has_value());
+        UNSCOPED_INFO("where it was typed");
+        CHECK(applied(name, *back.replacement) == std::string("if x then\n    y()\n    endp"));
+        UNSCOPED_INFO("and nothing kept");
+        CHECK(back.next.line < 0);
 
-        ensure("not with something after it on the line",
-               !outdentAsTyped(ALTextDocument("if x then\n    end y"), ALTextPos(1, 7), ALTextPos(1, 7), 'd', slua, none(), AutoOutdent(), spaces)
+        UNSCOPED_INFO("not with something after it on the line");
+        CHECK_FALSE(outdentAsTyped(ALTextDocument("if x then\n    end y"), ALTextPos(1, 7), ALTextPos(1, 7), 'd', slua, none(), AutoOutdent(), spaces)
                     .replacement);
-        ensure("nor with a selection",
-               !outdentAsTyped(doc, ALTextPos(2, 4), after_end, 'd', slua, none(), AutoOutdent(), spaces).replacement);
+        UNSCOPED_INFO("nor with a selection");
+        CHECK_FALSE(outdentAsTyped(doc, ALTextPos(2, 4), after_end, 'd', slua, none(), AutoOutdent(), spaces).replacement);
 
         // A bracket the caller matches goes level with its opener, however
         // the lines between are indented.
@@ -217,89 +246,113 @@ namespace tut
             return true;
         };
         const Outdent closed = outdentAsTyped(braces_doc, ALTextPos(2, 9), ALTextPos(2, 9), '}', lsl, matched, AutoOutdent(), spaces);
-        ensure_equals("level with the bracket's line", applied(braces, *closed.replacement), std::string("  f() {\n        x;\n  }"));
-        ensure("a bracket is kept for nothing", closed.next.line < 0);
+        REQUIRE(closed.replacement);
+        UNSCOPED_INFO("level with the bracket's line");
+        CHECK(applied(braces, *closed.replacement) == std::string("  f() {\n        x;\n  }"));
+        UNSCOPED_INFO("a bracket is kept for nothing");
+        CHECK(closed.next.line < 0);
 
         const std::string    outer = "if x then\n  y()\nend";
         const ALTextDocument outer_doc(outer);
-        ensure("a line already out stays", !reindent(outer_doc, 1, "    ", spaces));
-        ensure("one in comes out", reindent(outer_doc, 1, "", spaces).has_value());
+        UNSCOPED_INFO("a line already out stays");
+        CHECK_FALSE(reindent(outer_doc, 1, "    ", spaces));
+        UNSCOPED_INFO("one in comes out");
+        CHECK(reindent(outer_doc, 1, "", spaces).has_value());
     }
 
-    template<> template<>
-    void altextindent_object::test<5>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: closingBeforeReturn brings a closing word out but not with a selection", "[altextindent]")
     {
-        set_test_name("Return after a closing word brings it out first, and not with a selection");
         const ALSyntaxGrammar* slua = grammar("slua");
         const std::string      text = "while x do\n    y()\n    end";
         const ALTextDocument   doc(text);
         const std::optional<Replacement> closing = closingBeforeReturn(doc, ALTextPos(2, 7), ALTextPos(2, 7), slua, none(), spaces);
-        ensure("brought out", closing.has_value());
-        ensure_equals("level with the loop", applied(text, *closing), std::string("while x do\n    y()\nend"));
-        ensure("not with a selection", !closingBeforeReturn(doc, ALTextPos(2, 4), ALTextPos(2, 7), slua, none(), spaces));
-        ensure("not a word that is a name", !closingBeforeReturn(ALTextDocument("x\n    ending"), ALTextPos(1, 10), ALTextPos(1, 10), slua,
+        UNSCOPED_INFO("brought out");
+        REQUIRE(closing.has_value());
+        UNSCOPED_INFO("level with the loop");
+        CHECK(applied(text, *closing) == std::string("while x do\n    y()\nend"));
+        UNSCOPED_INFO("not with a selection");
+        CHECK_FALSE(closingBeforeReturn(doc, ALTextPos(2, 4), ALTextPos(2, 7), slua, none(), spaces));
+        UNSCOPED_INFO("not a word that is a name");
+        CHECK_FALSE(closingBeforeReturn(ALTextDocument("x\n    ending"), ALTextPos(1, 10), ALTextPos(1, 10), slua,
                                                                  none(), spaces));
     }
 
-    template<> template<>
-    void altextindent_object::test<6>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: indentation remade in spaces or tabs measured as the tabs were", "[altextindent]")
     {
-        set_test_name("indentation made again of spaces or of tabs, measured as the tabs were");
         const std::string code = "\tif x\n  \ty\n      z\nw";
         const ALTextDocument indented(code);
-        ensure_equals("to spaces, a tab to its stop", applied(code, *convertIndentation(indented, 0, 3, true, 4)),
-                      std::string("    if x\n    y\n      z\nw"));
-        ensure_equals("to tabs, as far as they go", applied(code, *convertIndentation(indented, 0, 3, false, 4)),
-                      std::string("\tif x\n\ty\n\t  z\nw"));
-        ensure("nothing to change is nothing", !convertIndentation(ALTextDocument("    a\nb"), 0, 1, true, 4));
-        ensure_equals("measured as the tabs were: a tab of two, two spaces at four",
-                      applied("\ta", *convertIndentation(ALTextDocument("\ta"), 0, 0, false, 4, 2)), std::string("  a"));
+        const std::optional<Change> to_spaces = convertIndentation(indented, 0, 3, true, 4);
+        REQUIRE(to_spaces.has_value());
+        UNSCOPED_INFO("to spaces, a tab to its stop");
+        CHECK(applied(code, *to_spaces) == std::string("    if x\n    y\n      z\nw"));
+        const std::optional<Change> to_tabs = convertIndentation(indented, 0, 3, false, 4);
+        REQUIRE(to_tabs.has_value());
+        UNSCOPED_INFO("to tabs, as far as they go");
+        CHECK(applied(code, *to_tabs) == std::string("\tif x\n\ty\n\t  z\nw"));
+        UNSCOPED_INFO("nothing to change is nothing");
+        CHECK_FALSE(convertIndentation(ALTextDocument("    a\nb"), 0, 1, true, 4));
+        const std::optional<Change> measured = convertIndentation(ALTextDocument("\ta"), 0, 0, false, 4, 2);
+        REQUIRE(measured.has_value());
+        UNSCOPED_INFO("measured as the tabs were: a tab of two, two spaces at four");
+        CHECK(applied("\ta", *measured) == std::string("  a"));
     }
 
-    template<> template<>
-    void altextindent_object::test<7>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: detect reads tabs or spaces and the level from the commonest step", "[altextindent]")
     {
-        set_test_name("a text's own indentation read: tabs or spaces by which more lines begin with, a level's spaces by the step seen most, nothing where it does not say");
         const auto read = [](const char* text, S32 lines = 10000) {
             const std::optional<Options> own = detect(ALTextDocument(text), 4, lines);
             return own ? llformat("%s %d", own->softTabs ? "spaces" : "tabs", own->tabWidth) : std::string("none");
         };
-        ensure_equals("four spaces a level", read("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}"), std::string("spaces 4"));
-        ensure_equals("two", read("if x then\n  y()\n  if z then\n    w()\n  end\nend"), std::string("spaces 2"));
-        ensure_equals("tabs, a tab as wide as the default", read("a\n\tb\n\t\tc\n\td"), std::string("tabs 4"));
-        ensure_equals("nothing indented", read("a\nb\n\nc"), std::string("none"));
-        ensure_equals("as many each way", read("\ta\n    b"), std::string("none"));
-        ensure_equals("a block comment's stars are not a level", read("/**\n * one\n * two\n */\nf()\n{\n  x;\n}"), std::string("spaces 2"));
-        ensure_equals("only the lines asked about", read("a\nb\n\tc", 2), std::string("none"));
-        ensure_equals("closing two levels at once is still steps of four", read("a\n    b\n        c\nd\n    e\n        f\ng"), std::string("spaces 4"));
+        UNSCOPED_INFO("four spaces a level");
+        CHECK(read("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}") == std::string("spaces 4"));
+        CHECK(read("if x then\n  y()\n  if z then\n    w()\n  end\nend") == std::string("spaces 2"));
+        UNSCOPED_INFO("tabs, a tab as wide as the default");
+        CHECK(read("a\n\tb\n\t\tc\n\td") == std::string("tabs 4"));
+        UNSCOPED_INFO("nothing indented");
+        CHECK(read("a\nb\n\nc") == std::string("none"));
+        UNSCOPED_INFO("as many each way");
+        CHECK(read("\ta\n    b") == std::string("none"));
+        UNSCOPED_INFO("a block comment's stars are not a level");
+        CHECK(read("/**\n * one\n * two\n */\nf()\n{\n  x;\n}") == std::string("spaces 2"));
+        UNSCOPED_INFO("only the lines asked about");
+        CHECK(read("a\nb\n\tc", 2) == std::string("none"));
+        UNSCOPED_INFO("closing two levels at once is still steps of four");
+        CHECK(read("a\n    b\n        c\nd\n    e\n        f\ng") == std::string("spaces 4"));
     }
 
-    template<> template<>
-    void altextindent_object::test<8>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: backspaceFrom takes leading spaces back to the stop before", "[altextindent]")
     {
-        set_test_name("Backspace in a line's leading spaces takes them back to the stop before; one character past a tab, in the text, or where one is all there is");
         const ALTextDocument doc("        x\n   y\n\t  z\n  w  v\n     u");
         const auto from = [&](S32 line, S32 column) {
             const std::optional<ALTextPos> to = backspaceFrom(doc, ALTextPos(line, column), spaces);
             return to ? llformat("%d:%d", to->line, to->column) : std::string("one");
         };
-        ensure_equals("a level from a stop", from(0, 8), std::string("0:4"));
-        ensure_equals("to the stop from between", from(0, 6), std::string("0:4"));
-        ensure_equals("from just past a stop, one", from(0, 5), std::string("one"));
-        ensure_equals("three to none", from(1, 3), std::string("1:0"));
-        ensure_equals("never past a tab", from(2, 3), std::string("2:1"));
-        ensure_equals("not in the text", from(3, 5), std::string("one"));
-        ensure_equals("from five, to four", from(4, 5), std::string("one"));
-        ensure_equals("before the text, not after it", from(0, 9), std::string("one"));
+        UNSCOPED_INFO("a level from a stop");
+        CHECK(from(0, 8) == std::string("0:4"));
+        UNSCOPED_INFO("to the stop from between");
+        CHECK(from(0, 6) == std::string("0:4"));
+        UNSCOPED_INFO("from just past a stop, one");
+        CHECK(from(0, 5) == std::string("one"));
+        UNSCOPED_INFO("three to none");
+        CHECK(from(1, 3) == std::string("1:0"));
+        UNSCOPED_INFO("never past a tab");
+        CHECK(from(2, 3) == std::string("2:1"));
+        UNSCOPED_INFO("not in the text");
+        CHECK(from(3, 5) == std::string("one"));
+        UNSCOPED_INFO("from five, to four");
+        CHECK(from(4, 5) == std::string("one"));
+        UNSCOPED_INFO("before the text, not after it");
+        CHECK(from(0, 9) == std::string("one"));
         Options wide = spaces;
         wide.tabWidth = 8;
-        ensure_equals("a level as wide as the tab", backspaceFrom(doc, ALTextPos(0, 8), wide)->column, 0);
+        const std::optional<ALTextPos> wide_back = backspaceFrom(doc, ALTextPos(0, 8), wide);
+        REQUIRE(wide_back.has_value());
+        UNSCOPED_INFO("a level as wide as the tab");
+        CHECK(wide_back->column == 0);
     }
 
-    template<> template<>
-    void altextindent_object::test<9>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: pasted lines go where they belong keeping their depth from the first", "[altextindent]")
     {
-        set_test_name("lines pasted into a line's indentation brought to where they go: the line's level, or the line above's say; each as far in from the first as it was; the caret with its line");
         const ALSyntaxGrammar* lsl = grammar("lsl");
         // The text with the paste in, then brought to where it goes; and
         // where the caret ends.
@@ -318,33 +371,37 @@ namespace tut
             }
             return change ? altextindent_data::applied(doc.text(), *change) : doc.text();
         };
-        ensure_equals("whole lines into a blank line under an opener: a level in from it",
-                      pasted("f()\n{\n\n}", ALTextPos(2, 0), "        a;\n        if (x)\n        {\n            b;\n        }\n", spaces),
+        UNSCOPED_INFO("whole lines into a blank line under an opener: a level in from it");
+        CHECK(pasted("f()\n{\n\n}", ALTextPos(2, 0), "        a;\n        if (x)\n        {\n            b;\n        }\n", spaces) ==
                       std::string("f()\n{\n    a;\n    if (x)\n    {\n        b;\n    }\n\n}"));
         ALTextPos caret;
-        ensure_equals("copied from where the text begins: the rest say how far in it was; what followed kept at its level",
-                      pasted("f()\n{\n    x;\n}", ALTextPos(2, 4), "if (y) {\n        z;\n    }\n", spaces, &caret),
+        UNSCOPED_INFO("copied from where the text begins: the rest say how far in it was; what followed kept at its level");
+        CHECK(pasted("f()\n{\n    x;\n}", ALTextPos(2, 4), "if (y) {\n        z;\n    }\n", spaces, &caret) ==
                       std::string("f()\n{\n    if (y) {\n        z;\n    }\n    x;\n}"));
-        ensure("the caret with its line", caret == ALTextPos(5, 4));
-        ensure_equals("spaces made tabs where the text is indented by tabs",
-                      pasted("f()\n{\n\tx;\n}", ALTextPos(2, 1), "    a;\n        b;\n", tabs), std::string("f()\n{\n\ta;\n\t\tb;\n\tx;\n}"));
-        ensure_equals("a closer first: a level out from where the line above says",
-                      pasted("f()\n{\n    x;\n\n", ALTextPos(3, 0), "}\ng()\n", spaces), std::string("f()\n{\n    x;\n}\ng()\n\n"));
-        ensure_equals("a blank line pasted keeps no blanks", pasted("{\n\n}", ALTextPos(1, 0), "  a;\n   \n  b;", spaces),
+        UNSCOPED_INFO("the caret with its line");
+        CHECK(caret == ALTextPos(5, 4));
+        UNSCOPED_INFO("spaces made tabs where the text is indented by tabs");
+        CHECK(pasted("f()\n{\n\tx;\n}", ALTextPos(2, 1), "    a;\n        b;\n", tabs) == std::string("f()\n{\n\ta;\n\t\tb;\n\tx;\n}"));
+        UNSCOPED_INFO("a closer first: a level out from where the line above says");
+        CHECK(pasted("f()\n{\n    x;\n\n", ALTextPos(3, 0), "}\ng()\n", spaces) == std::string("f()\n{\n    x;\n}\ng()\n\n"));
+        UNSCOPED_INFO("a blank line pasted keeps no blanks");
+        CHECK(pasted("{\n\n}", ALTextPos(1, 0), "  a;\n   \n  b;", spaces) ==
                       std::string("{\n    a;\n\n    b;\n}"));
 
         const ALTextDocument doc("{\n    x;\n}");
-        ensure("one line: nothing", !planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;", lsl, spaces));
-        ensure("after text on its line: nothing", !planPaste(doc, ALTextRange(ALTextPos(1, 6), ALTextPos(1, 6)), "a;\nb;", lsl, spaces));
-        ensure("no grammar that indents: nothing", !planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;\nb;", nullptr, spaces));
-        ensure_equals("already where it goes: nothing to do", pasted("{\n    x;\n}", ALTextPos(1, 4), "a;\n    b;\n", spaces),
+        UNSCOPED_INFO("one line: nothing");
+        CHECK_FALSE(planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;", lsl, spaces));
+        UNSCOPED_INFO("after text on its line: nothing");
+        CHECK_FALSE(planPaste(doc, ALTextRange(ALTextPos(1, 6), ALTextPos(1, 6)), "a;\nb;", lsl, spaces));
+        UNSCOPED_INFO("no grammar that indents: nothing");
+        CHECK_FALSE(planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;\nb;", nullptr, spaces));
+        UNSCOPED_INFO("already where it goes: nothing to do");
+        CHECK(pasted("{\n    x;\n}", ALTextPos(1, 4), "a;\n    b;\n", spaces) ==
                       std::string("{\n    a;\n    b;\n    x;\n}"));
     }
 
-    template<> template<>
-    void altextindent_object::test<10>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: in LSL a braceless head indents one line and a brace typed comes level", "[altextindent]")
     {
-        set_test_name("Return in LSL under a head with no brace: the one line in, then back out to the head, the outermost of a run; a brace under it brought level as it is typed");
         const ALSyntaxGrammar* lsl = grammar("lsl");
         // The text with Return pressed at a place, a | where the caret goes.
         const auto returned = [&](const std::string& text, S32 line, S32 column) {
@@ -356,27 +413,37 @@ namespace tut
             std::string          out   = after.text();
             return out.insert(static_cast<size_t>(after.offsetOf(caret)), "|");
         };
-        ensure_equals("if (x): the next line in", returned("if (x)", 0, 6), std::string("if (x)\n    |"));
-        ensure_equals("else too", returned("    else // otherwise", 0, 21), std::string("    else // otherwise\n        |"));
-        ensure_equals("a brace after the caret stays level", returned("if (x){", 0, 6), std::string("if (x)\n|{"));
-        ensure_equals("a statement on the line is none", returned("if (x) llSay(0, \"a\");", 0, 21), std::string("if (x) llSay(0, \"a\");\n|"));
-        ensure_equals("past its statement, back to the head", returned("if (a)\n    x;", 1, 6), std::string("if (a)\n    x;\n|"));
-        ensure_equals("the outermost of a run", returned("  if (a)\n      if (b)\n          x;", 2, 12), std::string("  if (a)\n      if (b)\n          x;\n  |"));
-        ensure_equals("a line of nothing under it stays in", returned("if (a)\n    ", 1, 4), std::string("if (a)\n\n    |"));
-        ensure_equals("under a brace, no head", returned("if (a)\n{\n    x;", 2, 6), std::string("if (a)\n{\n    x;\n    |"));
+        UNSCOPED_INFO("if (x): the next line in");
+        CHECK(returned("if (x)", 0, 6) == std::string("if (x)\n    |"));
+        UNSCOPED_INFO("else too");
+        CHECK(returned("    else // otherwise", 0, 21) == std::string("    else // otherwise\n        |"));
+        UNSCOPED_INFO("a brace after the caret stays level");
+        CHECK(returned("if (x){", 0, 6) == std::string("if (x)\n|{"));
+        UNSCOPED_INFO("a statement on the line is none");
+        CHECK(returned("if (x) llSay(0, \"a\");", 0, 21) == std::string("if (x) llSay(0, \"a\");\n|"));
+        UNSCOPED_INFO("past its statement, back to the head");
+        CHECK(returned("if (a)\n    x;", 1, 6) == std::string("if (a)\n    x;\n|"));
+        UNSCOPED_INFO("the outermost of a run");
+        CHECK(returned("  if (a)\n      if (b)\n          x;", 2, 12) == std::string("  if (a)\n      if (b)\n          x;\n  |"));
+        UNSCOPED_INFO("a line of nothing under it stays in");
+        CHECK(returned("if (a)\n    ", 1, 4) == std::string("if (a)\n\n    |"));
+        UNSCOPED_INFO("under a brace, no head");
+        CHECK(returned("if (a)\n{\n    x;", 2, 6) == std::string("if (a)\n{\n    x;\n    |"));
 
         const ALTextDocument brace("if (x)\n    {");
         const Outdent        level = outdentAsTyped(brace, ALTextPos(1, 5), ALTextPos(1, 5), '{', lsl, none(), AutoOutdent(), spaces);
-        ensure("the brace level with the head", level.replacement && applied("if (x)\n    {", *level.replacement) == "if (x)\n{");
+        {
+            INFO("the brace level with the head");
+            REQUIRE(level.replacement);
+            CHECK(applied("if (x)\n    {", *level.replacement) == "if (x)\n{");
+        }
         const ALTextDocument opened("if (x) {\n    {");
-        ensure("under a block's opener, where it is",
-               !outdentAsTyped(opened, ALTextPos(1, 5), ALTextPos(1, 5), '{', lsl, none(), AutoOutdent(), spaces).replacement);
+        UNSCOPED_INFO("under a block's opener, where it is");
+        CHECK_FALSE(outdentAsTyped(opened, ALTextPos(1, 5), ALTextPos(1, 5), '{', lsl, none(), AutoOutdent(), spaces).replacement);
     }
 
-    template<> template<>
-    void altextindent_object::test<11>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: a new line closes an open SLua block and continues an LSL block comment", "[altextindent]")
     {
-        set_test_name("Return in SLua puts a block's end in where it is not closed below, before a bracket after the caret; in an LSL block comment, its lines' star");
         const ALSyntaxGrammar* slua = grammar("slua");
         const ALSyntaxGrammar* lsl  = grammar("lsl");
         const auto returned = [&](const ALSyntaxGrammar* grammar, const std::string& text, S32 line, S32 column, bool in_comment = false) {
@@ -388,35 +455,50 @@ namespace tut
             std::string          out   = after.text();
             return out.insert(static_cast<size_t>(after.offsetOf(caret)), "|");
         };
-        ensure_equals("then, nothing below", returned(slua, "if x then", 0, 9), std::string("if x then\n    |\nend"));
-        ensure_equals("closed below already", returned(slua, "if x then\n    y()\nend", 0, 9), std::string("if x then\n    |\n    y()\nend"));
-        ensure_equals("an elseif, the if's end below", returned(slua, "if a then\n    x()\nelseif b then\nend", 2, 13),
+        UNSCOPED_INFO("then, nothing below");
+        CHECK(returned(slua, "if x then", 0, 9) == std::string("if x then\n    |\nend"));
+        UNSCOPED_INFO("closed below already");
+        CHECK(returned(slua, "if x then\n    y()\nend", 0, 9) == std::string("if x then\n    |\n    y()\nend"));
+        UNSCOPED_INFO("an elseif, the if's end below");
+        CHECK(returned(slua, "if a then\n    x()\nelseif b then\nend", 2, 13) ==
                       std::string("if a then\n    x()\nelseif b then\n    |\nend"));
-        ensure_equals("inside a block that ends further out", returned(slua, "do\n    while x do\nend", 1, 14), std::string("do\n    while x do\n        |\n    end\nend"));
-        ensure_equals("a function's, before the bracket after it", returned(slua, "f(function())", 0, 12), std::string("f(function()\n    |\nend)"));
-        ensure_equals("one closed on its line opens nothing", returned(slua, "local g = function() return 1 end", 0, 33),
+        UNSCOPED_INFO("inside a block that ends further out");
+        CHECK(returned(slua, "do\n    while x do\nend", 1, 14) == std::string("do\n    while x do\n        |\n    end\nend"));
+        UNSCOPED_INFO("a function's, before the bracket after it");
+        CHECK(returned(slua, "f(function())", 0, 12) == std::string("f(function()\n    |\nend)"));
+        UNSCOPED_INFO("one closed on its line opens nothing");
+        CHECK(returned(slua, "local g = function() return 1 end", 0, 33) ==
                       std::string("local g = function() return 1 end\n|"));
-        ensure_equals("else: the if's own end", returned(slua, "if a then\nelse", 1, 4), std::string("if a then\nelse\n    |"));
+        UNSCOPED_INFO("else: the if's own end");
+        CHECK(returned(slua, "if a then\nelse", 1, 4) == std::string("if a then\nelse\n    |"));
 
-        ensure_equals("a doc comment's first line", returned(lsl, "    /**", 0, 7, true), std::string("    /**\n     * |"));
-        ensure_equals("its lines", returned(lsl, "     * one", 0, 10, true), std::string("     * one\n     * |"));
-        ensure_equals("ended, none", returned(lsl, "     */", 0, 7, true), std::string("     */\n     |"));
-        ensure_equals("closed on its line, none", returned(lsl, "/* a */", 0, 7, true), std::string("/* a */\n|"));
-        ensure_equals("not in a comment, none", returned(lsl, "/**", 0, 3, false), std::string("/**\n|"));
-        ensure_equals("a line comment, none", returned(lsl, "// a", 0, 4, true), std::string("// a\n|"));
+        UNSCOPED_INFO("a doc comment's first line");
+        CHECK(returned(lsl, "    /**", 0, 7, true) == std::string("    /**\n     * |"));
+        UNSCOPED_INFO("its lines");
+        CHECK(returned(lsl, "     * one", 0, 10, true) == std::string("     * one\n     * |"));
+        UNSCOPED_INFO("ended, none");
+        CHECK(returned(lsl, "     */", 0, 7, true) == std::string("     */\n     |"));
+        UNSCOPED_INFO("closed on its line, none");
+        CHECK(returned(lsl, "/* a */", 0, 7, true) == std::string("/* a */\n|"));
+        UNSCOPED_INFO("not in a comment, none");
+        CHECK(returned(lsl, "/**", 0, 3, false) == std::string("/**\n|"));
+        UNSCOPED_INFO("a line comment, none");
+        CHECK(returned(lsl, "// a", 0, 4, true) == std::string("// a\n|"));
 
         const ALTextDocument bare("     * /");
         const Outdent        closed = outdentAsTyped(bare, ALTextPos(0, 8), ALTextPos(0, 8), '/', lsl, none(), AutoOutdent(), spaces);
-        ensure("its end typed on a bare line: the blank taken", closed.replacement && applied("     * /", *closed.replacement) == "     */");
+        {
+            INFO("its end typed on a bare line: the blank taken");
+            REQUIRE(closed.replacement);
+            CHECK(applied("     * /", *closed.replacement) == "     */");
+        }
         const ALTextDocument written("     * a /");
-        ensure("after something written, as typed",
-               !outdentAsTyped(written, ALTextPos(0, 10), ALTextPos(0, 10), '/', lsl, none(), AutoOutdent(), spaces).replacement);
+        UNSCOPED_INFO("after something written, as typed");
+        CHECK_FALSE(outdentAsTyped(written, ALTextPos(0, 10), ALTextPos(0, 10), '/', lsl, none(), AutoOutdent(), spaces).replacement);
     }
 
-    template<> template<>
-    void altextindent_object::test<12>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: shiftLines goes levels in or out as vim's > and < and leaves empty lines", "[altextindent]")
     {
-        set_test_name("lines shifted so many levels in, empty ones left alone, and out by a tab or a tab's width of spaces a level, as vim's > and <");
         const std::string text = "a\n\n  \n\tb\n      c";
         const ALTextDocument doc(text);
         const auto applied = [&](const ALTextIndent::Change& change) {
@@ -430,20 +512,22 @@ namespace tut
         ALTextIndent::Options soft;
         soft.tabWidth = 2;
         soft.softTabs = true;
-        ensure_equals("in by two, the empty line left", applied(ALTextIndent::shiftLines(doc, 0, 4, 2, true, soft)),
+        UNSCOPED_INFO("in by two, the empty line left");
+        CHECK(applied(ALTextIndent::shiftLines(doc, 0, 4, 2, true, soft)) ==
                       std::string("    a\n\n      \n    \tb\n          c"));
         ALTextIndent::Options hard;
         hard.tabWidth = 4;
-        ensure_equals("in by a tab", applied(ALTextIndent::shiftLines(doc, 0, 0, 1, true, hard)), std::string("\ta\n\n  \n\tb\n      c"));
-        ensure_equals("out by one: a tab, or up to a tab's width of spaces", applied(ALTextIndent::shiftLines(doc, 0, 4, 1, false, hard)),
+        UNSCOPED_INFO("in by a tab");
+        CHECK(applied(ALTextIndent::shiftLines(doc, 0, 0, 1, true, hard)) == std::string("\ta\n\n  \n\tb\n      c"));
+        UNSCOPED_INFO("out by one: a tab, or up to a tab's width of spaces");
+        CHECK(applied(ALTextIndent::shiftLines(doc, 0, 4, 1, false, hard)) ==
                       std::string("a\n\n\nb\n  c"));
-        ensure_equals("out by two", applied(ALTextIndent::shiftLines(doc, 0, 4, 2, false, hard)), std::string("a\n\n\nb\nc"));
+        UNSCOPED_INFO("out by two");
+        CHECK(applied(ALTextIndent::shiftLines(doc, 0, 4, 2, false, hard)) == std::string("a\n\n\nb\nc"));
     }
 
-    template<> template<>
-    void altextindent_object::test<13>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: indentLines at several selections moves a shared line once", "[altextindent]")
     {
-        set_test_name("lines in and out at several selections: once for those over the same lines, each selection moved with its lines");
         const std::string    text = "a\nb\nc\n    d";
         const ALTextDocument doc(text);
         const auto           made = [](const std::string& before, const std::vector<ALTextEditing::Group>& groups, std::string& placed) {
@@ -467,33 +551,43 @@ namespace tut
         // line 3.
         const std::vector<ALTextRange> selections = { ALTextRange(ALTextPos(0, 0), ALTextPos(1, 1)), ALTextRange(ALTextPos(1, 1), ALTextPos(1, 0)),
                                                       ALTextRange(ALTextPos(3, 5), ALTextPos(3, 4)) };
-        ensure_equals("each line in once", made(text, indentLines(doc, selections, true, spaces), placed), std::string("    a\n    b\nc\n        d"));
-        ensure_equals("each selection moved with its lines", placed, std::string("0:4-1:5 1:5-1:4 3:9-3:8 "));
-        ensure_equals("and out", made(text, indentLines(doc, selections, false, spaces), placed), std::string("a\nb\nc\nd"));
-        ensure_equals("those with nothing to take left to slide; the other moved", placed, std::string("- - 3:1-3:0 "));
+        UNSCOPED_INFO("each line in once");
+        CHECK(made(text, indentLines(doc, selections, true, spaces), placed) == std::string("    a\n    b\nc\n        d"));
+        UNSCOPED_INFO("each selection moved with its lines");
+        CHECK(placed == std::string("0:4-1:5 1:5-1:4 3:9-3:8 "));
+        UNSCOPED_INFO("and out");
+        CHECK(made(text, indentLines(doc, selections, false, spaces), placed) == std::string("a\nb\nc\nd"));
+        UNSCOPED_INFO("those with nothing to take left to slide; the other moved");
+        CHECK(placed == std::string("- - 3:1-3:0 "));
     }
 
-    template<> template<>
-    void altextindent_object::test<14>()
+    TEST_CASE_METHOD(altextindent_data, "altextindent: lines shifted out by drawn width take spaces before a tab with it", "[altextindent]")
     {
-        set_test_name("lines shifted out by how wide their blanks are drawn: spaces before a tab go with it, and the caret stays on its character");
         const std::string    text = "  \tfoo\n \t\tbar\n\t  baz\n      qux";
         const ALTextDocument doc(text);
         ALTextIndent::Options hard;
         hard.tabWidth = 4;
         const Change one = ALTextIndent::shiftLines(doc, 0, 3, 1, false, hard);
-        ensure_equals("each a tab's width out", applied(text, one), std::string("foo\n\tbar\n  baz\n  qux"));
+        UNSCOPED_INFO("each a tab's width out");
+        CHECK(applied(text, one) == std::string("foo\n\tbar\n  baz\n  qux"));
         bool taken_from_the_front = one.replacements.size() == 4;
         for (const Replacement& replacement : one.replacements)
         {
             taken_from_the_front = taken_from_the_front && replacement.range.begin.column == 0 && replacement.text.empty();
         }
-        ensure("each taken from the line's front", taken_from_the_front);
-        ensure_equals("two levels", applied(text, ALTextIndent::shiftLines(doc, 0, 3, 2, false, hard)), std::string("foo\nbar\nbaz\nqux"));
+        UNSCOPED_INFO("each taken from the line's front");
+        CHECK(taken_from_the_front);
+        UNSCOPED_INFO("two levels");
+        CHECK(applied(text, ALTextIndent::shiftLines(doc, 0, 3, 2, false, hard)) == std::string("foo\nbar\nbaz\nqux"));
 
         // The caret on the f of foo, past the spaces and the tab.
         const std::vector<ALTextEditing::Group> groups = indentLines(doc, { ALTextRange(ALTextPos(0, 3), ALTextPos(0, 3)) }, false, hard);
-        ensure("one group", groups.size() == 1 && groups[0].placed.size() == 1);
-        ensure("the caret still on the f", groups[0].placed[0].second == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
+        {
+            INFO("one group");
+            REQUIRE(groups.size() == 1);
+            REQUIRE(groups[0].placed.size() == 1);
+        }
+        UNSCOPED_INFO("the caret still on the f");
+        CHECK(groups[0].placed[0].second == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
     }
 }

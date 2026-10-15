@@ -28,6 +28,7 @@
 #include "../alnotecardembedded.h"
 
 #include "alfilewrite.h"
+#include "almainloop.h"
 #include "alscriptstudio_fixture.h"
 #include "alwatchedfile.h"
 #include "fsyspath.h"
@@ -35,7 +36,7 @@
 #include "newview_test_fakes.h"
 #include "workqueue.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 
@@ -213,7 +214,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudiomasters_data
     {
@@ -226,6 +227,9 @@ namespace tut
         NoWorld                                world;
         std::string                            folder;
         std::vector<boost::signals2::connection> wired;
+        // A look at the tabs waits for the main loop, so every case here
+        // has one: this file's choice, not whatever a test before it made.
+        const ALMainLoop::Choice               main_loop{ &mainLoop() };
 
         ~alscriptstudiomasters_data()
         {
@@ -242,7 +246,7 @@ namespace tut
             }
         }
 
-        // The main loop's queue, as the viewer's is, which a look at the
+        // The queue standing in for the main loop's, which a look at the
         // tabs waits for: the process's, kept for the rest of the run.
         static LL::WorkQueue& mainLoop() { return newview_test::mainLoop(); }
         // Whatever was waiting for the main loop, done.
@@ -252,9 +256,8 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            mainLoop();
             const fsyspath made = std::filesystem::temp_directory_path() / fsyspath("alscriptstudiomasters_" + LLUUID::generateNewID().asString());
             std::filesystem::create_directories(made);
             folder = made.string();
@@ -319,78 +322,99 @@ namespace tut
             return link;
         }
 
-        const al_studio_test::FakeServices::Said& said() const { return services.reports.back(); }
+        // The last thing said; there must be something.
+        const al_studio_test::FakeServices::Said& said() const
+        {
+            REQUIRE_FALSE(services.reports.empty());
+            return services.reports.back();
+        }
         static bool says(const std::string& text, const std::string& word) { return text.find(word) != std::string::npos; }
         typedef std::vector<std::string> Names;
     };
 
-    typedef test_group<alscriptstudiomasters_data> alscriptstudiomasters_group;
-    typedef alscriptstudiomasters_group::object    alscriptstudiomasters_object;
-    alscriptstudiomasters_group                    alscriptstudiomasters_instance("alscriptstudiomasters");
-
-    template<> template<>
-    void alscriptstudiomasters_object::test<1>()
+    // A tab may be linked where it is an item's, loaded, may be changed and is linked to
+    // nothing yet.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: only a loaded changeable item's unlinked tab may be linked", "[alscriptstudiomasters]")
     {
-        set_test_name("a tab may be linked where it is an item's, loaded, may be changed and is linked to nothing yet");
         make();
         Doc& script = itemTab("door", "default {}\n");
         Doc& card   = itemTab("card", "notes\n", false, true);
-        ensure("no tab", !unit->canLink(nullptr));
-        ensure("an item's script", unit->canLink(&script));
-        ensure("an item's notecard", unit->canLink(&card));
+        CHECK_FALSE(unit->canLink(nullptr));
+        UNSCOPED_INFO("an item's script");
+        CHECK(unit->canLink(&script));
+        UNSCOPED_INFO("an item's notecard");
+        CHECK(unit->canLink(&card));
 
         script.loaded = false;
-        ensure("not while it loads", !unit->canLink(&script));
+        UNSCOPED_INFO("not while it loads");
+        CHECK_FALSE(unit->canLink(&script));
         script.loaded     = true;
         script.modifiable = false;
-        ensure("not where it may not be changed", !unit->canLink(&script));
+        UNSCOPED_INFO("not where it may not be changed");
+        CHECK_FALSE(unit->canLink(&script));
         script.modifiable = true;
         const ALScriptRef ref = script.ref;
         script.ref            = ALScriptRef();
-        ensure("not with no item", !unit->canLink(&script));
+        UNSCOPED_INFO("not with no item");
+        CHECK_FALSE(unit->canLink(&script));
         script.ref = ref;
 
         studio->openMasterFile(in("a.lsl"), false);
-        ensure("not a file's tab", !unit->canLink(services.findDoc("disk:" + in("a.lsl"))));
+        UNSCOPED_INFO("not a file's tab");
+        CHECK_FALSE(unit->canLink(services.findDoc("disk:" + in("a.lsl"))));
 
         write(in("door.lsl"), "default {}\n");
         linkFromElsewhere(script, in("door.lsl"));
-        ensure("not once it is linked", !unit->canLink(&script));
-        ensure("another file's tab masters nothing", !unit->mastersAny(services.findDoc("disk:" + in("a.lsl"))));
+        UNSCOPED_INFO("not once it is linked");
+        CHECK_FALSE(unit->canLink(&script));
+        UNSCOPED_INFO("another file's tab masters nothing");
+        CHECK_FALSE(unit->mastersAny(services.findDoc("disk:" + in("a.lsl"))));
         studio->openMasterFile(in("door.lsl"), false);
-        ensure("the master's tab masters it", unit->mastersAny(services.findDoc("disk:" + in("door.lsl"))));
+        UNSCOPED_INFO("the master's tab masters it");
+        CHECK(unit->mastersAny(services.findDoc("disk:" + in("door.lsl"))));
     }
 
-    template<> template<>
-    void alscriptstudiomasters_object::test<2>()
+    // A notecard carrying items is not linked, and says why, before any file is picked; a script,
+    // or a notecard carrying none, carries nothing.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a notecard carrying items is refused with a reason before any pick", "[alscriptstudiomasters]")
     {
-        set_test_name("a notecard carrying items is not linked, and says why, before any file is picked; a script, or a notecard carrying none, carries nothing");
         make();
         Doc& script = itemTab("door", "default {}\n");
         Doc& empty  = itemTab("empty", "notes\n", false, true);
-        ensure("a script carries nothing", !unit->carriesItems(script));
+        UNSCOPED_INFO("a script carries nothing");
+        CHECK_FALSE(unit->carriesItems(script));
         empty.items = std::make_shared<ALNotecardEmbedded>(*empty.editor, ALNotecardEmbedded::Holder(), world);
-        ensure("a notecard with none carries nothing", !unit->carriesItems(empty));
-        ensure("and says nothing", services.reports.empty());
+        UNSCOPED_INFO("a notecard with none carries nothing");
+        CHECK_FALSE(unit->carriesItems(empty));
+        UNSCOPED_INFO("and says nothing");
+        REQUIRE(services.reports.empty());
 
         Doc& card  = itemTab("card", "a b\n", false, true);
         card.items = std::make_shared<ALNotecardEmbedded>(*card.editor, ALNotecardEmbedded::Holder(), world);
         LLPointer<LLInventoryItem> landmark = new LLInventoryItem();
         card.items->loaded({ landmark });
-        ensure("one with an item carries it", unit->carriesItems(card));
-        ensure("said, on its tab, as a failure", says(said().text, "MasterNotecardCarries") && said().failure && said().doc == "card");
+        UNSCOPED_INFO("one with an item carries it");
+        CHECK(unit->carriesItems(card));
+        {
+            INFO("said, on its tab, as a failure");
+            CHECK(says(said().text, "MasterNotecardCarries"));
+            CHECK(said().failure);
+            CHECK(said().doc == "card");
+        }
 
         studio->picked = in("card.txt");
         write(in("card.txt"), "a b\n");
         unit->linkToFile(card);
-        ensure_equals("no file asked for", studio->picks, 0);
-        ensure("nothing linked", !disk.linkOf(card.ref));
+        UNSCOPED_INFO("no file asked for");
+        CHECK(studio->picks == 0);
+        UNSCOPED_INFO("nothing linked");
+        REQUIRE_FALSE(disk.linkOf(card.ref));
     }
 
-    template<> template<>
-    void alscriptstudiomasters_object::test<3>()
+    // A file picked of another language is refused, and said, before anything is linked: LSL, SLua,
+    // a notecard's, and a name with no extension.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a file picked of another language is refused and its own is linked", "[alscriptstudiomasters]")
     {
-        set_test_name("a file picked of another language is refused, and said, before anything is linked: LSL, SLua, a notecard's, and a name with no extension");
         make();
         Doc& lsl  = itemTab("door", "default {}\n");
         Doc& slua = itemTab("lamp", "print(1)\n", true);
@@ -401,15 +425,27 @@ namespace tut
             studio->picked      = in(name);
             const size_t before = services.reports.size();
             unit->linkToFile(doc);
-            return !disk.linkOf(doc.ref) && services.reports.size() == before + 1 &&
-                   alscriptstudiomasters_data::says(said().text, word) && said().failure && said().doc == doc.id && services.findDoc(doc.id) == &doc;
+            // Read straight, not through said(): the count checked first guards it, and an assertion in
+            // here would clear the message of the CHECK this is called in.
+            if (disk.linkOf(doc.ref) || services.reports.size() != before + 1)
+            {
+                return false;
+            }
+            const al_studio_test::FakeServices::Said& last = services.reports.back();
+            return alscriptstudiomasters_data::says(last.text, word) && last.failure && last.doc == doc.id && services.findDoc(doc.id) == &doc;
         };
-        ensure("SLua for an LSL script", refused(lsl, "door.luau", "MasterNotLSLFile"));
-        ensure("a notecard's file for an LSL script", refused(lsl, "door.txt", "MasterNotLSLFile"));
-        ensure("no extension at all", refused(lsl, "door", "MasterNotLSLFile"));
-        ensure("LSL for an SLua script", refused(slua, "lamp.lsl", "MasterNotSLuaFile"));
-        ensure("a script's file for a notecard", refused(card, "card.lsl", "MasterNotNotecardFile"));
-        ensure("nothing closed", studio->closed.empty());
+        UNSCOPED_INFO("SLua for an LSL script");
+        CHECK(refused(lsl, "door.luau", "MasterNotLSLFile"));
+        UNSCOPED_INFO("a notecard's file for an LSL script");
+        CHECK(refused(lsl, "door.txt", "MasterNotLSLFile"));
+        UNSCOPED_INFO("no extension at all");
+        CHECK(refused(lsl, "door", "MasterNotLSLFile"));
+        UNSCOPED_INFO("LSL for an SLua script");
+        CHECK(refused(slua, "lamp.lsl", "MasterNotSLuaFile"));
+        UNSCOPED_INFO("a script's file for a notecard");
+        CHECK(refused(card, "card.lsl", "MasterNotNotecardFile"));
+        UNSCOPED_INFO("nothing closed");
+        REQUIRE(studio->closed.empty());
 
         // Each of its own language: linked, its tab giving way.
         const ALScriptRef lsl_ref = lsl.ref, slua_ref = slua.ref, card_ref = card.ref;
@@ -425,15 +461,33 @@ namespace tut
         const std::optional<ALMasterLink> a = disk.linkOf(lsl_ref);
         const std::optional<ALMasterLink> b = disk.linkOf(slua_ref);
         const std::optional<ALMasterLink> c = disk.linkOf(card_ref);
-        ensure("LSL", a && a->master == in("door.lsl") && !a->lua && !a->notecard && a->target == "mono");
-        ensure("SLua, by .lua too", b && b->lua && b->target == "luau");
-        ensure("a notecard: no language, no target", c && c->notecard && !c->lua && c->target.empty());
+        {
+            INFO("LSL");
+            REQUIRE(a);
+            REQUIRE(a->master == in("door.lsl"));
+            REQUIRE_FALSE(a->lua);
+            REQUIRE_FALSE(a->notecard);
+            CHECK(a->target == "mono");
+        }
+        {
+            INFO("SLua, by .lua too");
+            REQUIRE(b);
+            REQUIRE(b->lua);
+            CHECK(b->target == "luau");
+        }
+        {
+            INFO("a notecard: no language, no target");
+            REQUIRE(c);
+            REQUIRE(c->notecard);
+            REQUIRE_FALSE(c->lua);
+            REQUIRE(c->target.empty());
+        }
     }
 
-    template<> template<>
-    void alscriptstudiomasters_object::test<4>()
+    // A clean tab linked gives way to its file's tab; where the file is what it holds the file's
+    // stamp is taken, else Send File and Compare are offered there.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a linked clean tab gives way and takes the stamp of a matching file", "[alscriptstudiomasters]")
     {
-        set_test_name("a clean tab linked: it gives way to its file's tab; where the file is what it holds the file's stamp is taken, else Send File and Compare are offered there");
         make();
         Doc& same = itemTab("door", "default {}\n");
         const LLUUID      asset = same.assetId;
@@ -441,18 +495,43 @@ namespace tut
         write(in("door.lsl"), "default {}\n");
         studio->picked = in("door.lsl");
         unit->linkToFile(same);
-        ensure("nothing asked", studio->asked.empty());
+        REQUIRE(studio->asked.empty());
         const std::optional<ALMasterLink> link = disk.linkOf(ref);
-        ensure("linked as picked, from the world's asset", link && link->made == ALMasterLink::Made::Picked && link->base == asset &&
-                                                              link->itemName == "door" && link->objectName == "Door");
-        ensure("the file's stamp taken, as from a send of it", link->stamp != 0 && link->stamp == ALFileStamp::of(in("door.lsl")).time);
-        ensure("its tab closed, the file's opened in its place", studio->closed == Names{ "door" } && studio->opened == Names{ in("door.lsl") } &&
-                                                                     !services.findDoc(ref));
+        {
+            INFO("linked as picked, from the world's asset");
+            REQUIRE(link);
+            REQUIRE(link->made == ALMasterLink::Made::Picked);
+            REQUIRE(link->base == asset);
+            REQUIRE(link->itemName == "door");
+            CHECK(link->objectName == "Door");
+        }
+        {
+            INFO("the file's stamp taken, as from a send of it");
+            REQUIRE(link->stamp != 0);
+            CHECK(link->stamp == ALFileStamp::of(in("door.lsl")).time);
+        }
+        {
+            INFO("its tab closed, the file's opened in its place");
+            REQUIRE(studio->closed == Names{ "door" });
+            CHECK(studio->opened == Names{ in("door.lsl") });
+            REQUIRE_FALSE(services.findDoc(ref));
+        }
         Doc* tab = services.findDoc("disk:" + in("door.lsl"));
-        ensure("said there, with nothing offered", tab && says(said().text, "MasterLinked") && !says(said().text, "MasterLinkDiffers") &&
-                                                       said().doc == tab->id && said().actions.empty());
-        ensure("the file's tab acts on the script", tab->master->offerFor == ref);
-        ensure("nothing written or sent", disk.written.empty() && disk.sent.empty());
+        {
+            INFO("said there, with nothing offered");
+            REQUIRE(tab);
+            CHECK(says(said().text, "MasterLinked"));
+            CHECK_FALSE(says(said().text, "MasterLinkDiffers"));
+            CHECK(said().doc == tab->id);
+            REQUIRE(said().actions.empty());
+        }
+        UNSCOPED_INFO("the file's tab acts on the script");
+        CHECK(tab->master->offerFor == ref);
+        {
+            INFO("nothing written or sent");
+            REQUIRE(disk.written.empty());
+            REQUIRE(disk.sent.empty());
+        }
 
         Doc& other = itemTab("lamp", "default { state_entry() {} }\n");
         write(in("lamp.lsl"), "default {}\n");
@@ -460,17 +539,25 @@ namespace tut
         const ALScriptRef other_ref = other.ref;
         unit->linkToFile(other);
         const std::optional<ALMasterLink> differing = disk.linkOf(other_ref);
-        ensure("a file it is not what the script holds: no stamp", differing && differing->stamp == 0);
+        {
+            INFO("a file it is not what the script holds: no stamp");
+            REQUIRE(differing);
+            CHECK(differing->stamp == 0);
+        }
         Doc* lamp = services.findDoc("disk:" + in("lamp.lsl"));
-        ensure("a file it is not: said, Send File and Compare offered on the file's tab",
-               lamp && says(said().text, "MasterLinkDiffers") && said().doc == lamp->id &&
-                   said().actions == Names{ "master_send", "master_compare" });
+        {
+            INFO("a file it is not: said, Send File and Compare offered on the file's tab");
+            REQUIRE(lamp);
+            CHECK(says(said().text, "MasterLinkDiffers"));
+            CHECK(said().doc == lamp->id);
+            CHECK(said().actions == Names{ "master_send", "master_compare" });
+        }
     }
 
-    template<> template<>
-    void alscriptstudiomasters_object::test<5>()
+    // A tab with unsaved changes linked is asked first: Cancel links nothing, Discard holds the
+    // file up to the text as last saved, Write puts what was typed in the file.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: linking a tab with unsaved changes asks to cancel or discard or write", "[alscriptstudiomasters]")
     {
-        set_test_name("a tab with unsaved changes linked: asked first; Cancel links nothing, Discard holds the file up to the text as last saved, Write puts what was typed in the file");
         make();
         // Cancel: nothing.
         Doc& door = itemTab("door", "default {}\n");
@@ -479,10 +566,16 @@ namespace tut
         studio->picked = in("door.lsl");
         studio->answer = Unsaved::Cancel;
         unit->linkToFile(door);
-        ensure("asked, the file named", studio->asked == Names{ "door " + in("door.lsl") });
-        ensure("Cancel: not linked, the tab kept with what was typed, the file as it was",
-               !disk.linkOf(door.ref) && services.findDoc("door") == &door && door.editor->isDirty() &&
-                   contents(in("door.lsl")) == "default {}\n" && studio->closed.empty());
+        UNSCOPED_INFO("asked, the file named");
+        CHECK(studio->asked == Names{ "door " + in("door.lsl") });
+        {
+            INFO("Cancel: not linked, the tab kept with what was typed, the file as it was");
+            REQUIRE_FALSE(disk.linkOf(door.ref));
+            REQUIRE(services.findDoc("door") == &door);
+            CHECK(door.editor->isDirty());
+            CHECK(contents(in("door.lsl")) == "default {}\n");
+            REQUIRE(studio->closed.empty());
+        }
 
         // Discard, the file what the world holds: as a clean tab is linked,
         // whatever was typed.
@@ -490,10 +583,22 @@ namespace tut
         studio->answer             = Unsaved::Discard;
         unit->linkToFile(door);
         std::optional<ALMasterLink> link = disk.linkOf(door_ref);
-        ensure("Discard: linked, the tab gone", link && studio->closed == Names{ "door" });
-        ensure("the file is what the tab last saved: its stamp taken, nothing offered",
-               link->stamp == ALFileStamp::of(in("door.lsl")).time && !says(said().text, "MasterLinkDiffers") && said().actions.empty());
-        ensure("the file untouched", contents(in("door.lsl")) == "default {}\n" && disk.written.empty());
+        {
+            INFO("Discard: linked, the tab gone");
+            REQUIRE(link);
+            CHECK(studio->closed == Names{ "door" });
+        }
+        {
+            INFO("the file is what the tab last saved: its stamp taken, nothing offered");
+            CHECK(link->stamp == ALFileStamp::of(in("door.lsl")).time);
+            CHECK_FALSE(says(said().text, "MasterLinkDiffers"));
+            REQUIRE(said().actions.empty());
+        }
+        {
+            INFO("the file untouched");
+            CHECK(contents(in("door.lsl")) == "default {}\n");
+            REQUIRE(disk.written.empty());
+        }
 
         // Discard, the file what was typed and is let go of: not what the
         // world holds.
@@ -504,8 +609,13 @@ namespace tut
         const ALScriptRef lamp_ref = lamp.ref;
         unit->linkToFile(lamp);
         link = disk.linkOf(lamp_ref);
-        ensure("the file held up to the saved text, not to what was dropped: it differs, no stamp, Send File and Compare offered",
-               link && link->stamp == 0 && says(said().text, "MasterLinkDiffers") && said().actions == Names{ "master_send", "master_compare" });
+        {
+            INFO("the file held up to the saved text, not to what was dropped: it differs, no stamp, Send File and Compare offered");
+            REQUIRE(link);
+            CHECK(link->stamp == 0);
+            CHECK(says(said().text, "MasterLinkDiffers"));
+            CHECK(said().actions == Names{ "master_send", "master_compare" });
+        }
 
         // Write: what was typed in the file first, which the world does not
         // hold.
@@ -517,19 +627,31 @@ namespace tut
         const ALScriptRef bell_ref = bell.ref;
         unit->linkToFile(bell);
         link = disk.linkOf(bell_ref);
-        ensure_equals("Write: the file holds what was typed", contents(in("bell.lsl")), std::string("default {}\n// mine\n"));
-        ensure("the write the studio's own", disk.written == Names{ in("bell.lsl") });
-        ensure("linked, differing from the world: no stamp, Send File and Compare offered",
-               link && link->stamp == 0 && says(said().text, "MasterLinkDiffers") && said().actions == Names{ "master_send", "master_compare" });
-        ensure("its tab gone", !services.findDoc(bell_ref));
+        UNSCOPED_INFO("Write: the file holds what was typed");
+        CHECK(contents(in("bell.lsl")) == std::string("default {}\n// mine\n"));
+        UNSCOPED_INFO("the write the studio's own");
+        CHECK(disk.written == Names{ in("bell.lsl") });
+        {
+            INFO("linked, differing from the world: no stamp, Send File and Compare offered");
+            REQUIRE(link);
+            CHECK(link->stamp == 0);
+            CHECK(says(said().text, "MasterLinkDiffers"));
+            CHECK(said().actions == Names{ "master_send", "master_compare" });
+        }
+        UNSCOPED_INFO("its tab gone");
+        REQUIRE_FALSE(services.findDoc(bell_ref));
         Doc* tab = services.findDoc("disk:" + in("bell.lsl"));
-        ensure("the file's tab holds what was typed", tab && tab->editor->wholeText() == "default {}\n// mine\n");
+        {
+            INFO("the file's tab holds what was typed");
+            REQUIRE(tab);
+            CHECK(tab->editor->wholeText() == "default {}\n// mine\n");
+        }
     }
 
-    template<> template<>
-    void alscriptstudiomasters_object::test<6>()
+    // Linked from elsewhere: a clean tab gives way to its file's once the links have changed; one
+    // with something typed is kept and told once, with Compare with File, Open File and Unlink.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a link from elsewhere closes a clean tab and tells a typed one once", "[alscriptstudiomasters]")
     {
-        set_test_name("linked from elsewhere: a clean tab gives way to its file's once the links have changed; one with something typed is kept and told once, with Compare with File, Open File and Unlink");
         make();
         Doc& clean = itemTab("door", "default {}\n");
         Doc& dirty = itemTab("lamp", "default {}\n");
@@ -539,41 +661,60 @@ namespace tut
         write(in("lamp.lsl"), "default {}\n");
         linkFromElsewhere(clean, in("door.lsl"));
         linkFromElsewhere(dirty, in("lamp.lsl"));
-        ensure("nothing done while whoever changed the links is", studio->closed.empty() && services.reports.empty());
+        {
+            INFO("nothing done while whoever changed the links is");
+            REQUIRE(studio->closed.empty());
+            REQUIRE(services.reports.empty());
+        }
         settle();
-        ensure("the clean one gave way to its file's", studio->closed == Names{ "door" } && !services.findDoc(clean_ref) &&
-                                                         services.findDoc("disk:" + in("door.lsl")));
+        {
+            INFO("the clean one gave way to its file's");
+            CHECK(studio->closed == Names{ "door" });
+            REQUIRE_FALSE(services.findDoc(clean_ref));
+            REQUIRE(services.findDoc("disk:" + in("door.lsl")));
+        }
         const auto told = [&](const std::string& id) {
             return std::count_if(services.reports.begin(), services.reports.end(), [&](const al_studio_test::FakeServices::Said& one) {
                 return one.doc == id && alscriptstudiomasters_data::says(one.text, "MasterLinkedUnsaved");
             });
         };
-        ensure_equals("the one with something typed told once", told("lamp"), 1);
+        UNSCOPED_INFO("the one with something typed told once");
+        REQUIRE(told("lamp") == 1);
         const al_studio_test::FakeServices::Said& lamp = *std::find_if(services.reports.begin(), services.reports.end(),
                                                                          [](const al_studio_test::FakeServices::Said& one) { return one.doc == "lamp"; });
-        ensure("as a failure, with its file to compare with and to open, and the link to let go of",
-               lamp.failure && lamp.actions == Names{ "master_compare_file", "master_open_file", "master_unlink" });
-        ensure("and kept", services.findDoc("lamp") == &dirty && dirty.editor->isDirty());
+        {
+            INFO("as a failure, with its file to compare with and to open, and the link to let go of");
+            CHECK(lamp.failure);
+            CHECK(lamp.actions == Names{ "master_compare_file", "master_open_file", "master_unlink" });
+        }
+        {
+            INFO("and kept");
+            REQUIRE(services.findDoc("lamp") == &dirty);
+            CHECK(dirty.editor->isDirty());
+        }
 
         // The links changing again: not told again.
         Doc& bell = itemTab("bell", "default {}\n");
         write(in("bell.lsl"), "default {}\n");
         linkFromElsewhere(bell, in("bell.lsl"));
         settle();
-        ensure_equals("told once only", told("lamp"), 1);
-        ensure("the next clean one gave way", !services.findDoc("bell"));
+        UNSCOPED_INFO("told once only");
+        CHECK(told("lamp") == 1);
+        UNSCOPED_INFO("the next clean one gave way");
+        REQUIRE_FALSE(services.findDoc("bell"));
 
         // A tab of a file gone, or of a link held, is left as it is.
         Doc& gone = itemTab("gone", "default {}\n");
         linkFromElsewhere(gone, in("nowhere.lsl"));
         settle();
-        ensure("a file gone: left", services.findDoc("gone") == &gone);
+        UNSCOPED_INFO("a file gone: left");
+        CHECK(services.findDoc("gone") == &gone);
     }
 
-    template<> template<>
-    void alscriptstudiomasters_object::test<7>()
+    // A tab kept for what was typed gives way once that is saved -- its file's tab offering Send
+    // File and Compare where the world now differs -- or reverted.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a tab kept for what was typed gives way once saved or reverted", "[alscriptstudiomasters]")
     {
-        set_test_name("a tab kept for what was typed gives way once that is saved -- its file's tab offering Send File and Compare where the world now differs -- or reverted");
         make();
         Doc& door = itemTab("door", "default {}\n");
         type(door, "// mine\n");
@@ -581,20 +722,32 @@ namespace tut
         const ALScriptRef door_ref = door.ref;
         ALMasterLink      link     = linkFromElsewhere(door, in("door.lsl"));
         settle();
-        ensure("kept", services.findDoc("door") == &door);
+        UNSCOPED_INFO("the tab with something typed is kept");
+        CHECK(services.findDoc("door") == &door);
 
         // Saved from here: the world holds what was typed, and the save
         // heard marks the link differing.
         door.editor->resetDirty();
         link.state = ALMasterLink::State::Differing;
         disk.link(link);
-        ensure("not while the save is still being heard", services.findDoc("door") == &door);
+        UNSCOPED_INFO("not while the save is still being heard");
+        CHECK(services.findDoc("door") == &door);
         settle();
-        ensure("clean: it gave way, whatever it was told", !services.findDoc(door_ref) && studio->closed == Names{ "door" });
+        {
+            INFO("clean: it gave way, whatever it was told");
+            REQUIRE_FALSE(services.findDoc(door_ref));
+            CHECK(studio->closed == Names{ "door" });
+        }
         Doc* tab = services.findDoc("disk:" + in("door.lsl"));
-        ensure("its file's tab says so, offering to send the file over the world's or to compare them",
-               tab && said().doc == tab->id && says(said().text, "MasterGaveWay") && says(said().text, "MasterLinkDiffers") &&
-                   said().actions == Names{ "master_send", "master_compare" } && tab->master->offerFor == door_ref);
+        {
+            INFO("its file's tab says so, offering to send the file over the world's or to compare them");
+            REQUIRE(tab);
+            REQUIRE(said().doc == tab->id);
+            CHECK(says(said().text, "MasterGaveWay"));
+            CHECK(says(said().text, "MasterLinkDiffers"));
+            CHECK(said().actions == Names{ "master_send", "master_compare" });
+            CHECK(tab->master->offerFor == door_ref);
+        }
 
         // Saved with what the file last sent: the links do not change, and
         // the save heard looks again itself.
@@ -608,15 +761,20 @@ namespace tut
         saved.ref = lamp.ref;
         unit->saved(saved);
         settle();
-        ensure("gave way on the save alone", !services.findDoc(ALScriptRef(lamp_link.object, lamp_link.item)));
-        ensure("nothing offered: the world holds what the file does", says(said().text, "MasterGaveWay") && said().actions.empty());
+        UNSCOPED_INFO("gave way on the save alone");
+        REQUIRE_FALSE(services.findDoc(ALScriptRef(lamp_link.object, lamp_link.item)));
+        {
+            INFO("nothing offered: the world holds what the file does");
+            CHECK(says(said().text, "MasterGaveWay"));
+            REQUIRE(said().actions.empty());
+        }
 
         // A save of a script with no tab here, or not linked: nothing.
         saved.ref = ALScriptRef(LLUUID::generateNewID(), LLUUID::generateNewID());
         const size_t before = services.reports.size();
         unit->saved(saved);
         settle();
-        ensure("nothing", services.reports.size() == before);
+        REQUIRE(services.reports.size() == before);
 
         // Reverted: loaded again, clean.
         Doc& bell = itemTab("bell", "default {}\n");
@@ -627,13 +785,17 @@ namespace tut
         bell.editor->setText("default {}\n");
         unit->loaded(bell);
         settle();
-        ensure("reverted: gave way", !services.findDoc(ALScriptRef(bell_link.object, bell_link.item)) && says(said().text, "MasterGaveWay"));
+        {
+            INFO("reverted: gave way");
+            REQUIRE_FALSE(services.findDoc(ALScriptRef(bell_link.object, bell_link.item)));
+            CHECK(says(said().text, "MasterGaveWay"));
+        }
     }
 
-    template<> template<>
-    void alscriptstudiomasters_object::test<8>()
+    // The offers on a tab kept for what was typed: its file on disk set beside it, its file's tab
+    // opened beside it, the link let go of.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a kept tab's offers compare with its file or open it or unlink it", "[alscriptstudiomasters]")
     {
-        set_test_name("the offers on a tab kept for what was typed: its file on disk set beside it, its file's tab opened beside it, the link let go of");
         make();
         Doc& door = itemTab("door", "default {}\n");
         type(door, "// mine\n");
@@ -642,38 +804,65 @@ namespace tut
         settle();
 
         unit->offer(door, "master_compare_file");
-        ensure_equals("compared once", studio->compared.size(), size_t(1));
+        REQUIRE(studio->compared.size() == size_t(1));
         const FakeMastersWindow::Compared& compared = studio->compared.back();
-        ensure("in the tab's place: the file on disk, then what was typed", compared.doc == "door" &&
-                                                                              compared.left == "default { touch_start(integer n) {} }\n" &&
-                                                                              compared.right == "default {}\n// mine\n");
-        ensure("each named", says(compared.leftTitle, "CompareMasterOnDisk") && says(compared.leftTitle, "door.lsl") &&
-                                 says(compared.rightTitle, "CompareNow"));
+        {
+            INFO("in the tab's place: the file on disk, then what was typed");
+            CHECK(compared.doc == "door");
+            CHECK(compared.left == "default { touch_start(integer n) {} }\n");
+            CHECK(compared.right == "default {}\n// mine\n");
+        }
+        {
+            INFO("each named");
+            CHECK(says(compared.leftTitle, "CompareMasterOnDisk"));
+            CHECK(says(compared.leftTitle, "door.lsl"));
+            CHECK(says(compared.rightTitle, "CompareNow"));
+        }
 
         unit->offer(door, "master_open_file");
         Doc* tab = services.findDoc("disk:" + in("door.lsl"));
-        ensure("the file's tab opened, this one kept", tab && services.findDoc("door") == &door && studio->closed.empty());
-        ensure("the file's tab acts on the script", tab->master->offerFor == door.ref);
+        {
+            INFO("the file's tab opened, this one kept");
+            REQUIRE(tab);
+            CHECK(services.findDoc("door") == &door);
+            REQUIRE(studio->closed.empty());
+        }
+        UNSCOPED_INFO("the file's tab acts on the script");
+        CHECK(tab->master->offerFor == door.ref);
 
         std::filesystem::remove(fsyspath(in("door.lsl")));
         unit->offer(door, "master_compare_file");
-        ensure("a file that cannot be read: said, nothing compared", studio->compared.size() == 1 && says(said().text, "MasterNotRead") && said().failure);
+        {
+            INFO("a file that cannot be read: said, nothing compared");
+            REQUIRE(studio->compared.size() == 1);
+            CHECK(says(said().text, "MasterNotRead"));
+            CHECK(said().failure);
+        }
 
         // Not offered on a file's own tab.
         unit->offer(*tab, "master_compare_file");
         unit->offer(*tab, "master_open_file");
-        ensure("nothing from a file's tab", studio->compared.size() == 1 && studio->opened.size() == 1);
+        {
+            INFO("nothing from a file's tab");
+            REQUIRE(studio->compared.size() == 1);
+            REQUIRE(studio->opened.size() == 1);
+        }
 
         unit->offer(door, "master_unlink");
-        ensure("let go of, and said", !disk.linkOf(door.ref) && says(said().text, "MasterUnlinked"));
+        {
+            INFO("let go of, and said");
+            REQUIRE_FALSE(disk.linkOf(door.ref));
+            CHECK(says(said().text, "MasterUnlinked"));
+        }
         unit->offer(door, "master_compare_file");
-        ensure("nothing to compare once unlinked", studio->compared.size() == 1);
+        UNSCOPED_INFO("nothing to compare once unlinked");
+        REQUIRE(studio->compared.size() == 1);
     }
 
-    template<> template<>
-    void alscriptstudiomasters_object::test<9>()
+    // The file a script names is linked by Link while nothing is typed in its tab; with something
+    // typed, it is to be saved or reverted first, and nothing is written.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: the Link offer links a script's named file only while nothing is typed", "[alscriptstudiomasters]")
     {
-        set_test_name("the file a script names is linked by Link while nothing is typed in its tab; with something typed, it is to be saved or reverted first, and nothing is written");
         make();
         Doc& door = itemTab("door", "default {}\n");
         write(in("door.lsl"), "default {}\n");
@@ -681,30 +870,53 @@ namespace tut
         const ALScriptRef door_ref = door.ref;
         unit->offer(door, "master_link_hint");
         const std::optional<ALMasterLink> link = disk.linkOf(door_ref);
-        ensure("clean: linked, as named", link && link->made == ALMasterLink::Made::Hint && link->master == in("door.lsl"));
+        {
+            INFO("clean: linked, as named");
+            REQUIRE(link);
+            REQUIRE(link->made == ALMasterLink::Made::Hint);
+            CHECK(link->master == in("door.lsl"));
+        }
 
         Doc& lamp = itemTab("lamp", "default {}\n");
         type(lamp, "// mine\n");
         write(in("lamp.lsl"), "default {}\n");
         lamp.master->hinted = in("lamp.lsl");
         unit->offer(lamp, "master_link_hint");
-        ensure("with something typed: not linked, nothing asked, the tab kept",
-               !disk.linkOf(lamp.ref) && studio->asked.empty() && services.findDoc("lamp") == &lamp &&
-                   lamp.editor->isDirty());
-        ensure("said, Link offered again for after", says(said().text, "MasterHintUnsaved") && said().failure && said().doc == "lamp" &&
-                                                        said().actions == Names{ "master_link_hint" });
-        ensure("nothing written", contents(in("lamp.lsl")) == "default {}\n" && disk.written.empty());
+        {
+            INFO("with something typed: not linked, nothing asked, the tab kept");
+            REQUIRE_FALSE(disk.linkOf(lamp.ref));
+            REQUIRE(studio->asked.empty());
+            REQUIRE(services.findDoc("lamp") == &lamp);
+            CHECK(lamp.editor->isDirty());
+        }
+        {
+            INFO("said, Link offered again for after");
+            CHECK(says(said().text, "MasterHintUnsaved"));
+            CHECK(said().failure);
+            CHECK(said().doc == "lamp");
+            CHECK(said().actions == Names{ "master_link_hint" });
+        }
+        {
+            INFO("nothing written");
+            CHECK(contents(in("lamp.lsl")) == "default {}\n");
+            REQUIRE(disk.written.empty());
+        }
 
         const ALScriptRef lamp_ref = lamp.ref;
         lamp.editor->resetDirty();
         unit->offer(lamp, "master_link_hint");
-        ensure("saved: linked, its tab giving way", disk.linkOf(lamp_ref) && !services.findDoc(lamp_ref));
+        {
+            INFO("saved: linked, its tab giving way");
+            REQUIRE(disk.linkOf(lamp_ref));
+            REQUIRE_FALSE(services.findDoc(lamp_ref));
+        }
     }
 
-    template<> template<>
-    void alscriptstudiomasters_object::test<10>()
+    // A tab kept for what was typed, made clean by an undo, is kept and offered to switch to
+    // its file, and told again when typed in; Switch to File gives way, as a revert or a save
+    // of it does.
+    TEST_CASE_METHOD(alscriptstudiomasters_data, "alscriptstudiomasters: a kept tab made clean by an undo is offered Switch to File", "[alscriptstudiomasters]")
     {
-        set_test_name("a tab kept for what was typed, made clean by an undo, is kept and offered to switch to its file, and told again when typed in; Switch to File gives way, as a revert or a save of it does");
         make();
         Doc& door = itemTab("door", "default {}\n");
         wire(door);
@@ -713,45 +925,84 @@ namespace tut
         const ALScriptRef door_ref = door.ref;
         linkFromElsewhere(door, in("door.lsl"));
         settle();
-        ensure("kept and told", services.findDoc(door_ref) == &door && says(said().text, "MasterLinkedUnsaved") && said().doc == "door");
+        {
+            INFO("kept and told");
+            CHECK(services.findDoc(door_ref) == &door);
+            CHECK(says(said().text, "MasterLinkedUnsaved"));
+            CHECK(said().doc == "door");
+        }
         const size_t said_before = services.reports.size();
         const S32    notices     = studio->notices;
 
         door.editor->undo();
-        ensure("clean again by the undo", !door.editor->isDirty());
-        ensure("not closed under the author", services.findDoc(door_ref) == &door && studio->closed.empty());
-        ensure("its notice: nothing unsaved left, Switch to File offered with the rest",
-               door.offer && says(door.offer->text, "MasterLinkedClean") &&
-                   door.offer->actions == Names{ "master_give_way", "master_compare_file", "master_open_file", "master_unlink" } &&
-                   studio->notices == notices + 1);
-        ensure("over the tab alone, not in Output", services.reports.size() == said_before);
+        UNSCOPED_INFO("clean again by the undo");
+        CHECK_FALSE(door.editor->isDirty());
+        {
+            INFO("not closed under the author");
+            CHECK(services.findDoc(door_ref) == &door);
+            REQUIRE(studio->closed.empty());
+        }
+        {
+            INFO("its notice: nothing unsaved left, Switch to File offered with the rest");
+            REQUIRE(door.offer);
+            REQUIRE(says(door.offer->text, "MasterLinkedClean"));
+            CHECK(door.offer->actions == Names{ "master_give_way", "master_compare_file", "master_open_file", "master_unlink" });
+            CHECK(studio->notices == notices + 1);
+        }
+        UNSCOPED_INFO("over the tab alone, not in Output");
+        REQUIRE(services.reports.size() == said_before);
 
         // The links changing meanwhile: kept still.
         Doc& bell = itemTab("bell", "default {}\n");
         write(in("bell.lsl"), "default {}\n");
         linkFromElsewhere(bell, in("bell.lsl"));
         settle();
-        ensure("kept as the links change", services.findDoc(door_ref) == &door && !services.findDoc("bell"));
+        {
+            INFO("kept as the links change");
+            CHECK(services.findDoc(door_ref) == &door);
+            REQUIRE_FALSE(services.findDoc("bell"));
+        }
 
         door.editor->redo();
-        ensure("typed in again by the redo: the notice back to what was typed",
-               door.editor->isDirty() && door.offer && says(door.offer->text, "MasterLinkedUnsaved") &&
-                   door.offer->actions == Names{ "master_compare_file", "master_open_file", "master_unlink" });
+        {
+            INFO("typed in again by the redo: the notice back to what was typed");
+            REQUIRE(door.editor->isDirty());
+            REQUIRE(door.offer);
+            REQUIRE(says(door.offer->text, "MasterLinkedUnsaved"));
+            CHECK(door.offer->actions == Names{ "master_compare_file", "master_open_file", "master_unlink" });
+        }
         door.editor->undo();
-        ensure("and clean again", door.offer && says(door.offer->text, "MasterLinkedClean"));
+        {
+            INFO("and clean again");
+            REQUIRE(door.offer);
+            CHECK(says(door.offer->text, "MasterLinkedClean"));
+        }
 
         // Switch to File taken once typed in again: kept, and told so.
         type(door, "x");
         door.offer.reset();
         unit->offer(door, "master_give_way");
-        ensure("typed in since it was offered: kept, told so", services.findDoc(door_ref) == &door && door.offer &&
-                                                                  says(door.offer->text, "MasterLinkedUnsaved"));
+        {
+            INFO("typed in since it was offered: kept, told so");
+            REQUIRE(services.findDoc(door_ref) == &door);
+            REQUIRE(door.offer);
+            CHECK(says(door.offer->text, "MasterLinkedUnsaved"));
+        }
         door.editor->undo();
-        ensure("clean again", door.offer && says(door.offer->text, "MasterLinkedClean"));
+        {
+            INFO("clean again");
+            REQUIRE(door.offer);
+            CHECK(says(door.offer->text, "MasterLinkedClean"));
+        }
         unit->offer(door, "master_give_way");
-        ensure("Switch to File: the file's tab in its place, said there",
-               !services.findDoc(door_ref) && studio->closed.back() == "door" && says(said().text, "MasterGaveWay") &&
-                   said().doc == "disk:" + in("door.lsl"));
+        {
+            INFO("Switch to File: the file's tab in its place, said there");
+            REQUIRE_FALSE(services.findDoc(door_ref));
+            REQUIRE_FALSE(studio->closed.empty());
+            CHECK(studio->closed.back() == "door");
+            CHECK(says(said().text, "MasterGaveWay"));
+            CHECK(said().doc == "disk:" + in("door.lsl"));
+        }
 
         // Reverted once clean: gives way, as a revert does.
         Doc& lamp = itemTab("lamp", "default {}\n");
@@ -762,11 +1013,20 @@ namespace tut
         linkFromElsewhere(lamp, in("lamp.lsl"));
         settle();
         lamp.editor->undo();
-        ensure("kept once clean", services.findDoc(lamp_ref) == &lamp && says(lamp.offer->text, "MasterLinkedClean"));
+        {
+            INFO("kept once clean");
+            REQUIRE(services.findDoc(lamp_ref) == &lamp);
+            REQUIRE(lamp.offer);
+            CHECK(says(lamp.offer->text, "MasterLinkedClean"));
+        }
         lamp.editor->setText("default {}\n");
         unit->loaded(lamp);
         settle();
-        ensure("reverted: gave way", !services.findDoc(lamp_ref) && says(said().text, "MasterGaveWay"));
+        {
+            INFO("reverted: gave way");
+            REQUIRE_FALSE(services.findDoc(lamp_ref));
+            CHECK(says(said().text, "MasterGaveWay"));
+        }
 
         // Saved once clean: gives way, as a save does.
         Doc& gate = itemTab("gate", "default {}\n");
@@ -777,11 +1037,16 @@ namespace tut
         linkFromElsewhere(gate, in("gate.lsl"));
         settle();
         gate.editor->undo();
-        ensure("kept once clean", services.findDoc(gate_ref) == &gate);
+        UNSCOPED_INFO("kept once clean");
+        CHECK(services.findDoc(gate_ref) == &gate);
         ALScriptSaved saved;
         saved.ref = gate_ref;
         unit->saved(saved);
         settle();
-        ensure("saved: gave way", !services.findDoc(gate_ref) && says(said().text, "MasterGaveWay"));
+        {
+            INFO("saved: gave way");
+            REQUIRE_FALSE(services.findDoc(gate_ref));
+            CHECK(says(said().text, "MasterGaveWay"));
+        }
     }
 }

@@ -30,15 +30,14 @@
 namespace ll_test
 {
     // A hidden window, its GL context current, and the 2D renderer and UI
-    // shader set up in it: made by the first llui GL test that asks, and
-    // kept for the process. Inline, so every test file in a binary shares
-    // the one: a second would make another window, take the context, put
-    // the renderer's singletons through their setup again and, at exit,
-    // quit SDL while the first was still alive.
+    // shader set up in it: llrender's shared context, made by the first GL
+    // test that asks and kept for the process, so every test file in a
+    // binary shares the one. A second would make another window, take the
+    // context, put the renderer's singletons through their setup again and,
+    // at exit, quit SDL while the first was still alive.
     inline HeadlessGL& uiGL()
     {
-        static HeadlessGL instance(true, true, true, /*needs_render=*/true);
-        return instance;
+        return sharedHeadlessGL();
     }
 }
 

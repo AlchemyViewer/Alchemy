@@ -133,7 +133,7 @@ S32 LLDrawPoolSimple::getNumDeferredPasses()
 
 void LLDrawPoolSimple::renderDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SIMPLE_DEFERRED);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLGLDisable blend(GL_BLEND);
 
     // The diffuse sampler decodes and the deferred pass's hoisted GL_FRAMEBUFFER_SRGB
@@ -152,7 +152,7 @@ void LLDrawPoolSimple::renderDeferred(S32 pass)
 
 void LLDrawPoolAlphaMask::renderDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_MASK_DEFERRED);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     // Sampler decodes, the hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes.
     LLGLSLShader* shader = gDeferredDiffuseAlphaMaskProgram.selectVariant();
 
@@ -197,7 +197,7 @@ LLDrawPoolFullbright::LLDrawPoolFullbright() :
 
 void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_FULLBRIGHT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     LLGLSLShader* shader = nullptr;
     if (LLPipeline::sRenderingHUDs)
@@ -225,7 +225,7 @@ void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
 
 void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_FULLBRIGHT);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     LLGLSLShader* shader = nullptr;
     if (LLPipeline::sRenderingHUDs)

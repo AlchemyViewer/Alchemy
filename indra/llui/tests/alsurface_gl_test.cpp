@@ -35,7 +35,7 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <functional>
 #include <string>
@@ -69,7 +69,7 @@ namespace
     S32 at(const std::vector<S32>& pixels, S32 x, S32 y) { return pixels[static_cast<size_t>(y) * W + x]; }
 }
 
-namespace tut
+namespace
 {
     struct alsurface_gl_data
     {
@@ -80,21 +80,20 @@ namespace tut
         }
     };
 
-    typedef test_group<alsurface_gl_data> alsurface_gl_test;
-    typedef alsurface_gl_test::object     alsurface_gl_object;
-    tut::alsurface_gl_test                alsurface_gl_testcase("alsurface_gl");
-
-    template<> template<>
-    void alsurface_gl_object::test<1>()
+    TEST_CASE_METHOD(alsurface_gl_data, "alsurface_gl: draw frames the edge pixels and fills the rest even at the corner", "[alsurface_gl]")
     {
-        set_test_name("a surface is its ground inside its rect and its frame on the pixels just inside the edges, at the window's corner too");
         for (const LLRect& rect : { LLRect(0, 10, 20, 0), LLRect(30, 40, 50, 20) })
         {
+            CAPTURE(rect.mLeft, rect.mBottom);
             const std::vector<S32> pixels = drawn([&] { ALSurface::draw(rect, LLColor4::black, LLColor4::white, 1.f); });
             // Its frame and its ground, where both are sure to be.
             const S32 frame  = at(pixels, rect.mLeft + 3, rect.mTop - 1);
             const S32 ground = at(pixels, rect.mLeft + 3, rect.mBottom + 3);
-            ensure("the frame and the ground tell apart", frame != ground && ground != 0);
+            {
+                INFO("the frame and the ground tell apart");
+                REQUIRE(frame != ground);
+                REQUIRE(ground != 0);
+            }
             for (S32 y = 0; y < 50; ++y)
             {
                 for (S32 x = 0; x < 60; ++x)
@@ -104,22 +103,20 @@ namespace tut
                     const S32  wanted = edge ? frame : inside ? ground : 0;
                     if (at(pixels, x, y) != wanted)
                     {
-                        fail("at " + std::to_string(x) + "," + std::to_string(y) + " of the surface at " + std::to_string(rect.mLeft) + "," +
-                             std::to_string(rect.mBottom) + ": " + std::to_string(at(pixels, x, y)) + " for " + std::to_string(wanted));
+                        CAPTURE(x, y, wanted);
+                        FAIL("the pixel is " << at(pixels, x, y));
                     }
                 }
             }
         }
     }
 
-    template<> template<>
-    void alsurface_gl_object::test<2>()
+    TEST_CASE_METHOD(alsurface_gl_data, "alsurface_gl: a strip's first tab is framed at its left edge as at its right", "[alsurface_gl]")
     {
-        set_test_name("the first tab of a strip is framed at its left edge as at its right, not left without a line there");
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTabStrip::Params p(LLUICtrlFactory::getDefaultParams<ALTabStrip>());
         p.name                 = "tabs";
@@ -138,25 +135,24 @@ namespace tut
         // line, and a blank inside it.
         const S32 frame  = at(pixels, first.mLeft + 3, first.mTop - 1);
         const S32 ground = at(pixels, first.mLeft + 3, middle);
-        ensure("the frame and the ground tell apart", frame != ground);
-        ensure_equals("framed at its left edge", at(pixels, first.mLeft, middle), frame);
-        ensure_equals("and at its right", at(pixels, first.mRight - 1, middle), frame);
-        ensure_equals("its ground just inside", at(pixels, first.mLeft + 1, middle), ground);
+        UNSCOPED_INFO("the frame and the ground tell apart");
+        CHECK(frame != ground);
+        CHECK(at(pixels, first.mLeft, middle) == frame);
+        CHECK(at(pixels, first.mRight - 1, middle) == frame);
+        CHECK(at(pixels, first.mLeft + 1, middle) == ground);
         strip->die();
     }
 
-    template<> template<>
-    void alsurface_gl_object::test<3>()
+    TEST_CASE_METHOD(alsurface_gl_data, "alsurface_gl: only an attached strip's shown tab has no bottom edge", "[alsurface_gl]")
     {
-        set_test_name("a strip attached to what it shows opens its shown tab into it, with no bottom edge; the tabs behind, and an unattached "
-                      "strip's shown tab, keep theirs");
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         for (const bool attached : { true, false })
         {
+            CAPTURE(attached);
             ALTabStrip::Params p(LLUICtrlFactory::getDefaultParams<ALTabStrip>());
             p.name                 = "tabs";
             p.rect                 = LLRect(0, 24, W, 0);
@@ -173,11 +169,11 @@ namespace tut
             const LLRect           behind = strip->rectOf(0);
             const S32              frame  = at(pixels, shown.mLeft + 3, shown.mTop - 1);
             const S32              ground = at(pixels, shown.mLeft + 3, shown.getCenterY());
-            ensure("the frame and the shown tab's ground tell apart", frame != ground);
-            ensure_equals(attached ? "the shown tab open at its bottom" : "unattached, the shown tab closed at its bottom",
-                          at(pixels, shown.mLeft + 3, shown.mBottom), attached ? ground : frame);
-            ensure_equals("its sides still framed", at(pixels, shown.mLeft, shown.getCenterY()), frame);
-            ensure_equals("a tab behind closed at its bottom", at(pixels, behind.mLeft + 3, behind.mBottom), frame);
+            UNSCOPED_INFO("the frame and the shown tab's ground tell apart");
+            REQUIRE(frame != ground);
+            REQUIRE(at(pixels, shown.mLeft + 3, shown.mBottom) == (attached ? ground : frame));
+            REQUIRE(at(pixels, shown.mLeft, shown.getCenterY()) == frame);
+            REQUIRE(at(pixels, behind.mLeft + 3, behind.mBottom) == frame);
             strip->die();
         }
     }

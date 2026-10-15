@@ -27,31 +27,16 @@
  */
 
 #include "linden_common.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../llbboxlocal.h"
 
-namespace tut
-{
 namespace
 {
-    struct LLBBoxLocalData
-    {
-    };
-
-    typedef test_group<LLBBoxLocalData> factory;
-    typedef factory::object object;
-}
 }
 
 namespace
 {
-    tut::factory llbboxlocal_test_factory("LLBBoxLocal");
-}
-
-namespace tut
-{
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE("LLBBoxLocal: the default constructor gives an empty box at the origin", "[LLBBoxLocal]")
     {
         //
         // test the default constructor
@@ -59,12 +44,11 @@ namespace tut
 
         LLBBoxLocal bbox1;
 
-        ensure_equals("Default bbox min", bbox1.getMin(), LLVector3(0.0f, 0.0f, 0.0f));
-        ensure_equals("Default bbox max", bbox1.getMax(), LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getMin() == LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getMax() == LLVector3(0.0f, 0.0f, 0.0f));
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE("LLBBoxLocal: the constructor stores min and max", "[LLBBoxLocal]")
     {
         //
         // test the non-default constructor
@@ -72,12 +56,11 @@ namespace tut
 
         LLBBoxLocal bbox2(LLVector3(-1.0f, -2.0f, 0.0f), LLVector3(1.0f, 2.0f, 3.0f));
 
-        ensure_equals("Custom bbox min", bbox2.getMin(), LLVector3(-1.0f, -2.0f, 0.0f));
-        ensure_equals("Custom bbox max", bbox2.getMax(), LLVector3(1.0f, 2.0f, 3.0f));
+        CHECK(bbox2.getMin() == LLVector3(-1.0f, -2.0f, 0.0f));
+        CHECK(bbox2.getMax() == LLVector3(1.0f, 2.0f, 3.0f));
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE("LLBBoxLocal: setMin", "[LLBBoxLocal]")
     {
         //
         // test the setMin()
@@ -89,11 +72,10 @@ namespace tut
         LLBBoxLocal bbox2;
         bbox2.setMin(LLVector3(1.0f, 2.0f, 3.0f));
 
-        ensure_equals("Custom bbox min (2)", bbox2.getMin(), LLVector3(1.0f, 2.0f, 3.0f));
+        CHECK(bbox2.getMin() == LLVector3(1.0f, 2.0f, 3.0f));
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE("LLBBoxLocal: setMax", "[LLBBoxLocal]")
     {
         //
         // test the setMax()
@@ -105,45 +87,47 @@ namespace tut
         LLBBoxLocal bbox2;
         bbox2.setMax(LLVector3(10.0f, 20.0f, 30.0f));
 
-        ensure_equals("Custom bbox max (2)", bbox2.getMax(), LLVector3(10.0f, 20.0f, 30.0f));
+        CHECK(bbox2.getMax() == LLVector3(10.0f, 20.0f, 30.0f));
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE("LLBBoxLocal: getCenter including a box with min above max", "[LLBBoxLocal]")
     {
         //
         // test the getCenter() method
         //
 
-        ensure_equals("Default bbox center", LLBBoxLocal().getCenter(), LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(LLBBoxLocal().getCenter() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBoxLocal bbox1(LLVector3(-1.0f, -1.0f, -1.0f), LLVector3(0.0f, 0.0f, 0.0f));
 
-        ensure_equals("Custom bbox center", bbox1.getCenter(), LLVector3(-0.5f, -0.5f, -0.5f));
+        CHECK(bbox1.getCenter() == LLVector3(-0.5f, -0.5f, -0.5f));
 
         LLBBoxLocal bbox2(LLVector3(0.0f, 0.0f, 0.0f), LLVector3(-1.0f, -1.0f, -1.0f));
 
-        ensure_equals("Invalid bbox center", bbox2.getCenter(), LLVector3(-0.5f, -0.5f, -0.5f));
+        UNSCOPED_INFO("min above max");
+        CHECK(bbox2.getCenter() == LLVector3(-0.5f, -0.5f, -0.5f));
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE("LLBBoxLocal: getExtent", "[LLBBoxLocal]")
     {
         //
         // test the getExtent() method
         //
 
-        LLBBoxLocal bbox2(LLVector3(0.0f, 0.0f, 0.0f), LLVector3(-1.0f, -1.0f, -1.0f));
-
-        ensure_equals("Default bbox extent", LLBBoxLocal().getExtent(), LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(LLBBoxLocal().getExtent() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBoxLocal bbox3(LLVector3(-1.0f, -1.0f, -1.0f), LLVector3(1.0f, 2.0f, 0.0f));
 
-        ensure_equals("Custom bbox extent", bbox3.getExtent(), LLVector3(2.0f, 3.0f, 1.0f));
+        CHECK(bbox3.getExtent() == LLVector3(2.0f, 3.0f, 1.0f));
+
+        // Max less min, so negative where min is above max.
+        LLBBoxLocal bbox2(LLVector3(0.0f, 0.0f, 0.0f), LLVector3(-1.0f, -1.0f, -1.0f));
+
+        UNSCOPED_INFO("min above max");
+        CHECK(bbox2.getExtent() == LLVector3(-1.0f, -1.0f, -1.0f));
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE("LLBBoxLocal: addPoint grows the box only for points outside it", "[LLBBoxLocal]")
     {
         //
         // test the addPoint() method
@@ -157,27 +141,26 @@ namespace tut
         bbox1.addPoint(LLVector3(-1.0f, -2.0f, -3.0f));
         bbox1.addPoint(LLVector3(3.0f, 4.0f, 5.0f));
 
-        ensure_equals("Custom BBox center (1)", bbox1.getCenter(), LLVector3(1.0f, 1.0f, 1.0f));
-        ensure_equals("Custom BBox min (1)", bbox1.getMin(), LLVector3(-1.0f, -2.0f, -3.0f));
-        ensure_equals("Custom BBox max (1)", bbox1.getMax(), LLVector3(3.0f, 4.0f, 5.0f));
+        CHECK(bbox1.getCenter() == LLVector3(1.0f, 1.0f, 1.0f));
+        CHECK(bbox1.getMin() == LLVector3(-1.0f, -2.0f, -3.0f));
+        CHECK(bbox1.getMax() == LLVector3(3.0f, 4.0f, 5.0f));
 
         bbox1.addPoint(LLVector3(0.0f, 0.0f, 0.0f));
         bbox1.addPoint(LLVector3(1.0f, 2.0f, 3.0f));
         bbox1.addPoint(LLVector3(2.0f, 2.0f, 2.0f));
 
-        ensure_equals("Custom BBox center (2)", bbox1.getCenter(), LLVector3(1.0f, 1.0f, 1.0f));
-        ensure_equals("Custom BBox min (2)", bbox1.getMin(), LLVector3(-1.0f, -2.0f, -3.0f));
-        ensure_equals("Custom BBox max (2)", bbox1.getMax(), LLVector3(3.0f, 4.0f, 5.0f));
+        CHECK(bbox1.getCenter() == LLVector3(1.0f, 1.0f, 1.0f));
+        CHECK(bbox1.getMin() == LLVector3(-1.0f, -2.0f, -3.0f));
+        CHECK(bbox1.getMax() == LLVector3(3.0f, 4.0f, 5.0f));
 
         bbox1.addPoint(LLVector3(5.0f, 5.0f, 5.0f));
 
-        ensure_equals("Custom BBox center (3)", bbox1.getCenter(), LLVector3(2.0f, 1.5f, 1.0f));
-        ensure_equals("Custom BBox min (3)", bbox1.getMin(), LLVector3(-1.0f, -2.0f, -3.0f));
-        ensure_equals("Custom BBox max (3)", bbox1.getMax(), LLVector3(5.0f, 5.0f, 5.0f));
+        CHECK(bbox1.getCenter() == LLVector3(2.0f, 1.5f, 1.0f));
+        CHECK(bbox1.getMin() == LLVector3(-1.0f, -2.0f, -3.0f));
+        CHECK(bbox1.getMax() == LLVector3(5.0f, 5.0f, 5.0f));
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE("LLBBoxLocal: addBBox grows the box to cover both boxes", "[LLBBoxLocal]")
     {
         //
         // test the addBBox() methods
@@ -190,19 +173,18 @@ namespace tut
         LLBBoxLocal bbox2(LLVector3(1.0f, 1.0f, 1.0f), LLVector3(2.0f, 2.0f, 2.0f));
         bbox2.addBBox(LLBBoxLocal(LLVector3(1.5f, 1.5f, 1.5f), LLVector3(3.0f, 3.0f, 3.0f)));
 
-        ensure_equals("Custom BBox center (4)", bbox2.getCenter(), LLVector3(2.0f, 2.0f, 2.0f));
-        ensure_equals("Custom BBox min (4)", bbox2.getMin(), LLVector3(1.0f, 1.0f, 1.0f));
-        ensure_equals("Custom BBox max (4)", bbox2.getMax(), LLVector3(3.0f, 3.0f, 3.0f));
+        CHECK(bbox2.getCenter() == LLVector3(2.0f, 2.0f, 2.0f));
+        CHECK(bbox2.getMin() == LLVector3(1.0f, 1.0f, 1.0f));
+        CHECK(bbox2.getMax() == LLVector3(3.0f, 3.0f, 3.0f));
 
         bbox2.addBBox(LLBBoxLocal(LLVector3(-1.0f, -1.0f, -1.0f), LLVector3(0.0f, 0.0f, 0.0f)));
 
-        ensure_equals("Custom BBox center (5)", bbox2.getCenter(), LLVector3(1.0f, 1.0f, 1.0f));
-        ensure_equals("Custom BBox min (5)", bbox2.getMin(), LLVector3(-1.0f, -1.0f, -1.0f));
-        ensure_equals("Custom BBox max (5)", bbox2.getMax(), LLVector3(3.0f, 3.0f, 3.0f));
+        CHECK(bbox2.getCenter() == LLVector3(1.0f, 1.0f, 1.0f));
+        CHECK(bbox2.getMin() == LLVector3(-1.0f, -1.0f, -1.0f));
+        CHECK(bbox2.getMax() == LLVector3(3.0f, 3.0f, 3.0f));
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE("LLBBoxLocal: expand by zero then a positive then a negative amount", "[LLBBoxLocal]")
     {
         //
         // test the expand() method
@@ -211,25 +193,25 @@ namespace tut
         LLBBoxLocal bbox1;
         bbox1.expand(0.0f);
 
-        ensure_equals("Zero-expanded Default BBox center", bbox1.getCenter(), LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getCenter() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBoxLocal bbox2(LLVector3(1.0f, 2.0f, 3.0f), LLVector3(3.0f, 4.0f, 5.0f));
         bbox2.expand(0.0f);
 
-        ensure_equals("Zero-expanded BBox center", bbox2.getCenter(), LLVector3(2.0f, 3.0f, 4.0f));
-        ensure_equals("Zero-expanded BBox min", bbox2.getMin(), LLVector3(1.0f, 2.0f, 3.0f));
-        ensure_equals("Zero-expanded BBox max", bbox2.getMax(), LLVector3(3.0f, 4.0f, 5.0f));
+        CHECK(bbox2.getCenter() == LLVector3(2.0f, 3.0f, 4.0f));
+        CHECK(bbox2.getMin() == LLVector3(1.0f, 2.0f, 3.0f));
+        CHECK(bbox2.getMax() == LLVector3(3.0f, 4.0f, 5.0f));
 
         bbox2.expand(0.5f);
 
-        ensure_equals("Positive-expanded BBox center", bbox2.getCenter(), LLVector3(2.0f, 3.0f, 4.0f));
-        ensure_equals("Positive-expanded BBox min", bbox2.getMin(), LLVector3(0.5f, 1.5f, 2.5f));
-        ensure_equals("Positive-expanded BBox max", bbox2.getMax(), LLVector3(3.5f, 4.5f, 5.5f));
+        CHECK(bbox2.getCenter() == LLVector3(2.0f, 3.0f, 4.0f));
+        CHECK(bbox2.getMin() == LLVector3(0.5f, 1.5f, 2.5f));
+        CHECK(bbox2.getMax() == LLVector3(3.5f, 4.5f, 5.5f));
 
         bbox2.expand(-1.0f);
 
-        ensure_equals("Negative-expanded BBox center", bbox2.getCenter(), LLVector3(2.0f, 3.0f, 4.0f));
-        ensure_equals("Negative-expanded BBox min", bbox2.getMin(), LLVector3(1.5f, 2.5f, 3.5f));
-        ensure_equals("Negative-expanded BBox max", bbox2.getMax(), LLVector3(2.5f, 3.5f, 4.5f));
+        CHECK(bbox2.getCenter() == LLVector3(2.0f, 3.0f, 4.0f));
+        CHECK(bbox2.getMin() == LLVector3(1.5f, 2.5f, 3.5f));
+        CHECK(bbox2.getMax() == LLVector3(2.5f, 3.5f, 4.5f));
     }
 }

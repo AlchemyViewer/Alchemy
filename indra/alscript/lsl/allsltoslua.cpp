@@ -245,6 +245,17 @@ namespace
         return RESERVED.contains(name);
     }
 
+    // An LSL name as a Luau one: one Luau or SLua holds for its own with a
+    // mark after it.
+    std::string luauName(std::string name)
+    {
+        while (reservedName(name))
+        {
+            name += "_";
+        }
+        return name;
+    }
+
     // SLua's events that hand their handler the detected table in place of
     // LSL's count.
     bool detectedEvent(std::string_view name)
@@ -432,6 +443,15 @@ namespace
         std::string nameOf(LSLIdentifier* id);
         std::string nameOf(const char* lsl);
         std::string stateKey(const std::string& state) const;
+        // A fresh name, before anything is written, for each of the
+        // script's own whose Luau name would mean another than LSL's did: a
+        // global whose mark gave it another's name (print as print_ beside
+        // a print_), and a local -- a parameter, a declaration -- in whose
+        // reach the script names a function or a variable that has its
+        // Luau name. LSL kept its functions apart from its variables, so
+        // f2() beside a parameter f2 called the function, where Luau's
+        // parameter hides it.
+        void nameApart();
 
         // --- the text ---------------------------------------------------------------
 
@@ -691,9 +711,10 @@ namespace
         void statement(LSLASTNode* s, bool last);
         void statementBody(LSLASTNode* s, bool last);
         void block(LSLASTNode* s);
-        // A blank line over a statement or a global, where the LSL had one
-        // or more between it and the one written before it, which grouped
-        // them: one, and not where nothing has been written since `opened`
+        // A blank line over a statement, a global or a handler in a state's
+        // table, where the LSL had one or more between it and the one
+        // written before it, which grouped them: one, and not where nothing
+        // has been written since `opened`
         // -- a block's start -- nor where a comment over it keeps the
         // blank line over itself (Comment::apart).
         void keepApart(LSLASTNode* before, LSLASTNode* node, size_t opened);
@@ -773,11 +794,18 @@ namespace
 
         // --- LSL's order ----------------------------------------------------------------
 
-        // Whether a binary's sides run the other way round could do or give
-        // something else: one changes what the other reads, or both do
-        // something past the script. LSL ran the right side first, and Luau
-        // runs the left.
-        bool orderMatters(LSLExpression* lhs, LSLExpression* rhs) const;
+        // Why a binary's sides run the other way round could do or give
+        // something else, where they could: one changes what the other
+        // reads, or both reach past the script and one of them changes
+        // something there. LSL ran the right side first, and Luau runs the
+        // left. The note that says so, naming what does it, and its words.
+        struct Order
+        {
+            const char*              key = nullptr;
+            const char*              english = nullptr;
+            std::vector<std::string> args;
+        };
+        Order orderMatters(LSLExpression* lhs, LSLExpression* rhs) const;
         // l = (l = []) + l + ..., which spared LSO's memory by clearing l
         // after LSL, going right to left, had read it: the clearing taken
         // out of the tree, since Luau would clear it first, and what is left
@@ -886,6 +914,13 @@ namespace
         // Whether listItem writes a call as an index into its list: its
         // items already what is asked for.
         bool listItemFits(LSLFunctionExpression* e);
+        // llList2Key where keys are held as text: its item read as text, as
+        // LSL gave it -- a string's, a key's -- where SLua's List2Key
+        // answers NULL_KEY for text that is no UUID.
+        bool textKeyItem(LSLFunctionExpression* e) const
+        {
+            return !mOptions.uuidKeys && std::string_view(e->getIdentifier()->getName()) == "llList2Key";
+        }
 
         // --- keys that hold text -----------------------------------------------------
 
@@ -893,7 +928,8 @@ namespace
         // that is no UUID. The event parameters SLua passes as text --
         // link_message's id -- and the key variables given text that is no
         // UUID, or such a parameter, or another such, which SLua holds as
-        // strings.
+        // strings; and a key that may hold any text -- given a string --
+        // given on to one of those.
         void findTextKeys();
         // An expression's type as SLua has it: LSL's, but a key for the
         // constants SLua types a uuid, and a string for those above.
@@ -902,6 +938,17 @@ namespace
         LSLIType varType(LSLSymbol* var, LSLIType lsl) const
         {
             return var && (mTextKeys.contains(var) || mTextParams.contains(var)) ? LST_STRING : lsl;
+        }
+        // What an item of a list is written as: as LSL typed it -- NULL_KEY
+        // in a list is LSL's string -- but a key SLua holds as text kept
+        // text, which uuid() would stop the script on where it is no UUID.
+        LSLIType itemType(LSLExpression* e) const { return e->getIType() == LST_KEY && slType(e) == LST_STRING ? LST_STRING : e->getIType(); }
+        // What a function of the script's own gives, as SLua holds it: a
+        // key as text where the script's keys are.
+        LSLIType givenType(LSLSymbol* function) const
+        {
+            const LSLIType lsl = function ? function->getIType() : LST_NULL;
+            return lsl == LST_KEY && !mOptions.uuidKeys ? LST_STRING : lsl;
         }
 
         // x = x op y, which Luau writes x op= y: the compound operator and
@@ -1018,6 +1065,8 @@ namespace
         boost::unordered_flat_map<LSLSymbol*, std::string>    mEach;
         std::vector<std::string>                              mItemNames;
         std::string                                           mUnread;
+        // What a step inside an expression was, made once.
+        std::string                                           mWas;
         boost::unordered_flat_map<LSLSymbol*, U8>             mListTypes;
         boost::unordered_flat_set<LSLSymbol*>                 mLoopOnly;
         boost::unordered_flat_set<LSLSymbol*>                 mBooleans;
@@ -1130,17 +1179,113 @@ namespace
 
     std::string Writer::nameOf(const char* lsl)
     {
-        // A name Luau or SLua holds for its own, with a mark after it.
-        std::string name = lsl ? lsl : "";
-        while (reservedName(name))
-        {
-            name += "_";
-        }
+        std::string name = luauName(lsl ? lsl : "");
         if (lsl)
         {
             sameAs(lsl, name);
         }
         return name;
+    }
+
+    void Writer::nameApart()
+    {
+        takeNames();
+        const auto luau = [this](LSLSymbol* symbol) {
+            const auto found = mNames.find(symbol);
+            return found != mNames.end() ? found->second : luauName(symbol->getName());
+        };
+        const auto rename = [this](LSLSymbol* symbol) {
+            const std::string fresh = freshName(std::string(symbol->getName()) + "_");
+            mNames[symbol]          = fresh;
+            sameAs(symbol->getName(), fresh);
+            return fresh;
+        };
+        // The globals, each its own name: the script's as it wrote it, and a
+        // marked one where that is no other's.
+        boost::unordered_flat_set<std::string> globals;
+        std::vector<LSLSymbol*>                marks;
+        for (LSLASTNode* g = mScript->getGlobals()->getChild(0); g; g = g->getNext())
+        {
+            if (LSLSymbol* symbol = g->getSymbol(); symbol && luau(symbol) == symbol->getName())
+            {
+                globals.insert(symbol->getName());
+            }
+            else if (symbol)
+            {
+                marks.push_back(symbol);
+            }
+        }
+        for (LSLSymbol* symbol : marks)
+        {
+            if (!globals.insert(luau(symbol)).second)
+            {
+                globals.insert(rename(symbol));
+            }
+        }
+        // Each local against what its reach names but what is declared in
+        // it, which hides it there in Luau as in LSL: the outer first, whose
+        // names those inside them are held to.
+        const auto apart = [&](LSLIdentifier* id, const std::vector<LSLASTNode*>& reach) {
+            LSLSymbol* local = id ? id->getSymbol() : nullptr;
+            if (!local)
+            {
+                return;
+            }
+            const std::string                     name = luau(local);
+            boost::unordered_flat_set<LSLSymbol*> inside;
+            bool                                  hides = false;
+            for (LSLASTNode* root : reach)
+            {
+                walk(root, [&](LSLASTNode* node) {
+                    if (node->getNodeSubType() == NODE_DECLARATION)
+                    {
+                        inside.insert(node->getSymbol());
+                    }
+                });
+            }
+            for (LSLASTNode* root : reach)
+            {
+                walk(root, [&](LSLASTNode* node) {
+                    LSLSymbol* named = node->getNodeType() == NODE_IDENTIFIER ? static_cast<LSLIdentifier*>(node)->getSymbol() : nullptr;
+                    hides = hides || (named && named != local && !inside.contains(named) && named->getSubType() != SYM_BUILTIN &&
+                                      (named->getSymbolType() == SYM_VARIABLE || named->getSymbolType() == SYM_FUNCTION) && luau(named) == name);
+                });
+            }
+            if (hides)
+            {
+                rename(local);
+            }
+        };
+        walk(mScript, [&](LSLASTNode* node) {
+            // A parameter's reach is its body; a declaration's, what follows
+            // it in its block.
+            LSLASTNode* params = nullptr;
+            LSLASTNode* body   = nullptr;
+            if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
+            {
+                params = static_cast<LSLGlobalFunction*>(node)->getArguments();
+                body   = static_cast<LSLGlobalFunction*>(node)->getStatements();
+            }
+            else if (node->getNodeType() == NODE_EVENT_HANDLER)
+            {
+                params = static_cast<LSLEventHandler*>(node)->getArguments();
+                body   = static_cast<LSLEventHandler*>(node)->getStatements();
+            }
+            else if (node->getNodeSubType() == NODE_DECLARATION)
+            {
+                std::vector<LSLASTNode*> after;
+                for (LSLASTNode* next = node->getNext(); next; next = next->getNext())
+                {
+                    after.push_back(next);
+                }
+                apart(static_cast<LSLDeclaration*>(node)->getIdentifier(), after);
+                return;
+            }
+            for (LSLASTNode* p = isNull(params) ? nullptr : params->getChild(0); p; p = p->getNext())
+            {
+                apart(static_cast<LSLIdentifier*>(p), { body });
+            }
+        });
     }
 
     void Writer::sameAs(std::string_view lsl, std::string_view slua)
@@ -2346,7 +2491,14 @@ namespace
             case LST_INTEGER:
             case LST_FLOATINGPOINT: return { bracketed(out, COMPARE + 1) + " ~= 0", COMPARE, true };
             case LST_STRING: return { bracketed(out, COMPARE + 1) + " ~= \"\"", COMPARE, true };
-            case LST_KEY: return { bracketed(out, PRIMARY) + ".istruthy", PRIMARY, true };
+            case LST_KEY:
+                // A key SLua holds as text -- link_message's id, one given
+                // text -- a uuid made of it first, none where it is no UUID.
+                if (slType(e) == LST_STRING)
+                {
+                    return { "(touuid(" + out.text + ") or NULL_KEY).istruthy", PRIMARY, true };
+                }
+                return { bracketed(out, PRIMARY) + ".istruthy", PRIMARY, true };
             case LST_VECTOR: return { bracketed(out, COMPARE + 1) + " ~= ZERO_VECTOR", COMPARE, true };
             case LST_QUATERNION: return { bracketed(out, COMPARE + 1) + " ~= ZERO_ROTATION", COMPARE, true };
             case LST_LIST: return { "#" + bracketed(out, UNARY) + " > 0", COMPARE, true };
@@ -2521,6 +2673,13 @@ namespace
         if (slType(given) != LST_STRING || uuid)
         {
             return coerced(given, LST_KEY).text;
+        }
+        if (!mOptions.keyTextAny)
+        {
+            noteOnce(given, "SluaKeyAsTextBare",
+                     "SLua's ll takes a key as text, as LSL's functions did, so text is given as it is, though the type checker asks for a "
+                     "uuid: `:: any` quiets it, uuid() stops the script on text that is no UUID, and touuid() gives nil for it.");
+            return value(given).text;
         }
         noteOnce(given, "SluaKeyAsText",
                  "SLua's ll takes a key as text, as LSL's functions did, so text is given as it is; `:: any` tells the type checker, which "
@@ -3277,7 +3436,7 @@ namespace
                     gathered.push_back({ rule->key, fields.size(), one });
                     break;
                 }
-                default: text = coerced(v, v->getIType()).text; break;
+                default: text = coerced(v, itemType(v)).text; break;
             }
             sameAs(rule->constant, rule->key);
             fields.push_back(std::string(rule->key) + " = " + text);
@@ -3533,8 +3692,8 @@ namespace
         {
             return { nameOf(id) + "(" + args(e->getArguments(), params) + ")", PRIMARY, boolean(symbol) };
         }
-        const std::string lsl  = id->getName();
-        const std::string bare = lsl.rfind("ll", 0) == 0 ? lsl.substr(2) : lsl;
+        std::string lsl  = id->getName();
+        std::string bare = lsl.rfind("ll", 0) == 0 ? lsl.substr(2) : lsl;
         // A list's length is its length.
         if (lsl == "llGetListLength")
         {
@@ -3562,6 +3721,20 @@ namespace
             {
                 return *written;
             }
+        }
+        // llList2Key's item as text, where keys are held as text: as
+        // List2String reads it, which differs only for an item neither a
+        // string nor a key.
+        if (textKeyItem(e))
+        {
+            if ((itemTypes(argumentAt(e, 0)) & ~(ItemString | ItemKey)) != 0)
+            {
+                noteOnce(e, "SluaList2KeyText",
+                         "Keys are held as text, so llList2Key's item is read as List2String reads it, as LSL gave it, where SLua's "
+                         "List2Key answers NULL_KEY for text that is no UUID; a number's or a vector's text is given, where LSL gave \"\".");
+            }
+            lsl  = "llList2String";
+            bare = "List2String";
         }
         const ALLSLTraits::Trait* trait   = ALLSLTraits::of(lsl.c_str());
         const U8                  slua    = trait ? trait->slua : 0;
@@ -3790,10 +3963,12 @@ namespace
         const bool assigns = op == OP_ASSIGN || op == OP_ADD_ASSIGN || op == OP_SUB_ASSIGN || op == OP_MUL_ASSIGN || op == OP_DIV_ASSIGN ||
                              op == OP_MOD_ASSIGN;
         const bool andOr = op == OP_BOOLEAN_AND || op == OP_BOOLEAN_OR;
-        if (!assigns && !(andOr && !ALLSLTraits::sideEffectFree(rhs)) && orderMatters(lhs, rhs))
+        if (!assigns && !(andOr && !ALLSLTraits::sideEffectFree(rhs)))
         {
-            note(e, "SluaRightFirst",
-                 "LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.");
+            if (Order order = orderMatters(lhs, rhs); order.key)
+            {
+                note(e, order.key, order.english, std::move(order.args));
+            }
         }
         const auto bit = [&](const char* fn) -> Expr {
             // bit32 answers 0 to 4294967295, where LSL's integers were signed:
@@ -3946,7 +4121,27 @@ namespace
                 }
                 if ((lt == LST_KEY && rt == LST_STRING) || (lt == LST_STRING && rt == LST_KEY))
                 {
-                    // A key against a string, as LSL compares them: as text.
+                    // A key against no text, or a UUID, written out: as
+                    // uuids, the text made one as a key given it was. A key
+                    // given no text is NULL_KEY, whose text is not "". Not
+                    // NULL_KEY and the constants like it, which LSL had as
+                    // their text, and compared as text.
+                    LSLExpression* text = unbracketed(lt == LST_STRING ? lhs : rhs);
+                    LSLExpression* key  = lt == LST_KEY ? lhs : rhs;
+                    if (key->getIType() == LST_KEY && text && text->getNodeSubType() == NODE_CONSTANT_EXPRESSION &&
+                        text->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
+                    {
+                        const std::string_view written = static_cast<LSLStringConstant*>(text->getChild(0))->getValue();
+                        if (written.empty() || ALLSLTraits::isUuid(written))
+                        {
+                            const Expr a = coerced(lhs, LST_KEY);
+                            const Expr b = coerced(rhs, LST_KEY);
+                            return { bracketed(a, COMPARE) + (eq ? " == " : " ~= ") + bracketed(b, COMPARE + 1), COMPARE, true };
+                        }
+                    }
+                    // Against any other text, as LSL compares them: as text.
+                    // Made a uuid, text that is no UUID would stop the
+                    // script, and a uuid holds none.
                     const Expr a = coerced(lhs, LST_STRING);
                     const Expr b = coerced(rhs, LST_STRING);
                     return { bracketed(a, COMPARE) + (eq ? " == " : " ~= ") + bracketed(b, COMPARE + 1), COMPARE, true };
@@ -4052,6 +4247,12 @@ namespace
         const LSLIType to    = e->getIType();
         const LSLIType from  = slType(child);
         const Expr     v     = value(child);
+        if (to == LST_KEY && !mOptions.uuidKeys)
+        {
+            // A key held as text, as LSL's was: text as it is, a uuid made
+            // text.
+            return from == LST_KEY ? Expr{ "tostring(" + v.text + ")" } : v;
+        }
         if (to == from)
         {
             return v;
@@ -4153,9 +4354,13 @@ namespace
             target = static_cast<LSLLValueExpression*>(static_cast<LSLBinaryExpression*>(e)->getLHS());
         }
         const std::string name = lvalue(target).text;
+        if (post && mWas.empty())
+        {
+            mWas = freshName("was");
+        }
         if (post)
         {
-            mText += "local was = " + name + "; ";
+            mText += "local " + mWas + " = " + name + "; ";
         }
         effect(e);
         std::string made = mText;
@@ -4167,7 +4372,7 @@ namespace
         mText   = saved;
         mDepth  = depth;
         mInline = inline_;
-        return { "(function() " + made + " return " + (post ? "was" : name) + " end)()" };
+        return { "(function() " + made + " return " + (post ? mWas : name) + " end)()" };
     }
 
     Expr Writer::expr(LSLExpression* e)
@@ -4213,9 +4418,8 @@ namespace
                 std::string out;
                 for (LSLASTNode* item = e->getChild(0); item; item = item->getNext())
                 {
-                    // As LSL typed it: NULL_KEY in a list is LSL's string.
                     auto* each = static_cast<LSLExpression*>(item);
-                    out += (out.empty() ? "" : ", ") + coerced(each, each->getIType()).text;
+                    out += (out.empty() ? "" : ", ") + coerced(each, itemType(each)).text;
                 }
                 return { braced(out) };
             }
@@ -4295,8 +4499,7 @@ namespace
                 out += ",";
             }
             to(begins(item), listIndent(0), i > 0 || mOptions.braceSpaces);
-            // As LSL typed it: NULL_KEY in a list is LSL's string.
-            out += coerced(item, item->getIType()).text;
+            out += coerced(item, itemType(item)).text;
             line = item->getLoc()->last_line;
         }
         to(close, listIndent(-1), mOptions.braceSpaces);
@@ -4940,7 +5143,7 @@ namespace
                 // LSL's string.
                 const std::string given = isNull(e)             ? std::string()
                                           : boolean(mFunction) ? truthOf(e)
-                                          : mFunction          ? coerced(e, mFunction->getIType()).text
+                                          : mFunction          ? coerced(e, givenType(mFunction)).text
                                                                : value(e).text;
                 const std::string said  = isNull(e) ? "return" : "return " + given;
                 line(last ? said : "do " + said + " end");
@@ -5970,36 +6173,117 @@ namespace
 
     // --- LSL's order -------------------------------------------------------------------
 
-    bool Writer::orderMatters(LSLExpression* lhs, LSLExpression* rhs) const
+    Writer::Order Writer::orderMatters(LSLExpression* lhs, LSLExpression* rhs) const
     {
         const ALLSLEffects::Writes left  = mEffects.of(lhs);
         const ALLSLEffects::Writes right = mEffects.of(rhs);
-        // Both past the script, where either may change something there.
-        if (left.impure && right.impure && !(ALLSLTraits::changesNothing(lhs) && ALLSLTraits::changesNothing(rhs)))
-        {
-            return true;
-        }
-        // What one side sets, the other reads, or a function of the
-        // script's that it calls may.
-        const auto sees = [](const ALLSLEffects::Writes& w, LSLExpression* other) {
-            if (w.variables.empty())
-            {
-                return false;
-            }
-            bool seen = false;
-            walk(other, [&](LSLASTNode* node) {
-                if (node->getNodeSubType() == NODE_LVALUE_EXPRESSION)
-                {
-                    seen = seen || w.writes(static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol());
-                }
-                else if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(node))
-                {
-                    seen = true;
-                }
-            });
-            return seen;
+        // A call by its LSL name, as the note says it.
+        const auto callName = [](LSLASTNode* call) {
+            return std::string(static_cast<LSLFunctionExpression*>(call)->getIdentifier()->getName()) + "()";
         };
-        return sees(left, rhs) || sees(right, lhs);
+        // The first call on a side that reaches past the script, one that
+        // changes something there where `changing`.
+        const auto reaching = [&](LSLExpression* side, bool changing) -> LSLASTNode* {
+            LSLASTNode* found = nullptr;
+            walk(side, [&](LSLASTNode* node) {
+                LSLSymbol* callee = !found && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION
+                                        ? static_cast<LSLFunctionExpression*>(node)->getIdentifier()->getSymbol()
+                                        : nullptr;
+                if (!callee)
+                {
+                    return;
+                }
+                if (callee->getSubType() == SYM_BUILTIN)
+                {
+                    const ALLSLTraits::Trait* t = ALLSLTraits::of(callee->getName());
+                    found = (!t || !t->pure) && (!changing || !t || !t->mustUse) ? node : nullptr;
+                    return;
+                }
+                const ALLSLEffects::Writes& theirs = mEffects.ofFunction(callee);
+                found = theirs.impure && (!changing || theirs.changes) ? node : nullptr;
+            });
+            return found;
+        };
+        // Both past the script, where either changes something there: the
+        // one that changes it, and the other's.
+        if (left.impure && right.impure && (left.changes || right.changes))
+        {
+            LSLASTNode* changer = left.changes ? reaching(lhs, true) : reaching(rhs, true);
+            LSLASTNode* other   = left.changes ? reaching(rhs, false) : reaching(lhs, false);
+            if (changer && other)
+            {
+                return { "SluaRightFirstWorld",
+                         "LSL ran the right side of this before the left, and Luau runs the left first: [1] may change what [2] does or "
+                         "finds outside the script.",
+                         { callName(changer), callName(other) } };
+            }
+            return { "SluaRightFirst", "LSL ran the right side of this before the left, and Luau runs the left first: one side changes "
+                                       "what the other reads." };
+        }
+        // What one side sets, the other reads or sets too: itself, or
+        // through a function of the script's it calls.
+        const auto meets = [&](const ALLSLEffects::Writes& w, LSLExpression* side, LSLExpression* other) -> std::optional<Order> {
+            const ALLSLEffects::Writes theirs = mEffects.of(other);
+            for (LSLSymbol* var : w.variables)
+            {
+                bool named = theirs.writes(var);
+                walk(other, [&](LSLASTNode* node) {
+                    if (named)
+                    {
+                        return;
+                    }
+                    if (node->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+                    {
+                        named = static_cast<LSLLValueExpression*>(node)->getIdentifier()->getSymbol() == var;
+                    }
+                    else if (LSLSymbol* callee = readOf(node); callee && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+                    {
+                        named = mEffects.reads(callee, var);
+                    }
+                });
+                if (!named)
+                {
+                    continue;
+                }
+                // Set on its own side directly, or by a call there.
+                LSLASTNode* call = nullptr;
+                bool        set  = false;
+                walk(side, [&](LSLASTNode* node) {
+                    if (node->getNodeType() == NODE_EXPRESSION && operation_mutates(static_cast<LSLExpression*>(node)->getOperation()) &&
+                        node->getChild(0) && node->getChild(0)->getNodeSubType() == NODE_LVALUE_EXPRESSION &&
+                        static_cast<LSLLValueExpression*>(node->getChild(0))->getIdentifier()->getSymbol() == var)
+                    {
+                        set = true;
+                    }
+                    else if (LSLSymbol* callee = !call ? readOf(node) : nullptr;
+                             callee && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION && mEffects.ofFunction(callee).writes(var))
+                    {
+                        call = node;
+                    }
+                });
+                if (set || !call)
+                {
+                    return Order{ "SluaRightFirstSet",
+                                  "LSL ran the right side of this before the left, and Luau runs the left first: [1] is set on one side and "
+                                  "read or set on the other.",
+                                  { var->getName() } };
+                }
+                return Order{ "SluaRightFirstCall",
+                              "LSL ran the right side of this before the left, and Luau runs the left first: [1] sets [2], which the other "
+                              "side reads or sets too.",
+                              { callName(call), var->getName() } };
+            }
+            return std::nullopt;
+        };
+        if (std::optional<Order> found = meets(left, lhs, rhs))
+        {
+            return *found;
+        }
+        if (std::optional<Order> found = meets(right, rhs, lhs))
+        {
+            return *found;
+        }
+        return {};
     }
 
     namespace
@@ -6132,13 +6416,12 @@ namespace
 
     std::string Writer::itemText(LSLASTNode* item)
     {
-        // As LSL typed it: NULL_KEY in a list is LSL's string.
         if (item->getNodeType() == NODE_CONSTANT)
         {
             return constant(static_cast<LSLConstant*>(item)).text;
         }
         auto* e = static_cast<LSLExpression*>(item);
-        return coerced(e, e->getIType()).text;
+        return coerced(e, itemType(e)).text;
     }
 
     Shared Writer::handedOn(LSLASTNode* read) const
@@ -7078,14 +7361,16 @@ namespace
             { "llList2Vector", { ItemVector, 0 } },
             { "llList2Rot", { ItemRotation, 0 } },
         };
+        static const std::pair<U8, U8> TEXT_KEY = { ItemString, ItemString | ItemKey };
         const auto fits = FITS.find(std::string_view(e->getIdentifier()->getName()));
         LSLExpression* list = argumentAt(e, 0);
         if (!mOptions.idioms || fits == FITS.end() || !wholeVariable(list))
         {
             return false;
         }
-        const U8 types = itemTypes(list);
-        return (types & ~fits->second.first) == 0 || (types & ~fits->second.second) == 0;
+        const std::pair<U8, U8>& fit   = textKeyItem(e) ? TEXT_KEY : fits->second;
+        const U8                 types = itemTypes(list);
+        return (types & ~fit.first) == 0 || (types & ~fit.second) == 0;
     }
 
     std::optional<Expr> Writer::listItem(LSLFunctionExpression* e, const std::string& lsl)
@@ -7106,17 +7391,19 @@ namespace
             { "llList2Vector", { ItemVector, 0, "ZERO_VECTOR" } },
             { "llList2Rot", { ItemRotation, 0, "ZERO_ROTATION" } },
         };
-        const auto kind = KINDS.find(lsl);
-        if (kind == KINDS.end())
+        static const Kind TEXT_KEY = { ItemString, ItemString | ItemKey, "\"\"" };
+        const auto        named    = KINDS.find(lsl);
+        if (named == KINDS.end())
         {
             return std::nullopt;
         }
+        const Kind& kind = textKeyItem(e) ? TEXT_KEY : named->second;
         LSLExpression* list  = argumentAt(e, 0);
         LSLExpression* index = argumentAt(e, 1);
         LSLSymbol*     var   = wholeVariable(list);
         const U8       types = var ? itemTypes(list) : ItemAny;
-        const bool     as_is = (types & ~kind->second.as_is) == 0;
-        if (!var || (!as_is && (types & ~kind->second.as_text) != 0))
+        const bool     as_is = (types & ~kind.as_is) == 0;
+        if (!var || (!as_is && (types & ~kind.as_text) != 0))
         {
             return std::nullopt;
         }
@@ -7143,7 +7430,7 @@ namespace
         // And where its loop walks the list's items, the item by name.
         const auto        walked  = found ? mEach.find(counter) : mEach.end();
         const std::string item    = walked != mEach.end() ? walked->second : name + "[" + at + "]";
-        const Expr        read    = found ? Expr{ item } : Expr{ item + " or " + kind->second.empty, OR };
+        const Expr        read    = found ? Expr{ item } : Expr{ item + " or " + kind.empty, OR };
         return as_is ? read : Expr{ "tostring(" + read.text + ")" };
     }
 
@@ -7156,6 +7443,15 @@ namespace
             return LST_KEY;
         }
         LSLExpression* inner = unbracketed(e);
+        // Where the script's keys are held as text: a cast to a key, a call
+        // of its own that gives one, and llList2Key's item (textKeyItem).
+        if (!mOptions.uuidKeys && inner && e->getIType() == LST_KEY &&
+            (inner->getNodeSubType() == NODE_TYPECAST_EXPRESSION ||
+             (inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+              (readOf(inner) || textKeyItem(static_cast<LSLFunctionExpression*>(inner))))))
+        {
+            return LST_STRING;
+        }
         if (inner && inner->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(static_cast<LSLLValueExpression*>(inner)->getMember()))
         {
             return varType(static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol(), e->getIType());
@@ -7165,6 +7461,17 @@ namespace
 
     void Writer::findTextKeys()
     {
+        // Every key of the script's own, where they are held as text.
+        if (!mOptions.uuidKeys)
+        {
+            walk(mScript, [&](LSLASTNode* node) {
+                LSLSymbol* symbol = node->getNodeType() == NODE_IDENTIFIER ? static_cast<LSLIdentifier*>(node)->getSymbol() : nullptr;
+                if (symbol && symbol->getSymbolType() == SYM_VARIABLE && symbol->getSubType() != SYM_BUILTIN && symbol->getIType() == LST_KEY)
+                {
+                    mTextKeys.insert(symbol);
+                }
+            });
+        }
         walk(mScript, [&](LSLASTNode* node) {
             if (node->getNodeType() != NODE_EVENT_HANDLER)
             {
@@ -7240,7 +7547,7 @@ namespace
             if (e && e->getNodeSubType() == NODE_CONSTANT_EXPRESSION && e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT)
             {
                 const std::string_view value = static_cast<LSLStringConstant*>(e->getChild(0))->getValue();
-                return !value.empty() && !ALLSLTraits::isUuid(value);
+                return !ALLSLTraits::isUuid(value);
             }
             if (e && e->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
             {
@@ -7248,6 +7555,33 @@ namespace
                 return mTextParams.contains(var) || mTextKeys.contains(var);
             }
             return false;
+        };
+        // A key variable, as given whole.
+        const auto keyVar = [](LSLExpression* e) -> LSLSymbol* {
+            e = unbracketed(e);
+            if (!e || e->getIType() != LST_KEY || e->getNodeSubType() != NODE_LVALUE_EXPRESSION ||
+                !isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
+            {
+                return nullptr;
+            }
+            LSLSymbol* var = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
+            return var && var->getSubType() != SYM_BUILTIN ? var : nullptr;
+        };
+        // The keys that may hold any text: given a string that is no UUID
+        // written out -- a variable's, a call's -- or given such a key.
+        // Given on to a key held as text, uuid() would have made "" NULL_KEY
+        // on the way, so such a key holds text too.
+        boost::unordered_flat_set<LSLSymbol*> loose;
+        const auto loosely = [&](LSLExpression* e) {
+            e = unbracketed(e);
+            if (e && e->getIType() == LST_STRING)
+            {
+                return !uuidConstant(e) && !(e->getNodeSubType() == NODE_CONSTANT_EXPRESSION &&
+                                             e->getChild(0)->getNodeSubType() == NODE_STRING_CONSTANT &&
+                                             ALLSLTraits::isUuid(static_cast<LSLStringConstant*>(e->getChild(0))->getValue()));
+            }
+            LSLSymbol* var = keyVar(e);
+            return var && loose.contains(var);
         };
         for (bool changed = true; changed;)
         {
@@ -7257,6 +7591,16 @@ namespace
                 if (!mTextKeys.contains(var) && text(e))
                 {
                     mTextKeys.insert(var);
+                    changed = true;
+                }
+                if (!loose.contains(var) && loosely(e))
+                {
+                    loose.insert(var);
+                    changed = true;
+                }
+                if (LSLSymbol* from = keyVar(e); from && mTextKeys.contains(var) && loose.contains(from) && !mTextKeys.contains(from))
+                {
+                    mTextKeys.insert(from);
                     changed = true;
                 }
             }
@@ -7363,7 +7707,7 @@ namespace
             mFunction = f->getSymbol();
             commentsBefore(f);
             line(std::string(forward.contains(mFunction) ? "function " : "local function ") + nameOf(f->getIdentifier()) + "(" + params + ")" +
-                 (boolean(mFunction) ? std::string(mOptions.types ? ": boolean" : "") : typed(f->getIdentifier()->getIType())));
+                 (boolean(mFunction) ? std::string(mOptions.types ? ": boolean" : "") : typed(givenType(mFunction))));
             trail(f->getStatements());
             ++mDepth;
             prepareBody(f->getStatements());
@@ -7638,12 +7982,17 @@ namespace
             commentsBefore(state);
             line("states" + stateKey(name) + " = {");
             ++mDepth;
+            const size_t opened = mText.size();
+            LSLASTNode*  before = nullptr;
             for (LSLASTNode* h = state->getEventHandlers()->getChild(0); h; h = h->getNext())
             {
                 auto*             handler = static_cast<LSLEventHandler*>(h);
                 const std::string event   = handler->getIdentifier()->getName();
                 std::vector<std::string> lead;
                 const std::string        params = handlerParams(handler, lead);
+                // Apart from the one before it where the LSL had them so.
+                keepApart(before, handler, opened);
+                before = handler;
                 commentsBefore(handler);
                 if (event == "timer" && !mTimers)
                 {
@@ -7776,6 +8125,7 @@ end
         mTimeBase   = resets && mOptions.sluaCalls;
         mCompatTime = resets && !mOptions.sluaCalls;
         forgetMemoryHacks();
+        nameApart();
         findTextKeys();
         findListTypes();
         findBooleans();

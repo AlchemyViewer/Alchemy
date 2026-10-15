@@ -27,7 +27,7 @@
 #include "../alscriptanalysislane.h"
 #include "../alscriptanalyzers.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "Luau/Cancellation.h"
 
@@ -38,8 +38,6 @@
 #include <mutex>
 #include <thread>
 
-namespace tut
-{
 namespace
 {
     // What the lanes answered, in the order they did, from their threads.
@@ -151,7 +149,6 @@ namespace
         bool                  mStops   = false;
         bool                  mStopped = false;
     };
-} // anonymous namespace
 
     struct alscriptanalysislane_data
     {
@@ -187,121 +184,123 @@ namespace
         }
     };
 
-    typedef test_group<alscriptanalysislane_data> alscriptanalysislane_group;
-    typedef alscriptanalysislane_group::object    alscriptanalysislane_object;
-    alscriptanalysislane_group                    alscriptanalysislane_instance("alscriptanalysislane");
-
-    template<> template<>
-    void alscriptanalysislane_object::test<1>()
+    TEST_CASE_METHOD(alscriptanalysislane_data, "alscriptanalysislane: a long check on one lane holds up nothing on the other", "[alscriptanalysislane]")
     {
-        set_test_name("a long check on one lane holds nothing of the other's: each engine its own thread and queue");
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, false); }, main());
         ALScriptAnalysisLane lsl("TestLSL", [gate] { return std::make_unique<Held>(gate, false); }, main());
-        ensure("taken", post(luau, job("slow", ALScriptAnalysis::Kind::Check, true)));
-        ensure("held", gate->waitEntered());
-        ensure("taken too", post(lsl, job("other", ALScriptAnalysis::Kind::Hover, true)));
-        ensure("the other lane's question answered while the check is held", answers.waitFor(1));
-        ensure_equals("it alone", answers.all(), std::string("other/2"));
+        CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, true)));
+        CHECK(gate->waitEntered());
+        CHECK(post(lsl, job("other", ALScriptAnalysis::Kind::Hover, true)));
+        UNSCOPED_INFO("the other lane's question answered while the check is held");
+        CHECK(answers.waitFor(1));
+        CHECK(answers.all() == std::string("other/2"));
         gate->release();
-        ensure("then the check", answers.waitFor(2));
-        ensure_equals("in that order", answers.all(), std::string("other/2 slow/0"));
+        UNSCOPED_INFO("then the check");
+        CHECK(answers.waitFor(2));
+        CHECK(answers.all() == std::string("other/2 slow/0"));
         luau.close();
         lsl.close();
-        ensure("closed: refused", !post(luau, job("late", ALScriptAnalysis::Kind::Hover, true)));
+        UNSCOPED_INFO("closed: refused");
+        CHECK_FALSE(post(luau, job("late", ALScriptAnalysis::Kind::Hover, true)));
     }
 
-    template<> template<>
-    void alscriptanalysislane_object::test<2>()
+    TEST_CASE_METHOD(alscriptanalysislane_data, "alscriptanalysislane: another tab's check gives way to the front tab's question and reruns", "[alscriptanalysislane]")
     {
-        set_test_name("another tab's check gives way to a question of the tab in front, waits again behind it, and answers after");
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        ensure("taken", post(luau, job("slow", ALScriptAnalysis::Kind::Check, false)));
-        ensure("held", gate->waitEntered());
-        ensure("asked", post(luau, job("front", ALScriptAnalysis::Kind::Complete, true)));
-        ensure("both answered", answers.waitFor(2));
-        ensure_equals("the question first, then the check, run again", answers.all(), std::string("front/1 slow/0"));
+        CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, false)));
+        CHECK(gate->waitEntered());
+        CHECK(post(luau, job("front", ALScriptAnalysis::Kind::Complete, true)));
+        CHECK(answers.waitFor(2));
+        UNSCOPED_INFO("the question first, then the check, run again");
+        CHECK(answers.all() == std::string("front/1 slow/0"));
         luau.close();
     }
 
-    template<> template<>
-    void alscriptanalysislane_object::test<3>()
+    TEST_CASE_METHOD(alscriptanalysislane_data, "alscriptanalysislane: the front tab's own check runs on through its questions", "[alscriptanalysislane]")
     {
-        set_test_name("the front tab's own check runs on through its questions, and is answered as it was asked");
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        ensure("taken", post(luau, job("slow", ALScriptAnalysis::Kind::Check, true)));
-        ensure("held", gate->waitEntered());
-        ensure("asked", post(luau, job("front", ALScriptAnalysis::Kind::Complete, true)));
+        CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, true)));
+        CHECK(gate->waitEntered());
+        CHECK(post(luau, job("front", ALScriptAnalysis::Kind::Complete, true)));
         gate->release();
-        ensure("both answered", answers.waitFor(2));
-        ensure_equals("the check first, not stopped", answers.all(), std::string("slow/0 front/1"));
+        CHECK(answers.waitFor(2));
+        UNSCOPED_INFO("the check first, not stopped");
+        CHECK(answers.all() == std::string("slow/0 front/1"));
         luau.close();
     }
 
-    template<> template<>
-    void alscriptanalysislane_object::test<4>()
+    TEST_CASE_METHOD(alscriptanalysislane_data, "alscriptanalysislane: another tab's check gives way once and its rerun holds the next question", "[alscriptanalysislane]")
     {
-        set_test_name("another tab's check gives way once: run again, it runs through the next question of the tab in front, which waits for it");
         auto gate    = std::make_shared<Held::Gate>();
         gate->always = true;
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        ensure("taken", post(luau, job("slow", ALScriptAnalysis::Kind::Check, false)));
-        ensure("held", gate->waitEntered());
-        ensure("asked", post(luau, job("front", ALScriptAnalysis::Kind::Complete, true)));
-        ensure("the question answered", answers.waitFor(1));
-        ensure("the check run again, and held", gate->waitEntered(2));
-        ensure("asked again", post(luau, job("again", ALScriptAnalysis::Kind::Hover, true)));
+        CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, false)));
+        CHECK(gate->waitEntered());
+        CHECK(post(luau, job("front", ALScriptAnalysis::Kind::Complete, true)));
+        UNSCOPED_INFO("the question answered");
+        CHECK(answers.waitFor(1));
+        UNSCOPED_INFO("the check run again, and held");
+        CHECK(gate->waitEntered(2));
+        CHECK(post(luau, job("again", ALScriptAnalysis::Kind::Hover, true)));
         // A moment, in which a question that stopped it would be answered.
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        ensure_equals("the second question waits for the check", answers.all(), std::string("front/1"));
-        ensure_equals("not started over", gate->enteredNow(), 2);
+        UNSCOPED_INFO("the second question waits for the check");
+        CHECK(answers.all() == std::string("front/1"));
+        UNSCOPED_INFO("not started over");
+        CHECK(gate->enteredNow() == 2);
         gate->release();
-        ensure("all answered", answers.waitFor(3));
-        ensure_equals("the check, then the question", answers.all(), std::string("front/1 slow/0 again/2"));
+        CHECK(answers.waitFor(3));
+        CHECK(answers.all() == std::string("front/1 slow/0 again/2"));
         luau.close();
     }
 
-    template<> template<>
-    void alscriptanalysislane_object::test<5>()
+    TEST_CASE_METHOD(alscriptanalysislane_data, "alscriptanalysislane: a tab let go of mid-check has the check stopped unanswered and not rerun", "[alscriptanalysislane]")
     {
-        set_test_name("a tab let go of while its check runs: the check stopped, answered to nobody, and not run again");
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        ensure("taken", post(luau, job("slow", ALScriptAnalysis::Kind::Check, false)));
-        ensure("held", gate->waitEntered());
+        CHECK(post(luau, job("slow", ALScriptAnalysis::Kind::Check, false)));
+        CHECK(gate->waitEntered());
         luau.forget("slow");
-        ensure("asked", post(luau, job("front", ALScriptAnalysis::Kind::Hover, true)));
-        ensure("the question answered", answers.waitFor(1));
+        CHECK(post(luau, job("front", ALScriptAnalysis::Kind::Hover, true)));
+        UNSCOPED_INFO("the question answered");
+        CHECK(answers.waitFor(1));
         gate->release();
-        ensure("asked again", post(luau, job("last", ALScriptAnalysis::Kind::Hover, true)));
-        ensure("answered", answers.waitFor(2));
-        ensure_equals("nothing for the tab let go of", answers.all(), std::string("front/2 last/2"));
-        ensure_equals("run once", gate->enteredNow(), 1);
+        CHECK(post(luau, job("last", ALScriptAnalysis::Kind::Hover, true)));
+        CHECK(answers.waitFor(2));
+        UNSCOPED_INFO("nothing for the tab let go of");
+        CHECK(answers.all() == std::string("front/2 last/2"));
+        UNSCOPED_INFO("run once");
+        CHECK(gate->enteredNow() == 1);
         luau.close();
     }
 
-    template<> template<>
-    void alscriptanalysislane_object::test<6>()
+    TEST_CASE_METHOD(alscriptanalysislane_data, "alscriptanalysislane: lookups and other tabs' checks yield to the front tab but not LSL or weighs", "[alscriptanalysislane]")
     {
-        set_test_name("a lookup's question of another script gives way to the tab in front as another tab's check does; the front tab's own, LSL's and a weigh do not");
         using Kind = ALScriptAnalysis::Kind;
-        ensure("another tab's check", ALScriptAnalysisLane::yieldsOf(job("x", Kind::Check, false).request));
-        ensure("a lookup's", ALScriptAnalysisLane::yieldsOf(job("lookup:a:b", Kind::References, false).request));
-        ensure("not the front tab's", !ALScriptAnalysisLane::yieldsOf(job("x", Kind::Check, true).request));
-        ensure("not a weigh", !ALScriptAnalysisLane::yieldsOf(job("x", Kind::Weigh, false).request));
+        UNSCOPED_INFO("another tab's check");
+        CHECK(ALScriptAnalysisLane::yieldsOf(job("x", Kind::Check, false).request));
+        UNSCOPED_INFO("a lookup's");
+        CHECK(ALScriptAnalysisLane::yieldsOf(job("lookup:a:b", Kind::References, false).request));
+        UNSCOPED_INFO("not the front tab's");
+        CHECK_FALSE(ALScriptAnalysisLane::yieldsOf(job("x", Kind::Check, true).request));
+        UNSCOPED_INFO("not a weigh");
+        CHECK_FALSE(ALScriptAnalysisLane::yieldsOf(job("x", Kind::Weigh, false).request));
         ALScriptAnalysisLane::Job lsl = job("x", Kind::Check, false);
         lsl.request.lua               = false;
-        ensure("not LSL's", !ALScriptAnalysisLane::yieldsOf(lsl.request));
+        UNSCOPED_INFO("not LSL's");
+        CHECK_FALSE(ALScriptAnalysisLane::yieldsOf(lsl.request));
 
         auto                 gate = std::make_shared<Held::Gate>();
         ALScriptAnalysisLane luau("TestLuau", [gate] { return std::make_unique<Held>(gate, true); }, main());
-        ensure("taken", post(luau, job("slow", Kind::References, false)));
-        ensure("held", gate->waitEntered());
-        ensure("asked", post(luau, job("front", Kind::Complete, true)));
-        ensure("both answered", answers.waitFor(2));
-        ensure_equals("the question first, then the lookup's, run again", answers.all(), std::string("front/1 slow/5"));
+        CHECK(post(luau, job("slow", Kind::References, false)));
+        CHECK(gate->waitEntered());
+        CHECK(post(luau, job("front", Kind::Complete, true)));
+        CHECK(answers.waitFor(2));
+        UNSCOPED_INFO("the question first, then the lookup's, run again");
+        CHECK(answers.all() == std::string("front/1 slow/5"));
         luau.close();
     }
 }

@@ -23,13 +23,19 @@
  * $/LicenseInfo$
  */
 
-// Into RGBA16: .r and .g the lowest and highest nonzero id the tile holds over 65535, 0 for none; .b 1 where it
-// holds the near side of a jump; .a 1 where it holds the drawn surface of an object that glows.
-out vec4 frag_color;
+// [0], into RGBA16: .r and .g the lowest and highest nonzero id the tile holds over 65535, 0 for none; .b 1 where
+// it holds the near side of a jump; .a 1 where it holds the drawn surface of an object that glows.
+// [1], into R32F: the eye distance of the tile's nearest texel of an object that does not glow, NOTHING where it holds
+// none. No object can stand in front of a surface nearer than every tile around it (selectionOutlineF.glsl).
+out vec4 frag_data[2];
 
-// The id target, and the jump pass's marks on it (selectionJumpF.glsl).
+// The id target, its depth, and the jump pass's marks on it (selectionJumpF.glsl).
 uniform sampler2D selectionIdMap;
+uniform sampler2D depthMap;
 uniform sampler2D selectionJumpMap;
+
+// Past every eye distance.
+const float NOTHING = 1.0e30;
 
 // The side of a tile in texels of the id target (ALSelectionOutline::TILE_SIZE).
 #define TILE_SIZE 8
@@ -39,6 +45,7 @@ int decodeId(vec4 texel);
 bool isJumpFront(sampler2D jumps, ivec2 pos);
 bool isGlow(vec4 texel);
 bool isDrawn(vec4 texel);
+float eyeDistance(float depth);
 
 void main()
 {
@@ -51,6 +58,7 @@ void main()
     int highest = 0;
     bool jump = false;
     bool glow = false;
+    float nearest = NOTHING;
     for (int y = origin.y; y < end.y; ++y)
     {
         for (int x = origin.x; x < end.x; ++x)
@@ -64,10 +72,15 @@ void main()
                 // The jump pass marks no glowing texel.
                 jump = jump || (!isGlow(texel) && isJumpFront(selectionJumpMap, ivec2(x, y)));
                 glow = glow || (isGlow(texel) && isDrawn(texel));
+                if (!isGlow(texel))
+                {
+                    nearest = min(nearest, eyeDistance(texelFetch(depthMap, ivec2(x, y), 0).r));
+                }
             }
         }
     }
 
-    frag_color = vec4(float(highest != 0 ? lowest : 0) / 65535.0, float(highest) / 65535.0, jump ? 1.0 : 0.0,
-                      glow ? 1.0 : 0.0);
+    frag_data[0] = vec4(float(highest != 0 ? lowest : 0) / 65535.0, float(highest) / 65535.0, jump ? 1.0 : 0.0,
+                        glow ? 1.0 : 0.0);
+    frag_data[1] = vec4(nearest, 0.0, 0.0, 0.0);
 }

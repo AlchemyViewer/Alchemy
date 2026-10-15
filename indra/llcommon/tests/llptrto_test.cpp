@@ -37,7 +37,7 @@
 // other Linden headers
 #include "../llmemory.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace
 {
@@ -101,25 +101,16 @@ namespace
 }
 
 /*****************************************************************************
-*   tut test group
+*   Tests
 *****************************************************************************/
-namespace tut
+namespace
 {
-    struct llptrto_data
-    {
-    };
-    typedef test_group<llptrto_data> llptrto_group;
-    typedef llptrto_group::object llptrto_object;
-    llptrto_group llptrtogrp("LLPtrTo");
-
     // The checks above are static_asserts, made when this file compiles. Here,
     // what LLPtrTo names for a refcounted class holds a reference, as an
     // LLPointer does.
-    template<> template<>
-    void llptrto_object::test<1>()
+    TEST_CASE("LLPtrTo: LLPtrTo of a refcounted class holds a reference", "[LLPtrTo]")
     {
-        set_test_name("LLPtrTo of a refcounted class holds a reference");
         LLPtrTo<RCFoo>::type ptr(new RCFoo);
-        ensure_equals("one reference", ptr->getNumRefs(), 1);
+        CHECK(ptr->getNumRefs() == 1);
     }
 }

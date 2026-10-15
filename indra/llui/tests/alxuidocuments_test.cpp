@@ -31,11 +31,11 @@
 
 #include "altesttempdir.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <fstream>
 
-namespace tut
+namespace
 {
     struct alxuidocuments_data
     {
@@ -66,182 +66,208 @@ namespace tut
         }
     };
 
-    typedef test_group<alxuidocuments_data> alxuidocuments_test;
-    typedef alxuidocuments_test::object     alxuidocuments_object;
-    tut::alxuidocuments_test alxuidocuments_testgroup("alxuidocuments");
-
     // Two files open together, each with its own edits: the whole of why
     // this exists. A tool holding one at a time has to refuse the second
     // while there is work in the first, and refusing is the thing being
     // removed here.
-    template<> template<>
-    void alxuidocuments_object::test<1>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: two files open together each keep their own edits and undo", "[alxuidocuments]")
     {
         const std::string base = write("base.xml", panel("a"));
         const std::string other = write("other.xml", panel("b"));
 
         ALXUIDocuments open;
         ALXUIEdit* first = open.open(base);
-        ensure("the first opens", first != nullptr);
-        ensure("writes", first->setAttribute({ "a" }, "width", "40"));
+        REQUIRE(first != nullptr);
+        CHECK(first->setAttribute({ "a" }, "width", "40"));
 
         ALXUIEdit* second = open.open(other);
-        ensure("the second opens with work in the first", second != nullptr);
-        ensure("and is not the first", second != first);
-        ensure("writes to the second", second->setAttribute({ "b" }, "width", "50"));
+        UNSCOPED_INFO("the second opens with work in the first");
+        REQUIRE(second != nullptr);
+        CHECK(second != first);
+        CHECK(second->setAttribute({ "b" }, "width", "50"));
 
-        ensure("the first still has its work", first->dirty());
-        ensure_equals("and its own undo stack", first->undoDepth(), 1u);
-        ensure_equals("as does the second", second->undoDepth(), 1u);
-        ensure_equals("both are unsaved", open.dirtyCount(), 2);
+        UNSCOPED_INFO("the first still has its work");
+        CHECK(first->dirty());
+        UNSCOPED_INFO("and its own undo stack");
+        CHECK(first->undoDepth() == 1u);
+        UNSCOPED_INFO("as does the second");
+        CHECK(second->undoDepth() == 1u);
+        UNSCOPED_INFO("both are unsaved");
+        CHECK(open.dirtyCount() == 2);
 
         // Opening one is working on it, so it is the one an operation with
         // no path of its own means.
-        ensure_equals("the last opened is the active one", open.activePath(), other);
+        UNSCOPED_INFO("the last opened is the active one");
+        CHECK(open.activePath() == other);
         open.makeActive(base);
-        ensure_equals("and it can be said outright", open.activePath(), base);
-        ensure("which is the document itself", &open.active() == first);
+        UNSCOPED_INFO("and it can be said outright");
+        CHECK(open.activePath() == base);
+        UNSCOPED_INFO("which is the document itself");
+        CHECK(&open.active() == first);
     }
 
     // What a caller merging a file's layers reads: the text in hand where
     // there is one, and nothing where the file is not open, which means
     // read the file.
-    template<> template<>
-    void alxuidocuments_object::test<2>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: textFor gives an open file's text and nothing for one not open", "[alxuidocuments]")
     {
         const std::string base = write("base.xml", panel("a"));
         const std::string shut = write("shut.xml", panel("c"));
 
         ALXUIDocuments open;
         ALXUIEdit* held = open.open(base);
-        ensure("opens", held != nullptr);
-        ensure("writes", held->setAttribute({ "a" }, "width", "40"));
+        REQUIRE(held != nullptr);
+        CHECK(held->setAttribute({ "a" }, "width", "40"));
 
         const std::string* text = open.textFor(base);
-        ensure("the open one is read from memory", text != nullptr);
-        ensure("with the work in it", text->find("width=\"40\"") != std::string::npos);
-        ensure("and the disk does not have that yet",
-               read(base).find("width=\"40\"") == std::string::npos);
-        ensure("a file nobody has open is read from the file", open.textFor(shut) == nullptr);
+        UNSCOPED_INFO("the open one is read from memory");
+        REQUIRE(text != nullptr);
+        UNSCOPED_INFO("with the work in it");
+        CHECK(text->find("width=\"40\"") != std::string::npos);
+        UNSCOPED_INFO("and the disk does not have that yet");
+        CHECK(read(base).find("width=\"40\"") == std::string::npos);
+        UNSCOPED_INFO("a file nobody has open is read from the file");
+        CHECK(open.textFor(shut) == nullptr);
     }
 
     // Everything with work in it, written. And a document nobody opened is
     // still a document to answer with, so a caller reading the active one
     // before opening anything does not have to ask twice.
-    template<> template<>
-    void alxuidocuments_object::test<3>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: saveAll writes everything with work in it", "[alxuidocuments]")
     {
         ALXUIDocuments open;
-        ensure("nothing is active", !open.hasActive());
-        ensure("and the active one is empty", open.active().text().empty());
-        ensure_equals("nothing to save", open.saveAll(), 0);
+        CHECK_FALSE(open.hasActive());
+        UNSCOPED_INFO("and the active one is empty");
+        CHECK(open.active().text().empty());
+        UNSCOPED_INFO("nothing to save");
+        CHECK(open.saveAll() == 0);
 
         const std::string base = write("base.xml", panel("a"));
         const std::string other = write("other.xml", panel("b"));
-        ensure("opens", open.open(base) != nullptr);
-        ensure("opens", open.open(other) != nullptr);
-        ensure("writes", open.find(base)->setAttribute({ "a" }, "width", "40"));
-        ensure("writes", open.find(other)->setAttribute({ "b" }, "width", "50"));
+        REQUIRE(open.open(base) != nullptr);
+        REQUIRE(open.open(other) != nullptr);
+        CHECK(open.find(base)->setAttribute({ "a" }, "width", "40"));
+        CHECK(open.find(other)->setAttribute({ "b" }, "width", "50"));
 
-        ensure_equals("both written", open.saveAll(), 2);
-        ensure_equals("and nothing is left unsaved", open.dirtyCount(), 0);
-        ensure("the disk has the first", read(base).find("width=\"40\"") != std::string::npos);
-        ensure("and the second", read(other).find("width=\"50\"") != std::string::npos);
+        UNSCOPED_INFO("both written");
+        CHECK(open.saveAll() == 2);
+        UNSCOPED_INFO("and nothing is left unsaved");
+        CHECK(open.dirtyCount() == 0);
+        UNSCOPED_INFO("the disk has the first");
+        CHECK(read(base).find("width=\"40\"") != std::string::npos);
+        UNSCOPED_INFO("and the second");
+        CHECK(read(other).find("width=\"50\"") != std::string::npos);
 
         // Letting one go leaves the other, and leaves something active.
-        ensure("closes", open.close(base));
-        ensure_equals("one left", open.count(), 1u);
-        ensure_equals("and it is the active one", open.activePath(), other);
-        ensure("a file that was never open cannot be closed", !open.close(base));
+        CHECK(open.close(base));
+        CHECK(open.count() == 1u);
+        UNSCOPED_INFO("and it is the active one");
+        CHECK(open.activePath() == other);
+        UNSCOPED_INFO("a file that was never open cannot be closed");
+        CHECK_FALSE(open.close(base));
+    }
+
+    // A path that names no file is not a document, and says so rather than
+    // becoming an empty one nobody can tell from a real one.
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: a path that names no file is not a document", "[alxuidocuments]")
+    {
+        ALXUIDocuments open;
+        UNSCOPED_INFO("no file, no document");
+        CHECK(open.open(gDirUtilp->add(mDir, "not_here.xml")) == nullptr);
+        UNSCOPED_INFO("and it says why");
+        CHECK_FALSE(open.error().empty());
+        UNSCOPED_INFO("nothing was opened");
+        CHECK(open.count() == 0u);
+        UNSCOPED_INFO("nor is one made by an empty path");
+        CHECK(open.open(std::string()) == nullptr);
     }
 
     // One thing done to two files is one thing to put back. Repairing a
     // file's translations writes a base and every language beside it, and
     // undoing that a file at a time undoes something nobody did.
-    template<> template<>
-    void alxuidocuments_object::test<5>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: one thing done to two files is one thing to put back", "[alxuidocuments]")
     {
         const std::string base = write("base.xml", panel("a"));
         const std::string other = write("other.xml", panel("b"));
 
         ALXUIDocuments open;
-        ensure("opens", open.open(base) != nullptr);
-        ensure("opens", open.open(other) != nullptr);
-        ensure("nothing to put back yet", !open.canUndo());
+        REQUIRE(open.open(base) != nullptr);
+        REQUIRE(open.open(other) != nullptr);
+        UNSCOPED_INFO("nothing to put back yet");
+        CHECK_FALSE(open.canUndo());
 
         {
             ALXUIDocuments::Action together(open);
-            ensure("writes to one", open.find(base)->setAttribute({ "a" }, "width", "40"));
-            ensure("and to the other", open.find(other)->setAttribute({ "b" }, "width", "50"));
+            CHECK(open.find(base)->setAttribute({ "a" }, "width", "40"));
+            CHECK(open.find(other)->setAttribute({ "b" }, "width", "50"));
         }
 
-        ensure("which is one thing", open.canUndo());
-        ensure("put back", open.undo());
-        ensure("both of them", open.find(base)->text().find("width=\"40\"") == std::string::npos);
-        ensure("at once", open.find(other)->text().find("width=\"50\"") == std::string::npos);
-        ensure("and there is nothing else to put back", !open.canUndo());
+        UNSCOPED_INFO("which is one thing");
+        CHECK(open.canUndo());
+        CHECK(open.undo());
+        UNSCOPED_INFO("both of them");
+        CHECK(open.find(base)->text().find("width=\"40\"") == std::string::npos);
+        UNSCOPED_INFO("at once");
+        CHECK(open.find(other)->text().find("width=\"50\"") == std::string::npos);
+        UNSCOPED_INFO("and there is nothing else to put back");
+        CHECK_FALSE(open.canUndo());
 
-        ensure("done again", open.redo());
-        ensure("both", open.find(base)->text().find("width=\"40\"") != std::string::npos);
-        ensure("at once", open.find(other)->text().find("width=\"50\"") != std::string::npos);
+        CHECK(open.redo());
+        UNSCOPED_INFO("both");
+        CHECK(open.find(base)->text().find("width=\"40\"") != std::string::npos);
+        UNSCOPED_INFO("at once");
+        CHECK(open.find(other)->text().find("width=\"50\"") != std::string::npos);
 
         // An action over more than one step says only that: there is no one
         // field for a caller to write onto what it has already built.
-        ensure("undone", open.undo());
-        ensure("it does not claim to be one field",
-               !open.lastChange().oneField);
+        CHECK(open.undo());
+        UNSCOPED_INFO("it does not claim to be one field");
+        CHECK_FALSE(open.lastChange().oneField);
     }
 
     // Several steps in one file, asked for as one thing, come back as one --
     // and the same steps not asked for as one come back one at a time.
-    template<> template<>
-    void alxuidocuments_object::test<6>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: several steps in one file asked for as one come back as one", "[alxuidocuments]")
     {
         const std::string base = write("base.xml", panel("a"));
 
         ALXUIDocuments open;
         ALXUIEdit* held = open.open(base);
-        ensure("opens", held != nullptr);
+        REQUIRE(held != nullptr);
 
         {
             ALXUIDocuments::Action lining_up(open);
-            ensure("writes", held->setAttribute({ "a" }, "width", "40"));
-            ensure("writes", held->setAttribute({ "a" }, "height", "41"));
+            CHECK(held->setAttribute({ "a" }, "width", "40"));
+            CHECK(held->setAttribute({ "a" }, "height", "41"));
         }
-        ensure("put back", open.undo());
-        ensure("the first went", held->text().find("width=\"40\"") == std::string::npos);
-        ensure("and so did the second", held->text().find("height=\"41\"") == std::string::npos);
-        ensure("as one thing", !open.canUndo());
+        CHECK(open.undo());
+        UNSCOPED_INFO("the first went");
+        CHECK(held->text().find("width=\"40\"") == std::string::npos);
+        UNSCOPED_INFO("and so did the second");
+        CHECK(held->text().find("height=\"41\"") == std::string::npos);
+        UNSCOPED_INFO("as one thing");
+        CHECK_FALSE(open.canUndo());
 
         // The same two, each on its own.
-        ensure("writes", held->setAttribute({ "a" }, "width", "60"));
+        CHECK(held->setAttribute({ "a" }, "width", "60"));
         open.settle();
-        ensure("writes", held->setAttribute({ "a" }, "height", "61"));
+        CHECK(held->setAttribute({ "a" }, "height", "61"));
         open.settle();
-        ensure("put back", open.undo());
-        ensure("only the second went", held->text().find("height=\"61\"") == std::string::npos);
-        ensure("the first is still there", held->text().find("width=\"60\"") != std::string::npos);
-        ensure("and there is another to put back", open.canUndo());
-        ensure("which is one field of one element", open.lastChange().oneField);
-    }
-
-    // A path that names no file is not a document, and says so rather than
-    // becoming an empty one nobody can tell from a real one.
-    template<> template<>
-    void alxuidocuments_object::test<4>()
-    {
-        ALXUIDocuments open;
-        ensure("no file, no document", open.open(gDirUtilp->add(mDir, "not_here.xml")) == nullptr);
-        ensure("and it says why", !open.error().empty());
-        ensure_equals("nothing was opened", open.count(), 0u);
-        ensure("nor is one made by an empty path", open.open(std::string()) == nullptr);
+        CHECK(open.undo());
+        UNSCOPED_INFO("only the second went");
+        CHECK(held->text().find("height=\"61\"") == std::string::npos);
+        UNSCOPED_INFO("the first is still there");
+        CHECK(held->text().find("width=\"60\"") != std::string::npos);
+        UNSCOPED_INFO("and there is another to put back");
+        CHECK(open.canUndo());
+        UNSCOPED_INFO("which is one field of one element");
+        CHECK(open.lastChange().oneField);
     }
 
     // The whole stack as one timeline: everything done, then everything put
     // back, with a mark saying where the present is. Putting a step back does
     // not make it never have happened.
-    template<> template<>
-    void alxuidocuments_object::test<7>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: history keeps every action done or put back and marks the present", "[alxuidocuments]")
     {
         const std::string base = write("base.xml", panel("a"));
         const std::string other = write("other.xml", panel("b"));
@@ -249,48 +275,62 @@ namespace tut
         ALXUIDocuments open;
         ALXUIEdit* first = open.open(base);
         ALXUIEdit* second = open.open(other);
-        ensure("opens", first && second);
-        ensure("nothing yet", open.history().empty());
+        REQUIRE(first);
+        REQUIRE(second);
+        UNSCOPED_INFO("nothing yet");
+        CHECK(open.history().empty());
 
-        ensure("writes", first->setAttribute({ "a" }, "width", "40"));
+        CHECK(first->setAttribute({ "a" }, "width", "40"));
         open.settle();
         {
             ALXUIDocuments::Action together(open);
-            ensure("writes", first->setAttribute({ "a" }, "height", "41"));
-            ensure("and to the other", second->setAttribute({ "b" }, "width", "50"));
+            CHECK(first->setAttribute({ "a" }, "height", "41"));
+            CHECK(second->setAttribute({ "b" }, "width", "50"));
         }
 
         std::vector<ALXUIDocuments::Entry> all = open.history();
-        ensure_equals("two actions", all.size(), 2u);
-        ensure_equals("and both are in force", open.inForce(), 2u);
+        REQUIRE(all.size() == 2u);
+        UNSCOPED_INFO("and both are in force");
+        CHECK(open.inForce() == 2u);
 
-        ensure_equals("the first was one step", all[0].steps, 1);
-        ensure_equals("in one document", all[0].documents, 1);
-        ensure_equals("which it names", all[0].document, base);
-        ensure("and says what it did", all[0].change.did == ALXUIEdit::Did::WroteField);
-        ensure_equals("on which field", all[0].change.field, std::string("width"));
+        UNSCOPED_INFO("the first was one step");
+        CHECK(all[0].steps == 1);
+        UNSCOPED_INFO("in one document");
+        CHECK(all[0].documents == 1);
+        UNSCOPED_INFO("which it names");
+        CHECK(all[0].document == base);
+        UNSCOPED_INFO("and says what it did");
+        CHECK(all[0].change.did == ALXUIEdit::Did::WroteField);
+        UNSCOPED_INFO("on which field");
+        CHECK(all[0].change.field == std::string("width"));
 
-        ensure_equals("the second was two steps", all[1].steps, 2);
-        ensure_equals("over two documents", all[1].documents, 2);
-        ensure("so it names none of them", all[1].document.empty());
+        UNSCOPED_INFO("the second was two steps");
+        CHECK(all[1].steps == 2);
+        UNSCOPED_INFO("over two documents");
+        CHECK(all[1].documents == 2);
+        UNSCOPED_INFO("so it names none of them");
+        CHECK(all[1].document.empty());
 
         // Put back, and it is still listed: the present moved, not the past.
-        ensure("undone", open.undo());
+        CHECK(open.undo());
         all = open.history();
-        ensure_equals("both still listed", all.size(), 2u);
-        ensure_equals("with one of them in force", open.inForce(), 1u);
-        ensure_equals("and the one put back is still the second", all[1].steps, 2);
+        UNSCOPED_INFO("both still listed");
+        REQUIRE(all.size() == 2u);
+        UNSCOPED_INFO("with one of them in force");
+        CHECK(open.inForce() == 1u);
+        UNSCOPED_INFO("and the one put back is still the second");
+        CHECK(all[1].steps == 2);
 
-        ensure("done again", open.redo());
-        ensure_equals("back where it was", open.inForce(), 2u);
+        CHECK(open.redo());
+        UNSCOPED_INFO("back where it was");
+        CHECK(open.inForce() == 2u);
     }
 
     // A document's own stack is capped by what it weighs, and a file heavy
     // enough fills it in one step. The history here is of steps taken, not
     // of the stack's depth, so the second edit to such a file is an action
     // like the first rather than one the set never saw.
-    template<> template<>
-    void alxuidocuments_object::test<8>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: a file that fills its own stack in one step still has each in the history", "[alxuidocuments]")
     {
         const std::string heavy = write("heavy.xml",
             "<panel name=\"root\">\n"
@@ -300,65 +340,78 @@ namespace tut
 
         ALXUIDocuments open;
         ALXUIEdit* held = open.open(heavy);
-        ensure("opens", held != nullptr);
-        ensure("one", held->setAttribute({ "a" }, "width", "2"));
+        REQUIRE(held != nullptr);
+        CHECK(held->setAttribute({ "a" }, "width", "2"));
         open.settle();
-        ensure("two", held->setAttribute({ "a" }, "width", "3"));
+        CHECK(held->setAttribute({ "a" }, "width", "3"));
         open.settle();
-        ensure_equals("the stack held one of them", held->undoDepth(), 1u);
-        ensure_equals("and the history both", open.history().size(), 2u);
-        ensure_equals("in force", open.inForce(), 2u);
-        ensure("undo", open.undo());
-        ensure_equals("puts back the second", held->resolve({ "a" }).attribute("width").as_int(), 2);
-        ensure_equals("and lists it as put back", open.inForce(), 1u);
+        UNSCOPED_INFO("the stack held one of them");
+        CHECK(held->undoDepth() == 1u);
+        UNSCOPED_INFO("and the history both");
+        CHECK(open.history().size() == 2u);
+        CHECK(open.inForce() == 2u);
+        CHECK(open.undo());
+        UNSCOPED_INFO("puts back the second");
+        CHECK(held->resolve({ "a" }).attribute("width").as_int() == 2);
+        UNSCOPED_INFO("and lists it as put back");
+        CHECK(open.inForce() == 1u);
     }
 
     // A file that has gone from the disk is not read again: what was read
     // the first time stays, and the merge that reads the document in place
     // of the file goes on reading a document rather than nothing.
-    template<> template<>
-    void alxuidocuments_object::test<9>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: a file that has gone from the disk is not read again", "[alxuidocuments]")
     {
         const std::string path = write("going.xml", panel("a"));
         ALXUIDocuments open;
         ALXUIEdit* held = open.open(path);
-        ensure("opens", held != nullptr);
+        REQUIRE(held != nullptr);
         const std::string was = held->text();
 
         LLFile::remove(path);
-        ensure_equals("nothing was read again", open.rereadClean(), 0);
-        ensure_equals("and the text is what it was", held->text(), was);
-        ensure("and reading it did not put it back", !LLFile::isfile(path));
-        ensure("which the merge is still given", open.textFor(path) != nullptr);
-        ensure("and the document says why", !held->error().empty());
+        UNSCOPED_INFO("nothing was read again");
+        CHECK(open.rereadClean() == 0);
+        UNSCOPED_INFO("and the text is what it was");
+        CHECK(held->text() == was);
+        UNSCOPED_INFO("and reading it did not put it back");
+        CHECK_FALSE(LLFile::isfile(path));
+        UNSCOPED_INFO("which the merge is still given");
+        CHECK(open.textFor(path) != nullptr);
+        UNSCOPED_INFO("and the document says why");
+        CHECK_FALSE(held->error().empty());
     }
 
     // Closing a document takes the history with it only where an action
     // named it: one opened to be read and closed again is not a reason to
     // lose what was done to the others.
-    template<> template<>
-    void alxuidocuments_object::test<10>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: closing a document drops the history only where an action named it", "[alxuidocuments]")
     {
         const std::string base = write("base.xml", panel("a"));
         const std::string other = write("other.xml", panel("b"));
         ALXUIDocuments open;
         ALXUIEdit* first = open.open(base);
-        ensure("opens", first != nullptr);
-        ensure("writes", first->setAttribute({ "a" }, "width", "40"));
+        REQUIRE(first != nullptr);
+        CHECK(first->setAttribute({ "a" }, "width", "40"));
         open.settle();
-        ensure_equals("one action", open.history().size(), 1u);
+        CHECK(open.history().size() == 1u);
 
-        ensure("opens another", open.open(other) != nullptr);
-        ensure("closes it untouched", open.close(other));
-        ensure_equals("and the action is still there", open.history().size(), 1u);
-        ensure("to be put back", open.canUndo());
+        CHECK(open.open(other) != nullptr);
+        UNSCOPED_INFO("closes it untouched");
+        CHECK(open.close(other));
+        UNSCOPED_INFO("and the action is still there");
+        CHECK(open.history().size() == 1u);
+        UNSCOPED_INFO("to be put back");
+        CHECK(open.canUndo());
 
-        ensure("opens it again", open.open(other) != nullptr);
-        ensure("writes to it", open.find(other)->setAttribute({ "b" }, "width", "50"));
+        UNSCOPED_INFO("opens it again");
+        REQUIRE(open.open(other) != nullptr);
+        CHECK(open.find(other)->setAttribute({ "b" }, "width", "50"));
         open.settle();
-        ensure_equals("two actions", open.history().size(), 2u);
-        ensure("closes it with work in the history", open.close(other));
-        ensure("and the history is gone, since half of it named a file that is", open.history().empty());
+        CHECK(open.history().size() == 2u);
+        UNSCOPED_INFO("closes it with work in the history");
+        CHECK(open.close(other));
+        UNSCOPED_INFO("and the history is gone, since half of it named a file that is");
+        CHECK(open.history().empty());
     }
 
     // Given a window, a run of edits to one field is one action: a number
@@ -366,62 +419,77 @@ namespace tut
     // is put on again in one redo. Another field is another action, an
     // Action over several steps is never joined, and an edit after an undo
     // is a new run rather than more of the one put back.
-    template<> template<>
-    void alxuidocuments_object::test<11>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: given a window a run of edits to one field is one action", "[alxuidocuments]")
     {
         const std::string base = write("base.xml", panel("a"));
         ALXUIDocuments open;
         open.setCoalesceWindow(60.0);
         ALXUIEdit* held = open.open(base);
-        ensure("opens", held != nullptr);
+        REQUIRE(held != nullptr);
 
         for (const char* value : { "11", "12", "13" })
         {
-            ensure("writes", held->setAttribute({ "a" }, "width", value));
+            REQUIRE(held->setAttribute({ "a" }, "width", value));
             open.settle();
         }
         std::vector<ALXUIDocuments::Entry> all = open.history();
-        ensure_equals("three steps are one action", all.size(), 1u);
-        ensure_equals("of three steps", all[0].steps, 3);
-        ensure("to one field", all[0].sameField);
-        ensure_equals("which it names", all[0].change.field, std::string("width"));
+        UNSCOPED_INFO("three steps are one action");
+        REQUIRE(all.size() == 1u);
+        UNSCOPED_INFO("of three steps");
+        CHECK(all[0].steps == 3);
+        UNSCOPED_INFO("to one field");
+        CHECK(all[0].sameField);
+        UNSCOPED_INFO("which it names");
+        CHECK(all[0].change.field == std::string("width"));
 
-        ensure("writes another field", held->setAttribute({ "a" }, "height", "20"));
+        CHECK(held->setAttribute({ "a" }, "height", "20"));
         open.settle();
-        ensure_equals("which is its own action", open.history().size(), 2u);
+        UNSCOPED_INFO("which is its own action");
+        CHECK(open.history().size() == 2u);
         {
             ALXUIDocuments::Action together(open);
-            ensure("writes", held->setAttribute({ "a" }, "height", "21"));
-            ensure("writes", held->setAttribute({ "a" }, "height", "22"));
+            CHECK(held->setAttribute({ "a" }, "height", "21"));
+            CHECK(held->setAttribute({ "a" }, "height", "22"));
         }
         all = open.history();
-        ensure_equals("an Action is never joined", all.size(), 3u);
-        ensure("and is not one field", !all[2].sameField);
+        UNSCOPED_INFO("an Action is never joined");
+        REQUIRE(all.size() == 3u);
+        UNSCOPED_INFO("and is not one field");
+        CHECK_FALSE(all[2].sameField);
 
-        ensure("put back", open.undo());
-        ensure("put back", open.undo());
-        ensure("put back", open.undo());
-        ensure_equals("the run went as one", held->resolve({ "a" }).attribute("width").as_int(), 10);
-        ensure("and says which field it was", open.lastChange().oneField && open.lastChange().field == "width");
-        ensure("nothing else to put back", !open.canUndo());
+        CHECK(open.undo());
+        CHECK(open.undo());
+        CHECK(open.undo());
+        UNSCOPED_INFO("the run went as one");
+        CHECK(held->resolve({ "a" }).attribute("width").as_int() == 10);
+        {
+            INFO("and says which field it was");
+            CHECK(open.lastChange().oneField);
+            CHECK(open.lastChange().field == "width");
+        }
+        UNSCOPED_INFO("nothing else to put back");
+        CHECK_FALSE(open.canUndo());
 
-        ensure("done again", open.redo());
-        ensure_equals("the whole run", held->resolve({ "a" }).attribute("width").as_int(), 13);
+        CHECK(open.redo());
+        UNSCOPED_INFO("the whole run");
+        CHECK(held->resolve({ "a" }).attribute("width").as_int() == 13);
 
-        ensure("put back", open.undo());
-        ensure("writes after an undo", held->setAttribute({ "a" }, "width", "14"));
+        CHECK(open.undo());
+        UNSCOPED_INFO("writes after an undo");
+        CHECK(held->setAttribute({ "a" }, "width", "14"));
         open.settle();
         all = open.history();
-        ensure_equals("a new run, and the one put back is gone", all.size(), 1u);
-        ensure_equals("of one step", all[0].steps, 1);
+        UNSCOPED_INFO("a new run, and the one put back is gone");
+        REQUIRE(all.size() == 1u);
+        UNSCOPED_INFO("of one step");
+        CHECK(all[0].steps == 1);
     }
 
     // Looked at in the middle -- a caller settling after each edit while an
     // Action is open -- an Action is still the one thing: its steps in each
     // document added up, not one field though its first step was, and put
     // back and on again in one.
-    template<> template<>
-    void alxuidocuments_object::test<12>()
+    TEST_CASE_METHOD(alxuidocuments_data, "alxuidocuments: an Action settled after each edit is still one action", "[alxuidocuments]")
     {
         const std::string first  = write("first.xml", panel("a"));
         const std::string second = write("second.xml", panel("b"));
@@ -429,28 +497,39 @@ namespace tut
         open.setCoalesceWindow(60.0);
         ALXUIEdit* one = open.open(first);
         ALXUIEdit* two = open.open(second);
-        ensure("opens both", one && two);
+        REQUIRE(one);
+        REQUIRE(two);
         {
             ALXUIDocuments::Action together(open);
-            ensure("writes", one->setAttribute({ "a" }, "width", "11"));
+            CHECK(one->setAttribute({ "a" }, "width", "11"));
             open.settle();
-            ensure("writes", two->setAttribute({ "b" }, "width", "21"));
+            CHECK(two->setAttribute({ "b" }, "width", "21"));
             open.settle();
-            ensure("writes", one->setAttribute({ "a" }, "height", "12"));
+            CHECK(one->setAttribute({ "a" }, "height", "12"));
             open.settle();
         }
         std::vector<ALXUIDocuments::Entry> all = open.history();
-        ensure_equals("one action", all.size(), 1u);
-        ensure_equals("of three steps", all[0].steps, 3);
-        ensure_equals("in two documents", all[0].documents, 2);
-        ensure("not one field", !all[0].sameField);
-        ensure("put back", open.undo());
-        ensure("all of it", one->resolve({ "a" }).attribute("width").as_int() == 10 &&
-                                one->resolve({ "a" }).attribute("height").as_int() == 10 &&
-                                two->resolve({ "b" }).attribute("width").as_int() == 10);
-        ensure("nothing else", !open.canUndo());
-        ensure("done again", open.redo());
-        ensure("all of it", one->resolve({ "a" }).attribute("height").as_int() == 12 &&
-                                two->resolve({ "b" }).attribute("width").as_int() == 21);
+        REQUIRE(all.size() == 1u);
+        UNSCOPED_INFO("of three steps");
+        CHECK(all[0].steps == 3);
+        UNSCOPED_INFO("in two documents");
+        CHECK(all[0].documents == 2);
+        UNSCOPED_INFO("not one field");
+        CHECK_FALSE(all[0].sameField);
+        CHECK(open.undo());
+        {
+            INFO("all of it");
+            CHECK(one->resolve({ "a" }).attribute("width").as_int() == 10);
+            CHECK(one->resolve({ "a" }).attribute("height").as_int() == 10);
+            CHECK(two->resolve({ "b" }).attribute("width").as_int() == 10);
+        }
+        UNSCOPED_INFO("nothing else");
+        CHECK_FALSE(open.canUndo());
+        CHECK(open.redo());
+        {
+            INFO("all of it");
+            CHECK(one->resolve({ "a" }).attribute("height").as_int() == 12);
+            CHECK(two->resolve({ "b" }).attribute("width").as_int() == 21);
+        }
     }
 }

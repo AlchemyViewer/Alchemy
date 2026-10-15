@@ -363,7 +363,7 @@ LLBufferArray::segment_iterator_t LLBufferArray::splitAfter(U8* address)
     // We have the location and the segment.
     U8* base = (*it).data();
     S32 size = (*it).size();
-    if(address == (base + size))
+    if(address == (base + size - 1))
     {
         // No need to split, since this is the last byte of the
         // segment. We do not want to have zero length segments, since

@@ -27,6 +27,7 @@
 #include "alscriptmasterupload.h"
 
 #include "alfilewrite.h"
+#include "almainloop.h"
 #include "alrecovery.h"
 #include "alrecoverystore.h"
 #include "alsavehistory.h"
@@ -35,6 +36,7 @@
 #include "alserialworker.h"
 #include "alsourcemap.h"
 #include "aluploadheader.h"
+#include "llagent.h"
 #include "llinventory.h"
 #include "llinventorydefines.h"
 #include "llsingleton.h"
@@ -42,6 +44,8 @@
 #include "llviewercontrol.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
+#include "llviewerregion.h"
+#include "llvocache.h"
 #include "workqueue.h"
 
 namespace
@@ -169,7 +173,7 @@ void ALScriptMasterUpload::read()
     // to this send on the main thread, which alone goes on with it. With no
     // main loop to hand it back to -- a test -- or the thread closed as the
     // viewer goes, read here.
-    if (const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop"))
+    if (const LL::WorkQueue::ptr_t main_loop = ALMainLoop::queue())
     {
         std::shared_ptr<ALScriptMasterUpload> self   = shared_from_this();
         const std::string                     master = mLink.master;
@@ -222,6 +226,16 @@ void ALScriptMasterUpload::find()
     LLViewerObject* object = gObjectList.findObject(mRef.object);
     if (!object)
     {
+        // Said in the log with what may have sent it out of sight: the
+        // object cache short of memory, and how much it has let go of.
+        U32 cached = 0, active = 0, waiting = 0;
+        U64 bytes = 0, evicted = 0, built = 0;
+        if (const LLViewerRegion* region = gAgent.getRegion())
+        {
+            region->getObjectCacheFootprint(cached, active, waiting, bytes, evicted, built);
+        }
+        LL_INFOS("ScriptMasters") << "Not sent to " << mRef.object << ": not in the object list; cache memory factor "
+                                  << LLVOCacheEntry::sMemoryAdjustFactor << ", objects evicted here " << evicted << LL_ENDL;
         mUpdated.state = ALMasterLink::State::Pending;
         mChanged       = true;
         end(Outcome::What::Pending, LLTrans::getString("ScriptMasterOutOfReach"));
@@ -408,7 +422,7 @@ void ALScriptMasterUpload::askHistory()
     // given to keep before this; what it found handed back to the main
     // thread. With no main loop to hand it back to -- a test -- read here;
     // with the thread stopped, as the viewer quits, not read at all.
-    const LL::WorkQueue::ptr_t main_loop = LL::WorkQueue::getInstance("mainloop");
+    const LL::WorkQueue::ptr_t main_loop = ALMainLoop::queue();
     if (!main_loop)
     {
         historyHas(history->holds(key, asset, *text, HISTORY_NEWEST));
@@ -555,6 +569,9 @@ void ALScriptMasterUpload::upload()
     }
     ALScriptSaveOptions options;
     options.compileTarget = mTarget;
+    // The experience picked in the file's tab; none picked, the one it runs
+    // under, which the save asks the region for.
+    options.experience    = mLink.experience;
     options.sender        = ALScriptSender(ALScriptOrigin::Disk);
     options.sourceMap     = mPrepared.map;
     options.codeLine      = mPrepared.codeLine;

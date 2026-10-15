@@ -1,5 +1,5 @@
 /**
- * @file llcontrol_tut.cpp
+ * @file llcontrol_test.cpp
  * @date   February 2008
  * @brief control group unit tests
  *
@@ -32,12 +32,10 @@
 
 #include "../llcontrol.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <vector>
 
-namespace tut
-{
 namespace
 {
     struct control_group
@@ -46,7 +44,7 @@ namespace
         std::string mTestConfigDir;
         std::string mTestConfigFile;
         std::vector<std::string> mCleanups;
-        static bool mListenerFired;
+        bool mListenerFired = false;
         control_group()
         {
             mCG.reset(new LLControlGroup("foo"));
@@ -82,48 +80,35 @@ namespace
             }
             file.close();
         }
-        static bool handleListenerTest()
-        {
-            control_group::mListenerFired = true;
-            return true;
-        }
     };
 
-    bool control_group::mListenerFired = false;
-
-    typedef test_group<control_group> control_group_test;
-    typedef control_group_test::object control_group_t;
-    control_group_test tut_control_group("control_group");
-}
-
     //load settings from files - LLSD
-    template<> template<>
-    void control_group_t::test<1>()
+    TEST_CASE_METHOD(control_group, "control_group: loadFromFile reads the settings in an LLSD file", "[control_group]")
     {
         int results = mCG->loadFromFile(mTestConfigFile.c_str());
-        ensure("number of settings", (results == 1));
-        ensure("value of setting", (mCG->getU32("TestSetting") == 12));
+        UNSCOPED_INFO("number of settings");
+        CHECK(results == 1);
+        CHECK(mCG->getU32("TestSetting") == 12);
     }
 
     //save settings to files
-    template<> template<>
-    void control_group_t::test<2>()
+    TEST_CASE_METHOD(control_group, "control_group: saveToFile writes a changed setting another group loads", "[control_group]")
     {
         int results = mCG->loadFromFile(mTestConfigFile.c_str());
         mCG->setU32("TestSetting", 13);
-        ensure_equals("value of changed setting", mCG->getU32("TestSetting"), 13);
+        CHECK(mCG->getU32("TestSetting") == 13);
         LLControlGroup test_cg("foo2");
         std::string temp_test_file = (mTestConfigDir + "setting_llsd_temp.xml");
         mCleanups.push_back(temp_test_file);
         mCG->saveToFile(temp_test_file.c_str(), true);
         results = test_cg.loadFromFile(temp_test_file.c_str());
-        ensure("number of changed settings loaded", (results == 1));
-        ensure("value of changed settings loaded", (test_cg.getU32("TestSetting") == 13));
+        UNSCOPED_INFO("number of changed settings loaded");
+        CHECK(results == 1);
+        CHECK(test_cg.getU32("TestSetting") == 13);
     }
 
     //priorities
-    template<> template<>
-    void control_group_t::test<3>()
+    TEST_CASE_METHOD(control_group, "control_group: a value set without saving it is left out of the saved file", "[control_group]")
     {
         // Pass default_values = true. This tells loadFromFile() we're loading
         // a default settings file that declares variables, rather than a user
@@ -133,33 +118,34 @@ namespace
         LLControlVariable* control = mCG->getControl("TestSetting");
         LLSD new_value = 13;
         control->setValue(new_value, false);
-        ensure_equals("value of changed setting", mCG->getU32("TestSetting"), 13);
+        CHECK(mCG->getU32("TestSetting") == 13);
         LLControlGroup test_cg("foo3");
         std::string temp_test_file = (mTestConfigDir + "setting_llsd_persist_temp.xml");
         mCleanups.push_back(temp_test_file);
         mCG->saveToFile(temp_test_file.c_str(), true);
         results = test_cg.loadFromFile(temp_test_file.c_str());
         //If we haven't changed any settings, then we shouldn't have any settings to load
-        ensure("number of non-persisted changed settings loaded", (results == 0));
+        UNSCOPED_INFO("number of non-persisted changed settings loaded");
+        CHECK(results == 0);
     }
 
     //listeners
-    template<> template<>
-    void control_group_t::test<4>()
+    TEST_CASE_METHOD(control_group, "control_group: changing a setting fires its listener", "[control_group]")
     {
         int results = mCG->loadFromFile(mTestConfigFile.c_str());
-        ensure("number of settings", (results == 1));
-        mCG->getControl("TestSetting")->getSignal()->connect(boost::bind(&this->handleListenerTest));
+        UNSCOPED_INFO("number of settings");
+        REQUIRE(results == 1);
+        mCG->getControl("TestSetting")->getSignal()->connect(
+            [this](LLControlVariable*, const LLSD&, const LLSD&) { mListenerFired = true; });
         mCG->setU32("TestSetting", 13);
-        ensure("listener fired on changed setting", mListenerFired);
+        CHECK(mListenerFired);
     }
 
 
     // An LLSD-typed setting compares by value, and numbers compare as
     // numbers: an integer-typed list equal to the real-typed default is at
     // default, and writing it changes nothing and fires nothing.
-    template<> template<>
-    void control_group_t::test<5>()
+    TEST_CASE_METHOD(control_group, "control_group: an LLSD setting compares by value and its numbers as numbers", "[control_group]")
     {
         auto pair_of = [](const LLSD& x, const LLSD& y) {
             LLSD p = LLSD::emptyArray();
@@ -172,7 +158,8 @@ namespace
         real_default.append(pair_of(LLSD::Real(1.0), LLSD::Real(1.0)));
         mCG->declareLLSD("CurveSetting", real_default, "Dummy LLSD setting", LLControlVariable::PERSIST_NONDFT);
         LLControlVariable* control = mCG->getControl("CurveSetting");
-        ensure("declared at default", control->isDefault());
+        UNSCOPED_INFO("declared at default");
+        CHECK(control->isDefault());
 
         bool fired = false;
         control->getSignal()->connect([&fired](LLControlVariable*, const LLSD&, const LLSD&) { fired = true; });
@@ -181,25 +168,32 @@ namespace
         same.append(pair_of(LLSD::Real(0.0), LLSD::Real(0.0)));
         same.append(pair_of(LLSD::Real(1.0), LLSD::Real(1.0)));
         control->setValue(same, true);
-        ensure("an equal value does not fire", !fired);
-        ensure("and leaves the control at default", control->isDefault());
+        UNSCOPED_INFO("an equal value does not fire");
+        CHECK_FALSE(fired);
+        UNSCOPED_INFO("and leaves the control at default");
+        CHECK(control->isDefault());
 
         LLSD integers = LLSD::emptyArray();
         integers.append(pair_of(LLSD::Integer(0), LLSD::Integer(0)));
         integers.append(pair_of(LLSD::Integer(1), LLSD::Integer(1)));
         control->setValue(integers, true);
-        ensure("an integer-typed equal value does not fire", !fired);
-        ensure("and is still at default", control->isDefault());
+        UNSCOPED_INFO("an integer-typed equal value does not fire");
+        CHECK_FALSE(fired);
+        UNSCOPED_INFO("and is still at default");
+        CHECK(control->isDefault());
 
         LLSD other = LLSD::emptyArray();
         other.append(pair_of(LLSD::Real(0.0), LLSD::Real(0.0)));
         other.append(pair_of(LLSD::Real(0.5), LLSD::Real(0.25)));
         other.append(pair_of(LLSD::Real(1.0), LLSD::Real(1.0)));
         control->setValue(other, true);
-        ensure("a different value fires", fired);
-        ensure("and is no longer default", !control->isDefault());
+        UNSCOPED_INFO("a different value fires");
+        CHECK(fired);
+        UNSCOPED_INFO("and is no longer default");
+        CHECK_FALSE(control->isDefault());
 
         control->resetToDefault(true);
-        ensure("reset restores the default", control->isDefault());
+        UNSCOPED_INFO("reset restores the default");
+        CHECK(control->isDefault());
     }
 }

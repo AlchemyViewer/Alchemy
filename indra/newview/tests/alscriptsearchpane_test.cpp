@@ -35,7 +35,7 @@
 #include "alscriptstudio_fixture.h"
 #include "lltabcontainer.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <map>
@@ -151,7 +151,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alscriptsearchpane_data
     {
@@ -165,13 +165,16 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             // The tab as the skin built it.
             pane = window.find<ALScriptSearchPane>("search_tab");
-            ensure("the skin builds the tab as the pane", pane != nullptr);
+            UNSCOPED_INFO("the skin builds the tab as the pane");
+            REQUIRE(pane != nullptr);
             // In sight, its tab the one chosen, as when it is worked in.
-            window.find<LLTabContainer>("bottom_tabs")->selectTabByName("search_tab");
+            LLTabContainer* bottom = window.find<LLTabContainer>("bottom_tabs");
+            REQUIRE(bottom != nullptr);
+            bottom->selectTabByName("search_tab");
             return *pane;
         }
 
@@ -216,29 +219,39 @@ namespace tut
         }
         std::string counted() const { return pane->count()->getText(); }
     };
-    typedef test_group<alscriptsearchpane_data> alscriptsearchpane_group;
-    typedef alscriptsearchpane_group::object    alscriptsearchpane_object;
-    alscriptsearchpane_group                    alscriptsearchpane_instance("ALScriptSearchPane");
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<1>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: open scripts are searched as they stand and an object's are fetched", "[ALScriptSearchPane]")
     {
-        set_test_name("places found in the scripts open as they stand, and in an object's as fetched, a script open elsewhere as it stands there");
         ALScriptSearchPane& out  = make();
         Doc&                door = doc("door", "timer one\nnothing\n  timer two\n");
         find("timer");
-        ensure_equals("one script", out.search().found().size(), size_t(1));
-        ensure_equals("two places", out.search().found()[0].places.size(), size_t(2));
-        ensure_equals("a row each", out.list()->getItemCount(), 2);
+        UNSCOPED_INFO("one script");
+        REQUIRE(out.search().found().size() == size_t(1));
+        UNSCOPED_INFO("two places");
+        REQUIRE(out.search().found()[0].places.size() == size_t(2));
+        UNSCOPED_INFO("a row each");
+        CHECK(out.list()->getItemCount() == 2);
         // The list's keys: return goes to the place chosen, to type there,
         // escape back to the script; and the rows copy.
         out.list()->selectFirstItem();
-        ensure("return", out.list()->handleKeyHere(KEY_RETURN, MASK_NONE) && !studio.chosen.empty() && studio.chosen.back().toEditor);
-        ensure("escape", out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE) && services.reveals.back());
-        ensure("copied", out.list()->handleKeyHere('C', MASK_CONTROL));
-        ensure_equals("the line as listed, trimmed", out.search().found()[0].lines[1], std::string("timer two"));
-        ensure_equals("counted", counted(), services.words("SearchCount", { { "[HITS]", services.counted("Matches", 2) },
+        {
+            INFO("return");
+            CHECK(out.list()->handleKeyHere(KEY_RETURN, MASK_NONE));
+            REQUIRE_FALSE(studio.chosen.empty());
+            CHECK(studio.chosen.back().toEditor);
+        }
+        {
+            INFO("escape");
+            CHECK(out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            REQUIRE_FALSE(services.reveals.empty());
+            CHECK(services.reveals.back());
+        }
+        UNSCOPED_INFO("copied");
+        CHECK(out.list()->handleKeyHere('C', MASK_CONTROL));
+        REQUIRE(out.search().found()[0].lines.size() == size_t(2));
+        UNSCOPED_INFO("the line as listed, trimmed");
+        CHECK(out.search().found()[0].lines[1] == std::string("timer two"));
+        CHECK(counted() == services.words("SearchCount", { { "[HITS]", services.counted("Matches", 2) },
                                                                             { "[FILES]", services.counted("Files", 1) },
                                                                             { "[SHOWN]", "2000" } }));
 
@@ -251,57 +264,70 @@ namespace tut
         studio.objects = { { root, "Thing", { door.ref, there.ref, away } } };
         studio.inHand  = root;
         find("timer", "object");
-        ensure_equals("the open one and the one elsewhere", out.search().found().size(), size_t(2));
-        ensure_equals("where it is elsewhere, said", out.search().found()[1].where, std::string("Thing: there.lsl"));
-        ensure_equals("the rest fetched", studio.fetches.size(), size_t(1));
-        ensure("the one asked", studio.fetches[0].ref == away);
-        ensure_equals("counting while it comes", counted(), services.words("SearchCounting", { { "[HITS]", services.counted("Matches", 3) },
+        UNSCOPED_INFO("the open one and the one elsewhere");
+        REQUIRE(out.search().found().size() == size_t(2));
+        UNSCOPED_INFO("where it is elsewhere, said");
+        CHECK(out.search().found()[1].where == std::string("Thing: there.lsl"));
+        UNSCOPED_INFO("the rest fetched");
+        REQUIRE(studio.fetches.size() == size_t(1));
+        UNSCOPED_INFO("the one asked");
+        CHECK(studio.fetches[0].ref == away);
+        UNSCOPED_INFO("counting while it comes");
+        CHECK(counted() == services.words("SearchCounting", { { "[HITS]", services.counted("Matches", 3) },
                                                                                               { "[FILES]", services.counted("Files", 2) },
                                                                                               { "[SHOWN]", "2000" } }));
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("x\ntimer fetched\n"), false);
-        ensure_equals("fetched, found", out.search().found().size(), size_t(3));
-        ensure_equals("its text kept, for a replace", out.search().found()[2].text, std::string("x\ntimer fetched\n"));
-        ensure_equals("none to wait for", out.search().pending(), 0);
+        UNSCOPED_INFO("fetched, found");
+        REQUIRE(out.search().found().size() == size_t(3));
+        UNSCOPED_INFO("its text kept, for a replace");
+        CHECK(out.search().found()[2].text == std::string("x\ntimer fetched\n"));
+        UNSCOPED_INFO("none to wait for");
+        CHECK(out.search().pending() == 0);
 
         // No object in hand: none guessed at.
         studio.inHand.setNull();
         find("timer", "object");
-        ensure_equals("said", counted(), services.words("SearchNoObject"));
+        CHECK(counted() == services.words("SearchNoObject"));
     }
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<2>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: a later search drops the answers to an earlier one", "[ALScriptSearchPane]")
     {
-        set_test_name("a later search drops what an earlier one is answered");
         ALScriptSearchPane& out = make();
         const ALScriptRef   away(fresh(), fresh());
         const LLUUID        root = fresh();
         studio.objects           = { { root, "Thing", { away } } };
         find("timer", "listed");
         find("other", "listed");
-        ensure_equals("asked twice", studio.fetches.size(), size_t(2));
+        UNSCOPED_INFO("asked twice");
+        REQUIRE(studio.fetches.size() == size_t(2));
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\nother\n"), false);
-        ensure("the first search's answer dropped", out.search().found().empty());
-        ensure_equals("still waiting on the second's", out.search().pending(), 1);
+        UNSCOPED_INFO("the first search's answer dropped");
+        CHECK(out.search().found().empty());
+        UNSCOPED_INFO("still waiting on the second's");
+        CHECK(out.search().pending() == 1);
         out.fetched(studio.fetches[1].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\nother\n"), false);
-        ensure_equals("the second's kept", out.search().found().size(), size_t(1));
-        ensure_equals("for what it looked for", out.search().found()[0].places[0].begin.line, 1);
+        UNSCOPED_INFO("the second's kept");
+        REQUIRE(out.search().found().size() == size_t(1));
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
+        UNSCOPED_INFO("for what it looked for");
+        CHECK(out.search().found()[0].places[0].begin.line == 1);
     }
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<3>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: a script typed in since the search is left alone and searched again", "[ALScriptSearchPane]")
     {
-        set_test_name("a script typed in since the search is not replaced over, and is searched again a moment later");
         ALScriptSearchPane& out  = make();
         Doc&                door = doc("door", "timer one\ntimer two\n");
         find("timer");
         door.editor->setCaret(ALTextPos(0, 0));
         door.editor->insertText("x");
         out.replaceAll();
-        ensure_equals("left alone", door.editor->text(), std::string("xtimer one\ntimer two\n"));
-        ensure("said so", !services.reports.empty() && services.reports.back().failure);
+        UNSCOPED_INFO("left alone");
+        CHECK(door.editor->text() == std::string("xtimer one\ntimer two\n"));
+        {
+            INFO("said so");
+            REQUIRE_FALSE(services.reports.empty());
+            CHECK(services.reports.back().failure);
+        }
 
         // Searched again once the typing has rested: its places are where
         // they are now.
@@ -310,26 +336,36 @@ namespace tut
         door.editor->insertText("yy");
         out.typedIn(door);
         out.pump();
-        ensure_equals("not at once", out.search().found()[0].places[0].begin.column, 1);
+        // A script searched again keeps its place in found(), whether it
+        // holds places now or none: found() sized once, its places after
+        // each pump.
+        REQUIRE(out.search().found().size() == size_t(1));
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
+        UNSCOPED_INFO("not at once");
+        CHECK(out.search().found()[0].places[0].begin.column == 1);
         std::this_thread::sleep_for(std::chrono::milliseconds(700));
         LLTabContainer* tabs = window.find<LLTabContainer>("bottom_tabs");
+        REQUIRE(tabs != nullptr);
         tabs->selectTabByName("problems_tab");
         out.pump();
-        ensure_equals("due, but out of sight: waiting", out.search().found()[0].places[0].begin.column, 1);
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
+        UNSCOPED_INFO("due, but out of sight: waiting");
+        CHECK(out.search().found()[0].places[0].begin.column == 1);
         tabs->selectTabByName("search_tab");
         out.pump();
-        ensure_equals("then, seen, where it is now", out.search().found()[0].places[0].begin.column, 3);
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
+        UNSCOPED_INFO("then, seen, where it is now");
+        CHECK(out.search().found()[0].places[0].begin.column == 3);
         out.replaceAll();
-        ensure_equals("and replaced", door.editor->text(), std::string("yyx one\n two\n"));
+        UNSCOPED_INFO("and replaced");
+        CHECK(door.editor->text() == std::string("yyx one\n two\n"));
         door.editor->undo();
-        ensure_equals("as one step", door.editor->text(), std::string("yyxtimer one\ntimer two\n"));
+        UNSCOPED_INFO("as one step");
+        CHECK(door.editor->text() == std::string("yyxtimer one\ntimer two\n"));
     }
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<4>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: Replace All asks then edits open scripts and opens the rest unsaved", "[ALScriptSearchPane]")
     {
-        set_test_name("Replace All, asked first: an open script's places as one step, a script or a notecard not open opened with the change unsaved");
         ALScriptSearchPane& out  = make();
         Doc&                door = doc("door", "llSay(0, \"timer\");\n");
         const ALScriptRef   away(fresh(), fresh());
@@ -338,9 +374,11 @@ namespace tut
         studio.objects           = { { root, "Thing", { door.ref, away, card } } };
         studio.inHand            = root;
         find("timer", "object");
+        REQUIRE(studio.fetches.size() == size_t(2));
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\n"), false);
         out.fetched(studio.fetches[1].generation, "Thing", card, "card", std::make_shared<const std::string>("a timer\n"), true);
-        ensure_equals("three found", out.search().found().size(), size_t(3));
+        UNSCOPED_INFO("three found");
+        CHECK(out.search().found().size() == size_t(3));
         services.whenOpened = [this, card](const ALScriptRef& ref, const std::string&) {
             Doc& opened = ref == card ? doc("card", "a timer\n", true) : doc("away", "timer\n");
             opened.ref  = ref;
@@ -348,19 +386,37 @@ namespace tut
 
         window.find<LLLineEditor>("search_replacement")->setText(std::string("clock"));
         out.askReplaceAll();
-        ensure_equals("asked", studio.asked.size(), size_t(1));
-        ensure_equals("of the scripts and the notecard", studio.asked[0]["SCRIPTS"].asString(), services.counted("ScriptsNotecards", 3));
-        ensure_equals("the open one, replaced", door.editor->text(), std::string("llSay(0, \"clock\");\n"));
-        ensure_equals("the two not open, opened", services.opened.size(), size_t(2));
-        ensure("by their items", services.opened[0].ref == away && services.opened[1].ref == card);
+        UNSCOPED_INFO("asked");
+        REQUIRE(studio.asked.size() == size_t(1));
+        UNSCOPED_INFO("of the scripts and the notecard");
+        CHECK(studio.asked[0]["SCRIPTS"].asString() == services.counted("ScriptsNotecards", 3));
+        UNSCOPED_INFO("the open one, replaced");
+        CHECK(door.editor->text() == std::string("llSay(0, \"clock\");\n"));
+        UNSCOPED_INFO("the two not open, opened");
+        REQUIRE(services.opened.size() == size_t(2));
+        {
+            INFO("by their items");
+            CHECK(services.opened[0].ref == away);
+            CHECK(services.opened[1].ref == card);
+        }
         const Doc* opened = services.findDoc(away);
-        ensure("a tab for it", opened != nullptr);
-        ensure_equals("its change waiting on its text", opened->pendingEdits.size(), size_t(1));
-        ensure_equals("which it replaces", opened->pendingEdits[0].now, std::string("clock"));
+        UNSCOPED_INFO("a tab for it");
+        REQUIRE(opened != nullptr);
+        UNSCOPED_INFO("its change waiting on its text");
+        REQUIRE(opened->pendingEdits.size() == size_t(1));
+        UNSCOPED_INFO("which it replaces");
+        CHECK(opened->pendingEdits[0].now == std::string("clock"));
         const Doc* notecard = services.findDoc(card);
-        ensure("the notecard's too", notecard && notecard->pendingEdits.size() == 1 && notecard->pendingEdits[0].now == "clock");
-        ensure_equals("and each is made", studio.applied.size(), size_t(2));
-        ensure_equals("said", services.reports.back().text,
+        {
+            INFO("the notecard's too");
+            REQUIRE(notecard);
+            REQUIRE(notecard->pendingEdits.size() == 1);
+            CHECK(notecard->pendingEdits[0].now == "clock");
+        }
+        UNSCOPED_INFO("and each is made");
+        CHECK(studio.applied.size() == size_t(2));
+        REQUIRE_FALSE(services.reports.empty());
+        CHECK(services.reports.back().text ==
                       services.words("SearchReplaced", { { "[PLACES]", services.counted("Places", 3) }, { "[SCRIPTS]", services.counted("ScriptsNotecards", 3) } }) +
                           "; " +
                           services.words("SearchReplacedOpened",
@@ -368,11 +424,8 @@ namespace tut
                           ".");
     }
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<5>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: Replace All's step for a found script follows where it is now", "[ALScriptSearchPane]")
     {
-        set_test_name("what Replace All does with a script found, by where it is now");
         using Step = ALScriptSearch::Step;
         using At   = ALScriptSearch::Now::At;
         ALScriptSearch::Found one;
@@ -382,49 +435,58 @@ namespace tut
         ALTextDocument text("timer\n");
         ALScriptSearch::Now now;
 
-        ensure("closed, with no text kept: left", ALScriptSearch::step(one, now) == Step::Leave);
+        UNSCOPED_INFO("closed, with no text kept: left");
+        CHECK(ALScriptSearch::step(one, now) == Step::Leave);
         one.text = "timer\n";
-        ensure("closed, with its text: opened", ALScriptSearch::step(one, now) == Step::Open);
+        UNSCOPED_INFO("closed, with its text: opened");
+        CHECK(ALScriptSearch::step(one, now) == Step::Open);
         ALScriptSearch::Found file = one;
         file.ref                   = ALScriptRef();
-        ensure("a file closed since: left", ALScriptSearch::step(file, now) == Step::Leave);
+        UNSCOPED_INFO("a file closed since: left");
+        CHECK(ALScriptSearch::step(file, now) == Step::Leave);
 
         now.at         = At::Here;
         now.loaded     = true;
         now.modifiable = true;
         now.text       = &text;
-        ensure("here, at another version: left", ALScriptSearch::step(one, now) == Step::Leave);
+        UNSCOPED_INFO("here, at another version: left");
+        CHECK(ALScriptSearch::step(one, now) == Step::Leave);
         one.version = text.version();
-        ensure("here, as searched: replaced", ALScriptSearch::step(one, now) == Step::Replace);
+        UNSCOPED_INFO("here, as searched: replaced");
+        CHECK(ALScriptSearch::step(one, now) == Step::Replace);
         now.modifiable = false;
-        ensure("here, not to be changed: left", ALScriptSearch::step(one, now) == Step::Leave);
+        UNSCOPED_INFO("here, not to be changed: left");
+        CHECK(ALScriptSearch::step(one, now) == Step::Leave);
         now.modifiable = true;
         now.plainText  = true;
-        ensure("here, a text file: skipped", ALScriptSearch::step(one, now) == Step::Skip);
+        UNSCOPED_INFO("here, a text file: skipped");
+        CHECK(ALScriptSearch::step(one, now) == Step::Skip);
         now.plainText = false;
 
         now.at = At::Elsewhere;
-        ensure("elsewhere, reading as it did: replaced", ALScriptSearch::step(one, now) == Step::Replace);
+        UNSCOPED_INFO("elsewhere, reading as it did: replaced");
+        CHECK(ALScriptSearch::step(one, now) == Step::Replace);
         ALTextDocument typed("timer!\n");
         now.text = &typed;
-        ensure("elsewhere, typed in since: left", ALScriptSearch::step(one, now) == Step::Leave);
+        UNSCOPED_INFO("elsewhere, typed in since: left");
+        CHECK(ALScriptSearch::step(one, now) == Step::Leave);
 
         one.notecard = true;
         now.text     = &text;
-        ensure("found in a notecard in the world: replaced as a script is", ALScriptSearch::step(one, now) == Step::Replace);
+        UNSCOPED_INFO("found in a notecard in the world: replaced as a script is");
+        CHECK(ALScriptSearch::step(one, now) == Step::Replace);
         ALScriptSearch::Found text_file = one;
         text_file.ref                   = ALScriptRef();
-        ensure("found in a text file: skipped", ALScriptSearch::step(text_file, now) == Step::Skip);
+        UNSCOPED_INFO("found in a text file: skipped");
+        CHECK(ALScriptSearch::step(text_file, now) == Step::Skip);
         one.notecard = false;
         one.places.clear();
-        ensure("nothing found: skipped", ALScriptSearch::step(one, now) == Step::Skip);
+        UNSCOPED_INFO("nothing found: skipped");
+        CHECK(ALScriptSearch::step(one, now) == Step::Skip);
     }
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<6>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: included files are searched once each on request and left by Replace All", "[ALScriptSearchPane]")
     {
-        set_test_name("what the scripts include searched too where asked: each file once, as its own, left alone by Replace All");
         ALScriptSearchPane& out = make();
         doc("door", "#include \"lib\"\ntimer\n");
         doc("gate", "#include \"lib\"\n");
@@ -432,25 +494,36 @@ namespace tut
         studio.includes["door.lsl"] = lib;
         studio.includes["gate.lsl"] = lib;
         find("timer");
-        ensure_equals("alone: the script's own", out.search().found().size(), size_t(1));
-        ensure("nothing asked of what it includes", studio.askedIncludes.empty());
+        UNSCOPED_INFO("alone: the script's own");
+        CHECK(out.search().found().size() == size_t(1));
+        UNSCOPED_INFO("nothing asked of what it includes");
+        CHECK(studio.askedIncludes.empty());
         out.bar()->setValue("includes", "yes");
         const S32 before = studio.apart;
         find("timer");
-        ensure_equals("and the file it includes, once for the two", out.search().found().size(), size_t(2));
-        ensure("sought apart, once, and back", studio.apart == before + 1 && out.search().pending() == 0);
+        UNSCOPED_INFO("and the file it includes, once for the two");
+        REQUIRE(out.search().found().size() == size_t(2));
+        {
+            INFO("sought apart, once, and back");
+            CHECK(studio.apart == before + 1);
+            CHECK(out.search().pending() == 0);
+        }
         const ALScriptSearch::Found& found = out.search().found()[1];
-        ensure_equals("by its identity", found.file, std::string("disk:/scripts/lib.lsl"));
-        ensure("said to be included", found.where.find(services.words("SearchIncluded")) != std::string::npos && found.where.find("lib.lsl") != std::string::npos);
-        ensure_equals("a row for its place", out.list()->getItemCount(), 2);
-        ensure("Replace All leaves it", ALScriptSearch::step(found, ALScriptSearch::Now()) == ALScriptSearch::Step::Leave);
+        UNSCOPED_INFO("by its identity");
+        CHECK(found.file == std::string("disk:/scripts/lib.lsl"));
+        {
+            INFO("said to be included");
+            CHECK(found.where.find(services.words("SearchIncluded")) != std::string::npos);
+            CHECK(found.where.find("lib.lsl") != std::string::npos);
+        }
+        UNSCOPED_INFO("a row for its place");
+        CHECK(out.list()->getItemCount() == 2);
+        UNSCOPED_INFO("Replace All leaves it");
+        CHECK(ALScriptSearch::step(found, ALScriptSearch::Now()) == ALScriptSearch::Step::Leave);
     }
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<7>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: an object is searched once listed and the count says what was passed over", "[ALScriptSearchPane]")
     {
-        set_test_name("an object's scripts searched once its prims have said what they hold; the prims that did not, and a script not read, said with the count");
         ALScriptSearchPane& out = make();
         const ALScriptRef   one(fresh(), fresh());
         const ALScriptRef   two(fresh(), fresh());
@@ -464,20 +537,26 @@ namespace tut
         studio.inHand       = root;
         studio.holdListing  = true;
         find("timer", "object");
-        ensure("nothing fetched while its prims are asked", studio.fetches.empty());
-        ensure_equals("waited for", out.search().pending(), 1);
+        UNSCOPED_INFO("nothing fetched while its prims are asked");
+        CHECK(studio.fetches.empty());
+        UNSCOPED_INFO("waited for");
+        CHECK(out.search().pending() == 1);
         studio.heldListing();
-        ensure_equals("both fetched", studio.fetches.size(), size_t(2));
+        UNSCOPED_INFO("both fetched");
+        REQUIRE(studio.fetches.size() == size_t(2));
         out.fetched(studio.fetches[0].generation, "Thing", one, "one.lsl", std::make_shared<const std::string>("timer\n"), false);
         out.fetched(studio.fetches[1].generation, "Thing", two, "two.lsl", nullptr, false);
-        ensure_equals("none to wait for", out.search().pending(), 0);
-        ensure_equals("one read", out.search().found().size(), size_t(1));
+        UNSCOPED_INFO("none to wait for");
+        CHECK(out.search().pending() == 0);
+        UNSCOPED_INFO("one read");
+        CHECK(out.search().found().size() == size_t(1));
         const std::string said = services.words("SearchCount", { { "[HITS]", services.counted("Matches", 1) },
                                                                  { "[FILES]", services.counted("Files", 1) },
                                                                  { "[SHOWN]", "2000" } });
         const std::string missed = services.words("SearchBoth", { { "[FIRST]", services.counted("SearchUnlisted", 3) },
                                                                   { "[SECOND]", services.counted("SearchUnread", 1) } });
-        ensure_equals("what was passed over, after what was found", counted(),
+        UNSCOPED_INFO("what was passed over, after what was found");
+        CHECK(counted() ==
                       services.words("SearchPassedOver", { { "[SAID]", said }, { "[MISSED]", missed } }));
 
         // A search begun again lets the held listing go: its answer is an
@@ -487,28 +566,49 @@ namespace tut
         std::function<void()> first = std::move(studio.heldListing);
         find("other", "object");
         first();
-        ensure("the earlier listing dropped", studio.fetches.empty());
+        UNSCOPED_INFO("the earlier listing dropped");
+        CHECK(studio.fetches.empty());
         studio.heldListing();
-        ensure_equals("the later one searched", studio.fetches.size(), size_t(2));
+        UNSCOPED_INFO("the later one searched");
+        CHECK(studio.fetches.size() == size_t(2));
     }
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<8>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: Sources keeps a script by its text and drops the oldest past the limit", "[ALScriptSearchPane]")
     {
-        set_test_name("a script read for a search kept by which text it is: found again only for that text; no more than the most kept, the oldest going");
+        // The viewer's one store: emptied before the case and after it,
+        // however it ends.
+        struct Emptied
+        {
+            ALScriptSearch::Sources& sources;
+            ~Emptied() { sources.clear(); }
+        };
         ALScriptSearch::Sources& sources = ALScriptSearch::Sources::instance();
         sources.clear();
+        const Emptied emptied{ sources };
         const ALScriptRef one(LLUUID::generateNewID(), LLUUID::generateNewID());
         const LLUUID      asset = LLUUID::generateNewID();
         sources.keep(one, LLUUID::null, { std::make_shared<const std::string>("timer"), "one.lsl", false });
-        ensure("which text unknown: not kept", sources.bytes() == 0);
+        UNSCOPED_INFO("which text unknown: not kept");
+        CHECK(sources.bytes() == 0);
         sources.keep(one, asset, { std::make_shared<const std::string>("timer"), "one.lsl", false });
         const ALScriptSearch::Sources::Source* kept = sources.find(one, asset);
-        ensure("found by its text", kept && *kept->text == "timer" && kept->name == "one.lsl");
-        ensure("not for another", !sources.find(one, LLUUID::generateNewID()) && !sources.find(one, LLUUID::null));
+        {
+            INFO("found by its text");
+            REQUIRE(kept);
+            CHECK(*kept->text == "timer");
+            CHECK(kept->name == "one.lsl");
+        }
+        {
+            INFO("not for another");
+            CHECK_FALSE(sources.find(one, LLUUID::generateNewID()));
+            CHECK_FALSE(sources.find(one, LLUUID::null));
+        }
         sources.keep(one, LLUUID::generateNewID(), { std::make_shared<const std::string>("saved since"), "one.lsl", false });
-        ensure("saved since: in its place", !sources.find(one, asset) && sources.bytes() == std::string("saved since").size());
+        {
+            INFO("saved since: in its place");
+            CHECK_FALSE(sources.find(one, asset));
+            CHECK(sources.bytes() == std::string("saved since").size());
+        }
 
         sources.clear();
         const size_t              big = ALScriptSearch::Sources::MOST / 3 + 1;
@@ -520,53 +620,74 @@ namespace tut
             assets.push_back(LLUUID::generateNewID());
             if (i == 2)
             {
-                ensure("the first used again", sources.find(refs[0], assets[0]) != nullptr);
+                UNSCOPED_INFO("the first used again");
+                REQUIRE(sources.find(refs[0], assets[0]) != nullptr);
             }
             sources.keep(refs[i], assets[i], { std::make_shared<const std::string>(big, 'x'), "big", false });
         }
-        ensure("within the most", sources.bytes() <= ALScriptSearch::Sources::MOST);
-        ensure("the one used longest ago gone", !sources.find(refs[1], assets[1]) && sources.find(refs[0], assets[0]) && sources.find(refs[2], assets[2]));
-        sources.clear();
+        UNSCOPED_INFO("within the most");
+        CHECK(sources.bytes() <= ALScriptSearch::Sources::MOST);
+        {
+            INFO("the one used longest ago gone");
+            CHECK_FALSE(sources.find(refs[1], assets[1]));
+            CHECK(sources.find(refs[0], assets[0]));
+            CHECK(sources.find(refs[2], assets[2]));
+        }
     }
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<9>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: a fetched script is sought apart and an earlier search's is dropped", "[ALScriptSearchPane]")
     {
-        set_test_name("a fetched script sought apart, still to come until the answer is back; one of an earlier search dropped");
         ALScriptSearchPane& out  = make();
         const ALScriptRef   away(LLUUID::generateNewID(), LLUUID::generateNewID());
         studio.objects           = { { LLUUID::generateNewID(), "Thing", { away } } };
         find("timer", "listed");
-        ensure_equals("fetched", studio.fetches.size(), size_t(1));
+        REQUIRE(studio.fetches.size() == size_t(1));
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\n"), false);
-        ensure("sought apart", studio.apart == 1 && out.search().found().size() == 1 && out.search().pending() == 0);
+        {
+            INFO("sought apart");
+            CHECK(studio.apart == 1);
+            CHECK(out.search().found().size() == 1);
+            CHECK(out.search().pending() == 0);
+        }
         const S32 before = studio.apart;
         out.fetched(studio.fetches[0].generation + 7, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\n"), false);
-        ensure("another search's: not sought", studio.apart == before);
+        UNSCOPED_INFO("another search's: not sought");
+        CHECK(studio.apart == before);
     }
 
-    template <>
-    template <>
-    void alscriptsearchpane_object::test<10>()
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: inventory search reads open scripts as they stand and fetches the rest", "[ALScriptSearchPane]")
     {
-        set_test_name("the inventory searched: a script open here as it stands, the rest fetched; typing in an inventory script searches it again");
         ALScriptSearchPane& out  = make();
         Doc&                door = doc("door", "timer here\n");
         door.ref                 = ALScriptRef(LLUUID::null, fresh());
         const ALScriptRef   away(LLUUID::null, fresh());
         studio.inventory         = { { door.ref, "door" }, { away, "away.lsl" } };
         find("timer", "inventory");
-        ensure("the open one as it stands", out.search().found().size() == 1 && out.search().found()[0].doc == door.id);
-        ensure_equals("the other fetched", studio.fetches.size(), size_t(1));
-        ensure("from the inventory", studio.fetches[0].ref == away && studio.fetches[0].where == window.services().words("SearchInventoryWhere"));
+        {
+            INFO("the open one as it stands");
+            REQUIRE(out.search().found().size() == 1);
+            CHECK(out.search().found()[0].doc == door.id);
+        }
+        UNSCOPED_INFO("the other fetched");
+        REQUIRE(studio.fetches.size() == size_t(1));
+        {
+            INFO("from the inventory");
+            CHECK(studio.fetches[0].ref == away);
+            CHECK(studio.fetches[0].where == window.services().words("SearchInventoryWhere"));
+        }
         out.fetched(studio.fetches[0].generation, studio.fetches[0].where, away, "away.lsl", std::make_shared<const std::string>("a timer\n"), false);
-        ensure("both found", out.search().found().size() == 2 && out.search().pending() == 0);
+        {
+            INFO("both found");
+            REQUIRE(out.search().found().size() == 2);
+            CHECK(out.search().pending() == 0);
+        }
         door.editor->setCaret(ALTextPos(0, 0));
         door.editor->insertText("x");
         out.typedIn(door);
         std::this_thread::sleep_for(std::chrono::milliseconds(700));
         out.pump();
-        ensure_equals("typed in: searched again", out.search().found()[0].places[0].begin.column, 1);
+        REQUIRE_FALSE(out.search().found()[0].places.empty());
+        UNSCOPED_INFO("typed in: searched again");
+        CHECK(out.search().found()[0].places[0].begin.column == 1);
     }
 }

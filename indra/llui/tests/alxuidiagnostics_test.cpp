@@ -31,11 +31,11 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstring>
 
-namespace tut
+namespace
 {
     struct alxuidiagnostics_data
     {
@@ -103,19 +103,14 @@ namespace tut
         }
     };
 
-    typedef test_group<alxuidiagnostics_data> alxuidiagnostics_test;
-    typedef alxuidiagnostics_test::object     alxuidiagnostics_object;
-    tut::alxuidiagnostics_test alxuidiagnostics_testgroup("alxuidiagnostics");
-
     // With a sink alive, a build reports the attribute the viewer would log,
     // the nested one it would not, the mis-scoped dotted element, and the
     // element the factory cannot build; each carries the file it came from.
-    template<> template<>
-    void alxuidiagnostics_object::test<1>()
+    TEST_CASE_METHOD(alxuidiagnostics_data, "alxuidiagnostics: a live sink collects each finding of a build with its file", "[alxuidiagnostics]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
@@ -123,24 +118,26 @@ namespace tut
 
         {
             ALXUIDiagnostics sink;
-            ensure("the sink is active while alive", ALXUIDiagnostics::active() == &sink);
+            UNSCOPED_INFO("the sink is active while alive");
+            CHECK(ALXUIDiagnostics::active() == &sink);
 
             LLFloater* view = build(fv.get());
-            ensure("the floater builds in spite of its problems", view != nullptr);
+            UNSCOPED_INFO("the floater builds in spite of its problems");
+            REQUIRE(view != nullptr);
 
-            ensure("the floater's own unknown attribute is reported at depth 0",
-                   has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 0, "bogus_top"));
-            ensure("the nested element's unknown attribute is reported at depth 1",
-                   has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 1, "string.bogus_nested"));
-            ensure("a dotted element in the wrong scope is reported",
-                   has(sink, ALXUIDiagnostics::Kind::MisScopedElement, 1, "panel.string"));
-            ensure("an element that is not a widget is reported by the factory",
-                   has(sink, ALXUIDiagnostics::Kind::CreateFailed, 0, "nonesuch"));
+            UNSCOPED_INFO("the floater's own unknown attribute is reported at depth 0");
+            CHECK(has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 0, "bogus_top"));
+            UNSCOPED_INFO("the nested element's unknown attribute is reported at depth 1");
+            CHECK(has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 1, "string.bogus_nested"));
+            UNSCOPED_INFO("a dotted element in the wrong scope is reported");
+            CHECK(has(sink, ALXUIDiagnostics::Kind::MisScopedElement, 1, "panel.string"));
+            UNSCOPED_INFO("an element that is not a widget is reported by the factory");
+            CHECK(has(sink, ALXUIDiagnostics::Kind::CreateFailed, 0, "nonesuch"));
             // translate is a cue for translation tools, carried by 642
             // strings in the default skin; the string block swallows it
             // as LLView does, so it is not a finding.
-            ensure("translate on a string is not an unknown attribute",
-                   !has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 1, "string.translate"));
+            UNSCOPED_INFO("translate on a string is not an unknown attribute");
+            CHECK_FALSE(has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 1, "string.translate"));
 
             // The parser names the file it was handed. The factory names its
             // current file as the skin resolves it, and a file that is not on
@@ -149,11 +146,12 @@ namespace tut
             {
                 const bool from_factory = e.kind == ALXUIDiagnostics::Kind::InvalidChild
                                        || e.kind == ALXUIDiagnostics::Kind::CreateFailed;
-                ensure_equals(std::string("file on ") + ALXUIDiagnostics::kindName(e.kind) + " " + e.path,
-                              e.file, from_factory ? std::string() : std::string("diag_test.xml"));
+                INFO("file on " << ALXUIDiagnostics::kindName(e.kind) << " " << e.path);
+                REQUIRE(e.file == (from_factory ? std::string() : std::string("diag_test.xml")));
             }
         }
-        ensure("the sink detaches when it dies", ALXUIDiagnostics::active() == nullptr);
+        UNSCOPED_INFO("the sink detaches when it dies");
+        CHECK(ALXUIDiagnostics::active() == nullptr);
 
         fv.reset();
     }
@@ -162,12 +160,11 @@ namespace tut
     // block by design and are parsed again by the child's own parser; the
     // sink sees them under the child's tag so a reader can set them aside,
     // and never as the child's own at depth 0.
-    template<> template<>
-    void alxuidiagnostics_object::test<2>()
+    TEST_CASE_METHOD(alxuidiagnostics_data, "alxuidiagnostics: a child widget's attributes show as the parent's misses not its own", "[alxuidiagnostics]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         std::unique_ptr<LLFloaterView> fv(floaterView());
@@ -175,12 +172,12 @@ namespace tut
 
         ALXUIDiagnostics sink;
         LLFloater* view = build(fv.get());
-        ensure("built", view != nullptr);
+        REQUIRE(view != nullptr);
 
-        ensure("the child's known attribute shows up only as the parent's miss",
-               has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 1, "panel.name"));
-        ensure("and not as the child's own",
-               !has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 0, "name"));
+        UNSCOPED_INFO("the child's known attribute shows up only as the parent's miss");
+        CHECK(has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 1, "panel.name"));
+        UNSCOPED_INFO("and not as the child's own");
+        CHECK_FALSE(has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 0, "name"));
 
         fv.reset();
     }

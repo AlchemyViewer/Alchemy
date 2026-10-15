@@ -396,6 +396,14 @@ struct ALScriptStudioDoc
     };
     Expanded                                   expanded;
     Expanded                                   uploaded;
+    // The asset as the world holds it, whole -- the envelope and all, as
+    // another viewer opens it: as loaded, and as the last save that went
+    // up sent it; and what the save on its way sent.
+    std::shared_ptr<const std::string>         asset;
+    std::shared_ptr<const std::string>         assetSending;
+    // The next save sends it as written, its envelope let go of, whatever
+    // the setting says (Save Without Preprocessing).
+    bool                                       savePlain = false;
     // The source's require calls, of the text at requiresOf (namedAt).
     mutable std::vector<ALPreprocessor::Required> requiresFound;
     mutable std::optional<U32>                    requiresOf;
@@ -497,6 +505,12 @@ struct ALScriptStudioDoc
     // more it is asked.
     std::optional<bool>                        runningAsked;
     S32                                        runningAsks = 0;
+    // The script in an object a file's tab stands in for -- its file
+    // masters it and no other -- or none, found again as the links change
+    // (ALFloaterScriptStudio::restand); and the one asked whether it runs
+    // and what experience it runs under, asked again for another.
+    ALScriptRef                                standsFor;
+    ALScriptRef                                worldAsked;
     // A compile target picked here since the last save, which the
     // region's word on what the script compiles for does not put back.
     bool                                       targetChosen = false;

@@ -183,13 +183,11 @@ PBRMix fetch_pbr(
 }
 
 #ifdef TERRAIN_HEX_TILING
-// Hex tiling, after Mikkelsen, "Practical Real-Time Hex-Tiling", JCGT 11(2), 2022. A lattice
-// of equilateral triangles covers the plane; a fragment lies in one triangle, whose three
-// corners are the centres of the three hexagonal cells that reach it. Every cell shows the
-// texture at its own offset and rotation, and the three are blended by the fragment's
-// barycentric weights raised to a power, which keeps the blend band narrow enough that the
-// texture's contrast survives it. Nothing is precomputed from the texture, which is what lets
-// this run on assets the viewer first meets at fetch time.
+// Hex tiling on the lattice hexLatticeUtil.glsl shares with the water. Every cell shows the
+// texture at its own offset and rotation, and the three cells reaching a fragment are blended
+// by its barycentric weights raised to a power, which keeps the blend band narrow enough that
+// the texture's contrast survives it. Nothing is precomputed from the texture, which is what
+// lets this run on assets the viewer first meets at fetch time.
 //
 // It sits inside the projection: under triplanar each slice is hex-tiled in its own plane. It
 // breaks repetition within a plane and does nothing about the stretch a projection has on a
@@ -207,58 +205,41 @@ PBRMix fetch_pbr(
 // A cell whose weight falls under this is not fetched. As TERRAIN_TRIPLANAR_MIX_THRESHOLD.
 #define TERRAIN_HEX_MIX_THRESHOLD 0.01
 
-#define HEX_A 1 << 0
-#define HEX_B 1 << 1
-#define HEX_C 1 << 2
-
 struct HexTile
 {
     ivec2 corner[3];
     vec3 weight;    // Sums to 1
-    int type;       // HEX_A | HEX_B | HEX_C: the cells whose weight survived the threshold
+    int type;       // Bit i: corner i's weight survived the threshold
 };
 
-// lowbias32 (Wellons) over the lattice id. Integer, so every GPU agrees on what a cell shows;
-// the sin()-based hashes disagree once the argument is a few thousand.
+vec2 hex_skew(vec2 p);
+void hex_triangle(vec2 f, out ivec2 corner0, out ivec2 corner1, out ivec2 corner2, out vec3 bary);
+int hex_sharpen(vec3 bary, float contrast, float threshold, out vec3 weight);
+uint hex_hash(uvec2 id);
+
 uint _hex_hash(ivec2 corner)
 {
     // Ids run a few thousand either side of zero; the bias keeps the conversion in range.
-    uvec2 u = uvec2(corner + ivec2(1 << 20));
-    uint h = u.x * 0x8da6b343u + u.y * 0xd8163841u;
-    h ^= h >> 16;
-    h *= 0x7feb352du;
-    h ^= h >> 15;
-    h *= 0x846ca68bu;
-    h ^= h >> 16;
-    return h;
+    return hex_hash(uvec2(corner + ivec2(1 << 20)));
 }
 
 HexTile hex_tile(vec2 uv)
 {
-    // Skew the plane into the lattice's own coordinates, where every triangle is half of a
-    // unit square. The fragment's barycentrics come from its position in that square, and its
-    // three corners from which half it is in.
-    vec2 skewed = mat2(1.0, 0.0, -0.57735027, 1.15470054) * (uv * TERRAIN_HEX_GRID_SCALE);
+    // The fragment's barycentrics come from its position in the skewed lattice's unit square,
+    // and its three corners from which half of the square it is in.
+    vec2 skewed = hex_skew(uv * TERRAIN_HEX_GRID_SCALE);
     ivec2 base = ivec2(floor(skewed));
-    vec2 f = fract(skewed);
-    int upper = int(step(1.0, f.x + f.y));
-    float flip = float(upper) * 2.0 - 1.0;
 
     HexTile ht;
-    ht.corner[0] = base + ivec2(upper);
-    ht.corner[1] = base + ivec2(upper, 1 - upper);
-    ht.corner[2] = base + ivec2(1 - upper, upper);
-    vec3 w = max(vec3(0.0), vec3((f.x + f.y - 1.0) * flip, float(upper) - f.y * flip, float(upper) - f.x * flip));
-
-    w = pow(w, vec3(TERRAIN_HEX_EXPONENT));
-    w /= (w.x + w.y + w.z);
-    w -= TERRAIN_HEX_MIX_THRESHOLD;
-    ivec3 usage = ivec3(round(max(vec3(0.0), sign(w))));
-    ht.weight = max(vec3(0.0), w);
-    ht.weight /= (ht.weight.x + ht.weight.y + ht.weight.z);
-    ht.type = (usage.x * HEX_A) |
-              (usage.y * HEX_B) |
-              (usage.z * HEX_C);
+    ivec2 corner0;
+    ivec2 corner1;
+    ivec2 corner2;
+    vec3 w;
+    hex_triangle(fract(skewed), corner0, corner1, corner2, w);
+    ht.corner[0] = base + corner0;
+    ht.corner[1] = base + corner1;
+    ht.corner[2] = base + corner2;
+    ht.type = hex_sharpen(w, TERRAIN_HEX_EXPONENT, TERRAIN_HEX_MIX_THRESHOLD, ht.weight);
     return ht;
 }
 

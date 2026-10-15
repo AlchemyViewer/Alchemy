@@ -1149,6 +1149,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaVectorText">ll.DumpList2String writes a vector's or a rotation's parts as LSL did, with five places; SLua's tostring writes as few as each needs, &lt;1, 2, 3&gt;, which tovector reads back the same.</string>
 	<string name="SluaUuidText">uuid() stops the script on text that is no UUID, where LSL's keys held any text; touuid() answers nil instead.</string>
 	<string name="SluaKeyAsText">SLua's ll takes a key as text, as LSL's functions did, so text is given as it is; `:: any` tells the type checker, which asks for a uuid. uuid() would stop the script on text that is no UUID.</string>
+	<string name="SluaKeyAsTextBare">SLua's ll takes a key as text, as LSL's functions did, so text is given as it is, though the type checker asks for a uuid: `:: any` quiets it, uuid() stops the script on text that is no UUID, and touuid() gives nil for it.</string>
+	<string name="SluaList2KeyText">Keys are held as text, so llList2Key's item is read as List2String reads it, as LSL gave it, where SLua's List2Key answers NULL_KEY for text that is no UUID; a number's or a vector's text is given, where LSL gave "".</string>
 	<string name="SluaDetectedTable">detected[n] is what LSL read with llDetected*(n - 1): SLua counts it from 1, and one past its end is an error, where LSL answered nothing.</string>
 	<string name="SluaMathDomain">math.sqrt, math.log and math.log10 answer nan or -inf out of their range, where LSL answered 0 or stopped with a math error.</string>
 	<string name="SluaBase64Decode">llbase64.decode keeps every byte it decodes, a NUL and what is not UTF-8 among them, where LSL's llBase64ToString cut the string at a NUL and made what was not UTF-8 '?'.</string>
@@ -1168,6 +1170,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaBool">llcompat.[1] answers 1 or 0, as LSL did; ll.[1] answers true or false.</string>
 	<string name="SluaBoolList">llcompat.[1]'s list has 1 or 0 where LSL's did; ll.[1]'s has true or false there.</string>
 	<string name="SluaRightFirst">LSL ran the right side of this before the left, and Luau runs the left first: one side changes what the other reads.</string>
+	<string name="SluaRightFirstWorld">LSL ran the right side of this before the left, and Luau runs the left first: [1] may change what [2] does or finds outside the script.</string>
+	<string name="SluaRightFirstSet">LSL ran the right side of this before the left, and Luau runs the left first: [1] is set on one side and read or set on the other.</string>
+	<string name="SluaRightFirstCall">LSL ran the right side of this before the left, and Luau runs the left first: [1] sets [2], which the other side reads or sets too.</string>
 	<string name="SluaBit32Signed">bit32 answers 0 to 4294967295, where LSL's integers were signed: bit32.s32 makes the answer LSL's where it could pass 2147483647 and is read as a number.</string>
 	<string name="SluaHexSign">SLua reads [1] as [2], where LSL wrapped it to [3]: bit32 takes either the same, so it stays as written where only bit32 reads it, and is [3] where it is read as a number.</string>
 	<string name="SluaIntegerPast32Bits">LSL reads [1] as -1: past 0xFFFFFFFF, the most its 32 bits hold, a number stops there.</string>

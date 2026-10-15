@@ -447,6 +447,13 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     args["[NAME]"] = doc->name;
     if (action == "close")
     {
+        // Where the compiled half's word was what was said, let go of as
+        // Keep Source lets go of it: the next save replaces the half.
+        if (doc->compiledDiffers && !doc->recoverable && !orphanSaid(*doc) && !doc->historyShown)
+        {
+            doc->compiledDiffers.reset();
+            mWindow.endCompare(*doc);
+        }
         // Hidden until there is something else to say; a kept text from an
         // earlier session stays offered, under File > Recover Unsaved
         // Changes, once the notice is gone.

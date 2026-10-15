@@ -30,14 +30,12 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstring>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         // A registered panel class that counts its constructions, standing in
         // for the viewer classes whose constructors have side effects.
         int gProbeClassBuilt = 0;
@@ -51,7 +49,6 @@ namespace tut
         {
             TestPanel(const LLPanel::Params& p) : LLPanel(p) {}
         };
-    }
 
     struct alxuishellbuild_data
     {
@@ -86,45 +83,44 @@ namespace tut
         }
     };
 
-    typedef test_group<alxuishellbuild_data> alxuishellbuild_test;
-    typedef alxuishellbuild_test::object     alxuishellbuild_object;
-    tut::alxuishellbuild_test alxuishellbuild_testgroup("alxuishellbuild");
-
     // Without the switch, the class attribute builds the registered class.
-    template<> template<>
-    void alxuishellbuild_object::test<1>()
+    TEST_CASE_METHOD(alxuishellbuild_data, "alxuishellbuild: without the switch the class attribute builds the registered class", "[alxuishellbuild]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         gProbeClassBuilt = 0;
         std::unique_ptr<LLPanel> panel(build());
-        ensure("built", panel != nullptr);
-        ensure_equals("the registered class was constructed", gProbeClassBuilt, 1);
-        ensure("the inner panel exists", panel->findChild<LLPanel>("inner") != nullptr);
+        REQUIRE(panel != nullptr);
+        UNSCOPED_INFO("the registered class was constructed");
+        CHECK(gProbeClassBuilt == 1);
+        CHECK(panel->findChild<LLPanel>("inner") != nullptr);
     }
 
     // With it, the same file builds a plain panel in the class's place, and
     // the switch is gone again once its holder is.
-    template<> template<>
-    void alxuishellbuild_object::test<2>()
+    TEST_CASE_METHOD(alxuishellbuild_data, "alxuishellbuild: a shell build puts a plain panel in the class's place until it ends", "[alxuishellbuild]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         gProbeClassBuilt = 0;
         {
             ALXUIShellBuild shell;
-            ensure("the switch is active while its holder lives", ALXUIShellBuild::active());
+            UNSCOPED_INFO("the switch is active while its holder lives");
+            CHECK(ALXUIShellBuild::active());
             std::unique_ptr<LLPanel> panel(build());
-            ensure("built", panel != nullptr);
-            ensure_equals("the registered class was not constructed", gProbeClassBuilt, 0);
-            ensure("the inner panel exists as a plain panel", panel->findChild<LLPanel>("inner") != nullptr);
+            REQUIRE(panel != nullptr);
+            UNSCOPED_INFO("the registered class was not constructed");
+            CHECK(gProbeClassBuilt == 0);
+            UNSCOPED_INFO("the inner panel exists as a plain panel");
+            CHECK(panel->findChild<LLPanel>("inner") != nullptr);
         }
-        ensure("the switch is gone with its holder", !ALXUIShellBuild::active());
+        UNSCOPED_INFO("the switch is gone with its holder");
+        CHECK_FALSE(ALXUIShellBuild::active());
     }
 }

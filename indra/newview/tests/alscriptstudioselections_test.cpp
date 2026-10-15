@@ -29,7 +29,7 @@
 #include "aldiffview.h"
 #include "alscriptstudio_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace
 {
@@ -72,7 +72,7 @@ namespace
     };
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudioselections_data
     {
@@ -136,93 +136,115 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptstudioselections_data> alscriptstudioselections_group;
-    typedef alscriptstudioselections_group::object    alscriptstudioselections_object;
-    tut::alscriptstudioselections_group               alscriptstudioselections_test("alscriptstudioselections");
-
-    template<> template<>
-    void alscriptstudioselections_object::test<1>()
+    TEST_CASE_METHOD(alscriptstudioselections_data, "alscriptstudioselections: hold keeps a selection titled by its tab and lines and says so", "[alscriptstudioselections]")
     {
-        set_test_name("nothing selected, nothing held; a selection held by its tab's name and its lines, and said");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& door = tab("door", lines(8));
-        ensure("nothing to hold", !ALScriptStudioSelections::canHold(door));
+        UNSCOPED_INFO("nothing to hold");
+        CHECK_FALSE(ALScriptStudioSelections::canHold(door));
         unit->hold(door);
-        ensure("none held", !unit->held());
+        UNSCOPED_INFO("none held");
+        REQUIRE_FALSE(unit->held());
 
         door.editor->goTo(ALTextRange(ALTextPos(4, 0), ALTextPos(2, 0)));
-        ensure("something to hold", ALScriptStudioSelections::canHold(door));
+        UNSCOPED_INFO("something to hold");
+        CHECK(ALScriptStudioSelections::canHold(door));
         unit->hold(door);
-        ensure("held", unit->held().has_value());
-        ensure_equals("its text, whichever way it was selected", unit->held()->text, std::string("line 2\nline 3\n"));
-        ensure_equals("its lines, the last ending at a line's start not counted", unit->held()->title, titled("SelectionLines", "door", 3, 4));
+        REQUIRE(unit->held().has_value());
+        UNSCOPED_INFO("its text, whichever way it was selected");
+        CHECK(unit->held()->text == std::string("line 2\nline 3\n"));
+        UNSCOPED_INFO("its lines, the last ending at a line's start not counted");
+        CHECK(unit->held()->title == titled("SelectionLines", "door", 3, 4));
         LLStringUtil::format_map_t args;
         args["[TITLE]"] = unit->held()->title;
-        ensure_equals("said", services().statuses.back(), said("SelectionHeld", args));
+        REQUIRE_FALSE(services().statuses.empty());
+        CHECK(services().statuses.back() == said("SelectionHeld", args));
 
         door.editor->goTo(ALTextRange(ALTextPos(5, 0), ALTextPos(5, 4)));
         unit->hold(door);
-        ensure("one line, in place of the other", unit->held()->text == "line" && unit->held()->title == titled("SelectionLine", "door", 6));
+        {
+            INFO("one line, in place of the other");
+            REQUIRE(unit->held().has_value());
+            CHECK(unit->held()->text == "line");
+            CHECK(unit->held()->title == titled("SelectionLine", "door", 6));
+        }
     }
 
-    template<> template<>
-    void alscriptstudioselections_object::test<2>()
+    TEST_CASE_METHOD(alscriptstudioselections_data, "alscriptstudioselections: compare puts the held left of another tab's selection in its place", "[alscriptstudioselections]")
     {
-        set_test_name("the held compared with another tab's selection, in that tab's place: the held on the left, each under its title");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& door = tab("door", lines(8));
         Doc& lamp = tab("lamp", lines(8, { { 3, "lamp 3" } }));
         lamp.editor->goTo(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 0)));
-        ensure("nothing held: nothing to compare", !unit->canCompare(lamp));
+        UNSCOPED_INFO("nothing held: nothing to compare");
+        CHECK_FALSE(unit->canCompare(lamp));
         door.editor->goTo(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 0)));
         unit->hold(door);
-        ensure("held, and lamp's selected", unit->canCompare(lamp));
+        UNSCOPED_INFO("held, and lamp's selected");
+        CHECK(unit->canCompare(lamp));
         lamp.editor->goTo(ALTextPos(0, 0));
-        ensure("nothing selected in lamp", !unit->canCompare(lamp));
+        UNSCOPED_INFO("nothing selected in lamp");
+        CHECK_FALSE(unit->canCompare(lamp));
         lamp.editor->goTo(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 0)));
         unit->compare(lamp);
-        ensure_equals("compared", studio.did.size(), 1U);
-        ensure_equals("held against lamp's", studio.did[0],
+        UNSCOPED_INFO("compared");
+        REQUIRE(studio.did.size() == 1U);
+        UNSCOPED_INFO("held against lamp's");
+        CHECK(studio.did[0] ==
                       "line 2\nline 3\n | line 2\nlamp 3\n (" + titled("SelectionLines", "door", 3, 4) + " | " + titled("SelectionLines", "lamp", 3, 4) + ")");
-        ensure("in lamp's place", lamp.compareView && lamp.compareView->changeCount() == 1);
+        {
+            INFO("in lamp's place");
+            REQUIRE(lamp.compareView);
+            CHECK(lamp.compareView->changeCount() == 1);
+        }
     }
 
-    template<> template<>
-    void alscriptstudioselections_object::test<3>()
+    TEST_CASE_METHOD(alscriptstudioselections_data, "alscriptstudioselections: typing and taking back edit the source's stretch until it moves", "[alscriptstudioselections]")
     {
-        set_test_name("in the source: typing goes on at the selection's place, a change taken back edits that stretch; once the tab moves, neither");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& door = tab("door", lines(10));
         door.editor->goTo(ALTextRange(ALTextPos(1, 0), ALTextPos(3, 0)));
         unit->hold(door);
         door.editor->goTo(ALTextRange(ALTextPos(5, 0), ALTextPos(7, 0)));
         unit->compare(door);
+        REQUIRE(door.compareView);
         ALDiffView& view = *door.compareView;
-        ensure("its changes may be taken back", view.canTakeBack());
+        UNSCOPED_INFO("its changes may be taken back");
+        CHECK(view.canTakeBack());
 
         // Typed on the comparison's second line, two in: the source's
         // seventh line, two in.
         view.right()->setFocus(true);
         view.right()->goTo(ALTextPos(1, 2));
         view.right()->handleUnicodeChar('x', false);
-        ensure("sent to the stretch's place", studio.typedAt.size() == 1 && studio.typedAt[0] == ALTextPos(6, 2));
-        ensure_equals("typed there", door.editor->text(), lines(10, { { 6, "lixne 6" } }));
+        {
+            INFO("sent to the stretch's place");
+            REQUIRE(studio.typedAt.size() == 1);
+            CHECK(studio.typedAt[0] == ALTextPos(6, 2));
+        }
+        UNSCOPED_INFO("typed there");
+        CHECK(door.editor->text() == lines(10, { { 6, "lixne 6" } }));
 
         // Compared again, a change taken back: the stretch made the held's.
         door.editor->goTo(ALTextRange(ALTextPos(5, 0), ALTextPos(7, 0)));
         unit->compare(door);
-        ensure("taken back", view.takeBack(0));
-        ensure_equals("the stretch made the held's", door.editor->text(), lines(10, { { 5, "line 1" }, { 6, "line 2" } }));
-        ensure("the comparison with it", view.rightText() == "line 1\nline 2\n" && view.changeCount() == 0);
+        CHECK(view.takeBack(0));
+        UNSCOPED_INFO("the stretch made the held's");
+        CHECK(door.editor->text() == lines(10, { { 5, "line 1" }, { 6, "line 2" } }));
+        {
+            INFO("the comparison with it");
+            CHECK(view.rightText() == "line 1\nline 2\n");
+            CHECK(view.changeCount() == 0);
+        }
 
         // A stretch whose lines change in number: the next taken back
         // still lands within it.
@@ -230,8 +252,9 @@ namespace tut
         unit->hold(door);
         door.editor->goTo(ALTextRange(ALTextPos(5, 0), ALTextPos(7, 0)));
         unit->compare(door);
-        ensure("two lines made one", view.takeBack(0));
-        ensure_equals("the source", door.editor->text(), lines(9, { { 5, "line 0" }, { 6, "line 7" }, { 7, "line 8" }, { 8, "line 9" } }));
+        UNSCOPED_INFO("two lines made one");
+        CHECK(view.takeBack(0));
+        CHECK(door.editor->text() == lines(9, { { 5, "line 0" }, { 6, "line 7" }, { 7, "line 8" }, { 8, "line 9" } }));
 
         // The source moved under a comparison: nothing taken back, typing
         // at the stretch's start.
@@ -240,20 +263,23 @@ namespace tut
         door.editor->goTo(ALTextPos(0, 0));
         door.editor->insertText("new\n");
         const std::string moved = door.editor->text();
-        ensure("nothing taken back", !view.takeBack(0) && door.editor->text() == moved);
+        {
+            INFO("nothing taken back");
+            CHECK_FALSE(view.takeBack(0));
+            CHECK(door.editor->text() == moved);
+        }
         view.right()->setFocus(true);
         view.right()->goTo(ALTextPos(1, 3));
         view.right()->handleUnicodeChar('y', false);
-        ensure("typing at the stretch's start", studio.typedAt.back() == ALTextPos(1, 0));
+        UNSCOPED_INFO("typing at the stretch's start");
+        CHECK(studio.typedAt.back() == ALTextPos(1, 0));
     }
 
-    template<> template<>
-    void alscriptstudioselections_object::test<4>()
+    TEST_CASE_METHOD(alscriptstudioselections_data, "alscriptstudioselections: a selection in the preprocessed view compares as text and edits nothing", "[alscriptstudioselections]")
     {
-        set_test_name("a selection in what is not the source -- the preprocessed view -- compared as text alone: nothing taken back, and nothing typed into the script");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& door = tab("door", lines(8));
         door.editor->goTo(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 0)));
@@ -261,43 +287,56 @@ namespace tut
         door.expandedEditor = editor("expanded_door", lines(8, { { 1, "expanded 1" } }));
         door.view           = Doc::View::Expanded;
         door.expandedEditor->goTo(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 0)));
-        ensure("held from the view in sight", ALScriptStudioSelections::canHold(door) && unit->canCompare(door));
+        {
+            INFO("held from the view in sight");
+            CHECK(ALScriptStudioSelections::canHold(door));
+            CHECK(unit->canCompare(door));
+        }
         unit->compare(door);
-        ensure_equals("its text", studio.did.back(),
+        // Compared, and so in its place: the window makes the view as it compares.
+        REQUIRE_FALSE(studio.did.empty());
+        UNSCOPED_INFO("its text");
+        CHECK(studio.did.back() ==
                       "line 0\nline 1\n | line 0\nexpanded 1\n (" + titled("SelectionLines", "door", 1, 2) + " | " + titled("SelectionLines", "door", 1, 2) + ")");
-        ensure("nothing taken back", !door.compareView->canTakeBack());
+        UNSCOPED_INFO("nothing taken back");
+        CHECK_FALSE(door.compareView->canTakeBack());
         door.compareView->right()->setFocus(true);
         door.compareView->right()->goTo(ALTextPos(1, 2));
         door.compareView->right()->handleUnicodeChar('z', false);
-        ensure("nothing typed into the script: the expansion is not it", studio.typedAt.empty());
+        UNSCOPED_INFO("nothing typed into the script: the expansion is not it");
+        REQUIRE(studio.typedAt.empty());
     }
 
-    template<> template<>
-    void alscriptstudioselections_object::test<5>()
+    TEST_CASE_METHOD(alscriptstudioselections_data, "alscriptstudioselections: typing maps a mid-line selection's first line from where it starts", "[alscriptstudioselections]")
     {
-        set_test_name("a selection starting within a line: its first line's places counted from where it starts, the rest from their lines' starts");
         if (!window.floater)
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Doc& door = tab("door", "integer a = alpha;\ninteger b = beta;\ninteger c = 1;");
         door.editor->goTo(ALTextRange(ALTextPos(0, 12), ALTextPos(0, 17)));
         unit->hold(door);
         door.editor->goTo(ALTextRange(ALTextPos(1, 12), ALTextPos(2, 9)));
         unit->compare(door);
+        REQUIRE(door.compareView);
         ALDiffView& view = *door.compareView;
-        ensure_equals("the stretch", view.rightText(), std::string("beta;\ninteger c"));
+        UNSCOPED_INFO("the stretch");
+        CHECK(view.rightText() == std::string("beta;\ninteger c"));
         view.right()->setFocus(true);
         view.right()->goTo(ALTextPos(0, 2));
         view.right()->handleUnicodeChar('x', false);
-        ensure("on its first line, from where it starts", studio.typedAt.back() == ALTextPos(1, 14));
-        ensure_equals("typed there", door.editor->text(), std::string("integer a = alpha;\ninteger b = bexta;\ninteger c = 1;"));
+        REQUIRE_FALSE(studio.typedAt.empty());
+        UNSCOPED_INFO("on its first line, from where it starts");
+        CHECK(studio.typedAt.back() == ALTextPos(1, 14));
+        UNSCOPED_INFO("typed there");
+        CHECK(door.editor->text() == std::string("integer a = alpha;\ninteger b = bexta;\ninteger c = 1;"));
 
         door.editor->goTo(ALTextRange(ALTextPos(1, 12), ALTextPos(2, 9)));
         unit->compare(door);
         view.right()->setFocus(true);
         view.right()->goTo(ALTextPos(1, 3));
         view.right()->handleUnicodeChar('y', false);
-        ensure("on a line after, from its start", studio.typedAt.back() == ALTextPos(2, 3));
+        UNSCOPED_INFO("on a line after, from its start");
+        CHECK(studio.typedAt.back() == ALTextPos(2, 3));
     }
 }

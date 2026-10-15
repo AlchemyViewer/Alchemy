@@ -25,9 +25,13 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+
+#include "altestmatchers.h"
 
 #include "../alfarplane.h"
+#include "../alwaterfield.h"
+#include "../alwaterheightbake.h"
 
 #include "llcamera.h"
 
@@ -37,12 +41,8 @@
 #include <limits>
 #include <sstream>
 
-namespace tut
+namespace
 {
-    struct alfarplane_data
-    {
-    };
-
     // A shader's source, found from this file so the test reads what the viewer compiles.
     static std::string shader_source(const std::string& rel)
     {
@@ -60,173 +60,269 @@ namespace tut
         return at == std::string::npos ? -1.f : std::stof(text.substr(at + key.size()));
     }
 
-    typedef test_group<alfarplane_data> alfarplane_group;
-    typedef alfarplane_group::object    alfarplane_object;
-    tut::alfarplane_group alfarplane_g("alfarplane");
-
     // The draw distance consumers see: forward-Z keeps 512 m, reverse-Z reaches MAX_FAR_CLIP.
-    template<> template<>
-    void alfarplane_object::test<1>()
+    TEST_CASE("alfarplane: draw distance caps at 512 m forward-Z and MAX_FAR_CLIP reversed", "[alfarplane]")
     {
-        set_test_name("draw distance ceiling");
-        ensure_equals("forward ceiling", ALFarPlane::drawDistanceCeiling(false), 512.f);
-        ensure_equals("reverse ceiling", ALFarPlane::drawDistanceCeiling(true), 2048.f);
-        ensure_equals("forward caps", ALFarPlane::clampDrawDistance(2048.f, false), 512.f);
-        ensure_equals("forward keeps lower", ALFarPlane::clampDrawDistance(256.f, false), 256.f);
-        ensure_equals("reverse keeps 2048", ALFarPlane::clampDrawDistance(2048.f, true), 2048.f);
-        ensure_equals("reverse caps past MAX_FAR_CLIP", ALFarPlane::clampDrawDistance(4096.f, true), MAX_FAR_CLIP);
+        UNSCOPED_INFO("forward ceiling");
+        CHECK(ALFarPlane::drawDistanceCeiling(false) == 512.f);
+        UNSCOPED_INFO("reverse ceiling");
+        CHECK(ALFarPlane::drawDistanceCeiling(true) == 2048.f);
+        UNSCOPED_INFO("forward caps");
+        CHECK(ALFarPlane::clampDrawDistance(2048.f, false) == 512.f);
+        UNSCOPED_INFO("forward keeps lower");
+        CHECK(ALFarPlane::clampDrawDistance(256.f, false) == 256.f);
+        UNSCOPED_INFO("reverse keeps 2048");
+        CHECK(ALFarPlane::clampDrawDistance(2048.f, true) == 2048.f);
+        UNSCOPED_INFO("reverse caps past MAX_FAR_CLIP");
+        CHECK(ALFarPlane::clampDrawDistance(4096.f, true) == MAX_FAR_CLIP);
     }
 
     // Reverse-Z is infinite; forward-Z and probe captures keep the finite plane, and the debug force moves only the
     // main view under reverse-Z.
-    template<> template<>
-    void alfarplane_object::test<2>()
+    TEST_CASE("alfarplane: only the reverse-Z main view gets an infinite or forced far plane", "[alfarplane]")
     {
-        set_test_name("projection far plane");
         using namespace ALFarPlane;
-        ensure("reverse infinite", isInfinite(projectionFar(true, false)));
-        ensure_equals("forward", projectionFar(false, false), FINITE_PROJECTION_FAR);
-        ensure_equals("reverse cube snapshot", projectionFar(true, true), FINITE_PROJECTION_FAR);
-        ensure_equals("forward cube snapshot", projectionFar(false, true), FINITE_PROJECTION_FAR);
-        ensure_equals("finite plane is 1024 m", FINITE_PROJECTION_FAR, 1024.f);
-        ensure("1024 is finite", !isInfinite(1024.f));
-        ensure("infinite constant", isInfinite(INFINITE_FAR) && INFINITE_FAR > 0.f);
+        UNSCOPED_INFO("reverse infinite");
+        CHECK(isInfinite(projectionFar(true, false)));
+        UNSCOPED_INFO("forward");
+        CHECK(projectionFar(false, false) == FINITE_PROJECTION_FAR);
+        UNSCOPED_INFO("reverse cube snapshot");
+        CHECK(projectionFar(true, true) == FINITE_PROJECTION_FAR);
+        UNSCOPED_INFO("forward cube snapshot");
+        CHECK(projectionFar(false, true) == FINITE_PROJECTION_FAR);
+        CHECK(FINITE_PROJECTION_FAR == 1024.f);
+        CHECK_FALSE(isInfinite(1024.f));
+        CHECK(isInfinite(INFINITE_FAR));
+        CHECK(INFINITE_FAR > 0.f);
 
-        ensure("auto", isInfinite(projectionFar(true, false, FORCE_AUTOMATIC, 2048.f)));
-        ensure_equals("finite", projectionFar(true, false, FORCE_FINITE, 2048.f), 4096.f);
-        ensure_equals("finite never under the finite plane", projectionFar(true, false, FORCE_FINITE, 256.f), FINITE_PROJECTION_FAR);
-        ensure("infinite", isInfinite(projectionFar(true, false, FORCE_INFINITE, 2048.f)));
-        ensure("unknown mode", isInfinite(projectionFar(true, false, 7, 2048.f)));
-        ensure_equals("cube snapshot never forced infinite", projectionFar(true, true, FORCE_INFINITE, 2048.f), FINITE_PROJECTION_FAR);
-        ensure_equals("cube snapshot never forced finite", projectionFar(true, true, FORCE_FINITE, 2048.f), FINITE_PROJECTION_FAR);
-        ensure_equals("forward ignores infinite", projectionFar(false, false, FORCE_INFINITE, 2048.f), FINITE_PROJECTION_FAR);
-        ensure_equals("forward ignores finite", projectionFar(false, false, FORCE_FINITE, 2048.f), FINITE_PROJECTION_FAR);
+        CHECK(isInfinite(projectionFar(true, false, FORCE_AUTOMATIC, 2048.f)));
+        CHECK(projectionFar(true, false, FORCE_FINITE, 2048.f) == 4096.f);
+        UNSCOPED_INFO("finite never under the finite plane");
+        CHECK(projectionFar(true, false, FORCE_FINITE, 256.f) == FINITE_PROJECTION_FAR);
+        CHECK(isInfinite(projectionFar(true, false, FORCE_INFINITE, 2048.f)));
+        UNSCOPED_INFO("unknown mode");
+        CHECK(isInfinite(projectionFar(true, false, 7, 2048.f)));
+        UNSCOPED_INFO("cube snapshot never forced infinite");
+        CHECK(projectionFar(true, true, FORCE_INFINITE, 2048.f) == FINITE_PROJECTION_FAR);
+        UNSCOPED_INFO("cube snapshot never forced finite");
+        CHECK(projectionFar(true, true, FORCE_FINITE, 2048.f) == FINITE_PROJECTION_FAR);
+        UNSCOPED_INFO("forward ignores infinite");
+        CHECK(projectionFar(false, false, FORCE_INFINITE, 2048.f) == FINITE_PROJECTION_FAR);
+        UNSCOPED_INFO("forward ignores finite");
+        CHECK(projectionFar(false, false, FORCE_FINITE, 2048.f) == FINITE_PROJECTION_FAR);
     }
 
     // How far terrain and water reach, and from how high water is drawn.
-    template<> template<>
-    void alfarplane_object::test<3>()
+    TEST_CASE("alfarplane: how far terrain and water reach and from how high water shows", "[alfarplane]")
     {
-        set_test_name("terrain and water reach");
         using namespace ALFarPlane;
-        ensure_equals("terrain reach under the infinite projection", terrainReach(INFINITE_FAR), 8192.f);
-        ensure_equals("terrain unbounded on forward-Z", terrainReach(projectionFar(false, false)), 0.f);
-        ensure_equals("terrain unbounded in cube snapshots", terrainReach(projectionFar(true, true)), 0.f);
-        ensure_equals("edge water, infinite", edgeWaterStretch(true), 256000.f);
-        ensure_equals("edge water, finite keeps 2048", edgeWaterStretch(false), 2048.f);
-        ensure("edge water covers the terrain reach", edgeWaterStretch(true) >= TERRAIN_REACH);
+        CHECK(terrainReach(INFINITE_FAR) == 8192.f);
+        UNSCOPED_INFO("terrain unbounded on forward-Z");
+        CHECK(terrainReach(projectionFar(false, false)) == 0.f);
+        UNSCOPED_INFO("terrain unbounded in cube snapshots");
+        CHECK(terrainReach(projectionFar(true, true)) == 0.f);
+        UNSCOPED_INFO("edge water, infinite");
+        CHECK(edgeWaterStretch(true) == 256000.f);
+        UNSCOPED_INFO("edge water, finite keeps 2048");
+        CHECK(edgeWaterStretch(false) == 2048.f);
+        CHECK(edgeWaterStretch(true) >= TERRAIN_REACH);
 
-        ensure("finite: below 1024 m", waterVisibleFrom(1000.f, 20.f, FINITE_PROJECTION_FAR));
-        ensure("finite: from 1024 m it stops", !waterVisibleFrom(1024.f, 20.f, FINITE_PROJECTION_FAR));
-        ensure("finite: a farther plane shows it from higher", waterVisibleFrom(2000.f, 20.f, 4096.f));
-        ensure("finite: up to that plane", !waterVisibleFrom(4096.f, 20.f, 4096.f));
-        ensure("infinite: 2 km up still shows", waterVisibleFrom(2000.f, 20.f, INFINITE_FAR));
-        ensure("infinite: within reach above the water", waterVisibleFrom(20.f + EDGE_WATER_STRETCH - 1.f, 20.f, INFINITE_FAR));
-        ensure("infinite: past reach above the water", !waterVisibleFrom(20.f + EDGE_WATER_STRETCH, 20.f, INFINITE_FAR));
+        UNSCOPED_INFO("finite: below 1024 m");
+        CHECK(waterVisibleFrom(1000.f, 20.f, FINITE_PROJECTION_FAR));
+        UNSCOPED_INFO("finite: from 1024 m it stops");
+        CHECK_FALSE(waterVisibleFrom(1024.f, 20.f, FINITE_PROJECTION_FAR));
+        UNSCOPED_INFO("finite: a farther plane shows it from higher");
+        CHECK(waterVisibleFrom(2000.f, 20.f, 4096.f));
+        UNSCOPED_INFO("finite: up to that plane");
+        CHECK_FALSE(waterVisibleFrom(4096.f, 20.f, 4096.f));
+        UNSCOPED_INFO("infinite: 2 km up still shows");
+        CHECK(waterVisibleFrom(2000.f, 20.f, INFINITE_FAR));
+        UNSCOPED_INFO("infinite: within reach above the water");
+        CHECK(waterVisibleFrom(20.f + EDGE_WATER_STRETCH - 1.f, 20.f, INFINITE_FAR));
+        UNSCOPED_INFO("infinite: past reach above the water");
+        CHECK_FALSE(waterVisibleFrom(20.f + EDGE_WATER_STRETCH, 20.f, INFINITE_FAR));
     }
 
     // Depth reconstruction: the far corners an infinite projection unprojects, and the floors the shaders carry.
-    template<> template<>
-    void alfarplane_object::test<4>()
+    TEST_CASE("alfarplane: the far window depth and the reconstruction floor in the shaders", "[alfarplane]")
     {
-        set_test_name("depth reconstruction");
         using namespace ALFarPlane;
-        ensure_equals("infinite", frustumFarWindowDepth(true, 0.1f, 0.f), 0.1f / MAX_RECONSTRUCT_DISTANCE);
-        ensure("infinite depth unprojects to MAX_RECONSTRUCT_DISTANCE", fabsf(0.1f / frustumFarWindowDepth(true, 0.1f, 0.f) - MAX_RECONSTRUCT_DISTANCE) < 1.f);
-        ensure_equals("finite, reverse", frustumFarWindowDepth(false, 0.1f, 0.f), 0.f);
-        ensure_equals("finite, forward", frustumFarWindowDepth(false, 0.1f, 1.f), 1.f);
+        UNSCOPED_INFO("infinite");
+        CHECK(frustumFarWindowDepth(true, 0.1f, 0.f) == 0.1f / MAX_RECONSTRUCT_DISTANCE);
+        UNSCOPED_INFO("infinite depth unprojects to MAX_RECONSTRUCT_DISTANCE");
+        CHECK(fabsf(0.1f / frustumFarWindowDepth(true, 0.1f, 0.f) - MAX_RECONSTRUCT_DISTANCE) < 1.f);
+        UNSCOPED_INFO("finite, reverse");
+        CHECK(frustumFarWindowDepth(false, 0.1f, 0.f) == 0.f);
+        UNSCOPED_INFO("finite, forward");
+        CHECK(frustumFarWindowDepth(false, 0.1f, 1.f) == 1.f);
 
         // The sky keeps the cleared depth, 0 under reverse-Z. Anything drawn stores near / distance, which must stay
         // a normal float out to the reconstruction floor so no geometry rounds onto the sky.
-        ensure("reconstruction floor past the reach", MAX_RECONSTRUCT_DISTANCE > TERRAIN_REACH);
-        ensure("geometry at the floor stores a normal depth", MIN_NEAR_PLANE / MAX_RECONSTRUCT_DISTANCE >= std::numeric_limits<F32>::min());
+        CHECK(MAX_RECONSTRUCT_DISTANCE > TERRAIN_REACH);
+        UNSCOPED_INFO("geometry at the floor stores a normal depth");
+        CHECK(MIN_NEAR_PLANE / MAX_RECONSTRUCT_DISTANCE >= std::numeric_limits<F32>::min());
 
         // The floors the shaders actually carry, read from their sources.
         const F32 floor = 1.f / MAX_RECONSTRUCT_DISTANCE;
         const std::string util = shader_source("class1/deferred/deferredUtil.glsl");
-        ensure("deferredUtil read", !util.empty());
-        ensure_equals("deferredUtil floor", literal_after(util, "#define RECONSTRUCT_W_FLOOR "), floor);
-        ensure_equals("aoUtil floor", literal_after(shader_source("class1/deferred/aoUtil.glsl"), "pos.w = max(pos.w, "), floor);
-        ensure_equals("cofF floor", literal_after(shader_source("class1/deferred/cofF.glsl"), "p.z/max(p.w, "), floor);
+        UNSCOPED_INFO("deferredUtil read");
+        REQUIRE_FALSE(util.empty());
+        UNSCOPED_INFO("deferredUtil floor");
+        CHECK(literal_after(util, "#define RECONSTRUCT_W_FLOOR ") == floor);
+        CHECK(literal_after(shader_source("class1/deferred/aoUtil.glsl"), "pos.w = max(pos.w, ") == floor);
+        CHECK(literal_after(shader_source("class1/deferred/cofF.glsl"), "p.z/max(p.w, ") == floor);
     }
 
     // The sky is the cleared far depth and nothing else: every pass that tells sky from geometry tests for exactly
     // that value, so no distance, projection or pin enters the test.
-    template<> template<>
-    void alfarplane_object::test<5>()
+    TEST_CASE("alfarplane: every pass tells sky from geometry by the cleared depth alone", "[alfarplane]")
     {
-        set_test_name("sky is the cleared depth");
         const std::string haze = shader_source("class3/deferred/hazeF.glsl");
         const std::string haze_v = shader_source("class1/deferred/hazeV.glsl");
-        ensure("haze drawn on the far plane, reversed", haze_v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
-        ensure("haze drawn on the far plane, forward", haze_v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
+        UNSCOPED_INFO("haze drawn on the far plane, reversed");
+        REQUIRE(haze_v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
+        UNSCOPED_INFO("haze drawn on the far plane, forward");
+        REQUIRE(haze_v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
         // The lighting passes draw there too: the light map's passes, the lights and the soften pass's lit program in
         // front of it, the soften pass's sky program on it.
         for (const char* path : { "class2/deferred/softenLightV.glsl", "class3/deferred/multiPointLightV.glsl",
                                   "class2/deferred/sunLightV.glsl", "class1/deferred/blurLightV.glsl" })
         {
             const std::string v = shader_source(path);
-            ensure(std::string(path) + " drawn on the far plane, reversed", v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
-            ensure(std::string(path) + " drawn on the far plane, forward", v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
+            UNSCOPED_INFO(path << " drawn on the far plane, reversed");
+            REQUIRE(v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
+            UNSCOPED_INFO(path << " drawn on the far plane, forward");
+            REQUIRE(v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
         }
         const std::string soften = shader_source("class3/deferred/softenLightF.glsl");
-        ensure("the sky's soften program lights nothing", soften.find("writeColor(skyColor(getGBuffer(tc)));") != std::string::npos);
-        ensure("haze takes geometry where it is", haze.find("= getPositionWithDepth(tc, depth);") != std::string::npos);
-        ensure("void water fog keys on the far depth", shader_source("class3/deferred/waterHazeF.glsl").find("if (isFarDepth(depth))") != std::string::npos);
+        UNSCOPED_INFO("the sky's soften program lights nothing");
+        REQUIRE(soften.find("writeColor(skyColor(getGBuffer(tc)));") != std::string::npos);
+        UNSCOPED_INFO("haze takes geometry where it is");
+        REQUIRE(haze.find("= getPositionWithDepth(tc, depth);") != std::string::npos);
+        UNSCOPED_INFO("void water fog keys on the far depth");
+        REQUIRE(shader_source("class3/deferred/waterHazeF.glsl").find("if (isFarDepth(depth))") != std::string::npos);
         const std::string flare = shader_source("class1/alchemy/lensFlareStateF.glsl");
-        ensure("flare sky is the far plane, reversed", flare.find("return d <= 0.0 ? 1.0 : 0.0;") != std::string::npos);
-        ensure("flare sky is the far plane, forward", flare.find("return d >= 1.0 ? 1.0 : 0.0;") != std::string::npos);
+        UNSCOPED_INFO("flare sky is the far plane, reversed");
+        REQUIRE(flare.find("return d <= 0.0 ? 1.0 : 0.0;") != std::string::npos);
+        UNSCOPED_INFO("flare sky is the far plane, forward");
+        REQUIRE(flare.find("return d >= 1.0 ? 1.0 : 0.0;") != std::string::npos);
         // Opaque geometry in the haze pass takes the in-scatter blended geometry takes in its own shading, and the
         // water surface alone converges on the sky behind it.
-        ensure("the haze pass's in-scatter is alpha's", haze.find("atmosFragLighting(vec3(0), additive, atten)") != std::string::npos);
-        ensure("water converges on the sky behind", haze.find("if (on_water && skyBehindWeight > 0.0)") != std::string::npos);
-        ensure("the sky behind is sampled for water", haze.find("texture(skyBehindMap, tc)") != std::string::npos);
+        UNSCOPED_INFO("the haze pass's in-scatter is alpha's");
+        REQUIRE(haze.find("atmosFragLighting(vec3(0), additive, atten)") != std::string::npos);
+        UNSCOPED_INFO("water converges on the sky behind");
+        REQUIRE(haze.find("#ifdef HAZE_ON_WATER") != std::string::npos);
+        UNSCOPED_INFO("water converges on the sky behind");
+        REQUIRE(haze.find("additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);") != std::string::npos);
+        UNSCOPED_INFO("the sky behind is sampled for water");
+        REQUIRE(haze.find("texture(skyBehindMap, tc)") != std::string::npos);
         // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
         const F64 edge = (F64)ALFarPlane::edgeWaterStretch(true) + MAX_FAR_CLIP;
         const F64 farthest = sqrt(2.0 * edge * edge + (F64)ALFarPlane::EDGE_WATER_STRETCH * ALFarPlane::EDGE_WATER_STRETCH);
-        ensure("farthest water inside the floor", farthest < MAX_RECONSTRUCT_DISTANCE);
-        ensure("farthest water stores a normal depth", (F32)(MIN_NEAR_PLANE / farthest) >= std::numeric_limits<F32>::min());
+        CHECK(farthest < MAX_RECONSTRUCT_DISTANCE);
+        UNSCOPED_INFO("farthest water stores a normal depth");
+        CHECK((F32)(MIN_NEAR_PLANE / farthest) >= std::numeric_limits<F32>::min());
     }
 
     // Water's far terms: the old ones under a finite projection; under an infinite one the waves follow the surface
     // to the rim's farthest corner and the water fades over the edge water stretch.
-    template<> template<>
-    void alfarplane_object::test<6>()
+    TEST_CASE("alfarplane: water's wave clamp and edge fade under each projection", "[alfarplane]")
     {
-        set_test_name("water far terms");
         using namespace ALFarPlane;
         const LLVector2 lo(-1000.f, -2000.f);
         const LLVector2 hi(3000.f, 500.f);
         const WaterFar finite = waterFar(FINITE_PROJECTION_FAR, true, lo, hi);
-        ensure_equals("finite wave clamp", finite.mWaveClamp, 2560.f);
-        ensure_equals("finite no edge fade", finite.mEdgeFade, 0.f);
+        CHECK(finite.mWaveClamp == 2560.f);
+        CHECK(finite.mEdgeFade == 0.f);
         const WaterFar infinite = waterFar(INFINITE_FAR, true, lo, hi);
-        ensure("wave clamp at the farthest rim corner", fabsf(infinite.mWaveClamp - sqrtf(3000.f * 3000.f + 2000.f * 2000.f)) < 0.01f);
-        ensure_equals("edge fade over the stretch", infinite.mEdgeFade, EDGE_WATER_STRETCH);
+        UNSCOPED_INFO("wave clamp at the farthest rim corner");
+        CHECK(fabsf(infinite.mWaveClamp - sqrtf(3000.f * 3000.f + 2000.f * 2000.f)) < 0.01f);
+        CHECK(infinite.mEdgeFade == EDGE_WATER_STRETCH);
         const WaterFar rimless = waterFar(INFINITE_FAR, false, LLVector2(), LLVector2());
-        ensure_equals("no rim, no fade", rimless.mEdgeFade, 0.f);
-        ensure("no rim, waves past the regions", rimless.mWaveClamp >= EDGE_WATER_STRETCH);
+        CHECK(rimless.mEdgeFade == 0.f);
+        UNSCOPED_INFO("no rim, waves past the regions");
+        CHECK(rimless.mWaveClamp >= EDGE_WATER_STRETCH);
 
-        const std::string water_f = shader_source("class3/environment/waterF.glsl");
         const std::string haze = shader_source("class3/deferred/waterHazeF.glsl");
-        ensure("sky behind water is held past the surface", haze.find("entry + VOID_WATER_FOG_DEPTH") != std::string::npos);
-        const std::string water_v = shader_source("class1/environment/waterV.glsl");
-        ensure("wave clamp from the uniform", water_v.find("min(d, waterFar.x)") != std::string::npos);
-        ensure("no literal wave clamp", water_v.find("min(d, 2560.0)") == std::string::npos);
-        // The per-fragment rebuild scrolls by the offsets waterV takes from the CPU, which sets no wave direction or time.
-        for (const char* scroll : { "+ bigWaveScroll;", "+ littleWaveScroll.xy;", "+ littleWaveScroll.zw;" })
+        UNSCOPED_INFO("sky behind water is held past the surface");
+        REQUIRE(haze.find("entry + VOID_WATER_FOG_DEPTH") != std::string::npos);
+        const std::string surface = shader_source("class1/environment/waterSurface.glsl");
+        UNSCOPED_INFO("wave clamp from the uniform");
+        REQUIRE(surface.find("min(d, waterFar.x)") != std::string::npos);
+        UNSCOPED_INFO("no literal wave clamp");
+        REQUIRE(surface.find("2560.0") == std::string::npos);
+        // The waves follow the phases the CPU takes, the camera and the scroll folded in, which sets no wave direction
+        // or time; both water programs work them per fragment through the one function.
+        for (const char* phase : { "+ waterBigPhase;", "+ waterLittlePhase.xy;", "+ waterLittlePhase.zw;" })
         {
-            ensure(std::string("waterV scrolls by ") + scroll, water_v.find(scroll) != std::string::npos);
-            ensure(std::string("rebuilt waves scroll by ") + scroll, water_f.find(scroll) != std::string::npos);
+            UNSCOPED_INFO("waves take " << phase);
+            REQUIRE(surface.find(phase) != std::string::npos);
+        }
+        for (const char* path : { "class3/environment/waterF.glsl", "class3/environment/underWaterF.glsl" })
+        {
+            UNSCOPED_INFO(path << " works the waves per fragment");
+            REQUIRE(shader_source(path).find("water_wave_normals(bumpMap, bumpMap2, view.xy, wave1, wave2, wave3);") != std::string::npos);
+        }
+        UNSCOPED_INFO("the wave reads work the coordinates");
+        REQUIRE(surface.find("water_wave_coords(r, big_uv, little_uv);") != std::string::npos);
+        // The CPU places the camera on the tiled layers' lattices; the shader adds the rest of the way to a point, on
+        // the same lattice.
+        UNSCOPED_INFO("the lattice's density");
+        CHECK((F64)literal_after(surface, "#define WATER_HEX_GRID ") == ALWaterField::HEX_GRID);
+        const std::string lattice = shader_source("class1/deferred/hexLatticeUtil.glsl");
+        UNSCOPED_INFO("the lattice's skew");
+        CHECK_THAT(literal_after(lattice, "mat2(1.0, 0.0, "), ll_test::WithinBits((F32)ALWaterField::HEX_SKEW_XY, 16));
+        UNSCOPED_INFO("and its stretch");
+        CHECK_THAT(literal_after(lattice, "mat2(1.0, 0.0, -0.57735027, "), ll_test::WithinBits((F32)ALWaterField::HEX_SKEW_YY, 16));
+        // The waves' patches a cell side, which the draw counts, and the heights' metres, which the bake's bound uses.
+        UNSCOPED_INFO("the patches a cell side");
+        CHECK((S32)literal_after(surface, "#define WATER_PATCHES ") == ALWaterField::PATCHES_PER_CELL);
+        UNSCOPED_INFO("the big layer's metres");
+        CHECK(literal_after(surface, "#define WATER_BIG_METRES ") == ALWaterHeightBake::BIG_METRES);
+        UNSCOPED_INFO("the mid layer's metres");
+        CHECK(literal_after(surface, "#define WATER_MID_METRES ") == ALWaterHeightBake::MID_METRES);
+    }
+
+    // The far plane overlay: nearer-first pairs out to 100 km on distinct bearings, each farther column behind its
+    // partner and overlapping it on screen, and every column the same angular size.
+    TEST_CASE("alfarplane: overlay columns pair up out to 100 km at one angular size", "[alfarplane]")
+    {
+        const std::vector<ALFarPlane::OverlayColumn>& columns = ALFarPlane::overlayColumns();
+        REQUIRE(columns.size() >= 2);
+        REQUIRE(columns.size() % 2 == 0);
+        REQUIRE(columns[columns.size() - 2].mDistance == 100000.f);
+        for (size_t i = 0; i < columns.size(); i += 2)
+        {
+            const ALFarPlane::OverlayColumn& n = columns[i];
+            const ALFarPlane::OverlayColumn& f = columns[i + 1];
+            CAPTURE(n.mDistance);
+            REQUIRE(n.mNearer);
+            REQUIRE_FALSE(f.mNearer);
+            REQUIRE(f.mDistance > n.mDistance);
+            REQUIRE(f.mBearing == n.mBearing);
+            // On screen the farther column's near edge sits inside the nearer column.
+            const F32 f_left = (f.mOffset - f.mHalfWidth) / f.mDistance;
+            const F32 n_right = (n.mOffset + n.mHalfWidth) / n.mDistance;
+            const F32 n_left = (n.mOffset - n.mHalfWidth) / n.mDistance;
+            {
+                INFO("the farther column overlaps the nearer on screen");
+                REQUIRE(f_left > n_left);
+                REQUIRE(f_left < n_right);
+            }
+            UNSCOPED_INFO("every column the same angular size");
+            REQUIRE(fabsf(n.mHeight / n.mDistance - columns[0].mHeight / columns[0].mDistance) < 1e-6f);
+            if (i > 0)
+            {
+                REQUIRE(n.mBearing != columns[i - 2].mBearing);
+                REQUIRE(n.mDistance > columns[i - 2].mDistance);
+            }
         }
     }
 
     // The eye-to-sky rotation: a level camera's forward, up and right land on the sky's (north, up, east) for its heading,
     // and any view's eye directions come back as toLightNorm's swizzle of the agent directions it rotated.
-    template<> template<>
-    void alfarplane_object::test<8>()
+    TEST_CASE("alfarplane: eyeToSkyFrame turns eye directions into the sky's frame", "[alfarplane]")
     {
-        set_test_name("eye to sky frame");
         const auto apply = [](const std::array<F32, 9>& m, const LLVector3& v)
         {
             return LLVector3(m[0] * v.mV[0] + m[3] * v.mV[1] + m[6] * v.mV[2],
@@ -241,17 +337,22 @@ namespace tut
         north.setIdentity();
         north.setRows(LLVector4a(1.f, 0.f, 0.f), LLVector4a(0.f, 0.f, -1.f), LLVector4a(0.f, 1.f, 0.f));
         const std::array<F32, 9> n = ALFarPlane::eyeToSkyFrame(north);
-        ensure("facing north, forward is north", close_to(apply(n, LLVector3(0.f, 0.f, -1.f)), LLVector3(1.f, 0.f, 0.f)));
-        ensure("facing north, up is up", close_to(apply(n, LLVector3(0.f, 1.f, 0.f)), LLVector3(0.f, 1.f, 0.f)));
-        ensure("facing north, right is east", close_to(apply(n, LLVector3(1.f, 0.f, 0.f)), LLVector3(0.f, 0.f, 1.f)));
+        UNSCOPED_INFO("facing north, forward is north");
+        CHECK(close_to(apply(n, LLVector3(0.f, 0.f, -1.f)), LLVector3(1.f, 0.f, 0.f)));
+        UNSCOPED_INFO("facing north, up is up");
+        CHECK(close_to(apply(n, LLVector3(0.f, 1.f, 0.f)), LLVector3(0.f, 1.f, 0.f)));
+        UNSCOPED_INFO("facing north, right is east");
+        CHECK(close_to(apply(n, LLVector3(1.f, 0.f, 0.f)), LLVector3(0.f, 0.f, 1.f)));
 
         // Facing east: eye right is south, eye -z is east.
         LLMatrix4a east;
         east.setIdentity();
         east.setRows(LLVector4a(0.f, 0.f, -1.f), LLVector4a(-1.f, 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f));
         const std::array<F32, 9> e = ALFarPlane::eyeToSkyFrame(east);
-        ensure("facing east, forward is east", close_to(apply(e, LLVector3(0.f, 0.f, -1.f)), LLVector3(0.f, 0.f, 1.f)));
-        ensure("facing east, right is south", close_to(apply(e, LLVector3(1.f, 0.f, 0.f)), LLVector3(-1.f, 0.f, 0.f)));
+        UNSCOPED_INFO("facing east, forward is east");
+        CHECK(close_to(apply(e, LLVector3(0.f, 0.f, -1.f)), LLVector3(0.f, 0.f, 1.f)));
+        UNSCOPED_INFO("facing east, right is south");
+        CHECK(close_to(apply(e, LLVector3(1.f, 0.f, 0.f)), LLVector3(-1.f, 0.f, 0.f)));
 
         // A pitched, rolled, yawed view: what the pipeline rotates into eye space (as it does the sun's direction)
         // comes back as the sky frame's swizzle of the agent direction.
@@ -262,49 +363,30 @@ namespace tut
             LLVector4a eye;
             view.rotate(LLVector4a(agent.mV[0], agent.mV[1], agent.mV[2], 0.f), eye);
             const LLVector3 sky = apply(v, LLVector3(eye.getF32ptr()));
-            ensure("agent direction back as (north, up, east)", close_to(sky, LLVector3(agent.mV[1], agent.mV[2], agent.mV[0])));
+            UNSCOPED_INFO("agent direction back as (north, up, east)");
+            REQUIRE(close_to(sky, LLVector3(agent.mV[1], agent.mV[2], agent.mV[0])));
         }
 
         // WindLight's haze takes the rotation from the Environment block, for every pass that hazes geometry, and its
         // callers hand it eye space.
         const std::string funcs = shader_source("class1/windlight/atmosphericsFuncs.glsl");
-        ensure("haze position into the sky's frame", funcs.find("vec3 rel_pos = eyeToSky * inPositionEye;") != std::string::npos);
-        ensure("haze light into the sky's frame", funcs.find("light_dir = eyeToSky * light_dir;") != std::string::npos);
+        UNSCOPED_INFO("haze position into the sky's frame");
+        REQUIRE(funcs.find("vec3 rel_pos = eyeToSky * inPositionEye;") != std::string::npos);
+        UNSCOPED_INFO("haze light into the sky's frame");
+        REQUIRE(funcs.find("light_dir = eyeToSky * light_dir;") != std::string::npos);
         // Only rising rays leave the haze, as the dome's do; a falling ray keeps its whole length.
-        ensure("altitude limit on rising rays alone", funcs.find("float h = max(rel_pos.y, 0.0) / max(max_y, 1.0);") != std::string::npos);
-        ensure("no limit on falling rays", funcs.find("abs(rel_pos.y)") == std::string::npos);
-        ensure("the rotation is in the Environment block", shader_source("class1/deferred/environmentBlock.glsl").find("mat3  eyeToSky;") != std::string::npos);
-        ensure("the haze pass hands over eye space", shader_source("class3/deferred/hazeF.glsl").find("eyeToSky") == std::string::npos);
-    }
-
-    // The far plane overlay: nearer-first pairs out to 100 km on distinct bearings, each farther column behind its
-    // partner and overlapping it on screen, and every column the same angular size.
-    template<> template<>
-    void alfarplane_object::test<7>()
-    {
-        set_test_name("overlay columns");
-        const std::vector<ALFarPlane::OverlayColumn>& columns = ALFarPlane::overlayColumns();
-        ensure("pairs", columns.size() >= 2 && columns.size() % 2 == 0);
-        ensure_equals("reaches 100 km", columns[columns.size() - 2].mDistance, 100000.f);
-        for (size_t i = 0; i < columns.size(); i += 2)
-        {
-            const ALFarPlane::OverlayColumn& n = columns[i];
-            const ALFarPlane::OverlayColumn& f = columns[i + 1];
-            const std::string at = std::to_string((S32)n.mDistance) + " m";
-            ensure("nearer first at " + at, n.mNearer && !f.mNearer);
-            ensure("farther behind at " + at, f.mDistance > n.mDistance);
-            ensure("same bearing at " + at, f.mBearing == n.mBearing);
-            // On screen the farther column's near edge sits inside the nearer column.
-            const F32 f_left = (f.mOffset - f.mHalfWidth) / f.mDistance;
-            const F32 n_right = (n.mOffset + n.mHalfWidth) / n.mDistance;
-            const F32 n_left = (n.mOffset - n.mHalfWidth) / n.mDistance;
-            ensure("overlap at " + at, f_left > n_left && f_left < n_right);
-            ensure("same angle at " + at, fabsf(n.mHeight / n.mDistance - columns[0].mHeight / columns[0].mDistance) < 1e-6f);
-            if (i > 0)
-            {
-                ensure("own bearing at " + at, n.mBearing != columns[i - 2].mBearing);
-                ensure("receding at " + at, n.mDistance > columns[i - 2].mDistance);
-            }
-        }
+        UNSCOPED_INFO("altitude limit on rising rays alone");
+        REQUIRE(funcs.find("float h = max(rel_pos.y, 0.0) / max(max_y, 1.0);") != std::string::npos);
+        UNSCOPED_INFO("no limit on falling rays");
+        REQUIRE(funcs.find("abs(rel_pos.y)") == std::string::npos);
+        UNSCOPED_INFO("the rotation is in the Environment block");
+        REQUIRE(shader_source("class1/deferred/environmentBlock.glsl").find("mat3  eyeToSky;") != std::string::npos);
+        // Read, and calling the haze with the position it unprojected, so the turn's absence below is not the
+        // absence of the file.
+        const std::string haze = shader_source("class3/deferred/hazeF.glsl");
+        UNSCOPED_INFO("the haze pass hands over eye space");
+        REQUIRE(haze.find("calcAtmosphericVarsLinear(pos.xyz,") != std::string::npos);
+        UNSCOPED_INFO("and does not turn it itself");
+        REQUIRE(haze.find("eyeToSky") == std::string::npos);
     }
 }

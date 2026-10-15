@@ -14,8 +14,8 @@ if(AL_USE_TRACY)
   target_compile_definitions(
     ll::tracy
     INTERFACE
-      $<$<CONFIG:RelWithDebInfo,Release>:LL_PROFILER_CONFIGURATION=3>
-      $<$<CONFIG:Debug,OptDebug>:LL_PROFILER_CONFIGURATION=1>
+      $<$<CONFIG:RelWithDebInfo,Release>:LL_PROFILER_CONFIGURATION=2>
+      $<$<CONFIG:Debug,OptDebug>:LL_PROFILER_CONFIGURATION=0>
   )
   target_link_libraries(ll::tracy INTERFACE $<$<CONFIG:RelWithDebInfo,Release>:Tracy::TracyClient>)
 
@@ -36,5 +36,5 @@ if(AL_USE_TRACY)
   endif()
 else()
   # See: indra/llcommon/llprofiler.h
-  target_compile_definitions(ll::tracy INTERFACE LL_PROFILER_CONFIGURATION=1)
+  target_compile_definitions(ll::tracy INTERFACE LL_PROFILER_CONFIGURATION=0)
 endif()

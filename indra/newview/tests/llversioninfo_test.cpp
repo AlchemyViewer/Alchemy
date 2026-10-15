@@ -25,7 +25,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../llversioninfo.h"
 
@@ -38,7 +38,7 @@
 // need to turn it into a quoted string. LL_TO_STRING() does that.
 #define ll_viewer_channel LL_TO_STRING(LL_VIEWER_CHANNEL)
 
-namespace tut
+namespace
 {
     struct versioninfo
     {
@@ -77,39 +77,18 @@ namespace tut
         std::string mResetVersionAndChannel;
     };
 
-    typedef test_group<versioninfo> versioninfo_t;
-    typedef versioninfo_t::object versioninfo_object_t;
-    tut::versioninfo_t tut_versioninfo("LLVersionInfo");
-
-    template<> template<>
-    void versioninfo_object_t::test<1>()
+    TEST_CASE_METHOD(versioninfo, "LLVersionInfo: the version and channel are the build's until resetChannel", "[LLVersionInfo]")
     {
         std::cout << "What we parsed from CMake: " << LL_VIEWER_VERSION_BUILD << std::endl;
         std::cout << "What we get from llversioninfo: " << LLVersionInfo::instance().getBuild() << std::endl;
-        ensure_equals("Major version",
-                      LLVersionInfo::instance().getMajor(),
-                      LL_VIEWER_VERSION_MAJOR);
-        ensure_equals("Minor version",
-                      LLVersionInfo::instance().getMinor(),
-                      LL_VIEWER_VERSION_MINOR);
-        ensure_equals("Patch version",
-                      LLVersionInfo::instance().getPatch(),
-                      LL_VIEWER_VERSION_PATCH);
-        ensure_equals("Build version",
-                      LLVersionInfo::instance().getBuild(),
-                      LL_VIEWER_VERSION_BUILD);
-        ensure_equals("Channel version",
-                      LLVersionInfo::instance().getChannel(),
-                      ll_viewer_channel);
-        ensure_equals("Version String",
-                      LLVersionInfo::instance().getVersion(),
-                      mVersion);
-        ensure_equals("Short Version String",
-                      LLVersionInfo::instance().getShortVersion(),
-                      mShortVersion);
-        ensure_equals("Version and channel String",
-                      LLVersionInfo::instance().getChannelAndVersion(),
-                      mVersionAndChannel);
+        CHECK(LLVersionInfo::instance().getMajor() == LL_VIEWER_VERSION_MAJOR);
+        CHECK(LLVersionInfo::instance().getMinor() == LL_VIEWER_VERSION_MINOR);
+        CHECK(LLVersionInfo::instance().getPatch() == LL_VIEWER_VERSION_PATCH);
+        CHECK(LLVersionInfo::instance().getBuild() == LL_VIEWER_VERSION_BUILD);
+        CHECK(LLVersionInfo::instance().getChannel() == ll_viewer_channel);
+        CHECK(LLVersionInfo::instance().getVersion() == mVersion);
+        CHECK(LLVersionInfo::instance().getShortVersion() == mShortVersion);
+        CHECK(LLVersionInfo::instance().getChannelAndVersion() == mVersionAndChannel);
 
         // The channel is the process's: put back however this ends.
         struct ChannelBack
@@ -118,12 +97,8 @@ namespace tut
             ~ChannelBack() { LLVersionInfo::instance().resetChannel(was); }
         } channel_back;
         LLVersionInfo::instance().resetChannel(mResetChannel);
-        ensure_equals("Reset channel version",
-                      LLVersionInfo::instance().getChannel(),
-                      mResetChannel);
+        CHECK(LLVersionInfo::instance().getChannel() == mResetChannel);
 
-        ensure_equals("Reset Version and channel String",
-                      LLVersionInfo::instance().getChannelAndVersion(),
-                      mResetVersionAndChannel);
+        CHECK(LLVersionInfo::instance().getChannelAndVersion() == mResetVersionAndChannel);
     }
 }

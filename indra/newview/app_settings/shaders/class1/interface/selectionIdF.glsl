@@ -59,10 +59,12 @@ const float VISIBLE_SLACK = 0.001;
 
 // selectionUtilF.glsl, through the projection the scene and this pass share.
 float eyeDistance(float depth);
+float clearedDepth();
 
 // selectionAlphaF.glsl
 float faceAlpha(vec2 texcoord);
 bool isCutOut(float alpha);
+bool keepsCut();
 
 void main()
 {
@@ -84,10 +86,15 @@ void main()
         visible = (own <= scene + reach + own * VISIBLE_SLACK) ? 1.0 : 0.0;
     }
 
-    if (isCutOut(alpha))
+    bool cut = isCutOut(alpha);
+    if (cut && !keepsCut())
     {
         discard;
     }
+    // Surface the scene does not show, kept for its outline, lies at the cleared depth, behind every surface the scene
+    // shows: it takes only texels no shown surface does, so it never hides one, and every object counts as in front of
+    // it. Among such surfaces the one drawn last keeps the texel.
+    gl_FragDepth = cut ? clearedDepth() : gl_FragCoord.z;
 
     float drawn = (selection_outlined == 0) ? 0.0 : ((visible > 0.5) ? 1.0 : ((selection_show_hidden != 0) ? 0.5 : 0.0));
     frag_color = vec4(float(selection_id & 255) / 255.0, float((selection_id >> 8) & 255) / 255.0, drawn,

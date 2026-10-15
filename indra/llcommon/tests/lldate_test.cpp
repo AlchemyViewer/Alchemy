@@ -31,7 +31,7 @@
 #include "../llstring.h"
 #include "../lldate.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 
 #define VALID_DATE                                  "2003-04-30T04:00:00Z"
@@ -51,28 +51,24 @@
 #define INVALID_DATE_EMPTY                          ""
 
 // invalid values
-// apr 1.1.1 seems to not care about constraining the date to valid
-// dates. Put these back when the parser checks.
+// LLDate::fromStream checks only the format: it hands the fields to timegm,
+// which normalizes a value out of range rather than rejecting it (24:00:00 is
+// the next day's midnight, 2003-02-29 is 2003-03-01). Turn the case below on
+// when the parser checks the ranges.
 #define LL_DATE_PARSER_CHECKS_BOUNDARY 0
-//#define INVALID_DATE_24HOUR_BOUNDARY              "2003-04-30T24:00:00Z"
-//#define INVALID_DATE_LEAP                         "2003-04-29T04:00:00Z"
-//#define INVALID_DATE_HOUR                         "2003-04-30T24:59:59Z"
-//#define INVALID_DATE_MIN                          "2003-04-30T22:69:59Z"
-//#define INVALID_DATE_SEC                          "2003-04-30T22:59:69Z"
-//#define INVALID_DATE_YEAR                         "0-04-30T22:59:59Z"
-//#define INVALID_DATE_MONTH                            "2003-13-30T22:59:59Z"
-//#define INVALID_DATE_DAY                          "2003-04-35T22:59:59Z"
+#if LL_DATE_PARSER_CHECKS_BOUNDARY
+#define INVALID_DATE_24HOUR_BOUNDARY                "2003-04-30T24:00:00Z"
+#define INVALID_DATE_LEAP                           "2003-02-29T04:00:00Z"
+#define INVALID_DATE_HOUR                           "2003-04-30T24:59:59Z"
+#define INVALID_DATE_MIN                            "2003-04-30T22:69:59Z"
+#define INVALID_DATE_SEC                            "2003-04-30T22:59:69Z"
+#define INVALID_DATE_YEAR                           "0-04-30T22:59:59Z"
+#define INVALID_DATE_MONTH                          "2003-13-30T22:59:59Z"
+#define INVALID_DATE_DAY                            "2003-04-35T22:59:59Z"
+#endif
 
-namespace tut
+namespace
 {
-    struct date_test
-    {
-
-    };
-    typedef test_group<date_test> date_test_t;
-    typedef date_test_t::object date_test_object_t;
-    tut::date_test_t tut_date_test("LLDate");
-
     // Compile-time verification that LLDate's default ctor, accessors, and
     // comparison operators are constexpr.
     static_assert(LLDate{}.isNull(), "default LLDate is null at compile time");
@@ -84,131 +80,141 @@ namespace tut
     static_assert(LLDate{} >= LLDate{}, "default LLDate >= itself");
 
     /* format validation */
-    template<> template<>
-    void date_test_object_t::test<1>()
+    TEST_CASE("LLDate: fromString accepts valid dates and rejects malformed ones", "[LLDate]")
     {
         LLDate date(VALID_DATE);
         std::string  expected_string;
         bool result;
         expected_string = VALID_DATE;
-        ensure_equals("Valid Date failed" , expected_string, date.asString());
+        CHECK(expected_string == date.asString());
 
         result = date.fromString(VALID_DATE_LEAP);
         expected_string = VALID_DATE_LEAP;
-        ensure_equals("VALID_DATE_LEAP failed" , expected_string, date.asString());
+        CHECK(expected_string == date.asString());
 
         result = date.fromString(VALID_DATE_HOUR_BOUNDARY);
         expected_string = VALID_DATE_HOUR_BOUNDARY;
-        ensure_equals("VALID_DATE_HOUR_BOUNDARY failed" , expected_string, date.asString());
+        CHECK(expected_string == date.asString());
 
         result = date.fromString(VALID_DATE_FRACTIONAL_SECS);
         expected_string = VALID_DATE_FRACTIONAL_SECS;
-        ensure_equals("VALID_DATE_FRACTIONAL_SECS failed" , expected_string, date.asString());
+        CHECK(expected_string == date.asString());
 
         result = date.fromString(INVALID_DATE_MISSING_YEAR);
-        ensure_equals("INVALID_DATE_MISSING_YEAR should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MISSING_YEAR should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_MONTH);
-        ensure_equals("INVALID_DATE_MISSING_MONTH should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MISSING_MONTH should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_DATE);
-        ensure_equals("INVALID_DATE_MISSING_DATE should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MISSING_DATE should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_T);
-        ensure_equals("INVALID_DATE_MISSING_T should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MISSING_T should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_HOUR);
-        ensure_equals("INVALID_DATE_MISSING_HOUR should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MISSING_HOUR should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_MIN);
-        ensure_equals("INVALID_DATE_MISSING_MIN should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MISSING_MIN should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_SEC);
-        ensure_equals("INVALID_DATE_MISSING_SEC should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MISSING_SEC should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MISSING_Z);
-        ensure_equals("INVALID_DATE_MISSING_Z should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MISSING_Z should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_EMPTY);
-        ensure_equals("INVALID_DATE_EMPTY should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_EMPTY should have failed");
+        CHECK_FALSE(result);
     }
 
-    /* Invalid Value Handling */
-    template<> template<>
-    void date_test_object_t::test<2>()
-    {
 #if LL_DATE_PARSER_CHECKS_BOUNDARY
+    /* Invalid Value Handling */
+    TEST_CASE("LLDate: fromString rejects out-of-range field values", "[LLDate]")
+    {
         LLDate date;
-        std::string  expected_string;
         bool result;
 
         result = date.fromString(INVALID_DATE_24HOUR_BOUNDARY);
-        ensure_equals("INVALID_DATE_24HOUR_BOUNDARY should have failed" , result, false);
-        ensure_equals("INVALID_DATE_24HOUR_BOUNDARY date still set to old value on failure!" , date.secondsSinceEpoch(), 0);
+        UNSCOPED_INFO("INVALID_DATE_24HOUR_BOUNDARY should have failed");
+        CHECK_FALSE(result);
+        UNSCOPED_INFO("a failed parse leaves the date unchanged");
+        CHECK(date.secondsSinceEpoch() == 0);
 
         result = date.fromString(INVALID_DATE_LEAP);
-        ensure_equals("INVALID_DATE_LEAP should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_LEAP should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_HOUR);
-        ensure_equals("INVALID_DATE_HOUR should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_HOUR should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MIN);
-        ensure_equals("INVALID_DATE_MIN should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MIN should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_SEC);
-        ensure_equals("INVALID_DATE_SEC should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_SEC should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_YEAR);
-        ensure_equals("INVALID_DATE_YEAR should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_YEAR should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_MONTH);
-        ensure_equals("INVALID_DATE_MONTH should have failed" , result, false);
+        UNSCOPED_INFO("INVALID_DATE_MONTH should have failed");
+        CHECK_FALSE(result);
 
         result = date.fromString(INVALID_DATE_DAY);
-        ensure_equals("INVALID_DATE_DAY should have failed" , result, false);
-#endif
+        UNSCOPED_INFO("INVALID_DATE_DAY should have failed");
+        CHECK_FALSE(result);
     }
+#endif // LL_DATE_PARSER_CHECKS_BOUNDARY
 
     /* API checks */
-    template<> template<>
-    void date_test_object_t::test<3>()
+    TEST_CASE("LLDate: fromStream reads a date", "[LLDate]")
     {
         LLDate date;
         std::istringstream stream(VALID_DATE);
         std::string  expected_string = VALID_DATE;
         date.fromStream(stream);
-        ensure_equals("fromStream failed", date.asString(), expected_string);
+        CHECK(date.asString() == expected_string);
     }
 
-    template<> template<>
-    void date_test_object_t::test<4>()
+    TEST_CASE("LLDate: the copy constructor copies the date", "[LLDate]")
     {
         LLDate date1(VALID_DATE);
         LLDate date2(date1);
-        ensure_equals("LLDate(const LLDate& date) constructor failed", date1.asString(), date2.asString());
+        CHECK(date1.asString() == date2.asString());
     }
 
-    template<> template<>
-    void date_test_object_t::test<5>()
+    TEST_CASE("LLDate: a date built from secondsSinceEpoch equals the original", "[LLDate]")
     {
         LLDate date1(VALID_DATE);
         LLDate date2(date1.secondsSinceEpoch());
-        ensure_equals("secondsSinceEpoch not equal",date1.secondsSinceEpoch(), date2.secondsSinceEpoch());
-        ensure_equals("LLDate created using secondsSinceEpoch not equal", date1.asString(), date2.asString());
+        CHECK(date1.secondsSinceEpoch() == date2.secondsSinceEpoch());
+        CHECK(date1.asString() == date2.asString());
     }
 
-    template<> template<>
-    void date_test_object_t::test<6>()
+    TEST_CASE("LLDate: operator<< writes the date string", "[LLDate]")
     {
         LLDate date(VALID_DATE);
         std::ostringstream stream;
         stream << date;
         std::string expected_str = VALID_DATE;
-        ensure_equals("ostringstream failed", expected_str, stream.str());
+        CHECK(expected_str == stream.str());
     }
 
-    template<> template<>
-    void date_test_object_t::test<7>()
+    TEST_CASE("LLDate: operator>> reads a date that operator<< writes back the same", "[LLDate]")
     {
         LLDate date;
         std::istringstream stream(VALID_DATE);
@@ -217,60 +223,58 @@ namespace tut
         std::ostringstream out_stream;
         out_stream << date;
 
-        ensure_equals("<< failed", date.asString(),expected_str);
-        ensure_equals("<< to >> failed", stream.str(),out_stream.str());
+        CHECK(date.asString() == expected_str);
+        CHECK(stream.str() == out_stream.str());
     }
 
     // Comparison operators (now constexpr in the header) — runtime coverage.
-    template<> template<>
-    void date_test_object_t::test<8>()
+    TEST_CASE("LLDate: comparison operators order dates by their seconds", "[LLDate]")
     {
         LLDate earlier(1000.0);
         LLDate later(2000.0);
         LLDate also_earlier(1000.0);
 
-        ensure("earlier < later",   earlier < later);
-        ensure("later > earlier",   later > earlier);
-        ensure("earlier <= later",  earlier <= later);
-        ensure("later >= earlier",  later >= earlier);
-        ensure("equal <=",          earlier <= also_earlier);
-        ensure("equal >=",          earlier >= also_earlier);
-        ensure("equal ==",          earlier == also_earlier);
-        ensure("differ !=",         earlier != later);
-        ensure("!(equal <)",       !(earlier < also_earlier));
-        ensure("!(equal >)",       !(earlier > also_earlier));
+        CHECK(earlier < later);
+        CHECK(later > earlier);
+        CHECK(earlier <= later);
+        CHECK(later >= earlier);
+        CHECK(earlier <= also_earlier);
+        CHECK(earlier >= also_earlier);
+        CHECK(earlier == also_earlier);
+        CHECK(earlier != later);
+        CHECK_FALSE(earlier < also_earlier);
+        CHECK_FALSE(earlier > also_earlier);
     }
 
     // isNull / notNull / setter round-trip.
-    template<> template<>
-    void date_test_object_t::test<9>()
+    TEST_CASE("LLDate: isNull and notNull follow the seconds set", "[LLDate]")
     {
         LLDate d;
-        ensure("default isNull", d.isNull());
-        ensure("default !notNull", !d.notNull());
+        CHECK(d.isNull());
+        CHECK_FALSE(d.notNull());
 
         d.secondsSinceEpoch(1234.5);
-        ensure("after set, !isNull", !d.isNull());
-        ensure("after set, notNull", d.notNull());
-        ensure_equals("getter round-trips", d.secondsSinceEpoch(), 1234.5);
+        CHECK_FALSE(d.isNull());
+        CHECK(d.notNull());
+        CHECK(d.secondsSinceEpoch() == 1234.5);
 
         d.secondsSinceEpoch(0.0);
-        ensure("zero -> isNull again", d.isNull());
+        CHECK(d.isNull());
     }
 
     // toLocalDateString / toHTTPDateString must not crash on the epoch value
     // (regression for the thread-safe localtime_utc/gmtime_utc rewrite).
-    template<> template<>
-    void date_test_object_t::test<10>()
+    TEST_CASE("LLDate: the date string formatters give output for the epoch value", "[LLDate]")
     {
         LLDate d;
-        ensure("toLocalDateString does not throw",
-            d.toLocalDateString(std::string("%Y-%m-%d")).size() > 0);
-        ensure("toHTTPDateString does not throw",
-            d.toHTTPDateString(std::string("%Y-%m-%d")).size() > 0);
-        // RFC1123 wraps toHTTPDateString; verifies the day-of-week token
-        // is present (a strftime success indicator that doesn't pin locale).
+        CHECK(d.toLocalDateString(std::string("%Y-%m-%d")).size() > 0);
+        CHECK(d.toHTTPDateString(std::string("%Y-%m-%d")).size() > 0);
+        // RFC1123 wraps toHTTPDateString as "%A, %d %b %Y %H:%M:%S GMT".
+        // The day-of-week token, whatever the locale names it, comes before
+        // the first ", ": a strftime success indicator that doesn't pin locale.
         std::string rfc = d.asRFC1123();
-        ensure("asRFC1123 produces output", rfc.size() > 0);
+        const size_t day_end = rfc.find(", ");
+        CHECK(day_end != std::string::npos);
+        CHECK(day_end > 0);
     }
 }

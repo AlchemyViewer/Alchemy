@@ -30,7 +30,7 @@
 
 #include "alscriptstudio_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 namespace
 {
@@ -80,7 +80,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alscriptstudioweighing_data
     {
@@ -93,7 +93,7 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             unit = std::make_unique<ALScriptStudioWeighing>(services, studio, studio, studio);
             return *unit;
@@ -129,125 +129,185 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptstudioweighing_data> alscriptstudioweighing_group;
-    typedef alscriptstudioweighing_group::object    alscriptstudioweighing_object;
-    alscriptstudioweighing_group                    alscriptstudioweighing_instance("alscriptstudioweighing");
-
-    template<> template<>
-    void alscriptstudioweighing_object::test<1>()
+    // And the others while it is in front and the Weights tab looked at.
+    TEST_CASE_METHOD(alscriptstudioweighing_data, "alscriptstudioweighing: the target a tab is weighed for and none where it has no weigher", "[alscriptstudioweighing]")
     {
-        set_test_name("the target a tab is weighed for, none where it is not; and the others while it is in front and the Weights tab looked at");
         ALScriptStudioWeighing& unit = make();
-        ensure("Mono", unit.target(tab("mono", "x")) == Target::Mono);
-        ensure("no target said is Mono", unit.target(tab("none", "x", "")) == Target::Mono);
-        ensure("LSO", unit.target(tab("lso", "x", "lsl2")) == Target::LSO);
-        ensure("LSL on Luau", unit.target(tab("ll", "x", "lsl-luau")) == Target::LSLLuau);
-        ensure("SLua", unit.target(tab("slua", "x", "luau")) == Target::SLua);
-        ensure("a target with no weigher", !unit.target(tab("odd", "x", "something")));
+        CHECK(unit.target(tab("mono", "x")) == Target::Mono);
+        UNSCOPED_INFO("no target said is Mono");
+        CHECK(unit.target(tab("none", "x", "")) == Target::Mono);
+        CHECK(unit.target(tab("lso", "x", "lsl2")) == Target::LSO);
+        CHECK(unit.target(tab("ll", "x", "lsl-luau")) == Target::LSLLuau);
+        CHECK(unit.target(tab("slua", "x", "luau")) == Target::SLua);
+        UNSCOPED_INFO("a target with no weigher");
+        CHECK_FALSE(unit.target(tab("odd", "x", "something")));
         Doc& note  = tab("note", "x");
         note.notecard = true;
-        ensure("a notecard", !unit.target(note));
+        UNSCOPED_INFO("a notecard");
+        CHECK_FALSE(unit.target(note));
         Doc& loading = tab("loading", "x");
         loading.loaded = false;
-        ensure("not loaded", !unit.target(loading));
+        UNSCOPED_INFO("not loaded");
+        CHECK_FALSE(unit.target(loading));
         studio.fragment = true;
-        ensure("a fragment", !unit.target(tab("fragment", "x")));
+        UNSCOPED_INFO("a fragment");
+        CHECK_FALSE(unit.target(tab("fragment", "x")));
         studio.fragment = false;
 
         services.front = 0;
-        ensure("its own alone", unit.targets(*services.docs[0]).size() == 1);
+        UNSCOPED_INFO("its own alone");
+        CHECK(unit.targets(*services.docs[0]).size() == 1);
         studio.shown = true;
         const std::vector<Target> all = unit.targets(*services.docs[0]);
-        ensure("in front, the tab looked at: the other two as well", all.size() == 3 && all[0] == Target::Mono);
-        ensure("not in front: its own", unit.targets(*services.docs[2]).size() == 1);
+        {
+            INFO("in front, the tab looked at: the other two as well");
+            REQUIRE(all.size() == 3);
+            CHECK(all[0] == Target::Mono);
+        }
+        UNSCOPED_INFO("not in front: its own");
+        CHECK(unit.targets(*services.docs[2]).size() == 1);
         services.front = 4;
-        ensure("SLua has no others", unit.targets(*services.docs[4]).size() == 1);
+        UNSCOPED_INFO("SLua has no others");
+        CHECK(unit.targets(*services.docs[4]).size() == 1);
     }
 
-    template<> template<>
-    void alscriptstudioweighing_object::test<2>()
+    // Exact where nothing after the check changes it.
+    TEST_CASE_METHOD(alscriptstudioweighing_data, "alscriptstudioweighing: a weight with its check is kept and told and an older answer dropped", "[alscriptstudioweighing]")
     {
-        set_test_name("weighed with its check: kept, told, and exact where nothing after the check changes it; an answer for older text dropped");
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         unit.weigh(a);
-        ensure("asked", a.weighing->asking && studio.asked == Names{ "a" });
+        CHECK(a.weighing->asking);
+        CHECK(studio.asked == Names{ "a" });
         ALScriptAnalysis::Result old = answerFor(a, { weightOf(Target::Mono, 100) });
         old.version -= 1;
         unit.weighed(a, old);
-        ensure("older: dropped", !a.weighing->asking && !a.weighing->weight && a.weighing->all.empty());
+        {
+            INFO("older: dropped");
+            CHECK_FALSE(a.weighing->asking);
+            CHECK_FALSE(a.weighing->weight);
+            CHECK(a.weighing->all.empty());
+        }
         unit.weighed(a, answerFor(a, { weightOf(Target::Mono, 100), weightOf(Target::LSO, 200) }));
-        ensure("kept, its own first", a.weighing->weight && a.weighing->weight->total == 100 && a.weighing->all.size() == 2 &&
-                                          a.weighing->allVersion == versionOf(a) && a.weighing->version == versionOf(a));
-        ensure("exact: no optimizer after the check", a.weighing->exact && !a.weighing->sent);
-        ensure("the Problems and the save told", studio.problems == Names{ "a" } && studio.warned == Names{ "a" });
+        {
+            INFO("kept, its own first");
+            REQUIRE(a.weighing->weight);
+            CHECK(a.weighing->weight->total == 100);
+            CHECK(a.weighing->all.size() == 2);
+            CHECK(a.weighing->allVersion == versionOf(a));
+            CHECK(a.weighing->version == versionOf(a));
+        }
+        {
+            INFO("exact: no optimizer after the check");
+            CHECK(a.weighing->exact);
+            CHECK_FALSE(a.weighing->sent);
+        }
+        {
+            INFO("the Problems and the save told");
+            CHECK(studio.problems == Names{ "a" });
+            CHECK(studio.warned == Names{ "a" });
+        }
         studio.preprocessing = true;
         studio.optimizer     = true;
         unit.weighed(a, answerFor(a, { weightOf(Target::Mono, 90) }));
-        ensure("the optimizer after the check: not exact", !a.weighing->exact && a.weighing->weight->total == 90);
+        {
+            INFO("the optimizer after the check: not exact");
+            CHECK_FALSE(a.weighing->exact);
+            CHECK(a.weighing->weight->total == 90);
+        }
         Doc& none = tab("none", "x");
         none.notecard = true;
         none.weighing->weight = weightOf(Target::Mono, 1);
         unit.weigh(none);
-        ensure("nothing to weigh it for: its weight let go, nothing asked", !none.weighing->weight && studio.asked.size() == 1);
+        {
+            INFO("nothing to weigh it for: its weight let go, nothing asked");
+            CHECK_FALSE(none.weighing->weight);
+            CHECK(studio.asked.size() == 1);
+        }
     }
 
-    template<> template<>
-    void alscriptstudioweighing_object::test<3>()
+    // An answer for older text is dropped.
+    TEST_CASE_METHOD(alscriptstudioweighing_data, "alscriptstudioweighing: a sent text's weight stands over the check's of the same text", "[alscriptstudioweighing]")
     {
-        set_test_name("what a save sends weighed as sent, which stands over the check's of the same text; an answer for older text dropped");
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         unit.weighSent(a);
-        ensure("nothing sent yet: nothing asked", studio.requests.empty());
+        UNSCOPED_INFO("nothing sent yet: nothing asked");
+        CHECK(studio.requests.empty());
         a.uploaded.valid   = true;
         a.uploaded.version = versionOf(a);
         a.uploaded.text    = std::make_shared<const std::string>("sent text");
         unit.weighSent(a);
-        ensure("asked of what was sent, for its own target", studio.requests.size() == 1 && *studio.requests[0].text == "sent text" &&
-                                                                  studio.requests[0].targets == std::vector<Target>{ Target::Mono });
+        {
+            INFO("asked of what was sent, for its own target");
+            REQUIRE(studio.requests.size() == 1);
+            REQUIRE(studio.requests[0].text);
+            CHECK(*studio.requests[0].text == "sent text");
+            CHECK(studio.requests[0].targets == std::vector<Target>{ Target::Mono });
+        }
         studio.answers[0](answerFor(a, { weightOf(Target::Mono, 300) }));
-        ensure("kept as sent, and exact", a.weighing->weight && a.weighing->weight->total == 300 && a.weighing->sent && a.weighing->exact);
-        ensure("told", studio.problems == Names{ "a" } && studio.warned == Names{ "a" });
+        {
+            INFO("kept as sent, and exact");
+            REQUIRE(a.weighing->weight);
+            CHECK(a.weighing->weight->total == 300);
+            CHECK(a.weighing->sent);
+            CHECK(a.weighing->exact);
+        }
+        {
+            INFO("the Problems and the save told");
+            CHECK(studio.problems == Names{ "a" });
+            CHECK(studio.warned == Names{ "a" });
+        }
         unit.weighed(a, answerFor(a, { weightOf(Target::Mono, 100) }));
-        ensure("the check's of the same text does not replace it", a.weighing->weight->total == 300 && a.weighing->all.size() == 1);
+        {
+            INFO("the check's of the same text does not replace it");
+            CHECK(a.weighing->weight->total == 300);
+            CHECK(a.weighing->all.size() == 1);
+        }
         a.uploaded.disabled = true;
         unit.weighSent(a);
-        ensure("the preprocessor off: the text as written", *studio.requests[1].text == "default {}");
+        // Each question's answer is kept beside it: answers[1] below is there too.
+        REQUIRE(studio.requests.size() == 2);
+        REQUIRE(studio.requests[1].text);
+        UNSCOPED_INFO("the preprocessor off: the text as written");
+        CHECK(*studio.requests[1].text == "default {}");
         a.editor->setCaret(a.editor->document().end());
         a.editor->insertText(" ");
         ALScriptAnalysis::Result late = answerFor(a, { weightOf(Target::Mono, 1) });
         late.version -= 1;
         studio.answers[1](late);
-        ensure("typed on since: dropped", a.weighing->weight->total == 300);
+        UNSCOPED_INFO("typed on since: dropped");
+        CHECK(a.weighing->weight->total == 300);
     }
 
-    template<> template<>
-    void alscriptstudioweighing_object::test<4>()
+    TEST_CASE_METHOD(alscriptstudioweighing_data, "alscriptstudioweighing: the saved text's weight is kept target by target for the change column", "[alscriptstudioweighing]")
     {
-        set_test_name("what the text weighs while it is the text saved is kept for the change column, target by target");
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         a.weighing->all        = { weightOf(Target::Mono, 100), weightOf(Target::LSO, 200) };
         a.weighing->allVersion = versionOf(a);
         unit.keepSaved(a);
-        ensure("kept", a.weighing->saved.size() == 2);
+        CHECK(a.weighing->saved.size() == 2);
         a.weighing->all = { weightOf(Target::Mono, 150) };
         unit.keepSaved(a);
-        ensure("each target's replaced, the others kept", a.weighing->saved.size() == 2 && a.weighing->saved[0].total == 150 &&
-                                                              a.weighing->saved[1].total == 200);
+        {
+            INFO("each target's replaced, the others kept");
+            REQUIRE(a.weighing->saved.size() == 2);
+            CHECK(a.weighing->saved[0].total == 150);
+            CHECK(a.weighing->saved[1].total == 200);
+        }
         a.editor->setCaret(a.editor->document().end());
         a.editor->insertText(" ");
         a.weighing->allVersion = versionOf(a);
         a.weighing->all        = { weightOf(Target::Mono, 1) };
         unit.keepSaved(a);
-        ensure("not saved: nothing kept", a.weighing->saved[0].total == 150);
+        UNSCOPED_INFO("not saved: nothing kept");
+        CHECK(a.weighing->saved[0].total == 150);
     }
 
-    template<> template<>
-    void alscriptstudioweighing_object::test<5>()
+    // Neither where it is off or out of date.
+    TEST_CASE_METHOD(alscriptstudioweighing_data, "alscriptstudioweighing: a weight shows each part's bytes and each line's heat in the editor", "[alscriptstudioweighing]")
     {
-        set_test_name("a weight shown in the editor: each part's bytes after its line, each line's heat; neither where it is off or out of date");
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "integer f() { return 1; }\ndefault {}\n");
         ALScriptWeight          weight = weightOf(Target::Mono, 100);
@@ -265,42 +325,57 @@ namespace tut
         a.weighing->version = versionOf(a);
         a.weighing->exact   = true;
         unit.showInEditor(a);
-        ensure("its part's bytes after its line", a.editor->noteAt(0).find("WeightNote") != std::string::npos);
-        ensure("the included file's own not", a.editor->noteAt(1).empty());
-        ensure("the warmest line the heat's own colour", a.editor->heatAt(0) == 1.f);
-        ensure_equals("a quarter as warm by bytes, half by their square root", a.editor->heatAt(1), 0.5f);
+        UNSCOPED_INFO("its part's bytes after its line");
+        CHECK(a.editor->noteAt(0).find("WeightNote") != std::string::npos);
+        UNSCOPED_INFO("the included file's own not");
+        CHECK(a.editor->noteAt(1).empty());
+        UNSCOPED_INFO("the warmest line the heat's own colour");
+        CHECK(a.editor->heatAt(0) == 1.f);
+        UNSCOPED_INFO("a quarter as warm by bytes, half by their square root");
+        CHECK(a.editor->heatAt(1) == 0.5f);
         studio.notes = false;
         unit.showInEditor(a);
-        ensure("notes off: gone, the heat kept", a.editor->noteAt(0).empty() && a.editor->heatAt(0) == 1.f);
+        {
+            INFO("notes off: gone, the heat kept");
+            CHECK(a.editor->noteAt(0).empty());
+            CHECK(a.editor->heatAt(0) == 1.f);
+        }
         studio.heat = false;
         unit.showInEditor(a);
-        ensure("heat off: gone", a.editor->heatAt(0) == 0.f);
+        UNSCOPED_INFO("heat off: gone");
+        CHECK(a.editor->heatAt(0) == 0.f);
         studio.notes          = true;
         studio.heat           = true;
         a.weighing->version -= 1;
         unit.showInEditor(a);
-        ensure("out of date: nothing new said", a.editor->noteAt(0).empty() && a.editor->heatAt(0) == 0.f);
+        {
+            INFO("out of date: nothing new said");
+            CHECK(a.editor->noteAt(0).empty());
+            CHECK(a.editor->heatAt(0) == 0.f);
+        }
     }
 
-    template<> template<>
-    void alscriptstudioweighing_object::test<6>()
+    TEST_CASE_METHOD(alscriptstudioweighing_data, "alscriptstudioweighing: a save's size is measured once a text and not for a file on disk", "[alscriptstudioweighing]")
     {
-        set_test_name("what a save would send, measured once for each text: a script's, a notecard's, nothing for a file on disk");
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         unit.measureAsset(a);
-        ensure_equals("the script's text", a.weighing->assetBytes, size_t(10));
+        UNSCOPED_INFO("the script's text");
+        CHECK(a.weighing->assetBytes == size_t(10));
         a.weighing->assetBytes = 0;
         unit.measureAsset(a);
-        ensure("measured once for a text", a.weighing->assetBytes == 0);
+        UNSCOPED_INFO("measured once for a text");
+        CHECK(a.weighing->assetBytes == 0);
         Doc& n    = tab("n", "note text");
         n.notecard = true;
         unit.measureAsset(n);
-        ensure_equals("a notecard's", n.weighing->assetBytes, size_t(9));
+        UNSCOPED_INFO("a notecard's");
+        CHECK(n.weighing->assetBytes == size_t(9));
         Doc& f = tab("f", "file text");
         f.file = "/somewhere/f.lsl";
         unit.measureAsset(f);
-        ensure_equals("a file on disk has no limit", f.weighing->assetBytes, size_t(0));
+        UNSCOPED_INFO("a file on disk has no limit");
+        CHECK(f.weighing->assetBytes == size_t(0));
         // Preprocessed: the envelope a save would send, measured as long as
         // it would be made.
         Doc& p                 = tab("p", "#define X 1\ndefault { /* x */ }");
@@ -310,13 +385,12 @@ namespace tut
         p.expanded.generation  = 1;
         p.expanded.text        = std::make_shared<const std::string>("default { }\n");
         unit.measureAsset(p);
-        ensure_equals("the envelope's length", p.weighing->assetBytes, p.envelopeFor(*p.expanded.text, studio.programVersion()).wrap().size());
+        CHECK(p.weighing->assetBytes == p.envelopeFor(*p.expanded.text, studio.programVersion()).wrap().size());
     }
 
-    template<> template<>
-    void alscriptstudioweighing_object::test<7>()
+    // Each against the text as it stands.
+    TEST_CASE_METHOD(alscriptstudioweighing_data, "alscriptstudioweighing: listed fixes are weighed once settled and told what each would change", "[alscriptstudioweighing]")
     {
-        set_test_name("the fixes listed weighed once the list settles, each against the text as it stands; told what each would change");
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "integer a = 1\n");
         ALCodeEditor&           e    = *a.editor;
@@ -340,27 +414,43 @@ namespace tut
         e.setFixesShown([&unit, &a](U32 shown, const std::vector<ALCodeEditor::Fix>& fixes) { unit.fixesShown(a.id, shown, fixes); });
         e.setFixable(0, true, true);
         e.setFocus(true);
-        ensure("listed", e.handleKeyHere('.', MASK_CONTROL) && e.fixesOpen());
+        {
+            INFO("Ctrl+. lists the fixes");
+            CHECK(e.handleKeyHere('.', MASK_CONTROL));
+            CHECK(e.fixesOpen());
+        }
         unit.pump();
-        ensure_equals("weighed: the text, and each fix's copy but the suppression's", studio.requests.size(), size_t(1));
+        UNSCOPED_INFO("weighed: the text, and each fix's copy but the suppression's");
+        REQUIRE(studio.requests.size() == size_t(1));
         const ALScriptAnalysis::Request& request = studio.requests[0];
-        ensure("the text first, then the copies", request.variants.size() == 3 && request.variants[0] == "integer a = 1\n" &&
-                                                     request.variants[1] == "integer a = 1;\n" && request.variants[2] == "integer b = 1\n");
+        {
+            INFO("the text first, then the copies");
+            REQUIRE(request.variants.size() == 3);
+            CHECK(request.variants[0] == "integer a = 1\n");
+            CHECK(request.variants[1] == "integer a = 1;\n");
+            CHECK(request.variants[2] == "integer b = 1\n");
+        }
         ALScriptAnalysis::Result result;
         result.id            = a.id;
         result.version       = versionOf(a);
         result.variantTotals = { 100, 90, 100 };
         studio.answers[0](result);
-        ensure("the lighter one said", e.fixes()[0].note.find("FixLighterEstimate") == 0);
-        ensure("the same: nothing said", e.fixes()[1].note.empty() && e.fixes()[2].note.empty());
+        REQUIRE(e.fixes().size() == 3);
+        UNSCOPED_INFO("the lighter one said");
+        CHECK(e.fixes()[0].note.find("FixLighterEstimate") == 0);
+        {
+            INFO("the same: nothing said");
+            CHECK(e.fixes()[1].note.empty());
+            CHECK(e.fixes()[2].note.empty());
+        }
         unit.pump();
-        ensure("weighed once", studio.requests.size() == 1);
+        UNSCOPED_INFO("weighed once");
+        CHECK(studio.requests.size() == 1);
     }
 
-    template<> template<>
-    void alscriptstudioweighing_object::test<8>()
+    // While the Weights tab is looked at, and the tab checked as it stands.
+    TEST_CASE_METHOD(alscriptstudioweighing_data, "alscriptstudioweighing: the tab in front is weighed once for the targets it lacks", "[alscriptstudioweighing]")
     {
-        set_test_name("while the Weights tab is looked at, the tab in front checked as it stands is weighed for the targets it lacks, once");
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         services.front               = 0;
@@ -370,23 +460,30 @@ namespace tut
         a.weighing->allVersion       = versionOf(a);
         a.weighing->askedFor         = versionOf(a);
         unit.pump();
-        ensure("the others wanted: weighed", studio.asked == Names{ "a" } && a.weighing->asking);
+        {
+            INFO("the others wanted: weighed");
+            CHECK(studio.asked == Names{ "a" });
+            CHECK(a.weighing->asking);
+        }
         unit.pump();
-        ensure("once, while it is asked", studio.asked.size() == 1);
+        UNSCOPED_INFO("once, while it is asked");
+        CHECK(studio.asked.size() == 1);
         a.weighing->asking = false;
         a.weighing->all    = { weightOf(Target::Mono, 1), weightOf(Target::LSO, 2), weightOf(Target::LSLLuau, 3) };
         unit.pump();
-        ensure("all there: nothing more", studio.asked.size() == 1);
+        UNSCOPED_INFO("all there: nothing more");
+        CHECK(studio.asked.size() == 1);
         studio.shown          = false;
         a.weighing->all.clear();
         unit.pump();
-        ensure("not looked at: nothing", studio.asked.size() == 1);
+        UNSCOPED_INFO("not looked at: nothing");
+        CHECK(studio.asked.size() == 1);
     }
 
-    template<> template<>
-    void alscriptstudioweighing_object::test<9>()
+    // Checked but not weighed with it; one asked for an older text is not
+    // waited on.
+    TEST_CASE_METHOD(alscriptstudioweighing_data, "alscriptstudioweighing: a tab come to the front unweighed is weighed once for its text", "[alscriptstudioweighing]")
     {
-        set_test_name("a tab come to the front, checked but not weighed with it, is weighed once for its text; one asked for an older text is not waited on");
         ALScriptStudioWeighing& unit = make();
         Doc&                    a    = tab("a", "default {}");
         Doc&                    b    = tab("b", "default {}");
@@ -395,20 +492,29 @@ namespace tut
         a.weighing->askedFor         = versionOf(a);
         services.front               = 0;
         unit.pump();
-        ensure("weighed with its check already: nothing", studio.asked.empty());
+        UNSCOPED_INFO("weighed with its check already: nothing");
+        CHECK(studio.asked.empty());
         services.front = 1;
         unit.pump();
-        ensure("come to the front: weighed", studio.asked == Names{ "b" } && ALScriptStudioWeighing::asking(b));
+        {
+            INFO("come to the front: weighed");
+            CHECK(studio.asked == Names{ "b" });
+            CHECK(ALScriptStudioWeighing::asking(b));
+        }
         unit.pump();
-        ensure("once", studio.asked.size() == 1);
+        UNSCOPED_INFO("weighed once");
+        CHECK(studio.asked.size() == 1);
         // Typed in while it was weighed: the answer for the older text is
         // passed over, and the check of the new one weighs it again.
         b.editor->insertText("x");
-        ensure("not waited on", !ALScriptStudioWeighing::asking(b));
+        UNSCOPED_INFO("not waited on");
+        CHECK_FALSE(ALScriptStudioWeighing::asking(b));
         unit.pump();
-        ensure("not before its check", studio.asked.size() == 1);
+        UNSCOPED_INFO("not before its check");
+        CHECK(studio.asked.size() == 1);
         b.check->analysisVersion = versionOf(b);
         unit.pump();
-        ensure("then, for the new text", studio.asked == (Names{ "b", "b" }));
+        UNSCOPED_INFO("then, for the new text");
+        CHECK(studio.asked == (Names{ "b", "b" }));
     }
 }

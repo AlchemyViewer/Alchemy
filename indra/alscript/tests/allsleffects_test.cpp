@@ -23,12 +23,10 @@
 
 #include "linden_common.h"
 
-#include "linden_common.h"
-
 #include "../lsl/allsleffects.h"
 #include "../lsl/allslservice.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <tailslide/tailslide.hh>
 
@@ -94,7 +92,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct allsleffects_data
     {
@@ -108,20 +106,14 @@ namespace tut
                 loaded = service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error);
                 if (!loaded)
                 {
-                    fail("the builtins did not load: " + error);
+                    FAIL("the builtins did not load: " + error);
                 }
             }
         }
     };
 
-    typedef test_group<allsleffects_data> allsleffects_group;
-    typedef allsleffects_group::object    allsleffects_object;
-    allsleffects_group                    allsleffects_instance("allsleffects");
-
-    template<> template<>
-    void allsleffects_object::test<1>()
+    TEST_CASE_METHOD(allsleffects_data, "allsleffects: a function's writes and impurity take in its callees even round a loop", "[allsleffects]")
     {
-        set_test_name("a function's writes are the globals it assigns, itself and through what it calls, round a loop of calls too; a library call that is not pure makes it impure");
         const Parsed p("integer g;\ninteger h;\ninteger k;\n"
                        "a() { g = 1; }\n"
                        "b() { a(); h++; }\n"
@@ -132,7 +124,7 @@ namespace tut
                        "r() { k += 2; s(); }\n"
                        "s() { r(); }\n"
                        "default { state_entry() { f(); } }\n");
-        ensure("parsed", p.script != nullptr);
+        REQUIRE(p.script != nullptr);
         const ALLSLEffects effects(p.script);
         const auto         is = [&](const char* name, std::initializer_list<const char*> globals, bool impure) {
             const ALLSLEffects::Writes& w = effects.ofFunction(p.function(name));
@@ -143,20 +135,28 @@ namespace tut
             }
             return same;
         };
-        ensure("a writes g", is("a", { "g" }, false));
-        ensure("b writes h, and g through a", is("b", { "g", "h" }, false));
-        ensure("c writes only its own local, which no caller sees", is("c", {}, false));
-        ensure("d says something: impure", is("d", {}, true));
-        ensure("e's library call is pure", is("e", { "k" }, false));
-        ensure("f through b through a", is("f", { "g", "h" }, false));
-        ensure("r and s call each other, and both write k", is("r", { "k" }, false) && is("s", { "k" }, false));
-        ensure("one the script does not define: impure", effects.ofFunction(nullptr).impure);
+        CHECK(is("a", { "g" }, false));
+        UNSCOPED_INFO("b writes h, and g through a");
+        CHECK(is("b", { "g", "h" }, false));
+        UNSCOPED_INFO("c writes only its own local, which no caller sees");
+        CHECK(is("c", {}, false));
+        UNSCOPED_INFO("d says something: impure");
+        CHECK(is("d", {}, true));
+        UNSCOPED_INFO("e's library call is pure");
+        CHECK(is("e", { "k" }, false));
+        UNSCOPED_INFO("f through b through a");
+        CHECK(is("f", { "g", "h" }, false));
+        {
+            INFO("r and s call each other, and both write k");
+            CHECK(is("r", { "k" }, false));
+            CHECK(is("s", { "k" }, false));
+        }
+        UNSCOPED_INFO("one the script does not define: impure");
+        CHECK(effects.ofFunction(nullptr).impure);
     }
 
-    template<> template<>
-    void allsleffects_object::test<2>()
+    TEST_CASE_METHOD(allsleffects_data, "allsleffects: a call may go first past what changes nothing nor reads its writes", "[allsleffects]")
     {
-        set_test_name("a call may run first where what runs before it -- a right operand, earlier arguments, a list's other elements -- changes nothing and reads nothing it changes");
         const Parsed p("integer g;\ninteger h;\n"
                        "integer bump() { return ++g; }\n"
                        "integer same(integer v) { return v; }\n"
@@ -177,27 +177,43 @@ namespace tut
                        "    x = y + same(y++);\n"                 // 11: and here after
                        "    g = bump();\n"                        // 12: the store is after
                        "} }\n");
-        ensure("parsed", p.script != nullptr);
+        REQUIRE(p.script != nullptr);
         const ALLSLEffects                        effects(p.script);
         const std::vector<LSLFunctionExpression*> bumps = p.calls("bump");
         const std::vector<LSLFunctionExpression*> sames = p.calls("same");
-        ensure_equals("the calls", bumps.size(), size_t(11));
+        REQUIRE(bumps.size() == size_t(11));
+        REQUIRE(sames.size() == size_t(2));
         const auto first = [&](LSLFunctionExpression* call) { return effects.mayRunFirst(statementOf(call), call); };
-        ensure("0: the right operand runs first", first(bumps[0]));
-        ensure("1: g before it, and it writes g", !first(bumps[1]));
-        ensure("2: h before it, unwritten", first(bumps[2]));
-        ensure("3: an impure call before it", !first(bumps[3]));
-        ensure("4: a pure call before it", first(bumps[4]));
-        ensure("5: an increment before it", !first(bumps[5]));
-        ensure("6: an earlier argument reads what it writes", !first(bumps[6]));
-        ensure("7: the first argument", first(bumps[7]));
-        ensure("8: a list's other element, unwritten", first(bumps[8]));
-        ensure("9: a list's other element it writes, the order not known", !first(bumps[9]));
-        ensure("10: its own argument writes what runs before it", !first(sames[0]));
-        ensure("11: what reads it runs after", first(sames[1]));
-        ensure("12: an assignment's store is after its value", first(bumps[10]));
-        ensure_equals("before the right operand: nothing", ALLSLEffects::before(statementOf(bumps[0]), bumps[0]).size(), size_t(0));
-        ensure_equals("before the left: the right", ALLSLEffects::before(statementOf(bumps[1]), bumps[1]).size(), size_t(1));
+        UNSCOPED_INFO("0: the right operand runs first");
+        CHECK(first(bumps[0]));
+        UNSCOPED_INFO("1: g before it, and it writes g");
+        CHECK_FALSE(first(bumps[1]));
+        UNSCOPED_INFO("2: h before it, unwritten");
+        CHECK(first(bumps[2]));
+        UNSCOPED_INFO("3: an impure call before it");
+        CHECK_FALSE(first(bumps[3]));
+        UNSCOPED_INFO("4: a pure call before it");
+        CHECK(first(bumps[4]));
+        UNSCOPED_INFO("5: an increment before it");
+        CHECK_FALSE(first(bumps[5]));
+        UNSCOPED_INFO("6: an earlier argument reads what it writes");
+        CHECK_FALSE(first(bumps[6]));
+        UNSCOPED_INFO("7: the first argument");
+        CHECK(first(bumps[7]));
+        UNSCOPED_INFO("8: a list's other element, unwritten");
+        CHECK(first(bumps[8]));
+        UNSCOPED_INFO("9: a list's other element it writes, the order not known");
+        CHECK_FALSE(first(bumps[9]));
+        UNSCOPED_INFO("10: its own argument writes what runs before it");
+        CHECK_FALSE(first(sames[0]));
+        UNSCOPED_INFO("11: what reads it runs after");
+        CHECK(first(sames[1]));
+        UNSCOPED_INFO("12: an assignment's store is after its value");
+        CHECK(first(bumps[10]));
+        UNSCOPED_INFO("before the right operand: nothing");
+        REQUIRE(ALLSLEffects::before(statementOf(bumps[0]), bumps[0]).size() == size_t(0));
+        UNSCOPED_INFO("before the left: the right");
+        REQUIRE(ALLSLEffects::before(statementOf(bumps[1]), bumps[1]).size() == size_t(1));
 
         // Calls of the script's own that change nothing, either side.
         const Parsed q("integer g;\n"
@@ -210,11 +226,58 @@ namespace tut
                        "    l = [look(), bump()];\n"   // bump writes what look reads
                        "    l = [bump(), same(2)];\n"  // same changes nothing, and bump does
                        "} }\n");
-        ensure("parsed", q.script != nullptr);
-        const ALLSLEffects quiet(q.script);
-        const auto         firstQ = [&](LSLFunctionExpression* call) { return quiet.mayRunFirst(statementOf(call), call); };
-        ensure("a quiet call before a quiet one", firstQ(q.calls("same")[0]));
-        ensure("a call that reads before one that writes", !firstQ(q.calls("bump")[0]));
-        ensure("a call that writes before a quiet one", !firstQ(q.calls("same")[1]));
+        REQUIRE(q.script != nullptr);
+        const ALLSLEffects                        quiet(q.script);
+        const std::vector<LSLFunctionExpression*> quiet_bumps = q.calls("bump");
+        const std::vector<LSLFunctionExpression*> quiet_sames = q.calls("same");
+        REQUIRE(quiet_bumps.size() == size_t(2));
+        REQUIRE(quiet_sames.size() == size_t(2));
+        const auto firstQ = [&](LSLFunctionExpression* call) { return quiet.mayRunFirst(statementOf(call), call); };
+        UNSCOPED_INFO("a quiet call before a quiet one");
+        CHECK(firstQ(quiet_sames[0]));
+        UNSCOPED_INFO("a call that reads before one that writes");
+        CHECK_FALSE(firstQ(quiet_bumps[0]));
+        UNSCOPED_INFO("a call that writes before a quiet one");
+        CHECK_FALSE(firstQ(quiet_sames[1]));
+    }
+    TEST_CASE_METHOD(allsleffects_data, "allsleffects: a function's changes past the script and globals it reads through calls", "[allsleffects]")
+    {
+        const Parsed p("integer g;\n"
+                       "integer h;\n"
+                       "key me() { return llGetKey(); }\n"
+                       "say() { llOwnerSay(\"x\"); }\n"
+                       "loud() { say(); }\n"
+                       "integer look() { return g; }\n"
+                       "integer near() { return look(); }\n"
+                       "integer bump() { return ++h; }\n"
+                       "default { state_entry() { me(); loud(); near(); bump(); } }\n");
+        REQUIRE(p.script != nullptr);
+        const ALLSLEffects effects(p.script);
+        UNSCOPED_INFO("reading the world is past the script");
+        CHECK(effects.ofFunction(p.function("me")).impure);
+        UNSCOPED_INFO("and changes nothing there");
+        CHECK_FALSE(effects.ofFunction(p.function("me")).changes);
+        UNSCOPED_INFO("saying something changes it");
+        CHECK(effects.ofFunction(p.function("say")).changes);
+        UNSCOPED_INFO("through what it calls too");
+        CHECK(effects.ofFunction(p.function("loud")).changes);
+        UNSCOPED_INFO("a read of a global");
+        CHECK(effects.reads(p.function("look"), p.global("g")));
+        UNSCOPED_INFO("through what it calls");
+        CHECK(effects.reads(p.function("near"), p.global("g")));
+        UNSCOPED_INFO("not one it does not name");
+        CHECK_FALSE(effects.reads(p.function("near"), p.global("h")));
+        UNSCOPED_INFO("nor one only another function names");
+        CHECK_FALSE(effects.reads(p.function("me"), p.global("g")));
+        UNSCOPED_INFO("one it steps");
+        CHECK(effects.reads(p.function("bump"), p.global("h")));
+        UNSCOPED_INFO("a function the script does not define reads any");
+        CHECK(effects.reads(nullptr, p.global("g")));
+        LSLASTNode* body = p.script->getStates()->getChild(0);
+        {
+            INFO("a statement's, its calls'");
+            CHECK(effects.of(body).changes);
+            CHECK(effects.of(body).impure);
+        }
     }
 }

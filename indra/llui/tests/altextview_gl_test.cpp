@@ -32,17 +32,18 @@
 #include "altextruler.h"
 #include "altextview.h"
 #include "../llui.h"
-#include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <list>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -76,6 +77,49 @@ namespace
             out[i] = rgba[i * 4];
         }
         return out;
+    }
+
+    // Where two frames, or two strips of them, part: how many pixels differ
+    // and the first of them, so that a failure names a place rather than
+    // printing both whole. A row is width pixels of channels bytes, bottom
+    // row first; frames of different sizes differ by what the longer has
+    // over the shorter.
+    struct FrameDiff
+    {
+        size_t pixels = 0;
+        S32    x      = -1;
+        S32    y      = -1;
+
+        bool operator==(const FrameDiff&) const = default;
+    };
+
+    std::ostream& operator<<(std::ostream& out, const FrameDiff& d)
+    {
+        if (d.pixels == 0)
+        {
+            return out << "no pixel";
+        }
+        return out << d.pixels << " pixels, the first at (" << d.x << ", " << d.y << ")";
+    }
+
+    FrameDiff frameDiff(const std::vector<U8>& a, const std::vector<U8>& b, S32 width = W, S32 channels = 4)
+    {
+        FrameDiff    d;
+        const size_t step   = static_cast<size_t>(channels);
+        const size_t common = std::min(a.size(), b.size());
+        for (size_t i = 0; i + step <= common; i += step)
+        {
+            if (!std::equal(a.begin() + i, a.begin() + i + step, b.begin() + i))
+            {
+                if (d.pixels++ == 0)
+                {
+                    d.x = static_cast<S32>((i / step) % static_cast<size_t>(width));
+                    d.y = static_cast<S32>((i / step) / static_cast<size_t>(width));
+                }
+            }
+        }
+        d.pixels += (std::max(a.size(), b.size()) - common + step - 1) / step;
+        return d;
     }
 
     // A keymap that is always typing the same line, and counts how often
@@ -139,14 +183,35 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct altextview_gl_data
     {
+        // Focus as the case found it, whatever it leaves it on.
+        ll_test::FocusScope  focus;
+        // The views a case made, dying when it ends however it ends: a
+        // failed REQUIRE skips whatever comes after it.
+        std::vector<LLView*> views;
+
         altextview_gl_data()
         {
             ll_test::uiGL();
             ll_test::installWhiteTexture();
+        }
+
+        ~altextview_gl_data()
+        {
+            for (LLView* view : views)
+            {
+                view->die();
+            }
+        }
+
+        template <class T>
+        T* keep(T* view)
+        {
+            views.push_back(view);
+            return view;
         }
 
         // What a squiggle from x0 at height y covers of a pixel, worked out
@@ -204,31 +269,26 @@ namespace tut
             }
             return d;
         }
-
-        static std::string said(const Difference& d)
-        {
-            return " (most " + std::to_string(d.most) + ", covered " + std::to_string(d.covered) + " against " +
-                   std::to_string(d.compared) + ")";
-        }
     };
-
-    typedef test_group<altextview_gl_data> altextview_gl_test;
-    typedef altextview_gl_test::object     altextview_gl_object;
-    tut::altextview_gl_test                altextview_gl_testcase("altextview_gl");
 
     // A squiggle is one quad over a texture of one wave, and covers what
     // the wave works out to: pixel for pixel, each texel's middle falling
     // on a pixel's, and as much of them all told.
-    template<> template<>
-    void altextview_gl_object::test<1>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: a squiggle covers what its wave works out to pixel for pixel", "[altextview_gl]")
     {
         const LLRect           all(0, H, W, 0);
         const std::vector<S32> was = expectedAll(40.f, 140.f, 128, 1.f);
         const std::vector<S32> now = coverage([&] { Painter::drawSquiggle(40.f, 140.f, 128, LLColor4::white, all); });
         const Difference       d   = differ(was, now, 40, 140);
-        ensure("the wave covers something" + said(d), d.covered > 0);
-        ensure("no pixel far from the wave's" + said(d), d.most <= 6);
-        ensure("as much covered as the wave" + said(d), std::abs(d.covered - d.compared) * 64 <= d.covered);
+        {
+            CAPTURE(d.most, d.covered, d.compared);
+            UNSCOPED_INFO("the squiggle covers something");
+            CHECK(d.compared > 0);
+            UNSCOPED_INFO("no pixel far from the wave's");
+            CHECK(d.most <= 6);
+            UNSCOPED_INFO("as much covered as the wave");
+            CHECK(std::abs(d.covered - d.compared) * 64 <= d.covered);
+        }
         // Nothing above or below the band it was drawn in.
         for (S32 y = 0; y < H; ++y)
         {
@@ -236,7 +296,8 @@ namespace tut
             {
                 if (std::abs(y - 128) > 3 && now[static_cast<size_t>(y) * W + x] != 0)
                 {
-                    fail("drawn at " + std::to_string(x) + "," + std::to_string(y));
+                    CAPTURE(x, y);
+                    FAIL("drawn outside the wave's band");
                 }
             }
         }
@@ -244,8 +305,7 @@ namespace tut
 
     // What is outside the clip is not drawn, and what is inside is drawn as
     // it would have been: the wave stays where the squiggle began.
-    template<> template<>
-    void altextview_gl_object::test<2>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: a squiggle's clip cuts it without moving the wave inside", "[altextview_gl]")
     {
         const std::vector<S32> whole   = coverage([] { Painter::drawSquiggle(33.f, 200.f, 100, LLColor4::white, LLRect(0, H, W, 0)); });
         const std::vector<S32> clipped = coverage([] { Painter::drawSquiggle(33.f, 200.f, 100, LLColor4::white, LLRect(80, H, 120, 0)); });
@@ -255,25 +315,28 @@ namespace tut
             for (S32 x = 0; x < W; ++x)
             {
                 const size_t i = static_cast<size_t>(y) * W + x;
+                CAPTURE(x, y);
                 if (x < 80 || x >= 120)
                 {
-                    ensure_equals("nothing outside the clip at " + std::to_string(x) + "," + std::to_string(y), clipped[i], 0);
+                    UNSCOPED_INFO("nothing outside the clip");
+                    REQUIRE(clipped[i] == 0);
                 }
                 else
                 {
-                    ensure("the same wave inside the clip at " + std::to_string(x) + "," + std::to_string(y), std::abs(clipped[i] - whole[i]) <= 1);
+                    UNSCOPED_INFO("the same wave inside the clip");
+                    REQUIRE(std::abs(clipped[i] - whole[i]) <= 1);
                     inside += clipped[i];
                 }
             }
         }
-        ensure("something inside the clip", inside > 0);
+        UNSCOPED_INFO("something inside the clip");
+        CHECK(inside > 0);
     }
 
     // Where the UI is scaled, the wave is made with as many texels to a
     // point as the scale has pixels, and covers what the wave works out to
     // there.
-    template<> template<>
-    void altextview_gl_object::test<3>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: under a UI scale a squiggle covers what its wave works out to", "[altextview_gl]")
     {
         LLVector2& scale = LLUI::getScaleFactor();
         const LLVector2 was_scale = scale;
@@ -291,20 +354,23 @@ namespace tut
         const std::vector<S32> now = scaled([] { Painter::drawSquiggle(10.f, 110.f, 64, LLColor4::white, LLRect(0, H, W, 0)); });
         scale = was_scale;
         const Difference d = differ(was, now, 20, 220);
-        ensure("the wave covers something" + said(d), d.covered > 0);
-        ensure("no pixel far from the wave's" + said(d), d.most <= 6);
-        ensure("as much covered as the wave" + said(d), std::abs(d.covered - d.compared) * 64 <= d.covered);
+        CAPTURE(d.most, d.covered, d.compared);
+        UNSCOPED_INFO("the squiggle covers something");
+        CHECK(d.compared > 0);
+        UNSCOPED_INFO("no pixel far from the wave's");
+        CHECK(d.most <= 6);
+        UNSCOPED_INFO("as much covered as the wave");
+        CHECK(std::abs(d.covered - d.compared) * 64 <= d.covered);
     }
     // The map draws each line's runs from what it read last, and reads a
     // line again when it changes -- a space made a tab moves the runs after
     // it, though no token does -- and not otherwise.
-    template<> template<>
-    void altextview_gl_object::test<4>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: the scroll map reads a line again only when it changes", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::string text;
         for (S32 i = 0; i < 40; ++i)
@@ -315,7 +381,7 @@ namespace tut
         p.name         = "view";
         p.rect         = LLRect(0, H, W, 0);
         p.default_text = text;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setScrollMap(true);
         // The map's columns, at the right of the view.
@@ -338,13 +404,16 @@ namespace tut
             return map;
         };
         const std::vector<U8> first = map_of();
-        ensure("the map draws its lines", std::adjacent_find(first.begin(), first.end(), std::not_equal_to<U8>()) != first.end());
-        ensure("the same map when nothing changed", map_of() == first);
+        UNSCOPED_INFO("the map draws its lines");
+        REQUIRE(std::adjacent_find(first.begin(), first.end(), std::not_equal_to<U8>()) != first.end());
+        UNSCOPED_INFO("the same map when nothing changed");
+        CHECK(frameDiff(map_of(), first, W - map_left) == FrameDiff());
         view->document().replace(ALTextRange(ALTextPos(3, 4), ALTextPos(3, 5)), "\t");
         const std::vector<U8> tabbed = map_of();
-        ensure("a space made a tab changes the map", tabbed != first);
-        ensure("and it stays as it now is", map_of() == tabbed);
-        view->die();
+        UNSCOPED_INFO("a space made a tab changes the map");
+        CHECK(frameDiff(tabbed, first, W - map_left).pixels > 0);
+        UNSCOPED_INFO("and it stays as it now is");
+        CHECK(frameDiff(map_of(), tabbed, W - map_left) == FrameDiff());
     }
     // The code editor draws its rows in passes -- what is behind the text,
     // every row's glyphs in one call, then what is over it -- and each
@@ -352,13 +421,12 @@ namespace tut
     // of a line and a squiggle each change only the pixels of the line they
     // are on.
     // And the frame is a handful of draws.
-    template<> template<>
-    void altextview_gl_object::test<5>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: the code editor draws its rows in passes each landing on its own line", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::string text;
         for (S32 i = 0; i < 12; ++i)
@@ -370,7 +438,7 @@ namespace tut
         p.rect         = LLRect(0, H, W, 0);
         p.default_text = text;
         p.syntax       = "lsl";
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         // With the keyboard, so that a selection is drawn as the one being
         // worked in; read-only, so that no caret blinks between frames.
@@ -392,7 +460,8 @@ namespace tut
         // Every pixel that differs between two frames lies within a line's
         // band, a few pixels either way -- `below` more under it -- and
         // some do.
-        const auto only_on = [&](const std::string& what, const std::vector<U8>& a, const std::vector<U8>& b, S32 line, S32 below = 0) {
+        const auto require_only_on = [&](const std::string& what, const std::vector<U8>& a, const std::vector<U8>& b, S32 line, S32 below = 0) {
+            INFO(what);
             const S32 top    = editor->textRect().mTop - (editor->layout().lineTop(line) - editor->scrollY()) + 3;
             const S32 bottom = top - 3 - editor->layout().lineHeight(line) - 3 - below;
             bool      some   = false;
@@ -404,21 +473,26 @@ namespace tut
                     if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2])
                     {
                         some = true;
-                        ensure(what + ": changed at " + std::to_string(x) + "," + std::to_string(y) + ", off line " + std::to_string(line),
-                               y <= top && y >= bottom);
+                        CAPTURE(x, y, line);
+                        INFO("changed off the line");
+                        REQUIRE(y <= top);
+                        REQUIRE(y >= bottom);
                     }
                 }
             }
-            ensure(what + ": something changed", some);
+            UNSCOPED_INFO("something changed");
+            REQUIRE(some);
         };
 
         const std::vector<U8> plain = frame();
-        ensure("the same frame again", frame() == plain);
+        UNSCOPED_INFO("the same frame again");
+        CHECK(frameDiff(frame(), plain) == FrameDiff());
 
         editor->setSelection(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 20)));
-        only_on("a selection", plain, frame(), 2);
+        require_only_on("a selection", plain, frame(), 2);
         editor->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
-        ensure("the selection gone", frame() == plain);
+        UNSCOPED_INFO("the selection gone");
+        CHECK(frameDiff(frame(), plain) == FrameDiff());
 
         // A colour of its own over part of a line: each row's glyphs carry
         // their own colours into the one call.
@@ -426,9 +500,10 @@ namespace tut
         style.range = ALTextRange(ALTextPos(5, 8), ALTextPos(5, 13));
         style.color = LLColor4::red;
         editor->setStyles({ style });
-        only_on("a colour of its own", plain, frame(), 5);
+        require_only_on("a colour of its own", plain, frame(), 5);
         editor->clearStyles();
-        ensure("the colour gone", frame() == plain);
+        UNSCOPED_INFO("the colour gone");
+        CHECK(frameDiff(frame(), plain) == FrameDiff());
 
         ALCodeEditor::Decoration d;
         d.range = ALTextRange(ALTextPos(7, 8), ALTextPos(7, 13));
@@ -438,7 +513,7 @@ namespace tut
         // where the font's lines are closer than its letters are tall.
         const LLFontGL* mono     = LLFontGL::getFontMonospace();
         const S32       overhang = llmax(0, ll_round(mono->getDescenderHeight()) - (mono->getLineSpacing() - ll_round(mono->getAscenderHeight())));
-        only_on("a squiggle", plain, frame(), 7, overhang);
+        require_only_on("a squiggle", plain, frame(), 7, overhang);
 
         std::list<LLVertexBufferData> capture;
         gGL.beginList(&capture);
@@ -446,21 +521,19 @@ namespace tut
         gGL.flush();
         gGL.endList();
         glFinish();
-        ensure("a handful of draws: " + std::to_string(capture.size()), capture.size() <= 25);
-        gFocusMgr.setKeyboardFocus(nullptr);
-        editor->die();
+        UNSCOPED_INFO("the frame is a handful of draws");
+        CHECK(capture.size() <= 25);
     }
 
     // The preview of the lines under the mouse on the map is drawn over the
     // text beside the map: to its left where the map is on the right, to its
     // right where it is on the left -- not off the view past it.
-    template<> template<>
-    void altextview_gl_object::test<6>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: the map's preview is drawn over the text beside the map on either side", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::string text;
         for (S32 i = 0; i < 200; ++i)
@@ -471,13 +544,14 @@ namespace tut
         p.name           = "view";
         p.rect           = LLRect(0, H, W, 0);
         p.default_text   = text;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setScrollMap(true);
         view->setScrollMapWidth(60);
         view->setBackgroundColor(LLColor4(0.1f, 0.1f, 0.12f, 1.f));
         view->setTextColor(LLColor4(0.9f, 0.9f, 0.9f, 1.f));
         ALTextRuler* map = view->findChild<ALTextRuler>("ruler");
+        REQUIRE(map != nullptr);
         // Every pixel of the view, as it draws.
         const auto drawn = [&]() {
             ll_test::uiGL().clearFramebuffer();
@@ -511,17 +585,15 @@ namespace tut
             const std::vector<U8> shown = drawn();
             const S32 text_from = left ? 60 : 0;
             const S32 text_to   = left ? W : W - 60;
-            ensure(std::string("the preview over the text, the map on the ") + (left ? "left" : "right"),
-                   changed(plain, shown, text_from, text_to) > 1000);
+            UNSCOPED_INFO("the preview over the text, the map on the " << (left ? "left" : "right"));
+            REQUIRE(changed(plain, shown, text_from, text_to) > 1000);
         }
-        view->die();
     }
 
     // A row's squiggle is under its text: nothing at or above the baseline,
     // where a period's foot stands, and only the fade in the pixel under
     // it; the line itself lower still.
-    template<> template<>
-    void altextview_gl_object::test<7>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: a row's squiggle draws nothing at or above its text's baseline", "[altextview_gl]")
     {
         const S32              text_top = 150;
         const S32              ascent   = 12;
@@ -536,7 +608,8 @@ namespace tut
             {
                 if (now[static_cast<size_t>(y) * W + x] != 0)
                 {
-                    fail("over the text at " + std::to_string(x) + "," + std::to_string(y));
+                    CAPTURE(x, y);
+                    FAIL("drawn over the text");
                 }
             }
             under = llmax(under, now[static_cast<size_t>(baseline - 1) * W + x]);
@@ -545,8 +618,10 @@ namespace tut
                 drawn = llmax(drawn, now[static_cast<size_t>(y) * W + x]);
             }
         }
-        ensure("drawn under the text", drawn == 255);
-        ensure("only the fade just under the baseline: " + std::to_string(under), under < 128);
+        UNSCOPED_INFO("drawn under the text");
+        CHECK(drawn == 255);
+        UNSCOPED_INFO("only the fade just under the baseline");
+        CHECK(under < 128);
     }
 
     // The carets besides the main one are drawn as it is, blinking with it:
@@ -554,13 +629,12 @@ namespace tut
     // the frame with the two the other way round. A selection besides the
     // main one is washed as it is, on its own line only. And every caret
     // in sight is the one draw.
-    template<> template<>
-    void altextview_gl_object::test<8>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: other carets and selections are drawn as the main one is in one draw", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::string text;
         for (S32 i = 0; i < 12; ++i)
@@ -573,7 +647,7 @@ namespace tut
         p.default_text = text;
         // The skin's colours are not loaded here: the caret's is given.
         p.cursor_color = LLUIColor(LLColor4::white);
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setSelectionColor(LLUIColor(LLColor4(0.2f, 0.4f, 0.9f, 0.6f)));
         // Shown, and still from frame to frame.
@@ -592,7 +666,8 @@ namespace tut
         };
         // Every pixel that differs between two frames lies within a line's
         // band, and some do.
-        const auto only_on = [&](const std::string& what, const std::vector<U8>& a, const std::vector<U8>& b, S32 line) {
+        const auto require_only_on = [&](const std::string& what, const std::vector<U8>& a, const std::vector<U8>& b, S32 line) {
+            INFO(what);
             const S32 top    = view->textRect().mTop - (view->layout().lineTop(line) - view->scrollY()) + 3;
             const S32 bottom = top - 3 - view->layout().lineHeight(line) - 3;
             bool      some   = false;
@@ -604,12 +679,15 @@ namespace tut
                     if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2])
                     {
                         some = true;
-                        ensure(what + ": changed at " + std::to_string(x) + "," + std::to_string(y) + ", off line " + std::to_string(line),
-                               y <= top && y >= bottom);
+                        CAPTURE(x, y, line);
+                        INFO("changed off the line");
+                        REQUIRE(y <= top);
+                        REQUIRE(y >= bottom);
                     }
                 }
             }
-            ensure(what + ": something changed", some);
+            UNSCOPED_INFO("something changed");
+            REQUIRE(some);
         };
         const auto at = [](S32 line, S32 column) { return ALTextRange(ALTextPos(line, column), ALTextPos(line, column)); };
 
@@ -617,16 +695,18 @@ namespace tut
         const std::vector<U8> one = frame();
         view->addSelection(at(2, 5));
         const std::vector<U8> two = frame();
-        only_on("another caret", one, two, 2);
+        require_only_on("another caret", one, two, 2);
         view->setSelections(at(2, 5), { at(4, 0) });
-        ensure("the two the other way round, the same frame", frame() == two);
+        UNSCOPED_INFO("the two the other way round, the same frame");
+        CHECK(frameDiff(frame(), two) == FrameDiff());
 
         const ALTextRange      span(ALTextPos(7, 2), ALTextPos(7, 10));
         view->setSelections(at(4, 0), { span });
         const std::vector<U8> other_span = frame();
-        only_on("another selection, its caret at its end", one, other_span, 7);
+        require_only_on("another selection, its caret at its end", one, other_span, 7);
         view->setSelections(span, { at(4, 0) });
-        ensure("the same as the main selection", frame() == other_span);
+        UNSCOPED_INFO("the same as the main selection");
+        CHECK(frameDiff(frame(), other_span) == FrameDiff());
 
         // A caret on every line: the carets are one draw, not one each.
         std::vector<ALTextRange> many;
@@ -649,21 +729,18 @@ namespace tut
         gGL.flush();
         gGL.endList();
         glFinish();
-        ensure("twelve carets cost what one does: " + std::to_string(with_many) + " against " + std::to_string(capture.size()),
-               with_many == capture.size());
-        gFocusMgr.setKeyboardFocus(nullptr);
-        view->die();
+        UNSCOPED_INFO("twelve carets cost what one does");
+        CHECK(with_many == capture.size());
     }
     // A gap: its tint across the text and nothing else in it, the line
     // under it drawn as far down as the gap is tall, and the rows below
     // the text drawn too.
-    template<> template<>
-    void altextview_gl_object::test<9>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: a gap is tinted across the text and moves the lines below it down", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
         p.name         = "view";
@@ -673,7 +750,7 @@ namespace tut
         // black.
         p.text_color   = LLUIColor(LLColor4::white);
         p.bg_visible   = false;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         const auto frame = [&]() {
             ll_test::uiGL().clearFramebuffer();
@@ -701,7 +778,8 @@ namespace tut
             return count;
         };
         const std::vector<U8> before = frame();
-        ensure("the second line's ink in its row", lit(before, 1, 1, 0, 128) > 20);
+        UNSCOPED_INFO("the second line's ink in its row");
+        CHECK(lit(before, 1, 1, 0, 128) > 20);
 
         std::vector<ALTextView::LineAnnotation> lines(4);
         lines[1].gap     = 2;
@@ -711,24 +789,33 @@ namespace tut
         view->setLineAnnotations(lines);
         const std::vector<U8> after = frame();
         const S32             width = text.getWidth();
-        ensure("the gap tinted across the text", lit(after, 1, 2, 2, 200) >= width * (2 * row_h - 2));
-        ensure("and nothing written in it", lit(after, 1, 2, 0, 128) == 0);
-        ensure("the line under it as far down", lit(after, 3, 1, 0, 128) > 20 && lit(after, 3, 1, 0, 128) == lit(before, 1, 1, 0, 128));
-        ensure("the first line where it was", lit(after, 0, 1, 0, 128) == lit(before, 0, 1, 0, 128));
-        ensure("the rows below the text tinted", lit(after, 5, 1, 1, 200) >= width * (row_h - 2) && lit(after, 6, 1, 1, 200) == 0);
-        view->die();
+        UNSCOPED_INFO("the gap tinted across the text");
+        CHECK(lit(after, 1, 2, 2, 200) >= width * (2 * row_h - 2));
+        UNSCOPED_INFO("and nothing written in it");
+        CHECK(lit(after, 1, 2, 0, 128) == 0);
+        {
+            INFO("the line under it as far down");
+            CHECK(lit(after, 3, 1, 0, 128) > 20);
+            CHECK(lit(after, 3, 1, 0, 128) == lit(before, 1, 1, 0, 128));
+        }
+        UNSCOPED_INFO("the first line where it was");
+        CHECK(lit(after, 0, 1, 0, 128) == lit(before, 0, 1, 0, 128));
+        {
+            INFO("the rows below the text tinted");
+            CHECK(lit(after, 5, 1, 1, 200) >= width * (row_h - 2));
+            CHECK(lit(after, 6, 1, 1, 200) == 0);
+        }
     }
 
     // What goes by row is cut at the text's edge: a code editor scrolled
     // half a row has its top row's number in the gutter cut there, not
     // drawn above the editor; and an atom's view on that row cut too.
-    template<> template<>
-    void altextview_gl_object::test<10>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: a row's gutter number and atom view are cut at the text's top edge", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
         p.name              = "editor";
@@ -741,15 +828,17 @@ namespace tut
         {
             text += "MMMM " + std::to_string(n) + "\n";
         }
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         editor->setText(text);
         const S32 row_h = editor->layout().rowHeight();
         const S32 above = editor->getRect().mTop;
         editor->setScrollY(row_h / 2);
         const std::vector<U8> frame = drawnAt(*editor);
-        ensure("the gutter drawn", drawnIn(frame, 0, W, editor->getRect().mBottom, above) > 0);
-        ensure("nothing of it above the editor", drawnIn(frame, 0, W, above, H) == 0);
+        UNSCOPED_INFO("the gutter drawn");
+        CHECK(drawnIn(frame, 0, W, editor->getRect().mBottom, above) > 0);
+        UNSCOPED_INFO("nothing of it above the editor");
+        CHECK(drawnIn(frame, 0, W, above, H) == 0);
 
         // An atom's view on the first line, which is half out of sight.
         LLView::Params bp(LLUICtrlFactory::getDefaultParams<LLView>());
@@ -765,21 +854,21 @@ namespace tut
         const std::vector<U8> with_atom = drawnAt(*editor);
         const LLRect          area      = editor->textRect();
         const S32             x0        = editor->getRect().mLeft + area.mLeft;
-        ensure("the atom drawn, in what of its row is in sight", drawnIn(with_atom, x0, x0 + 40, editor->getRect().mBottom + area.mTop - row_h / 2, editor->getRect().mBottom + area.mTop) > 0);
+        UNSCOPED_INFO("the atom drawn, in what of its row is in sight");
+        CHECK(drawnIn(with_atom, x0, x0 + 40, editor->getRect().mBottom + area.mTop - row_h / 2, editor->getRect().mBottom + area.mTop) > 0);
         // A clip takes in the row its top edge names, as a rect is drawn.
-        ensure("nothing of it above the text", drawnIn(with_atom, x0, x0 + 40, editor->getRect().mBottom + area.mTop + 1, H) == 0);
-        editor->die();
+        UNSCOPED_INFO("nothing of it above the text");
+        CHECK(drawnIn(with_atom, x0, x0 + 40, editor->getRect().mBottom + area.mTop + 1, H) == 0);
     }
 
     // The ruler's marks cost what one does, however many lines have one: a
     // comparison marks every line it changed, and a gap's mark with them.
-    template<> template<>
-    void altextview_gl_object::test<11>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: the ruler's marks cost what one does however many lines have one", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::string text;
         for (S32 i = 0; i < 200; ++i)
@@ -790,7 +879,7 @@ namespace tut
         p.name           = "view";
         p.rect           = LLRect(0, H, W, 0);
         p.default_text   = text;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         ALTextRuler* ruler = view->findChild<ALTextRuler>("ruler");
         // A frame's draws, the ruler put in its place by a frame before it.
@@ -812,7 +901,11 @@ namespace tut
         lines[5].rulerTint = changed;
         view->setLineAnnotations(lines);
         const size_t one = draws();
-        ensure("the ruler beside the text", ruler && ruler->getVisible());
+        {
+            INFO("the ruler beside the text");
+            REQUIRE(ruler);
+            CHECK(ruler->getVisible());
+        }
         for (ALTextView::LineAnnotation& line : lines)
         {
             line.rulerTint = changed;
@@ -820,21 +913,20 @@ namespace tut
         lines[100].gapRulerTint = changed;
         view->setLineAnnotations(lines);
         const size_t every = draws();
-        ensure("two hundred marks and a gap's cost what one does: " + std::to_string(every) + " against " + std::to_string(one), every == one);
-        view->die();
+        UNSCOPED_INFO("two hundred marks and a gap's cost what one does");
+        CHECK(every == one);
     }
 
     // A tint behind every line in sight and every gap costs what one does,
     // as a line under a link and a style on every line costs what one of
     // each does: a comparison's side tints most of its lines, and a log may
     // underline a name on each.
-    template<> template<>
-    void altextview_gl_object::test<12>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: tints and underlines on every line cost what one line's do", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::string text;
         for (S32 i = 0; i < 12; ++i)
@@ -845,7 +937,7 @@ namespace tut
         p.name           = "view";
         p.rect           = LLRect(0, H, W, 0);
         p.default_text   = text;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         // A frame's draws, laid out by a frame before it.
         const auto draws = [&]() {
@@ -875,8 +967,8 @@ namespace tut
         lines[8].gapTint = tint;
         view->setLineAnnotations(lines);
         const size_t every_tint = draws();
-        ensure("a tint on every line and gap costs what one does: " + std::to_string(every_tint) + " against " + std::to_string(one_tint),
-               every_tint == one_tint);
+        UNSCOPED_INFO("a tint on every line and gap costs what one does");
+        CHECK(every_tint == one_tint);
         view->setLineAnnotations({});
 
         // A style that underlines the first word, and a link always
@@ -905,22 +997,20 @@ namespace tut
         view->setStyles(styles);
         view->setSubstitutions(links);
         const size_t every_line = draws();
-        ensure("underlines on every line cost what one line's do: " + std::to_string(every_line) + " against " + std::to_string(one_line),
-               every_line == one_line);
-        view->die();
+        UNSCOPED_INFO("underlines on every line cost what one line's do");
+        CHECK(every_line == one_line);
     }
 
     // The blocks the gutter draws its markers by are found again once the
     // text is lexed to its end: an edit that changes how every line after
     // it starts -- a string left open at the top -- has the lines in sight
     // lexed in the frame after it, and of the rest a slice, not the whole.
-    template<> template<>
-    void altextview_gl_object::test<13>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: fold blocks are found again once the text is lexed to its end", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::string text = "default\n{\n";
         for (S32 i = 0; i < 3000; ++i)
@@ -933,7 +1023,7 @@ namespace tut
         p.rect              = LLRect(0, H, W, 0);
         p.syntax            = "lsl";
         p.show_fold_markers = true;
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         editor->setText(text);
         const S32  last  = editor->document().lineCount() - 1;
@@ -945,29 +1035,28 @@ namespace tut
         };
         editor->highlighter().tokens(last);
         frame();
-        ensure_equals("the block", editor->foldRegions().size(), size_t(1));
+        UNSCOPED_INFO("the block");
+        REQUIRE(editor->foldRegions().size() == size_t(1));
 
         editor->document().insert(ALTextPos(0, 0), "\"");
         frame();
         editor->highlighter().tokens(last);
-        ensure("the frame after the edit left most of the text to lex: " + std::to_string(editor->highlighter().lastLexed()) + " of " +
-                   std::to_string(last + 1),
-               editor->highlighter().lastLexed() > last / 2);
+        UNSCOPED_INFO("the frame after the edit left most of the text to lex");
+        CHECK(editor->highlighter().lastLexed() > last / 2);
         frame();
-        ensure("lexed to its end: the block gone", editor->foldRegions().empty());
-        editor->die();
+        UNSCOPED_INFO("lexed to its end: the block gone");
+        CHECK(editor->foldRegions().empty());
     }
 
     // What is being composed is underlined under its own text on each row
     // its line wraps it over: on the first, from where it starts to the
     // row's end; on the next, from the row's start to where it ends.
-    template<> template<>
-    void altextview_gl_object::test<14>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: preedit text is underlined under itself on each row it wraps over", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::string words;
         for (S32 i = 0; i < 16; ++i)
@@ -982,7 +1071,7 @@ namespace tut
         // black.
         p.text_color   = LLUIColor(LLColor4::white);
         p.bg_visible   = false;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setWordWrap(true);
         const auto frame = [&]() {
@@ -998,15 +1087,20 @@ namespace tut
         // Laid out by a frame, as it is drawn.
         frame();
         const std::vector<ALTextLayout::Row> rows = view->layout().line(0).rows;
-        ensure("the line wraps, three words or more to its first row", rows.size() >= 2 && rows[0].end > 15);
+        {
+            INFO("the line wraps, three words or more to its first row");
+            REQUIRE(rows.size() >= 2);
+            CHECK(rows[0].end > 15);
+        }
         // From the third word of the first row to the end of the first word
         // of the second.
         const S32 begin = 10;
         const S32 end   = rows[1].begin + 4;
-        ensure("it ends inside the second row", end < rows[1].end);
+        UNSCOPED_INFO("it ends inside the second row");
+        CHECK(end < rows[1].end);
         const std::vector<U8> plain = frame();
         view->preeditor().markAsPreedit(begin, end - begin);
-        ensure("composing", view->hasPreedit());
+        CHECK(view->hasPreedit());
         const std::vector<U8> composed = frame();
 
         // The columns of a row's band in which anything changed between the
@@ -1040,34 +1134,33 @@ namespace tut
         const S32               first_from = text.mLeft + static_cast<S32>(view->layout().xOf(0, begin));
         const S32               first_to   = text.mLeft + static_cast<S32>(rows[0].width);
         const std::vector<bool> first      = columns(0);
-        ensure("nothing on the first row left of where it starts: " + std::to_string(changed_in(first, 0, first_from)),
-               changed_in(first, 0, first_from) == 0);
-        ensure("under its text to the first row's end: " + std::to_string(changed_in(first, first_from, first_to)) + " of " +
-                   std::to_string(first_to - first_from),
-               changed_in(first, first_from, first_to) * 4 >= (first_to - first_from) * 3);
-        ensure("nothing past the first row's end", changed_in(first, first_to, W) == 0);
+        UNSCOPED_INFO("nothing on the first row left of where it starts");
+        CHECK(changed_in(first, 0, first_from) == 0);
+        UNSCOPED_INFO("under most of its text to the first row's end");
+        CHECK(changed_in(first, first_from, first_to) * 4 >= (first_to - first_from) * 3);
+        UNSCOPED_INFO("nothing past the first row's end");
+        CHECK(changed_in(first, first_to, W) == 0);
 
         const S32               second_from = text.mLeft + static_cast<S32>(view->layout().xOf(0, rows[1].begin));
         const S32               second_to   = text.mLeft + static_cast<S32>(view->layout().xOf(0, end));
         const std::vector<bool> second      = columns(1);
-        ensure("under its text on the second row: " + std::to_string(changed_in(second, second_from, second_to)) + " of " +
-                   std::to_string(second_to - second_from),
-               changed_in(second, second_from, second_to) * 4 >= (second_to - second_from) * 3);
-        ensure("nothing on the second row past where it ends",
-               changed_in(second, 0, second_from) == 0 && changed_in(second, second_to, W) == 0);
-        view->die();
+        UNSCOPED_INFO("under most of its text on the second row");
+        CHECK(changed_in(second, second_from, second_to) * 4 >= (second_to - second_from) * 3);
+        UNSCOPED_INFO("nothing on the second row left of its start");
+        CHECK(changed_in(second, 0, second_from) == 0);
+        UNSCOPED_INFO("nothing on the second row past where it ends");
+        CHECK(changed_in(second, second_to, W) == 0);
     }
 
     // The preview of the lines under the mouse on the map numbers them as
     // the view does, from its first line's number: a notecard's from 0, an
     // expansion's from past its envelope.
-    template<> template<>
-    void altextview_gl_object::test<15>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: the map's preview numbers its lines from the view's line number base", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         std::string text;
         for (S32 i = 0; i < 200; ++i)
@@ -1078,7 +1171,7 @@ namespace tut
         p.name               = "editor";
         p.rect               = LLRect(0, H, W, 0);
         p.default_text       = text;
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         // No gutter, so that only the preview says a line's number; read
         // only, so that no caret blinks between frames.
@@ -1090,7 +1183,7 @@ namespace tut
         editor->setBackgroundColor(LLColor4(0.1f, 0.1f, 0.12f, 1.f));
         editor->setTextColor(LLColor4(0.9f, 0.9f, 0.9f, 1.f));
         ALTextRuler* map = editor->findChild<ALTextRuler>("ruler");
-        ensure("a map", map != nullptr);
+        REQUIRE(map != nullptr);
         const auto drawn = [&]() {
             ll_test::uiGL().clearFramebuffer();
             glEnable(GL_BLEND);
@@ -1120,10 +1213,11 @@ namespace tut
         const std::vector<U8> from_one = drawn();
         editor->setLineNumberBase(1000);
         const std::vector<U8> from_base = drawn();
-        ensure("numbered past a thousand, the preview says so: " + std::to_string(changed(from_one, from_base)), changed(from_one, from_base) > 0);
+        UNSCOPED_INFO("numbered past a thousand, the preview says so");
+        CHECK(changed(from_one, from_base) > 0);
         editor->setLineNumberBase(0);
-        ensure("and from one again as before", changed(from_one, drawn()) == 0);
-        editor->die();
+        UNSCOPED_INFO("and from one again as before");
+        CHECK(changed(from_one, drawn()) == 0);
     }
 
     // A gap put between the lines moves the map's rows below it down, each
@@ -1131,13 +1225,12 @@ namespace tut
     // that gap from the start draws, though the text, and so the lines in
     // sight, are as they were. A text with no grammar, whose lines' tokens
     // never change.
-    template<> template<>
-    void altextview_gl_object::test<16>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: a gap put between the lines moves the map's rows below it down", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         // Lines of many lengths, so that one drawn with another's runs is
         // seen to be.
@@ -1153,7 +1246,7 @@ namespace tut
             p.name           = "view";
             p.rect           = LLRect(0, H, W, 0);
             p.default_text   = text;
-            ALTextView* made = LLUICtrlFactory::create<ALTextView>(p);
+            ALTextView* made = keep(LLUICtrlFactory::create<ALTextView>(p));
             made->setFont(LLFontGL::getFontMonospace());
             made->setScrollMap(true);
             made->setScrollMapWidth(60);
@@ -1191,31 +1284,30 @@ namespace tut
         const std::vector<U8> before = map_of(drawn_first);
         drawn_first->setLineAnnotations(gapped);
         const std::vector<U8> after = map_of(drawn_first);
-        ensure("the gap moved the map", after != before);
+        UNSCOPED_INFO("the gap moved the map");
+        CHECK(frameDiff(after, before, 60, 3).pixels > 0);
         ALTextView* gapped_first = make();
         gapped_first->setLineAnnotations(gapped);
-        ensure("as a view with the gap from the start draws it", after == map_of(gapped_first));
-        drawn_first->die();
-        gapped_first->die();
+        UNSCOPED_INFO("as a view with the gap from the start draws it");
+        CHECK(frameDiff(after, map_of(gapped_first), 60, 3) == FrameDiff());
     }
 
     // The code editor's words beside the text -- an inlay's in its pill, a
     // line's note -- and the arrows for its tabs cost what one line's do,
     // however many lines have them: a script with a name before every
     // argument has a hint on most rows.
-    template<> template<>
-    void altextview_gl_object::test<17>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: hints and notes and tab arrows on every line cost what one line's do", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
         p.name   = "editor";
         p.rect   = LLRect(0, H, W, 0);
         p.syntax = "lsl";
-        ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        ALCodeEditor* editor = keep(LLUICtrlFactory::create<ALCodeEditor>(p));
         editor->setFont(LLFontGL::getFontMonospace());
         // Read-only, so that no caret blinks between frames.
         editor->setReadOnly(true);
@@ -1263,21 +1355,19 @@ namespace tut
         const size_t one = draws();
         fill(12);
         const size_t every = draws();
-        ensure("hints, notes and tabs on every line cost what one line's do: " + std::to_string(every) + " against " + std::to_string(one),
-               every == one);
-        editor->die();
+        UNSCOPED_INFO("hints, notes and tabs on every line cost what one line's do");
+        CHECK(every == one);
     }
 
     // A selection that goes on past a line's end is drawn a little past the
     // line's last glyph, as a match that does is: as far however far in the
     // text's first line starts.
-    template<> template<>
-    void altextview_gl_object::test<18>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: a selection past a line's end is drawn a little past its last glyph", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
         p.name         = "view";
@@ -1287,7 +1377,7 @@ namespace tut
         // black.
         p.text_color   = LLUIColor(LLColor4::white);
         p.bg_visible   = false;
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         view->setSelectionColor(LLUIColor(LLColor4(0.f, 0.f, 1.f, 1.f)));
         // The first line in from the edge, as a log's are.
@@ -1315,28 +1405,28 @@ namespace tut
         {
             past += rgba[(static_cast<size_t>(y) * W + x) * 4 + 2] > 128 ? 1 : 0;
         }
-        ensure("drawn past the line's end: " + std::to_string(past), past > 0);
-        ensure("a little, not as far again as the first line is in: " + std::to_string(past), past <= 10);
-        view->die();
+        UNSCOPED_INFO("drawn past the line's end");
+        CHECK(past > 0);
+        UNSCOPED_INFO("a little, not as far again as the first line is in");
+        CHECK(past <= 10);
     }
 
     // The band a modal keymap has under the text is read and measured once
     // while nothing moves, and again once the fonts are loaded again under
     // the same font: its caret and its choices are measured in the faces
     // its text is drawn in.
-    template<> template<>
-    void altextview_gl_object::test<19>()
+    TEST_CASE_METHOD(altextview_gl_data, "altextview_gl: a modal keymap's band is read once and again after a font reload", "[altextview_gl]")
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
         p.name           = "view";
         p.rect           = LLRect(0, H, W, 0);
         p.default_text   = "text";
-        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        ALTextView* view = keep(LLUICtrlFactory::create<ALTextView>(p));
         view->setFont(LLFontGL::getFontMonospace());
         S32  asked  = 0;
         auto keymap = std::make_unique<TypingKeymap>();
@@ -1350,13 +1440,21 @@ namespace tut
         };
         frame();
         const S32 once = asked;
-        ensure("read for the first frame", once > 0);
+        UNSCOPED_INFO("read for the first frame");
+        CHECK(once > 0);
         frame();
-        ensure_equals("not again while nothing moved", asked, once);
-        // What a font reload does: the faces swapped under the same font.
+        UNSCOPED_INFO("not again while nothing moved");
+        CHECK(asked == once);
+        // What a font reload does: the faces swapped under the same font;
+        // put back however the case ends, for the views of the cases after.
+        struct Generation
+        {
+            const S32 was = LLFontGL::sResolutionGeneration;
+            ~Generation() { LLFontGL::sResolutionGeneration = was; }
+        } generation;
         ++LLFontGL::sResolutionGeneration;
         frame();
-        ensure("read again once the fonts were loaded again", asked > once);
-        view->die();
+        UNSCOPED_INFO("read again once the fonts were loaded again");
+        CHECK(asked > once);
     }
 }

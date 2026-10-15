@@ -28,7 +28,7 @@
 
 #include "linden_common.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "../llbbox.h"
 
@@ -36,28 +36,13 @@
 #define ANGLE                (3.14159265f / 2.0f)
 #define APPROX_EQUAL(a, b)   (dist_vec_squared((a),(b)) < 1e-10)
 
-namespace tut
-{
 namespace
 {
-    struct LLBBoxData
-    {
-    };
-
-    typedef test_group<LLBBoxData> factory;
-    typedef factory::object object;
-}
 }
 
 namespace
 {
-    tut::factory llbbox_test_factory("LLBBox");
-}
-
-namespace tut
-{
-    template<> template<>
-    void object::test<1>()
+    TEST_CASE("LLBBox: the default constructor gives an empty box at the origin", "[LLBBox]")
     {
         //
         // test the default constructor
@@ -65,14 +50,13 @@ namespace tut
 
         LLBBox bbox1;
 
-        ensure_equals("Default bbox min", bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, 0.0f));
-        ensure_equals("Default bbox max", bbox1.getMaxLocal(), LLVector3(0.0f, 0.0f, 0.0f));
-        ensure_equals("Default bbox pos agent", bbox1.getPositionAgent(), LLVector3(0.0f, 0.0f, 0.0f));
-        ensure_equals("Default bbox rotation", bbox1.getRotation(), LLQuaternion(0.0f, 0.0f, 0.0f, 1.0f));
+        CHECK(bbox1.getMinLocal() == LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getMaxLocal() == LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getPositionAgent() == LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getRotation() == LLQuaternion(0.0f, 0.0f, 0.0f, 1.0f));
     }
 
-    template<> template<>
-    void object::test<2>()
+    TEST_CASE("LLBBox: the full constructor stores its arguments", "[LLBBox]")
     {
         //
         // test the non-default constructor
@@ -81,96 +65,93 @@ namespace tut
         LLBBox bbox2(LLVector3(1.0f, 2.0f, 3.0f), LLQuaternion(),
                      LLVector3(2.0f, 3.0f, 4.0f), LLVector3(4.0f, 5.0f, 6.0f));
 
-        ensure_equals("Custom bbox min", bbox2.getMinLocal(), LLVector3(2.0f, 3.0f, 4.0f));
-        ensure_equals("Custom bbox max", bbox2.getMaxLocal(), LLVector3(4.0f, 5.0f, 6.0f));
-        ensure_equals("Custom bbox pos agent", bbox2.getPositionAgent(), LLVector3(1.0f, 2.0f, 3.0f));
-        ensure_equals("Custom bbox rotation", bbox2.getRotation(), LLQuaternion(0.0f, 0.0f, 0.0f, 1.0f));
+        CHECK(bbox2.getMinLocal() == LLVector3(2.0f, 3.0f, 4.0f));
+        CHECK(bbox2.getMaxLocal() == LLVector3(4.0f, 5.0f, 6.0f));
+        CHECK(bbox2.getPositionAgent() == LLVector3(1.0f, 2.0f, 3.0f));
+        CHECK(bbox2.getRotation() == LLQuaternion(0.0f, 0.0f, 0.0f, 1.0f));
     }
 
-    template<> template<>
-    void object::test<3>()
+    TEST_CASE("LLBBox: setMinLocal", "[LLBBox]")
     {
         //
         // test the setMinLocal() method
         //
         LLBBox bbox2;
         bbox2.setMinLocal(LLVector3(3.0f, 3.0f, 3.0f));
-        ensure_equals("Custom bbox min (2)", bbox2.getMinLocal(), LLVector3(3.0f, 3.0f, 3.0f));
+        CHECK(bbox2.getMinLocal() == LLVector3(3.0f, 3.0f, 3.0f));
     }
 
-    template<> template<>
-    void object::test<4>()
+    TEST_CASE("LLBBox: setMaxLocal", "[LLBBox]")
     {
         //
         // test the setMaxLocal() method
         //
         LLBBox bbox2;
         bbox2.setMaxLocal(LLVector3(5.0f, 5.0f, 5.0f));
-        ensure_equals("Custom bbox max (2)", bbox2.getMaxLocal(), LLVector3(5.0f, 5.0f, 5.0f));
+        CHECK(bbox2.getMaxLocal() == LLVector3(5.0f, 5.0f, 5.0f));
     }
 
-    template<> template<>
-    void object::test<5>()
+    TEST_CASE("LLBBox: getCenterLocal ignores position and rotation", "[LLBBox]")
     {
         //
         // test the getCenterLocal() method
         //
 
-        ensure_equals("Default bbox local center", LLBBox().getCenterLocal(), LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(LLBBox().getCenterLocal() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBox bbox1(LLVector3(1.0f, 2.0f, 3.0f), LLQuaternion(),
                      LLVector3(2.0f, 4.0f, 6.0f), LLVector3(4.0f, 6.0f, 8.0f));
 
-        ensure_equals("Custom bbox center local", bbox1.getCenterLocal(), LLVector3(3.0f, 5.0f, 7.0f));
+        CHECK(bbox1.getCenterLocal() == LLVector3(3.0f, 5.0f, 7.0f));
 
         LLBBox bbox2(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(ANGLE, LLVector3(0.0f, 0.0f, 1.0f)),
                      LLVector3(2.0f, 2.0f, 2.0f), LLVector3(4.0f, 4.0f, 4.0f));
 
-        ensure_equals("Custom bbox center local with rot", bbox2.getCenterLocal(), LLVector3(3.0f, 3.0f, 3.0f));
+        UNSCOPED_INFO("rotated box");
+        CHECK(bbox2.getCenterLocal() == LLVector3(3.0f, 3.0f, 3.0f));
     }
 
-    template<> template<>
-    void object::test<6>()
+    TEST_CASE("LLBBox: getCenterAgent applies position and rotation", "[LLBBox]")
     {
         //
         // test the getCenterAgent()
         //
 
-        ensure_equals("Default bbox agent center", LLBBox().getCenterAgent(), LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(LLBBox().getCenterAgent() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBox bbox1(LLVector3(1.0f, 2.0f, 3.0f), LLQuaternion(),
                      LLVector3(2.0f, 4.0f, 6.0f), LLVector3(4.0f, 6.0f, 8.0f));
 
-        ensure_equals("Custom bbox center agent", bbox1.getCenterAgent(), LLVector3(4.0f, 7.0f, 10.0f));
+        CHECK(bbox1.getCenterAgent() == LLVector3(4.0f, 7.0f, 10.0f));
 
         LLBBox bbox2(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(ANGLE, LLVector3(0.0f, 0.0f, 1.0f)),
                      LLVector3(2.0f, 2.0f, 2.0f), LLVector3(4.0f, 4.0f, 4.0f));
 
-        ensure("Custom bbox center agent with rot", APPROX_EQUAL(bbox2.getCenterAgent(), LLVector3(-2.0f, 4.0f, 4.0f)));
+        UNSCOPED_INFO("rotated box");
+        CHECK(APPROX_EQUAL(bbox2.getCenterAgent(), LLVector3(-2.0f, 4.0f, 4.0f)));
     }
 
-    template<> template<>
-    void object::test<7>()
+    TEST_CASE("LLBBox: getExtentLocal", "[LLBBox]")
     {
         //
         // test the getExtentLocal() method
         //
 
-        ensure_equals("Default bbox local extent", LLBBox().getExtentLocal(), LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(LLBBox().getExtentLocal() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBox bbox1(LLVector3(1.0f, 2.0f, 3.0f), LLQuaternion(),
                      LLVector3(2.0f, 4.0f, 6.0f), LLVector3(4.0f, 6.0f, 8.0f));
 
-        ensure_equals("Custom bbox extent local", bbox1.getExtentLocal(), LLVector3(2.0f, 2.0f, 2.0f));
+        CHECK(bbox1.getExtentLocal() == LLVector3(2.0f, 2.0f, 2.0f));
 
+        // Local: the rotation and position do not enter into it.
         LLBBox bbox2(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(ANGLE, LLVector3(0.0f, 0.0f, 1.0f)),
-                     LLVector3(2.0f, 2.0f, 2.0f), LLVector3(4.0f, 4.0f, 4.0f));
+                     LLVector3(2.0f, 2.0f, 2.0f), LLVector3(4.0f, 5.0f, 6.0f));
 
-        ensure_equals("Custom bbox extent local with rot", bbox1.getExtentLocal(), LLVector3(2.0f, 2.0f, 2.0f));
+        CHECK(bbox2.getExtentLocal() == LLVector3(2.0f, 3.0f, 4.0f));
     }
 
-    template<> template<>
-    void object::test<8>()
+    TEST_CASE("LLBBox: addPointLocal grows the box", "[LLBBox]")
     {
         //
         // test the addPointLocal() method
@@ -180,22 +161,21 @@ namespace tut
         bbox1.addPointLocal(LLVector3(1.0f, 1.0f, 1.0f));
         bbox1.addPointLocal(LLVector3(3.0f, 3.0f, 3.0f));
 
-        ensure_equals("addPointLocal center local (1)", bbox1.getCenterLocal(), LLVector3(2.0f, 2.0f, 2.0f));
-        ensure_equals("addPointLocal center agent (1)", bbox1.getCenterAgent(), LLVector3(2.0f, 2.0f, 2.0f));
-        ensure_equals("addPointLocal min (1)", bbox1.getMinLocal(), LLVector3(1.0f, 1.0f, 1.0f));
-        ensure_equals("addPointLocal max (1)", bbox1.getMaxLocal(), LLVector3(3.0f, 3.0f, 3.0f));
+        CHECK(bbox1.getCenterLocal() == LLVector3(2.0f, 2.0f, 2.0f));
+        CHECK(bbox1.getCenterAgent() == LLVector3(2.0f, 2.0f, 2.0f));
+        CHECK(bbox1.getMinLocal() == LLVector3(1.0f, 1.0f, 1.0f));
+        CHECK(bbox1.getMaxLocal() == LLVector3(3.0f, 3.0f, 3.0f));
 
         bbox1.addPointLocal(LLVector3(0.0f, 0.0f, 0.0f));
         bbox1.addPointLocal(LLVector3(1.0f, 1.0f, 1.0f));
         bbox1.addPointLocal(LLVector3(2.0f, 2.0f, 2.0f));
 
-        ensure_equals("addPointLocal center local (2)", bbox1.getCenterLocal(), LLVector3(1.5f, 1.5f, 1.5f));
-        ensure_equals("addPointLocal min (2)", bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, 0.0f));
-        ensure_equals("addPointLocal max (2)", bbox1.getMaxLocal(), LLVector3(3.0f, 3.0f, 3.0f));
+        CHECK(bbox1.getCenterLocal() == LLVector3(1.5f, 1.5f, 1.5f));
+        CHECK(bbox1.getMinLocal() == LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getMaxLocal() == LLVector3(3.0f, 3.0f, 3.0f));
     }
 
-    template<> template<>
-    void object::test<9>()
+    TEST_CASE("LLBBox: addBBoxLocal grows the box", "[LLBBox]")
     {
         //
         // test the addBBoxLocal() method
@@ -205,21 +185,20 @@ namespace tut
         bbox1.addBBoxLocal(LLBBox(LLVector3(), LLQuaternion(),
                                   LLVector3(0.0f, 0.0f, 0.0f), LLVector3(3.0f, 3.0f, 3.0f)));
 
-        ensure_equals("addPointLocal center local (3)", bbox1.getCenterLocal(), LLVector3(1.5f, 1.5f, 1.5f));
-        ensure_equals("addPointLocal min (3)", bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, 0.0f));
-        ensure_equals("addPointLocal max (3)", bbox1.getMaxLocal(), LLVector3(3.0f, 3.0f, 3.0f));
+        CHECK(bbox1.getCenterLocal() == LLVector3(1.5f, 1.5f, 1.5f));
+        CHECK(bbox1.getMinLocal() == LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getMaxLocal() == LLVector3(3.0f, 3.0f, 3.0f));
 
         bbox1.addBBoxLocal(LLBBox(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(),
                                   LLVector3(5.0f, 5.0f, 5.0f), LLVector3(10.0f, 10.0f, 10.0f)));
 
-        ensure_equals("addPointLocal center local (4)", bbox1.getCenterLocal(), LLVector3(5.0f, 5.0f, 5.0f));
-        ensure_equals("addPointLocal center agent (4)", bbox1.getCenterAgent(), LLVector3(5.0f, 5.0f, 5.0f));
-        ensure_equals("addPointLocal min (4)", bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, 0.0f));
-        ensure_equals("addPointLocal max (4)", bbox1.getMaxLocal(), LLVector3(10.0f, 10.0f, 10.0f));
+        CHECK(bbox1.getCenterLocal() == LLVector3(5.0f, 5.0f, 5.0f));
+        CHECK(bbox1.getCenterAgent() == LLVector3(5.0f, 5.0f, 5.0f));
+        CHECK(bbox1.getMinLocal() == LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getMaxLocal() == LLVector3(10.0f, 10.0f, 10.0f));
     }
 
-    template<> template<>
-    void object::test<10>()
+    TEST_CASE("LLBBox: addPointAgent on a rotated box", "[LLBBox]")
     {
         //
         // test the addPointAgent() method
@@ -231,18 +210,14 @@ namespace tut
         bbox1.addPointAgent(LLVector3(1.0f, 1.0f, 1.0f));
         bbox1.addPointAgent(LLVector3(3.0f, 3.0f, 3.0f));
 
-        ensure_equals("addPointAgent center local (1)", bbox1.getCenterLocal(), LLVector3(2.0f, 2.0f, -2.0f));
-        ensure_equals("addPointAgent center agent (1)", bbox1.getCenterAgent(), LLVector3(3.0f, 3.0f, 7.0f));
-        ensure_equals("addPointAgent min (1)", bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, -4.0f));
-        ensure_equals("addPointAgent max (1)", bbox1.getMaxLocal(), LLVector3(4.0f, 4.0f, 0.0f));
+        CHECK(bbox1.getCenterLocal() == LLVector3(2.0f, 2.0f, -2.0f));
+        CHECK(bbox1.getCenterAgent() == LLVector3(3.0f, 3.0f, 7.0f));
+        CHECK(bbox1.getMinLocal() == LLVector3(0.0f, 0.0f, -4.0f));
+        CHECK(bbox1.getMaxLocal() == LLVector3(4.0f, 4.0f, 0.0f));
     }
 
-    template<> template<>
-    void object::test<11>()
+    TEST_CASE("LLBBox: addBBoxLocal after addPointAgent on a rotated box", "[LLBBox]")
     {
-        //
-        // test the addBBoxAgent() method
-        //
 
         LLBBox bbox1(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(1.0, 0.0, 0.0, 1.0),
                      LLVector3(2.0f, 2.0f, 2.0f), LLVector3(4.0f, 4.0f, 4.0f));
@@ -253,14 +228,43 @@ namespace tut
         bbox1.addBBoxLocal(LLBBox(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(),
                                   LLVector3(5.0f, 5.0f, 5.0f), LLVector3(10.0f, 10.0f, 10.0f)));
 
-        ensure_equals("addPointAgent center local (2)", bbox1.getCenterLocal(), LLVector3(5.0f, 5.0f, 3.0f));
-        ensure_equals("addPointAgent center agent (2)", bbox1.getCenterAgent(), LLVector3(6.0f, -10.0f, 8.0f));
-        ensure_equals("addPointAgent min (2)", bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, -4.0f));
-        ensure_equals("addPointAgent max (2)", bbox1.getMaxLocal(), LLVector3(10.0f, 10.0f, 10.0f));
+        CHECK(bbox1.getCenterLocal() == LLVector3(5.0f, 5.0f, 3.0f));
+        CHECK(bbox1.getCenterAgent() == LLVector3(6.0f, -10.0f, 8.0f));
+        CHECK(bbox1.getMinLocal() == LLVector3(0.0f, 0.0f, -4.0f));
+        CHECK(bbox1.getMaxLocal() == LLVector3(10.0f, 10.0f, 10.0f));
     }
 
-    template<> template<>
-    void object::test<12>()
+    TEST_CASE("LLBBox: addBBoxAgent into an empty box takes the other box's frame", "[LLBBox]")
+    {
+        const LLQuaternion quarter(ANGLE, LLVector3(0.0f, 0.0f, 1.0f));
+        LLBBox bbox1;
+        bbox1.addBBoxAgent(LLBBox(LLVector3(1.0f, 2.0f, 3.0f), quarter,
+                                  LLVector3(0.0f, 0.0f, 0.0f), LLVector3(2.0f, 4.0f, 6.0f)));
+
+        CHECK(bbox1.getPositionAgent() == LLVector3(1.0f, 2.0f, 3.0f));
+        CHECK(bbox1.getRotation() == quarter);
+        CHECK(APPROX_EQUAL(bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, 0.0f)));
+        CHECK(APPROX_EQUAL(bbox1.getMaxLocal(), LLVector3(2.0f, 4.0f, 6.0f)));
+    }
+
+    TEST_CASE("LLBBox: addBBoxAgent grows a box by the other box's corners in agent space", "[LLBBox]")
+    {
+        // An axis-aligned box at the origin, holding only the origin.
+        LLBBox bbox1;
+        bbox1.addPointLocal(LLVector3(0.0f, 0.0f, 0.0f));
+
+        // Two by one by one, turned a quarter about z, at (10, 0, 0): x goes
+        // to y and y to -x, so its corners span x 9 to 10, y 0 to 2, z 0 to 1.
+        bbox1.addBBoxAgent(LLBBox(LLVector3(10.0f, 0.0f, 0.0f), LLQuaternion(ANGLE, LLVector3(0.0f, 0.0f, 1.0f)),
+                                  LLVector3(0.0f, 0.0f, 0.0f), LLVector3(2.0f, 1.0f, 1.0f)));
+
+        CHECK(bbox1.getPositionAgent() == LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getRotation() == LLQuaternion());
+        CHECK(APPROX_EQUAL(bbox1.getMinLocal(), LLVector3(0.0f, 0.0f, 0.0f)));
+        CHECK(APPROX_EQUAL(bbox1.getMaxLocal(), LLVector3(10.0f, 2.0f, 1.0f)));
+    }
+
+    TEST_CASE("LLBBox: expand by zero then a positive then a negative amount", "[LLBBox]")
     {
         //
         // test the expand() method
@@ -269,32 +273,31 @@ namespace tut
         LLBBox bbox1;
         bbox1.expand(0.0);
 
-        ensure_equals("Zero-expanded Default BBox center", bbox1.getCenterLocal(), LLVector3(0.0f, 0.0f, 0.0f));
+        CHECK(bbox1.getCenterLocal() == LLVector3(0.0f, 0.0f, 0.0f));
 
         LLBBox bbox2(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(),
                      LLVector3(1.0f, 1.0f, 1.0f), LLVector3(3.0f, 3.0f, 3.0f));
         bbox2.expand(0.0);
 
-        ensure_equals("Zero-expanded center local", bbox2.getCenterLocal(), LLVector3(2.0f, 2.0f, 2.0f));
-        ensure_equals("Zero-expanded center agent", bbox2.getCenterAgent(), LLVector3(3.0f, 3.0f, 3.0f));
-        ensure_equals("Zero-expanded min", bbox2.getMinLocal(), LLVector3(1.0f, 1.0f, 1.0f));
-        ensure_equals("Zero-expanded max", bbox2.getMaxLocal(), LLVector3(3.0f, 3.0f, 3.0f));
+        CHECK(bbox2.getCenterLocal() == LLVector3(2.0f, 2.0f, 2.0f));
+        CHECK(bbox2.getCenterAgent() == LLVector3(3.0f, 3.0f, 3.0f));
+        CHECK(bbox2.getMinLocal() == LLVector3(1.0f, 1.0f, 1.0f));
+        CHECK(bbox2.getMaxLocal() == LLVector3(3.0f, 3.0f, 3.0f));
 
         bbox2.expand(0.5);
 
-        ensure_equals("Positive-expanded center", bbox2.getCenterLocal(), LLVector3(2.0f, 2.0f, 2.0f));
-        ensure_equals("Positive-expanded min", bbox2.getMinLocal(), LLVector3(0.5f, 0.5f, 0.5f));
-        ensure_equals("Positive-expanded max", bbox2.getMaxLocal(), LLVector3(3.5f, 3.5f, 3.5f));
+        CHECK(bbox2.getCenterLocal() == LLVector3(2.0f, 2.0f, 2.0f));
+        CHECK(bbox2.getMinLocal() == LLVector3(0.5f, 0.5f, 0.5f));
+        CHECK(bbox2.getMaxLocal() == LLVector3(3.5f, 3.5f, 3.5f));
 
         bbox2.expand(-1.0);
 
-        ensure_equals("Negative-expanded center", bbox2.getCenterLocal(), LLVector3(2.0f, 2.0f, 2.0f));
-        ensure_equals("Negative-expanded min", bbox2.getMinLocal(), LLVector3(1.5f, 1.5f, 1.5f));
-        ensure_equals("Negative-expanded max", bbox2.getMaxLocal(), LLVector3(2.5f, 2.5f, 2.5f));
+        CHECK(bbox2.getCenterLocal() == LLVector3(2.0f, 2.0f, 2.0f));
+        CHECK(bbox2.getMinLocal() == LLVector3(1.5f, 1.5f, 1.5f));
+        CHECK(bbox2.getMaxLocal() == LLVector3(2.5f, 2.5f, 2.5f));
     }
 
-    template<> template<>
-    void object::test<13>()
+    TEST_CASE("LLBBox: localToAgent with and without rotation", "[LLBBox]")
     {
         //
         // test the localToAgent() method
@@ -303,16 +306,16 @@ namespace tut
         LLBBox bbox1(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(),
                      LLVector3(1.0f, 1.0f, 1.0f), LLVector3(3.0f, 3.0f, 3.0f));
 
-        ensure_equals("localToAgent(1,2,3)", bbox1.localToAgent(LLVector3(1.0f, 2.0f, 3.0f)), LLVector3(2.0f, 3.0f, 4.0f));
+        CHECK(bbox1.localToAgent(LLVector3(1.0f, 2.0f, 3.0f)) == LLVector3(2.0f, 3.0f, 4.0f));
 
         LLBBox bbox2(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(ANGLE, LLVector3(1.0f, 0.0f, 0.0f)),
                      LLVector3(1.0f, 1.0f, 1.0f), LLVector3(3.0f, 3.0f, 3.0f));
 
-        ensure("localToAgent(1,2,3) rot", APPROX_EQUAL(bbox2.localToAgent(LLVector3(1.0f, 2.0f, 3.0f)), LLVector3(2.0f, -2.0f, 3.0f)));
+        UNSCOPED_INFO("rotated box");
+        CHECK(APPROX_EQUAL(bbox2.localToAgent(LLVector3(1.0f, 2.0f, 3.0f)), LLVector3(2.0f, -2.0f, 3.0f)));
     }
 
-    template<> template<>
-    void object::test<14>()
+    TEST_CASE("LLBBox: agentToLocal and its round trip through localToAgent", "[LLBBox]")
     {
         //
         // test the agentToLocal() method
@@ -321,20 +324,21 @@ namespace tut
         LLBBox bbox1(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(),
                      LLVector3(1.0f, 1.0f, 1.0f), LLVector3(3.0f, 3.0f, 3.0f));
 
-        ensure_equals("agentToLocal(1,2,3)", bbox1.agentToLocal(LLVector3(1.0f, 2.0f, 3.0f)), LLVector3(0.0f, 1.0f, 2.0f));
-        ensure_equals("agentToLocal(localToAgent)", bbox1.agentToLocal(bbox1.localToAgent(LLVector3(1.0f, 2.0f, 3.0f))),
+        CHECK(bbox1.agentToLocal(LLVector3(1.0f, 2.0f, 3.0f)) == LLVector3(0.0f, 1.0f, 2.0f));
+        CHECK(bbox1.agentToLocal(bbox1.localToAgent(LLVector3(1.0f, 2.0f, 3.0f))) ==
                       LLVector3(1.0f, 2.0f, 3.0f));
 
         LLBBox bbox2(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(ANGLE, LLVector3(1.0f, 0.0f, 0.0f)),
                      LLVector3(1.0f, 1.0f, 1.0f), LLVector3(3.0f, 3.0f, 3.0f));
 
-        ensure("agentToLocal(1,2,3) rot", APPROX_EQUAL(bbox2.agentToLocal(LLVector3(1.0f, 2.0f, 3.0f)), LLVector3(0.0f, 2.0f, -1.0f)));
-        ensure("agentToLocal(localToAgent) rot", APPROX_EQUAL(bbox2.agentToLocal(bbox2.localToAgent(LLVector3(1.0f, 2.0f, 3.0f))),
+        UNSCOPED_INFO("rotated box");
+        CHECK(APPROX_EQUAL(bbox2.agentToLocal(LLVector3(1.0f, 2.0f, 3.0f)), LLVector3(0.0f, 2.0f, -1.0f)));
+        UNSCOPED_INFO("rotated box");
+        CHECK(APPROX_EQUAL(bbox2.agentToLocal(bbox2.localToAgent(LLVector3(1.0f, 2.0f, 3.0f))),
                                                               LLVector3(1.0f, 2.0f, 3.0f)));
     }
 
-    template<> template<>
-    void object::test<15>()
+    TEST_CASE("LLBBox: containsPointLocal is inclusive at min and max", "[LLBBox]")
     {
         //
         // test the containsPointLocal() method
@@ -343,15 +347,14 @@ namespace tut
         LLBBox bbox1(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(),
                      LLVector3(1.0f, 2.0f, 3.0f), LLVector3(3.0f, 4.0f, 5.0f));
 
-        ensure("containsPointLocal(0,0,0)", bbox1.containsPointLocal(LLVector3(0.0f, 0.0f, 0.0f)) == false);
-        ensure("containsPointLocal(1,2,3)", bbox1.containsPointLocal(LLVector3(1.0f, 2.0f, 3.0f)) == true);
-        ensure("containsPointLocal(0.999,2,3)", bbox1.containsPointLocal(LLVector3(0.999f, 2.0f, 3.0f)) == false);
-        ensure("containsPointLocal(3,4,5)", bbox1.containsPointLocal(LLVector3(3.0f, 4.0f, 5.0f)) == true);
-        ensure("containsPointLocal(3,4,5.001)", bbox1.containsPointLocal(LLVector3(3.0f, 4.0f, 5.001f)) == false);
+        CHECK_FALSE(bbox1.containsPointLocal(LLVector3(0.0f, 0.0f, 0.0f)));
+        CHECK(bbox1.containsPointLocal(LLVector3(1.0f, 2.0f, 3.0f)));
+        CHECK_FALSE(bbox1.containsPointLocal(LLVector3(0.999f, 2.0f, 3.0f)));
+        CHECK(bbox1.containsPointLocal(LLVector3(3.0f, 4.0f, 5.0f)));
+        CHECK_FALSE(bbox1.containsPointLocal(LLVector3(3.0f, 4.0f, 5.001f)));
     }
 
-    template<> template<>
-    void object::test<16>()
+    TEST_CASE("LLBBox: containsPointAgent is inclusive at min and max", "[LLBBox]")
     {
         //
         // test the containsPointAgent() method
@@ -360,11 +363,11 @@ namespace tut
         LLBBox bbox1(LLVector3(1.0f, 1.0f, 1.0f), LLQuaternion(),
                      LLVector3(1.0f, 2.0f, 3.0f), LLVector3(3.0f, 4.0f, 5.0f));
 
-        ensure("containsPointAgent(0,0,0)", bbox1.containsPointAgent(LLVector3(0.0f, 0.0f, 0.0f)) == false);
-        ensure("containsPointAgent(2,3,4)", bbox1.containsPointAgent(LLVector3(2.0f, 3.0f, 4.0f)) == true);
-        ensure("containsPointAgent(2,2.999,4)", bbox1.containsPointAgent(LLVector3(2.0f, 2.999f, 4.0f)) == false);
-        ensure("containsPointAgent(4,5,6)", bbox1.containsPointAgent(LLVector3(4.0f, 5.0f, 6.0f)) == true);
-        ensure("containsPointAgent(4,5.001,6)", bbox1.containsPointAgent(LLVector3(4.0f, 5.001f, 6.0f)) == false);
+        CHECK_FALSE(bbox1.containsPointAgent(LLVector3(0.0f, 0.0f, 0.0f)));
+        CHECK(bbox1.containsPointAgent(LLVector3(2.0f, 3.0f, 4.0f)));
+        CHECK_FALSE(bbox1.containsPointAgent(LLVector3(2.0f, 2.999f, 4.0f)));
+        CHECK(bbox1.containsPointAgent(LLVector3(4.0f, 5.0f, 6.0f)));
+        CHECK_FALSE(bbox1.containsPointAgent(LLVector3(4.0f, 5.001f, 6.0f)));
     }
 }
 

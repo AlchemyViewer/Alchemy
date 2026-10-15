@@ -26,7 +26,8 @@
  * $/LicenseInfo$
  */
 #include "../llviewerprecompiledheaders.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include "altestmatchers.h"
 #include "../llsecapi.h"
 #include "../llsechandler_basic.h"
 #include "../../llxml/llcontrol.h"
@@ -52,17 +53,18 @@
 #include "../llmachineid.h"
 #include <simdutf.h>
 
-#define ensure_throws(str, exc_type, cert, func, ...) \
+#define require_throws_with_cert(str, exc_type, cert, func, ...) \
 try \
 { \
 func(__VA_ARGS__); \
-fail("throws, " str); \
+FAIL("no exception: " str); \
 } \
 catch(exc_type& except) \
 { \
 LLSD cert_data; \
 cert->getLLSD(cert_data); \
-ensure("Exception cert is incorrect for " str, valueCompareLLSD(except.getCertData(), cert_data)); \
+UNSCOPED_INFO("Exception cert is incorrect for " str); \
+REQUIRE(valueCompareLLSD(except.getCertData(), cert_data)); \
 }
 
 extern bool _cert_hostname_wildcard_match(const std::string& hostname, const std::string& wildcard_string);
@@ -138,9 +140,9 @@ LLCertException::LLCertException(const LLSD& cert_data, const std::string& msg)
 
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// Tests
 // -------------------------------------------------------------------------------------------
-namespace tut
+namespace
 {
     const std::string mPemTestCert(
         "Certificate:\n"
@@ -702,17 +704,10 @@ namespace tut
         }
     };
 
-    // Tut templating thingamagic: test group, object and test instance
-    typedef test_group<sechandler_basic_test> sechandler_basic_test_factory;
-    typedef sechandler_basic_test_factory::object sechandler_basic_test_object;
-    tut::sechandler_basic_test_factory tut_sechandler_basic("LLSecHandler");
-
     // ---------------------------------------------------------------------------------------
     // Test functions
     // ---------------------------------------------------------------------------------------
-    // test cert data retrieval
-    template<> template<>
-    void sechandler_basic_test_object::test<1>()
+    TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: a certificate is made from PEM without throwing", "[LLSecHandler]")
     {
         try
         {
@@ -722,17 +717,16 @@ namespace tut
         catch (LLCertException& cert_exception)
         {
             LL_INFOS() << "cert ex: " << cert_exception.getCertData() << LL_ENDL;
-            fail("cert exception");
+            FAIL("cert exception");
         }
         catch (...)
         {
             LOG_UNHANDLED_EXCEPTION("test 1");
-            fail("other exception");
+            FAIL("other exception");
         }
     }
 
-    template<> template<>
-    void sechandler_basic_test_object::test<2>()
+    TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: a certificate's LLSD describes its issuer and subject and validity", "[LLSecHandler]")
     {
         LLPointer<LLCertificate> test_cert(new LLBasicCertificate(mPemChildCert, &mValidationDate));
 
@@ -741,41 +735,38 @@ namespace tut
         //std::ostringstream llsd_value;
         //llsd_value << LLSDOStreamer<LLSDNotationFormatter>(llsd_cert) << std::endl;
         LL_DEBUGS() << "test 1 cert " << llsd_cert << LL_ENDL;
-        ensure_equals("Issuer Name/commonName", (std::string)llsd_cert["issuer_name"]["commonName"], "Integration Test Intermediate CA");
-        ensure_equals("Issuer Name/countryName", (std::string)llsd_cert["issuer_name"]["countryName"], "US");
-        ensure_equals("Issuer Name/state", (std::string)llsd_cert["issuer_name"]["stateOrProvinceName"], "California");
-        ensure_equals("Issuer Name/org name", (std::string)llsd_cert["issuer_name"]["organizationName"], "Linden Lab");
-        ensure_equals("Issuer Name/org unit", (std::string)llsd_cert["issuer_name"]["organizationalUnitName"], "Second Life Engineering");
-        ensure_equals("Issuer name string", (std::string)llsd_cert["issuer_name_string"],
+        CHECK((std::string)llsd_cert["issuer_name"]["commonName"] == "Integration Test Intermediate CA");
+        CHECK((std::string)llsd_cert["issuer_name"]["countryName"] == "US");
+        CHECK((std::string)llsd_cert["issuer_name"]["stateOrProvinceName"] == "California");
+        CHECK((std::string)llsd_cert["issuer_name"]["organizationName"] == "Linden Lab");
+        CHECK((std::string)llsd_cert["issuer_name"]["organizationalUnitName"] == "Second Life Engineering");
+        CHECK((std::string)llsd_cert["issuer_name_string"] ==
                       "emailAddress=noreply@lindenlab.com,CN=Integration Test Intermediate CA,OU=Second Life Engineering,O=Linden Lab,L=San Francisco,ST=California,C=US");
-        ensure_equals("subject Name/commonName", (std::string)llsd_cert["subject_name"]["commonName"],
+        CHECK((std::string)llsd_cert["subject_name"]["commonName"] ==
                       "Integration Test Server Cert");
-        ensure_equals("subject Name/countryName", (std::string)llsd_cert["subject_name"]["countryName"], "US");
-        ensure_equals("subject Name/state", (std::string)llsd_cert["subject_name"]["stateOrProvinceName"], "California");
-        ensure_equals("subject Name/localityName", (std::string)llsd_cert["subject_name"]["localityName"], "San Francisco");
-        ensure_equals("subject Name/org name", (std::string)llsd_cert["subject_name"]["organizationName"], "Linden Lab");
-        ensure_equals("subjectName/org unit",
-               (std::string)llsd_cert["subject_name"]["organizationalUnitName"], "Second Life Engineering");
+        CHECK((std::string)llsd_cert["subject_name"]["countryName"] == "US");
+        CHECK((std::string)llsd_cert["subject_name"]["stateOrProvinceName"] == "California");
+        CHECK((std::string)llsd_cert["subject_name"]["localityName"] == "San Francisco");
+        CHECK((std::string)llsd_cert["subject_name"]["organizationName"] == "Linden Lab");
+        CHECK((std::string)llsd_cert["subject_name"]["organizationalUnitName"] == "Second Life Engineering");
 
-        ensure_equals("subject name string",
-               (std::string)llsd_cert["subject_name_string"],
+        CHECK((std::string)llsd_cert["subject_name_string"] ==
                       "emailAddress=noreply@lindenlab.com,CN=Integration Test Server Cert,OU=Second Life Engineering,O=Linden Lab,L=San Francisco,ST=California,C=US");
-        ensure_equals("serial number", (std::string)llsd_cert["serial_number"], "9E8D3413E79BF931");
-        ensure_equals("valid from", (std::string)llsd_cert["valid_from"], "2024-07-23T11:46:39Z");
-        ensure_equals("valid to", (std::string)llsd_cert["valid_to"], "2034-07-21T11:46:39Z");
+        CHECK((std::string)llsd_cert["serial_number"] == "9E8D3413E79BF931");
+        CHECK((std::string)llsd_cert["valid_from"] == "2024-07-23T11:46:39Z");
+        CHECK((std::string)llsd_cert["valid_to"] == "2034-07-21T11:46:39Z");
         LLSD expectedKeyUsage = LLSD::emptyArray();
         expectedKeyUsage.append(LLSD((std::string)"digitalSignature"));
         expectedKeyUsage.append(LLSD((std::string)"keyEncipherment"));
-        ensure("key usage", valueCompareLLSD(llsd_cert["keyUsage"], expectedKeyUsage));
-        ensure_equals("basic constraints", llsd_cert["basicConstraints"]["CA"].asInteger(), 0);
+        CHECK(valueCompareLLSD(llsd_cert["keyUsage"], expectedKeyUsage));
+        CHECK(llsd_cert["basicConstraints"]["CA"].asInteger() == 0);
 
-        ensure("x509 is equal", !X509_cmp(mX509ChildCert, test_cert->getOpenSSLX509()));
+        UNSCOPED_INFO("x509 is equal");
+        CHECK_FALSE(X509_cmp(mX509ChildCert, test_cert->getOpenSSLX509()));
     }
 
 
-    // test protected data
-    template<> template<>
-    void sechandler_basic_test_object::test<3>()
+    TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: protected data is kept by type and id and survives a reload", "[LLSecHandler]")
     {
         std::string protected_data = "sUSh3wj77NG9oAMyt3XIhaej3KLZhLZWFZvI6rIGmwUUOmmelrRg0NI9rkOj8ZDpTPxpwToaBT5u"
         "GQhakdaGLJznr9bHr4/6HIC1bouKj4n2rs4TL6j2WSjto114QdlNfLsE8cbbE+ghww58g8SeyLQO"
@@ -789,7 +780,7 @@ namespace tut
         simdutf::result r = simdutf::base64_to_binary(protected_data.data(), protected_data.size(), (char*)binary_data.data());
         if (r.error != simdutf::error_code::SUCCESS)
         {
-            fail("base64 decode failed");
+            FAIL("base64 decode failed");
         }
         else
         {
@@ -813,9 +804,9 @@ namespace tut
         LLSD data = handler->getProtectedData("test_data_type", "test_data_id");
 
 
-        ensure_equals("retrieve existing data1", (std::string)data["data1"], "test_data_1");
-        ensure_equals("retrieve existing data2", (std::string)data["data2"], "test_data_2");
-        ensure_equals("retrieve existing data3", (std::string)data["data3"]["elem1"], "test element1");
+        CHECK((std::string)data["data1"] == "test_data_1");
+        CHECK((std::string)data["data2"] == "test_data_2");
+        CHECK((std::string)data["data3"]["elem1"] == "test element1");
 
         // data storage
         LLSD store_data = LLSD::emptyMap();
@@ -829,22 +820,22 @@ namespace tut
 
         data = handler->getProtectedData("test_data_type", "test_data_id");
         // verify no overwrite of existing data
-        ensure_equals("verify no overwrite 1", (std::string)data["data1"], "test_data_1");
-        ensure_equals("verify no overwrite 2", (std::string)data["data2"], "test_data_2");
-        ensure_equals("verify no overwrite 3", (std::string)data["data3"]["elem1"], "test element1");
+        CHECK((std::string)data["data1"] == "test_data_1");
+        CHECK((std::string)data["data2"] == "test_data_2");
+        CHECK((std::string)data["data3"]["elem1"] == "test element1");
 
         // verify written data is good
         data = handler->getProtectedData("test_data_type", "test_data_id1");
-        ensure_equals("verify stored data1", (std::string)data["store_data1"], "test_store_data1");
-        ensure_equals("verify stored data2", (int)data["store_data2"], 27);
-        ensure_equals("verify stored data3", (std::string)data["store_data3"]["subelem1"], "test_subelem1");
+        CHECK((std::string)data["store_data1"] == "test_store_data1");
+        CHECK((int)data["store_data2"] == 27);
+        CHECK((std::string)data["store_data3"]["subelem1"] == "test_subelem1");
 
         // verify overwrite works
         handler->setProtectedData("test_data_type", "test_data_id", store_data);
         data = handler->getProtectedData("test_data_type", "test_data_id");
-        ensure_equals("verify overwrite stored data1", (std::string)data["store_data1"], "test_store_data1");
-        ensure_equals("verify overwrite stored data2", (int)data["store_data2"], 27);
-        ensure_equals("verify overwrite stored data3", (std::string)data["store_data3"]["subelem1"], "test_subelem1");
+        CHECK((std::string)data["store_data1"] == "test_store_data1");
+        CHECK((int)data["store_data2"] == 27);
+        CHECK((std::string)data["store_data3"]["subelem1"] == "test_subelem1");
 
         // verify other datatype doesn't conflict
         store_data["store_data3"] = "test_store_data3";
@@ -854,14 +845,14 @@ namespace tut
 
         handler->setProtectedData("test_data_type1", "test_data_id", store_data);
         data = handler->getProtectedData("test_data_type1", "test_data_id");
-        ensure_equals("verify datatype stored data3", (std::string)data["store_data3"], "test_store_data3");
-        ensure_equals("verify datatype stored data4", (int)data["store_data4"], 28);
-        ensure_equals("verify datatype stored data5", (std::string)data["store_data5"]["subelem2"], "test_subelem2");
+        CHECK((std::string)data["store_data3"] == "test_store_data3");
+        CHECK((int)data["store_data4"] == 28);
+        CHECK((std::string)data["store_data5"]["subelem2"] == "test_subelem2");
 
         // test data not found
 
         data = handler->getProtectedData("test_data_type1", "test_data_not_found");
-        ensure("not found", data.isUndefined());
+        REQUIRE(data.isUndefined());
 
         // cause a 'write' by using 'LLPointer' to delete then instantiate a handler
         handler = NULL;
@@ -869,9 +860,9 @@ namespace tut
         handler->init();
 
         data = handler->getProtectedData("test_data_type1", "test_data_id");
-        ensure_equals("verify datatype stored data3a", (std::string)data["store_data3"], "test_store_data3");
-        ensure_equals("verify datatype stored data4a", (int)data["store_data4"], 28);
-        ensure_equals("verify datatype stored data5a", (std::string)data["store_data5"]["subelem2"], "test_subelem2");
+        CHECK((std::string)data["store_data3"] == "test_store_data3");
+        CHECK((int)data["store_data4"] == 28);
+        CHECK((std::string)data["store_data5"]["subelem2"] == "test_subelem2");
 
         // rewrite the initial file to verify reloads
         handler = NULL;
@@ -883,24 +874,22 @@ namespace tut
         handler = new LLSecAPIBasicHandler("sechandler_settings.tmp", "test_password.dat");
         handler->init();
         data = handler->getProtectedData("test_data_type1", "test_data_id");
-        ensure("not found", data.isUndefined());
+        REQUIRE(data.isUndefined());
 
         handler->deleteProtectedData("test_data_type", "test_data_id");
-        ensure("Deleted data not found", handler->getProtectedData("test_data_type", "test_data_id").isUndefined());
+        REQUIRE(handler->getProtectedData("test_data_type", "test_data_id").isUndefined());
 
         LLFile::remove("sechandler_settings.tmp");
         handler = new LLSecAPIBasicHandler("sechandler_settings.tmp", "test_password.dat");
         handler->init();
         data = handler->getProtectedData("test_data_type1", "test_data_id");
-        ensure("not found", data.isUndefined());
+        REQUIRE(data.isUndefined());
         handler = NULL;
 
-        ensure(LLFile::isfile("sechandler_settings.tmp"));
+        CHECK(LLFile::isfile("sechandler_settings.tmp"));
     }
 
-    // test credenitals
-    template<> template<>
-    void sechandler_basic_test_object::test<4>()
+    TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: credentials save and load and delete and fall back to legacy logins", "[LLSecHandler]")
     {
         LLPointer<LLSecAPIBasicHandler> handler = new LLSecAPIBasicHandler("sechandler_settings.tmp", "test_password.dat");
         handler->init();
@@ -916,9 +905,12 @@ namespace tut
         LLPointer<LLCredential> my_cred = handler->createCredential("my_grid", my_id, my_authenticator);
 
         // test retrieval of credential components
-        ensure_equals("basic credential creation: identifier", my_id, my_cred->getIdentifier());
-        ensure_equals("basic credential creation: authenticator", my_authenticator, my_cred->getAuthenticator());
-        ensure_equals("basic credential creation: grid", "my_grid", my_cred->getGrid());
+        UNSCOPED_INFO("basic credential creation: identifier");
+        CHECK_THAT(my_id, ll_test::LLSDEquals(my_cred->getIdentifier()));
+        UNSCOPED_INFO("basic credential creation: authenticator");
+        CHECK_THAT(my_authenticator, ll_test::LLSDEquals(my_cred->getAuthenticator()));
+        UNSCOPED_INFO("basic credential creation: grid");
+        CHECK(my_cred->getGrid() == "my_grid");
 
         // test setting/overwriting of credential components
         my_id["first_name"] = "firstname";
@@ -927,53 +919,69 @@ namespace tut
         my_authenticator["hash"] = "6563245";
 
         my_cred->setCredentialData(my_id, my_authenticator);
-        ensure_equals("set credential data: identifier", my_id, my_cred->getIdentifier());
-        ensure_equals("set credential data: authenticator", my_authenticator, my_cred->getAuthenticator());
-        ensure_equals("set credential data: grid", "my_grid", my_cred->getGrid());
+        UNSCOPED_INFO("set credential data: identifier");
+        CHECK_THAT(my_id, ll_test::LLSDEquals(my_cred->getIdentifier()));
+        UNSCOPED_INFO("set credential data: authenticator");
+        CHECK_THAT(my_authenticator, ll_test::LLSDEquals(my_cred->getAuthenticator()));
+        UNSCOPED_INFO("set credential data: grid");
+        CHECK(my_cred->getGrid() == "my_grid");
 
         // test loading of a credential, that hasn't been saved, without
         // any legacy saved credential data
         LLPointer<LLCredential> my_new_cred = handler->loadCredential("my_grid2");
-        ensure("unknown credential load test", my_new_cred->getIdentifier().isMap());
-        ensure("unknown credential load test", !my_new_cred->getIdentifier().has("type"));
-        ensure("unknown credential load test", my_new_cred->getAuthenticator().isMap());
-        ensure("unknown credential load test", !my_new_cred->getAuthenticator().has("type"));
+        {
+            INFO("a credential never saved loads empty");
+            REQUIRE(my_new_cred->getIdentifier().isMap());
+            REQUIRE_FALSE(my_new_cred->getIdentifier().has("type"));
+            REQUIRE(my_new_cred->getAuthenticator().isMap());
+            REQUIRE_FALSE(my_new_cred->getAuthenticator().has("type"));
+        }
         // test saving of a credential
         handler->saveCredential(my_cred, true);
 
         // test loading of a known credential
         my_new_cred = handler->loadCredential("my_grid");
-        ensure_equals("load a known credential: identifier", my_id, my_new_cred->getIdentifier());
-        ensure_equals("load a known credential: authenticator",my_authenticator, my_new_cred->getAuthenticator());
-        ensure_equals("load a known credential: grid", "my_grid", my_cred->getGrid());
+        UNSCOPED_INFO("load a known credential: identifier");
+        CHECK_THAT(my_id, ll_test::LLSDEquals(my_new_cred->getIdentifier()));
+        UNSCOPED_INFO("load a known credential: authenticator");
+        CHECK_THAT(my_authenticator, ll_test::LLSDEquals(my_new_cred->getAuthenticator()));
+        UNSCOPED_INFO("load a known credential: grid");
+        CHECK(my_new_cred->getGrid() == "my_grid");
 
         // test deletion of a credential
         handler->deleteCredential(my_new_cred);
 
-        ensure("delete credential: identifier", my_new_cred->getIdentifier().isUndefined());
-        ensure("delete credentialt: authenticator", my_new_cred->getIdentifier().isUndefined());
-        ensure_equals("delete credential: grid", "my_grid", my_cred->getGrid());
+        UNSCOPED_INFO("delete credential: identifier");
+        REQUIRE(my_new_cred->getIdentifier().isUndefined());
+        UNSCOPED_INFO("delete credential: authenticator");
+        REQUIRE(my_new_cred->getAuthenticator().isUndefined());
+        UNSCOPED_INFO("delete credential: grid");
+        CHECK(my_new_cred->getGrid() == "my_grid");
         // load unknown cred
 
         my_new_cred = handler->loadCredential("my_grid");
-        ensure("deleted credential load test", my_new_cred->getIdentifier().isMap());
-        ensure("deleted credential load test", !my_new_cred->getIdentifier().has("type"));
-        ensure("deleted credential load test", my_new_cred->getAuthenticator().isMap());
-        ensure("deleted credential load test", !my_new_cred->getAuthenticator().has("type"));
+        {
+            INFO("a deleted credential loads empty");
+            REQUIRE(my_new_cred->getIdentifier().isMap());
+            REQUIRE_FALSE(my_new_cred->getIdentifier().has("type"));
+            REQUIRE(my_new_cred->getAuthenticator().isMap());
+            REQUIRE_FALSE(my_new_cred->getAuthenticator().has("type"));
+        }
 
         // test loading of an unknown credential with legacy saved username, but without
         // saved password
         gFirstName = "myfirstname";
         gLastName = "mylastname";
         my_new_cred = handler->loadCredential("my_legacy_grid");
-        ensure_equals("legacy credential with no password: type",
-                      (const std::string)my_new_cred->getIdentifier()["type"], "agent");
-        ensure_equals("legacy credential with no password: first_name",
-                      (const std::string)my_new_cred->getIdentifier()["first_name"], "myfirstname");
-        ensure_equals("legacy credential with no password: last_name",
-                      (const std::string)my_new_cred->getIdentifier()["last_name"], "mylastname");
+        UNSCOPED_INFO("legacy credential with no password: type");
+        CHECK((const std::string)my_new_cred->getIdentifier()["type"] == "agent");
+        UNSCOPED_INFO("legacy credential with no password: first_name");
+        CHECK((const std::string)my_new_cred->getIdentifier()["first_name"] == "myfirstname");
+        UNSCOPED_INFO("legacy credential with no password: last_name");
+        CHECK((const std::string)my_new_cred->getIdentifier()["last_name"] == "mylastname");
 
-        ensure("legacy credential with no password: no authenticator", my_new_cred->getAuthenticator().isUndefined());
+        UNSCOPED_INFO("legacy credential with no password: no authenticator");
+        REQUIRE(my_new_cred->getAuthenticator().isUndefined());
 
         // test loading of an unknown credential with legacy saved password and username
 
@@ -986,7 +994,7 @@ namespace tut
         simdutf::result r = simdutf::base64_to_binary(hashed_password.data(), hashed_password.size(), decoded_password.data());
         if (r.error != simdutf::error_code::SUCCESS)
         {
-            fail("base64 decode failed");
+            FAIL("base64 decode failed");
         }
         else
         {
@@ -1005,22 +1013,22 @@ namespace tut
         password_file.close();
 
         my_new_cred = handler->loadCredential("my_legacy_grid2");
-        ensure_equals("legacy credential with password: type",
-                      (const std::string)my_new_cred->getIdentifier()["type"], "agent");
-        ensure_equals("legacy credential with password: first_name",
-                      (const std::string)my_new_cred->getIdentifier()["first_name"], "myfirstname");
-        ensure_equals("legacy credential with password: last_name",
-                      (const std::string)my_new_cred->getIdentifier()["last_name"], "mylastname");
+        UNSCOPED_INFO("legacy credential with password: type");
+        CHECK((const std::string)my_new_cred->getIdentifier()["type"] == "agent");
+        UNSCOPED_INFO("legacy credential with password: first_name");
+        CHECK((const std::string)my_new_cred->getIdentifier()["first_name"] == "myfirstname");
+        UNSCOPED_INFO("legacy credential with password: last_name");
+        CHECK((const std::string)my_new_cred->getIdentifier()["last_name"] == "mylastname");
 
         LLSD legacy_authenticator = my_new_cred->getAuthenticator();
-        ensure_equals("legacy credential with password: type",
-                      (std::string)legacy_authenticator["type"],
+        UNSCOPED_INFO("legacy credential with password: authenticator type");
+        CHECK((std::string)legacy_authenticator["type"] ==
                       "hash");
-        ensure_equals("legacy credential with password: algorithm",
-                      (std::string)legacy_authenticator["algorithm"],
+        UNSCOPED_INFO("legacy credential with password: algorithm");
+        CHECK((std::string)legacy_authenticator["algorithm"] ==
                       "md5");
-        ensure_equals("legacy credential with password: algorithm",
-                      (std::string)legacy_authenticator["secret"],
+        UNSCOPED_INFO("legacy credential with password: secret");
+        CHECK((std::string)legacy_authenticator["secret"] ==
                       "01234567890123456789012345678901");
 
         // test creation of credentials
@@ -1028,35 +1036,37 @@ namespace tut
         // test save without saving authenticator.
         handler->saveCredential(my_cred, false);
         my_new_cred = handler->loadCredential("mysavedgrid");
-        ensure_equals("saved credential without auth",
-                      (const std::string)my_new_cred->getIdentifier()["type"], "test_type");
-        ensure("no authenticator values were saved", my_new_cred->getAuthenticator().isUndefined());
+        UNSCOPED_INFO("saved credential without auth");
+        CHECK((const std::string)my_new_cred->getIdentifier()["type"] == "test_type");
+        UNSCOPED_INFO("no authenticator values were saved");
+        REQUIRE(my_new_cred->getAuthenticator().isUndefined());
     }
 
-    // test cert vector
-    template<> template<>
-    void sechandler_basic_test_object::test<5>()
+    TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: a certificate vector adds once and iterates and inserts and finds", "[LLSecHandler]")
     {
         // validate create from empty vector
         LLPointer<LLBasicCertificateVector> test_vector = new LLBasicCertificateVector();
-        ensure_equals("when loading with nothing, we should result in no certs in vector", test_vector->size(), 0);
+        REQUIRE(test_vector->size() == 0);
 
         test_vector->add(new LLBasicCertificate(mPemTestCert, &mValidationDate));
-        ensure_equals("one element in vector", test_vector->size(), 1);
+        REQUIRE(test_vector->size() == 1);
         test_vector->add(new LLBasicCertificate(mPemChildCert, &mValidationDate));
-        ensure_equals("two elements in vector after add", test_vector->size(), 2);
+        REQUIRE(test_vector->size() == 2);
 
         // add duplicate; should be a no-op (and log at DEBUG level)
         test_vector->add(new LLBasicCertificate(mPemChildCert, &mValidationDate));
-        ensure_equals("two elements in vector after re-add", test_vector->size(), 2);
+        UNSCOPED_INFO("two elements in vector after re-add");
+        REQUIRE(test_vector->size() == 2);
 
         // validate order
         X509* test_cert = (*test_vector)[0]->getOpenSSLX509();
-        ensure("first cert added remains first cert", !X509_cmp(test_cert, mX509TestCert));
+        UNSCOPED_INFO("first cert added remains first cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509TestCert));
         X509_free(test_cert);
 
         test_cert = (*test_vector)[1]->getOpenSSLX509();
-        ensure("second cert is second cert", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("second cert is second cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         X509_free(test_cert);
 
         //
@@ -1065,71 +1075,75 @@ namespace tut
         LLBasicCertificateVector::iterator current_cert = test_vector->begin();
         LLBasicCertificateVector::iterator copy_current_cert = current_cert;
         // operator++(int)
-        ensure("validate iterator++ element in vector is expected cert", *current_cert++ == (*test_vector)[0]);
-        ensure("validate 2nd iterator++ element in vector is expected cert", *current_cert++ == (*test_vector)[1]);
-        ensure("validate end iterator++", current_cert == test_vector->end());
+        CHECK(*current_cert++ == (*test_vector)[0]);
+        CHECK(*current_cert++ == (*test_vector)[1]);
+        REQUIRE(current_cert == test_vector->end());
 
         // copy
-        ensure("validate copy iterator element in vector is expected cert", *copy_current_cert == (*test_vector)[0]);
+        CHECK(*copy_current_cert == (*test_vector)[0]);
 
         // operator--(int)
         current_cert--;
-        ensure("validate iterator-- element in vector is expected cert", *current_cert-- == (*test_vector)[1]);
-        ensure("validate iterator-- element in vector is expected cert", *current_cert == (*test_vector)[0]);
+        CHECK(*current_cert-- == (*test_vector)[1]);
+        CHECK(*current_cert == (*test_vector)[0]);
 
-        ensure("begin iterator is equal", current_cert == test_vector->begin());
+        CHECK(current_cert == test_vector->begin());
 
         // operator++
-        ensure("validate ++iterator element in vector is expected cert", *++current_cert == (*test_vector)[1]);
-        ensure("end of cert vector after ++iterator", ++current_cert == test_vector->end());
+        CHECK(*++current_cert == (*test_vector)[1]);
+        REQUIRE(++current_cert == test_vector->end());
         // operator--
-        ensure("validate --iterator element in vector is expected cert", *--current_cert == (*test_vector)[1]);
-        ensure("validate 2nd --iterator element in vector is expected cert", *--current_cert == (*test_vector)[0]);
+        CHECK(*--current_cert == (*test_vector)[1]);
+        CHECK(*--current_cert == (*test_vector)[0]);
 
         test_vector->erase(test_vector->begin());
-        ensure_equals("one element in store after remove", test_vector->size(), 1);
+        UNSCOPED_INFO("one element in store after remove");
+        REQUIRE(test_vector->size() == 1);
         test_cert = (*test_vector)[0]->getOpenSSLX509();
-        ensure("Child cert remains", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("Child cert remains");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         X509_free(test_cert);
 
         // validate insert
         test_vector->insert(test_vector->begin(), new LLBasicCertificate(mPemIntermediateCert, &mValidationDate));
         test_cert = (*test_vector)[0]->getOpenSSLX509();
-        ensure_equals("two elements in store after insert", test_vector->size(), 2);
-        ensure("validate intermediate cert was inserted at first position", !X509_cmp(test_cert, mX509IntermediateCert));
+        UNSCOPED_INFO("two elements in store after insert");
+        REQUIRE(test_vector->size() == 2);
+        UNSCOPED_INFO("validate intermediate cert was inserted at first position");
+        CHECK_FALSE(X509_cmp(test_cert, mX509IntermediateCert));
         X509_free(test_cert);
         test_cert = (*test_vector)[1]->getOpenSSLX509();
-        ensure("validate child cert still there", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("validate child cert still there");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         X509_free(test_cert);
 
         //validate find
         LLSD find_info = LLSD::emptyMap();
         find_info["subjectKeyIdentifier"] = "7b:1a:f9:2b:c4:b2:f6:ae:d6:f2:8e:b1:73:fb:dd:11:ca:db:f8:87";
         LLBasicCertificateVector::iterator found_cert = test_vector->find(find_info);
-        ensure("found some cert", found_cert != test_vector->end());
+        REQUIRE(found_cert != test_vector->end());
         X509* found_x509 = (*found_cert).get()->getOpenSSLX509();
-        ensure("child cert was found", !X509_cmp(found_x509, mX509ChildCert));
+        UNSCOPED_INFO("child cert was found");
+        CHECK_FALSE(X509_cmp(found_x509, mX509ChildCert));
         X509_free(found_x509);
 
         find_info["subjectKeyIdentifier"] = "00:00:00:00"; // bogus
         current_cert =test_vector->find(find_info);
-        ensure("didn't find cert", current_cert == test_vector->end());
+        REQUIRE(current_cert == test_vector->end());
     }
 
-    // test cert store
-    template<> template<>
-    void sechandler_basic_test_object::test<6>()
+    TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: a certificate store loads from and saves to its file", "[LLSecHandler]")
     {
         // validate load with nothing
         LLFile::remove("mycertstore.pem");
         LLPointer<LLBasicCertificateStore> test_store = new LLBasicCertificateStore("mycertstore.pem");
-        ensure_equals("when loading with nothing, we should result in no certs in store", test_store->size(), 0);
+        REQUIRE(test_store->size() == 0);
 
         // validate load with empty file
         test_store->save();
         test_store = NULL;
         test_store = new LLBasicCertificateStore("mycertstore.pem");
-        ensure_equals("when loading with nothing, we should result in no certs in store", test_store->size(), 0);
+        REQUIRE(test_store->size() == 0);
         test_store=NULL;
 
         // instantiate a cert store from a file
@@ -1138,15 +1152,17 @@ namespace tut
         certstorefile.close();
         // validate loaded certs
         test_store = new LLBasicCertificateStore("mycertstore.pem");
-        ensure_equals("two elements in store", test_store->size(), 2);
+        REQUIRE(test_store->size() == 2);
 
         // operator[]
         X509* test_cert = (*test_store)[0]->getOpenSSLX509();
 
-        ensure("validate first element in store is expected cert", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("validate first element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         X509_free(test_cert);
         test_cert = (*test_store)[1]->getOpenSSLX509();
-        ensure("validate second element in store is expected cert", !X509_cmp(test_cert, mX509TestCert));
+        UNSCOPED_INFO("validate second element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509TestCert));
         X509_free(test_cert);
 
 
@@ -1155,131 +1171,123 @@ namespace tut
         test_store->save();
         test_store = NULL;
         test_store = new LLBasicCertificateStore("mycertstore.pem");
-        ensure_equals("two elements in store after save", test_store->size(), 2);
+        UNSCOPED_INFO("two elements in store after save");
+        REQUIRE(test_store->size() == 2);
         LLCertificateStore::iterator current_cert = test_store->begin();
         test_cert = (*current_cert)->getOpenSSLX509();
-        ensure("validate first element in store is expected cert", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("validate first element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         current_cert++;
         X509_free(test_cert);
         test_cert = (*current_cert)->getOpenSSLX509();
-        ensure("validate second element in store is expected cert", !X509_cmp(test_cert, mX509TestCert));
+        UNSCOPED_INFO("validate second element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509TestCert));
         X509_free(test_cert);
         current_cert++;
-        ensure("end of cert store", current_cert == test_store->end());
+        REQUIRE(current_cert == test_store->end());
 
     }
 
-    // cert name wildcard matching
-    template<> template<>
-    void sechandler_basic_test_object::test<7>()
+    TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: hostnames match certificate names with wildcards and end periods", "[LLSecHandler]")
     {
-        ensure("simple name match",
-               _cert_hostname_wildcard_match("foo", "foo"));
+        CHECK(_cert_hostname_wildcard_match("foo", "foo"));
 
-        ensure("simple name match, with end period",
-               _cert_hostname_wildcard_match("foo.", "foo."));
+        UNSCOPED_INFO("simple name match, with end period");
+        CHECK(_cert_hostname_wildcard_match("foo.", "foo."));
 
-        ensure("simple name match, with begin period",
-               _cert_hostname_wildcard_match(".foo", ".foo"));
+        UNSCOPED_INFO("simple name match, with begin period");
+        CHECK(_cert_hostname_wildcard_match(".foo", ".foo"));
 
-        ensure("simple name match, with mismatched period cn",
-               _cert_hostname_wildcard_match("foo.", "foo"));
+        UNSCOPED_INFO("simple name match, with mismatched period cn");
+        CHECK(_cert_hostname_wildcard_match("foo.", "foo"));
 
-        ensure("simple name match, with mismatched period hostname",
-               _cert_hostname_wildcard_match("foo", "foo."));
+        UNSCOPED_INFO("simple name match, with mismatched period hostname");
+        CHECK(_cert_hostname_wildcard_match("foo", "foo."));
 
-        ensure("simple name match, with subdomain",
-               _cert_hostname_wildcard_match("foo.bar", "foo.bar"));
+        UNSCOPED_INFO("simple name match, with subdomain");
+        CHECK(_cert_hostname_wildcard_match("foo.bar", "foo.bar"));
 
-        ensure("stutter name match",
-               _cert_hostname_wildcard_match("foobbbbfoo", "foo*bbbfoo"));
+        UNSCOPED_INFO("stutter name match");
+        CHECK(_cert_hostname_wildcard_match("foobbbbfoo", "foo*bbbfoo"));
 
-        ensure("simple name match, with beginning wildcard",
-               _cert_hostname_wildcard_match("foobar", "*bar"));
+        UNSCOPED_INFO("simple name match, with beginning wildcard");
+        CHECK(_cert_hostname_wildcard_match("foobar", "*bar"));
 
-        ensure("simple name match, with ending wildcard",
-               _cert_hostname_wildcard_match("foobar", "foo*"));
+        UNSCOPED_INFO("simple name match, with ending wildcard");
+        CHECK(_cert_hostname_wildcard_match("foobar", "foo*"));
 
-        ensure("simple name match, with beginning null wildcard",
-               _cert_hostname_wildcard_match("foobar", "*foobar"));
+        UNSCOPED_INFO("simple name match, with beginning null wildcard");
+        CHECK(_cert_hostname_wildcard_match("foobar", "*foobar"));
 
-        ensure("simple name match, with ending null wildcard",
-               _cert_hostname_wildcard_match("foobar", "foobar*"));
+        UNSCOPED_INFO("simple name match, with ending null wildcard");
+        CHECK(_cert_hostname_wildcard_match("foobar", "foobar*"));
 
-        ensure("simple name match, with embedded wildcard",
-               _cert_hostname_wildcard_match("foobar", "f*r"));
+        UNSCOPED_INFO("simple name match, with embedded wildcard");
+        CHECK(_cert_hostname_wildcard_match("foobar", "f*r"));
 
-        ensure("simple name match, with embedded null wildcard",
-               _cert_hostname_wildcard_match("foobar", "foo*bar"));
+        UNSCOPED_INFO("simple name match, with embedded null wildcard");
+        CHECK(_cert_hostname_wildcard_match("foobar", "foo*bar"));
 
-        ensure("simple name match, with dual embedded wildcard",
-               _cert_hostname_wildcard_match("foobar", "f*o*ar"));
+        UNSCOPED_INFO("simple name match, with dual embedded wildcard");
+        CHECK(_cert_hostname_wildcard_match("foobar", "f*o*ar"));
 
-        ensure("simple name mismatch",
-               !_cert_hostname_wildcard_match("bar", "foo"));
+        CHECK_FALSE(_cert_hostname_wildcard_match("bar", "foo"));
 
-        ensure("simple name mismatch, with end period",
-               !_cert_hostname_wildcard_match("foobar.", "foo."));
+        UNSCOPED_INFO("simple name mismatch, with end period");
+        CHECK_FALSE(_cert_hostname_wildcard_match("foobar.", "foo."));
 
-        ensure("simple name mismatch, with begin period",
-               !_cert_hostname_wildcard_match(".foobar", ".foo"));
+        UNSCOPED_INFO("simple name mismatch, with begin period");
+        CHECK_FALSE(_cert_hostname_wildcard_match(".foobar", ".foo"));
 
-        ensure("simple name mismatch, with subdomain",
-               !_cert_hostname_wildcard_match("foobar.bar", "foo.bar"));
+        UNSCOPED_INFO("simple name mismatch, with subdomain");
+        CHECK_FALSE(_cert_hostname_wildcard_match("foobar.bar", "foo.bar"));
 
-        ensure("simple name mismatch, with beginning wildcard",
-               !_cert_hostname_wildcard_match("foobara", "*bar"));
+        UNSCOPED_INFO("simple name mismatch, with beginning wildcard");
+        CHECK_FALSE(_cert_hostname_wildcard_match("foobara", "*bar"));
 
-        ensure("simple name mismatch, with ending wildcard",
-               !_cert_hostname_wildcard_match("oobar", "foo*"));
+        UNSCOPED_INFO("simple name mismatch, with ending wildcard");
+        CHECK_FALSE(_cert_hostname_wildcard_match("oobar", "foo*"));
 
-        ensure("simple name mismatch, with embedded wildcard",
-               !_cert_hostname_wildcard_match("oobar", "f*r"));
+        UNSCOPED_INFO("simple name mismatch, with embedded wildcard");
+        CHECK_FALSE(_cert_hostname_wildcard_match("oobar", "f*r"));
 
-        ensure("simple name mismatch, with dual embedded wildcard",
-               !_cert_hostname_wildcard_match("foobar", "f*d*ar"));
+        UNSCOPED_INFO("simple name mismatch, with dual embedded wildcard");
+        CHECK_FALSE(_cert_hostname_wildcard_match("foobar", "f*d*ar"));
 
-        ensure("simple wildcard",
-               _cert_hostname_wildcard_match("foobar", "*"));
+        UNSCOPED_INFO("simple wildcard");
+        CHECK(_cert_hostname_wildcard_match("foobar", "*"));
 
-        ensure("long domain",
-               _cert_hostname_wildcard_match("foo.bar.com", "foo.bar.com"));
+        UNSCOPED_INFO("long domain");
+        CHECK(_cert_hostname_wildcard_match("foo.bar.com", "foo.bar.com"));
 
-        ensure("long domain with multiple wildcards",
-               _cert_hostname_wildcard_match("foo.bar.com", "*.b*r.com"));
+        UNSCOPED_INFO("long domain with multiple wildcards");
+        CHECK(_cert_hostname_wildcard_match("foo.bar.com", "*.b*r.com"));
 
-        ensure("end periods",
-               _cert_hostname_wildcard_match("foo.bar.com.", "*.b*r.com."));
+        UNSCOPED_INFO("end periods");
+        CHECK(_cert_hostname_wildcard_match("foo.bar.com.", "*.b*r.com."));
 
-        ensure("match end period",
-               _cert_hostname_wildcard_match("foo.bar.com.", "*.b*r.com"));
+        UNSCOPED_INFO("match end period");
+        CHECK(_cert_hostname_wildcard_match("foo.bar.com.", "*.b*r.com"));
 
-        ensure("match end period2",
-               _cert_hostname_wildcard_match("foo.bar.com", "*.b*r.com."));
+        UNSCOPED_INFO("match end period2");
+        CHECK(_cert_hostname_wildcard_match("foo.bar.com", "*.b*r.com."));
 
-        ensure("wildcard mismatch",
-               !_cert_hostname_wildcard_match("bar.com", "*.bar.com"));
+        CHECK_FALSE(_cert_hostname_wildcard_match("bar.com", "*.bar.com"));
 
-        ensure("wildcard match",
-               _cert_hostname_wildcard_match("foo.bar.com", "*.bar.com"));
+        CHECK(_cert_hostname_wildcard_match("foo.bar.com", "*.bar.com"));
 
-        ensure("wildcard match",
-               _cert_hostname_wildcard_match("foo.foo.bar.com", "*.bar.com"));
+        CHECK(_cert_hostname_wildcard_match("foo.foo.bar.com", "*.bar.com"));
 
-        ensure("wildcard match",
-               _cert_hostname_wildcard_match("foo.foo.bar.com", "*.*.com"));
+        CHECK(_cert_hostname_wildcard_match("foo.foo.bar.com", "*.*.com"));
 
-        ensure("wildcard mismatch",
-               !_cert_hostname_wildcard_match("foo.foo.bar.com", "*.foo.com"));
+        CHECK_FALSE(_cert_hostname_wildcard_match("foo.foo.bar.com", "*.foo.com"));
     }
 
-    // test cert chain
-    template<> template<>
-    void sechandler_basic_test_object::test<8>()
+    TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: a certificate chain follows issuers and drops unrelated certs", "[LLSecHandler]")
     {
         // validate create from empty chain
         LLPointer<LLBasicCertificateChain> test_chain = new LLBasicCertificateChain(NULL);
-        ensure_equals("when loading with nothing, we should result in no certs in chain", test_chain->size(), 0);
+        REQUIRE(test_chain->size() == 0);
 
         // Single cert in the chain.
         X509_STORE_CTX *test_store = X509_STORE_CTX_new();
@@ -1287,9 +1295,10 @@ namespace tut
         X509_STORE_CTX_set0_untrusted(test_store, sk_X509_new_null());
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        ensure_equals("two elements in store [1]", test_chain->size(), 1);
+        REQUIRE(test_chain->size() == 1);
         X509* test_cert = (*test_chain)[0]->getOpenSSLX509();
-        ensure("validate first element in store is expected cert", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("validate first element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         X509_free(test_cert);
 
         // cert + CA
@@ -1300,12 +1309,14 @@ namespace tut
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509IntermediateCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        ensure_equals("two elements in store [2]", test_chain->size(), 2);
+        REQUIRE(test_chain->size() == 2);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
-        ensure("validate first element in store is expected cert", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("validate first element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         X509_free(test_cert);
         test_cert = (*test_chain)[1]->getOpenSSLX509();
-        ensure("validate second element in store is expected cert", !X509_cmp(test_cert, mX509IntermediateCert));
+        UNSCOPED_INFO("validate second element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509IntermediateCert));
         X509_free(test_cert);
 
         // cert + nonrelated
@@ -1316,9 +1327,10 @@ namespace tut
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509TestCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        ensure_equals("two elements in store [3]", test_chain->size(), 1);
+        REQUIRE(test_chain->size() == 1);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
-        ensure("validate first element in store is expected cert", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("validate first element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         X509_free(test_cert);
 
         // cert + CA + nonrelated
@@ -1329,12 +1341,14 @@ namespace tut
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509TestCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        ensure_equals("two elements in store [4]", test_chain->size(), 2);
+        REQUIRE(test_chain->size() == 2);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
-        ensure("validate first element in store is expected cert", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("validate first element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         X509_free(test_cert);
         test_cert = (*test_chain)[1]->getOpenSSLX509();
-        ensure("validate second element in store is expected cert", !X509_cmp(test_cert, mX509IntermediateCert));
+        UNSCOPED_INFO("validate second element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509IntermediateCert));
         X509_free(test_cert);
 
         // cert + intermediate + CA
@@ -1345,22 +1359,23 @@ namespace tut
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509RootCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
-        ensure_equals("three elements in store", test_chain->size(), 3);
+        REQUIRE(test_chain->size() == 3);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
-        ensure("validate first element in store is expected cert", !X509_cmp(test_cert, mX509ChildCert));
+        UNSCOPED_INFO("validate first element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509ChildCert));
         X509_free(test_cert);
         test_cert = (*test_chain)[1]->getOpenSSLX509();
-        ensure("validate second element in store is expected cert", !X509_cmp(test_cert, mX509IntermediateCert));
+        UNSCOPED_INFO("validate second element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509IntermediateCert));
         X509_free(test_cert);
 
         test_cert = (*test_chain)[2]->getOpenSSLX509();
-        ensure("validate second element in store is expected cert", !X509_cmp(test_cert, mX509RootCert));
+        UNSCOPED_INFO("validate third element in store is expected cert");
+        CHECK_FALSE(X509_cmp(test_cert, mX509RootCert));
         X509_free(test_cert);
     }
 
-    // test cert validation
-    template<> template<>
-    void sechandler_basic_test_object::test<9>()
+    TEST_CASE_METHOD(sechandler_basic_test, "LLSecHandler: validation needs a trusted CA and a valid date and SSL key usage", "[LLSecHandler]")
     {
         // start with a trusted store with our known root cert
         LLFile::remove("mycertstore.pem");
@@ -1389,18 +1404,18 @@ namespace tut
         // trusted
         test_chain->add(new LLBasicCertificate(mX509ChildCert, &mValidationDate));
 
-        // validate without the trust flag.
+        // validate with the trust flag: the store's cache of validated certs vouches for the child.
         test_store->validate(VALIDATION_POLICY_TRUSTED, test_chain, validation_params);
 
         // Validate with child cert but no parent, and no parent in CA store
         test_store = new LLBasicCertificateStore("mycertstore.pem");
-        ensure_throws("no CA, with only a child cert",
-                      LLCertValidationTrustException,
-                      (*test_chain)[0],
-                      test_store->validate,
-                      VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("no CA, with only a child cert",
+                                 LLCertValidationTrustException,
+                                 (*test_chain)[0],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
 
 
         // validate without the trust flag.
@@ -1410,13 +1425,13 @@ namespace tut
         test_store = new LLBasicCertificateStore("mycertstore.pem");
         // append the intermediate cert
         test_chain->add(new LLBasicCertificate(mX509IntermediateCert, &mValidationDate));
-        ensure_throws("no CA, with child and intermediate certs",
-                      LLCertValidationTrustException,
-                      (*test_chain)[1],
-                      test_store->validate,
-                      VALIDATION_POLICY_TRUSTED | VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("no CA, with child and intermediate certs",
+                                 LLCertValidationTrustException,
+                                 (*test_chain)[1],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
         // validate without the trust flag
         test_store->validate(0, test_chain, validation_params);
 
@@ -1428,30 +1443,33 @@ namespace tut
         test_store->validate(VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
                              test_chain, validation_params);
 
+        // valid from its first second
         validation_params = LLSD::emptyMap();
         validation_params[CERT_VALIDATION_DATE] = child_info[CERT_VALID_FROM].asDate();
+        CHECK_NOTHROW(test_store->validate(VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
+                                           test_chain, validation_params));
 
         validation_params[CERT_VALIDATION_DATE] = LLDate(child_info[CERT_VALID_FROM].asDate().secondsSinceEpoch() - 1.0);
 
         // test not yet valid
-        ensure_throws("Child cert not yet valid" ,
-                      LLCertValidationExpirationException,
-                      (*test_chain)[0],
-                      test_store->validate,
-                      VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("Child cert not yet valid" ,
+                                 LLCertValidationExpirationException,
+                                 (*test_chain)[0],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
         validation_params = LLSD::emptyMap();
         validation_params[CERT_VALIDATION_DATE] = LLDate(child_info[CERT_VALID_TO].asDate().secondsSinceEpoch() + 1.0);
 
         // test cert expired
-        ensure_throws("Child cert expired",
-                      LLCertValidationExpirationException,
-                      (*test_chain)[0],
-                      test_store->validate,
-                      VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("Child cert expired",
+                                 LLCertValidationExpirationException,
+                                 (*test_chain)[0],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_TIME | VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
 
         // test SSL KU
         // validate basic trust for a chain containing child and intermediate.
@@ -1465,13 +1483,13 @@ namespace tut
         test_chain->add(new LLBasicCertificate(mX509TestCert, &mValidationDate));
 
         test_store = new LLBasicCertificateStore("mycertstore.pem");
-        ensure_throws("Cert doesn't have ku",
-                      LLCertKeyUsageValidationException,
-                      (*test_chain)[0],
-                      test_store->validate,
-                      VALIDATION_POLICY_SSL_KU | VALIDATION_POLICY_TRUSTED,
-                      test_chain,
-                      validation_params);
+        require_throws_with_cert("Cert doesn't have ku",
+                                 LLCertKeyUsageValidationException,
+                                 (*test_chain)[0],
+                                 test_store->validate,
+                                 VALIDATION_POLICY_SSL_KU | VALIDATION_POLICY_TRUSTED,
+                                 test_chain,
+                                 validation_params);
 
         test_store->validate(0, test_chain, validation_params);
     }

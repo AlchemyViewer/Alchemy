@@ -66,6 +66,10 @@ public:
         // it.
         std::string                        sleep;
         bool                               godMode = false;
+        // A library's table the definitions list among the functions --
+        // SLua's lljson, math, ll -- which takes no arguments: completed
+        // with a dot after it, not brackets.
+        bool                               table = false;
         // Where the offline reference files it, beside its kind: a
         // function's first category in the definitions, in words ("Avatar
         // communication"), an SLua ll function its LSL twin's, any other

@@ -27,143 +27,180 @@
  */
 
 #include "linden_common.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include "altestmatchers.h"
 #include "llsd.h"
 
 #include "../m4math.h"
 #include "../v4math.h"
 #include "../llquaternion.h"
 
-namespace tut
-{
 namespace
 {
-    struct v4math_data
-    {
-    };
-    typedef test_group<v4math_data> v4math_test;
-    typedef v4math_test::object v4math_object;
-    tut::v4math_test v4math_testcase("v4math_h");
-}
-
-    template<> template<>
-    void v4math_object::test<1>()
+    TEST_CASE("v4math_h: constructors set every component and default w to 1", "[v4math_h]")
     {
         LLVector4 vec4;
-        ensure("1:LLVector4:Fail to initialize " ,((0 == vec4.mV[VX]) && (0 == vec4.mV[VY]) && (0 == vec4.mV[VZ])&& (1.0f == vec4.mV[VW])));
+        CHECK(vec4.mV[VX] == 0);
+        CHECK(vec4.mV[VY] == 0);
+        CHECK(vec4.mV[VZ] == 0);
+        CHECK(vec4.mV[VW] == 1.0f);
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4a(x,y,z);
-        ensure("2:LLVector4:Fail to initialize " ,((x == vec4a.mV[VX]) && (y == vec4a.mV[VY]) && (z == vec4a.mV[VZ])&& (1.0f == vec4a.mV[VW])));
+        CHECK(x == vec4a.mV[VX]);
+        CHECK(y == vec4a.mV[VY]);
+        CHECK(z == vec4a.mV[VZ]);
+        CHECK(vec4a.mV[VW] == 1.0f);
         LLVector4 vec4b(x,y,z,w);
-        ensure("3:LLVector4:Fail to initialize " ,((x == vec4b.mV[VX]) && (y == vec4b.mV[VY]) && (z == vec4b.mV[VZ])&& (w == vec4b.mV[VW])));
+        CHECK(x == vec4b.mV[VX]);
+        CHECK(y == vec4b.mV[VY]);
+        CHECK(z == vec4b.mV[VZ]);
+        CHECK(w == vec4b.mV[VW]);
         const F32 vec[4] = {.112f ,23.2f, -4.2f, -.0001f};
         LLVector4 vec4c(vec);
-        ensure("4:LLVector4:Fail to initialize " ,((vec[0] == vec4c.mV[VX]) && (vec[1] == vec4c.mV[VY]) && (vec[2] == vec4c.mV[VZ])&& (vec[3] == vec4c.mV[VW])));
+        CHECK(vec[0] == vec4c.mV[VX]);
+        CHECK(vec[1] == vec4c.mV[VY]);
+        CHECK(vec[2] == vec4c.mV[VZ]);
+        CHECK(vec[3] == vec4c.mV[VW]);
         LLVector3 vec3(-2.23f,1.01f,42.3f);
         LLVector4 vec4d(vec3);
-        ensure("5:LLVector4:Fail to initialize " ,((vec3.mV[VX] == vec4d.mV[VX]) && (vec3.mV[VY] == vec4d.mV[VY]) && (vec3.mV[VZ] == vec4d.mV[VZ])&& (1.f == vec4d.mV[VW])));
+        CHECK(vec3.mV[VX] == vec4d.mV[VX]);
+        CHECK(vec3.mV[VY] == vec4d.mV[VY]);
+        CHECK(vec3.mV[VZ] == vec4d.mV[VZ]);
+        CHECK(vec4d.mV[VW] == 1.f);
         F32 w1 = -.234f;
         LLVector4 vec4e(vec3,w1);
-        ensure("6:LLVector4:Fail to initialize " ,((vec3.mV[VX] == vec4e.mV[VX]) && (vec3.mV[VY] == vec4e.mV[VY]) && (vec3.mV[VZ] == vec4e.mV[VZ])&& (w1 == vec4e.mV[VW])));
+        CHECK(vec3.mV[VX] == vec4e.mV[VX]);
+        CHECK(vec3.mV[VY] == vec4e.mV[VY]);
+        CHECK(vec3.mV[VZ] == vec4e.mV[VZ]);
+        CHECK(w1 == vec4e.mV[VW]);
     }
 
-    template<> template<>
-    void v4math_object::test<2>()
+    TEST_CASE("v4math_h: setVec sets components and clearVec/zeroVec reset them", "[v4math_h]")
     {
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4;
         vec4.setVec(x,y,z);
-        ensure("1:setVec:Fail to initialize " ,((x == vec4.mV[VX]) && (y == vec4.mV[VY]) && (z == vec4.mV[VZ])&& (1.0f == vec4.mV[VW])));
+        CHECK(x == vec4.mV[VX]);
+        CHECK(y == vec4.mV[VY]);
+        CHECK(z == vec4.mV[VZ]);
+        CHECK(vec4.mV[VW] == 1.0f);
         vec4.clearVec();
-        ensure("2:clearVec:Fail " ,((0 == vec4.mV[VX]) && (0 == vec4.mV[VY]) && (0 == vec4.mV[VZ])&& (1.0f == vec4.mV[VW])));
+        CHECK(vec4.mV[VX] == 0);
+        CHECK(vec4.mV[VY] == 0);
+        CHECK(vec4.mV[VZ] == 0);
+        CHECK(vec4.mV[VW] == 1.0f);
         vec4.setVec(x,y,z,w);
-        ensure("3:setVec:Fail to initialize " ,((x == vec4.mV[VX]) && (y == vec4.mV[VY]) && (z == vec4.mV[VZ])&& (w == vec4.mV[VW])));
+        CHECK(x == vec4.mV[VX]);
+        CHECK(y == vec4.mV[VY]);
+        CHECK(z == vec4.mV[VZ]);
+        CHECK(w == vec4.mV[VW]);
         vec4.zeroVec();
-        ensure("4:zeroVec:Fail " ,((0 == vec4.mV[VX]) && (0 == vec4.mV[VY]) && (0 == vec4.mV[VZ])&& (0 == vec4.mV[VW])));
+        CHECK(vec4.mV[VX] == 0);
+        CHECK(vec4.mV[VY] == 0);
+        CHECK(vec4.mV[VZ] == 0);
+        CHECK(vec4.mV[VW] == 0);
         LLVector3 vec3(-2.23f,1.01f,42.3f);
         vec4.clearVec();
         vec4.setVec(vec3);
-        ensure("5:setVec:Fail to initialize " ,((vec3.mV[VX] == vec4.mV[VX]) && (vec3.mV[VY] == vec4.mV[VY]) && (vec3.mV[VZ] == vec4.mV[VZ])&& (1.f == vec4.mV[VW])));
+        CHECK(vec3.mV[VX] == vec4.mV[VX]);
+        CHECK(vec3.mV[VY] == vec4.mV[VY]);
+        CHECK(vec3.mV[VZ] == vec4.mV[VZ]);
+        CHECK(vec4.mV[VW] == 1.f);
         F32 w1 = -.234f;
         vec4.zeroVec();
         vec4.setVec(vec3,w1);
-        ensure("6:setVec:Fail to initialize " ,((vec3.mV[VX] == vec4.mV[VX]) && (vec3.mV[VY] == vec4.mV[VY]) && (vec3.mV[VZ] == vec4.mV[VZ])&& (w1 == vec4.mV[VW])));
+        CHECK(vec3.mV[VX] == vec4.mV[VX]);
+        CHECK(vec3.mV[VY] == vec4.mV[VY]);
+        CHECK(vec3.mV[VZ] == vec4.mV[VZ]);
+        CHECK(w1 == vec4.mV[VW]);
         const F32 vec[4] = {.112f ,23.2f, -4.2f, -.0001f};
         LLVector4 vec4a;
         vec4a.setVec(vec);
-        ensure("7:setVec:Fail to initialize " ,((vec[0] == vec4a.mV[VX]) && (vec[1] == vec4a.mV[VY]) && (vec[2] == vec4a.mV[VZ])&& (vec[3] == vec4a.mV[VW])));
+        CHECK(vec[0] == vec4a.mV[VX]);
+        CHECK(vec[1] == vec4a.mV[VY]);
+        CHECK(vec[2] == vec4a.mV[VZ]);
+        CHECK(vec[3] == vec4a.mV[VW]);
     }
 
-    template<> template<>
-    void v4math_object::test<3>()
+    TEST_CASE("v4math_h: magVec and magVecSquared", "[v4math_h]")
     {
         F32 x = 10.f, y = -2.3f, z = -.023f;
         LLVector4 vec4(x,y,z);
-        ensure("magVec:Fail ", is_approx_equal(vec4.magVec(), (F32) sqrt(x*x + y*y + z*z)));
-        ensure("magVecSquared:Fail ", is_approx_equal(vec4.magVecSquared(), (x*x + y*y + z*z)));
+        CHECK(is_approx_equal(vec4.magVec(), (F32) sqrt(x*x + y*y + z*z)));
+        CHECK(is_approx_equal(vec4.magVecSquared(), (x*x + y*y + z*z)));
     }
 
-    template<> template<>
-    void v4math_object::test<4>()
+    TEST_CASE("v4math_h: normVec normalizes and zeroes a near-zero vector", "[v4math_h]")
     {
         F32 x = 10.f, y = -2.3f, z = -.023f;
         LLVector4 vec4(x,y,z);
         F32 mag = vec4.normVec();
         mag = 1.f/ mag;
-        ensure("1:normVec: Fail " ,is_approx_equal(mag*x,vec4.mV[VX]) && is_approx_equal(mag*y, vec4.mV[VY])&& is_approx_equal(mag*z, vec4.mV[VZ]));
+        CHECK(is_approx_equal(mag*x,vec4.mV[VX]));
+        CHECK(is_approx_equal(mag*y, vec4.mV[VY]));
+        CHECK(is_approx_equal(mag*z, vec4.mV[VZ]));
         x = 0.000000001f, y = 0.000000001f, z = 0.000000001f;
         vec4.clearVec();
         vec4.setVec(x,y,z);
         mag = vec4.normVec();
-        ensure("2:normVec: Fail " ,is_approx_equal(mag*x,vec4.mV[VX]) && is_approx_equal(mag*y, vec4.mV[VY])&& is_approx_equal(mag*z, vec4.mV[VZ]));
+        CHECK(is_approx_equal(mag*x,vec4.mV[VX]));
+        CHECK(is_approx_equal(mag*y, vec4.mV[VY]));
+        CHECK(is_approx_equal(mag*z, vec4.mV[VZ]));
     }
 
-    template<> template<>
-    void v4math_object::test<5>()
+    TEST_CASE("v4math_h: abs drops signs; isExactlyClear and isExactlyZero", "[v4math_h]")
     {
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4(x,y,z,w);
         vec4.abs();
-        ensure("abs:Fail " ,((x == vec4.mV[VX]) && (-y == vec4.mV[VY]) && (-z == vec4.mV[VZ])&& (-w == vec4.mV[VW])));
+        CHECK(x == vec4.mV[VX]);
+        CHECK(-y == vec4.mV[VY]);
+        CHECK(-z == vec4.mV[VZ]);
+        CHECK(-w == vec4.mV[VW]);
         vec4.clearVec();
-        ensure("isExactlyClear:Fail " ,(true == vec4.isExactlyClear()));
+        CHECK(vec4.isExactlyClear());
         vec4.zeroVec();
-        ensure("isExactlyZero:Fail " ,(true == vec4.isExactlyZero()));
+        CHECK(vec4.isExactlyZero());
     }
 
-    template<> template<>
-    void v4math_object::test<6>()
+    TEST_CASE("v4math_h: scaleVec multiplies component-wise", "[v4math_h]")
     {
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4(x,y,z,w),vec4a;
         vec4a = vec4.scaleVec(vec4);
-        ensure("scaleVec:Fail " ,(is_approx_equal(x*x, vec4a.mV[VX]) && is_approx_equal(y*y, vec4a.mV[VY]) && is_approx_equal(z*z, vec4a.mV[VZ])&& is_approx_equal(w*w, vec4a.mV[VW])));
+        CHECK(is_approx_equal(x*x, vec4a.mV[VX]));
+        CHECK(is_approx_equal(y*y, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z*z, vec4a.mV[VZ]));
+        CHECK(is_approx_equal(w*w, vec4a.mV[VW]));
     }
 
-    template<> template<>
-    void v4math_object::test<7>()
+    TEST_CASE("v4math_h: subscript operator reads components and gives references", "[v4math_h]")
     {
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4(x,y,z,w);
-        ensure("1:operator [] failed " ,( x ==  vec4[0]));
-        ensure("2:operator [] failed " ,( y ==  vec4[1]));
-        ensure("3:operator [] failed " ,( z ==  vec4[2]));
-        ensure("4:operator [] failed " ,( w ==  vec4[3]));
-        x = 23.f, y = -.2361f, z = 3.25;
-        vec4.setVec(x,y,z);
+        CHECK(x ==  vec4[0]);
+        CHECK(y ==  vec4[1]);
+        CHECK(z ==  vec4[2]);
+        CHECK(w ==  vec4[3]);
+        // The non-const subscript is a reference to the component itself.
         F32 &ref1 = vec4[0];
-        ensure("5:operator [] failed " ,( ref1 ==  vec4[0]));
-        F32 &ref2 = vec4[1];
-        ensure("6:operator [] failed " ,( ref2 ==  vec4[1]));
-        F32 &ref3 = vec4[2];
-        ensure("7:operator [] failed " ,( ref3 ==  vec4[2]));
-        F32 &ref4 = vec4[3];
-        ensure("8:operator [] failed " ,( ref4 ==  vec4[3]));
+        CHECK(&ref1 == &vec4.mV[VX]);
+        ref1 = 23.f;
+        vec4[1] = -.2361f;
+        vec4[2] = 3.25f;
+        vec4[3] = 7.5f;
+        CHECK(vec4.mV[VX] == 23.f);
+        CHECK(vec4.mV[VY] == -.2361f);
+        CHECK(vec4.mV[VZ] == 3.25f);
+        CHECK(vec4.mV[VW] == 7.5f);
     }
 
-    template<> template<>
-    void v4math_object::test<8>()
+    TEST_CASE("v4math_h: rotVec by a matrix and by a quaternion", "[v4math_h]")
     {
+        using Catch::Matchers::WithinAbs;
+
+        // By a matrix: the row vector times the matrix, all four components.
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         const  F32 val[16] = {
             1.f,  2.f,   3.f,    0.f,
@@ -172,22 +209,40 @@ namespace
             .89f, 0.f,   0.f,    0.f
         };
         LLMatrix4 mat(val);
-        LLVector4 vec4(x,y,z,w),vec4a;
+        LLVector4 vec4(x,y,z,w);
         vec4.rotVec(mat);
-        vec4a.setVec(x,y,z,w);
-        vec4a.rotVec(mat);
-        ensure_equals("1:rotVec: Fail " ,vec4a, vec4);
-        F32 a = 2.32f, b = -23.2f, c = -34.1112f, d = 1.010112f;
-        LLQuaternion q(a,b,c,d);
-        LLVector4 vec4b(a,b,c,d),vec4c;
+        const F64 v[4] = { x, y, z, w };
+        for (int col = 0; col < 4; ++col)
+        {
+            F64 expected = 0.0;
+            for (int row = 0; row < 4; ++row)
+            {
+                expected += v[row] * val[row * 4 + col];
+            }
+            CAPTURE(col);
+            CHECK_THAT(vec4.mV[col], WithinAbs(expected, 1e-4));
+        }
+
+        // By a quaternion: x, y and z turn as an LLVector3 does, and w stays.
+        LLVector4 quarter(1.f, 0.f, 0.f, 3.f);
+        quarter.rotVec(LLQuaternion(F_PI_BY_TWO, LLVector3(0.f, 0.f, 1.f)));
+        CHECK_THAT(quarter.mV[VX], WithinAbs(0.f, 1e-6));
+        CHECK_THAT(quarter.mV[VY], WithinAbs(1.f, 1e-6));
+        CHECK_THAT(quarter.mV[VZ], WithinAbs(0.f, 1e-6));
+        CHECK(quarter.mV[VW] == 3.f);
+
+        // A vector off the turn's axis, which the turn moves.
+        const LLQuaternion q(1.3f, LLVector3(2.32f, -23.2f, -34.1112f));
+        LLVector4 vec4b(1.f, 2.f, 3.f, 1.010112f);
         vec4b.rotVec(q);
-        vec4c.setVec(a, b, c, d);
-        vec4c.rotVec(q);
-        ensure_equals("2:rotVec: Fail " ,vec4b, vec4c);
+        const LLVector3 turned = LLVector3(1.f, 2.f, 3.f) * q;
+        CHECK(vec4b.mV[VX] == turned.mV[VX]);
+        CHECK(vec4b.mV[VY] == turned.mV[VY]);
+        CHECK(vec4b.mV[VZ] == turned.mV[VZ]);
+        CHECK(vec4b.mV[VW] == 1.010112f);
     }
 
-    template<> template<>
-    void v4math_object::test<9>()
+    TEST_CASE("v4math_h: operator<< prints equal vectors the same", "[v4math_h]")
     {
         F32 x = 10.f, y = -2.3f, z = -.023f, w = -2.0f;
         LLVector4 vec4(x,y,z,w),vec4a;;
@@ -195,126 +250,139 @@ namespace
         stream1 << vec4;
         vec4a.setVec(x,y,z,w);
         stream2 << vec4a;
-        ensure("operator << failed",(stream1.str() == stream2.str()));
+        CHECK(stream1.str() == stream2.str());
     }
 
-    template<> template<>
-    void v4math_object::test<10>()
+    TEST_CASE("v4math_h: operator+ and operator+=", "[v4math_h]")
     {
         F32 x1 = 1.f, y1 = 2.f, z1 = -1.1f, w1 = .23f;
         F32 x2 = 1.2f, y2 = 2.5f, z2 = 1.f, w2 = 1.3f;
         LLVector4 vec4(x1,y1,z1,w1),vec4a(x2,y2,z2,w2),vec4b;
         vec4b = vec4a + vec4;
-        ensure("1:operator+:Fail to initialize " ,(is_approx_equal(x1+x2,vec4b.mV[VX]) && is_approx_equal(y1+y2,vec4b.mV[VY]) && is_approx_equal(z1+z2,vec4b.mV[VZ])));
+        CHECK(is_approx_equal(x1+x2,vec4b.mV[VX]));
+        CHECK(is_approx_equal(y1+y2,vec4b.mV[VY]));
+        CHECK(is_approx_equal(z1+z2,vec4b.mV[VZ]));
         x1 = -2.45f, y1 = 2.1f, z1 = 3.0f;
         vec4.clearVec();
         vec4a.clearVec();
         vec4.setVec(x1,y1,z1);
         vec4a +=vec4;
-        ensure_equals("2:operator+=: Fail to initialize", vec4a,vec4);
+        CHECK(vec4a == vec4);
         vec4a += vec4;
-        ensure("3:operator+=:Fail to initialize " ,(is_approx_equal(2*x1,vec4a.mV[VX]) && is_approx_equal(2*y1,vec4a.mV[VY]) && is_approx_equal(2*z1,vec4a.mV[VZ])));
+        CHECK(is_approx_equal(2*x1,vec4a.mV[VX]));
+        CHECK(is_approx_equal(2*y1,vec4a.mV[VY]));
+        CHECK(is_approx_equal(2*z1,vec4a.mV[VZ]));
     }
-    template<> template<>
-    void v4math_object::test<11>()
+    TEST_CASE("v4math_h: operator- and operator-=", "[v4math_h]")
     {
         F32 x1 = 1.f, y1 = 2.f, z1 = -1.1f, w1 = .23f;
         F32 x2 = 1.2f, y2 = 2.5f, z2 = 1.f, w2 = 1.3f;
         LLVector4 vec4(x1,y1,z1,w1),vec4a(x2,y2,z2,w2),vec4b;
         vec4b = vec4a - vec4;
-        ensure("1:operator-:Fail to initialize " ,(is_approx_equal(x2-x1,vec4b.mV[VX]) && is_approx_equal(y2-y1,vec4b.mV[VY]) && is_approx_equal(z2-z1,vec4b.mV[VZ])));
+        CHECK(is_approx_equal(x2-x1,vec4b.mV[VX]));
+        CHECK(is_approx_equal(y2-y1,vec4b.mV[VY]));
+        CHECK(is_approx_equal(z2-z1,vec4b.mV[VZ]));
         x1 = -2.45f, y1 = 2.1f, z1 = 3.0f;
         vec4.clearVec();
         vec4a.clearVec();
         vec4.setVec(x1,y1,z1);
         vec4a -=vec4;
-        ensure_equals("2:operator-=: Fail to initialize" , vec4a,-vec4);
+        CHECK(vec4a == -vec4);
         vec4a -=vec4;
-        ensure("3:operator-=:Fail to initialize " ,(is_approx_equal(-2*x1,vec4a.mV[VX]) && is_approx_equal(-2*y1,vec4a.mV[VY]) && is_approx_equal(-2*z1,vec4a.mV[VZ])));
+        CHECK(is_approx_equal(-2*x1,vec4a.mV[VX]));
+        CHECK(is_approx_equal(-2*y1,vec4a.mV[VY]));
+        CHECK(is_approx_equal(-2*z1,vec4a.mV[VZ]));
     }
 
-    template<> template<>
-    void v4math_object::test<12>()
+    TEST_CASE("v4math_h: dot product and scalar multiplication", "[v4math_h]")
     {
         F32 x1 = 1.f, y1 = 2.f, z1 = -1.1f;
         F32 x2 = 1.2f, y2 = 2.5f, z2 = 1.f;
         LLVector4 vec4(x1,y1,z1),vec4a(x2,y2,z2);
         F32 res = vec4 * vec4a;
-        ensure("1:operator* failed " ,is_approx_equal(res, x1*x2 + y1*y2 + z1*z2));
+        CHECK(is_approx_equal(res, x1*x2 + y1*y2 + z1*z2));
         vec4a.clearVec();
         F32 mulVal = 4.2f;
         vec4a = vec4 * mulVal;
-        ensure("2:operator* failed " ,is_approx_equal(x1*mulVal,vec4a.mV[VX]) && is_approx_equal(y1*mulVal, vec4a.mV[VY])&& is_approx_equal(z1*mulVal, vec4a.mV[VZ]));
+        CHECK(is_approx_equal(x1*mulVal,vec4a.mV[VX]));
+        CHECK(is_approx_equal(y1*mulVal, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z1*mulVal, vec4a.mV[VZ]));
         vec4a.clearVec();
         vec4a = mulVal *  vec4 ;
-        ensure("3:operator* failed " ,is_approx_equal(x1*mulVal, vec4a.mV[VX]) && is_approx_equal(y1*mulVal, vec4a.mV[VY])&& is_approx_equal(z1*mulVal, vec4a.mV[VZ]));
+        CHECK(is_approx_equal(x1*mulVal, vec4a.mV[VX]));
+        CHECK(is_approx_equal(y1*mulVal, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z1*mulVal, vec4a.mV[VZ]));
         vec4 *= mulVal;
-        ensure("4:operator*= failed " ,is_approx_equal(x1*mulVal, vec4.mV[VX]) && is_approx_equal(y1*mulVal, vec4.mV[VY])&& is_approx_equal(z1*mulVal, vec4.mV[VZ]));
+        CHECK(is_approx_equal(x1*mulVal, vec4.mV[VX]));
+        CHECK(is_approx_equal(y1*mulVal, vec4.mV[VY]));
+        CHECK(is_approx_equal(z1*mulVal, vec4.mV[VZ]));
     }
 
-    template<> template<>
-    void v4math_object::test<13>()
+    TEST_CASE("v4math_h: cross product operator% and operator%=", "[v4math_h]")
     {
         F32 x1 = 1.f, y1 = 2.f, z1 = -1.1f;
         F32 x2 = 1.2f, y2 = 2.5f, z2 = 1.f;
         LLVector4 vec4(x1,y1,z1),vec4a(x2,y2,z2),vec4b;
         vec4b = vec4 % vec4a;
-        ensure("1:operator% failed " ,is_approx_equal(y1*z2 - y2*z1, vec4b.mV[VX]) && is_approx_equal(z1*x2 -z2*x1, vec4b.mV[VY]) && is_approx_equal(x1*y2-x2*y1, vec4b.mV[VZ]));
+        CHECK(is_approx_equal(y1*z2 - y2*z1, vec4b.mV[VX]));
+        CHECK(is_approx_equal(z1*x2 -z2*x1, vec4b.mV[VY]));
+        CHECK(is_approx_equal(x1*y2-x2*y1, vec4b.mV[VZ]));
         vec4 %= vec4a;
-        ensure_equals("operator%= failed " ,vec4,vec4b);
+        CHECK(vec4 == vec4b);
     }
 
-    template<> template<>
-    void v4math_object::test<14>()
+    TEST_CASE("v4math_h: operator/ and operator/= by a scalar", "[v4math_h]")
     {
         F32 x = 1.f, y = 2.f, z = -1.1f,div = 4.2f;
         F32 t = 1.f / div;
         LLVector4 vec4(x,y,z), vec4a;
         vec4a = vec4/div;
-        ensure("1:operator/ failed " ,is_approx_equal(x*t, vec4a.mV[VX]) && is_approx_equal(y*t, vec4a.mV[VY])&& is_approx_equal(z*t, vec4a.mV[VZ]));
+        CHECK(is_approx_equal(x*t, vec4a.mV[VX]));
+        CHECK(is_approx_equal(y*t, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z*t, vec4a.mV[VZ]));
         x = 1.23f, y = 4.f, z = -2.32f;
         vec4.clearVec();
         vec4a.clearVec();
         vec4.setVec(x,y,z);
         vec4a = vec4/div;
-        ensure("2:operator/ failed " ,is_approx_equal(x*t, vec4a.mV[VX]) && is_approx_equal(y*t, vec4a.mV[VY])&& is_approx_equal(z*t, vec4a.mV[VZ]));
+        CHECK(is_approx_equal(x*t, vec4a.mV[VX]));
+        CHECK(is_approx_equal(y*t, vec4a.mV[VY]));
+        CHECK(is_approx_equal(z*t, vec4a.mV[VZ]));
         vec4 /= div;
-        ensure("3:operator/ failed " ,is_approx_equal(x*t, vec4.mV[VX]) && is_approx_equal(y*t, vec4.mV[VY])&& is_approx_equal(z*t, vec4.mV[VZ]));
+        CHECK(is_approx_equal(x*t, vec4.mV[VX]));
+        CHECK(is_approx_equal(y*t, vec4.mV[VY]));
+        CHECK(is_approx_equal(z*t, vec4.mV[VZ]));
     }
 
-    template<> template<>
-    void v4math_object::test<15>()
+    TEST_CASE("v4math_h: operator== and operator!=", "[v4math_h]")
     {
         F32 x = 1.f, y = 2.f, z = -1.1f;
         LLVector4 vec4(x,y,z), vec4a;
-        ensure("operator!= failed " ,(vec4 != vec4a));
+        CHECK(vec4 != vec4a);
         vec4a = vec4;
-        ensure("operator== failed " ,(vec4 ==vec4a));
+        CHECK(vec4 ==vec4a);
     }
 
-    template<> template<>
-    void v4math_object::test<16>()
+    TEST_CASE("v4math_h: unary minus negates", "[v4math_h]")
     {
         F32 x = 1.f, y = 2.f, z = -1.1f;
         LLVector4 vec4(x,y,z), vec4a;
         vec4a = - vec4;
-        ensure("operator- failed " , (vec4 == - vec4a));
+        CHECK(vec4 == - vec4a);
     }
 
-    template<> template<>
-    void v4math_object::test<17>()
+    TEST_CASE("v4math_h: are_parallel within an epsilon", "[v4math_h]")
     {
         F32 x = 1.f, y = 2.f, z = -1.1f,epsilon = .23425f;
         LLVector4 vec4(x,y,z), vec4a(x,y,z);
-        ensure("1:are_parallel: Fail " ,(true == are_parallel(vec4a,vec4,epsilon)));
+        CHECK(are_parallel(vec4a,vec4,epsilon));
         x = 21.f, y = 12.f, z = -123.1f;
         vec4a.clearVec();
         vec4a.setVec(x,y,z);
-        ensure("2:are_parallel: Fail " ,(false == are_parallel(vec4a,vec4,epsilon)));
+        CHECK_FALSE(are_parallel(vec4a,vec4,epsilon));
     }
 
-    template<> template<>
-    void v4math_object::test<18>()
+    TEST_CASE("v4math_h: angle_between matches acos of the normalized dot product", "[v4math_h]")
     {
         F32 x = 1.f, y = 2.f, z = -1.1f;
         F32 angle1, angle2;
@@ -323,32 +391,30 @@ namespace
         vec4.normVec();
         vec4a.normVec();
         angle2 = acos(vec4 * vec4a);
-        ensure_approximately_equals("1:angle_between: Fail " ,angle1,angle2,8);
+        CHECK_THAT(angle1, ll_test::WithinBits(angle2, 8));
         F32 x1 = 21.f, y1 = 2.23f, z1 = -1.1f;
         LLVector4 vec4b(x,y,z), vec4c(x1,y1,z1);
         angle1 = angle_between(vec4b, vec4c);
         vec4b.normVec();
         vec4c.normVec();
         angle2 = acos(vec4b * vec4c);
-        ensure_approximately_equals("2:angle_between: Fail " ,angle1,angle2,8);
+        CHECK_THAT(angle1, ll_test::WithinBits(angle2, 8));
     }
 
-    template<> template<>
-    void v4math_object::test<19>()
+    TEST_CASE("v4math_h: dist_vec and dist_vec_squared", "[v4math_h]")
     {
         F32 x1 =-2.3f, y1 = 2.f,z1 = 1.2f, x2 = 1.3f, y2 = 1.f, z2 = 1.f;
         F32 val1,val2;
         LLVector4 vec4(x1,y1,z1),vec4a(x2,y2,z2);
         val1 = dist_vec(vec4,vec4a);
         val2 = (F32) sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)* (y1 - y2) + (z1 - z2)* (z1 -z2));
-        ensure_equals("dist_vec: Fail ",val2, val1);
+        CHECK(val2 == val1);
         val1 = dist_vec_squared(vec4,vec4a);
         val2 =((x1 - x2)*(x1 - x2) + (y1 - y2)* (y1 - y2) + (z1 - z2)* (z1 -z2));
-        ensure_equals("dist_vec_squared: Fail ",val2, val1);
+        CHECK(val2 == val1);
     }
 
-    template<> template<>
-    void v4math_object::test<20>()
+    TEST_CASE("v4math_h: lerp interpolates every component", "[v4math_h]")
     {
         F32 x1 =-2.3f, y1 = 2.f,z1 = 1.2f, w1 = -.23f, x2 = 1.3f, y2 = 1.f, z2 = 1.f,w2 = .12f;
         F32 val = 2.3f,val1,val2,val3,val4;
@@ -359,28 +425,28 @@ namespace
         val4 = w1 + (w2 - w1)* val;
         LLVector4 vec4b = lerp(vec4,vec4a,val);
         LLVector4 check(val1, val2, val3, val4);
-        ensure_equals("lerp failed", check, vec4b);
+        CHECK(check == vec4b);
     }
 
-    template<> template<>
-    void v4math_object::test<21>()
+    TEST_CASE("v4math_h: vec4to3 and vec3to4", "[v4math_h]")
     {
         F32 x = 1.f, y = 2.f, z = -1.1f;
         LLVector4 vec4(x,y,z);
         LLVector3 vec3 = vec4to3(vec4);
-        ensure("vec4to3 failed", ((x == vec3.mV[VX])&& (y == vec3.mV[VY]) && (z == vec3.mV[VZ])));
+        CHECK(x == vec3.mV[VX]);
+        CHECK(y == vec3.mV[VY]);
+        CHECK(z == vec3.mV[VZ]);
         LLVector4 vec4a = vec3to4(vec3);
-        ensure_equals("vec3to4 failed",vec4a,vec4);
+        CHECK(vec4a == vec4);
     }
 
-    template<> template<>
-    void v4math_object::test<22>()
+    TEST_CASE("v4math_h: getValue round-trips through LLVector3", "[v4math_h]")
     {
         F32 x = 1.f, y = 2.f, z = -1.1f;
         LLVector4 vec4(x,y,z);
         LLSD llsd = vec4.getValue();
         LLVector3 vec3(llsd);
         LLVector4 vec4a = vec3to4(vec3);
-        ensure_equals("getValue failed",vec4a,vec4);
+        CHECK(vec4a == vec4);
     }
 }

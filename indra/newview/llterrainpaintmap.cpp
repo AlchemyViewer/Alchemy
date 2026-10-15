@@ -25,6 +25,7 @@
  */
 
 #include "llterrainpaintmap.h"
+#include "llspatialpartition.h"
 
 #include "llviewerprecompiledheaders.h"
 

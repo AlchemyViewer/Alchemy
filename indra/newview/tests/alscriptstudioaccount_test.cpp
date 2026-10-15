@@ -27,23 +27,17 @@
 
 #include "../alscriptstudioaccount.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    struct alscriptstudioaccount_data
+    // The account's own is taken out of a state written whole, the shape and switches left shared;
+    // a key it no longer has is taken out of the account's too.
+    TEST_CASE("alscriptstudioaccount: split takes the account's own out of the state and drops what it lost", "[alscriptstudioaccount]")
     {
-    };
-    typedef test_group<alscriptstudioaccount_data> alscriptstudioaccount_group;
-    typedef alscriptstudioaccount_group::object    alscriptstudioaccount_object;
-    alscriptstudioaccount_group                    alscriptstudioaccount_instance("alscriptstudioaccount");
-
-    template<> template<>
-    void alscriptstudioaccount_object::test<1>()
-    {
-        set_test_name("the account's own taken out of a state written whole, the shape and switches left shared; a key it no longer has taken out of the account's too");
         LLSD state;
         state["rect"]           = LLSD().with(0, 1).with(1, 2);
+        state["scroll_map"]     = true;
         state["open"]["tabs"]   = LLSD::emptyArray();
         state["pinned"]         = LLSD().with(0, "a");
         state["recent_scripts"] = LLSD().with(0, "s");
@@ -51,27 +45,50 @@ namespace tut
         LLSD mine;
         mine["windows"] = LLSD().with(0, "w");
         ALScriptStudioAccount::split(state, mine);
-        ensure("out of the shared", !state.has("open") && !state.has("pinned") && !state.has("recent_scripts"));
-        ensure("the shape, the switches and the files left", state.has("rect") && state.has("recent_files"));
-        ensure("into the account's", mine.has("open") && mine["pinned"][0].asString() == "a" && mine["recent_scripts"][0].asString() == "s");
-        ensure("what the state no longer has, gone from the account's", !mine.has("windows"));
+        {
+            INFO("out of the shared");
+            REQUIRE_FALSE(state.has("open"));
+            REQUIRE_FALSE(state.has("pinned"));
+            REQUIRE_FALSE(state.has("recent_scripts"));
+        }
+        {
+            INFO("the shape, the switches and the files left");
+            CHECK(state.has("rect"));
+            CHECK(state.has("scroll_map"));
+            CHECK(state.has("recent_files"));
+        }
+        {
+            INFO("into the account's");
+            REQUIRE(mine.has("open"));
+            CHECK(mine["pinned"][0].asString() == "a");
+            CHECK(mine["recent_scripts"][0].asString() == "s");
+        }
+        UNSCOPED_INFO("what the state no longer has, gone from the account's");
+        REQUIRE_FALSE(mine.has("windows"));
     }
 
-    template<> template<>
-    void alscriptstudioaccount_object::test<2>()
+    // Read: the account's own over the shared where it has kept any, a key it has not taken out;
+    // the shared as it was where it has kept none.
+    TEST_CASE("alscriptstudioaccount: merged lays the account's own over the shared once it has kept any", "[alscriptstudioaccount]")
     {
-        set_test_name("read: the account's own over the shared where it has kept any, a key it has not taken out; the shared as it was where it has kept none");
         LLSD shared;
         shared["rect"]   = 1;
         shared["open"]   = "old tabs";
         shared["pinned"] = "old pins";
         const LLSD first = ALScriptStudioAccount::merged(shared, LLSD());
-        ensure("none kept yet: the shared taken over", first["open"].asString() == "old tabs" && first["pinned"].asString() == "old pins");
+        {
+            INFO("none kept yet: the shared taken over");
+            CHECK(first["open"].asString() == "old tabs");
+            CHECK(first["pinned"].asString() == "old pins");
+        }
         LLSD mine;
         mine["open"] = "my tabs";
         const LLSD read = ALScriptStudioAccount::merged(shared, mine);
-        ensure("its own", read["open"].asString() == "my tabs");
-        ensure("another account's pins not seen", !read.has("pinned"));
-        ensure("the shape shared", read["rect"].asInteger() == 1);
+        UNSCOPED_INFO("its own");
+        CHECK(read["open"].asString() == "my tabs");
+        UNSCOPED_INFO("another account's pins not seen");
+        REQUIRE_FALSE(read.has("pinned"));
+        UNSCOPED_INFO("the shape shared");
+        CHECK(read["rect"].asInteger() == 1);
     }
 }

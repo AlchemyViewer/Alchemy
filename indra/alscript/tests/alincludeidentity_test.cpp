@@ -25,34 +25,49 @@
 
 #include "../preprocessor/alincludeidentity.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    struct alincludeidentity_data
+    TEST_CASE("alincludeidentity: object and inventory items and files read back but nothing else does", "[alincludeidentity]")
     {
-    };
-
-    typedef test_group<alincludeidentity_data> alincludeidentity_group;
-    typedef alincludeidentity_group::object    alincludeidentity_object;
-    alincludeidentity_group                    alincludeidentity_instance("alincludeidentity");
-
-    template<> template<>
-    void alincludeidentity_object::test<1>()
-    {
-        set_test_name("an item in an object, one in the inventory, a file: made and read back; anything else not");
         const LLUUID prim = LLUUID::generateNewID(), item = LLUUID::generateNewID();
         LLUUID       object, found;
         std::string  file;
         const std::string in_object = ALIncludeIdentity::ofItem(prim, item);
-        ensure("an object's item", ALIncludeIdentity::itemOf(in_object, object, found) && object == prim && found == item);
+        {
+            INFO("an object's item");
+            REQUIRE(ALIncludeIdentity::itemOf(in_object, object, found));
+            CHECK(object == prim);
+            CHECK(found == item);
+        }
         const std::string held = ALIncludeIdentity::ofItem(LLUUID::null, item);
-        ensure("an inventory item", held.rfind("inventory:", 0) == 0 && ALIncludeIdentity::itemOf(held, object, found) && object.isNull() && found == item);
-        ensure("both in the world", ALIncludeIdentity::inWorld(in_object) && ALIncludeIdentity::inWorld(held));
-        ensure("a file", ALIncludeIdentity::fileOf(ALIncludeIdentity::ofFile("/lib/a.lsl"), file) && file == "/lib/a.lsl" &&
-                             !ALIncludeIdentity::inWorld("disk:/lib/a.lsl"));
-        ensure("an object's with no item", !ALIncludeIdentity::itemOf("object:" + prim.asString(), object, found));
-        ensure("nor a file's item, nor an item's file", !ALIncludeIdentity::itemOf("disk:/a", object, found) && !ALIncludeIdentity::fileOf(held, file));
-        ensure("an empty file", !ALIncludeIdentity::fileOf("disk:", file));
+        {
+            INFO("an inventory item");
+            CHECK(held.rfind("inventory:", 0) == 0);
+            CHECK(ALIncludeIdentity::itemOf(held, object, found));
+            CHECK(object.isNull());
+            CHECK(found == item);
+        }
+        {
+            INFO("both in the world");
+            CHECK(ALIncludeIdentity::inWorld(in_object));
+            CHECK(ALIncludeIdentity::inWorld(held));
+        }
+        {
+            INFO("a file");
+            REQUIRE(ALIncludeIdentity::fileOf(ALIncludeIdentity::ofFile("/lib/a.lsl"), file));
+            CHECK(file == "/lib/a.lsl");
+            CHECK_FALSE(ALIncludeIdentity::inWorld("disk:/lib/a.lsl"));
+        }
+        UNSCOPED_INFO("an object's with no item");
+        CHECK_FALSE(ALIncludeIdentity::itemOf("object:" + prim.asString(), object, found));
+        {
+            INFO("nor a file's item, nor an item's file");
+            CHECK_FALSE(ALIncludeIdentity::itemOf("disk:/a", object, found));
+            CHECK_FALSE(ALIncludeIdentity::fileOf(held, file));
+        }
+        UNSCOPED_INFO("an empty file");
+        CHECK_FALSE(ALIncludeIdentity::fileOf("disk:", file));
     }
 }

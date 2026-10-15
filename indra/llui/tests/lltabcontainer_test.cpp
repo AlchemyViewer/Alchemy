@@ -26,6 +26,7 @@
 
 #include "../lltabcontainer.h"
 
+#include "../llbadge.h"
 #include "../llbutton.h"
 #include "../llfocusmgr.h"
 #include "../lliconctrl.h"
@@ -39,11 +40,11 @@
 #include "alheadlessui_fixture.h"
 #include "aluistatescope.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct lltabcontainer_data
     {
@@ -83,6 +84,24 @@ namespace tut
             return tabs->findChild<LLButton>((vertical ? "vtab_" : "htab_") + name, true);
         }
 
+        // The badge on a tab. The strip holds it rather than the button, so
+        // that it is drawn over everything, and with one tab there is one.
+        static const LLBadge* badgeIn(const LLView* view)
+        {
+            for (const LLView* child : *view->getChildList())
+            {
+                if (const LLBadge* badge = child->as<LLBadge>())
+                {
+                    return badge;
+                }
+                if (const LLBadge* badge = badgeIn(child))
+                {
+                    return badge;
+                }
+            }
+            return nullptr;
+        }
+
         // A texture with a size and nothing else: what a UI image needs to
         // exist here, where no image provider makes any.
         struct SizedTexture : public LLTexture
@@ -92,18 +111,13 @@ namespace tut
         };
     };
 
-    typedef test_group<lltabcontainer_data> lltabcontainer_test;
-    typedef lltabcontainer_test::object     lltabcontainer_object;
-    tut::lltabcontainer_test lltabcontainer_testgroup("lltabcontainer");
-
     // What the file wrote about a page is what the button that selects it
     // says. A tab with an icon and no label has nothing else to say it.
-    template<> template<>
-    void lltabcontainer_object::test<1>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a page's tooltip is what its tab button says", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -111,8 +125,8 @@ namespace tut
         tabs->addTabPanel(described);
 
         LLButton* button = tabButton(tabs, "described");
-        ensure("the page has a button", button != nullptr);
-        ensure_equals("the button says what the page said", button->getToolTip(),
+        REQUIRE(button != nullptr);
+        CHECK(button->getToolTip() ==
                       std::string("What this mode is for"));
         tabs->die();
     }
@@ -120,31 +134,29 @@ namespace tut
     // A page that wrote nothing is left as it was: hundreds of files have
     // tabs whose label is the whole story, and a tooltip repeating it is
     // noise that nobody asked for.
-    template<> template<>
-    void lltabcontainer_object::test<2>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a page with no tooltip leaves its tab button without one", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
         tabs->addTabPanel(page("plain", std::string()));
 
         LLButton* button = tabButton(tabs, "plain");
-        ensure("the page has a button", button != nullptr);
-        ensure("a page that said nothing leaves its button silent", button->getToolTip().empty());
+        REQUIRE(button != nullptr);
+        CHECK(button->getToolTip().empty());
         tabs->die();
     }
 
     // A count on the tab, and off it again. A tab with nothing to say looks
     // like one that never had anything.
-    template<> template<>
-    void lltabcontainer_object::test<3>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: setTabBadge makes a badge and keeps it hidden once the count is cleared", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -152,25 +164,34 @@ namespace tut
         tabs->addTabPanel(counted);
 
         LLButton* button = tabButton(tabs, "counted");
-        ensure("the page has a button", button != nullptr);
-        ensure("a tab starts with nothing to say", !button->hasBadge());
+        REQUIRE(button != nullptr);
+        CHECK_FALSE(button->hasBadge());
 
         tabs->setTabBadge(counted, "12");
-        ensure("a count puts a badge on the tab", button->hasBadge());
+        CHECK(button->hasBadge());
+        const LLBadge* badge = badgeIn(tabs);
+        REQUIRE(badge != nullptr);
+        {
+            INFO("showing the count");
+            CHECK(badge->getVisible());
+            CHECK(badge->getLabel() == std::string("12"));
+        }
 
         tabs->setTabBadge(counted, std::string());
-        ensure("the badge stays made once it is made", button->hasBadge());
+        UNSCOPED_INFO("the badge stays made once it is made");
+        CHECK(button->hasBadge());
+        UNSCOPED_INFO("and is hidden, as a tab with no count has none showing");
+        CHECK_FALSE(badge->getVisible());
         tabs->die();
     }
 
     // Asking for nothing on a tab that has nothing makes nothing: a badge
     // is not built in order to be hidden straight away.
-    template<> template<>
-    void lltabcontainer_object::test<4>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: clearing the badge of a tab that has none makes no badge", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -179,20 +200,38 @@ namespace tut
 
         tabs->setTabBadge(quiet, std::string());
         LLButton* button = tabButton(tabs, "quiet");
-        ensure("the page has a button", button != nullptr);
-        ensure("nothing to say builds nothing", !button->hasBadge());
+        REQUIRE(button != nullptr);
+        CHECK_FALSE(button->hasBadge());
+        tabs->die();
+    }
+
+    // The strip down the side names its buttons differently, and a tooltip
+    // written for a page reaches the button either way.
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a side strip's tab button carries the page's tooltip too", "[lltabcontainer]")
+    {
+        if (!ui.ok())
+        {
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLTabContainer* tabs = build(LLTabContainer::LEFT);
+        tabs->addTabPanel(page("sideways", "Down the side"));
+
+        LLButton* button = tabButton(tabs, "sideways", true);
+        REQUIRE(button != nullptr);
+        CHECK(button->getToolTip() ==
+                      std::string("Down the side"));
         tabs->die();
     }
 
     // Hiding a tab that is not the one being read leaves the reader where
     // they are. A container that hides a tab as the selection changes threw
     // them back to the first tab every time it did.
-    template<> template<>
-    void lltabcontainer_object::test<6>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: hiding a tab other than the current one keeps the selection", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -204,69 +243,52 @@ namespace tut
         tabs->addTabPanel(third);
 
         tabs->selectTabPanel(third);
-        ensure_equals("reading the third", tabs->getCurrentPanel(), third);
+        CHECK(tabs->getCurrentPanel() == third);
 
         tabs->setTabVisibility(second, false);
-        ensure_equals("hiding another leaves it there", tabs->getCurrentPanel(), third);
+        CHECK(tabs->getCurrentPanel() == third);
 
         // The one being read is the one that went: somewhere else, then.
         tabs->setTabVisibility(third, false);
-        ensure_equals("hiding this one moves to the first left", tabs->getCurrentPanel(), first);
-        ensure("and the container is still worth showing", tabs->getVisible());
+        UNSCOPED_INFO("hiding this one moves to the first left");
+        CHECK(tabs->getCurrentPanel() == first);
+        CHECK(tabs->getVisible());
 
         tabs->setTabVisibility(first, false);
-        ensure("a container with nothing to show does not", !tabs->getVisible());
-        tabs->die();
-    }
-
-    // The strip down the side names its buttons differently, and a tooltip
-    // written for a page reaches the button either way.
-    template<> template<>
-    void lltabcontainer_object::test<5>()
-    {
-        if (!ui.ok())
-        {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
-        }
-
-        LLTabContainer* tabs = build(LLTabContainer::LEFT);
-        tabs->addTabPanel(page("sideways", "Down the side"));
-
-        LLButton* button = tabButton(tabs, "sideways", true);
-        ensure("the page has a button", button != nullptr);
-        ensure_equals("the button says what the page said", button->getToolTip(),
-                      std::string("Down the side"));
+        UNSCOPED_INFO("nothing left to show");
+        CHECK_FALSE(tabs->getVisible());
         tabs->die();
     }
 
     // The arrows at the right end of the strip move in by the difference
     // between one offset and the next, both of them, and an offset asked
     // for twice moves nothing the second time.
-    template<> template<>
-    void lltabcontainer_object::test<7>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: the right arrows move by the change in setRightTabBtnOffset", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
         LLButton* next = tabs->findChild<LLButton>("Right Arrow", true);
         LLButton* jump = tabs->findChild<LLButton>("Jump Right Arrow", true);
-        ensure("the strip has its arrows", next && jump);
+        REQUIRE(next);
+        REQUIRE(jump);
         const S32 next_right = next->getRect().mRight;
         const S32 jump_right = jump->getRect().mRight;
 
         tabs->setRightTabBtnOffset(10);
-        ensure_equals("the arrow moved in", next->getRect().mRight, next_right - 10);
-        ensure_equals("and the jump beside it", jump->getRect().mRight, jump_right - 10);
+        CHECK(next->getRect().mRight == next_right - 10);
+        CHECK(jump->getRect().mRight == jump_right - 10);
 
         tabs->setRightTabBtnOffset(10);
-        ensure_equals("the same offset again moves nothing", next->getRect().mRight, next_right - 10);
+        UNSCOPED_INFO("the same offset again moves nothing");
+        CHECK(next->getRect().mRight == next_right - 10);
 
         tabs->setRightTabBtnOffset(0);
-        ensure_equals("no offset puts it back", next->getRect().mRight, next_right);
-        ensure_equals("both of them", jump->getRect().mRight, jump_right);
+        CHECK(next->getRect().mRight == next_right);
+        CHECK(jump->getRect().mRight == jump_right);
         tabs->die();
     }
 
@@ -274,12 +296,11 @@ namespace tut
     // the width they took, the ones that were locked in place. A lock left
     // over would put the next tab added at the front past the end of an
     // empty list.
-    template<> template<>
-    void lltabcontainer_object::test<8>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: deleteAllTabs forgets the tabs' locks and widths", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -287,17 +308,17 @@ namespace tut
         tabs->addTabPanel(page("b", std::string()));
         tabs->addTabPanel(page("c", std::string()));
         tabs->lockTabs();
-        ensure_equals("three locked", tabs->getNumLockedTabs(), 3);
-        ensure("three widths", tabs->getTotalTabWidth() > 0);
+        CHECK(tabs->getNumLockedTabs() == 3);
+        CHECK(tabs->getTotalTabWidth() > 0);
 
         tabs->deleteAllTabs();
-        ensure_equals("none locked", tabs->getNumLockedTabs(), 0);
-        ensure_equals("no width", tabs->getTotalTabWidth(), 0);
-        ensure_equals("nothing read", tabs->getCurrentPanelIndex(), -1);
+        CHECK(tabs->getNumLockedTabs() == 0);
+        CHECK(tabs->getTotalTabWidth() == 0);
+        CHECK(tabs->getCurrentPanelIndex() == -1);
 
         LLPanel* front = page("front", std::string());
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(front).insert_at(LLTabContainer::START));
-        ensure_equals("a tab at the front of an empty strip", tabs->getPanelByIndex(0), front);
+        CHECK(tabs->getPanelByIndex(0) == front);
         tabs->die();
     }
 
@@ -305,12 +326,11 @@ namespace tut
     // select they leave the strip as it is, without telling it again about
     // the tab it is on; with nothing selected and nothing selectable they
     // come back, rather than going round forever.
-    template<> template<>
-    void lltabcontainer_object::test<9>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: next and previous with nothing else selectable change nothing", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -324,31 +344,32 @@ namespace tut
         S32 commits = 0;
         tabs->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         tabs->selectNextTab();
-        ensure_equals("still on the first", tabs->getCurrentPanel(), first);
-        ensure_equals("and not told about it again", commits, 0);
+        CHECK(tabs->getCurrentPanel() == first);
+        UNSCOPED_INFO("next: not told again about the tab it is on");
+        CHECK(commits == 0);
         tabs->selectPrevTab();
-        ensure_equals("either way", commits, 0);
+        UNSCOPED_INFO("previous: nor that way");
+        CHECK(commits == 0);
 
         tabs->deleteAllTabs();
         tabs->addTabPanel(page("third", std::string()));
         tabs->addTabPanel(page("fourth", std::string()));
         tabs->enableTabButton(0, false);
         tabs->enableTabButton(1, false);
-        ensure_equals("nothing selected", tabs->getCurrentPanelIndex(), -1);
+        CHECK(tabs->getCurrentPanelIndex() == -1);
         tabs->selectNextTab();
         tabs->selectPrevTab();
-        ensure_equals("and nothing selectable leaves it so", tabs->getCurrentPanelIndex(), -1);
+        CHECK(tabs->getCurrentPanelIndex() == -1);
         tabs->die();
     }
 
     // A tab retitled is measured in the strip's own font, the one its title
     // is drawn in, not in whichever font a tab is drawn in by default.
-    template<> template<>
-    void lltabcontainer_object::test<10>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a retitled tab is measured in the strip's own font", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
@@ -361,22 +382,21 @@ namespace tut
         const std::string title("A title to measure");
         tabs->setPanelTitle(0, title);
         LLButton* button = tabButton(tabs, "titled");
-        ensure("the page has a button", button != nullptr);
+        REQUIRE(button != nullptr);
         const S32 in_own_font = llclamp(LLFontGL::getFontSansSerifBig()->getWidth(title),
                                         tabs->getMinTabWidth(), tabs->getMaxTabWidth());
-        ensure_equals("sized to the title in the strip's font", button->getRect().getWidth(), in_own_font);
+        CHECK(button->getRect().getWidth() == in_own_font);
         tabs->die();
     }
 
     // A click on a tab the container would not switch to -- one a validate
     // callback refused -- does not take the keyboard into a panel that is
     // not showing.
-    template<> template<>
-    void lltabcontainer_object::test<11>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a click on a refused tab does not focus its hidden panel", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -388,9 +408,9 @@ namespace tut
         tabs->setValidateBeforeCommit([](const LLSD&) { return false; });
 
         tabs->onTabBtn(LLSD(), second);
-        ensure_equals("refused, so still on the first", tabs->getCurrentPanel(), first);
-        ensure("the keyboard did not go into the refused panel", !gFocusMgr.childHasKeyboardFocus(second));
-        ensure("which is not showing", !second->getVisible());
+        CHECK(tabs->getCurrentPanel() == first);
+        CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(second));
+        CHECK_FALSE(second->getVisible());
         gFocusMgr.setKeyboardFocus(nullptr);
         tabs->die();
     }
@@ -398,12 +418,11 @@ namespace tut
     // A drag passing over the strip opens the tab under it, and a hidden
     // tab is not under it: its button is not shown for the occasion, nor
     // its panel opened.
-    template<> template<>
-    void lltabcontainer_object::test<12>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a drag over a hidden tab neither shows nor opens it", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
@@ -418,8 +437,9 @@ namespace tut
         tabs->selectTabPanel(first);
         tabs->setTabVisibility(second, false);
         LLButton* hidden = tabButton(tabs, "second");
-        ensure("the hidden page has a button", hidden != nullptr);
-        ensure("which is not shown", !hidden->getVisible());
+        REQUIRE(hidden != nullptr);
+        UNSCOPED_INFO("before the drag");
+        CHECK_FALSE(hidden->getVisible());
 
         // Before the strip is drawn its buttons all sit at the left, so a
         // point in the strip's band is over the hidden one.
@@ -433,8 +453,8 @@ namespace tut
         LLFrameTimer::updateFrameTime();
         tabs->handleDragAndDrop(x, y, 0, false, DAD_NONE, nullptr, &accept, tip);
 
-        ensure("the hidden tab's button stays hidden", !hidden->getVisible());
-        ensure_equals("and the drag did not open it", tabs->getCurrentPanel(), first);
+        CHECK_FALSE(hidden->getVisible());
+        CHECK(tabs->getCurrentPanel() == first);
         gFocusMgr.setKeyboardFocus(nullptr);
         tabs->die();
     }
@@ -442,31 +462,29 @@ namespace tut
     // A strip built with no height yet has its arrows all the same; their
     // follows flags carry them when it is given one. Without them the first
     // draw had nothing to show or hide.
-    template<> template<>
-    void lltabcontainer_object::test<13>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a strip built with no height still has its arrows", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
         p.name = "tabs";
         p.rect = LLRect(0, 0, 400, 0);
         LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(p);
-        ensure("a strip with no height has its arrows", tabs->findChild<LLButton>("Left Arrow", true) != nullptr);
-        ensure("all of them", tabs->findChild<LLButton>("Jump Right Arrow", true) != nullptr);
+        CHECK(tabs->findChild<LLButton>("Left Arrow", true) != nullptr);
+        CHECK(tabs->findChild<LLButton>("Jump Right Arrow", true) != nullptr);
         tabs->die();
     }
 
     // The strip down the side puts its lower arrow at its own bottom, not
     // at where the strip sits in whatever holds it.
-    template<> template<>
-    void lltabcontainer_object::test<14>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a side strip puts its lower arrow at its own bottom", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
@@ -475,19 +493,18 @@ namespace tut
         p.tab_position = LLTabContainer::LEFT;
         LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(p);
         LLButton* down = tabs->findChild<LLButton>("Down Arrow", true);
-        ensure("the strip has its lower arrow", down != nullptr);
-        ensure_equals("at the strip's own bottom", down->getRect().mBottom, 0);
+        REQUIRE(down != nullptr);
+        CHECK(down->getRect().mBottom == 0);
         tabs->die();
     }
 
     // A strip down the side with more tabs than fit scrolls to the one
     // selected, and says it selected it, as the strip along the top does.
-    template<> template<>
-    void lltabcontainer_object::test<15>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a side strip with more tabs than fit selects any of them", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build(LLTabContainer::LEFT);
@@ -495,41 +512,39 @@ namespace tut
         {
             tabs->addTabPanel(page("page" + std::to_string(i), std::string()));
         }
-        ensure("the last tab is selected", tabs->selectTab(19));
-        ensure_equals("and is the one being read", tabs->getCurrentPanelIndex(), 19);
-        ensure("the first again", tabs->selectTab(0));
-        ensure_equals("and read", tabs->getCurrentPanelIndex(), 0);
+        CHECK(tabs->selectTab(19));
+        CHECK(tabs->getCurrentPanelIndex() == 19);
+        CHECK(tabs->selectTab(0));
+        CHECK(tabs->getCurrentPanelIndex() == 0);
         tabs->die();
     }
 
     // The next arrow with nothing selected selects the first tab, rather
     // than comparing nothing to the count as an unsigned and doing nothing.
-    template<> template<>
-    void lltabcontainer_object::test<16>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: the next arrow with nothing selected selects the first tab", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
         tabs->addTabPanel(page("first", std::string()));
         tabs->addTabPanel(page("second", std::string()));
-        ensure_equals("nothing selected", tabs->getCurrentPanelIndex(), -1);
+        CHECK(tabs->getCurrentPanelIndex() == -1);
         tabs->onNextBtn(LLSD());
-        ensure_equals("next from nothing is the first", tabs->getCurrentPanelIndex(), 0);
+        CHECK(tabs->getCurrentPanelIndex() == 0);
         tabs->die();
     }
 
     // A tab's flash image comes with the rest of its position's images,
     // however it was put in the strip. A tab put in the middle never
     // passed through the step that gave the first and last tabs theirs.
-    template<> template<>
-    void lltabcontainer_object::test<17>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a tab put in the middle gets the middle tab's flash image", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLPointer<LLUIImage> flash = new LLUIImage(std::string("flash"), LLPointer<LLTexture>(new SizedTexture()));
@@ -544,22 +559,21 @@ namespace tut
         tabs->selectTabPanel(a);
         LLPanel* between = page("between", std::string());
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(between).insert_at(LLTabContainer::RIGHT_OF_CURRENT));
-        ensure_equals("put in the middle", tabs->getIndexForPanel(between), 1);
+        CHECK(tabs->getIndexForPanel(between) == 1);
 
         LLButton* button = tabButton(tabs, "between");
-        ensure("the page has a button", button != nullptr);
-        ensure_equals("with the middle tab's flash image", button->getImageFlash().get(), flash.get());
+        REQUIRE(button != nullptr);
+        CHECK(button->getImageFlash().get() == flash.get());
         tabs->die();
     }
 
     // A tab added and selected in the same breath is the one selected,
     // wherever in the strip it was put; it used to be whichever was last.
-    template<> template<>
-    void lltabcontainer_object::test<18>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a tab added and selected at once is selected wherever it is put", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -571,20 +585,19 @@ namespace tut
 
         LLPanel* added = page("added", std::string());
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(added).select_tab(true).insert_at(LLTabContainer::RIGHT_OF_CURRENT));
-        ensure_equals("put after the first", tabs->getIndexForPanel(added), 1);
-        ensure_equals("and the one selected", tabs->getCurrentPanel(), added);
+        CHECK(tabs->getIndexForPanel(added) == 1);
+        CHECK(tabs->getCurrentPanel() == added);
         tabs->die();
     }
 
     // Removing a tab before the one being read leaves that one being read.
     // It used to move the reading to the tab after it, which is what the
     // old index came to point at once the list closed up.
-    template<> template<>
-    void lltabcontainer_object::test<19>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: removing a tab before the current one keeps the current one", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -601,33 +614,35 @@ namespace tut
         tabs->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
         tabs->removeTabPanel(a);
         a->die();
-        ensure_equals("still reading the third", tabs->getCurrentPanel(), c);
-        ensure_equals("at its new place", tabs->getCurrentPanelIndex(), 1);
-        ensure_equals("with nothing to announce", commits, 0);
-        ensure("and it is the one showing", c->getVisible() && !d->getVisible());
+        CHECK(tabs->getCurrentPanel() == c);
+        CHECK(tabs->getCurrentPanelIndex() == 1);
+        UNSCOPED_INFO("the selection did not change, so nothing to announce");
+        CHECK(commits == 0);
+        CHECK(c->getVisible());
+        CHECK_FALSE(d->getVisible());
 
         // The one being read is the one that goes: what took its place.
         tabs->removeTabPanel(c);
         c->die();
-        ensure_equals("reading what took its place", tabs->getCurrentPanel(), d);
-        ensure_equals("announced", commits, 1);
+        CHECK(tabs->getCurrentPanel() == d);
+        UNSCOPED_INFO("the selection changed, so announced");
+        CHECK(commits == 1);
         tabs->die();
     }
 
     // What a strip is set to, as a value, is what it reads back as one.
-    template<> template<>
-    void lltabcontainer_object::test<20>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a strip's value reads back as it was set", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
         tabs->addTabPanel(page("first", std::string()));
         tabs->addTabPanel(page("second", std::string()));
         tabs->setValue(1);
-        ensure_equals("the value set is the value read", tabs->getValue().asInteger(), 1);
+        CHECK(tabs->getValue().asInteger() == 1);
         tabs->die();
     }
 
@@ -635,12 +650,11 @@ namespace tut
     // button's own coordinates. It used to be placed by the button's
     // position in the strip, which put it as far above the button as the
     // button was above the strip's bottom.
-    template<> template<>
-    void lltabcontainer_object::test<21>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a tab's picture sits inside its button in the button's coordinates", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
@@ -658,15 +672,20 @@ namespace tut
         tabs->setTabImage(pictured, icon);
 
         LLButton* button = tabButton(tabs, "pictured");
-        ensure("the page has a button", button != nullptr);
-        ensure_equals("the picture is the button's", icon->getParent(), button);
+        REQUIRE(button != nullptr);
+        CHECK(icon->getParent() == button);
         const LLRect& in_button = icon->getRect();
         const LLRect box = button->getLocalRect();
-        ensure("and sits inside it", in_button.mLeft >= box.mLeft && in_button.mRight <= box.mRight
-                                     && in_button.mBottom >= box.mBottom && in_button.mTop <= box.mTop);
-        ensure_equals("padded off the top", in_button.mTop, box.mTop - 2);
-        ensure_equals("and the left", in_button.mLeft, 2);
-        ensure_equals("as tall as the room leaves it", in_button.getHeight(), box.getHeight() - 4);
+        CHECK(in_button.mLeft >= box.mLeft);
+        CHECK(in_button.mRight <= box.mRight);
+        CHECK(in_button.mBottom >= box.mBottom);
+        CHECK(in_button.mTop <= box.mTop);
+        UNSCOPED_INFO("padded off the top");
+        CHECK(in_button.mTop == box.mTop - 2);
+        UNSCOPED_INFO("padded off the left");
+        CHECK(in_button.mLeft == 2);
+        UNSCOPED_INFO("as tall as the room leaves it");
+        CHECK(in_button.getHeight() == box.getHeight() - 4);
         tabs->die();
     }
 
@@ -675,12 +694,11 @@ namespace tut
     // no room; it used to be counted into how many fit from the right and
     // into where a selected tab sits, so the strip scrolled to the wrong
     // place whenever a hidden tab lay before the one selected.
-    template<> template<>
-    void lltabcontainer_object::test<22>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: scrolling counts only the tabs that show", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -694,25 +712,27 @@ namespace tut
         tabs->addTabPanel(page("g", std::string()));
         LLPanel* last = page("h", std::string());
         tabs->addTabPanel(last);
-        ensure_equals("the wide tab is as wide as a tab may be",
-                      tabButton(tabs, "f")->getRect().getWidth(), tabs->getMaxTabWidth());
+        const LLButton* wide_button = tabButton(tabs, "f");
+        REQUIRE(wide_button != nullptr);
+        CHECK(wide_button->getRect().getWidth() == tabs->getMaxTabWidth());
 
         tabs->setTabVisibility(wide, false);
-        ensure_equals("seven tabs of sixty in four hundred: one more than fit", tabs->getMaxScrollPos(), 1);
+        UNSCOPED_INFO("seven tabs of sixty in four hundred: one more than fit");
+        CHECK(tabs->getMaxScrollPos() == 1);
 
         tabs->selectTabPanel(last);
-        ensure_equals("scrolled one tab to show the last", tabs->getScrollPos(), 1);
+        UNSCOPED_INFO("scrolled one tab to show the last");
+        CHECK(tabs->getScrollPos() == 1);
         tabs->die();
     }
 
     // Arrow keys on a tab button switch tabs on their own. With a modifier
     // held they are somebody else's key, and the strip says so.
-    template<> template<>
-    void lltabcontainer_object::test<23>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: arrow keys switch tabs only with no modifier held", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -721,24 +741,25 @@ namespace tut
         tabs->addTabPanel(first);
         tabs->addTabPanel(second);
         tabs->selectTabPanel(first);
-        tabButton(tabs, "first")->setFocus(true);
+        LLButton* first_button = tabButton(tabs, "first");
+        REQUIRE(first_button != nullptr);
+        first_button->setFocus(true);
 
-        ensure("control-right is not the strip's", !tabs->handleKeyHere(KEY_RIGHT, MASK_CONTROL));
-        ensure_equals("and moved nothing", tabs->getCurrentPanel(), first);
-        ensure("right on its own is", tabs->handleKeyHere(KEY_RIGHT, MASK_NONE));
-        ensure_equals("and moved to the next", tabs->getCurrentPanel(), second);
+        CHECK_FALSE(tabs->handleKeyHere(KEY_RIGHT, MASK_CONTROL));
+        CHECK(tabs->getCurrentPanel() == first);
+        CHECK(tabs->handleKeyHere(KEY_RIGHT, MASK_NONE));
+        CHECK(tabs->getCurrentPanel() == second);
         gFocusMgr.setKeyboardFocus(nullptr);
         tabs->die();
     }
 
     // An indent asked for on a tab is added to the padding its label has
     // along the top; it used to be written and then written over.
-    template<> template<>
-    void lltabcontainer_object::test<24>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a tab's indent is added to its label's padding", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -746,21 +767,22 @@ namespace tut
         LLPanel* indented = page("indented", std::string());
         tabs->addTabPanel(plain);
         tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(indented).indent(10));
-        const S32 pad = tabButton(tabs, "plain")->getLeftHPad();
-        ensure_equals("the indent is added to the label's padding",
-                      tabButton(tabs, "indented")->getLeftHPad(), pad + 10);
+        const LLButton* plain_button = tabButton(tabs, "plain");
+        const LLButton* indented_button = tabButton(tabs, "indented");
+        REQUIRE(plain_button != nullptr);
+        REQUIRE(indented_button != nullptr);
+        CHECK(indented_button->getLeftHPad() == plain_button->getLeftHPad() + 10);
         tabs->die();
     }
 
     // The container hides when its last tab is hidden and shows when one
     // comes back, and between those its visibility is its owner's: hiding
     // one tab among others does not show a container its owner has hidden.
-    template<> template<>
-    void lltabcontainer_object::test<25>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: hiding every tab hides the container and showing one shows it", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer* tabs = build();
@@ -772,32 +794,36 @@ namespace tut
 
         tabs->setVisible(false);
         tabs->setTabVisibility(second, false);
-        ensure("hiding a tab among others leaves the container as its owner left it", !tabs->getVisible());
+        UNSCOPED_INFO("hiding a tab among others leaves the container as its owner left it");
+        CHECK_FALSE(tabs->getVisible());
         tabs->setTabVisibility(second, true);
-        ensure("and so does showing one while another showed", !tabs->getVisible());
+        UNSCOPED_INFO("and so does showing one while another showed");
+        CHECK_FALSE(tabs->getVisible());
 
         tabs->setVisible(true);
         tabs->setTabVisibility(first, false);
         tabs->setTabVisibility(second, false);
-        ensure("nothing left to show hides it", !tabs->getVisible());
+        UNSCOPED_INFO("nothing left to show hides it");
+        CHECK_FALSE(tabs->getVisible());
         tabs->setTabVisibility(first, true);
-        ensure("something to show again shows it", tabs->getVisible());
+        UNSCOPED_INFO("something to show again shows it");
+        CHECK(tabs->getVisible());
         tabs->die();
     }
 
     // The strip sits flush with the pages: its outer arrows stand where a
     // page's sides are, so nothing is a pixel or two short of the content
     // under it, whichever way the pages are inset.
-    template<> template<>
-    void lltabcontainer_object::test<26>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: the strip's outer arrows stand at the page's sides", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         for (bool offset : { false, true })
         {
+            CAPTURE(offset);
             LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
             p.name = "tabs";
             p.rect = LLRect(0, 300, 400, 0);
@@ -807,9 +833,10 @@ namespace tut
             tabs->addTabPanel(only);
             LLButton* jump_left = tabs->findChild<LLButton>("Jump Left Arrow", true);
             LLButton* jump_right = tabs->findChild<LLButton>("Jump Right Arrow", true);
-            ensure("the strip has its jump arrows", jump_left && jump_right);
-            ensure_equals("the strip starts where the page does", jump_left->getRect().mLeft, only->getRect().mLeft);
-            ensure_equals("and ends where it does", jump_right->getRect().mRight, only->getRect().mRight);
+            REQUIRE(jump_left);
+            REQUIRE(jump_right);
+            REQUIRE(jump_left->getRect().mLeft == only->getRect().mLeft);
+            REQUIRE(jump_right->getRect().mRight == only->getRect().mRight);
             tabs->die();
         }
     }
@@ -817,12 +844,11 @@ namespace tut
     // A strip asked to fill its width shares what is left over among the
     // tabs that show, so it runs the whole way across its pages; a strip
     // whose tabs do not fit leaves each its own width and scrolls.
-    template<> template<>
-    void lltabcontainer_object::test<27>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: fill_width shares the room among the tabs that show", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
@@ -838,16 +864,22 @@ namespace tut
 
         // Four tabs of sixty in the three hundred and ninety-eight between
         // the page's sides: each gets its sixty and a fourth of the rest.
+        // Each tab's button is found here, and the strip keeps it as long as
+        // it keeps the tab, so the reads of them below have it to read.
         const S32 room = 398;
         S32 total = 0;
         for (const char* name : { "a", "b", "c", "d" })
         {
-            const S32 width = tabButton(tabs, name)->getRect().getWidth();
-            ensure("each tab is wider than it wants", width > 60);
+            CAPTURE(name);
+            const LLButton* button = tabButton(tabs, name);
+            REQUIRE(button != nullptr);
+            const S32 width = button->getRect().getWidth();
+            REQUIRE(width > 60);
             total += width;
         }
-        ensure_equals("and together they are the strip", total, room);
-        ensure_equals("the odd pixels go to the first", tabButton(tabs, "a")->getRect().getWidth(),
+        CHECK(total == room);
+        UNSCOPED_INFO("the odd pixels go to the first");
+        CHECK(tabButton(tabs, "a")->getRect().getWidth() ==
                       tabButton(tabs, "d")->getRect().getWidth() + 1);
 
         // A hidden tab takes no share.
@@ -857,8 +889,9 @@ namespace tut
         {
             total += tabButton(tabs, name)->getRect().getWidth();
         }
-        ensure_equals("three share it", total, room);
-        ensure_equals("the hidden one is its own width", tabButton(tabs, "a")->getRect().getWidth(), 60);
+        CHECK(total == room);
+        UNSCOPED_INFO("the hidden one is its own width");
+        CHECK(tabButton(tabs, "a")->getRect().getWidth() == 60);
         tabs->setTabVisibility(a, true);
 
         // More than fit: their own widths, and a scroll.
@@ -866,8 +899,9 @@ namespace tut
         {
             tabs->addTabPanel(page(name, std::string()));
         }
-        ensure_equals("seven of sixty do not fit, so each is sixty", tabButton(tabs, "a")->getRect().getWidth(), 60);
-        ensure("and the strip scrolls", tabs->getMaxScrollPos() > 0);
+        UNSCOPED_INFO("seven of sixty do not fit, so each is sixty");
+        CHECK(tabButton(tabs, "a")->getRect().getWidth() == 60);
+        CHECK(tabs->getMaxScrollPos() > 0);
         tabs->die();
     }
 
@@ -876,12 +910,11 @@ namespace tut
     // panel stays a child rather than becoming a tab; and a button in the
     // kept room gets its own clicks, because the tabs' mouse capture stops
     // where that room begins. The Lightbox keeps its pop-out button there.
-    template<> template<>
-    void lltabcontainer_object::test<28>()
+    TEST_CASE_METHOD(lltabcontainer_data, "lltabcontainer: a strip can keep its right end for buttons of its own", "[lltabcontainer]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
         constexpr S32 KEPT = 80;
@@ -905,31 +938,35 @@ namespace tut
         button->setCommitCallback([&clicks](LLUICtrl*, const LLSD&) { ++clicks; });
         tabs->addChild(button);
 
-        ensure_equals("the button is not a tab", tabs->getTabCount(), 4);
-        ensure("it is the container's own child", button->getParent() == tabs);
+        UNSCOPED_INFO("the button is not a tab");
+        CHECK(tabs->getTabCount() == 4);
+        CHECK(button->getParent() == tabs);
 
         // The 398 between the pages' sides, less the 80 kept.
         S32 total = 0;
         for (const char* name : { "a", "b", "c", "d" })
         {
-            total += tabButton(tabs, name)->getRect().getWidth();
+            CAPTURE(name);
+            const LLButton* tab = tabButton(tabs, name);
+            REQUIRE(tab != nullptr);
+            total += tab->getRect().getWidth();
         }
-        ensure_equals("the tabs fill what is left", total, 398 - KEPT);
-        ensure("and stop short of the button", 1 + total <= button->getRect().mLeft);
+        CHECK(total == 398 - KEPT);
+        CHECK(1 + total <= button->getRect().mLeft);
 
         // Pressed and released on it: its own click, and the strip does not
         // take the mouse from it in between.
         const S32 x = button->getRect().getCenterX();
         const S32 y = button->getRect().getCenterY();
         tabs->handleMouseDown(x, y, MASK_NONE);
-        ensure("the button holds the mouse", gFocusMgr.getMouseCapture() == button);
+        CHECK(gFocusMgr.getMouseCapture() == button);
         button->handleMouseUp(x - button->getRect().mLeft, y - button->getRect().mBottom, MASK_NONE);
-        ensure_equals("and is clicked", clicks, 1);
+        CHECK(clicks == 1);
 
         // Over the tabs, the strip takes the mouse, and would take it from a
         // button put there.
         tabs->handleMouseDown(10, y, MASK_NONE);
-        ensure("the strip holds the mouse over the tabs", gFocusMgr.getMouseCapture() == tabs);
+        CHECK(gFocusMgr.getMouseCapture() == tabs);
         gFocusMgr.setMouseCapture(nullptr);
         tabs->die();
     }

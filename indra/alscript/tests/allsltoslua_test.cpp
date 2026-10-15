@@ -31,7 +31,7 @@
 #include "../lsl/allsltraits.h"
 #include "../luau/alluauservice.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include "Luau/Allocator.h"
 #include "Luau/Lexer.h"
@@ -42,7 +42,7 @@
 #include <set>
 #include <sstream>
 
-namespace tut
+namespace
 {
     struct allsltoslua_data
     {
@@ -62,7 +62,7 @@ namespace tut
                 loaded = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error);
                 if (!loaded)
                 {
-                    fail("the builtins did not load: " + error);
+                    FAIL("the builtins did not load: " + error);
                 }
             }
             llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
@@ -80,7 +80,7 @@ namespace tut
         }
 
         // Written again, and it must have been.
-        ALLSLToSLua::Result convert(const std::string& lsl)
+        ALLSLToSLua::Result require_converted(const std::string& lsl)
         {
             ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl);
             std::string         why;
@@ -88,7 +88,8 @@ namespace tut
             {
                 why += p.message + "\n";
             }
-            ensure("converted: " + why, r.converted);
+            CAPTURE(why);
+            REQUIRE(r.converted);
             return r;
         }
 
@@ -110,9 +111,9 @@ namespace tut
         }
 
         // What SLua's check says of it: nothing unwanted.
-        void checksClean(const ALLSLToSLua::Result& r)
+        void require_checks_clean(const ALLSLToSLua::Result& r)
         {
-            ensure("the definitions", definitions);
+            REQUIRE(definitions);
             std::string said;
             for (const ALScriptProblem& p : service.check(r.text))
             {
@@ -121,7 +122,8 @@ namespace tut
                     said += llformat("[%d:%d] %s\n", p.line + 1, p.column + 1, p.message.c_str());
                 }
             }
-            ensure("checks as SLua:\n" + said + "---\n" + r.text, said.empty());
+            CAPTURE(said, r.text);
+            REQUIRE(said.empty());
         }
 
         // The comment Luau's own lexer reads beginning at `at` in the text,
@@ -156,19 +158,21 @@ namespace tut
             }
             return {};
         }
-        static std::string commentAt(const std::string& slua, const std::string& begins)
+        static std::string require_comment_at(const std::string& slua, const std::string& begins)
         {
             const size_t at = slua.find(begins);
-            ensure("written: " + begins + "\n" + slua, at != std::string::npos);
+            CAPTURE(begins, slua);
+            REQUIRE(at != std::string::npos);
             return commentAt(slua, at);
         }
         // A toggle turned the other way in SLua: a dash taken out of its
         // opener's ---, or put in a block comment's --; the comment that
         // begins there then.
-        static std::string toggled(const std::string& slua, const std::string& opener, bool off = true)
+        static std::string require_toggled(const std::string& slua, const std::string& opener, bool off = true)
         {
             const size_t at = slua.find(opener);
-            ensure("written: " + opener + "\n" + slua, at != std::string::npos);
+            CAPTURE(opener, slua);
+            REQUIRE(at != std::string::npos);
             std::string other = slua;
             if (off)
             {
@@ -204,170 +208,263 @@ namespace tut
             }
             return false;
         }
+        // Any of the notes that LSL ran a binary's right side first.
+        static bool orderNoted(const ALLSLToSLua::Result& r)
+        {
+            for (const ALScriptProblem& p : r.notes)
+            {
+                if (p.key.rfind("SluaRightFirst", 0) == 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     };
 
-    typedef test_group<allsltoslua_data, 100> allsltoslua_group;
-    typedef allsltoslua_group::object    allsltoslua_object;
-    tut::allsltoslua_group               allsltoslua_test("ALLSLToSLua");
-
-    template<> template<>
-    void allsltoslua_object::test<1>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a one-state script as locals and LLEvents handlers; state_entry last", "[ALLSLToSLua]")
     {
-        set_test_name("a script of one state: globals and functions as locals, handlers on LLEvents, the detected count from the table, state_entry run last");
-        const ALLSLToSLua::Result r = convert("integer gCount = 2;\n"
-                                              "string greet(string who) { return \"Hello, \" + who; }\n"
-                                              "default {\n"
-                                              "    state_entry() { llSay(0, greet(\"world\")); }\n"
-                                              "    touch_start(integer total_number) {\n"
-                                              "        gCount += total_number;\n"
-                                              "        llSay(0, greet(llDetectedName(0)) + \" \" + (string)gCount);\n"
-                                              "    }\n"
-                                              "}\n");
-        ensure("the global: " + r.text, has(r, "local gCount = 2"));
-        ensure("the function: " + r.text, has(r, "local function greet(who)") && has(r, "return \"Hello, \" .. who"));
-        ensure("the handler: " + r.text, has(r, "LLEvents:on(\"touch_start\", function(detected)") && has(r, "local total_number = #detected"));
-        ensure("the step: " + r.text, has(r, "gCount += total_number"));
-        ensure("what was detected from the table: " + r.text, has(r, "detected[1]:getName()") && noted(r, "SluaDetectedTable"));
-        ensure("an integer joined to text, interpolated: " + r.text, has(r, "ll.Say(0, `{greet(detected[1]:getName())} {gCount}`)"));
-        ensure("state_entry last: " + r.text, r.text.find("-- state_entry") > r.text.find("LLEvents:on") && has(r, "ll.Say(0, greet(\"world\"))"));
-        ensure("the note over its line: " + r.text, has(r, "-- LSL: detected[n] is what LSL read"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer gCount = 2;\n"
+                                                        "string greet(string who) { return \"Hello, \" + who; }\n"
+                                                        "default {\n"
+                                                        "    state_entry() { llSay(0, greet(\"world\")); }\n"
+                                                        "    touch_start(integer total_number) {\n"
+                                                        "        gCount += total_number;\n"
+                                                        "        llSay(0, greet(llDetectedName(0)) + \" \" + (string)gCount);\n"
+                                                        "    }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("the global");
+        CHECK(has(r, "local gCount = 2"));
+        {
+            INFO("the function");
+            CHECK(has(r, "local function greet(who)"));
+            CHECK(has(r, "return \"Hello, \" .. who"));
+        }
+        {
+            INFO("the handler");
+            CHECK(has(r, "LLEvents:on(\"touch_start\", function(detected)"));
+            CHECK(has(r, "local total_number = #detected"));
+        }
+        UNSCOPED_INFO("the step");
+        CHECK(has(r, "gCount += total_number"));
+        {
+            INFO("what was detected from the table");
+            CHECK(has(r, "detected[1]:getName()"));
+            CHECK(noted(r, "SluaDetectedTable"));
+        }
+        UNSCOPED_INFO("an integer joined to text, interpolated");
+        CHECK(has(r, "ll.Say(0, `{greet(detected[1]:getName())} {gCount}`)"));
+        {
+            INFO("state_entry last");
+            const size_t entered = r.text.find("-- state_entry");
+            CHECK(entered != std::string::npos);
+            CHECK(entered > r.text.find("LLEvents:on"));
+            CHECK(has(r, "ll.Say(0, greet(\"world\"))"));
+        }
+        UNSCOPED_INFO("the note over its line");
+        CHECK(has(r, "-- LSL: detected[n] is what LSL read"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<2>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: expressions: truth tests; 1 or 0 comparisons; / and % toward nought; lists", "[ALLSLToSLua]")
     {
-        set_test_name("expressions: conditions as LSL reads them, comparisons as 1 or 0 where they are numbers, integer division and remainder toward nought, lists grown and measured");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    integer a = 7; integer b = 2; float f = 1.5; string s = \"x\"; list l = [1, 2];\n"
-                                              "    integer same = a == b;\n"
-                                              "    if (a) llOwnerSay(\"a\");\n"
-                                              "    if (s) llOwnerSay(\"said\");\n"
-                                              "    if (a > 1 && llGetListLength(l) > 1) llOwnerSay(\"both\");\n"
-                                              "    integer q = a / b; integer m = a % b;\n"
-                                              "    l += 3; l = l + [4] + \"five\";\n"
-                                              "    integer t = TRUE; if (FALSE) t = 0;\n"
-                                              "    llOwnerSay((string)f + (string)((integer)\"12abc\"));\n"
-                                              "    if (l == [1]) llOwnerSay(\"one long\");\n"
-                                              "    integer flags = a & b | 4;\n"
-                                              "    vector v = <1, 2, 3>; v.x = 4; v.z += 1;\n"
-                                              "    llOwnerSay((string)v + (string)same + (string)q + (string)m + (string)t + (string)flags);\n"
-                                              "} }\n");
-        ensure("a comparison as a number: " + r.text, has(r, "local same = if a == b then 1 else 0"));
-        ensure("an integer's truth: " + r.text, has(r, "if a ~= 0 then"));
-        ensure("a string's: " + r.text, has(r, "if s ~= \"\" then"));
-        ensure("and: " + r.text, has(r, "if a > 1 and #l > 1 then"));
-        ensure("integer division: " + r.text, has(r, "local q = bit32.s32(a / b)"));
-        ensure("remainder: " + r.text, has(r, "local m = math.fmod(a, b)"));
-        ensure("a list no other holds grown in place: " + r.text, has(r, "table.insert(l, 3)") && has(r, "table.append(l, 4, \"five\")") &&
-                                                                    !has(r, "table.extend"));
-        ensure("TRUE and FALSE: " + r.text, has(r, "local t = 1") && has(r, "if false then"));
-        ensure("a float as LSL writes it: " + r.text, has(r, "string.format(\"%.6f\", f)"));
-        ensure("a string as an integer, as a list's item converts it: " + r.text,
-               has(r, "lslInteger(\"12abc\")") && has(r, "return llcompat.List2Integer({ s }, 0)"));
-        ensure("lists compared by length: " + r.text, has(r, "#l == #{ 1 }") && noted(r, "SluaListCompare"));
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    integer a = 7; integer b = 2; float f = 1.5; string s = \"x\"; list l = [1, 2];\n"
+                                                        "    integer same = a == b;\n"
+                                                        "    if (a) llOwnerSay(\"a\");\n"
+                                                        "    if (s) llOwnerSay(\"said\");\n"
+                                                        "    if (a > 1 && llGetListLength(l) > 1) llOwnerSay(\"both\");\n"
+                                                        "    integer q = a / b; integer m = a % b;\n"
+                                                        "    l += 3; l = l + [4] + \"five\";\n"
+                                                        "    integer t = TRUE; if (FALSE) t = 0;\n"
+                                                        "    llOwnerSay((string)f + (string)((integer)\"12abc\"));\n"
+                                                        "    if (l == [1]) llOwnerSay(\"one long\");\n"
+                                                        "    integer flags = a & b | 4;\n"
+                                                        "    vector v = <1, 2, 3>; v.x = 4; v.z += 1;\n"
+                                                        "    llOwnerSay((string)v + (string)same + (string)q + (string)m + (string)t + (string)flags);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a comparison as a number");
+        CHECK(has(r, "local same = if a == b then 1 else 0"));
+        UNSCOPED_INFO("an integer's truth");
+        CHECK(has(r, "if a ~= 0 then"));
+        UNSCOPED_INFO("a string's");
+        CHECK(has(r, "if s ~= \"\" then"));
+        CHECK(has(r, "if a > 1 and #l > 1 then"));
+        UNSCOPED_INFO("integer division");
+        CHECK(has(r, "local q = bit32.s32(a / b)"));
+        UNSCOPED_INFO("remainder");
+        CHECK(has(r, "local m = math.fmod(a, b)"));
+        {
+            INFO("a list no other holds grown in place");
+            CHECK(has(r, "table.insert(l, 3)"));
+            CHECK(has(r, "table.append(l, 4, \"five\")"));
+            CHECK_FALSE(has(r, "table.extend"));
+        }
+        {
+            INFO("TRUE and FALSE");
+            CHECK(has(r, "local t = 1"));
+            CHECK(has(r, "if false then"));
+        }
+        UNSCOPED_INFO("a float as LSL writes it");
+        CHECK(has(r, "string.format(\"%.6f\", f)"));
+        {
+            INFO("a string as an integer, as a list's item converts it");
+            CHECK(has(r, "lslInteger(\"12abc\")"));
+            CHECK(has(r, "return llcompat.List2Integer({ s }, 0)"));
+        }
+        {
+            INFO("lists compared by length");
+            CHECK(has(r, "#l == #{ 1 }"));
+            CHECK(noted(r, "SluaListCompare"));
+        }
         // bit32 answers 0 to 4294967295: made LSL's signed integer, but where
         // bit32 takes it again.
-        ensure("bits: " + r.text, has(r, "bit32.s32(bit32.bor(bit32.band(a, b), 4))") && !has(r, "local function int32"));
-        ensure("a vector's part set: " + r.text, has(r, "v = vector(4, v.y, v.z)") && has(r, "v = vector(v.x, v.y, v.z + 1)"));
-        ensure("a vector as LSL writes it: " + r.text, has(r, "ll.DumpList2String({ v }, \"\")"));
-        checksClean(r);
+        CHECK(has(r, "bit32.s32(bit32.bor(bit32.band(a, b), 4))"));
+        CHECK_FALSE(has(r, "local function int32"));
+        {
+            INFO("a vector's part set");
+            CHECK(has(r, "v = vector(4, v.y, v.z)"));
+            CHECK(has(r, "v = vector(v.x, v.y, v.z + 1)"));
+        }
+        UNSCOPED_INFO("a vector as LSL writes it");
+        CHECK(has(r, "ll.DumpList2String({ v }, \"\")"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<3>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: loops: numeric for; break and continue jumps; repeat; other jumps noted", "[ALLSLToSLua]")
     {
-        set_test_name("loops: a counting for as Luau's numeric for, a jump out as break and to the next turn as continue, a do as repeat; another jump noted");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    integer i; integer n;\n"
-                                              "    for (i = 0; i < 10; ++i) {\n"
-                                              "        if (i == 3) jump next;\n"
-                                              "        if (i == 8) jump done;\n"
-                                              "        n += i;\n"
-                                              "        @next;\n"
-                                              "    }\n"
-                                              "    @done;\n"
-                                              "    do { n -= 1; } while (n > 5);\n"
-                                              "    while (n) { n--; }\n"
-                                              "    jump away;\n"
-                                              "    n = 1;\n"
-                                              "    @away;\n"
-                                              "    llOwnerSay((string)n);\n"
-                                              "} }\n");
-        ensure("a numeric for: " + r.text, has(r, "for i = 0, 9 do"));
-        ensure("its counter declared by it alone: " + r.text, !has(r, "local i = 0"));
-        ensure("continue, the step Luau's own: " + r.text, has(r, "then continue end"));
-        ensure("break: " + r.text, has(r, "break"));
-        ensure("repeat: " + r.text, has(r, "repeat") && has(r, "until not (n > 5)"));
-        ensure("a step: " + r.text, has(r, "n -= 1"));
-        ensure("another jump noted and kept as a mark: " + r.text, noted(r, "SluaJump") && has(r, "-- jump away") && has(r, "-- @away"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    integer i; integer n;\n"
+                                                        "    for (i = 0; i < 10; ++i) {\n"
+                                                        "        if (i == 3) jump next;\n"
+                                                        "        if (i == 8) jump done;\n"
+                                                        "        n += i;\n"
+                                                        "        @next;\n"
+                                                        "    }\n"
+                                                        "    @done;\n"
+                                                        "    do { n -= 1; } while (n > 5);\n"
+                                                        "    while (n) { n--; }\n"
+                                                        "    jump away;\n"
+                                                        "    n = 1;\n"
+                                                        "    @away;\n"
+                                                        "    llOwnerSay((string)n);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a numeric for");
+        CHECK(has(r, "for i = 0, 9 do"));
+        UNSCOPED_INFO("its counter declared by it alone");
+        CHECK_FALSE(has(r, "local i = 0"));
+        UNSCOPED_INFO("continue, the step Luau's own");
+        CHECK(has(r, "then continue end"));
+        CHECK(has(r, "break"));
+        CHECK(has(r, "repeat"));
+        CHECK(has(r, "until not (n > 5)"));
+        UNSCOPED_INFO("a step");
+        CHECK(has(r, "n -= 1"));
+        {
+            INFO("another jump noted and kept as a mark");
+            CHECK(noted(r, "SluaJump"));
+            CHECK(has(r, "-- jump away"));
+            CHECK(has(r, "-- @away"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<4>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: states as handler tables entered by setState; the timer on LLTimers", "[ALLSLToSLua]")
     {
-        set_test_name("states: each a table of handlers, entered by setState, a state change ending the event; the timer on LLTimers, calling the state's");
-        const ALLSLToSLua::Result r = convert("default {\n"
-                                              "    state_entry() { llSetTimerEvent(1.0); }\n"
-                                              "    timer() { state running; }\n"
-                                              "    state_exit() { llOwnerSay(\"leaving\"); }\n"
-                                              "}\n"
-                                              "state running {\n"
-                                              "    state_entry() { llOwnerSay(\"running\"); }\n"
-                                              "    touch_start(integer n) { if (n > 1) { state default; } llOwnerSay(\"touched\"); }\n"
-                                              "}\n");
-        ensure("the tables: " + r.text, has(r, "states.default = {") && has(r, "states.running = {"));
-        ensure("setState: " + r.text, has(r, "local function setState(name: string)") && has(r, "setState(\"default\")"));
-        ensure("a change ends the event, where anything follows: " + r.text,
-               has(r, "setState(\"running\")\n    end,") && has(r, "setState(\"default\")\n            return\n        end"));
-        ensure("the timer on LLTimers: " + r.text, has(r, "setTimer(1") && has(r, "LLTimers:every(seconds") && noted(r, "SluaTimers"));
-        ensure("calling the state's handler: " + r.text, has(r, "states[currentState].timer") && has(r, "event ~= \"timer\""));
-        ensure("state_exit a handler of its state: " + r.text, has(r, "state_exit = function()"));
-        ensure("what is let go of noted: " + r.text, noted(r, "SluaStates"));
+        const ALLSLToSLua::Result r = require_converted("default {\n"
+                                                        "    state_entry() { llSetTimerEvent(1.0); }\n"
+                                                        "    timer() { state running; }\n"
+                                                        "    state_exit() { llOwnerSay(\"leaving\"); }\n"
+                                                        "}\n"
+                                                        "state running {\n"
+                                                        "    state_entry() { llOwnerSay(\"running\"); }\n"
+                                                        "    touch_start(integer n) { if (n > 1) { state default; } llOwnerSay(\"touched\"); }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        {
+            INFO("the tables");
+            CHECK(has(r, "states.default = {"));
+            CHECK(has(r, "states.running = {"));
+        }
+        CHECK(has(r, "local function setState(name: string)"));
+        CHECK(has(r, "setState(\"default\")"));
+        {
+            INFO("a change ends the event, where anything follows");
+            CHECK(has(r, "setState(\"running\")\n    end,"));
+            CHECK(has(r, "setState(\"default\")\n            return\n        end"));
+        }
+        {
+            INFO("the timer on LLTimers");
+            CHECK(has(r, "setTimer(1"));
+            CHECK(has(r, "LLTimers:every(seconds"));
+            CHECK(noted(r, "SluaTimers"));
+        }
+        {
+            INFO("calling the state's handler");
+            CHECK(has(r, "states[currentState].timer"));
+            CHECK(has(r, "event ~= \"timer\""));
+        }
+        UNSCOPED_INFO("state_exit a handler of its state");
+        CHECK(has(r, "state_exit = function()"));
+        UNSCOPED_INFO("what is let go of noted");
+        CHECK(noted(r, "SluaStates"));
         // Tapple's: a name with no state, which only an edit could write,
         // said so at the call, before the state it is in is left.
         const size_t looked = r.text.find("    local entering = states[name]\n    if not entering then\n        error(\"unknown state: \" .. name, 2)\n    end\n");
-        ensure("a state not there said: " + r.text, looked != std::string::npos && looked < r.text.find("local leaving"));
-        checksClean(r);
+        {
+            INFO("a state not there said");
+            REQUIRE(looked != std::string::npos);
+            const size_t leaving = r.text.find("local leaving");
+            CHECK(leaving != std::string::npos);
+            CHECK(looked < leaving);
+        }
+        require_checks_clean(r);
         ALLSLToSLua::Options typed;
         typed.types = true;
-        checksClean(ALLSLToSLua::convert("default { touch_start(integer n) { state two; } }\nstate two { state_entry() { state default; } }\n", typed));
+        require_checks_clean(ALLSLToSLua::convert("default { touch_start(integer n) { state two; } }\nstate two { state_entry() { state default; } }\n", typed));
     }
 
-    template<> template<>
-    void allsltoslua_object::test<5>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: names: reserved ones renamed; forward declarations; inline assignments", "[ALLSLToSLua]")
     {
-        set_test_name("names: one Luau or SLua holds renamed, functions declared first where one calls another after it; assignments inside expressions made in place");
-        const ALLSLToSLua::Result r = convert("integer table = 1;\n"
-                                              "integer first(integer end) { return second(end) + table; }\n"
-                                              "integer second(integer x) { return x * 2; }\n"
-                                              "default { state_entry() {\n"
-                                              "    integer i; integer j = (i = 4) + i++;\n"
-                                              "    llOwnerSay((string)first(j));\n"
-                                              "} }\n");
-        ensure("renamed: " + r.text, has(r, "local table_ = 1") && has(r, "(end_)"));
-        ensure("only the one called before it is written declared first: " + r.text,
-               has(r, "local second\n") && has(r, "local function first(end_)") && has(r, "\nfunction second(x)"));
-        ensure("an assignment in place: " + r.text, has(r, "(function() i = 4 return i end)()") && noted(r, "SluaAssignInExpression"));
-        ensure("a step after, what it was: " + r.text, has(r, "(function() local was = i; i += 1 return was end)()"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer table = 1;\n"
+                                                        "integer first(integer end) { return second(end) + table; }\n"
+                                                        "integer second(integer x) { return x * 2; }\n"
+                                                        "default { state_entry() {\n"
+                                                        "    integer i; integer j = (i = 4) + i++;\n"
+                                                        "    llOwnerSay((string)first(j));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        CHECK(has(r, "local table_ = 1"));
+        CHECK(has(r, "(end_)"));
+        {
+            INFO("only the one called before it is written declared first");
+            CHECK(has(r, "local second\n"));
+            CHECK(has(r, "local function first(end_)"));
+            CHECK(has(r, "\nfunction second(x)"));
+        }
+        {
+            INFO("an assignment in place");
+            CHECK(has(r, "(function() i = 4 return i end)()"));
+            CHECK(noted(r, "SluaAssignInExpression"));
+        }
+        UNSCOPED_INFO("a step after, what it was");
+        CHECK(has(r, "(function() local was = i; i += 1 return was end)()"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<6>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: LSL that does not parse writes nothing and says why", "[ALLSLToSLua]")
     {
-        set_test_name("LSL that does not parse writes nothing, and says why");
         const ALLSLToSLua::Result r = ALLSLToSLua::convert("default { state_entry() { integer = ; } }");
-        ensure("not converted", !r.converted && r.text.empty());
-        ensure("why", !r.problems.empty());
+        CHECK_FALSE(r.converted);
+        CHECK(r.text.empty());
+        CHECK_FALSE(r.problems.empty());
     }
 
-    template<> template<>
-    void allsltoslua_object::test<7>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: close to LSL: llcompat's Detected and timer event noted; ll.OwnerSay kept", "[ALLSLToSLua]")
     {
-        set_test_name("close to LSL: llcompat's Detected functions and timer event, as LSL had them, noted with SLua's ways; ll's "
-                      "OwnerSay, which only SLua's deprecating sets apart");
         const ALLSLToSLua::Options close = ALLSLToSLua::Options::closeToLSL();
         const ALLSLToSLua::Result  r     = ALLSLToSLua::convert("default {\n"
                                                                 "    state_entry() { llSetTimerEvent(2.0); }\n"
@@ -375,50 +472,82 @@ namespace tut
                                                                 "    touch_start(integer n) { llOwnerSay(llDetectedName(0)); }\n"
                                                                 "}\n",
                                                                 close);
-        ensure("converted", r.converted);
-        ensure("llcompat's Detected: " + r.text, has(r, "llcompat.DetectedName(0)") && noted(r, "SluaDetected"));
-        ensure("the timer event: " + r.text, has(r, "llcompat.SetTimerEvent(2") && has(r, "LLEvents:on(\"timer\"") && noted(r, "SluaTimer"));
-        ensure("ll.OwnerSay, SLua deprecating it for print: " + r.text,
-               has(r, "ll.OwnerSay(\"tick\")") && !has(r, "llcompat.OwnerSay") && noted(r, "SluaDeprecatedFor", "OwnerSay"));
-        checksClean(r);
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        {
+            INFO("llcompat's Detected");
+            CHECK(has(r, "llcompat.DetectedName(0)"));
+            CHECK(noted(r, "SluaDetected"));
+        }
+        {
+            INFO("the timer event");
+            CHECK(has(r, "llcompat.SetTimerEvent(2"));
+            CHECK(has(r, "LLEvents:on(\"timer\""));
+            CHECK(noted(r, "SluaTimer"));
+        }
+        {
+            INFO("ll.OwnerSay, SLua deprecating it for print");
+            CHECK(has(r, "ll.OwnerSay(\"tick\")"));
+            CHECK_FALSE(has(r, "llcompat.OwnerSay"));
+            CHECK(noted(r, "SluaDeprecatedFor", "OwnerSay"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<8>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: SLua's ll where it means the same and SLua's own forms for some calls", "[ALLSLToSLua]")
     {
-        set_test_name("SLua's ll where it means the same -- a boolean, a constant index moved on, a find against nil -- and what SLua has in a call's stead");
-        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
-                                              "    key k = llDetectedKey(0); string s = \"abcdef\"; list l = [\"a\", \"b\"]; integer i = 2;\n"
-                                              "    if (llSameGroup(k)) llOwnerSay(\"group\");\n"
-                                              "    integer same = llSameGroup(k);\n"
-                                              "    string head = llGetSubString(s, 0, 2);\n"
-                                              "    string tail = llGetSubString(s, i, -1);\n"
-                                              "    if (llListFindList(l, [\"a\"]) != -1) llOwnerSay(\"found\");\n"
-                                              "    if (~llSubStringIndex(s, \"c\")) llOwnerSay(\"has c\");\n"
-                                              "    if (llSubStringIndex(s, \"z\") < 0) llOwnerSay(\"no z\");\n"
-                                              "    integer at = llListFindList(l, [\"a\", \"b\"]);\n"
-                                              "    float p = llPow(2.0, 3.0) + llFabs(-1.0) + llVecDist(<1,2,3>, ZERO_VECTOR);\n"
-                                              "    integer r = llRound(2.5) + llGetUnixTime();\n"
-                                              "    llOwnerSay(head + tail + (string)same + (string)at + (string)p + (string)r);\n"
-                                              "} }\n");
-        ensure("a boolean in a condition: " + r.text, has(r, "if ll.SameGroup(k) then"));
-        ensure("and as a number: " + r.text, has(r, "local same = if ll.SameGroup(k) then 1 else 0"));
-        ensure("a constant index moved on: " + r.text, has(r, "ll.GetSubString(s, 1, 3)"));
-        ensure("one that is not, through llcompat: " + r.text, has(r, "llcompat.GetSubString(s, i, -1)") && noted(r, "SluaIndex", "GetSubString"));
-        ensure("one thing found in a list: " + r.text, has(r, "if table.find(l, \"a\") ~= nil then"));
-        ensure("~ of a find: " + r.text, has(r, "if string.find(s, \"c\", 1, true) ~= nil then"));
-        ensure("< 0 of one: " + r.text, has(r, "if string.find(s, \"z\", 1, true) == nil then"));
-        ensure("a find's index as a number, through llcompat: " + r.text, has(r, "llcompat.ListFindList(l, { \"a\", \"b\" })"));
-        ensure("^, math and vector: " + r.text, has(r, "2.0 ^ 3.0") && has(r, "math.abs(-1.0)") && has(r, "vector.magnitude(vector(1, 2, 3) - ZERO_VECTOR)"));
-        ensure("half up, as LSL rounds, not math.round: " + r.text, has(r, "math.floor(2.5 + 0.5)"));
-        ensure("os.time and print: " + r.text, has(r, "os.time()") && has(r, "print("));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    key k = llDetectedKey(0); string s = \"abcdef\"; list l = [\"a\", \"b\"]; integer i = 2;\n"
+                                                        "    if (llSameGroup(k)) llOwnerSay(\"group\");\n"
+                                                        "    integer same = llSameGroup(k);\n"
+                                                        "    string head = llGetSubString(s, 0, 2);\n"
+                                                        "    string tail = llGetSubString(s, i, -1);\n"
+                                                        "    if (llListFindList(l, [\"a\"]) != -1) llOwnerSay(\"found\");\n"
+                                                        "    if (~llSubStringIndex(s, \"c\")) llOwnerSay(\"has c\");\n"
+                                                        "    if (llSubStringIndex(s, \"z\") < 0) llOwnerSay(\"no z\");\n"
+                                                        "    integer at = llListFindList(l, [\"a\", \"b\"]);\n"
+                                                        "    float p = llPow(2.0, 3.0) + llFabs(-1.0) + llVecDist(<1,2,3>, ZERO_VECTOR);\n"
+                                                        "    integer r = llRound(2.5) + llGetUnixTime();\n"
+                                                        "    llOwnerSay(head + tail + (string)same + (string)at + (string)p + (string)r);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a boolean in a condition");
+        CHECK(has(r, "if ll.SameGroup(k) then"));
+        UNSCOPED_INFO("and as a number");
+        CHECK(has(r, "local same = if ll.SameGroup(k) then 1 else 0"));
+        UNSCOPED_INFO("a constant index moved on");
+        CHECK(has(r, "ll.GetSubString(s, 1, 3)"));
+        {
+            INFO("one that is not, through llcompat");
+            CHECK(has(r, "llcompat.GetSubString(s, i, -1)"));
+            CHECK(noted(r, "SluaIndex", "GetSubString"));
+        }
+        UNSCOPED_INFO("one thing found in a list");
+        CHECK(has(r, "if table.find(l, \"a\") ~= nil then"));
+        UNSCOPED_INFO("~ of a find");
+        CHECK(has(r, "if string.find(s, \"c\", 1, true) ~= nil then"));
+        UNSCOPED_INFO("< 0 of one");
+        CHECK(has(r, "if string.find(s, \"z\", 1, true) == nil then"));
+        UNSCOPED_INFO("a find's index as a number, through llcompat");
+        CHECK(has(r, "llcompat.ListFindList(l, { \"a\", \"b\" })"));
+        {
+            INFO("^, math and vector");
+            CHECK(has(r, "2.0 ^ 3.0"));
+            CHECK(has(r, "math.abs(-1.0)"));
+            CHECK(has(r, "vector.magnitude(vector(1, 2, 3) - ZERO_VECTOR)"));
+        }
+        UNSCOPED_INFO("half up, as LSL rounds, not math.round");
+        CHECK(has(r, "math.floor(2.5 + 0.5)"));
+        {
+            INFO("os.time and print");
+            CHECK(has(r, "os.time()"));
+            CHECK(has(r, "print("));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<9>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: handlers assigned to LLEvents' fields and Luau types on what LSL typed", "[ALLSLToSLua]")
     {
-        set_test_name("handlers assigned to LLEvents' fields, and Luau types on what LSL typed");
         ALLSLToSLua::Options options;
         options.handlers = ALLSLToSLua::Options::Handlers::Field;
         options.types    = true;
@@ -426,13 +555,20 @@ namespace tut
                                                            "string greet(string who) { return \"Hi \" + who; }\n"
                                                            "default { touch_start(integer n) { string s = greet(\"x\"); gCount += n; llOwnerSay(s); } }\n",
                                                            options);
-        ensure("converted", r.converted);
-        ensure("a field, as SLua's own scripts write one: " + r.text,
-               has(r, "function LLEvents.touch_start(detected: { DetectedEvent })") && !has(r, "LLEvents:on") && !has(r, "= function("));
-        ensure("the count typed: " + r.text, has(r, "local n: number = #detected"));
-        ensure("typed: " + r.text, has(r, "local gCount: number = 2") && has(r, "local function greet(who: string): string") &&
-                                       has(r, "local s: string = greet(\"x\")"));
-        checksClean(r);
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        {
+            INFO("a field, as SLua's own scripts write one");
+            CHECK(has(r, "function LLEvents.touch_start(detected: { DetectedEvent })"));
+            CHECK_FALSE(has(r, "LLEvents:on"));
+            CHECK_FALSE(has(r, "= function("));
+        }
+        UNSCOPED_INFO("the count typed");
+        CHECK(has(r, "local n: number = #detected"));
+        CHECK(has(r, "local gCount: number = 2"));
+        CHECK(has(r, "local function greet(who: string): string"));
+        CHECK(has(r, "local s: string = greet(\"x\")"));
+        require_checks_clean(r);
 
         // Each parameter as the definitions type SLua's handler: a key a
         // uuid, link_message's id the string SLua passes; none on a key the
@@ -444,12 +580,16 @@ namespace tut
                                      "    money(key giver, integer amount) { giver = \"someone\"; llOwnerSay((string)giver); }\n"
                                      "}\n";
         const ALLSLToSLua::Result typed = ALLSLToSLua::convert(handlers, options);
-        ensure("an integer: " + typed.text, has(typed, "function LLEvents.on_rez(param: number)"));
-        ensure("a key a uuid: " + typed.text, has(typed, "function LLEvents.listen(c: number, n: string, id: uuid, m: string)"));
-        ensure("link_message's id a string: " + typed.text, has(typed, "function LLEvents.link_message(s: number, num: number, str: string, id: string)"));
-        ensure("a key the body takes as text, under a name of its own: " + typed.text,
-               has(typed, "function LLEvents.money(giverKey: uuid, amount: number)\n    local giver: string = tostring(giverKey)\n    giver = \"someone\"\n"));
-        checksClean(typed);
+        CAPTURE(typed.text);
+        UNSCOPED_INFO("an integer");
+        CHECK(has(typed, "function LLEvents.on_rez(param: number)"));
+        UNSCOPED_INFO("a key a uuid");
+        CHECK(has(typed, "function LLEvents.listen(c: number, n: string, id: uuid, m: string)"));
+        UNSCOPED_INFO("link_message's id a string");
+        CHECK(has(typed, "function LLEvents.link_message(s: number, num: number, str: string, id: string)"));
+        UNSCOPED_INFO("a key the body takes as text, under a name of its own");
+        CHECK(has(typed, "function LLEvents.money(giverKey: uuid, amount: number)\n    local giver: string = tostring(giverKey)\n    giver = \"someone\"\n"));
+        require_checks_clean(typed);
         // Strict as well, under the grid's solver: each handler as the
         // definitions type it, the text key made text.
         if (!newSolver)
@@ -459,329 +599,499 @@ namespace tut
             {
                 said += p.severity == ALScriptProblem::Severity::Error ? p.message + "\n" : std::string();
             }
-            ensure("strict:\n" + said + "---\n" + typed.text, said.empty());
+            CAPTURE(said);
+            CHECK(said.empty());
         }
         ALLSLToSLua::Options on = options;
         on.handlers             = ALLSLToSLua::Options::Handlers::On;
-        ensure("typed with LLEvents:on too", has(ALLSLToSLua::convert(handlers, on), "LLEvents:on(\"on_rez\", function(param: number)"));
+        UNSCOPED_INFO("typed with LLEvents:on too");
+        CHECK(has(ALLSLToSLua::convert(handlers, on), "LLEvents:on(\"on_rez\", function(param: number)"));
         on.types = false;
-        ensure("and none where types are not written", has(ALLSLToSLua::convert(handlers, on), "LLEvents:on(\"on_rez\", function(param)"));
+        UNSCOPED_INFO("and none where types are not written");
+        CHECK(has(ALLSLToSLua::convert(handlers, on), "LLEvents:on(\"on_rez\", function(param)"));
 
         const ALLSLToSLua::Result many = ALLSLToSLua::convert("default { touch_start(integer n) { state other; } }\n"
                                                               "state other { touch_start(integer n) { state default; } }\n",
                                                               options);
+        CAPTURE(many.text);
         // SLua stops the script at a field assigned nil: taken off by
         // LLEvents:off, as LLEvents:on's are.
-        ensure("setState sets the fields: " + many.text, has(many, "(LLEvents :: any)[event] = handler") &&
-                                                         has(many, "LLEvents:off(event :: any, handler)") && !has(many, "[event] = nil"));
-        ensure("a state's handlers typed in its table: " + many.text, has(many, "touch_start = function(detected: { DetectedEvent })"));
-        checksClean(many);
+        {
+            INFO("setState sets the fields");
+            CHECK(has(many, "(LLEvents :: any)[event] = handler"));
+            CHECK(has(many, "LLEvents:off(event :: any, handler)"));
+            CHECK_FALSE(has(many, "[event] = nil"));
+        }
+        UNSCOPED_INFO("a state's handlers typed in its table");
+        CHECK(has(many, "touch_start = function(detected: { DetectedEvent })"));
+        require_checks_clean(many);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<10>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: no comments where they are not wanted: the notes are still said", "[ALLSLToSLua]")
     {
-        set_test_name("no comments where they are not wanted: the notes are still said");
         ALLSLToSLua::Options options;
         options.comments = false;
         const ALLSLToSLua::Result r = ALLSLToSLua::convert("default { state_entry() { list l = [7]; integer a = l == [2]; llOwnerSay((string)a); } }\n", options);
-        ensure("converted", r.converted);
-        ensure("no comment: " + r.text, !has(r, "-- LSL:"));
-        ensure("but noted", noted(r, "SluaListCompare"));
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("no comment");
+        CHECK_FALSE(has(r, "-- LSL:"));
+        UNSCOPED_INFO("but noted");
+        CHECK(noted(r, "SluaListCompare"));
     }
 
-    template<> template<>
-    void allsltoslua_object::test<11>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: numeric for where it counts as LSL's did; while where it might not", "[ALLSLToSLua]")
     {
-        set_test_name("numeric for where it counts as LSL's did: up, down, by a step, to a length; a while where the counter or the limit could change, or the counter is read after");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    list l = [1, 2, 3]; integer n = 4; integer total;\n"
-                                              "    integer a; for (a = 0; a < llGetListLength(l); a++) total += llList2Integer(l, a);\n"
-                                              "    integer b; for (b = 10; b >= 0; b -= 2) total += b;\n"
-                                              "    integer c; for (c = 1; c <= n; ++c) total += c;\n"
-                                              "    integer d; for (d = 0; d < n; ++d) { if (total > 100) d = n; }\n"
-                                              "    integer e; for (e = 0; e < n; ++e) { n--; }\n"
-                                              "    integer f; for (f = 0; f < 3; ++f) total += f;\n"
-                                              "    llOwnerSay((string)(total + f));\n"
-                                              "} }\n");
-        ensure("up to a length, walking its items: " + r.text, has(r, "for _, item in l do\n    total += item"));
-        ensure("down by a step: " + r.text, has(r, "for b = 10, 0, -2 do"));
-        ensure("up to and with: " + r.text, has(r, "for c = 1, n do"));
-        ensure("a counter set in its body keeps the while: " + r.text, has(r, "while d < n do"));
-        ensure("a limit set in its body keeps the while: " + r.text, has(r, "while e < n do"));
-        ensure("a counter read after keeps the while: " + r.text, has(r, "while f < 3 do") && has(r, "local f = 0"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    list l = [1, 2, 3]; integer n = 4; integer total;\n"
+                                                        "    integer a; for (a = 0; a < llGetListLength(l); a++) total += llList2Integer(l, a);\n"
+                                                        "    integer b; for (b = 10; b >= 0; b -= 2) total += b;\n"
+                                                        "    integer c; for (c = 1; c <= n; ++c) total += c;\n"
+                                                        "    integer d; for (d = 0; d < n; ++d) { if (total > 100) d = n; }\n"
+                                                        "    integer e; for (e = 0; e < n; ++e) { n--; }\n"
+                                                        "    integer f; for (f = 0; f < 3; ++f) total += f;\n"
+                                                        "    llOwnerSay((string)(total + f));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("up to a length, walking its items");
+        CHECK(has(r, "for _, item in l do\n    total += item"));
+        UNSCOPED_INFO("down by a step");
+        CHECK(has(r, "for b = 10, 0, -2 do"));
+        UNSCOPED_INFO("up to and with");
+        CHECK(has(r, "for c = 1, n do"));
+        UNSCOPED_INFO("a counter set in its body keeps the while");
+        CHECK(has(r, "while d < n do"));
+        UNSCOPED_INFO("a limit set in its body keeps the while");
+        CHECK(has(r, "while e < n do"));
+        {
+            INFO("a counter read after keeps the while");
+            CHECK(has(r, "while f < 3 do"));
+            CHECK(has(r, "local f = 0"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<12>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: integers only used as truths become booleans; number reads keep numbers", "[ALLSLToSLua]")
     {
-        set_test_name("integers only ever truth values are booleans, and functions that answer one; each use that reads a number keeps it one");
-        const ALLSLToSLua::Result r = convert("integer gOn = FALSE;\n"
-                                              "integer gSeen;\n"
-                                              "integer isOwner(key k) { return k == llGetOwner(); }\n"
-                                              "integer anyOf(list l) { return llGetListLength(l); }\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    gOn = !gOn;\n"
-                                              "    if (gOn) llOwnerSay(\"on\"); else llOwnerSay(\"off\");\n"
-                                              "    if (gSeen == FALSE && isOwner(llDetectedKey(0))) gSeen = TRUE;\n"
-                                              "    integer busy = anyOf([1]);\n"
-                                              "    while (!busy) busy = TRUE;\n"
-                                              "    integer count; count++;\n"
-                                              "    integer shown = TRUE; llOwnerSay((string)shown);\n"
-                                              "    integer loose = 5; if (loose == TRUE) llOwnerSay(\"one\");\n"
-                                              "    integer y; integer z = (y = 5); if (y) llOwnerSay((string)z);\n"
-                                              "    if (count) llOwnerSay((string)count);\n"
-                                              "} }\n");
-        ensure("a global toggled: " + r.text, has(r, "local gOn = false") && has(r, "gOn = not gOn") && has(r, "if gOn then"));
-        ensure("compared with FALSE: " + r.text, has(r, "local gSeen = false") && has(r, "if not gSeen and isOwner(") && has(r, "gSeen = true"));
-        ensure("a function that answers one: " + r.text, has(r, "return k == ll.GetOwner()"));
-        ensure("a length, as a truth: " + r.text, has(r, "return #l ~= 0") && has(r, "local busy = anyOf({ 1 })") && has(r, "while not busy do"));
-        ensure("stepped: " + r.text, has(r, "local count = 0") && has(r, "count += 1"));
-        ensure("printed: " + r.text, has(r, "local shown = 1"));
-        ensure("more than TRUE, compared with it: " + r.text, has(r, "local loose = 5") && has(r, "if loose == 1 then"));
-        ensure("set where the assignment is read: " + r.text, has(r, "local y = 0"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer gOn = FALSE;\n"
+                                                        "integer gSeen;\n"
+                                                        "integer isOwner(key k) { return k == llGetOwner(); }\n"
+                                                        "integer anyOf(list l) { return llGetListLength(l); }\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    gOn = !gOn;\n"
+                                                        "    if (gOn) llOwnerSay(\"on\"); else llOwnerSay(\"off\");\n"
+                                                        "    if (gSeen == FALSE && isOwner(llDetectedKey(0))) gSeen = TRUE;\n"
+                                                        "    integer busy = anyOf([1]);\n"
+                                                        "    while (!busy) busy = TRUE;\n"
+                                                        "    integer count; count++;\n"
+                                                        "    integer shown = TRUE; llOwnerSay((string)shown);\n"
+                                                        "    integer loose = 5; if (loose == TRUE) llOwnerSay(\"one\");\n"
+                                                        "    integer y; integer z = (y = 5); if (y) llOwnerSay((string)z);\n"
+                                                        "    if (count) llOwnerSay((string)count);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("a global toggled");
+            CHECK(has(r, "local gOn = false"));
+            CHECK(has(r, "gOn = not gOn"));
+            CHECK(has(r, "if gOn then"));
+        }
+        {
+            INFO("compared with FALSE");
+            CHECK(has(r, "local gSeen = false"));
+            CHECK(has(r, "if not gSeen and isOwner("));
+            CHECK(has(r, "gSeen = true"));
+        }
+        UNSCOPED_INFO("a function that answers one");
+        CHECK(has(r, "return k == ll.GetOwner()"));
+        {
+            INFO("a length, as a truth");
+            CHECK(has(r, "return #l ~= 0"));
+            CHECK(has(r, "local busy = anyOf({ 1 })"));
+            CHECK(has(r, "while not busy do"));
+        }
+        {
+            INFO("stepped");
+            CHECK(has(r, "local count = 0"));
+            CHECK(has(r, "count += 1"));
+        }
+        UNSCOPED_INFO("printed");
+        CHECK(has(r, "local shown = 1"));
+        {
+            INFO("more than TRUE, compared with it");
+            CHECK(has(r, "local loose = 5"));
+            CHECK(has(r, "if loose == 1 then"));
+        }
+        UNSCOPED_INFO("set where the assignment is read");
+        CHECK(has(r, "local y = 0"));
+        require_checks_clean(r);
 
         ALLSLToSLua::Options typed;
         typed.types = true;
         const ALLSLToSLua::Result t = ALLSLToSLua::convert("integer ready(integer n) { return n > 2; }\n"
                                                            "default { state_entry() { integer ok = ready(3); if (ok) llOwnerSay(\"yes\"); } }\n",
                                                            typed);
-        ensure("typed boolean: " + t.text, has(t, "local function ready(n: number): boolean") && has(t, "local ok: boolean = ready(3)"));
-        checksClean(t);
+        CAPTURE(t.text);
+        {
+            INFO("typed boolean");
+            CHECK(has(t, "local function ready(n: number): boolean"));
+            CHECK(has(t, "local ok: boolean = ready(3)"));
+        }
+        require_checks_clean(t);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<13>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: the right-first memory hack is an append; a visible order is noted", "[ALLSLToSLua]")
     {
-        set_test_name("LSL ran a binary's right side first: (l = []) + l is the append it meant, and where the order could show it is noted");
-        const ALLSLToSLua::Result r = convert("list gItems;\n"
-                                              "string gLog = \"a\";\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    gItems = (gItems = []) + gItems + [\"x\"];\n"
-                                              "    gItems = (gItems = []) + [\"y\"] + gItems;\n"
-                                              "    gLog = (gLog = \"\") + gLog + \"b\";\n"
-                                              "    llOwnerSay(gLog + (string)llGetListLength(gItems));\n"
-                                              "} }\n");
-        ensure("appended: " + r.text, has(r, "table.insert(gItems, \"x\")"));
-        ensure("prepended: " + r.text, has(r, "table.insert(gItems, 1, \"y\")"));
-        ensure("a string: " + r.text, has(r, "gLog ..= \"b\""));
-        ensure("nothing cleared first: " + r.text, !has(r, "gItems = {} return") && !has(r, "gLog = \"\" return"));
-        ensure("noted once for each variable: " + r.text, noted(r, "SluaMemoryHack") && count(r, "-- LSL: (gItems = []) + gItems") == 1 &&
-                                                         count(r, "-- LSL: (gLog = \"\") + gLog") == 1);
-        ensure("not taken as an order that shows", !noted(r, "SluaRightFirst"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("list gItems;\n"
+                                                        "string gLog = \"a\";\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    gItems = (gItems = []) + gItems + [\"x\"];\n"
+                                                        "    gItems = (gItems = []) + [\"y\"] + gItems;\n"
+                                                        "    gLog = (gLog = \"\") + gLog + \"b\";\n"
+                                                        "    llOwnerSay(gLog + (string)llGetListLength(gItems));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("appended");
+        CHECK(has(r, "table.insert(gItems, \"x\")"));
+        UNSCOPED_INFO("prepended");
+        CHECK(has(r, "table.insert(gItems, 1, \"y\")"));
+        UNSCOPED_INFO("a string");
+        CHECK(has(r, "gLog ..= \"b\""));
+        {
+            INFO("nothing cleared first");
+            CHECK_FALSE(has(r, "gItems = {} return"));
+            CHECK_FALSE(has(r, "gLog = \"\" return"));
+        }
+        {
+            INFO("noted once for each variable");
+            CHECK(noted(r, "SluaMemoryHack"));
+            CHECK(count(r, "-- LSL: (gItems = []) + gItems") == 1);
+            CHECK(count(r, "-- LSL: (gLog = \"\") + gLog") == 1);
+        }
+        UNSCOPED_INFO("not taken as an order that shows");
+        CHECK_FALSE(orderNoted(r));
+        require_checks_clean(r);
 
-        const ALLSLToSLua::Result order = convert("integer gCount;\n"
-                                                  "integer bump() { return ++gCount; }\n"
-                                                  "default { state_entry() {\n"
-                                                  "    integer i = 1;\n"
-                                                  "    integer j = i + (i = 5);\n"
-                                                  "    integer k = gCount - bump();\n"
-                                                  "    llOwnerSay((string)(j + k));\n"
-                                                  "} }\n");
-        ensure("an assignment the other side reads", noted(order, "SluaRightFirst"));
-        ensure("said over its line: " + order.text, has(order, "-- LSL: LSL ran the right side of this before the left"));
-        checksClean(order);
+        const ALLSLToSLua::Result order = require_converted("integer gCount;\n"
+                                                            "integer bump() { return ++gCount; }\n"
+                                                            "default { state_entry() {\n"
+                                                            "    integer i = 1;\n"
+                                                            "    integer j = i + (i = 5);\n"
+                                                            "    integer k = gCount - bump();\n"
+                                                            "    llOwnerSay((string)(j + k));\n"
+                                                            "} }\n");
+        CAPTURE(order.text);
+        UNSCOPED_INFO("an assignment the other side reads, named");
+        CHECK(noted(order, "SluaRightFirstSet", "i"));
+        UNSCOPED_INFO("a call that sets what the other side reads, named");
+        CHECK(noted(order, "SluaRightFirstCall", "bump()"));
+        UNSCOPED_INFO("said over its line, with what");
+        CHECK(has(order, "-- LSL: LSL ran the right side of this before the left, and Luau "
+                         "runs the left first: bump() sets gCount, which the other side "
+                         "reads or sets too."));
+        UNSCOPED_INFO("said over its line");
+        CHECK(has(order, "-- LSL: LSL ran the right side of this before the left"));
+        require_checks_clean(order);
 
-        const ALLSLToSLua::Result quiet = convert("integer gCount;\n"
-                                                  "integer bump() { return ++gCount; }\n"
-                                                  "default { state_entry() {\n"
-                                                  "    integer i = 1;\n"
-                                                  "    integer j = (i + 1) * bump();\n"
-                                                  "    string s = \"n: \" + (string)bump();\n"
-                                                  "    llOwnerSay(s + (string)(j + (integer)llGetTime()));\n"
-                                                  "} }\n");
-        ensure("nothing either side changes the other reads: " + quiet.text, !noted(quiet, "SluaRightFirst"));
-        checksClean(quiet);
+        const ALLSLToSLua::Result quiet = require_converted("integer gCount;\n"
+                                                            "integer bump() { return ++gCount; }\n"
+                                                            "default { state_entry() {\n"
+                                                            "    integer i = 1;\n"
+                                                            "    integer j = (i + 1) * bump();\n"
+                                                            "    string s = \"n: \" + (string)bump();\n"
+                                                            "    llOwnerSay(s + (string)(j + (integer)llGetTime()));\n"
+                                                            "} }\n");
+        CAPTURE(quiet.text);
+        UNSCOPED_INFO("nothing either side changes the other reads");
+        CHECK_FALSE(orderNoted(quiet));
+        require_checks_clean(quiet);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<14>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: unshared lists grown in place; a list handed on copied and noted", "[ALLSLToSLua]")
     {
-        set_test_name("lists no other holds grown in place: appended, prepended, by a list's name, by a call, several at once, passed to a function that only reads it; a list handed on keeps LSL's copy, and says why");
-        const ALLSLToSLua::Result r = convert("list gAll;\n"
-                                              "list gSeen;\n"
-                                              "list gPassed;\n"
-                                              "list gStored;\n"
-                                              "list gGrown;\n"
-                                              "integer addOne() { gGrown += [1]; return 1; }\n"
-                                              "list gKept = [1];\n"
-                                              "list parts(string s) { list out = llParseString2List(s, [\",\"], []); out += [\"end\"]; return out; }\n"
-                                              "list kept() { return gKept; }\n"
-                                              "show(list l) { llOwnerSay(llDumpList2String(l, \",\")); }\n"
-                                              "showAll(list l) { show(l); }\n"
-                                              "keep(list l) { gStored = l; }\n"
-                                              "keepLater(list l) { keep(l); }\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    gAll = parts(\"a,b\");\n"
-                                              "    gAll += parts(\"c\");\n"
-                                              "    gAll = [\"first\"] + gAll;\n"
-                                              "    list more = [4, 5];\n"
-                                              "    gAll += more;\n"
-                                              "    gAll += [llGetTime(), llFrand(1.0)];\n"
-                                              "    gSeen += [n];\n"
-                                              "    showAll(gSeen);\n"
-                                              "    gPassed += [n];\n"
-                                              "    keepLater(gPassed);\n"
-                                              "    gKept += [2];\n"
-                                              "    list a = [1]; list b = a; a += [2];\n"
-                                              "    show(llListInsertList(gGrown, [addOne()], 0));\n"
-                                              "    show(kept() + b + a + gAll + gStored);\n"
-                                              "} }\n");
-        ensure("a local returned, grown in place: " + r.text, has(r, "local out = ll.ParseString2List(s, { \",\" }, {})") && has(r, "table.insert(out, \"end\")"));
-        ensure("a call's list, put on the end: " + r.text, has(r, "gAll = parts(\"a,b\")") && has(r, "table.extend(gAll, parts(\"c\"))"));
-        ensure("prepended: " + r.text, has(r, "table.insert(gAll, 1, \"first\")"));
-        ensure("a list by its name: " + r.text, has(r, "table.extend(gAll, more)"));
-        ensure("several that do not run apart, each had before any is added: " + r.text, has(r, "table.append(gAll, ll.GetTime(), ll.Frand(1.0))"));
-        ensure("passed to a function that only reads it: " + r.text, has(r, "table.insert(gSeen, n)"));
-        ensure("passed to one that keeps it: " + r.text,
-               has(r, "gPassed = table.extend(table.clone(gPassed), { n })") &&
-                   has(r, "-- LSL: LSL's lists were values, and gPassed is passed to a function of the script's that keeps it"));
-        ensure("returned: " + r.text, has(r, "gKept = table.extend(table.clone(gKept), { 2 })") && has(r, "gKept is returned by a function"));
-        ensure("given to another: " + r.text, has(r, "a = table.extend(table.clone(a), { 2 })") && has(r, "a is given to another variable"));
-        ensure("read where a call in the statement grows it: " + r.text,
-               has(r, "gGrown = table.extend(table.clone(gGrown), { 1 })") &&
-                   has(r, "gGrown is read where a call of the script's in the same statement changes it"));
-        ensure("said once for each: " + r.text, count(r, "and gPassed is") == 1);
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("list gAll;\n"
+                                                        "list gSeen;\n"
+                                                        "list gPassed;\n"
+                                                        "list gStored;\n"
+                                                        "list gGrown;\n"
+                                                        "integer addOne() { gGrown += [1]; return 1; }\n"
+                                                        "list gKept = [1];\n"
+                                                        "list parts(string s) { list out = llParseString2List(s, [\",\"], []); out += [\"end\"]; return out; }\n"
+                                                        "list kept() { return gKept; }\n"
+                                                        "show(list l) { llOwnerSay(llDumpList2String(l, \",\")); }\n"
+                                                        "showAll(list l) { show(l); }\n"
+                                                        "keep(list l) { gStored = l; }\n"
+                                                        "keepLater(list l) { keep(l); }\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    gAll = parts(\"a,b\");\n"
+                                                        "    gAll += parts(\"c\");\n"
+                                                        "    gAll = [\"first\"] + gAll;\n"
+                                                        "    list more = [4, 5];\n"
+                                                        "    gAll += more;\n"
+                                                        "    gAll += [llGetTime(), llFrand(1.0)];\n"
+                                                        "    gSeen += [n];\n"
+                                                        "    showAll(gSeen);\n"
+                                                        "    gPassed += [n];\n"
+                                                        "    keepLater(gPassed);\n"
+                                                        "    gKept += [2];\n"
+                                                        "    list a = [1]; list b = a; a += [2];\n"
+                                                        "    show(llListInsertList(gGrown, [addOne()], 0));\n"
+                                                        "    show(kept() + b + a + gAll + gStored);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("a local returned, grown in place");
+            CHECK(has(r, "local out = ll.ParseString2List(s, { \",\" }, {})"));
+            CHECK(has(r, "table.insert(out, \"end\")"));
+        }
+        {
+            INFO("a call's list, put on the end");
+            CHECK(has(r, "gAll = parts(\"a,b\")"));
+            CHECK(has(r, "table.extend(gAll, parts(\"c\"))"));
+        }
+        UNSCOPED_INFO("prepended");
+        CHECK(has(r, "table.insert(gAll, 1, \"first\")"));
+        UNSCOPED_INFO("a list by its name");
+        CHECK(has(r, "table.extend(gAll, more)"));
+        UNSCOPED_INFO("several that do not run apart, each had before any is added");
+        CHECK(has(r, "table.append(gAll, ll.GetTime(), ll.Frand(1.0))"));
+        UNSCOPED_INFO("passed to a function that only reads it");
+        CHECK(has(r, "table.insert(gSeen, n)"));
+        {
+            INFO("passed to one that keeps it");
+            CHECK(has(r, "gPassed = table.extend(table.clone(gPassed), { n })"));
+            CHECK(has(r, "-- LSL: LSL's lists were values, and gPassed is passed to a function of the script's that keeps it"));
+        }
+        {
+            INFO("returned");
+            CHECK(has(r, "gKept = table.extend(table.clone(gKept), { 2 })"));
+            CHECK(has(r, "gKept is returned by a function"));
+        }
+        {
+            INFO("given to another");
+            CHECK(has(r, "a = table.extend(table.clone(a), { 2 })"));
+            CHECK(has(r, "a is given to another variable"));
+        }
+        {
+            INFO("read where a call in the statement grows it");
+            CHECK(has(r, "gGrown = table.extend(table.clone(gGrown), { 1 })"));
+            CHECK(has(r, "gGrown is read where a call of the script's in the same statement changes it"));
+        }
+        UNSCOPED_INFO("said once for each");
+        CHECK(count(r, "and gPassed is") == 1);
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<15>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: strings built in loops joined once from a table; noted where not", "[ALLSLToSLua]")
     {
-        set_test_name("strings built in loops: their pieces in a table, joined once after the loop that builds them; noted where they cannot be");
-        const ALLSLToSLua::Result r = convert("string gReport;\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    list names = [\"a\", \"b\", \"c\"];\n"
-                                              "    integer outParts = 1;\n"
-                                              "    string out = \"Names: \";\n"
-                                              "    integer i;\n"
-                                              "    for (i = 0; i < llGetListLength(names); ++i) {\n"
-                                              "        string row = \"\";\n"
-                                              "        integer j;\n"
-                                              "        for (j = 0; j < 3; ++j) row += (string)j;\n"
-                                              "        out = out + llList2String(names, i) + row;\n"
-                                              "    }\n"
-                                              "    string seen;\n"
-                                              "    integer k;\n"
-                                              "    for (k = 0; k < 3; ++k) { seen += \"x\"; if (llStringLength(seen) > 2) llOwnerSay(seen); }\n"
-                                              "    for (k = 0; k < 2; ++k) gReport += \"y\";\n"
-                                              "    llOwnerSay(out + seen + gReport + (string)outParts);\n"
-                                              "} }\n");
-        ensure("the outer loop's table, a name of its own: " + r.text, has(r, "local outParts2 = {}\n    for _, item in names do"));
-        ensure("the pieces put in: " + r.text, has(r, "table.insert(outParts2, item .. row)"));
-        ensure("joined after: " + r.text, has(r, "    end\n    out ..= table.concat(outParts2)"));
-        ensure("the inner loop's, declared in the outer: " + r.text,
-               has(r, "        local rowParts = {}\n        for j = 0, 2 do\n            table.insert(rowParts, tostring(j))"));
-        ensure("declared empty just before it: declared where it is joined: " + r.text,
-               has(r, "        end\n        local row = table.concat(rowParts)") && !has(r, "local row = \"\""));
-        ensure("declared with words of its own: added to: " + r.text, has(r, "local out = \"Names: \"") && has(r, "out ..= table.concat(outParts2)"));
-        ensure("read in its loop: noted: " + r.text, has(r, "seen ..= \"x\"") && has(r, "-- LSL: seen is built with .. in a loop"));
-        ensure("a global: noted: " + r.text, has(r, "gReport ..= \"y\"") && has(r, "-- LSL: gReport is built with .. in a loop"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("string gReport;\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    list names = [\"a\", \"b\", \"c\"];\n"
+                                                        "    integer outParts = 1;\n"
+                                                        "    string out = \"Names: \";\n"
+                                                        "    integer i;\n"
+                                                        "    for (i = 0; i < llGetListLength(names); ++i) {\n"
+                                                        "        string row = \"\";\n"
+                                                        "        integer j;\n"
+                                                        "        for (j = 0; j < 3; ++j) row += (string)j;\n"
+                                                        "        out = out + llList2String(names, i) + row;\n"
+                                                        "    }\n"
+                                                        "    string seen;\n"
+                                                        "    integer k;\n"
+                                                        "    for (k = 0; k < 3; ++k) { seen += \"x\"; if (llStringLength(seen) > 2) llOwnerSay(seen); }\n"
+                                                        "    for (k = 0; k < 2; ++k) gReport += \"y\";\n"
+                                                        "    llOwnerSay(out + seen + gReport + (string)outParts);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("the outer loop's table, a name of its own");
+        CHECK(has(r, "local outParts2 = {}\n    for _, item in names do"));
+        UNSCOPED_INFO("the pieces put in");
+        CHECK(has(r, "table.insert(outParts2, item .. row)"));
+        UNSCOPED_INFO("joined after");
+        CHECK(has(r, "    end\n    out ..= table.concat(outParts2)"));
+        UNSCOPED_INFO("the inner loop's, declared in the outer");
+        CHECK(has(r, "        local rowParts = {}\n        for j = 0, 2 do\n            table.insert(rowParts, tostring(j))"));
+        {
+            INFO("declared empty just before it: declared where it is joined");
+            CHECK(has(r, "        end\n        local row = table.concat(rowParts)"));
+            CHECK_FALSE(has(r, "local row = \"\""));
+        }
+        {
+            INFO("declared with words of its own: added to");
+            CHECK(has(r, "local out = \"Names: \""));
+            CHECK(has(r, "out ..= table.concat(outParts2)"));
+        }
+        {
+            INFO("read in its loop: noted");
+            CHECK(has(r, "seen ..= \"x\""));
+            CHECK(has(r, "-- LSL: seen is built with .. in a loop"));
+        }
+        {
+            INFO("a global: noted");
+            CHECK(has(r, "gReport ..= \"y\""));
+            CHECK(has(r, "-- LSL: gReport is built with .. in a loop"));
+        }
+        require_checks_clean(r);
 
         ALLSLToSLua::Options typed;
         typed.types = true;
         const ALLSLToSLua::Result t = ALLSLToSLua::convert("default { state_entry() { string s; integer i; for (i = 0; i < 3; ++i) s += \"z\"; llOwnerSay(s); } }\n",
                                                            typed);
-        ensure("typed: " + t.text, has(t, "local sParts: { string } = {}") && has(t, "local s: string = table.concat(sParts)"));
-        checksClean(t);
+        CAPTURE(t.text);
+        CHECK(has(t, "local sParts: { string } = {}"));
+        CHECK(has(t, "local s: string = table.concat(sParts)"));
+        require_checks_clean(t);
 
-        const ALLSLToSLua::Result read = convert("default { state_entry() { string t = \"\"; llOwnerSay(t); integer i; for (i = 0; i < 3; ++i) t += \"q\"; llOwnerSay(t); } }\n");
-        ensure("read between: declared where it was: " + read.text, has(read, "local t = \"\"") && has(read, "t ..= table.concat(tParts)"));
-        checksClean(read);
+        const ALLSLToSLua::Result read = require_converted("default { state_entry() { string t = \"\"; llOwnerSay(t); integer i; for (i = 0; i < 3; ++i) t += \"q\"; llOwnerSay(t); } }\n");
+        CAPTURE(read.text);
+        {
+            INFO("read between: declared where it was");
+            CHECK(has(read, "local t = \"\""));
+            CHECK(has(read, "t ..= table.concat(tParts)"));
+        }
+        require_checks_clean(read);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<16>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: compound assignments: x op= y; integer /= and %= whole; vector %= cross", "[ALLSLToSLua]")
     {
-        set_test_name("x = x op y as Luau's own compound assignments; an integer's /= and %= written whole, as / and % are; a vector's %= its cross product");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    integer a = 7; float f = 3.0; vector v = <1, 0, 0>;\n"
-                                              "    a /= 2; a %= 3; f /= 2.0; v %= <0, 1, 0>;\n"
-                                              "    integer b = 1; integer c = 2; string s = \"x\";\n"
-                                              "    b = b + c; b = b - (c - 1); b = b - c - 1; c = c * 2 + b; s = s + \"y\" + (string)b;\n"
-                                              "    llOwnerSay((string)a + (string)f + (string)v + s + (string)(b + c));\n"
-                                              "} }\n");
-        ensure("integer division: " + r.text, has(r, "a = bit32.s32(a / 2)") && !has(r, "//="));
-        ensure("remainder: " + r.text, has(r, "a = math.fmod(a, 3)") && !has(r, "%="));
-        ensure("a float's: " + r.text, has(r, "f /= 2.0"));
-        ensure("a vector's cross product: " + r.text, has(r, "v = vector.cross(v, vector(0, 1, 0))"));
-        ensure("x = x op y: " + r.text, has(r, "b += c") && has(r, "b -= c - 1"));
-        ensure("not where the left of the operator is more than x: " + r.text, has(r, "b = b - c - 1") && has(r, "c = c * 2 + b"));
-        ensure("a string's pieces, joined: " + r.text, has(r, "s ..= `y{b}`"));
-        ensure("a float's and a vector's as LSL writes them, in one interpolated string: " + r.text,
-               has(r, "print(`{a}{string.format(\"%.6f\", f)}{ll.DumpList2String({ v }, \"\")}{s}{b + c}`)"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    integer a = 7; float f = 3.0; vector v = <1, 0, 0>;\n"
+                                                        "    a /= 2; a %= 3; f /= 2.0; v %= <0, 1, 0>;\n"
+                                                        "    integer b = 1; integer c = 2; string s = \"x\";\n"
+                                                        "    b = b + c; b = b - (c - 1); b = b - c - 1; c = c * 2 + b; s = s + \"y\" + (string)b;\n"
+                                                        "    llOwnerSay((string)a + (string)f + (string)v + s + (string)(b + c));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("integer division");
+            CHECK(has(r, "a = bit32.s32(a / 2)"));
+            CHECK_FALSE(has(r, "//="));
+        }
+        {
+            INFO("remainder");
+            CHECK(has(r, "a = math.fmod(a, 3)"));
+            CHECK_FALSE(has(r, "%="));
+        }
+        UNSCOPED_INFO("a float's");
+        CHECK(has(r, "f /= 2.0"));
+        UNSCOPED_INFO("a vector's cross product");
+        CHECK(has(r, "v = vector.cross(v, vector(0, 1, 0))"));
+        {
+            INFO("x = x op y");
+            CHECK(has(r, "b += c"));
+            CHECK(has(r, "b -= c - 1"));
+        }
+        {
+            INFO("not where the left of the operator is more than x");
+            CHECK(has(r, "b = b - c - 1"));
+            CHECK(has(r, "c = c * 2 + b"));
+        }
+        UNSCOPED_INFO("a string's pieces, joined");
+        CHECK(has(r, "s ..= `y{b}`"));
+        UNSCOPED_INFO("a float's and a vector's as LSL writes them, in one interpolated string");
+        CHECK(has(r, "print(`{a}{string.format(\"%.6f\", f)}{ll.DumpList2String({ v }, \"\")}{s}{b + c}`)"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<17>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a minus before a negative number is bracketed and not a comment", "[ALLSLToSLua]")
     {
-        set_test_name("a minus before a negative number is bracketed, not a comment");
-        const ALLSLToSLua::Result r = convert("default { state_entry() { integer a = -5; llOwnerSay((string)(-(-2147483648)) + (string)(-a) + (string)(- -a)); } }\n");
-        ensure("bracketed: " + r.text, has(r, "-(-2147483648)") && !has(r, "--2147483648"));
-        ensure("a name as it was: " + r.text, has(r, "}{-a}{"));
-        ensure("twice: " + r.text, has(r, "-(-a)"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() { integer a = -5; llOwnerSay((string)(-(-2147483648)) + (string)(-a) + (string)(- -a)); } }\n");
+        CAPTURE(r.text);
+        {
+            INFO("bracketed");
+            CHECK(has(r, "-(-2147483648)"));
+            CHECK_FALSE(has(r, "--2147483648"));
+        }
+        UNSCOPED_INFO("a name as it was");
+        CHECK(has(r, "}{-a}{"));
+        UNSCOPED_INFO("twice");
+        CHECK(has(r, "-(-a)"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<18>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a one-state script's state_exit never ran: left out and said", "[ALLSLToSLua]")
     {
-        set_test_name("a script of one state: its state_exit, which never ran and SLua has no event for, left out and said");
-        const ALLSLToSLua::Result r = convert("default { state_entry() { llOwnerSay(\"in\"); } state_exit() { llOwnerSay(\"out\"); } touch_start(integer n) { } }\n");
-        ensure("not an event: " + r.text, !has(r, "\"state_exit\"") && !has(r, "print(\"out\")"));
-        ensure("said where it was: " + r.text, noted(r, "SluaStateExit") && has(r, "-- LSL: state_exit runs as a script leaves a state") &&
-                                                  has(r, "-- state_exit, left out"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() { llOwnerSay(\"in\"); } state_exit() { llOwnerSay(\"out\"); } touch_start(integer n) { } }\n");
+        CAPTURE(r.text);
+        {
+            INFO("not an event");
+            CHECK_FALSE(has(r, "\"state_exit\""));
+            CHECK_FALSE(has(r, "print(\"out\")"));
+        }
+        {
+            INFO("said where it was");
+            CHECK(noted(r, "SluaStateExit"));
+            CHECK(has(r, "-- LSL: state_exit runs as a script leaves a state"));
+            CHECK(has(r, "-- state_exit, left out"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<19>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a function SLua lacks left out and said; boolean ll lists kept on llcompat", "[ALLSLToSLua]")
     {
-        set_test_name("a function SLua has nowhere left out and said; one whose ll list has booleans for LSL's 1 and 0 kept on llcompat");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    llPointAt(ZERO_VECTOR);\n"
-                                              "    list e = llGetExperienceList(NULL_KEY);\n"
-                                              "    if (llList2Integer(llGetPrimitiveParams([PRIM_FULLBRIGHT, 0]), 0)) llOwnerSay((string)llGetListLength(e));\n"
-                                              "} }\n");
-        ensure("left out: " + r.text, !has(r, "PointAt(") && has(r, "-- llPointAt, left out") && noted(r, "SluaAbsent", "llPointAt"));
-        ensure("its empty value where read: " + r.text, has(r, "local e = {}") && noted(r, "SluaAbsent", "llGetExperienceList"));
-        ensure("llcompat, said: " + r.text, has(r, "llcompat.GetPrimitiveParams({ PRIM_FULLBRIGHT, 0 })") && noted(r, "SluaBoolList", "GetPrimitiveParams"));
-        ensure("not a truth: " + r.text, !has(r, "if llcompat.GetPrimitiveParams"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    llPointAt(ZERO_VECTOR);\n"
+                                                        "    list e = llGetExperienceList(NULL_KEY);\n"
+                                                        "    if (llList2Integer(llGetPrimitiveParams([PRIM_FULLBRIGHT, 0]), 0)) llOwnerSay((string)llGetListLength(e));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("left out");
+            CHECK_FALSE(has(r, "PointAt("));
+            CHECK(has(r, "-- llPointAt, left out"));
+            CHECK(noted(r, "SluaAbsent", "llPointAt"));
+        }
+        {
+            INFO("its empty value where read");
+            CHECK(has(r, "local e = {}"));
+            CHECK(noted(r, "SluaAbsent", "llGetExperienceList"));
+        }
+        {
+            INFO("llcompat, said");
+            CHECK(has(r, "llcompat.GetPrimitiveParams({ PRIM_FULLBRIGHT, 0 })"));
+            CHECK(noted(r, "SluaBoolList", "GetPrimitiveParams"));
+        }
+        UNSCOPED_INFO("not a truth");
+        CHECK_FALSE(has(r, "if llcompat.GetPrimitiveParams"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<20>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: NULL_KEY and such constants: a uuid as a key and a string as text", "[ALLSLToSLua]")
     {
-        set_test_name("NULL_KEY and the constants LSL types a string and SLua a uuid: a key where compared with one or given as one, LSL's string where read as one");
-        const ALLSLToSLua::Result r = convert("string gName = NULL_KEY;\n"
-                                              "key gKey = NULL_KEY;\n"
-                                              "string nothing() { return NULL_KEY; }\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    key k = llDetectedKey(0);\n"
-                                              "    if (k != NULL_KEY) llOwnerSay(\"someone\");\n"
-                                              "    if (NULL_KEY != \"\") llOwnerSay(llGetSubString(NULL_KEY, 0, 7));\n"
-                                              "    list l = [NULL_KEY, TEXTURE_BLANK];\n"
-                                              "    if (NULL_KEY) llOwnerSay(gName + nothing() + (string)gKey + (string)llGetListLength(l));\n"
-                                              "} }\n");
-        ensure("a key against a key: " + r.text, has(r, "if k ~= NULL_KEY then"));
-        ensure("a string where LSL's string was: " + r.text, has(r, "tostring(NULL_KEY) ~= \"\"") && has(r, "ll.GetSubString(tostring(NULL_KEY), 1, 8)"));
-        ensure("in a list, as LSL had it: " + r.text, has(r, "{ tostring(NULL_KEY), tostring(TEXTURE_BLANK) }"));
-        ensure("a string's truth: " + r.text, has(r, "if tostring(NULL_KEY) ~= \"\" then print("));
-        ensure("given to a string and a key: " + r.text, has(r, "local gName = tostring(NULL_KEY)") && has(r, "local gKey = NULL_KEY"));
-        ensure("returned as a string function's: " + r.text, has(r, "return tostring(NULL_KEY)"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("string gName = NULL_KEY;\n"
+                                                        "key gKey = NULL_KEY;\n"
+                                                        "string nothing() { return NULL_KEY; }\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    key k = llDetectedKey(0);\n"
+                                                        "    if (k != NULL_KEY) llOwnerSay(\"someone\");\n"
+                                                        "    if (NULL_KEY != \"\") llOwnerSay(llGetSubString(NULL_KEY, 0, 7));\n"
+                                                        "    list l = [NULL_KEY, TEXTURE_BLANK];\n"
+                                                        "    if (NULL_KEY) llOwnerSay(gName + nothing() + (string)gKey + (string)llGetListLength(l));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a key against a key");
+        CHECK(has(r, "if k ~= NULL_KEY then"));
+        {
+            INFO("a string where LSL's string was");
+            CHECK(has(r, "tostring(NULL_KEY) ~= \"\""));
+            CHECK(has(r, "ll.GetSubString(tostring(NULL_KEY), 1, 8)"));
+        }
+        UNSCOPED_INFO("in a list, as LSL had it");
+        CHECK(has(r, "{ tostring(NULL_KEY), tostring(TEXTURE_BLANK) }"));
+        UNSCOPED_INFO("a string's truth");
+        CHECK(has(r, "if tostring(NULL_KEY) ~= \"\" then print("));
+        {
+            INFO("given to a string and a key");
+            CHECK(has(r, "local gName = tostring(NULL_KEY)"));
+            CHECK(has(r, "local gKey = NULL_KEY"));
+        }
+        UNSCOPED_INFO("returned as a string function's");
+        CHECK(has(r, "return tostring(NULL_KEY)"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<21>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: Tailslide's test scripts convert and check clean or are refused", "[ALLSLToSLua]")
     {
-        set_test_name("Tailslide's own test scripts: every one it takes converts and checks as SLua, and each it refuses is refused");
         // Those Tailslide says are wrong LSL, by design.
         static const std::set<std::string> REFUSED = { "bad_globals.lsl", "bugs/0002.lsl", "bugs/0003.lsl", "bugs/0006.lsl", "bugs/0007.lsl",
                                                           "bugs/0010.lsl", "bugs/0015.lsl", "bugs/0017.lsl", "bugs/0019.lsl", "bugs/bad-for-exprs.lsl",
@@ -800,7 +1110,8 @@ namespace tut
             }
         }
         std::sort(files.begin(), files.end());
-        ensure("the scripts: " + dir, files.size() > 100);
+        CAPTURE(dir);
+        REQUIRE(files.size() > 100);
         std::string wrong;
         size_t      converted = 0;
         for (const std::string& name : files)
@@ -829,217 +1140,282 @@ namespace tut
                 }
             }
         }
-        ensure("every one as it should be:\n" + wrong, wrong.empty());
-        ensure_equals("those taken, converted", converted + REFUSED.size(), files.size());
+        CAPTURE(wrong);
+        CHECK(wrong.empty());
+        UNSCOPED_INFO("those taken, converted");
+        CHECK(converted + REFUSED.size() == files.size());
     }
 
-    template<> template<>
-    void allsltoslua_object::test<22>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: deprecated ll: SLua's own way where it means the same or llcompat noted", "[ALLSLToSLua]")
     {
-        set_test_name("what SLua deprecates: its own way where it means the same -- math.floor(x + 0.5), utf8.len, an index read as LSL's -- and llcompat, with SLua's word, where not");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    string s = \"a:b\"; list l = [\"x\", 2];\n"
-                                              "    integer at = llSubStringIndex(s, \":\");\n"
-                                              "    integer n = llStringLength(s) + llRound(1.5);\n"
-                                              "    llOwnerSay(llList2String(l, at) + (string)(at + n));\n"
-                                              "} }\n");
-        ensure("an index read as LSL's: " + r.text, has(r, "local at = (ll.SubStringIndex(s, \":\") or 0) - 1"));
-        ensure("utf8.len and half up: " + r.text, has(r, "local n = (utf8.len(s) :: number) + math.floor(1.5 + 0.5)"));
-        ensure("llcompat, with SLua's word: " + r.text,
-               has(r, "llcompat.List2String(l, at)") && has(r, "-- LSL: SLua deprecates ll.List2String: Use '[]' and 'tostring' instead."));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    string s = \"a:b\"; list l = [\"x\", 2];\n"
+                                                        "    integer at = llSubStringIndex(s, \":\");\n"
+                                                        "    integer n = llStringLength(s) + llRound(1.5);\n"
+                                                        "    llOwnerSay(llList2String(l, at) + (string)(at + n));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("an index read as LSL's");
+        CHECK(has(r, "local at = (ll.SubStringIndex(s, \":\") or 0) - 1"));
+        UNSCOPED_INFO("utf8.len and half up");
+        CHECK(has(r, "local n = (utf8.len(s) :: number) + math.floor(1.5 + 0.5)"));
+        {
+            INFO("llcompat, with SLua's word");
+            CHECK(has(r, "llcompat.List2String(l, at)"));
+            CHECK(has(r, "-- LSL: SLua deprecates ll.List2String: Use '[]' and 'tostring' instead."));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<23>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: keys that hold text stay strings: link_message's id and non-UUID text", "[ALLSLToSLua]")
     {
-        set_test_name("keys that hold text: link_message's id as SLua passes it, a string; a key given text that is no UUID kept a string; text where SLua takes it, ll's key too");
-        const ALLSLToSLua::Result r = convert("key DOMAIN = \"MY CHANNEL\";\n"
-                                              "key gOwner;\n"
-                                              "send(key to) { llMessageLinked(LINK_SET, 0, \"\", to); }\n"
-                                              "default {\n"
-                                              "    state_entry() {\n"
-                                              "        gOwner = llGetOwner();\n"
-                                              "        llMessageLinked(LINK_SET, 1, \"hi\", DOMAIN);\n"
-                                              "        send(\"other text\");\n"
-                                              "        llMessageLinked(LINK_SET, 2, \"x\", gOwner);\n"
-                                              "    }\n"
-                                              "    link_message(integer s, integer n, string m, key id) {\n"
-                                              "        if (id == DOMAIN) llOwnerSay(m);\n"
-                                              "        if (id == gOwner) llOwnerSay(\"owner\");\n"
-                                              "        key k = id;\n"
-                                              "        llOwnerSay((string)llGetOwnerKey(\"abc\") + (string)k);\n"
-                                              "    }\n"
-                                              "}\n");
-        ensure("a key given text, a string: " + r.text, has(r, "local DOMAIN = \"MY CHANNEL\""));
-        ensure("text where SLua takes it: " + r.text,
-               has(r, "ll.MessageLinked(LINK_SET, 1, \"hi\", DOMAIN)") && has(r, "ll.MessageLinked(LINK_SET, 2, \"x\", gOwner)") &&
-                   has(r, "send(\"other text\")") && has(r, "ll.MessageLinked(LINK_SET, 0, \"\", to)"));
-        ensure("compared as text: " + r.text, has(r, "if id == DOMAIN then") && has(r, "if id == tostring(gOwner) then"));
-        ensure("a key given the id, text: " + r.text, has(r, "local k = id") && has(r, "{k}`)"));
-        ensure("ll's key given text as it is, said: " + r.text,
-               has(r, "ll.GetOwnerKey(\"abc\" :: any)") && noted(r, "SluaKeyAsText") && !noted(r, "SluaKeyText"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("key DOMAIN = \"MY CHANNEL\";\n"
+                                                        "key gOwner;\n"
+                                                        "send(key to) { llMessageLinked(LINK_SET, 0, \"\", to); }\n"
+                                                        "default {\n"
+                                                        "    state_entry() {\n"
+                                                        "        gOwner = llGetOwner();\n"
+                                                        "        llMessageLinked(LINK_SET, 1, \"hi\", DOMAIN);\n"
+                                                        "        send(\"other text\");\n"
+                                                        "        llMessageLinked(LINK_SET, 2, \"x\", gOwner);\n"
+                                                        "    }\n"
+                                                        "    link_message(integer s, integer n, string m, key id) {\n"
+                                                        "        if (id == DOMAIN) llOwnerSay(m);\n"
+                                                        "        if (id == gOwner) llOwnerSay(\"owner\");\n"
+                                                        "        key k = id;\n"
+                                                        "        llOwnerSay((string)llGetOwnerKey(\"abc\") + (string)k);\n"
+                                                        "    }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a key given text, a string");
+        CHECK(has(r, "local DOMAIN = \"MY CHANNEL\""));
+        {
+            INFO("text where SLua takes it");
+            CHECK(has(r, "ll.MessageLinked(LINK_SET, 1, \"hi\", DOMAIN)"));
+            CHECK(has(r, "ll.MessageLinked(LINK_SET, 2, \"x\", gOwner)"));
+            CHECK(has(r, "send(\"other text\")"));
+            CHECK(has(r, "ll.MessageLinked(LINK_SET, 0, \"\", to)"));
+        }
+        {
+            INFO("compared as text");
+            CHECK(has(r, "if id == DOMAIN then"));
+            CHECK(has(r, "if id == tostring(gOwner) then"));
+        }
+        {
+            INFO("a key given the id, text");
+            CHECK(has(r, "local k = id"));
+            CHECK(has(r, "{k}`)"));
+        }
+        {
+            INFO("ll's key given text as it is, said");
+            CHECK(has(r, "ll.GetOwnerKey(\"abc\" :: any)"));
+            CHECK(noted(r, "SluaKeyAsText"));
+            CHECK_FALSE(noted(r, "SluaKeyText"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<24>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: notes only where they say something: &&; deprecations; bit32's range", "[ALLSLToSLua]")
     {
-        set_test_name("a note only where it says something: && not over a read, a deprecated call's reason rather than its indexes; bit32's range made LSL's, not for an & with a flag nor a truth");
-        const ALLSLToSLua::Result r = convert("integer sayIt() { llOwnerSay(\"x\"); return 1; }\n"
-                                              "default { changed(integer what) {\n"
-                                              "    if (what & CHANGED_LINK && llGetLinkNumber() == 0) llDie();\n"
-                                              "    integer m = what | 0x80000000;\n"
-                                              "    list l = [\"a\"];\n"
-                                              "    llOwnerSay(llList2String(l, what) + (string)m);\n"
-                                              "    if ((what & 3) && sayIt()) llDie();\n"
-                                              "} }\n");
-        ensure("bit32's range made LSL's where it shows: " + r.text, has(r, "local m = bit32.s32(bit32.bor(what, ") && count(r, "-- LSL: bit32") == 1);
-        ensure("not for a flag's truth: " + r.text, has(r, "if bit32.btest(what, CHANGED_LINK)"));
-        ensure("&& said once, over a call that does something: " + r.text,
-               count(r, "leaves its right side unrun") == 1 && has(r, "LSL ran both sides, the right one first.\n    if bit32.btest(what, 3) and sayIt()"));
-        ensure("the deprecated call's reason only: " + r.text, has(r, "-- LSL: SLua deprecates ll.List2String") && !has(r, "takes indexes from 0"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer sayIt() { llOwnerSay(\"x\"); return 1; }\n"
+                                                        "default { changed(integer what) {\n"
+                                                        "    if (what & CHANGED_LINK && llGetLinkNumber() == 0) llDie();\n"
+                                                        "    integer m = what | 0x80000000;\n"
+                                                        "    list l = [\"a\"];\n"
+                                                        "    llOwnerSay(llList2String(l, what) + (string)m);\n"
+                                                        "    if ((what & 3) && sayIt()) llDie();\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("bit32's range made LSL's where it shows");
+            CHECK(has(r, "local m = bit32.s32(bit32.bor(what, "));
+            CHECK(count(r, "-- LSL: bit32") == 1);
+        }
+        UNSCOPED_INFO("not for a flag's truth");
+        CHECK(has(r, "if bit32.btest(what, CHANGED_LINK)"));
+        {
+            INFO("&& said once, over a call that does something");
+            CHECK(count(r, "leaves its right side unrun") == 1);
+            CHECK(has(r, "LSL ran both sides, the right one first.\n    if bit32.btest(what, 3) and sayIt()"));
+        }
+        {
+            INFO("the deprecated call's reason only");
+            CHECK(has(r, "-- LSL: SLua deprecates ll.List2String"));
+            CHECK_FALSE(has(r, "takes indexes from 0"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<25>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: flatter expressions: joined text unbracketed; one bit32 call per chain", "[ALLSLToSLua]")
     {
-        set_test_name("flatter expressions: text joined in a chain without brackets, and an &, | or ^ of the same again one bit32 call");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    string b = \"b\"; integer n = 3; integer f = 5;\n"
-                                              "    llOwnerSay(\"a\" + b + \"c\" + (string)n);\n"
-                                              "    llSetTextureAnim(ANIM_ON | ROTATE | LOOP, ALL_SIDES, 0, 0, 0, TWO_PI, 1.0);\n"
-                                              "    llOwnerSay((string)((f | 2) & n));\n"
-                                              "} }\n");
-        ensure("a chain, one string: " + r.text, has(r, "print(`a{b}c{n}`)"));
-        ensure("one call: " + r.text, has(r, "ll.SetTextureAnim(bit32.bor(ANIM_ON, ROTATE, LOOP), ALL_SIDES"));
-        ensure("not across operators: " + r.text, has(r, "bit32.band(bit32.bor(f, 2), n)"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    string b = \"b\"; integer n = 3; integer f = 5;\n"
+                                                        "    llOwnerSay(\"a\" + b + \"c\" + (string)n);\n"
+                                                        "    llSetTextureAnim(ANIM_ON | ROTATE | LOOP, ALL_SIDES, 0, 0, 0, TWO_PI, 1.0);\n"
+                                                        "    llOwnerSay((string)((f | 2) & n));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a chain, one string");
+        CHECK(has(r, "print(`a{b}c{n}`)"));
+        UNSCOPED_INFO("one call");
+        CHECK(has(r, "ll.SetTextureAnim(bit32.bor(ANIM_ON, ROTATE, LOOP), ALL_SIDES"));
+        UNSCOPED_INFO("not across operators");
+        CHECK(has(r, "bit32.band(bit32.bor(f, 2), n)"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<26>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: steps as statements before or after theirs unless something reads x", "[ALLSLToSLua]")
     {
-        set_test_name("steps as statements: x++ after its statement, ++x and x = v before it, where nothing else in it reads x; kept in place where something could");
-        const ALLSLToSLua::Result r = convert("integer gLine;\n"
-                                              "integer bump() { return ++gLine; }\n"
-                                              "default { state_entry() {\n"
-                                              "    integer n = 0;\n"
-                                              "    llSay(n++, \"a\");\n"
-                                              "    integer m = ++n;\n"
-                                              "    integer k = n++ + n;\n"
-                                              "    llOwnerSay((string)(gLine++));\n"
-                                              "    llOwnerSay((string)bump() + (string)(gLine++) + (string)(m + k));\n"
-                                              "} }\n");
-        ensure("after: " + r.text, has(r, "ll.Say(n, \"a\")\nn += 1\n"));
-        ensure("before: " + r.text, has(r, "\nn += 1\nlocal m = n\n"));
-        ensure("read again, kept: " + r.text, has(r, "local k = (function() local was = n; n += 1 return was end)() + n"));
-        ensure("a global with nothing of the script's called: " + r.text, has(r, "print(tostring(gLine))\ngLine += 1\n"));
-        ensure("a global beside a call of the script's, kept: " + r.text, has(r, "print(`{bump()}{(function() local was = gLine;"));
-        ensure("a return's step before it: " + r.text, has(r, "    gLine += 1\n    return gLine\n"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer gLine;\n"
+                                                        "integer bump() { return ++gLine; }\n"
+                                                        "default { state_entry() {\n"
+                                                        "    integer n = 0;\n"
+                                                        "    llSay(n++, \"a\");\n"
+                                                        "    integer m = ++n;\n"
+                                                        "    integer k = n++ + n;\n"
+                                                        "    llOwnerSay((string)(gLine++));\n"
+                                                        "    llOwnerSay((string)bump() + (string)(gLine++) + (string)(m + k));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("after");
+        CHECK(has(r, "ll.Say(n, \"a\")\nn += 1\n"));
+        UNSCOPED_INFO("before");
+        CHECK(has(r, "\nn += 1\nlocal m = n\n"));
+        UNSCOPED_INFO("read again, kept");
+        CHECK(has(r, "local k = (function() local was = n; n += 1 return was end)() + n"));
+        UNSCOPED_INFO("a global with nothing of the script's called");
+        CHECK(has(r, "print(tostring(gLine))\ngLine += 1\n"));
+        UNSCOPED_INFO("a global beside a call of the script's, kept");
+        CHECK(has(r, "print(`{bump()}{(function() local was = gLine;"));
+        UNSCOPED_INFO("a return's step before it");
+        CHECK(has(r, "    gLine += 1\n    return gLine\n"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<27>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: simpler conditions: negated comparisons flipped; if-set booleans direct", "[ALLSLToSLua]")
     {
-        set_test_name("simpler conditions: !(a == b) as a ~= b, a boolean given TRUE or FALSE by an if as the check itself");
-        const ALLSLToSLua::Result r = convert("integer gOn;\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    if (!(n == 2)) llOwnerSay(\"not two\");\n"
-                                              "    if (!(n != 3)) llOwnerSay(\"three\");\n"
-                                              "    if (n > 1) gOn = TRUE; else gOn = FALSE;\n"
-                                              "    if (n > 5) { gOn = FALSE; } else { gOn = TRUE; }\n"
-                                              "    if (gOn) llOwnerSay(\"on\");\n"
-                                              "} }\n");
-        ensure("flipped: " + r.text, has(r, "if n ~= 2 then") && has(r, "if n == 3 then"));
-        const ALLSLToSLua::Result nots = convert("integer gOn;\n"
-                                                 "default { touch_start(integer n) {\n"
-                                                 "    if (!n) llOwnerSay(\"none\"); if (!(n & 4)) llOwnerSay(\"no four\"); if (!(n > 1)) llDie();\n"
-                                                 "    gOn = !gOn; if (gOn) llOwnerSay(\"on\");\n"
-                                                 "} }\n");
-        ensure("not a number: the other way round: " + nots.text,
-               has(nots, "if n == 0 then") && has(nots, "if not bit32.btest(n, 4) then") && has(nots, "if not (n > 1) then") &&
-                   has(nots, "gOn = not gOn"));
-        checksClean(nots);
-        ensure("the check itself: " + r.text, has(r, "    gOn = n > 1\n") && has(r, "    gOn = not (n > 5)\n"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer gOn;\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    if (!(n == 2)) llOwnerSay(\"not two\");\n"
+                                                        "    if (!(n != 3)) llOwnerSay(\"three\");\n"
+                                                        "    if (n > 1) gOn = TRUE; else gOn = FALSE;\n"
+                                                        "    if (n > 5) { gOn = FALSE; } else { gOn = TRUE; }\n"
+                                                        "    if (gOn) llOwnerSay(\"on\");\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("flipped");
+            CHECK(has(r, "if n ~= 2 then"));
+            CHECK(has(r, "if n == 3 then"));
+        }
+        const ALLSLToSLua::Result nots = require_converted("integer gOn;\n"
+                                                           "default { touch_start(integer n) {\n"
+                                                           "    if (!n) llOwnerSay(\"none\"); if (!(n & 4)) llOwnerSay(\"no four\"); if (!(n > 1)) llDie();\n"
+                                                           "    gOn = !gOn; if (gOn) llOwnerSay(\"on\");\n"
+                                                           "} }\n");
+        CAPTURE(nots.text);
+        {
+            INFO("not a number: the other way round");
+            CHECK(has(nots, "if n == 0 then"));
+            CHECK(has(nots, "if not bit32.btest(n, 4) then"));
+            CHECK(has(nots, "if not (n > 1) then"));
+            CHECK(has(nots, "gOn = not gOn"));
+        }
+        require_checks_clean(nots);
+        {
+            INFO("the check itself");
+            CHECK(has(r, "    gOn = n > 1\n"));
+            CHECK(has(r, "    gOn = not (n > 5)\n"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<28>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a non-negative counter moved on by one as an index; loops count from 1", "[ALLSLToSLua]")
     {
-        set_test_name("a counter never below nought is an index ll takes moved on by one, and a loop whose counter is only such an index counts from 1");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    integer n = llGetInventoryNumber(INVENTORY_SOUND);\n"
-                                              "    integer i; for (i = 0; i < n; ++i) llOwnerSay(llGetInventoryName(INVENTORY_SOUND, i));\n"
-                                              "    integer j; for (j = 0; j < n; ++j) llOwnerSay((string)j + llGetInventoryName(INVENTORY_SOUND, j));\n"
-                                              "    integer k; for (k = n - 1; k >= 0; --k) llOwnerSay(llGetInventoryName(INVENTORY_SOUND, k));\n"
-                                              "    string s = \"abcdef\";\n"
-                                              "    integer c; for (c = 0; c <= 2; ++c) llOwnerSay(llGetSubString(s, c, c + 1));\n"
-                                              "} }\n");
-        ensure("counting from 1: " + r.text, has(r, "for i = 1, n do\n    print(ll.GetInventoryName(INVENTORY_SOUND, i))"));
-        ensure("read as a number too, moved on by one: " + r.text,
-               has(r, "for j = 0, n - 1 do\n    print(`{j}{ll.GetInventoryName(INVENTORY_SOUND, j + 1)}`)"));
-        ensure("down to nought: " + r.text, has(r, "for k = n - 1, 0, -1 do\n    print(ll.GetInventoryName(INVENTORY_SOUND, k + 1))"));
-        ensure("to and with, a number added: " + r.text, has(r, "for c = 1, 3 do\n    print(ll.GetSubString(s, c, c + 1))"));
-        ensure("no llcompat: " + r.text, !has(r, "llcompat."));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    integer n = llGetInventoryNumber(INVENTORY_SOUND);\n"
+                                                        "    integer i; for (i = 0; i < n; ++i) llOwnerSay(llGetInventoryName(INVENTORY_SOUND, i));\n"
+                                                        "    integer j; for (j = 0; j < n; ++j) llOwnerSay((string)j + llGetInventoryName(INVENTORY_SOUND, j));\n"
+                                                        "    integer k; for (k = n - 1; k >= 0; --k) llOwnerSay(llGetInventoryName(INVENTORY_SOUND, k));\n"
+                                                        "    string s = \"abcdef\";\n"
+                                                        "    integer c; for (c = 0; c <= 2; ++c) llOwnerSay(llGetSubString(s, c, c + 1));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("counting from 1");
+        CHECK(has(r, "for i = 1, n do\n    print(ll.GetInventoryName(INVENTORY_SOUND, i))"));
+        UNSCOPED_INFO("read as a number too, moved on by one");
+        CHECK(has(r, "for j = 0, n - 1 do\n    print(`{j}{ll.GetInventoryName(INVENTORY_SOUND, j + 1)}`)"));
+        UNSCOPED_INFO("down to nought");
+        CHECK(has(r, "for k = n - 1, 0, -1 do\n    print(ll.GetInventoryName(INVENTORY_SOUND, k + 1))"));
+        UNSCOPED_INFO("to and with, a number added");
+        CHECK(has(r, "for c = 1, 3 do\n    print(ll.GetSubString(s, c, c + 1))"));
+        UNSCOPED_INFO("no llcompat");
+        CHECK_FALSE(has(r, "llcompat."));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<29>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: list items read by index directly or through tostring; else llcompat", "[ALLSLToSLua]")
     {
-        set_test_name("a list's items read by index where they are already what is asked for: within its length as they are, else LSL's empty value past the end; tostring where that makes them so; llcompat where nothing does");
-        const ALLSLToSLua::Result r = convert("list gNames = [\"a\", \"b\"];\n"
-                                              "list parts(string s) { return llParseString2List(s, [\",\"], []); }\n"
-                                              "default { state_entry() {\n"
-                                              "    list p = parts(\"x,y\");\n"
-                                              "    list mixed = [1, \"two\", 3.0];\n"
-                                              "    list keys = [llGetOwner(), \"text\"];\n"
-                                              "    integer n = 1;\n"
-                                              "    llOwnerSay(llList2String(gNames, 0) + llList2String(p, -1) + llList2String(keys, 1));\n"
-                                              "    llOwnerSay(llList2String(mixed, 2) + (string)llList2Integer(mixed, 0) + llList2String(gNames, n));\n"
-                                              "    integer i; for (i = 0; i < llGetListLength(p); ++i) llOwnerSay(llList2String(p, i) + llGetSubString(\"abc\", i, i));\n"
-                                              "} }\n");
-        ensure("from the start, empty past the end: " + r.text, has(r, "(gNames[1] or \"\")"));
-        ensure("back from the end, through a function's list: " + r.text, has(r, "(p[#p] or \"\")"));
-        ensure("keys and text made text: " + r.text, has(r, "tostring(keys[2] or \"\")"));
-        ensure("a float's text is not tostring's, and an index not known: llcompat: " + r.text,
-               has(r, "llcompat.List2String(mixed, 2)") && has(r, "llcompat.List2String(gNames, n)"));
-        ensure("mixed items for a number: llcompat: " + r.text, has(r, "llcompat.List2Integer(mixed, 0)"));
-        ensure("within its length, as it is, counting from 1: " + r.text, has(r, "for i = 1, #p do\n    print(p[i] .. ll.GetSubString(\"abc\", i, i))"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("list gNames = [\"a\", \"b\"];\n"
+                                                        "list parts(string s) { return llParseString2List(s, [\",\"], []); }\n"
+                                                        "default { state_entry() {\n"
+                                                        "    list p = parts(\"x,y\");\n"
+                                                        "    list mixed = [1, \"two\", 3.0];\n"
+                                                        "    list keys = [llGetOwner(), \"text\"];\n"
+                                                        "    integer n = 1;\n"
+                                                        "    llOwnerSay(llList2String(gNames, 0) + llList2String(p, -1) + llList2String(keys, 1));\n"
+                                                        "    llOwnerSay(llList2String(mixed, 2) + (string)llList2Integer(mixed, 0) + llList2String(gNames, n));\n"
+                                                        "    integer i; for (i = 0; i < llGetListLength(p); ++i) llOwnerSay(llList2String(p, i) + llGetSubString(\"abc\", i, i));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("from the start, empty past the end");
+        CHECK(has(r, "(gNames[1] or \"\")"));
+        UNSCOPED_INFO("back from the end, through a function's list");
+        CHECK(has(r, "(p[#p] or \"\")"));
+        UNSCOPED_INFO("keys and text made text");
+        CHECK(has(r, "tostring(keys[2] or \"\")"));
+        {
+            INFO("a float's text is not tostring's, and an index not known: llcompat");
+            CHECK(has(r, "llcompat.List2String(mixed, 2)"));
+            CHECK(has(r, "llcompat.List2String(gNames, n)"));
+        }
+        UNSCOPED_INFO("mixed items for a number: llcompat");
+        CHECK(has(r, "llcompat.List2Integer(mixed, 0)"));
+        UNSCOPED_INFO("within its length, as it is, counting from 1");
+        CHECK(has(r, "for i = 1, #p do\n    print(p[i] .. ll.GetSubString(\"abc\", i, i))"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<30>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: unshared lists changed at either end in place; elsewhere a new list", "[ALLSLToSLua]")
     {
-        set_test_name("a list no other holds taken from or put to at its front or back in place: table.remove and table.insert; anywhere else, or one held elsewhere, as LSL made a new one");
-        const ALLSLToSLua::Result r = convert("list gQueue;\n"
-                                              "list gShared;\n"
-                                              "keep(list l) { gShared = l; }\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    gQueue += [n];\n"
-                                              "    gQueue = llListInsertList(gQueue, [n + 1], 0);\n"
-                                              "    gQueue = llDeleteSubList(gQueue, 0, 0);\n"
-                                              "    gQueue = llDeleteSubList(gQueue, -1, -1);\n"
-                                              "    gQueue = llDeleteSubList(gQueue, 1, 1);\n"
-                                              "    keep(gShared);\n"
-                                              "    gShared = llDeleteSubList(gShared, 0, 0);\n"
-                                              "} }\n");
-        ensure("in place: " + r.text, has(r, "table.insert(gQueue, 1, n + 1)") && has(r, "table.remove(gQueue, 1)") && has(r, "table.remove(gQueue)\n"));
-        ensure("elsewhere in the list, as LSL did: " + r.text, has(r, "gQueue = llcompat.DeleteSubList(gQueue, 1, 1)"));
-        ensure("one held elsewhere, as LSL did: " + r.text, has(r, "gShared = llcompat.DeleteSubList(gShared, 0, 0)"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("list gQueue;\n"
+                                                        "list gShared;\n"
+                                                        "keep(list l) { gShared = l; }\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    gQueue += [n];\n"
+                                                        "    gQueue = llListInsertList(gQueue, [n + 1], 0);\n"
+                                                        "    gQueue = llDeleteSubList(gQueue, 0, 0);\n"
+                                                        "    gQueue = llDeleteSubList(gQueue, -1, -1);\n"
+                                                        "    gQueue = llDeleteSubList(gQueue, 1, 1);\n"
+                                                        "    keep(gShared);\n"
+                                                        "    gShared = llDeleteSubList(gShared, 0, 0);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("in place");
+            CHECK(has(r, "table.insert(gQueue, 1, n + 1)"));
+            CHECK(has(r, "table.remove(gQueue, 1)"));
+            CHECK(has(r, "table.remove(gQueue)\n"));
+        }
+        UNSCOPED_INFO("elsewhere in the list, as LSL did");
+        CHECK(has(r, "gQueue = llcompat.DeleteSubList(gQueue, 1, 1)"));
+        UNSCOPED_INFO("one held elsewhere, as LSL did");
+        CHECK(has(r, "gShared = llcompat.DeleteSubList(gShared, 0, 0)"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<31>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: notes are keyed with their words and lint; the studio's words used", "[ALLSLToSLua]")
     {
-        set_test_name("each note is keyed, with the words it was said with, and carries the lint that finds the same in SLua where one "
-                      "does; the studio's words for a note are its comment's, and the header's");
         const std::string lsl = "default {\n"
                                 "    touch_start(integer n) {\n"
                                 "        string s = \"abc\";\n"
@@ -1050,26 +1426,40 @@ namespace tut
                                 "}\n";
         ALLSLToSLua::Options close = ALLSLToSLua::Options::closeToLSL();
         const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, close);
-        ensure("converted", r.converted);
+        CHECK(r.converted);
         std::string listed;
         for (const ALScriptProblem& p : r.notes)
         {
             listed += p.key + "(" + (p.args.empty() ? std::string() : p.args[0]) + ") " + p.code + "\n";
         }
+        CAPTURE(listed);
         // Once for each function, with the lint where there is one.
-        ensure("an index: " + listed, noted(r, "SluaIndex", "GetSubString"));
+        UNSCOPED_INFO("an index");
+        CHECK(noted(r, "SluaIndex", "GetSubString"));
         size_t indexes = 0;
         for (const ALScriptProblem& p : r.notes)
         {
             indexes += p.key == "SluaIndex";
             const bool compat = p.key == "SluaIndex" || p.key == "SluaIndexFound" || p.key == "SluaBool";
-            ensure("the lint of " + p.key + ": " + listed, compat ? p.code == "SlCompatCall" : p.code.empty());
-            ensure_equals("no mark left unfilled", p.message, ALScriptProblem::fill(p.message, p.args));
+            CAPTURE(p.key);
+            REQUIRE((compat ? p.code == "SlCompatCall" : p.code.empty()));
+            UNSCOPED_INFO("no mark left unfilled");
+            REQUIRE(p.message == ALScriptProblem::fill(p.message, p.args));
         }
-        ensure_equals("one index note for one function", indexes, size_t(1));
-        ensure("a found index and a boolean: " + listed, noted(r, "SluaIndexFound", "SubStringIndex") && noted(r, "SluaBool", "SameGroup"));
-        ensure("words filled: " + listed, has(r, "-- LSL: llcompat.GetSubString takes indexes from 0, as LSL did; ll.GetSubString takes them from 1."));
-        ensure("the lint by key", std::string(ALLSLToSLua::lintOf("SluaIndex")) == "SlCompatCall" && !ALLSLToSLua::lintOf("SluaListCompare"));
+        UNSCOPED_INFO("one index note for one function");
+        CHECK(indexes == size_t(1));
+        {
+            INFO("a found index and a boolean");
+            CHECK(noted(r, "SluaIndexFound", "SubStringIndex"));
+            CHECK(noted(r, "SluaBool", "SameGroup"));
+        }
+        UNSCOPED_INFO("words filled");
+        CHECK(has(r, "-- LSL: llcompat.GetSubString takes indexes from 0, as LSL did; ll.GetSubString takes them from 1."));
+        {
+            INFO("the lint by key");
+            CHECK(std::string(ALLSLToSLua::lintOf("SluaIndex")) == "SlCompatCall");
+            CHECK_FALSE(ALLSLToSLua::lintOf("SluaListCompare"));
+        }
 
         // The studio's words: each comment's, each note's, and the header's,
         // a line at a time.
@@ -1077,52 +1467,81 @@ namespace tut
             return key == "SluaHeader" ? std::string("first\nsecond") : "<" + key + (args.empty() ? "" : " " + args[0]) + ">";
         };
         const ALLSLToSLua::Result said = ALLSLToSLua::convert(lsl, close);
-        ensure("the header's: " + said.text, said.text.rfind("-- first\n-- second\n\n", 0) == 0);
-        ensure("a comment's: " + said.text, has(said, "-- LSL: <SluaIndex GetSubString>\n"));
-        ensure("a note's", noted(said, "SluaIndex", "GetSubString") && [&] {
-            for (const ALScriptProblem& p : said.notes)
-            {
-                if (p.key == "SluaIndex")
+        CAPTURE(said.text);
+        UNSCOPED_INFO("the header's");
+        CHECK(said.text.rfind("-- first\n-- second\n\n", 0) == 0);
+        UNSCOPED_INFO("a comment's");
+        CHECK(has(said, "-- LSL: <SluaIndex GetSubString>\n"));
+        {
+            INFO("a note's");
+            CHECK(noted(said, "SluaIndex", "GetSubString"));
+            CHECK([&] {
+                for (const ALScriptProblem& p : said.notes)
                 {
-                    return p.message == "<SluaIndex GetSubString>";
+                    if (p.key == "SluaIndex")
+                    {
+                        return p.message == "<SluaIndex GetSubString>";
+                    }
                 }
-            }
-            return false;
-        }());
+                return false;
+            }());
+        }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<32>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: LSL comments read back as notes with Done and the lint's fix", "[ALLSLToSLua]")
     {
-        set_test_name("each LSL comment read back as a note: Done takes it out; one a lint finds too offers the lint's fix with it, read in "
-                      "the words it was written in");
-        ensure("the definitions", definitions);
+        CHECK(definitions);
         const std::string lsl = "default { state_entry() { string s = \"abc\"; llOwnerSay(llGetSubString(s, 0, 2)); } }";
         const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
-        ensure("converted", r.converted);
+        CAPTURE(r.text);
+        CHECK(r.converted);
         ALScriptProblems notes = ALLSLToSLua::notesIn(r.text, nullptr);
-        ensure("as many as the converter noted: " + r.text, notes.size() == r.notes.size() && !notes.empty());
+        {
+            INFO("as many as the converter noted");
+            REQUIRE(notes.size() == r.notes.size());
+            REQUIRE_FALSE(notes.empty());
+        }
         ALScriptProblem* index = nullptr;
         for (ALScriptProblem& note : notes)
         {
-            ensure("a note's", note.key == "SluaNote" && note.severity == ALScriptProblem::Severity::Note && note.fixes.size() == 1 &&
-                                   note.fixes[0].safe && note.fixes[0].removes && !note.fixes[0].preferred);
+            REQUIRE(note.key == "SluaNote");
+            REQUIRE(note.severity == ALScriptProblem::Severity::Note);
+            REQUIRE(note.fixes.size() == 1);
+            REQUIRE(note.fixes[0].safe);
+            REQUIRE(note.fixes[0].removes);
+            REQUIRE_FALSE(note.fixes[0].preferred);
             index = note.message.rfind("llcompat.GetSubString takes indexes", 0) == 0 ? &note : index;
         }
-        ensure("the index's, the lint's: " + r.text, index && index->code == "SlCompatCall");
+        {
+            INFO("the index's, the lint's");
+            REQUIRE(index);
+            CHECK(index->code == "SlCompatCall");
+        }
         const size_t at = index - notes.data();
         ALLSLToSLua::linkNotes(notes, service.check(r.text), r.text);
         const ALScriptProblem& linked = notes[at];
-        ensure("the lint's fix first, then Done", linked.fixes.size() == 2 && linked.fixes[0].preferred &&
-                                                      linked.fixes[0].title == "Write it ll.GetSubString(s, 1, 3), and take the note out" &&
-                                                      linked.fixes[1].title == "Done: take the note out");
+        {
+            INFO("the lint's fix first, then Done");
+            REQUIRE(linked.fixes.size() == 2);
+            CHECK(linked.fixes[0].preferred);
+            CHECK(linked.fixes[0].title == "Write it ll.GetSubString(s, 1, 3), and take the note out");
+            CHECK(linked.fixes[1].title == "Done: take the note out");
+        }
         const std::optional<std::string> made = ALScriptFixes::apply(r.text, linked.fixes[0]);
-        ensure("made: ll's, the note gone", made && made->find("ll.GetSubString(s, 1, 3)") != std::string::npos &&
-                                                made->find("llcompat.GetSubString takes indexes") == std::string::npos);
+        {
+            INFO("made: ll's, the note gone");
+            REQUIRE(made);
+            CHECK(made->find("ll.GetSubString(s, 1, 3)") != std::string::npos);
+            CHECK(made->find("llcompat.GetSubString takes indexes") == std::string::npos);
+        }
         const std::optional<std::string> done = ALScriptFixes::apply(r.text, linked.fixes[1]);
-        ensure("done: the line gone, the call kept", done && done->find("llcompat.GetSubString takes indexes") == std::string::npos &&
-                                                         done->find("llcompat.GetSubString(s, 0, 2)") != std::string::npos &&
-                                                         std::count(done->begin(), done->end(), '\n') + 1 == std::count(r.text.begin(), r.text.end(), '\n'));
+        {
+            INFO("done: the line gone, the call kept");
+            REQUIRE(done);
+            CHECK(done->find("llcompat.GetSubString takes indexes") == std::string::npos);
+            CHECK(done->find("llcompat.GetSubString(s, 0, 2)") != std::string::npos);
+            CHECK(std::count(done->begin(), done->end(), '\n') + 1 == std::count(r.text.begin(), r.text.end(), '\n'));
+        }
 
         // Written in the studio's words, read back in them.
         ALLSLToSLua::Options close = ALLSLToSLua::Options::closeToLSL();
@@ -1130,158 +1549,204 @@ namespace tut
             return ALScriptProblem::fill(key == "SluaIndex" ? "Index de [1]" : english, args);
         };
         const ALLSLToSLua::Result said = ALLSLToSLua::convert(lsl, close);
-        ensure("written so", has(said, "-- LSL: Index de GetSubString\n"));
+        UNSCOPED_INFO("written so");
+        CHECK(has(said, "-- LSL: Index de GetSubString\n"));
         const auto linted = [](const ALScriptProblems& read) {
             return std::count_if(read.begin(), read.end(), [](const ALScriptProblem& note) { return note.code == "SlCompatCall"; });
         };
-        ensure("read in the studio's words", linted(ALLSLToSLua::notesIn(said.text, close.words)) == 1);
-        ensure("not in English's", linted(ALLSLToSLua::notesIn(said.text, nullptr)) == 0);
+        UNSCOPED_INFO("read in the studio's words");
+        CHECK(linted(ALLSLToSLua::notesIn(said.text, close.words)) == 1);
+        UNSCOPED_INFO("not in English's");
+        CHECK(linted(ALLSLToSLua::notesIn(said.text, nullptr)) == 0);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<33>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: parameters only read as truths are booleans; others and events numbers", "[ALLSLToSLua]")
     {
-        set_test_name("a parameter the script only reads as a truth is a boolean, each call giving one; one read as a number, or given more than TRUE where it is asked about TRUE, stays a number; an event's stay the grid's numbers");
-        const ALLSLToSLua::Result r = convert("say(integer loud, string text) { if (loud) llShout(0, text); else llSay(0, text); }\n"
-                                              "glow(integer on) { if (!on) return; llOwnerSay(\"glow\"); }\n"
-                                              "integer next(integer n) { return n + 1; }\n"
-                                              "integer exactly(integer f) { return f == TRUE; }\n"
-                                              "default {\n"
-                                              "    touch_start(integer n) {\n"
-                                              "        say(TRUE, \"hi\");\n"
-                                              "        say(n > 1, \"many\");\n"
-                                              "        say(n, \"some\");\n"
-                                              "        glow(FALSE);\n"
-                                              "        llOwnerSay((string)next(n));\n"
-                                              "        exactly(1); exactly(5);\n"
-                                              "    }\n"
-                                              "    on_rez(integer p) { if (p) llOwnerSay(\"rezzed\"); }\n"
-                                              "}\n");
-        ensure("read only as a truth: a boolean: " + r.text, has(r, "local function say(loud, text)") && has(r, "if loud then"));
-        ensure("each call giving one, a number as its truth: " + r.text,
-               has(r, "say(true, \"hi\")") && has(r, "say(n > 1, \"many\")") && has(r, "say(n ~= 0, \"some\")"));
-        ensure("not, as a truth: " + r.text, has(r, "if not on then") && has(r, "glow(false)"));
-        ensure("read as a number: kept one: " + r.text, has(r, "return n + 1") && has(r, "next_(n)"));
-        ensure("given 5 where asked about TRUE: kept a number: " + r.text, has(r, "f == 1") && has(r, "exactly(5)"));
-        ensure("an event's: the grid's number: " + r.text, has(r, "if p ~= 0 then"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("say(integer loud, string text) { if (loud) llShout(0, text); else llSay(0, text); }\n"
+                                                        "glow(integer on) { if (!on) return; llOwnerSay(\"glow\"); }\n"
+                                                        "integer next(integer n) { return n + 1; }\n"
+                                                        "integer exactly(integer f) { return f == TRUE; }\n"
+                                                        "default {\n"
+                                                        "    touch_start(integer n) {\n"
+                                                        "        say(TRUE, \"hi\");\n"
+                                                        "        say(n > 1, \"many\");\n"
+                                                        "        say(n, \"some\");\n"
+                                                        "        glow(FALSE);\n"
+                                                        "        llOwnerSay((string)next(n));\n"
+                                                        "        exactly(1); exactly(5);\n"
+                                                        "    }\n"
+                                                        "    on_rez(integer p) { if (p) llOwnerSay(\"rezzed\"); }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        {
+            INFO("read only as a truth: a boolean");
+            CHECK(has(r, "local function say(loud, text)"));
+            CHECK(has(r, "if loud then"));
+        }
+        {
+            INFO("each call giving one, a number as its truth");
+            CHECK(has(r, "say(true, \"hi\")"));
+            CHECK(has(r, "say(n > 1, \"many\")"));
+            CHECK(has(r, "say(n ~= 0, \"some\")"));
+        }
+        {
+            INFO("not, as a truth");
+            CHECK(has(r, "if not on then"));
+            CHECK(has(r, "glow(false)"));
+        }
+        {
+            INFO("read as a number: kept one");
+            CHECK(has(r, "return n + 1"));
+            CHECK(has(r, "next_(n)"));
+        }
+        {
+            INFO("given 5 where asked about TRUE: kept a number");
+            CHECK(has(r, "f == 1"));
+            CHECK(has(r, "exactly(5)"));
+        }
+        UNSCOPED_INFO("an event's: the grid's number");
+        CHECK(has(r, "if p ~= 0 then"));
+        require_checks_clean(r);
 
         ALLSLToSLua::Options typed;
         typed.types = true;
         const ALLSLToSLua::Result t = ALLSLToSLua::convert("say(integer loud, string text) { if (loud) llSay(0, text); }\n"
                                                            "default { state_entry() { say(TRUE, \"hi\"); } }\n",
                                                            typed);
-        ensure("typed: " + t.text, has(t, "local function say(loud: boolean, text: string)"));
-        checksClean(t);
+        CAPTURE(t.text);
+        CHECK(has(t, "local function say(loud: boolean, text: string)"));
+        require_checks_clean(t);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<34>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a counting loop from 0 whose counter only indexes walks the items", "[ALLSLToSLua]")
     {
-        set_test_name("a counting loop over a list's items, its counter read as nothing else, walks the items; from another start, or read otherwise, it counts");
-        const ALLSLToSLua::Result r = convert("list gNames = [\"a\", \"b\"];\n"
-                                              "default { state_entry() {\n"
-                                              "    list keys = [llGetOwner()];\n"
-                                              "    integer i;\n"
-                                              "    for (i = 0; i < llGetListLength(gNames); ++i) llOwnerSay(llList2String(gNames, i));\n"
-                                              "    integer j;\n"
-                                              "    for (j = 0; j < llGetListLength(gNames); ++j) {\n"
-                                              "        integer k;\n"
-                                              "        for (k = 0; k < llGetListLength(keys); ++k) llOwnerSay(llList2String(gNames, j) + llList2String(keys, k));\n"
-                                              "    }\n"
-                                              "    integer m;\n"
-                                              "    for (m = 1; m < llGetListLength(gNames); ++m) llOwnerSay(llList2String(gNames, m));\n"
-                                              "    integer n;\n"
-                                              "    for (n = 0; n < llGetListLength(gNames); ++n) llOwnerSay(llList2String(gNames, n) + (string)n);\n"
-                                              "} }\n");
-        ensure("walked: " + r.text, has(r, "for _, item in gNames do\n    print(item)\n"));
-        ensure("one inside another, each its own name, a key's made text: " + r.text,
-               has(r, "for _, item2 in keys do\n        print(item .. tostring(item2))"));
-        ensure("from the second: counted: " + r.text, has(r, "for m = 2, #gNames do\n    print(gNames[m])"));
-        ensure("its counter read as a number too: counted: " + r.text, has(r, "for n = 0, #gNames - 1 do"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("list gNames = [\"a\", \"b\"];\n"
+                                                        "default { state_entry() {\n"
+                                                        "    list keys = [llGetOwner()];\n"
+                                                        "    integer i;\n"
+                                                        "    for (i = 0; i < llGetListLength(gNames); ++i) llOwnerSay(llList2String(gNames, i));\n"
+                                                        "    integer j;\n"
+                                                        "    for (j = 0; j < llGetListLength(gNames); ++j) {\n"
+                                                        "        integer k;\n"
+                                                        "        for (k = 0; k < llGetListLength(keys); ++k) llOwnerSay(llList2String(gNames, j) + llList2String(keys, k));\n"
+                                                        "    }\n"
+                                                        "    integer m;\n"
+                                                        "    for (m = 1; m < llGetListLength(gNames); ++m) llOwnerSay(llList2String(gNames, m));\n"
+                                                        "    integer n;\n"
+                                                        "    for (n = 0; n < llGetListLength(gNames); ++n) llOwnerSay(llList2String(gNames, n) + (string)n);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("walked");
+        CHECK(has(r, "for _, item in gNames do\n    print(item)\n"));
+        UNSCOPED_INFO("one inside another, each its own name, a key's made text");
+        CHECK(has(r, "for _, item2 in keys do\n        print(item .. tostring(item2))"));
+        UNSCOPED_INFO("from the second: counted");
+        CHECK(has(r, "for m = 2, #gNames do\n    print(gNames[m])"));
+        UNSCOPED_INFO("its counter read as a number too: counted");
+        CHECK(has(r, "for n = 0, #gNames - 1 do"));
+        require_checks_clean(r);
 
-        const ALLSLToSLua::Result named = convert("list gNames = [\"a\"];\n"
-                                                  "integer _ = 2;\n"
-                                                  "default { state_entry() {\n"
-                                                  "    integer i;\n"
-                                                  "    for (i = 0; i < llGetListLength(gNames); ++i) llOwnerSay(llList2String(gNames, i) + (string)_);\n"
-                                                  "} }\n");
-        ensure("an index that would hide the script's _ named afresh: " + named.text, has(named, "for _2, item in gNames do"));
-        checksClean(named);
+        const ALLSLToSLua::Result named = require_converted("list gNames = [\"a\"];\n"
+                                                            "integer _ = 2;\n"
+                                                            "default { state_entry() {\n"
+                                                            "    integer i;\n"
+                                                            "    for (i = 0; i < llGetListLength(gNames); ++i) llOwnerSay(llList2String(gNames, i) + (string)_);\n"
+                                                            "} }\n");
+        CAPTURE(named.text);
+        UNSCOPED_INFO("an index that would hide the script's _ named afresh");
+        CHECK(has(named, "for _2, item in gNames do"));
+        require_checks_clean(named);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<35>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: strings built in loops: two loops share one; one read in its loop kept", "[ALLSLToSLua]")
     {
-        set_test_name("strings built in loops: one built by two loops declared once, the second adding to it; one appended to another in the loop it builds read as it stands, not built");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    string s;\n"
-                                              "    integer i;\n"
-                                              "    for (i = 0; i < 2; ++i) s += \"a\";\n"
-                                              "    integer j;\n"
-                                              "    for (j = 0; j < 2; ++j) s += \"b\";\n"
-                                              "    llOwnerSay(s);\n"
-                                              "    string line;\n"
-                                              "    string all;\n"
-                                              "    integer k;\n"
-                                              "    for (k = 0; k < 3; ++k) { line += \"x\"; all += line; }\n"
-                                              "    llOwnerSay(all);\n"
-                                              "} }\n");
-        ensure("declared at the first loop's join: " + r.text, has(r, "local s = table.concat(sParts)"));
-        ensure("the second adds to it: " + r.text, has(r, "s ..= table.concat(sParts2)") && !has(r, "local s = table.concat(sParts2)"));
-        ensure("one read in its loop kept as it is: " + r.text, has(r, "local line = \"\"") && !has(r, "table.concat(lineParts)"));
-        ensure("the other built from it: " + r.text, has(r, "table.insert(allParts, line)") && has(r, "local all = table.concat(allParts)"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    string s;\n"
+                                                        "    integer i;\n"
+                                                        "    for (i = 0; i < 2; ++i) s += \"a\";\n"
+                                                        "    integer j;\n"
+                                                        "    for (j = 0; j < 2; ++j) s += \"b\";\n"
+                                                        "    llOwnerSay(s);\n"
+                                                        "    string line;\n"
+                                                        "    string all;\n"
+                                                        "    integer k;\n"
+                                                        "    for (k = 0; k < 3; ++k) { line += \"x\"; all += line; }\n"
+                                                        "    llOwnerSay(all);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("declared at the first loop's join");
+        CHECK(has(r, "local s = table.concat(sParts)"));
+        {
+            INFO("the second adds to it");
+            CHECK(has(r, "s ..= table.concat(sParts2)"));
+            CHECK_FALSE(has(r, "local s = table.concat(sParts2)"));
+        }
+        {
+            INFO("one read in its loop kept as it is");
+            CHECK(has(r, "local line = \"\""));
+            CHECK_FALSE(has(r, "table.concat(lineParts)"));
+        }
+        {
+            INFO("the other built from it");
+            CHECK(has(r, "table.insert(allParts, line)"));
+            CHECK(has(r, "local all = table.concat(allParts)"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<36>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: bit32 answers made signed where they can pass 2147483647 and it shows", "[ALLSLToSLua]")
     {
-        set_test_name("bit32's answers made LSL's signed integers where they can pass 2147483647 -- a message number with its top bit set, the mask "
-                      "that finds it, ~, a shift -- and not where bit32 takes them again, only truth is asked, or an & is with a constant not below nought");
         // A protocol of link messages whose numbers have their top bit set,
         // as a set of scripts may share: before, the mask's answer was never
         // the message's number, and no message was heard.
-        const ALLSLToSLua::Result r = convert("integer MASK = 0xFFFF0000;\n"
-                                              "integer MSG = 0xB3470000;\n"
-                                              "integer FN_MASK = 0x0000FF00;\n"
-                                              "integer FN_RESET = 0x0500;\n"
-                                              "default {\n"
-                                              "    state_entry() {\n"
-                                              "        llMessageLinked(LINK_SET, MSG | FN_RESET, \"\", \"\");\n"
-                                              "    }\n"
-                                              "    link_message(integer sender, integer num, string text, key id) {\n"
-                                              "        if ((num & MASK) == MSG) {\n"
-                                              "            integer fn = num & FN_MASK;\n"
-                                              "            if (fn == FN_RESET) llOwnerSay(\"reset\");\n"
-                                              "        }\n"
-                                              "        integer inverse = ~num;\n"
-                                              "        integer high = num << 4;\n"
-                                              "        integer low = num >> 2;\n"
-                                              "        integer part = FN_MASK >> 8;\n"
-                                              "        if (~llGetPermissions() & PERMISSION_TRIGGER_ANIMATION) llOwnerSay(\"ask\");\n"
-                                              "        llOwnerSay((string)(inverse + high + low + part));\n"
-                                              "    }\n"
-                                              "}\n");
-        ensure("the mask's answer signed: " + r.text, has(r, "if bit32.s32(bit32.band(num, MASK)) == MSG then"));
-        ensure("the number sent signed: " + r.text, has(r, "ll.MessageLinked(LINK_SET, bit32.s32(bit32.bor(MSG, FN_RESET)), \"\", \"\")"));
-        ensure("an & with a constant not below nought as it is: " + r.text, has(r, "local fn = bit32.band(num, FN_MASK)\n"));
-        ensure("~ signed: " + r.text, has(r, "local inverse = bit32.s32(bit32.bnot(num))"));
-        ensure("<< signed: " + r.text, has(r, "local high = bit32.s32(bit32.lshift(num, 4))"));
-        ensure(">> of what may be below nought signed: " + r.text, has(r, "local low = bit32.s32(bit32.arshift(num, 2))"));
-        ensure(">> of a constant not below nought as it is: " + r.text, has(r, "local part = bit32.arshift(FN_MASK, 8)\n"));
-        ensure("a truth, and what bit32 takes again, as they are: " + r.text,
-               has(r, "if bit32.btest(bit32.bnot(ll.GetPermissions()), PERMISSION_TRIGGER_ANIMATION) then"));
-        ensure("SLua's own bit32.s32, no helper, said once: " + r.text, !has(r, "local function int32") && count(r, "-- LSL: bit32 answers") == 1);
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer MASK = 0xFFFF0000;\n"
+                                                        "integer MSG = 0xB3470000;\n"
+                                                        "integer FN_MASK = 0x0000FF00;\n"
+                                                        "integer FN_RESET = 0x0500;\n"
+                                                        "default {\n"
+                                                        "    state_entry() {\n"
+                                                        "        llMessageLinked(LINK_SET, MSG | FN_RESET, \"\", \"\");\n"
+                                                        "    }\n"
+                                                        "    link_message(integer sender, integer num, string text, key id) {\n"
+                                                        "        if ((num & MASK) == MSG) {\n"
+                                                        "            integer fn = num & FN_MASK;\n"
+                                                        "            if (fn == FN_RESET) llOwnerSay(\"reset\");\n"
+                                                        "        }\n"
+                                                        "        integer inverse = ~num;\n"
+                                                        "        integer high = num << 4;\n"
+                                                        "        integer low = num >> 2;\n"
+                                                        "        integer part = FN_MASK >> 8;\n"
+                                                        "        if (~llGetPermissions() & PERMISSION_TRIGGER_ANIMATION) llOwnerSay(\"ask\");\n"
+                                                        "        llOwnerSay((string)(inverse + high + low + part));\n"
+                                                        "    }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("the mask's answer signed");
+        CHECK(has(r, "if bit32.s32(bit32.band(num, MASK)) == MSG then"));
+        UNSCOPED_INFO("the number sent signed");
+        CHECK(has(r, "ll.MessageLinked(LINK_SET, bit32.s32(bit32.bor(MSG, FN_RESET)), \"\", \"\")"));
+        UNSCOPED_INFO("an & with a constant not below nought as it is");
+        CHECK(has(r, "local fn = bit32.band(num, FN_MASK)\n"));
+        UNSCOPED_INFO("~ signed");
+        CHECK(has(r, "local inverse = bit32.s32(bit32.bnot(num))"));
+        UNSCOPED_INFO("<< signed");
+        CHECK(has(r, "local high = bit32.s32(bit32.lshift(num, 4))"));
+        UNSCOPED_INFO(">> of what may be below nought signed");
+        CHECK(has(r, "local low = bit32.s32(bit32.arshift(num, 2))"));
+        UNSCOPED_INFO(">> of a constant not below nought as it is");
+        CHECK(has(r, "local part = bit32.arshift(FN_MASK, 8)\n"));
+        UNSCOPED_INFO("a truth, and what bit32 takes again, as they are");
+        CHECK(has(r, "if bit32.btest(bit32.bnot(ll.GetPermissions()), PERMISSION_TRIGGER_ANIMATION) then"));
+        {
+            INFO("SLua's own bit32.s32, no helper, said once");
+            CHECK_FALSE(has(r, "local function int32"));
+            CHECK(count(r, "-- LSL: bit32 answers") == 1);
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<37>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: comments carried over where they stood with blocks at a safe level", "[ALLSLToSLua]")
     {
-        set_test_name("the script's comments carried over, each over what it stood over: the script's own at the top, a global's, those inside a list on their lines, "
-                      "a trailing one, a brace's after its opening line, between branches, at a block's end; // as --, /* */ as --[[ ]] at a level nothing in it closes");
         const std::string lsl = "// Door script by Someone.\n"
                                 "// Do as you like with it.\n"
                                 "\n"
@@ -1322,37 +1787,62 @@ namespace tut
                                 "        /* it ends ]] here */\n"
                                 "    }\n"
                                 "}\n";
-        const ALLSLToSLua::Result r = convert(lsl);
+        const ALLSLToSLua::Result r = require_converted(lsl);
+        CAPTURE(r.text);
         const auto                at = [&r](const std::string& text) { return r.text.find(text); };
-        ensure("the script's own at the top: " + r.text, has(r, "-- Door script by Someone.\n-- Do as you like with it.\n\n"));
-        ensure("over everything, once: " + r.text, at("-- Door script by Someone.") < at("local SWING") && count(r, "Door script") == 1);
-        ensure("a global's, what trailed it still after it: " + r.text, has(r, "-- How far it swings, in degrees\nlocal SWING = 90.0 -- a right angle\n"));
-        ensure("those inside a list, on their lines: " + r.text,
-               has(r, "local NAMES = {\n    \"open\", -- when it is open\n    \"closed\" -- when it is shut\n}\n"));
-        ensure("a block comment as Luau's: " + r.text, has(r, "--[[ old code:\ninteger unused() { return 1; }\n]]\n"));
-        ensure("over the function it stood over: " + r.text, at("--[[ old code:") > at("local NAMES") && at("--[[ old code:") < at("-- Turns the door."));
-        ensure("a brace's, after the line that opens it: " + r.text, has(r, "-- Turns the door.\nlocal function swing(by) -- by degrees\n"));
-        ensure("over a statement: " + r.text, has(r, "    -- the rotation it turns by\n    local r = "));
-        ensure("a trailing one, after its statement: " + r.text, has(r, "    ll.SetLinkPrimitiveParamsFast(LINK_THIS, { PRIM_ROT_LOCAL, r * ll.GetLocalRot() }) -- turn\n"));
-        ensure("between branches, over the elseif: " + r.text, has(r, "    -- when it shuts\n    elseif by < 0 then\n"));
-        ensure("an empty branch's, in it: " + r.text, has(r, "    if false then\n        --[[ left off ]]\n    elseif by == 0 then\n"));
-        ensure("at a block's end: " + r.text, has(r, "    -- done\nend\n"));
-        ensure("a state's, over its handler: " + r.text, has(r, "-- on a touch\nLLEvents:on(\"touch_start\""));
-        ensure("not a block of Luau's: " + r.text, has(r, "    swing(SWING) -- [[ not a block of Luau's ]]\n"));
-        ensure("a level nothing in it closes: " + r.text, has(r, "    --[=[ it ends ]] here ]=]\nend)"));
-        checksClean(r);
+        UNSCOPED_INFO("the script's own at the top");
+        CHECK(has(r, "-- Door script by Someone.\n-- Do as you like with it.\n\n"));
+        {
+            INFO("over everything, once");
+            CHECK(at("-- Door script by Someone.") < at("local SWING"));
+            CHECK(count(r, "Door script") == 1);
+        }
+        UNSCOPED_INFO("a global's, what trailed it still after it");
+        CHECK(has(r, "-- How far it swings, in degrees\nlocal SWING = 90.0 -- a right angle\n"));
+        UNSCOPED_INFO("those inside a list, on their lines");
+        CHECK(has(r, "local NAMES = {\n    \"open\", -- when it is open\n    \"closed\" -- when it is shut\n}\n"));
+        UNSCOPED_INFO("a block comment as Luau's");
+        CHECK(has(r, "--[[ old code:\ninteger unused() { return 1; }\n]]\n"));
+        {
+            INFO("over the function it stood over");
+            CHECK(at("--[[ old code:") > at("local NAMES"));
+            CHECK(at("--[[ old code:") < at("-- Turns the door."));
+        }
+        UNSCOPED_INFO("a brace's, after the line that opens it");
+        CHECK(has(r, "-- Turns the door.\nlocal function swing(by) -- by degrees\n"));
+        UNSCOPED_INFO("over a statement");
+        CHECK(has(r, "    -- the rotation it turns by\n    local r = "));
+        UNSCOPED_INFO("a trailing one, after its statement");
+        CHECK(has(r, "    ll.SetLinkPrimitiveParamsFast(LINK_THIS, { PRIM_ROT_LOCAL, r * ll.GetLocalRot() }) -- turn\n"));
+        UNSCOPED_INFO("between branches, over the elseif");
+        CHECK(has(r, "    -- when it shuts\n    elseif by < 0 then\n"));
+        UNSCOPED_INFO("an empty branch's, in it");
+        CHECK(has(r, "    if false then\n        --[[ left off ]]\n    elseif by == 0 then\n"));
+        UNSCOPED_INFO("at a block's end");
+        CHECK(has(r, "    -- done\nend\n"));
+        UNSCOPED_INFO("a state's, over its handler");
+        CHECK(has(r, "-- on a touch\nLLEvents:on(\"touch_start\""));
+        UNSCOPED_INFO("not a block of Luau's");
+        CHECK(has(r, "    swing(SWING) -- [[ not a block of Luau's ]]\n"));
+        UNSCOPED_INFO("a level nothing in it closes");
+        CHECK(has(r, "    --[=[ it ends ]] here ]=]\nend)"));
+        require_checks_clean(r);
 
         ALLSLToSLua::Options none;
         none.keepComments              = false;
         const ALLSLToSLua::Result bare = ALLSLToSLua::convert(lsl, none);
-        ensure("none where asked: " + bare.text, bare.converted && bare.text.find("Door script") == std::string::npos &&
-                                                    bare.text.find("degrees") == std::string::npos && bare.text.find("--[[") == std::string::npos);
+        CAPTURE(bare.text);
+        {
+            INFO("none where asked");
+            CHECK(bare.converted);
+            CHECK(bare.text.find("Door script") == std::string::npos);
+            CHECK(bare.text.find("degrees") == std::string::npos);
+            CHECK(bare.text.find("--[[") == std::string::npos);
+        }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<38>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: spans: each LSL line beside the SLua line made of it", "[ALLSLToSLua]")
     {
-        set_test_name("spans: each global, function, handler and statement's LSL line beside the line of SLua made of it, under the head, its notes and comments");
         const std::string lsl = "integer count = 0;\n"               // 0
                                 "add(integer n)\n"                   // 1
                                 "{\n"                                // 2
@@ -1367,7 +1857,7 @@ namespace tut
                                 "        llSay(0, (string)count);\n" // 11
                                 "    }\n"                            // 12
                                 "}\n";                               // 13
-        const ALLSLToSLua::Result r = convert(lsl);
+        const ALLSLToSLua::Result r = require_converted(lsl);
         std::vector<std::string>  lines;
         for (size_t from = 0; from <= r.text.size();)
         {
@@ -1377,9 +1867,13 @@ namespace tut
         }
         for (const ALLSLToSLua::Span& span : r.spans)
         {
-            ensure("within both: " + std::to_string(span.lslFirst) + " " + std::to_string(span.sluaFirst),
-                   span.lslFirst >= 0 && span.lslLast < 14 && span.lslFirst <= span.lslLast && span.sluaFirst >= 0 && span.sluaFirst <= span.sluaLast &&
-                       span.sluaLast < static_cast<S32>(lines.size()));
+            CAPTURE(span.lslFirst, span.sluaFirst);
+            REQUIRE(span.lslFirst >= 0);
+            REQUIRE(span.lslLast < 14);
+            REQUIRE(span.lslFirst <= span.lslLast);
+            REQUIRE(span.sluaFirst >= 0);
+            REQUIRE(span.sluaFirst <= span.sluaLast);
+            REQUIRE(span.sluaLast < static_cast<S32>(lines.size()));
         }
         const auto at = [&](S32 lsl_line) -> std::string {
             for (const ALLSLToSLua::Span& span : r.spans)
@@ -1391,111 +1885,166 @@ namespace tut
             }
             return "(none)";
         };
-        ensure("the global: " + at(0) + "\n" + r.text, at(0).find("local count") != std::string::npos);
-        ensure("the function: " + at(1), at(1).find("function add(") != std::string::npos);
-        ensure("its statement: " + at(3), at(3).find("count") != std::string::npos && at(3).find("n") != std::string::npos);
-        ensure("the handler: " + at(7), at(7).find("touch_start") != std::string::npos);
-        ensure("a call under its comment, not the comment: " + at(10), at(10).find("add(1)") != std::string::npos);
-        ensure("the next: " + at(11), at(11).find("ll.Say(0") != std::string::npos);
+        UNSCOPED_INFO("the global: " + at(0) + "\n" + r.text);
+        CHECK(at(0).find("local count") != std::string::npos);
+        UNSCOPED_INFO("the function: " + at(1));
+        CHECK(at(1).find("function add(") != std::string::npos);
+        {
+            INFO("its statement: " + at(3));
+            CHECK(at(3).find("count") != std::string::npos);
+            CHECK(at(3).find("n") != std::string::npos);
+        }
+        UNSCOPED_INFO("the handler: " + at(7));
+        CHECK(at(7).find("touch_start") != std::string::npos);
+        UNSCOPED_INFO("a call under its comment, not the comment: " + at(10));
+        CHECK(at(10).find("add(1)") != std::string::npos);
+        UNSCOPED_INFO("the next: " + at(11));
+        CHECK(at(11).find("ll.Say(0") != std::string::npos);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<39>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: fewer calls: bit32.btest and table.append; hexadecimal kept where safe", "[ALLSLToSLua]")
     {
-        set_test_name("in fewer calls: an & asked whether it is nought by bit32.btest, values added together by one table.append, a key's default "
-                      "the null key; and hexadecimal as written where SLua reads the same number");
-        const ALLSLToSLua::Result r = convert("integer MASK = 0x0000FF00;\n"
-                                              "integer HIGH = 0xF0000000;\n"
-                                              "integer S_MASK = 0xF0000000;\n"
-                                              "integer BIG = 4294967296;\n"
-                                              "integer BIG_HEX = 0x100000000;\n"
-                                              "integer WRAPPED = 2147483648;\n"
-                                              "key gSitter;\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    integer flags = llGetParcelFlags(llGetPos());\n"
-                                              "    if (flags & PARCEL_FLAG_ALLOW_CREATE_OBJECTS) llOwnerSay(\"build\");\n"
-                                              "    if (!(flags & MASK & 0x300)) llOwnerSay(\"none\");\n"
-                                              "    if ((flags & 4) == 0) llOwnerSay(\"no 4\");\n"
-                                              "    integer masked = flags & MASK;\n"
-                                              "    integer top = flags & 0x80000000;\n"
-                                              "    integer sign = flags & S_MASK; if (flags & ~S_MASK) sign = 0;\n"
-                                              "    integer low = 0xFFFF0000; sign = sign | low;\n"
-                                              "    list params = [PRIM_NAME, \"a\"];\n"
-                                              "    params += [PRIM_LINK_TARGET, LINK_ROOT, PRIM_POSITION, llGetPos()];\n"
-                                              "    params += n;\n"
-                                              "    llSetLinkPrimitiveParamsFast(LINK_THIS, params);\n"
-                                              "    float f = (float)\"1.5\";\n"
-                                              "    llOwnerSay((string)(masked + HIGH + top + BIG + BIG_HEX + WRAPPED + sign) + (string)f + (string)gSitter);\n"
-                                              "} }\n");
-        ensure("an & as a condition: " + r.text, has(r, "if bit32.btest(flags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then"));
-        ensure("not of one, an & of &s one call: " + r.text, has(r, "if not bit32.btest(flags, MASK, 0x300) then"));
-        ensure("against nought: " + r.text, has(r, "if not bit32.btest(flags, 4) then"));
-        ensure("an & as a number is still bit32.band: " + r.text, has(r, "local masked = bit32.band(flags, MASK)"));
-        ensure("one bit32 takes, as written, which it reads the same: " + r.text, has(r, "local top = bit32.s32(bit32.band(flags, 0x80000000))"));
-        ensure("values added together: " + r.text,
-               has(r, "table.append(params, PRIM_LINK_TARGET, LINK_ROOT, PRIM_POSITION, ll.GetPos())") && has(r, "table.insert(params, n)"));
-        ensure("the null key: " + r.text, has(r, "local gSitter = NULL_KEY") && !has(r, "uuid(\"\")"));
-        ensure("a float from a string: " + r.text, has(r, "lslFloat(\"1.5\")") && has(r, "return llcompat.List2Float({ s }, 0)"));
-        ensure("hexadecimal kept: " + r.text, has(r, "local MASK = 0x0000FF00"));
-        ensure("past 0x7FFFFFFF, which SLua reads as another number, as LSL had it: " + r.text, has(r, "local HIGH = -268435456"));
+        const ALLSLToSLua::Result r = require_converted("integer MASK = 0x0000FF00;\n"
+                                                        "integer HIGH = 0xF0000000;\n"
+                                                        "integer S_MASK = 0xF0000000;\n"
+                                                        "integer BIG = 4294967296;\n"
+                                                        "integer BIG_HEX = 0x100000000;\n"
+                                                        "integer WRAPPED = 2147483648;\n"
+                                                        "key gSitter;\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    integer flags = llGetParcelFlags(llGetPos());\n"
+                                                        "    if (flags & PARCEL_FLAG_ALLOW_CREATE_OBJECTS) llOwnerSay(\"build\");\n"
+                                                        "    if (!(flags & MASK & 0x300)) llOwnerSay(\"none\");\n"
+                                                        "    if ((flags & 4) == 0) llOwnerSay(\"no 4\");\n"
+                                                        "    integer masked = flags & MASK;\n"
+                                                        "    integer top = flags & 0x80000000;\n"
+                                                        "    integer sign = flags & S_MASK; if (flags & ~S_MASK) sign = 0;\n"
+                                                        "    integer low = 0xFFFF0000; sign = sign | low;\n"
+                                                        "    list params = [PRIM_NAME, \"a\"];\n"
+                                                        "    params += [PRIM_LINK_TARGET, LINK_ROOT, PRIM_POSITION, llGetPos()];\n"
+                                                        "    params += n;\n"
+                                                        "    llSetLinkPrimitiveParamsFast(LINK_THIS, params);\n"
+                                                        "    float f = (float)\"1.5\";\n"
+                                                        "    llOwnerSay((string)(masked + HIGH + top + BIG + BIG_HEX + WRAPPED + sign) + (string)f + (string)gSitter);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("an & as a condition");
+        CHECK(has(r, "if bit32.btest(flags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then"));
+        UNSCOPED_INFO("not of one, an & of &s one call");
+        CHECK(has(r, "if not bit32.btest(flags, MASK, 0x300) then"));
+        UNSCOPED_INFO("against nought");
+        CHECK(has(r, "if not bit32.btest(flags, 4) then"));
+        UNSCOPED_INFO("an & as a number is still bit32.band");
+        CHECK(has(r, "local masked = bit32.band(flags, MASK)"));
+        UNSCOPED_INFO("one bit32 takes, as written, which it reads the same");
+        CHECK(has(r, "local top = bit32.s32(bit32.band(flags, 0x80000000))"));
+        {
+            INFO("values added together");
+            CHECK(has(r, "table.append(params, PRIM_LINK_TARGET, LINK_ROOT, PRIM_POSITION, ll.GetPos())"));
+            CHECK(has(r, "table.insert(params, n)"));
+        }
+        {
+            INFO("the null key");
+            CHECK(has(r, "local gSitter = NULL_KEY"));
+            CHECK_FALSE(has(r, "uuid(\"\")"));
+        }
+        {
+            INFO("a float from a string");
+            CHECK(has(r, "lslFloat(\"1.5\")"));
+            CHECK(has(r, "return llcompat.List2Float({ s }, 0)"));
+        }
+        UNSCOPED_INFO("hexadecimal kept");
+        CHECK(has(r, "local MASK = 0x0000FF00"));
+        UNSCOPED_INFO("past 0x7FFFFFFF, which SLua reads as another number, as LSL had it");
+        CHECK(has(r, "local HIGH = -268435456"));
         // As the grid's 32-bit hosts read them: strtoul stops at 0xFFFFFFFF.
-        ensure("past 32 bits, -1: " + r.text, has(r, "local BIG = -1\n") && has(r, "local BIG_HEX = -1\n"));
-        ensure("and said: " + r.text, noted(r, "SluaIntegerPast32Bits", "4294967296") && noted(r, "SluaIntegerPast32Bits", "0x100000000"));
-        ensure("a global only bit32 reads keeps its hexadecimal: " + r.text, has(r, "local S_MASK = 0xF0000000\n") &&
-                                                                               has(r, "bit32.band(flags, S_MASK)"));
-        ensure("one read as a number does not: " + r.text, has(r, "local HIGH = -268435456"));
-        ensure("nor a local, never set, only bit32 reads: " + r.text, has(r, "local low = 0xFFFF0000\n"));
+        {
+            INFO("past 32 bits, -1");
+            CHECK(has(r, "local BIG = -1\n"));
+            CHECK(has(r, "local BIG_HEX = -1\n"));
+        }
+        {
+            INFO("and said");
+            CHECK(noted(r, "SluaIntegerPast32Bits", "4294967296"));
+            CHECK(noted(r, "SluaIntegerPast32Bits", "0x100000000"));
+        }
+        {
+            INFO("a global only bit32 reads keeps its hexadecimal");
+            CHECK(has(r, "local S_MASK = 0xF0000000\n"));
+            CHECK(has(r, "bit32.band(flags, S_MASK)"));
+        }
+        UNSCOPED_INFO("one read as a number does not");
+        CHECK(has(r, "local HIGH = -268435456"));
+        UNSCOPED_INFO("nor a local, never set, only bit32 reads");
+        CHECK(has(r, "local low = 0xFFFF0000\n"));
         // Each said once, over the first place: what SLua reads such a
         // number as, and what bit32.s32 is for.
         const auto times = [&r](const char* key) {
             return std::count_if(r.notes.begin(), r.notes.end(), [key](const ALScriptProblem& p) { return p.key == key; });
         };
-        ensure("the hexadecimal's number said once, over the first: " + r.text,
-               times("SluaHexSign") == 1 && noted(r, "SluaHexSign", "0xF0000000") &&
-                   has(r, "-- LSL: SLua reads 0xF0000000 as 4026531840, where LSL wrapped it to -268435456: bit32 takes either the same, so it "
+        {
+            INFO("the hexadecimal's number said once, over the first");
+            CHECK(times("SluaHexSign") == 1);
+            CHECK(noted(r, "SluaHexSign", "0xF0000000"));
+            CHECK(has(r, "-- LSL: SLua reads 0xF0000000 as 4026531840, where LSL wrapped it to -268435456: bit32 takes either the same, so it "
                           "stays as written where only bit32 reads it, and is -268435456 where it is read as a number.\nlocal HIGH = -268435456"));
-        ensure("bit32.s32 said once: " + r.text, times("SluaBit32Signed") == 1 && count(r, "-- LSL: bit32 answers 0 to 4294967295") == 1);
-        ensure("within them, wrapped: " + r.text, has(r, "local WRAPPED = -2147483648\n"));
-        checksClean(r);
+        }
+        {
+            INFO("bit32.s32 said once");
+            CHECK(times("SluaBit32Signed") == 1);
+            CHECK(count(r, "-- LSL: bit32 answers 0 to 4294967295") == 1);
+        }
+        UNSCOPED_INFO("within them, wrapped");
+        CHECK(has(r, "local WRAPPED = -2147483648\n"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<40>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: numeric for by a constant and a shared counter; one forward declaration", "[ALLSLToSLua]")
     {
-        set_test_name("numeric for by a constant's name, and a counter its fors share; each function local but one called before it is written");
-        const ALLSLToSLua::Result r = convert("integer ACTIVE_PROPS_STRIDE = 3;\n"
-                                              "list activeProps = [\"a\", 1, 2, \"b\", 3, 4];\n"
-                                              "setProps(list unattachedProps) {\n"
-                                              "    integer i;\n"
-                                              "    for (i = llGetListLength(activeProps) - ACTIVE_PROPS_STRIDE; i >= 0; i -= ACTIVE_PROPS_STRIDE) {\n"
-                                              "        llOwnerSay((string)i);\n"
-                                              "    }\n"
-                                              "    for (i = 0; i < llGetListLength(unattachedProps); i++) {\n"
-                                              "        llOwnerSay((string)i + llList2String(unattachedProps, i));\n"
-                                              "    }\n"
-                                              "    report();\n"
-                                              "}\n"
-                                              "report() { llOwnerSay(\"done\"); }\n"
-                                              "integer twice(integer n) { return n * 2; }\n"
-                                              "default { state_entry() { setProps([\"x\"]); llOwnerSay((string)twice(2)); } }\n");
-        ensure("down by the constant's name: " + r.text, has(r, "for i = #activeProps - ACTIVE_PROPS_STRIDE, 0, -ACTIVE_PROPS_STRIDE do"));
-        ensure("the same counter's other for: " + r.text, has(r, "for i = 0, #unattachedProps - 1 do"));
-        ensure("the counter's declaration gone: " + r.text, !has(r, "local i = 0") && !has(r, "while i"));
-        ensure("only the one called first declared first: " + r.text, has(r, "local report\n") && has(r, "local function setProps(") &&
-                                                                             has(r, "\nfunction report()") && has(r, "local function twice("));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer ACTIVE_PROPS_STRIDE = 3;\n"
+                                                        "list activeProps = [\"a\", 1, 2, \"b\", 3, 4];\n"
+                                                        "setProps(list unattachedProps) {\n"
+                                                        "    integer i;\n"
+                                                        "    for (i = llGetListLength(activeProps) - ACTIVE_PROPS_STRIDE; i >= 0; i -= ACTIVE_PROPS_STRIDE) {\n"
+                                                        "        llOwnerSay((string)i);\n"
+                                                        "    }\n"
+                                                        "    for (i = 0; i < llGetListLength(unattachedProps); i++) {\n"
+                                                        "        llOwnerSay((string)i + llList2String(unattachedProps, i));\n"
+                                                        "    }\n"
+                                                        "    report();\n"
+                                                        "}\n"
+                                                        "report() { llOwnerSay(\"done\"); }\n"
+                                                        "integer twice(integer n) { return n * 2; }\n"
+                                                        "default { state_entry() { setProps([\"x\"]); llOwnerSay((string)twice(2)); } }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("down by the constant's name");
+        CHECK(has(r, "for i = #activeProps - ACTIVE_PROPS_STRIDE, 0, -ACTIVE_PROPS_STRIDE do"));
+        UNSCOPED_INFO("the same counter's other for");
+        CHECK(has(r, "for i = 0, #unattachedProps - 1 do"));
+        {
+            INFO("the counter's declaration gone");
+            CHECK_FALSE(has(r, "local i = 0"));
+            CHECK_FALSE(has(r, "while i"));
+        }
+        {
+            INFO("only the one called first declared first");
+            CHECK(has(r, "local report\n"));
+            CHECK(has(r, "local function setProps("));
+            CHECK(has(r, "\nfunction report()"));
+            CHECK(has(r, "local function twice("));
+        }
+        require_checks_clean(r);
 
-        const ALLSLToSLua::Result set = convert("integer gStep = 2;\n"
-                                                "default { state_entry() { integer i; for (i = 0; i < 10; i += gStep) llOwnerSay((string)i); gStep = 3; } }\n");
-        ensure("a step by a global something sets keeps the while: " + set.text, has(set, "while i < 10 do"));
-        checksClean(set);
+        const ALLSLToSLua::Result set = require_converted("integer gStep = 2;\n"
+                                                          "default { state_entry() { integer i; for (i = 0; i < 10; i += gStep) llOwnerSay((string)i); gStep = 3; } }\n");
+        CAPTURE(set.text);
+        UNSCOPED_INFO("a step by a global something sets keeps the while");
+        CHECK(has(set, "while i < 10 do"));
+        require_checks_clean(set);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<41>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: comments as laid out: trailing; rules as dashes; the toggle; one-line ifs", "[ALLSLToSLua]")
     {
-        set_test_name("the script's comments as it laid them out: one after a statement still after it, rules of stars and slashes as dashes, "
-                      "the //* toggle as ---[[, and an if on one line on one line");
         ALLSLToSLua::Options options;
         options.types               = true;
         const ALLSLToSLua::Result r = ALLSLToSLua::convert("/***************************************/\n"
@@ -1522,18 +2071,31 @@ namespace tut
                                                            "}\n"
                                                            "default { state_entry() { llOwnerSay(get(allowed(S_MASK)) + (string)gDebug); } }\n",
                                                            options);
-        ensure("converted", r.converted);
-        ensure("a rule of stars: " + r.text, has(r, "\n-----------------------------------------\n--------------- CONSTANTS ---------------\n"));
-        ensure("after its statement: " + r.text, has(r, "local S_MASK: number = -268435456 -- -268435456\n"));
-        ensure("a rule of slashes: " + r.text, has(r, "\n---------------------------------------------------------------\n") ||
-                                                    has(r, "------------------------- DEBUGGING ---------------------------\n"));
-        ensure("the toggle: " + r.text, has(r, "---[[\nlocal function get(") && has(r, "end\n--]]\n"));
-        ensure("the toggle the other way: " + r.text, has(r, "--[[\nstring old() { return \"\"; }\n--]]"));
-        ensure("an if on one line on one: " + r.text,
-               has(r, "    if bit32.btest(parcelFlags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then return 1 end -- may build\n"));
-        ensure("one on two lines on three: " + r.text, has(r, "    if bit32.btest(parcelFlags, 4) then\n        return 2\n    end\n"));
-        ensure("after a declaration and a block comment after a step: " + r.text,
-               has(r, "local n: number = 3 -- three\n") && has(r, "n += 1 --[[ and one ]]\n"));
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("a rule of stars");
+        CHECK(has(r, "\n-----------------------------------------\n--------------- CONSTANTS ---------------\n"));
+        UNSCOPED_INFO("after its statement");
+        CHECK(has(r, "local S_MASK: number = -268435456 -- -268435456\n"));
+        UNSCOPED_INFO("a rule of slashes");
+        CHECK((has(r, "\n---------------------------------------------------------------\n") ||
+               has(r, "------------------------- DEBUGGING ---------------------------\n")));
+        {
+            INFO("the toggle");
+            CHECK(has(r, "---[[\nlocal function get("));
+            CHECK(has(r, "end\n--]]\n"));
+        }
+        UNSCOPED_INFO("the toggle the other way");
+        CHECK(has(r, "--[[\nstring old() { return \"\"; }\n--]]"));
+        UNSCOPED_INFO("an if on one line on one");
+        CHECK(has(r, "    if bit32.btest(parcelFlags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then return 1 end -- may build\n"));
+        UNSCOPED_INFO("one on two lines on three");
+        CHECK(has(r, "    if bit32.btest(parcelFlags, 4) then\n        return 2\n    end\n"));
+        {
+            INFO("after a declaration and a block comment after a step");
+            CHECK(has(r, "local n: number = 3 -- three\n"));
+            CHECK(has(r, "n += 1 --[[ and one ]]\n"));
+        }
         // The lines beside the LSL's past an if put on one line.
         std::vector<std::string> lines;
         for (size_t from = 0; from <= r.text.size();)
@@ -1552,16 +2114,20 @@ namespace tut
             }
             return "(none)";
         };
-        ensure("the if on one line beside its line: " + at(15), at(15).find("then return 1 end") != std::string::npos);
-        ensure("the next beside its own: " + at(16), at(16).find("if bit32.btest(parcelFlags, 4) then") != std::string::npos);
-        ensure("and those after: " + at(18) + " / " + at(19), at(18).find("local n: number = 3") != std::string::npos && at(19).find("n += 1") != std::string::npos);
-        checksClean(r);
+        UNSCOPED_INFO("the if on one line beside its line: " + at(15));
+        CHECK(at(15).find("then return 1 end") != std::string::npos);
+        UNSCOPED_INFO("the next beside its own: " + at(16));
+        CHECK(at(16).find("if bit32.btest(parcelFlags, 4) then") != std::string::npos);
+        {
+            INFO("and those after: " + at(18) + " / " + at(19));
+            CHECK(at(18).find("local n: number = 3") != std::string::npos);
+            CHECK(at(19).find("n += 1") != std::string::npos);
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<42>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: declarations the LSL lined up lined up again and others as written", "[ALLSLToSLua]")
     {
-        set_test_name("declarations the LSL lined up lined up again, their = and the comments after them; those it did not, as written");
         ALLSLToSLua::Options options;
         options.types               = true;
         const ALLSLToSLua::Result r = ALLSLToSLua::convert("integer S_MASK        = 0xF0000000; // the sign\n"
@@ -1576,19 +2142,21 @@ namespace tut
                                                            "    llOwnerSay(PREFIX + (string)(S_MASK + ACTIVE_STRIDE + a + x + yy) + bee);\n"
                                                            "} }\n",
                                                            options);
-        ensure("converted", r.converted);
-        ensure("globals lined up: " + r.text, has(r, "local S_MASK: number        = -268435456 -- the sign\n"
-                                                     "local ACTIVE_STRIDE: number = 3          -- per prop\n"
-                                                     "local PREFIX: string        = \"ARS#\"     -- linkset data\n"));
-        ensure("not lined up, not lined up: " + r.text, has(r, "local a: number = 1\nlocal bee: string = \"b\"\n"));
-        ensure("locals lined up: " + r.text, has(r, "\nlocal x: number  = 1\nlocal yy: number = 2.5\n"));
-        checksClean(r);
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("globals lined up");
+        CHECK(has(r, "local S_MASK: number        = -268435456 -- the sign\n"
+                     "local ACTIVE_STRIDE: number = 3          -- per prop\n"
+                     "local PREFIX: string        = \"ARS#\"     -- linkset data\n"));
+        UNSCOPED_INFO("not lined up, not lined up");
+        CHECK(has(r, "local a: number = 1\nlocal bee: string = \"b\"\n"));
+        UNSCOPED_INFO("locals lined up");
+        CHECK(has(r, "\nlocal x: number  = 1\nlocal yy: number = 2.5\n"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<43>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a vector or rotation cast from text bracketed only where needed", "[ALLSLToSLua]")
     {
-        set_test_name("text made a vector or a rotation bracketed only where an operator around it needs it");
         const ALLSLToSLua::Result r = ALLSLToSLua::convert("vector offset;\n"
                                                            "default { state_entry() {\n"
                                                            "    list command = [\"a\", \"<1,2,3>\"];\n"
@@ -1597,78 +2165,91 @@ namespace tut
                                                            "    llOwnerSay((string)((vector)llList2String(command, 1) * 2.0));\n"
                                                            "    llSetPos((vector)llList2String(command, 1));\n"
                                                            "} }\n");
-        ensure("converted", r.converted);
-        ensure("assigned as it is: " + r.text, has(r, "offset = tovector(command[2] or \"\") or ZERO_VECTOR\n"));
-        ensure("a local's value too: " + r.text, has(r, "local r = toquaternion(command[2] or \"\") or ZERO_ROTATION\n"));
-        ensure("an argument too: " + r.text, has(r, "ll.SetPos(tovector(command[2] or \"\") or ZERO_VECTOR)"));
-        ensure("an operand bracketed: " + r.text, has(r, "(tovector(command[2] or \"\") or ZERO_VECTOR) * 2"));
-        checksClean(r);
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("assigned as it is");
+        CHECK(has(r, "offset = tovector(command[2] or \"\") or ZERO_VECTOR\n"));
+        UNSCOPED_INFO("a local's value too");
+        CHECK(has(r, "local r = toquaternion(command[2] or \"\") or ZERO_ROTATION\n"));
+        UNSCOPED_INFO("an argument too");
+        CHECK(has(r, "ll.SetPos(tovector(command[2] or \"\") or ZERO_VECTOR)"));
+        UNSCOPED_INFO("an operand bracketed");
+        CHECK(has(r, "(tovector(command[2] or \"\") or ZERO_VECTOR) * 2"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<44>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: an integer as text interpolated where joined and by tostring alone", "[ALLSLToSLua]")
     {
-        set_test_name("an integer made text where text is joined, interpolated; alone, or a lone piece of a table's, by tostring");
-        const ALLSLToSLua::Result r = convert("set(integer keey, string value) { llLinksetDataWrite(\"ARS#\" + (string)keey, value); }\n"
-                                              "default { state_entry() {\n"
-                                              "    integer n = 4; float f = 1.5; key k = llGetOwner();\n"
-                                              "    set(n, (string)n);\n"
-                                              "    llOwnerSay((string)f + \";\" + (string)k + \";\" + (string)(n * 2) + (string)(-n));\n"
-                                              "} }\n");
-        ensure("converted", r.converted);
-        ensure("joined, interpolated: " + r.text, has(r, "ll.LinksetDataWrite(`ARS#{keey}`, value)"));
-        ensure("alone, still text: " + r.text, has(r, "set(n, tostring(n))"));
-        ensure("a float's six places, a key's text, a product bracketed, a negation bare: " + r.text,
-               has(r, "print(`{string.format(\"%.6f\", f)};{k};{n * 2}{-n}`)"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("set(integer keey, string value) { llLinksetDataWrite(\"ARS#\" + (string)keey, value); }\n"
+                                                        "default { state_entry() {\n"
+                                                        "    integer n = 4; float f = 1.5; key k = llGetOwner();\n"
+                                                        "    set(n, (string)n);\n"
+                                                        "    llOwnerSay((string)f + \";\" + (string)k + \";\" + (string)(n * 2) + (string)(-n));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("joined, interpolated");
+        CHECK(has(r, "ll.LinksetDataWrite(`ARS#{keey}`, value)"));
+        UNSCOPED_INFO("alone, still text");
+        CHECK(has(r, "set(n, tostring(n))"));
+        UNSCOPED_INFO("a float's six places, a key's text, a product bracketed, a negation bare");
+        CHECK(has(r, "print(`{string.format(\"%.6f\", f)};{k};{n * 2}{-n}`)"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<45>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a vector as text with five places as LSL wrote it noted once", "[ALLSLToSLua]")
     {
-        set_test_name("a vector made text as LSL wrote it, five places a part, which tostring would not: noted, once");
-        const ALLSLToSLua::Result r = convert("integer SEAT_NUM = 0;\n"
-                                              "vector offset = ZERO_VECTOR;\n"
-                                              "set(integer which, string value) { llLinksetDataWrite((string)which, value); }\n"
-                                              "default { state_entry() {\n"
-                                              "    set(7, (string)SEAT_NUM + \";\" + (string)offset);\n"
-                                              "    llOwnerSay((string)ZERO_ROTATION);\n"
-                                              "} }\n");
-        ensure("converted", r.converted);
-        ensure("LSL's text kept: " + r.text, has(r, "set(7, `{SEAT_NUM};{ll.DumpList2String({ offset }, \"\")}`)"));
-        ensure("a rotation's too: " + r.text, has(r, "ll.DumpList2String({ ZERO_ROTATION }, \"\")"));
-        ensure("said why, once: " + r.text, noted(r, "SluaVectorText") && r.text.find("-- LSL: ll.DumpList2String writes") != std::string::npos &&
-                                                 r.text.find("-- LSL: ll.DumpList2String writes") == r.text.rfind("-- LSL: ll.DumpList2String writes"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer SEAT_NUM = 0;\n"
+                                                        "vector offset = ZERO_VECTOR;\n"
+                                                        "set(integer which, string value) { llLinksetDataWrite((string)which, value); }\n"
+                                                        "default { state_entry() {\n"
+                                                        "    set(7, (string)SEAT_NUM + \";\" + (string)offset);\n"
+                                                        "    llOwnerSay((string)ZERO_ROTATION);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("LSL's text kept");
+        CHECK(has(r, "set(7, `{SEAT_NUM};{ll.DumpList2String({ offset }, \"\")}`)"));
+        UNSCOPED_INFO("a rotation's too");
+        CHECK(has(r, "ll.DumpList2String({ ZERO_ROTATION }, \"\")"));
+        {
+            INFO("said why, once");
+            CHECK(noted(r, "SluaVectorText"));
+            CHECK(r.text.find("-- LSL: ll.DumpList2String writes") != std::string::npos);
+            CHECK(r.text.find("-- LSL: ll.DumpList2String writes") == r.text.rfind("-- LSL: ll.DumpList2String writes"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<46>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: text joined with non-strings interpolated and escaped; strings with ..", "[ALLSLToSLua]")
     {
-        set_test_name("text joined with a piece that is no string as one interpolated string, its own text escaped; strings alone with ..");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    key k = llGetOwner(); integer n = 3; string s = \"x\"; float f = 0.5;\n"
-                                              "    llOwnerSay(\"100% `{a}` \\\\ \\\"q\\\"\\n\" + (string)k);\n"
-                                              "    llOwnerSay(\"n=\" + (string)n + \";\" + s);\n"
-                                              "    llOwnerSay(\"a\" + llToUpper(\"b\" + (string)k) + (string)f);\n"
-                                              "    s = s + \"/\" + (string)k;\n"
-                                              "    string all = \"\";\n"
-                                              "    integer i; for (i = 0; i < n; ++i) all += (string)k + \",\";\n"
-                                              "    llOwnerSay(all + s);\n"
-                                              "} }\n");
-        ensure("converted", r.converted);
-        ensure("its text escaped -- a backtick, a brace, a backslash, a line -- and % as it is: " + r.text,
-               has(r, "print(`100% \\`\\{a}\\` \\\\ \"q\"\\n{k}`)"));
-        ensure("a number joined too: " + r.text, has(r, "print(`n={n};{s}`)"));
-        ensure("strings alone, with ..: " + r.text, has(r, "print(all .. s)"));
-        ensure("one inside another's braces: " + r.text, has(r, "print(`a{ll.ToUpper(`b{k}`)}{string.format(\"%.6f\", f)}`)"));
-        ensure("joined onto a string: " + r.text, has(r, "s ..= `/{k}`"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    key k = llGetOwner(); integer n = 3; string s = \"x\"; float f = 0.5;\n"
+                                                        "    llOwnerSay(\"100% `{a}` \\\\ \\\"q\\\"\\n\" + (string)k);\n"
+                                                        "    llOwnerSay(\"n=\" + (string)n + \";\" + s);\n"
+                                                        "    llOwnerSay(\"a\" + llToUpper(\"b\" + (string)k) + (string)f);\n"
+                                                        "    s = s + \"/\" + (string)k;\n"
+                                                        "    string all = \"\";\n"
+                                                        "    integer i; for (i = 0; i < n; ++i) all += (string)k + \",\";\n"
+                                                        "    llOwnerSay(all + s);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("its text escaped -- a backtick, a brace, a backslash, a line -- and % as it is");
+        CHECK(has(r, "print(`100% \\`\\{a}\\` \\\\ \"q\"\\n{k}`)"));
+        UNSCOPED_INFO("a number joined too");
+        CHECK(has(r, "print(`n={n};{s}`)"));
+        UNSCOPED_INFO("strings alone, with ..");
+        CHECK(has(r, "print(all .. s)"));
+        UNSCOPED_INFO("one inside another's braces");
+        CHECK(has(r, "print(`a{ll.ToUpper(`b{k}`)}{string.format(\"%.6f\", f)}`)"));
+        UNSCOPED_INFO("joined onto a string");
+        CHECK(has(r, "s ..= `/{k}`"));
+        require_checks_clean(r);
     }
-    template<> template<>
-    void allsltoslua_object::test<47>()
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: spans end where their SLua does: blocks at end and statements on a line", "[ALLSLToSLua]")
     {
-        set_test_name("spans end where the SLua made of them does: a block at its end, a statement at its own line, a comment over the next left to the next");
         const std::string lsl = "default\n"                        // 0
                                 "{\n"                              // 1
                                 "    touch_start(integer d)\n"     // 2
@@ -1681,7 +2262,7 @@ namespace tut
                                 "        llSay(0, \"one\");\n"     // 9
                                 "    }\n"                          // 10
                                 "}\n";                             // 11
-        const ALLSLToSLua::Result r = convert(lsl);
+        const ALLSLToSLua::Result r = require_converted(lsl);
         std::vector<std::string>  lines;
         for (size_t from = 0; from <= r.text.size();)
         {
@@ -1708,84 +2289,119 @@ namespace tut
             return first == std::string::npos ? std::string() : text.substr(first);
         };
         const ALLSLToSLua::Span* block = span(4);
-        ensure("the if", block && block->lslLast == 7);
-        ensure("from its head: " + trimmed(block->sluaFirst), trimmed(block->sluaFirst).find("if d > 1 then") == 0);
-        ensure("to its end: " + trimmed(block->sluaLast) + "\n" + r.text, trimmed(block->sluaLast) == "end");
+        {
+            INFO("the if");
+            REQUIRE(block);
+            CHECK(block->lslLast == 7);
+        }
+        UNSCOPED_INFO("from its head: " + trimmed(block->sluaFirst));
+        CHECK(trimmed(block->sluaFirst).find("if d > 1 then") == 0);
+        UNSCOPED_INFO("to its end: " + trimmed(block->sluaLast) + "\n" + r.text);
+        CHECK(trimmed(block->sluaLast) == "end");
         const ALLSLToSLua::Span* inside = span(6);
         std::string all;
         for (const ALLSLToSLua::Span& each : r.spans)
         {
             all += std::to_string(each.lslFirst) + "-" + std::to_string(each.lslLast) + " : " + std::to_string(each.sluaFirst) + "-" + std::to_string(each.sluaLast) + "\n";
         }
-        ensure("the statement in it, a line of its own\n" + all + r.text, inside && inside->lslLast == 6 && inside->sluaFirst == inside->sluaLast &&
-                                                             trimmed(inside->sluaFirst).find("ll.Say(0, \"many\")") == 0);
+        {
+            INFO("the statement in it, a line of its own\n" + all + r.text);
+            REQUIRE(inside);
+            CHECK(inside->lslLast == 6);
+            CHECK(inside->sluaFirst == inside->sluaLast);
+            CHECK(trimmed(inside->sluaFirst).find("ll.Say(0, \"many\")") == 0);
+        }
         const ALLSLToSLua::Span* next = span(9);
-        ensure("the next, under the comment: " + (next ? trimmed(next->sluaFirst) : std::string()),
-               next && next->sluaFirst == next->sluaLast && trimmed(next->sluaFirst).find("ll.Say(0, \"one\")") == 0 &&
-                   trimmed(next->sluaFirst - 1) == "-- after");
+        {
+            INFO("the next, under the comment: " + (next ? trimmed(next->sluaFirst) : std::string()));
+            REQUIRE(next);
+            CHECK(next->sluaFirst == next->sluaLast);
+            REQUIRE(trimmed(next->sluaFirst).find("ll.Say(0, \"one\")") == 0);
+            CHECK(trimmed(next->sluaFirst - 1) == "-- after");
+        }
         const ALLSLToSLua::Span* handler = span(2);
-        ensure("the handler, over all of it", handler && handler->lslLast == 10 && handler->sluaFirst < block->sluaFirst && handler->sluaLast >= next->sluaLast);
-        ensure("to its own end: " + trimmed(handler->sluaLast), trimmed(handler->sluaLast).find("end") == 0);
+        {
+            INFO("the handler, over all of it");
+            REQUIRE(handler);
+            CHECK(handler->lslLast == 10);
+            CHECK(handler->sluaFirst < block->sluaFirst);
+            CHECK(handler->sluaLast >= next->sluaLast);
+        }
+        UNSCOPED_INFO("to its own end: " + trimmed(handler->sluaLast));
+        CHECK(trimmed(handler->sluaLast).find("end") == 0);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<48>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: what the SLua says otherwise: calls and names and syntax; no semicolons", "[ALLSLToSLua]")
     {
-        set_test_name("what the SLua says otherwise: each call's name as written, SLua's own way's too, a name SLua holds for its own, the syntax always; semicolons let go of");
-        const ALLSLToSLua::Result r = convert("integer end = 1;\n"
-                                              "default\n"
-                                              "{\n"
-                                              "    state_entry()\n"
-                                              "    {\n"
-                                              "        if (end != 2 && TRUE) llSay(0, \"hi\");\n"
-                                              "        llOwnerSay((string)llAbs(end));\n"
-                                              "    }\n"
-                                              "}\n");
+        const ALLSLToSLua::Result r = require_converted("integer end = 1;\n"
+                                                        "default\n"
+                                                        "{\n"
+                                                        "    state_entry()\n"
+                                                        "    {\n"
+                                                        "        if (end != 2 && TRUE) llSay(0, \"hi\");\n"
+                                                        "        llOwnerSay((string)llAbs(end));\n"
+                                                        "    }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
         const auto has_pair = [&r](const std::string& lsl, const std::string& slua) {
             return std::find(r.same.begin(), r.same.end(), std::make_pair(lsl, slua)) != r.same.end();
         };
-        ensure("llSay as ll.Say: " + r.text, has_pair("llSay", "ll.Say"));
-        ensure("llOwnerSay as SLua's print: " + r.text, has_pair("llOwnerSay", "print"));
-        ensure("llAbs as SLua's own: " + r.text, has_pair("llAbs", "math.abs"));
-        ensure("a name Luau holds, marked", has_pair("end", "end_") && has(r, "local end_"));
-        ensure("the syntax", has_pair("!=", "~=") && has_pair("&&", "and") && has_pair("integer", "local") && has_pair("TRUE", "true") &&
-                                 has_pair("(string)", "tostring"));
-        ensure("each once", std::count(r.same.begin(), r.same.end(), std::make_pair(std::string("llSay"), std::string("ll.Say"))) == 1);
-        ensure("semicolons let go of", r.dropped == std::vector<std::string>{ ";" });
+        UNSCOPED_INFO("llSay as ll.Say");
+        CHECK(has_pair("llSay", "ll.Say"));
+        UNSCOPED_INFO("llOwnerSay as SLua's print");
+        CHECK(has_pair("llOwnerSay", "print"));
+        UNSCOPED_INFO("llAbs as SLua's own");
+        CHECK(has_pair("llAbs", "math.abs"));
+        {
+            INFO("a name Luau holds, marked");
+            CHECK(has_pair("end", "end_"));
+            CHECK(has(r, "local end_"));
+        }
+        {
+            INFO("the syntax");
+            CHECK(has_pair("!=", "~="));
+            CHECK(has_pair("&&", "and"));
+            CHECK(has_pair("integer", "local"));
+            CHECK(has_pair("TRUE", "true"));
+            CHECK(has_pair("(string)", "tostring"));
+        }
+        UNSCOPED_INFO("each once");
+        CHECK(std::count(r.same.begin(), r.same.end(), std::make_pair(std::string("llSay"), std::string("ll.Say"))) == 1);
+        UNSCOPED_INFO("semicolons let go of");
+        CHECK(r.dropped == std::vector<std::string>{ ";" });
     }
 
-    template<> template<>
-    void allsltoslua_object::test<49>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: an integer added to a string by += or s = s + joined by ..= alone", "[ALLSLToSLua]")
     {
-        set_test_name("an integer made text and added to a string with += joined on as s = s + it has it, by .. alone");
-        const ALLSLToSLua::Result r = convert("string gOut;\n"
-                                              "string gTwo;\n"
-                                              "default { state_entry() {\n"
-                                              "    integer n = llGetUnixTime();\n"
-                                              "    gOut += (string)n;\n"
-                                              "    gTwo = gTwo + (string)n;\n"
-                                              "    llOwnerSay(gOut + gTwo);\n"
-                                              "} }\n");
-        ensure("converted", r.converted);
-        ensure("+=: " + r.text, has(r, "gOut ..= n\n"));
-        ensure("s = s +: " + r.text, has(r, "gTwo ..= n\n"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("string gOut;\n"
+                                                        "string gTwo;\n"
+                                                        "default { state_entry() {\n"
+                                                        "    integer n = llGetUnixTime();\n"
+                                                        "    gOut += (string)n;\n"
+                                                        "    gTwo = gTwo + (string)n;\n"
+                                                        "    llOwnerSay(gOut + gTwo);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("+=");
+        CHECK(has(r, "gOut ..= n\n"));
+        UNSCOPED_INFO("s = s +");
+        CHECK(has(r, "gTwo ..= n\n"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<50>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: spans: statements sharing an LSL line side by side and not nested", "[ALLSLToSLua]")
     {
-        set_test_name("spans: statements sharing an LSL line side by side, not one inside the other");
-        const ALLSLToSLua::Result r = convert("integer x;\n"                  // 0
-                                              "integer y;\n"                  // 1
-                                              "default\n"                     // 2
-                                              "{\n"                           // 3
-                                              "    state_entry()\n"           // 4
-                                              "    {\n"                       // 5
-                                              "        x = 1; y = 2;\n"       // 6
-                                              "        llSay(0, (string)(x + y));\n" // 7
-                                              "    }\n"                       // 8
-                                              "}\n");                         // 9
+        const ALLSLToSLua::Result r = require_converted("integer x;\n"                  // 0
+                                                        "integer y;\n"                  // 1
+                                                        "default\n"                     // 2
+                                                        "{\n"                           // 3
+                                                        "    state_entry()\n"           // 4
+                                                        "    {\n"                       // 5
+                                                        "        x = 1; y = 2;\n"       // 6
+                                                        "        llSay(0, (string)(x + y));\n" // 7
+                                                        "    }\n"                       // 8
+                                                        "}\n");                         // 9
         std::vector<const ALLSLToSLua::Span*> shared;
         std::string                           all;
         for (const ALLSLToSLua::Span& each : r.spans)
@@ -1797,50 +2413,65 @@ namespace tut
                 shared.push_back(&each);
             }
         }
-        ensure_equals("two statements on the line\n" + all + r.text, shared.size(), size_t(2));
-        ensure("their SLua apart\n" + all + r.text, shared[0]->sluaLast < shared[1]->sluaFirst || shared[1]->sluaLast < shared[0]->sluaFirst);
+        CAPTURE(all, r.text);
+        UNSCOPED_INFO("two statements on the line");
+        REQUIRE(shared.size() == size_t(2));
+        UNSCOPED_INFO("their SLua apart");
+        CHECK((shared[0]->sluaLast < shared[1]->sluaFirst || shared[1]->sluaLast < shared[0]->sluaFirst));
         // The handler, over more than one LSL line, still holds both.
-        for (const ALLSLToSLua::Span& each : r.spans)
+        const auto handler = std::find_if(r.spans.begin(), r.spans.end(), [](const ALLSLToSLua::Span& each) { return each.lslFirst == 4; });
         {
-            if (each.lslFirst == 4)
-            {
-                ensure("the handler over both\n" + all, each.sluaFirst < shared[0]->sluaFirst && each.sluaLast >= shared[1]->sluaLast);
-            }
+            INFO("the handler over both");
+            REQUIRE(handler != r.spans.end());
+            CHECK(handler->sluaFirst < shared[0]->sluaFirst);
+            CHECK(handler->sluaLast >= shared[1]->sluaLast);
         }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<51>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: what the SLua says otherwise: a call as written; marks only where written", "[ALLSLToSLua]")
     {
-        set_test_name("what the SLua says otherwise: a call by the name it was written with, not one inside it; marks only where written so");
         const auto has_pair = [](const ALLSLToSLua::Result& r, const std::string& lsl, const std::string& slua) {
             return std::find(r.same.begin(), r.same.end(), std::make_pair(lsl, slua)) != r.same.end();
         };
-        const ALLSLToSLua::Result plain = convert("default { state_entry() {\n"
-                                                  "    integer n = 2;\n"
-                                                  "    if (n > 1) llSay(0, (string)llPow(llFrand(1.0), 2.0));\n"
-                                                  "} }\n");
-        ensure("llFrand as ll.Frand: " + plain.text, has_pair(plain, "llFrand", "ll.Frand"));
-        ensure("llPow, written as ^, not as the call inside it: " + plain.text,
-               std::none_of(plain.same.begin(), plain.same.end(), [](const auto& p) { return p.first == "llPow"; }));
-        ensure("a block's braces: " + plain.text, has_pair(plain, "{", "then") && has_pair(plain, "}", "end"));
-        ensure("no vector, no string joined: no marks for them: " + plain.text,
-               !has_pair(plain, ">", ")") && !has_pair(plain, "<", "vector(") && !has_pair(plain, "+", "..") && !has_pair(plain, "+=", "..="));
-        const ALLSLToSLua::Result marks = convert("string gOut;\n"
-                                                  "default { state_entry() {\n"
-                                                  "    vector v = <1, 2, llFrand(1.0)>;\n"
-                                                  "    gOut += llGetObjectName();\n"
-                                                  "    llSay(0, gOut + llGetObjectDesc() + (string)v.z);\n"
-                                                  "} }\n");
-        ensure("a vector's brackets: " + marks.text, has_pair(marks, "<", "vector(") && has_pair(marks, ">", ")"));
-        ensure("a string added to: " + marks.text, has_pair(marks, "+=", "..="));
+        const ALLSLToSLua::Result plain = require_converted("default { state_entry() {\n"
+                                                            "    integer n = 2;\n"
+                                                            "    if (n > 1) llSay(0, (string)llPow(llFrand(1.0), 2.0));\n"
+                                                            "} }\n");
+        CAPTURE(plain.text);
+        UNSCOPED_INFO("llFrand as ll.Frand");
+        CHECK(has_pair(plain, "llFrand", "ll.Frand"));
+        UNSCOPED_INFO("llPow, written as ^, not as the call inside it");
+        CHECK(std::none_of(plain.same.begin(), plain.same.end(), [](const auto& p) { return p.first == "llPow"; }));
+        {
+            INFO("a block's braces");
+            CHECK(has_pair(plain, "{", "then"));
+            CHECK(has_pair(plain, "}", "end"));
+        }
+        {
+            INFO("no vector, no string joined: no marks for them");
+            CHECK_FALSE(has_pair(plain, ">", ")"));
+            CHECK_FALSE(has_pair(plain, "<", "vector("));
+            CHECK_FALSE(has_pair(plain, "+", ".."));
+            CHECK_FALSE(has_pair(plain, "+=", "..="));
+        }
+        const ALLSLToSLua::Result marks = require_converted("string gOut;\n"
+                                                            "default { state_entry() {\n"
+                                                            "    vector v = <1, 2, llFrand(1.0)>;\n"
+                                                            "    gOut += llGetObjectName();\n"
+                                                            "    llSay(0, gOut + llGetObjectDesc() + (string)v.z);\n"
+                                                            "} }\n");
+        CAPTURE(marks.text);
+        {
+            INFO("a vector's brackets");
+            CHECK(has_pair(marks, "<", "vector("));
+            CHECK(has_pair(marks, ">", ")"));
+        }
+        UNSCOPED_INFO("a string added to");
+        CHECK(has_pair(marks, "+=", "..="));
     }
 
-    template<> template<>
-    void allsltoslua_object::test<52>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a comment after a block's brace stays after the line that opens it", "[ALLSLToSLua]")
     {
-        set_test_name("a comment after a block's brace stays after the line that opens the block: then, else, elseif, a loop's do, repeat, a function, a "
-                      "handler; one over several lines too, running on; a one-line if with a block comment after its brace still on one line");
         const std::string lsl = "vector offset;\n"
                                 "list adjustments;\n"
                                 "integer count() { // how many\n"
@@ -1872,279 +2503,590 @@ namespace tut
                                 "        if (n) { /* one */ llOwnerSay(\"y\"); }\n"
                                 "    }\n"
                                 "}\n";
-        const ALLSLToSLua::Result r = convert(lsl);
-        ensure("converted", r.converted);
-        ensure("then: " + r.text, has(r, "    if i < 0 then -- no saved setting. use 0\n        offset = ZERO_VECTOR\n"));
-        ensure("elseif: " + r.text, has(r, "    elseif i > 100 then -- too far\n"));
-        ensure("else: " + r.text, has(r, "    else -- restore saved setting\n"));
-        ensure("not over the if: " + r.text, !has(r, "-- no saved setting. use 0\n    -- restore") && count(r, "restore saved setting") == 1);
-        ensure("a while's do: " + r.text, has(r, " do -- count down\n"));
-        ensure("repeat: " + r.text, has(r, "repeat --[[ at least once ]]\n"));
-        ensure("a for's do: " + r.text, has(r, " do -- each\n"));
-        ensure("a function: " + r.text, has(r, "local function count() -- how many\n"));
-        ensure("a handler: " + r.text, has(r, "LLEvents:on(\"touch_start\", function(detected) -- whoever touches\n"));
-        ensure("one over two lines, running on: " + r.text, has(r, "    if i ~= 0 then --[[ over\n                    two lines ]]\n        print(\"x\")\n"));
-        ensure("a one-line if on one line still: " + r.text, has(r, "    if n ~= 0 then --[[ one ]] print(\"y\") end\n"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted(lsl);
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("then");
+        CHECK(has(r, "    if i < 0 then -- no saved setting. use 0\n        offset = ZERO_VECTOR\n"));
+        UNSCOPED_INFO("elseif");
+        CHECK(has(r, "    elseif i > 100 then -- too far\n"));
+        UNSCOPED_INFO("else");
+        CHECK(has(r, "    else -- restore saved setting\n"));
+        {
+            INFO("not over the if");
+            CHECK_FALSE(has(r, "-- no saved setting. use 0\n    -- restore"));
+            CHECK(count(r, "restore saved setting") == 1);
+        }
+        UNSCOPED_INFO("a while's do");
+        CHECK(has(r, " do -- count down\n"));
+        UNSCOPED_INFO("repeat");
+        CHECK(has(r, "repeat --[[ at least once ]]\n"));
+        UNSCOPED_INFO("a for's do");
+        CHECK(has(r, " do -- each\n"));
+        UNSCOPED_INFO("a function");
+        CHECK(has(r, "local function count() -- how many\n"));
+        UNSCOPED_INFO("a handler");
+        CHECK(has(r, "LLEvents:on(\"touch_start\", function(detected) -- whoever touches\n"));
+        UNSCOPED_INFO("one over two lines, running on");
+        CHECK(has(r, "    if i ~= 0 then --[[ over\n                    two lines ]]\n        print(\"x\")\n"));
+        UNSCOPED_INFO("a one-line if on one line still");
+        CHECK(has(r, "    if n ~= 0 then --[[ one ]] print(\"y\") end\n"));
+        require_checks_clean(r);
 
         // The same with the field style, and in a state's table.
         ALLSLToSLua::Options field;
         field.handlers = ALLSLToSLua::Options::Handlers::Field;
-        ensure("a field's handler: ", has(ALLSLToSLua::convert(lsl, field), "function LLEvents.touch_start(detected) -- whoever touches\n"));
-        const ALLSLToSLua::Result states = convert("default {\n"
-                                                   "    touch_start(integer n) { // first state\n"
-                                                   "        state other;\n"
-                                                   "    }\n"
-                                                   "}\n"
-                                                   "state other {\n"
-                                                   "    state_entry() { // entered\n"
-                                                   "        llOwnerSay(\"in\");\n"
-                                                   "    }\n"
-                                                   "}\n");
-        ensure("in a state's table: " + states.text, has(states, "touch_start = function(detected) -- first state\n") &&
-                                                         has(states, "state_entry = function() -- entered\n"));
-        checksClean(states);
+        UNSCOPED_INFO("a field's handler");
+        CHECK(has(ALLSLToSLua::convert(lsl, field), "function LLEvents.touch_start(detected) -- whoever touches\n"));
+        const ALLSLToSLua::Result states = require_converted("default {\n"
+                                                             "    touch_start(integer n) { // first state\n"
+                                                             "        state other;\n"
+                                                             "    }\n"
+                                                             "}\n"
+                                                             "state other {\n"
+                                                             "    state_entry() { // entered\n"
+                                                             "        llOwnerSay(\"in\");\n"
+                                                             "    }\n"
+                                                             "}\n");
+        CAPTURE(states.text);
+        {
+            INFO("in a state's table");
+            CHECK(has(states, "touch_start = function(detected) -- first state\n"));
+            CHECK(has(states, "state_entry = function() -- entered\n"));
+        }
+        require_checks_clean(states);
         // A single state's state_entry runs at the top: its comment at the
         // top of what it ran.
-        const ALLSLToSLua::Result entry = convert("default {\n    state_entry() { // set up\n        llOwnerSay(\"hi\");\n    }\n}\n");
-        ensure("state_entry's, kept: " + entry.text, has(entry, "-- set up\n") && entry.text.find("-- set up") < entry.text.find("ll.OwnerSay"));
+        const ALLSLToSLua::Result entry = require_converted("default {\n    state_entry() { // set up\n        llOwnerSay(\"hi\");\n    }\n}\n");
+        CAPTURE(entry.text);
+        {
+            INFO("state_entry's, kept");
+            const size_t set_up = entry.text.find("-- set up\n");
+            const size_t said   = entry.text.find("print(\"hi\")");
+            CHECK(set_up != std::string::npos);
+            CHECK(said != std::string::npos);
+            CHECK(set_up < said);
+        }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<53>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a comment after the brace of an unwritten block goes over its stand-in", "[ALLSLToSLua]")
     {
-        set_test_name("a comment after the brace of a block not written goes over what stands for it, not at the end of what holds it: a boolean's "
-                      "if and else, a lone state's state_exit; an if with -- in a string in its check still on one line");
-        const ALLSLToSLua::Result r = convert("integer gMany;\n"
-                                              "default {\n"
-                                              "    touch_start(integer n) {\n"
-                                              "        if (n > 1) { // many\n"
-                                              "            gMany = TRUE;\n"
-                                              "        } else { // one\n"
-                                              "            gMany = FALSE;\n"
-                                              "        }\n"
-                                              "        if (gMany) llOwnerSay(\"many\");\n"
-                                              "    }\n"
-                                              "}\n");
+        const ALLSLToSLua::Result r = require_converted("integer gMany;\n"
+                                                        "default {\n"
+                                                        "    touch_start(integer n) {\n"
+                                                        "        if (n > 1) { // many\n"
+                                                        "            gMany = TRUE;\n"
+                                                        "        } else { // one\n"
+                                                        "            gMany = FALSE;\n"
+                                                        "        }\n"
+                                                        "        if (gMany) llOwnerSay(\"many\");\n"
+                                                        "    }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
         const size_t many = r.text.find("    -- many\n");
         const size_t one  = r.text.find("    -- one\n");
         const size_t set  = r.text.find("    gMany = n > 1\n");
-        ensure("both over the line that stands for the if: " + r.text, set != std::string::npos && many < one && one < set);
-        ensure("once each: " + r.text, count(r, "-- many") == 1 && count(r, "-- one") == 1);
-        checksClean(r);
+        {
+            INFO("both over the line that stands for the if");
+            REQUIRE(set != std::string::npos);
+            CHECK(many < one);
+            CHECK(one < set);
+        }
+        {
+            INFO("once each");
+            CHECK(count(r, "-- many") == 1);
+            CHECK(count(r, "-- one") == 1);
+        }
+        require_checks_clean(r);
 
-        const ALLSLToSLua::Result exit = convert("default {\n"
-                                                 "    state_entry() {\n"
-                                                 "        llOwnerSay(\"in\");\n"
-                                                 "    }\n"
-                                                 "    state_exit() { // say goodbye\n"
-                                                 "        llOwnerSay(\"out\");\n"
-                                                 "    }\n"
-                                                 "}\n");
+        const ALLSLToSLua::Result exit = require_converted("default {\n"
+                                                           "    state_entry() {\n"
+                                                           "        llOwnerSay(\"in\");\n"
+                                                           "    }\n"
+                                                           "    state_exit() { // say goodbye\n"
+                                                           "        llOwnerSay(\"out\");\n"
+                                                           "    }\n"
+                                                           "}\n");
+        CAPTURE(exit.text);
         const size_t left = exit.text.find("-- state_exit, left out");
-        ensure("state_exit's, over the line said in its place: " + exit.text,
-               left != std::string::npos && exit.text.find("-- say goodbye\n") < left && count(exit, "-- say goodbye") == 1);
+        {
+            INFO("state_exit's, over the line said in its place");
+            REQUIRE(left != std::string::npos);
+            CHECK(exit.text.find("-- say goodbye\n") < left);
+            CHECK(count(exit, "-- say goodbye") == 1);
+        }
 
-        const ALLSLToSLua::Result dashes = convert("default {\n"
-                                                   "    listen(integer c, string name, key id, string s) {\n"
-                                                   "        if (s == \" -- x\") llOwnerSay(\"y\");\n"
-                                                   "    }\n"
-                                                   "}\n");
-        ensure("a string's dashes no comment: " + dashes.text, has(dashes, " == \" -- x\" then print(\"y\") end\n"));
+        const ALLSLToSLua::Result dashes = require_converted("default {\n"
+                                                             "    listen(integer c, string name, key id, string s) {\n"
+                                                             "        if (s == \" -- x\") llOwnerSay(\"y\");\n"
+                                                             "    }\n"
+                                                             "}\n");
+        CAPTURE(dashes.text);
+        UNSCOPED_INFO("a string's dashes no comment");
+        CHECK(has(dashes, " == \" -- x\" then print(\"y\") end\n"));
     }
 
-    template<> template<>
-    void allsltoslua_object::test<54>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: llVecNorm through one vecNorm that keeps zero zero unless known nonzero", "[ALLSLToSLua]")
     {
-        set_test_name("llVecNorm keeps a zero vector zero, as LSL does, where vector.normalize makes NaN of it: through vecNorm, written "
-                      "once, but for a vector known not to be nought; no vecNorm where nothing normalizes");
-        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
-                                              "    vector d = llDetectedPos(0) - llGetPos();\n"
-                                              "    vector a = llVecNorm(d);\n"
-                                              "    vector b = llVecNorm(llGetVel());\n"
-                                              "    vector c = llVecNorm(<0, 3, 4>);\n"
-                                              "    vector z = llVecNorm(ZERO_VECTOR);\n"
-                                              "    llOwnerSay((string)(a + b + c + z));\n"
-                                              "} }\n");
-        ensure("guarded: " + r.text, has(r, "local a = vecNorm(d)") && has(r, "vecNorm(ll.GetVel())"));
-        ensure("written once: " + r.text, count(r, "local function vecNorm(v: vector): vector") == 1);
-        ensure("a vector known: " + r.text, has(r, "vector.normalize(vector(0, 3, 4))"));
-        ensure("nought guarded: " + r.text, has(r, "vecNorm(ZERO_VECTOR)"));
-        checksClean(r);
-        const ALLSLToSLua::Result none = convert("default { state_entry() { llOwnerSay((string)llVecMag(<1, 2, 3>)); } }\n");
-        ensure("no helper unasked: " + none.text, !has(none, "vecNorm"));
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    vector d = llDetectedPos(0) - llGetPos();\n"
+                                                        "    vector a = llVecNorm(d);\n"
+                                                        "    vector b = llVecNorm(llGetVel());\n"
+                                                        "    vector c = llVecNorm(<0, 3, 4>);\n"
+                                                        "    vector z = llVecNorm(ZERO_VECTOR);\n"
+                                                        "    llOwnerSay((string)(a + b + c + z));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("guarded");
+            CHECK(has(r, "local a = vecNorm(d)"));
+            CHECK(has(r, "vecNorm(ll.GetVel())"));
+        }
+        UNSCOPED_INFO("written once");
+        CHECK(count(r, "local function vecNorm(v: vector): vector") == 1);
+        UNSCOPED_INFO("a vector known");
+        CHECK(has(r, "vector.normalize(vector(0, 3, 4))"));
+        UNSCOPED_INFO("nought guarded");
+        CHECK(has(r, "vecNorm(ZERO_VECTOR)"));
+        require_checks_clean(r);
+        const ALLSLToSLua::Result none = require_converted("default { state_entry() { llOwnerSay((string)llVecMag(<1, 2, 3>)); } }\n");
+        CAPTURE(none.text);
+        UNSCOPED_INFO("no helper unasked");
+        CHECK_FALSE(has(none, "vecNorm"));
     }
 
-    template<> template<>
-    void allsltoslua_object::test<65>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: lists appended with table.extend and + on a copy of the left; no joinLists", "[ALLSLToSLua]")
     {
-        set_test_name("a script that resets its time keeps a clock of its own, script-wide as a state change leaves LSL's: ll.GetTime read "
-                      "from timeBase, each reset setting it again; one that only reads keeps ll.GetTime; close to LSL, llcompat's three");
-        const ALLSLToSLua::Result r = convert("float timeBase;\n"
-                                              "default {\n"
-                                              "    state_entry() { llResetTime(); state running; }\n"
-                                              "}\n"
-                                              "state running {\n"
-                                              "    state_entry() { timeBase = llGetTime(); }\n"
-                                              "    touch_start(integer n) {\n"
-                                              "        float lap = llGetAndResetTime();\n"
-                                              "        llGetAndResetTime();\n"
-                                              "        llOwnerSay((string)(lap + timeBase) + \" \" + (string)(llGetTime() * 2));\n"
-                                              "    }\n"
-                                              "}\n");
-        ensure("the clock, once, over everything: " + r.text,
-               count(r, "local timeBase = ll.GetTime()") == 1 && r.text.find("local timeBase = ll.GetTime()") < r.text.find("local states"));
-        ensure("the script's own name made another: " + r.text, has(r, "local timeBase_ = 0") && has(r, "timeBase_ = ll.GetTime() - timeBase"));
-        ensure("a reset: " + r.text, has(r, "state_entry = function()\n        timeBase = ll.GetTime()\n        setState(\"running\")"));
-        ensure("both, as a value, through the helper: " + r.text,
-               has(r, "local lap = getAndResetTime()") && count(r, "local function getAndResetTime(): number") == 1);
-        ensure("both where nothing reads the time, the reset alone: " + r.text,
-               has(r, "local lap = getAndResetTime()\n        timeBase = ll.GetTime()\n"));
-        ensure("a read bracketed: " + r.text, has(r, "(ll.GetTime() - timeBase) * 2"));
-        ensure("nothing of llcompat's: " + r.text, !has(r, "llcompat.ResetTime") && !has(r, "llcompat.GetAndResetTime") &&
-                                                     !noted(r, "SluaCompatOnly", "ResetTime") && !noted(r, "SluaCompatOnly", "GetAndResetTime"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("list gKept = [1];\n"
+                                                        "list kept() { return gKept; }\n"
+                                                        "show(list l) { llOwnerSay(llDumpList2String(l, \",\")); }\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    list all = llParseString2List(\"a,b\", [\",\"], []);\n"
+                                                        "    list more = [4, 5];\n"
+                                                        "    all += more;\n"
+                                                        "    all += all;\n"
+                                                        "    all += llList2List(more, 0, n);\n"
+                                                        "    all += [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, "
+                                                        "26, 27, 28, 29, 30, 31, 32, \"x\"];\n"
+                                                        "    show(all);\n"
+                                                        "    show(kept() + more + all);\n"
+                                                        "    show(more + n);\n"
+                                                        "    show(n + more);\n"
+                                                        "    show([PRIM_NAME, \"x\"] + more);\n"
+                                                        "    show(llParseString2List(\"c\", [], []) + [1] + [<1, 2, 3>]);\n"
+                                                        "    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_COLOR, ALL_SIDES, <1, 1, 1>, 1.0] + more);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a list by its name");
+        CHECK(has(r, "table.extend(all, more)"));
+        UNSCOPED_INFO("itself");
+        CHECK(has(r, "table.extend(all, all)"));
+        {
+            INFO("a call's, run once");
+            CHECK(has(r, "table.extend(all, llcompat.List2List(more, 0, n))"));
+            CHECK_FALSE(has(r, "for _, item in"));
+        }
+        {
+            INFO("many values");
+            CHECK(has(r, "table.extend(all, { 0, 1, 2,"));
+            CHECK(has(r, "32, \"x\" })"));
+        }
+        UNSCOPED_INFO("one copy, of the variable a call answers");
+        CHECK(has(r, "show(table.extend(table.extend(table.clone(kept()), more), all))"));
+        UNSCOPED_INFO("a variable copied");
+        CHECK(has(r, "show(table.extend(table.clone(more), { n }))"));
+        UNSCOPED_INFO("a value");
+        CHECK(has(r, "show(table.extend({ n } :: { any }, more))"));
+        {
+            INFO("written out");
+            CHECK(has(r, "show(table.extend({ PRIM_NAME, \"x\" } :: { any }, more))"));
+            CHECK(has(r, "table.extend({ PRIM_COLOR, ALL_SIDES, vector(1, 1, 1), 1.0 } :: { any }, more)"));
+        }
+        UNSCOPED_INFO("a library call's");
+        CHECK(has(r, "show(table.extend(table.extend(ll.ParseString2List(\"c\", {}, {}) :: { any }, { 1 }), { vector(1, 2, 3) }))"));
+        {
+            INFO("no helper, nor a move");
+            CHECK_FALSE(has(r, "joinLists"));
+            CHECK_FALSE(has(r, "table.move("));
+        }
+        require_checks_clean(r);
+    }
 
-        const ALLSLToSLua::Result reads = convert("default { touch_start(integer n) { llOwnerSay((string)llGetTime()); } }\n");
-        ensure("only read, ll's: " + reads.text, has(reads, "ll.GetTime()") && !has(reads, "timeBase"));
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: list functions through SLua's own where they do as LSL's; else llcompat", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("list gNames = [\"a\", \"b\"];\n"
+                                                        "list gKept;\n"
+                                                        "list gL = [1, 2, 3];\n"
+                                                        "integer bump() { gL += [0]; return 1; }\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    list l = [1, 2, 3];\n"
+                                                        "    integer i;\n"
+                                                        "    for (i = 0; i < llGetListLength(l); ++i)\n"
+                                                        "        l = llListReplaceList(l, [llList2Integer(l, i) * 2], i, i);\n"
+                                                        "    list held = [1, 2];\n"
+                                                        "    gKept = held;\n"
+                                                        "    integer j;\n"
+                                                        "    for (j = 0; j < llGetListLength(held); ++j)\n"
+                                                        "        held = llListReplaceList(held, [j], j, j);\n"
+                                                        "    integer k;\n"
+                                                        "    for (k = 0; k < llGetListLength(gL); ++k)\n"
+                                                        "        gL = llListReplaceList(gL, [bump()], k, k);\n"
+                                                        "    l = llListReplaceList(l, [7], -1, -1);\n"
+                                                        "    l = llListInsertList(l, [9], llGetListLength(l));\n"
+                                                        "    list part = llList2List(l, 1, 2);\n"
+                                                        "    list all = llList2List(l, 0, -1);\n"
+                                                        "    list rest = llList2List(l, 2, -1);\n"
+                                                        "    list wrapped = llList2List(l, 3, 1);\n"
+                                                        "    llOwnerSay(llDumpList2String(l, \",\"));\n"
+                                                        "    llOwnerSay(llDumpList2String(gNames + [n], \", \"));\n"
+                                                        "    llOwnerSay(llDumpList2String(l + [1.5], \",\"));\n"
+                                                        "    llOwnerSay((string)l);\n"
+                                                        "    integer at = llListFindList(gNames, [\"b\"]);\n"
+                                                        "    integer none = llListFindList(gNames, [NULL_KEY]);\n"
+                                                        "    if (llListFindList(gNames, [NULL_KEY]) != -1) llOwnerSay(\"null\");\n"
+                                                        "    integer parsed = llListFindList(llParseString2List(\"a,b\", [\",\"], []), [\"b\"]);\n"
+                                                        "    llOwnerSay((string)(at + none + parsed) + llDumpList2String(part + all + rest + wrapped + held, \"\"));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("replaced in place, in Luau's numeric for");
+        CHECK(has(r, "for i = 0, #l - 1 do\n        l[i + 1] = l[i + 1] * 2\n"));
+        {
+            INFO("a list held elsewhere, replaced as LSL's");
+            CHECK(has(r, "for j = 0, #held - 1 do\n"));
+            CHECK(has(r, "        held = llcompat.ListReplaceList(held, { j }, j, j)\n"));
+        }
+        {
+            INFO("a global a call of the script's could change");
+            CHECK(has(r, "while k < #gL do"));
+            CHECK(has(r, "gL = llcompat.ListReplaceList(gL, { bump() }, k, k)"));
+        }
+        UNSCOPED_INFO("the last of a list that could be empty");
+        CHECK(has(r, "l = llcompat.ListReplaceList(l, { 7 }, -1, -1)"));
+        UNSCOPED_INFO("on the end");
+        CHECK(has(r, "table.insert(l, 9)"));
+        {
+            INFO("a part, and all of it");
+            CHECK(has(r, "local part = table.move(l, 2, 3, 1, {})"));
+            CHECK(has(r, "local all = table.clone(l)"));
+        }
+        {
+            INFO("to the end, and the part left out, as LSL's");
+            CHECK(has(r, "local rest = llcompat.List2List(l, 2, -1)"));
+            CHECK(has(r, "local wrapped = llcompat.List2List(l, 3, 1)"));
+        }
+        {
+            INFO("whole numbers joined");
+            CHECK(has(r, "print(table.concat(l, \",\"))"));
+            CHECK(has(r, "print(table.concat(l))"));
+        }
+        UNSCOPED_INFO("and text");
+        CHECK(has(r, "print(table.concat(table.extend(table.clone(gNames), { n }), \", \"))"));
+        UNSCOPED_INFO("a float as LSL writes one");
+        CHECK(has(r, "print(ll.DumpList2String(table.extend(table.clone(l), { 1.5 }), \",\"))"));
+        UNSCOPED_INFO("found, its place");
+        CHECK(has(r, "local at = (table.find(gNames, \"b\") or 0) - 1"));
+        {
+            INFO("NULL_KEY as LSL's string, as its place and found");
+            CHECK(has(r, "local none = (table.find(gNames, tostring(NULL_KEY)) or 0) - 1"));
+            CHECK(has(r, "if table.find(gNames, tostring(NULL_KEY)) ~= nil then"));
+        }
+        UNSCOPED_INFO("in a library call's list");
+        CHECK(has(r, "local parsed = (table.find(ll.ParseString2List(\"a,b\", { \",\" }, {}) :: { any }, \"b\") or 0) - 1"));
+        UNSCOPED_INFO("no llcompat but those");
+        CHECK(count(r, "llcompat.") == 5);
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: llSubStringIndex asked only whether it found is a plain string.find", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    string s = llGetObjectName(); key k = llGetOwner();\n"
+                                                        "    if (llSubStringIndex(s, \"a\") != -1) llOwnerSay(\"a\");\n"
+                                                        "    if (llSubStringIndex(s, \"b\") >= 0) llOwnerSay(\"b\");\n"
+                                                        "    if (llSubStringIndex(s, \"c\") > -1) llOwnerSay(\"c\");\n"
+                                                        "    if (llSubStringIndex(s, \"d\") == -1) llOwnerSay(\"no d\");\n"
+                                                        "    if (!~llSubStringIndex(s, \"e\")) llOwnerSay(\"no e\");\n"
+                                                        "    if (~llSubStringIndex(s, \".\")) llOwnerSay(\"dot\");\n"
+                                                        "    if (~llSubStringIndex(s, k)) llOwnerSay(\"owner\");\n"
+                                                        "    if (~llSubStringIndex(s, \"\")) llOwnerSay(\"empty\");\n"
+                                                        "    integer at = llSubStringIndex(s, \"x\");\n"
+                                                        "    llOwnerSay((string)at);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("found");
+            CHECK(has(r, "if string.find(s, \"a\", 1, true) ~= nil then"));
+            CHECK(has(r, "if string.find(s, \"b\", 1, true) ~= nil then"));
+            CHECK(has(r, "if string.find(s, \"c\", 1, true) ~= nil then"));
+        }
+        {
+            INFO("not");
+            CHECK(has(r, "if string.find(s, \"d\", 1, true) == nil then"));
+            CHECK(has(r, "if not (string.find(s, \"e\", 1, true) ~= nil) then"));
+        }
+        UNSCOPED_INFO("plain, not a pattern");
+        CHECK(has(r, "if string.find(s, \".\", 1, true) ~= nil then"));
+        UNSCOPED_INFO("a key as its text");
+        CHECK(has(r, "if string.find(s, tostring(k), 1, true) ~= nil then"));
+        UNSCOPED_INFO("the empty text");
+        CHECK(has(r, "if string.find(s, \"\", 1, true) ~= nil then"));
+        UNSCOPED_INFO("its index in characters, ll's");
+        CHECK(has(r, "local at = (ll.SubStringIndex(s, \"x\") or 0) - 1"));
+        UNSCOPED_INFO("found by string.find alone");
+        CHECK(count(r, "SubStringIndex") == 1);
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a script that resets its time keeps its own timeBase clock; else ll's", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("float timeBase;\n"
+                                                        "default {\n"
+                                                        "    state_entry() { llResetTime(); state running; }\n"
+                                                        "}\n"
+                                                        "state running {\n"
+                                                        "    state_entry() { timeBase = llGetTime(); }\n"
+                                                        "    touch_start(integer n) {\n"
+                                                        "        float lap = llGetAndResetTime();\n"
+                                                        "        llGetAndResetTime();\n"
+                                                        "        llOwnerSay((string)(lap + timeBase) + \" \" + (string)(llGetTime() * 2));\n"
+                                                        "    }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        {
+            INFO("the clock, once, over everything");
+            CHECK(count(r, "local timeBase = ll.GetTime()") == 1);
+            CHECK(r.text.find("local timeBase = ll.GetTime()") < r.text.find("local states"));
+        }
+        {
+            INFO("the script's own name made another");
+            CHECK(has(r, "local timeBase_ = 0"));
+            CHECK(has(r, "timeBase_ = ll.GetTime() - timeBase"));
+        }
+        UNSCOPED_INFO("a reset");
+        CHECK(has(r, "state_entry = function()\n        timeBase = ll.GetTime()\n        setState(\"running\")"));
+        {
+            INFO("both, as a value, through the helper");
+            CHECK(has(r, "local lap = getAndResetTime()"));
+            CHECK(count(r, "local function getAndResetTime(): number") == 1);
+        }
+        UNSCOPED_INFO("both where nothing reads the time, the reset alone");
+        CHECK(has(r, "local lap = getAndResetTime()\n        timeBase = ll.GetTime()\n"));
+        UNSCOPED_INFO("a read bracketed");
+        CHECK(has(r, "(ll.GetTime() - timeBase) * 2"));
+        {
+            INFO("nothing of llcompat's");
+            CHECK_FALSE(has(r, "llcompat.ResetTime"));
+            CHECK_FALSE(has(r, "llcompat.GetAndResetTime"));
+            CHECK_FALSE(noted(r, "SluaCompatOnly", "ResetTime"));
+            CHECK_FALSE(noted(r, "SluaCompatOnly", "GetAndResetTime"));
+        }
+        require_checks_clean(r);
+
+        const ALLSLToSLua::Result reads = require_converted("default { touch_start(integer n) { llOwnerSay((string)llGetTime()); } }\n");
+        CAPTURE(reads.text);
+        {
+            INFO("only read, ll's");
+            CHECK(has(reads, "ll.GetTime()"));
+            CHECK_FALSE(has(reads, "timeBase"));
+        }
 
         const ALLSLToSLua::Result close = ALLSLToSLua::convert("default { touch_start(integer n) {\n"
                                                                "    llOwnerSay((string)llGetTime());\n"
                                                                "    llResetTime();\n"
                                                                "} }\n",
                                                                ALLSLToSLua::Options::closeToLSL());
-        ensure("close to LSL, llcompat's together: " + close.text,
-               has(close, "llcompat.GetTime()") && has(close, "llcompat.ResetTime()") && !has(close, "ll.GetTime") && !has(close, "timeBase"));
-        checksClean(close);
+        CAPTURE(close.text);
+        {
+            INFO("close to LSL, llcompat's together");
+            CHECK(has(close, "llcompat.GetTime()"));
+            CHECK(has(close, "llcompat.ResetTime()"));
+            CHECK_FALSE(has(close, "ll.GetTime"));
+            CHECK_FALSE(has(close, "timeBase"));
+        }
+        require_checks_clean(close);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<66>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: Base64 through llbase64 with decode noted once; ll's close to LSL", "[ALLSLToSLua]")
     {
-        set_test_name("Base64 through llbase64: encode as it is, the same bytes as LSL's; decode noted once, as it keeps a NUL and what is "
-                      "not UTF-8; close to LSL, ll's, which only SLua's deprecating sets apart from llcompat's");
-        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
-                                              "    key k = llDetectedKey(0);\n"
-                                              "    string s = llStringToBase64(\"hello\");\n"
-                                              "    string t = llStringToBase64(k);\n"
-                                              "    string d = llBase64ToString(s);\n"
-                                              "    string e = llBase64ToString(t + \"=\");\n"
-                                              "    llOwnerSay(s + t + d + e);\n"
-                                              "} }\n");
-        ensure("encode: " + r.text, has(r, "local s = llbase64.encode(\"hello\")") && has(r, "local t = llbase64.encode(tostring(k))"));
-        ensure("decode: " + r.text, has(r, "local d = llbase64.decode(s)") && has(r, "local e = llbase64.decode(t .. \"=\")"));
-        ensure("decode noted once: " + r.text, noted(r, "SluaBase64Decode") && count(r, "-- LSL: llbase64.decode keeps every byte") == 1);
-        ensure("nothing of llcompat's or ll's: " + r.text, !has(r, "llcompat.") && !has(r, "ll.StringToBase64") && !has(r, "ll.Base64ToString") &&
-                                                             !noted(r, "SluaDeprecatedFor", "StringToBase64") &&
-                                                             !noted(r, "SluaDeprecatedFor", "Base64ToString"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    key k = llDetectedKey(0);\n"
+                                                        "    string s = llStringToBase64(\"hello\");\n"
+                                                        "    string t = llStringToBase64(k);\n"
+                                                        "    string d = llBase64ToString(s);\n"
+                                                        "    string e = llBase64ToString(t + \"=\");\n"
+                                                        "    llOwnerSay(s + t + d + e);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("encode");
+            CHECK(has(r, "local s = llbase64.encode(\"hello\")"));
+            CHECK(has(r, "local t = llbase64.encode(tostring(k))"));
+        }
+        {
+            INFO("decode");
+            CHECK(has(r, "local d = llbase64.decode(s)"));
+            CHECK(has(r, "local e = llbase64.decode(t .. \"=\")"));
+        }
+        {
+            INFO("decode noted once");
+            CHECK(noted(r, "SluaBase64Decode"));
+            CHECK(count(r, "-- LSL: llbase64.decode keeps every byte") == 1);
+        }
+        {
+            INFO("nothing of llcompat's or ll's");
+            CHECK_FALSE(has(r, "llcompat."));
+            CHECK_FALSE(has(r, "ll.StringToBase64"));
+            CHECK_FALSE(has(r, "ll.Base64ToString"));
+            CHECK_FALSE(noted(r, "SluaDeprecatedFor", "StringToBase64"));
+            CHECK_FALSE(noted(r, "SluaDeprecatedFor", "Base64ToString"));
+        }
+        require_checks_clean(r);
 
         const ALLSLToSLua::Result close =
             ALLSLToSLua::convert("default { state_entry() { llOwnerSay(llBase64ToString(llStringToBase64(\"x\"))); } }\n", ALLSLToSLua::Options::closeToLSL());
-        ensure("close to LSL: " + close.text,
-               has(close, "ll.Base64ToString(ll.StringToBase64(\"x\"))") && !has(close, "llcompat.") && !has(close, "llbase64.decode(") &&
-                   !has(close, "llbase64.encode(") && !noted(close, "SluaBase64Decode"));
+        CAPTURE(close.text);
+        {
+            INFO("close to LSL");
+            CHECK(has(close, "ll.Base64ToString(ll.StringToBase64(\"x\"))"));
+            CHECK_FALSE(has(close, "llcompat."));
+            CHECK_FALSE(has(close, "llbase64.decode("));
+            CHECK_FALSE(has(close, "llbase64.encode("));
+            CHECK_FALSE(noted(close, "SluaBase64Decode"));
+        }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<67>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: llAdjustDamage in on_damage as detected adjustDamage; llcompat elsewhere", "[ALLSLToSLua]")
     {
-        set_test_name("llAdjustDamage in on_damage as the detected table's adjustDamage, as the llDetected* are; llcompat's elsewhere, where "
-                      "LSL's call only said an error and adjustDamage would stop the handler");
-        const ALLSLToSLua::Result r = convert("halve() { llAdjustDamage(0, 2.0); }\n"
-                                              "default {\n"
-                                              "    on_damage(integer n) {\n"
-                                              "        llAdjustDamage(0, 0.5);\n"
-                                              "        integer i;\n"
-                                              "        for (i = 1; i < n; ++i) llAdjustDamage(i, 5);\n"
-                                              "        if (n > 3) halve();\n"
-                                              "    }\n"
-                                              "    touch_start(integer n) { llAdjustDamage(0, 1.0); }\n"
-                                              "}\n");
-        ensure("on_damage's own: " + r.text, has(r, "detected[1]:adjustDamage(0.5)") && has(r, "detected[i + 1]:adjustDamage(5)") &&
-                                                 noted(r, "SluaDetectedTable"));
-        ensure("a function's, llcompat's: " + r.text, has(r, "llcompat.AdjustDamage(0, 2.0)"));
-        ensure("another event's, llcompat's: " + r.text, has(r, "llcompat.AdjustDamage(0, 1.0)"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("halve() { llAdjustDamage(0, 2.0); }\n"
+                                                        "default {\n"
+                                                        "    on_damage(integer n) {\n"
+                                                        "        llAdjustDamage(0, 0.5);\n"
+                                                        "        integer i;\n"
+                                                        "        for (i = 1; i < n; ++i) llAdjustDamage(i, 5);\n"
+                                                        "        if (n > 3) halve();\n"
+                                                        "    }\n"
+                                                        "    touch_start(integer n) { llAdjustDamage(0, 1.0); }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        {
+            INFO("on_damage's own");
+            CHECK(has(r, "detected[1]:adjustDamage(0.5)"));
+            CHECK(has(r, "detected[i + 1]:adjustDamage(5)"));
+            CHECK(noted(r, "SluaDetectedTable"));
+        }
+        UNSCOPED_INFO("a function's, llcompat's");
+        CHECK(has(r, "llcompat.AdjustDamage(0, 2.0)"));
+        UNSCOPED_INFO("another event's, llcompat's");
+        CHECK(has(r, "llcompat.AdjustDamage(0, 1.0)"));
+        require_checks_clean(r);
 
         const ALLSLToSLua::Result close =
             ALLSLToSLua::convert("default { on_damage(integer n) { llAdjustDamage(0, 0.5); } }\n", ALLSLToSLua::Options::closeToLSL());
-        ensure("close to LSL, llcompat's: " + close.text, has(close, "llcompat.AdjustDamage(0, 0.5)") && !has(close, "adjustDamage("));
+        CAPTURE(close.text);
+        {
+            INFO("close to LSL, llcompat's");
+            CHECK(has(close, "llcompat.AdjustDamage(0, 0.5)"));
+            CHECK_FALSE(has(close, "adjustDamage("));
+        }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<68>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a timer every handler turns off first is LLTimers:once; else :every", "[ALLSLToSLua]")
     {
-        set_test_name("a timer every state's handler of which turns it off first is a one-shot, on LLTimers:once, set again as often as "
-                      "the script likes; on LLTimers:every where a state has no timer handler, or one that does anything first");
-        const ALLSLToSLua::Result r = convert("default {\n"
-                                              "    state_entry() { llSetTimerEvent(5.0); }\n"
-                                              "    timer() {\n"
-                                              "        llSetTimerEvent(0.0);\n"
-                                              "        llOwnerSay(\"once\");\n"
-                                              "        if (llFrand(1.0) < 0.5) llSetTimerEvent(2);\n"
-                                              "    }\n"
-                                              "    touch_start(integer n) { llSetTimerEvent(1); }\n"
-                                              "}\n");
-        ensure("once: " + r.text, has(r, "timerHandle = LLTimers:once(seconds, function()") && !has(r, "LLTimers:every(seconds, function"));
-        ensure("said so: " + r.text, has(r, "-- time it is set, as its handler turns it off before anything else."));
-        ensure("the handler's own off kept, and set again: " + r.text,
-               has(r, "function timerHandler()\n    setTimer(0.0)\n") && has(r, "setTimer(2)") && has(r, "setTimer(1)"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default {\n"
+                                                        "    state_entry() { llSetTimerEvent(5.0); }\n"
+                                                        "    timer() {\n"
+                                                        "        llSetTimerEvent(0.0);\n"
+                                                        "        llOwnerSay(\"once\");\n"
+                                                        "        if (llFrand(1.0) < 0.5) llSetTimerEvent(2);\n"
+                                                        "    }\n"
+                                                        "    touch_start(integer n) { llSetTimerEvent(1); }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        {
+            INFO("once");
+            CHECK(has(r, "timerHandle = LLTimers:once(seconds, function()"));
+            CHECK_FALSE(has(r, "LLTimers:every(seconds, function"));
+        }
+        UNSCOPED_INFO("said so");
+        CHECK(has(r, "-- time it is set, as its handler turns it off before anything else."));
+        {
+            INFO("the handler's own off kept, and set again");
+            CHECK(has(r, "function timerHandler()\n    setTimer(0.0)\n"));
+            CHECK(has(r, "setTimer(2)"));
+            CHECK(has(r, "setTimer(1)"));
+        }
+        require_checks_clean(r);
         // Tapple's: the local the preamble declared, assigned by a function
         // statement of its name, which types as it is declared.
         ALLSLToSLua::Options typed;
         typed.types                     = true;
         const ALLSLToSLua::Result types = ALLSLToSLua::convert("default { state_entry() { llSetTimerEvent(5); } timer() { llOwnerSay(\"t\"); } }\n", typed);
-        ensure("a function statement, typed: " + types.text,
-               has(types, "local timerHandler: (() -> ())? = nil\n") && has(types, "\nfunction timerHandler()\n    print(\"t\")\nend\n") &&
-                   !has(types, "timerHandler = function"));
-        checksClean(types);
+        CAPTURE(types.text);
+        {
+            INFO("a function statement, typed");
+            CHECK(has(types, "local timerHandler: (() -> ())? = nil\n"));
+            CHECK(has(types, "\nfunction timerHandler()\n    print(\"t\")\nend\n"));
+            CHECK_FALSE(has(types, "timerHandler = function"));
+        }
+        require_checks_clean(types);
 
-        const ALLSLToSLua::Result states = convert("default {\n"
-                                                   "    state_entry() { llSetTimerEvent(1); }\n"
-                                                   "    timer() { llSetTimerEvent(0); state two; }\n"
-                                                   "}\n"
-                                                   "state two {\n"
-                                                   "    timer() { llSetTimerEvent(FALSE); llOwnerSay(\"two\"); }\n"
-                                                   "    touch_start(integer n) { llSetTimerEvent(3); }\n"
-                                                   "}\n");
-        ensure("every state's, once: " + states.text,
-               has(states, "timerHandle = LLTimers:once(seconds, function") && has(states, "states[currentState].timer"));
-        checksClean(states);
+        const ALLSLToSLua::Result states = require_converted("default {\n"
+                                                             "    state_entry() { llSetTimerEvent(1); }\n"
+                                                             "    timer() { llSetTimerEvent(0); state two; }\n"
+                                                             "}\n"
+                                                             "state two {\n"
+                                                             "    timer() { llSetTimerEvent(FALSE); llOwnerSay(\"two\"); }\n"
+                                                             "    touch_start(integer n) { llSetTimerEvent(3); }\n"
+                                                             "}\n");
+        CAPTURE(states.text);
+        {
+            INFO("every state's, once");
+            CHECK(has(states, "timerHandle = LLTimers:once(seconds, function"));
+            CHECK(has(states, "states[currentState].timer"));
+        }
+        require_checks_clean(states);
 
-        const ALLSLToSLua::Result without = convert("default {\n"
-                                                    "    state_entry() { llSetTimerEvent(1); state two; }\n"
-                                                    "    timer() { llSetTimerEvent(0); }\n"
-                                                    "}\n"
-                                                    "state two {\n"
-                                                    "    touch_start(integer n) { state default; }\n"
-                                                    "}\n");
-        ensure("a state with none, every: " + without.text,
-               has(without, "timerHandle = LLTimers:every(seconds, function") && !has(without, "LLTimers:once(seconds, function"));
+        const ALLSLToSLua::Result without = require_converted("default {\n"
+                                                              "    state_entry() { llSetTimerEvent(1); state two; }\n"
+                                                              "    timer() { llSetTimerEvent(0); }\n"
+                                                              "}\n"
+                                                              "state two {\n"
+                                                              "    touch_start(integer n) { state default; }\n"
+                                                              "}\n");
+        CAPTURE(without.text);
+        {
+            INFO("a state with none, every");
+            CHECK(has(without, "timerHandle = LLTimers:every(seconds, function"));
+            CHECK_FALSE(has(without, "LLTimers:once(seconds, function"));
+        }
 
-        const ALLSLToSLua::Result later = convert("default {\n"
-                                                  "    state_entry() { llSetTimerEvent(1); }\n"
-                                                  "    timer() { llOwnerSay(\"tick\"); llSetTimerEvent(0); }\n"
-                                                  "}\n");
-        ensure("off after something else, every: " + later.text,
-               has(later, "timerHandle = LLTimers:every(seconds, function") && !has(later, "LLTimers:once(seconds, function"));
+        const ALLSLToSLua::Result later = require_converted("default {\n"
+                                                            "    state_entry() { llSetTimerEvent(1); }\n"
+                                                            "    timer() { llOwnerSay(\"tick\"); llSetTimerEvent(0); }\n"
+                                                            "}\n");
+        CAPTURE(later.text);
+        {
+            INFO("off after something else, every");
+            CHECK(has(later, "timerHandle = LLTimers:every(seconds, function"));
+            CHECK_FALSE(has(later, "LLTimers:once(seconds, function"));
+        }
 
-        const ALLSLToSLua::Result again = convert("float gNext = 0.0;\n"
-                                                  "default {\n"
-                                                  "    state_entry() { llSetTimerEvent(1); }\n"
-                                                  "    timer() { llSetTimerEvent(gNext); }\n"
-                                                  "    touch_start(integer n) { gNext = 2.0; }\n"
-                                                  "}\n");
-        ensure("set to what is not written nought, every: " + again.text,
-               has(again, "timerHandle = LLTimers:every(seconds, function") && !has(again, "LLTimers:once(seconds, function"));
+        const ALLSLToSLua::Result again = require_converted("float gNext = 0.0;\n"
+                                                            "default {\n"
+                                                            "    state_entry() { llSetTimerEvent(1); }\n"
+                                                            "    timer() { llSetTimerEvent(gNext); }\n"
+                                                            "    touch_start(integer n) { gNext = 2.0; }\n"
+                                                            "}\n");
+        CAPTURE(again.text);
+        {
+            INFO("set to what is not written nought, every");
+            CHECK(has(again, "timerHandle = LLTimers:every(seconds, function"));
+            CHECK_FALSE(has(again, "LLTimers:once(seconds, function"));
+        }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<75>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: integer / and % as LSL's via bit32.s32 and math.fmod; // and % if safe", "[ALLSLToSLua]")
     {
-        set_test_name("an integer's / and % as LSL's, toward nought and the remainder of the dividend's sign: bit32.s32 of the quotient and "
-                      "math.fmod, unnoted; // and % where neither side is below nought; compound ones written whole; a float's / as it was");
         const char* const script = "integer gSize = 16;\n"
                                    "default { touch_start(integer n) {\n"
                                    "    integer a = n - 3; integer b = 1 - n; float f = 2.5;\n"
@@ -2157,24 +3099,47 @@ namespace tut
                                    "    f = f / 2;\n"
                                    "    llOwnerSay((string)(q + m + sum + back + cut + half + a + b) + (string)f);\n"
                                    "} }\n";
-        const ALLSLToSLua::Result r = convert(script);
-        ensure("toward nought: " + r.text, has(r, "local q = bit32.s32(a / b)") && has(r, "local m = math.fmod(a, b)"));
-        ensure("bracketed as / binds: " + r.text, has(r, "bit32.s32((a + 1) / (b - 2)) + math.fmod(a + 1, b - 2)"));
-        ensure("a side below nought: " + r.text, has(r, "bit32.s32(-7 / 2) + math.fmod(7, -2)"));
-        ensure("neither below nought: " + r.text, has(r, "gSize // 4 + gSize % 3 + bit32.band(n, 255) // 16 + bit32.band(n, 255) % gSize"));
-        ensure("one known, not the other: " + r.text, has(r, "local half = bit32.s32(a / gSize)"));
-        ensure("compound ones whole: " + r.text, has(r, "a = bit32.s32(a / b)") && has(r, "a = math.fmod(a, b)") && has(r, "b = bit32.s32(b / 2)") &&
-                                                    has(r, "b = math.fmod(b, 3)") && !has(r, "//=") && !has(r, "%="));
-        ensure("a float's: " + r.text, has(r, "f /= 2"));
-        ensure("unnoted: " + r.text, !noted(r, "SluaIntegerDivision") && !noted(r, "SluaModulo"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted(script);
+        CAPTURE(r.text);
+        {
+            INFO("toward nought");
+            CHECK(has(r, "local q = bit32.s32(a / b)"));
+            CHECK(has(r, "local m = math.fmod(a, b)"));
+        }
+        UNSCOPED_INFO("bracketed as / binds");
+        CHECK(has(r, "bit32.s32((a + 1) / (b - 2)) + math.fmod(a + 1, b - 2)"));
+        UNSCOPED_INFO("a side below nought");
+        CHECK(has(r, "bit32.s32(-7 / 2) + math.fmod(7, -2)"));
+        UNSCOPED_INFO("neither below nought");
+        CHECK(has(r, "gSize // 4 + gSize % 3 + bit32.band(n, 255) // 16 + bit32.band(n, 255) % gSize"));
+        UNSCOPED_INFO("one known, not the other");
+        CHECK(has(r, "local half = bit32.s32(a / gSize)"));
+        {
+            INFO("compound ones whole");
+            CHECK(has(r, "a = bit32.s32(a / b)"));
+            CHECK(has(r, "a = math.fmod(a, b)"));
+            CHECK(has(r, "b = bit32.s32(b / 2)"));
+            CHECK(has(r, "b = math.fmod(b, 3)"));
+            CHECK_FALSE(has(r, "//="));
+            CHECK_FALSE(has(r, "%="));
+        }
+        UNSCOPED_INFO("a float's");
+        CHECK(has(r, "f /= 2"));
+        {
+            INFO("unnoted");
+            CHECK_FALSE(noted(r, "SluaIntegerDivision"));
+            CHECK_FALSE(noted(r, "SluaModulo"));
+        }
+        require_checks_clean(r);
         // Typed, each one a number to the checker, strict under the grid's
         // solver: math.fmod's one answer and bit32.s32's.
         ALLSLToSLua::Options options;
         options.types                 = true;
         const ALLSLToSLua::Result typed = ALLSLToSLua::convert(script, options);
-        ensure("typed: " + typed.text, has(typed, "local q: number = bit32.s32(a / b)") && has(typed, "local m: number = math.fmod(a, b)"));
-        checksClean(typed);
+        CAPTURE(typed.text);
+        CHECK(has(typed, "local q: number = bit32.s32(a / b)"));
+        CHECK(has(typed, "local m: number = math.fmod(a, b)"));
+        require_checks_clean(typed);
         if (!newSolver)
         {
             std::string said;
@@ -2182,488 +3147,231 @@ namespace tut
             {
                 said += p.severity == ALScriptProblem::Severity::Error ? p.message + "\n" : std::string();
             }
-            ensure("strict:\n" + said + "---\n" + typed.text, said.empty());
+            CAPTURE(said);
+            CHECK(said.empty());
         }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<76>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: keys from empty or capital text noted; the XorBase64Strings pair noted", "[ALLSLToSLua]")
     {
-        set_test_name("a key of no text said to be NULL_KEY, and one with capitals said to be written small, cast or given; other text as "
-                      "it was said; the two XorBase64Strings said to be what ll.XorBase64 is not, LSL's kept");
-        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
-                                              "    key a = (key)\"\"; key c = (key)\"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
-                                              "    if ((key)\"\" == NULL_KEY) llOwnerSay(\"same\");\n"
-                                              "    string s = llGetObjectDesc(); key d = (key)s;\n"
-                                              "    llOwnerSay((string)a + (string)c + (string)d + llXorBase64(\"a\", \"b\") + llXorBase64Strings(\"a\", \"b\") +\n"
-                                              "               llXorBase64StringsCorrect(\"a\", \"b\"));\n"
-                                              "} }\n");
-        ensure("no text, NULL_KEY: " + r.text, has(r, "local a = uuid(\"\")") && noted(r, "SluaKeyEmpty") &&
-                                                  has(r, "-- LSL: SLua's uuid of no text is NULL_KEY"));
-        ensure("capitals, small: " + r.text, has(r, "uuid(\"A2E76FCD-9360-4F6D-A924-938F923DF11D\")") && noted(r, "SluaKeyCase"));
-        ensure("other text as it was: " + r.text, has(r, "local d = uuid(s)") && noted(r, "SluaUuid"));
-        ensure("ll.XorBase64 as it is: " + r.text, has(r, "ll.XorBase64(\"a\", \"b\")"));
-        ensure("the two, LSL's: " + r.text,
-               has(r, "ll.XorBase64Strings(\"a\", \"b\")") && has(r, "ll.XorBase64StringsCorrect(\"a\", \"b\")") && !has(r, "llcompat."));
-        ensure("said what ll.XorBase64 is not: " + r.text, noted(r, "SluaXorBase64Wrong") && noted(r, "SluaXorBase64Nul") &&
-                                                              !noted(r, "SluaDeprecated", "XorBase64Strings") &&
-                                                              !noted(r, "SluaDeprecated", "XorBase64StringsCorrect"));
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    key a = (key)\"\"; key c = (key)\"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
+                                                        "    if ((key)\"\" == NULL_KEY) llOwnerSay(\"same\");\n"
+                                                        "    string s = llGetObjectDesc(); key d = (key)s;\n"
+                                                        "    llOwnerSay((string)a + (string)c + (string)d + llXorBase64(\"a\", \"b\") + llXorBase64Strings(\"a\", \"b\") +\n"
+                                                        "               llXorBase64StringsCorrect(\"a\", \"b\"));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("no text, NULL_KEY");
+            CHECK(has(r, "local a = uuid(\"\")"));
+            CHECK(noted(r, "SluaKeyEmpty"));
+            CHECK(has(r, "-- LSL: SLua's uuid of no text is NULL_KEY"));
+        }
+        {
+            INFO("capitals, small");
+            CHECK(has(r, "uuid(\"A2E76FCD-9360-4F6D-A924-938F923DF11D\")"));
+            CHECK(noted(r, "SluaKeyCase"));
+        }
+        {
+            INFO("other text as it was");
+            CHECK(has(r, "local d = uuid(s)"));
+            CHECK(noted(r, "SluaUuid"));
+        }
+        UNSCOPED_INFO("ll.XorBase64 as it is");
+        CHECK(has(r, "ll.XorBase64(\"a\", \"b\")"));
+        {
+            INFO("the two, LSL's");
+            CHECK(has(r, "ll.XorBase64Strings(\"a\", \"b\")"));
+            CHECK(has(r, "ll.XorBase64StringsCorrect(\"a\", \"b\")"));
+            CHECK_FALSE(has(r, "llcompat."));
+        }
+        {
+            INFO("said what ll.XorBase64 is not");
+            CHECK(noted(r, "SluaXorBase64Wrong"));
+            CHECK(noted(r, "SluaXorBase64Nul"));
+            CHECK_FALSE(noted(r, "SluaDeprecated", "XorBase64Strings"));
+            CHECK_FALSE(noted(r, "SluaDeprecated", "XorBase64StringsCorrect"));
+        }
         for (const ALScriptProblem& p : r.notes)
         {
             if (p.key == "SluaXorBase64Wrong" || p.key == "SluaXorBase64Nul")
             {
-                ensure("named: " + p.message, p.message.find("for ll.XorBase64,") != std::string::npos);
+                CAPTURE(p.message);
+                REQUIRE(p.message.find("for ll.XorBase64,") != std::string::npos);
             }
         }
-        checksClean(r);
+        require_checks_clean(r);
 
-        // Given rather than cast: the same said, and a UUID written small
+        // Given rather than cast: no text kept as text, as other text that is
+        // no UUID is; capitals the same said, and a UUID written small
         // nothing at all.
-        const ALLSLToSLua::Result given = convert("default { touch_start(integer n) {\n"
-                                                  "    key b = \"\"; key c = \"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
-                                                  "    key l = \"a2e76fcd-9360-4f6d-a924-938f923df11d\";\n"
-                                                  "    llOwnerSay((string)llGetOwnerKey(b) + (string)llGetOwnerKey(c) + (string)llGetOwnerKey(l));\n"
-                                                  "} }\n");
-        ensure("given no text: " + given.text, noted(given, "SluaKeyEmpty") && noted(given, "SluaKeyCase"));
-        ensure("nothing else said of them: " + given.text, !noted(given, "SluaKeyText") && !noted(given, "SluaUuidText"));
-        checksClean(given);
-    }
-
-    template<> template<>
-    void allsltoslua_object::test<90>()
-    {
-        set_test_name("the //* toggle with a word after its star: ---[[ and the word over the code, --]] under it, which SLua reads as "
-                      "two line comments, and a dash taken out of the opener as the block comment the closer closes");
-        ALLSLToSLua::Options options;
-        options.types               = true;
-        const ALLSLToSLua::Result r = ALLSLToSLua::convert("//* OVERRIDE\n"
-                                                           "integer allowAttachedAO;\n"
-                                                           "//*/\n"
-                                                           "default { state_entry() { if (allowAttachedAO) llOwnerSay(\"on\"); } }\n",
-                                                           options);
-        ensure("converted", r.converted);
-        ensure("the toggle: " + r.text, has(r, "\n---[[ OVERRIDE\nlocal allowAttachedAO: boolean = false\n--]]\n"));
-        ensure_equals("the opener a line comment", commentAt(r.text, "---[["), std::string("---[[ OVERRIDE"));
-        ensure_equals("the closer one", commentAt(r.text, "--]]"), std::string("--]]"));
-        ensure_equals("turned off", toggled(r.text, "---[["), std::string("--[[ OVERRIDE\nlocal allowAttachedAO: boolean = false\n--]]"));
-        checksClean(r);
-    }
-
-    template<> template<>
-    void allsltoslua_object::test<91>()
-    {
-        set_test_name("what is half of a toggle: an opener only where a closer follows it, and no rule of stars nor a comment closed on "
-                      "its line once a / is out; openers since the last closer share the next; a closer's own comment after it SLua's");
-        const ALLSLToSLua::Result lone = convert("integer a;\n"
-                                                 "//* nothing closes this\n"
-                                                 "integer b;\n"
-                                                 "default { state_entry() { llOwnerSay((string)(a + b)); } }\n");
-        ensure("a lone opener a comment with a star: " + lone.text, has(lone, "\n--* nothing closes this\nlocal b = 0\n") && !has(lone, "---["));
-        checksClean(lone);
-
-        const ALLSLToSLua::Result r = convert("//* not one */\n"
-                                              "//**************\n"
-                                              "integer c = 1;\n"
-                                              "//* one\n"
-                                              "integer d = 2;\n"
-                                              "//* two\n"
-                                              "integer e = 3;\n"
-                                              "//*/ // both\n"
-                                              "//*/\n"
-                                              "default { state_entry() { llOwnerSay((string)(c + d + e)); } }\n");
-        ensure("closed on its line: " + r.text, has(r, "\n--* not one */\n"));
-        ensure("a rule of stars: " + r.text, has(r, "\n--**************\n"));
-        ensure("two openers and a closer, then one alone: " + r.text,
-               has(r, "\n---[[ one\nlocal d = 2\n---[[ two\nlocal e = 3\n--]] -- both\n--]]\n"));
-        ensure_equals("the first off", toggled(r.text, "---[[ one"), std::string("--[[ one\nlocal d = 2\n---[[ two\nlocal e = 3\n--]]"));
-        ensure_equals("the second off", toggled(r.text, "---[[ two"), std::string("--[[ two\nlocal e = 3\n--]]"));
-        std::string off = r.text;
-        off.erase(off.find("---[[ one"), 1);
-        ensure_equals("the closer's own comment after it, off", commentAt(off, "-- both"), std::string("-- both"));
-        checksClean(r);
-    }
-
-    template<> template<>
-    void allsltoslua_object::test<92>()
-    {
-        set_test_name("the toggle the other way, /* over the code and //*/ under it: --[[ and --]], which a dash put in the opener makes two "
-                      "line comments again; and an opener over code before one, which shares its closer");
-        const ALLSLToSLua::Result r = convert("/* OVERRIDE\n"
-                                              "integer allowAttachedAO;\n"
-                                              "//*/\n"
-                                              "//* A\n"
-                                              "integer x = 1;\n"
-                                              "/* B\n"
-                                              "integer y = 2;\n"
-                                              "//*/\n"
-                                              "default { state_entry() { llOwnerSay((string)x); } }\n");
-        ensure_equals("one block comment", commentAt(r.text, "--[[ OVERRIDE"), std::string("--[[ OVERRIDE\ninteger allowAttachedAO;\n--]]"));
-        // What it holds stays LSL: nothing says it is code.
-        std::string on = r.text;
-        on.insert(on.find("--[[ OVERRIDE"), "-");
-        ensure_equals("turned on, the opener a line comment", commentAt(on, "---[[ OVERRIDE"), std::string("---[[ OVERRIDE"));
-        ensure_equals("and the closer", commentAt(on, "--]]"), std::string("--]]"));
-        ensure_equals("the opener over code off, to the closer of the one after it", toggled(r.text, "---[[ A"),
-                      std::string("--[[ A\nlocal x = 1\n\n--[[ B\ninteger y = 2;\n--]]"));
-        checksClean(r);
-    }
-
-    template<> template<>
-    void allsltoslua_object::test<93>()
-    {
-        set_test_name("a toggle's level, the fewest =s nothing between its first opener and its closer closes once it is off: past a ]] "
-                      "in a string or a comment in it, the opener and closer of one pair at one; nought where the script leaves no byte "
-                      "to mark it with");
-        const ALLSLToSLua::Result r = convert("//* OVERRIDE\n"
-                                              "string s = \"]]\";\n"
-                                              "//*/\n"
-                                              "default { state_entry() { llOwnerSay(s); } }\n");
-        ensure("past a string's ]]: " + r.text, has(r, "\n---[=[ OVERRIDE\nlocal s = \"]]\"\n--]=]\n"));
-        ensure_equals("off", toggled(r.text, "---[=["), std::string("--[=[ OVERRIDE\nlocal s = \"]]\"\n--]=]"));
-        checksClean(r);
-
-        const ALLSLToSLua::Result shared = convert("//* A\n"
-                                                   "integer x = 1; /* one */\n"
-                                                   "/* B\n"
-                                                   "string s = \"]]\";\n"
-                                                   "//*/\n"
-                                                   "default { state_entry() { llOwnerSay((string)x); } }\n");
-        ensure("one level for the pair: " + shared.text, has(shared, "\n---[=[ A\nlocal x = 1 --[[ one ]]\n") &&
-                                                             has(shared, "\n--[=[ B\nstring s = \"]]\";\n--]=]\n"));
-        ensure_equals("the opener off", toggled(shared.text, "---[=[ A"),
-                      std::string("--[=[ A\nlocal x = 1 --[[ one ]]\n\n--[=[ B\nstring s = \"]]\";\n--]=]"));
-        checksClean(shared);
-
-        std::string every = "// ";
-        for (char c = 1; c < ' '; ++c)
+        const ALLSLToSLua::Result given = require_converted("default { touch_start(integer n) {\n"
+                                                            "    key b = \"\"; key c = \"A2E76FCD-9360-4F6D-A924-938F923DF11D\";\n"
+                                                            "    key l = \"a2e76fcd-9360-4f6d-a924-938f923df11d\";\n"
+                                                            "    llOwnerSay((string)llGetOwnerKey(b) + (string)llGetOwnerKey(c) + (string)llGetOwnerKey(l));\n"
+                                                            "} }\n");
+        CAPTURE(given.text);
         {
-            if (c != '\t' && c != '\n' && c != '\r')
-            {
-                every += c;
-            }
+            INFO("given no text, text");
+            CHECK(has(given, "local b = \"\""));
+            CHECK(has(given, "ll.GetOwnerKey(b :: any)"));
+            CHECK_FALSE(noted(given, "SluaKeyEmpty"));
+            CHECK(noted(given, "SluaKeyCase"));
         }
-        const ALLSLToSLua::Result unmarked = convert(every + "\ninteger y;\n//* A\ninteger x = 1;\n//*/\n"
-                                                             "default { state_entry() { llOwnerSay((string)(x + y)); } }\n");
-        ensure("paired still: " + unmarked.text, has(unmarked, "\n---[[ A\nlocal x = 1\n--]]\n"));
-        ensure_equals("no byte of its own left in", count(unmarked, std::string(1, '\x01')), size_t(1));
-        checksClean(unmarked);
+        {
+            INFO("nothing else said of them");
+            CHECK_FALSE(noted(given, "SluaKeyText"));
+            CHECK_FALSE(noted(given, "SluaUuidText"));
+        }
+        require_checks_clean(given);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<94>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a particle rule list written out as a ParticleParams table", "[ALLSLToSLua]")
     {
-        set_test_name("where a toggle sits: after code on its line, which stays when it is off, the closer after code it turns off; in a "
-                      "handler; and from the script's first comments, kept off the helpers written over the code");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    integer a = 1; //* A\n"
-                                              "    llOwnerSay((string)a); //*/\n"
-                                              "    //* DEBUG\n"
-                                              "    llOwnerSay(\"debug\");\n"
-                                              "    //*/\n"
-                                              "    llOwnerSay(\"done\");\n"
-                                              "} }\n");
-        ensure("after code: " + r.text, has(r, "\nlocal a = 1 ---[[ A\nprint(tostring(a)) --]]\n"));
-        ensure_equals("off from it", toggled(r.text, "---[[ A"), std::string("--[[ A\nprint(tostring(a)) --]]"));
-        ensure("in a handler: " + r.text, has(r, "\n---[[ DEBUG\nprint(\"debug\")\n--]]\nprint(\"done\")\n"));
-        ensure_equals("off", toggled(r.text, "---[[ DEBUG"), std::string("--[[ DEBUG\nprint(\"debug\")\n--]]"));
-        checksClean(r);
-
-        const ALLSLToSLua::Result top = convert("//* DEBUG\n"
-                                                "\n"
-                                                "vector v = <1, 2, 3>;\n"
-                                                "//*/\n"
-                                                "default { state_entry() { llOwnerSay((string)llVecNorm(v)); } }\n");
-        ensure("the helper over it: " + top.text, has(top, "local function vecNorm(") &&
-                                                      top.text.find("local function vecNorm(") < top.text.find("---[[ DEBUG"));
-        ensure_equals("off", toggled(top.text, "---[[ DEBUG"), std::string("--[[ DEBUG\nlocal v = vector(1, 2, 3)\n--]]"));
-        checksClean(top);
-    }
-
-    template<> template<>
-    void allsltoslua_object::test<85>()
-    {
-        set_test_name("a call the definitions deprecate, naming what to use where SLua's own word names nothing, is noted with it: "
-                      "llMakeFire's ll.ParticleSystem, llSoundPreload's ll.PreloadSound; llXorBase64Strings' ll.XorBase64 in a note of "
-                      "its own, which says how the two differ");
-        const ALLSLToSLua::Result r = convert("default { state_entry() {\n"
-                                              "    llMakeFire(10, 1.0, 1.0, 1.0, PI, \"\", ZERO_VECTOR);\n"
-                                              "    llSoundPreload(\"boom\");\n"
-                                              "    llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 1.0]);\n"
-                                              "    llOwnerSay(llXorBase64Strings(\"YQ==\", \"Yg==\"));\n"
-                                              "    llTakeCamera(llGetOwner());\n"
-                                              "} }\n");
-        const auto named = [&r](const std::string& bare, const std::string& use) {
-            return std::any_of(r.notes.begin(), r.notes.end(), [&](const ALScriptProblem& p) {
-                return p.key == "SluaDeprecatedFor" && p.args.size() == 2 && p.args[0] == bare && p.args[1] == use;
-            });
-        };
-        ensure("each, for what it names: " + r.text,
-               named("MakeFire", "ll.ParticleSystem") && named("SoundPreload", "ll.PreloadSound") &&
-                   named("SetPrimitiveParams", "ll.SetLinkPrimitiveParamsFast") && named("TakeCamera", "ll.SetCameraParams"));
-        ensure("XorBase64Strings' own: " + r.text, noted(r, "SluaXorBase64Wrong") && !named("XorBase64Strings", "ll.XorBase64"));
-        ensure("said so: " + r.text, has(r, "-- LSL: SLua deprecates ll.MakeFire, for ll.ParticleSystem.\n"));
-        ensure("none said bare: " + r.text, !noted(r, "SluaDeprecated"));
-        checksClean(r);
-    }
-
-    template<> template<>
-    void allsltoslua_object::test<55>()
-    {
-        set_test_name("lists appended with table.extend, which runs what it is given once and answers the list: a list by its name, "
-                      "itself, a call's, many values; + in an expression on a copy of the left, but for a new one, said to hold any "
-                      "value, and another +'s answer; no joinLists");
-        const ALLSLToSLua::Result r = convert("list gKept = [1];\n"
-                                              "list kept() { return gKept; }\n"
-                                              "show(list l) { llOwnerSay(llDumpList2String(l, \",\")); }\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    list all = llParseString2List(\"a,b\", [\",\"], []);\n"
-                                              "    list more = [4, 5];\n"
-                                              "    all += more;\n"
-                                              "    all += all;\n"
-                                              "    all += llList2List(more, 0, n);\n"
-                                              "    all += [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, "
-                                              "26, 27, 28, 29, 30, 31, 32, \"x\"];\n"
-                                              "    show(all);\n"
-                                              "    show(kept() + more + all);\n"
-                                              "    show(more + n);\n"
-                                              "    show(n + more);\n"
-                                              "    show([PRIM_NAME, \"x\"] + more);\n"
-                                              "    show(llParseString2List(\"c\", [], []) + [1] + [<1, 2, 3>]);\n"
-                                              "    llSetLinkPrimitiveParamsFast(LINK_THIS, [PRIM_COLOR, ALL_SIDES, <1, 1, 1>, 1.0] + more);\n"
-                                              "} }\n");
-        ensure("a list by its name: " + r.text, has(r, "table.extend(all, more)"));
-        ensure("itself: " + r.text, has(r, "table.extend(all, all)"));
-        ensure("a call's, run once: " + r.text, has(r, "table.extend(all, llcompat.List2List(more, 0, n))") && !has(r, "for _, item in"));
-        ensure("many values: " + r.text, has(r, "table.extend(all, { 0, 1, 2,") && has(r, "32, \"x\" })"));
-        ensure("one copy, of the variable a call answers: " + r.text,
-               has(r, "show(table.extend(table.extend(table.clone(kept()), more), all))"));
-        ensure("a variable copied: " + r.text, has(r, "show(table.extend(table.clone(more), { n }))"));
-        ensure("a value: " + r.text, has(r, "show(table.extend({ n } :: { any }, more))"));
-        ensure("written out: " + r.text, has(r, "show(table.extend({ PRIM_NAME, \"x\" } :: { any }, more))") &&
-                                             has(r, "table.extend({ PRIM_COLOR, ALL_SIDES, vector(1, 1, 1), 1.0 } :: { any }, more)"));
-        ensure("a library call's: " + r.text,
-               has(r, "show(table.extend(table.extend(ll.ParseString2List(\"c\", {}, {}) :: { any }, { 1 }), { vector(1, 2, 3) }))"));
-        ensure("no helper, nor a move: " + r.text, !has(r, "joinLists") && !has(r, "table.move("));
-        checksClean(r);
-    }
-
-    template<> template<>
-    void allsltoslua_object::test<56>()
-    {
-        set_test_name("list forms through SLua's own where they do what LSL's did: an item replaced at a counter within the list, in "
-                      "place, its loop Luau's numeric for, the length kept; one put on the end; a part between two places written out; "
-                      "text and whole numbers joined; one thing's place found; llcompat's where not");
-        const ALLSLToSLua::Result r = convert("list gNames = [\"a\", \"b\"];\n"
-                                              "list gKept;\n"
-                                              "list gL = [1, 2, 3];\n"
-                                              "integer bump() { gL += [0]; return 1; }\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    list l = [1, 2, 3];\n"
-                                              "    integer i;\n"
-                                              "    for (i = 0; i < llGetListLength(l); ++i)\n"
-                                              "        l = llListReplaceList(l, [llList2Integer(l, i) * 2], i, i);\n"
-                                              "    list held = [1, 2];\n"
-                                              "    gKept = held;\n"
-                                              "    integer j;\n"
-                                              "    for (j = 0; j < llGetListLength(held); ++j)\n"
-                                              "        held = llListReplaceList(held, [j], j, j);\n"
-                                              "    integer k;\n"
-                                              "    for (k = 0; k < llGetListLength(gL); ++k)\n"
-                                              "        gL = llListReplaceList(gL, [bump()], k, k);\n"
-                                              "    l = llListReplaceList(l, [7], -1, -1);\n"
-                                              "    l = llListInsertList(l, [9], llGetListLength(l));\n"
-                                              "    list part = llList2List(l, 1, 2);\n"
-                                              "    list all = llList2List(l, 0, -1);\n"
-                                              "    list rest = llList2List(l, 2, -1);\n"
-                                              "    list wrapped = llList2List(l, 3, 1);\n"
-                                              "    llOwnerSay(llDumpList2String(l, \",\"));\n"
-                                              "    llOwnerSay(llDumpList2String(gNames + [n], \", \"));\n"
-                                              "    llOwnerSay(llDumpList2String(l + [1.5], \",\"));\n"
-                                              "    llOwnerSay((string)l);\n"
-                                              "    integer at = llListFindList(gNames, [\"b\"]);\n"
-                                              "    integer none = llListFindList(gNames, [NULL_KEY]);\n"
-                                              "    if (llListFindList(gNames, [NULL_KEY]) != -1) llOwnerSay(\"null\");\n"
-                                              "    integer parsed = llListFindList(llParseString2List(\"a,b\", [\",\"], []), [\"b\"]);\n"
-                                              "    llOwnerSay((string)(at + none + parsed) + llDumpList2String(part + all + rest + wrapped + held, \"\"));\n"
-                                              "} }\n");
-        ensure("replaced in place, in Luau's numeric for: " + r.text, has(r, "for i = 0, #l - 1 do\n        l[i + 1] = l[i + 1] * 2\n"));
-        ensure("a list held elsewhere, replaced as LSL's: " + r.text,
-               has(r, "for j = 0, #held - 1 do\n") && has(r, "        held = llcompat.ListReplaceList(held, { j }, j, j)\n"));
-        ensure("a global a call of the script's could change: " + r.text, has(r, "while k < #gL do") &&
-                                                                            has(r, "gL = llcompat.ListReplaceList(gL, { bump() }, k, k)"));
-        ensure("the last of a list that could be empty: " + r.text, has(r, "l = llcompat.ListReplaceList(l, { 7 }, -1, -1)"));
-        ensure("on the end: " + r.text, has(r, "table.insert(l, 9)"));
-        ensure("a part, and all of it: " + r.text, has(r, "local part = table.move(l, 2, 3, 1, {})") && has(r, "local all = table.clone(l)"));
-        ensure("to the end, and the part left out, as LSL's: " + r.text,
-               has(r, "local rest = llcompat.List2List(l, 2, -1)") && has(r, "local wrapped = llcompat.List2List(l, 3, 1)"));
-        ensure("whole numbers joined: " + r.text, has(r, "print(table.concat(l, \",\"))") && has(r, "print(table.concat(l))"));
-        ensure("and text: " + r.text, has(r, "print(table.concat(table.extend(table.clone(gNames), { n }), \", \"))"));
-        ensure("a float as LSL writes one: " + r.text, has(r, "print(ll.DumpList2String(table.extend(table.clone(l), { 1.5 }), \",\"))"));
-        ensure("found, its place: " + r.text, has(r, "local at = (table.find(gNames, \"b\") or 0) - 1"));
-        ensure("NULL_KEY as LSL's string, as its place and found: " + r.text,
-               has(r, "local none = (table.find(gNames, tostring(NULL_KEY)) or 0) - 1") &&
-                   has(r, "if table.find(gNames, tostring(NULL_KEY)) ~= nil then"));
-        ensure("in a library call's list: " + r.text, has(r, "local parsed = (table.find(ll.ParseString2List(\"a,b\", { \",\" }, {}) :: { any }, \"b\") or 0) - 1"));
-        ensure("no llcompat but those: " + r.text, count(r, "llcompat.") == 5);
-        checksClean(r);
-    }
-
-    template<> template<>
-    void allsltoslua_object::test<57>()
-    {
-        set_test_name("llSubStringIndex asked only whether it found: string.find's plain search, each way LSL asks it, a key as its "
-                      "text, the empty text found; its index still ll's");
-        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
-                                              "    string s = llGetObjectName(); key k = llGetOwner();\n"
-                                              "    if (llSubStringIndex(s, \"a\") != -1) llOwnerSay(\"a\");\n"
-                                              "    if (llSubStringIndex(s, \"b\") >= 0) llOwnerSay(\"b\");\n"
-                                              "    if (llSubStringIndex(s, \"c\") > -1) llOwnerSay(\"c\");\n"
-                                              "    if (llSubStringIndex(s, \"d\") == -1) llOwnerSay(\"no d\");\n"
-                                              "    if (!~llSubStringIndex(s, \"e\")) llOwnerSay(\"no e\");\n"
-                                              "    if (~llSubStringIndex(s, \".\")) llOwnerSay(\"dot\");\n"
-                                              "    if (~llSubStringIndex(s, k)) llOwnerSay(\"owner\");\n"
-                                              "    if (~llSubStringIndex(s, \"\")) llOwnerSay(\"empty\");\n"
-                                              "    integer at = llSubStringIndex(s, \"x\");\n"
-                                              "    llOwnerSay((string)at);\n"
-                                              "} }\n");
-        ensure("found: " + r.text, has(r, "if string.find(s, \"a\", 1, true) ~= nil then") && has(r, "if string.find(s, \"b\", 1, true) ~= nil then") &&
-                                       has(r, "if string.find(s, \"c\", 1, true) ~= nil then"));
-        ensure("not: " + r.text, has(r, "if string.find(s, \"d\", 1, true) == nil then") && has(r, "if not (string.find(s, \"e\", 1, true) ~= nil) then"));
-        ensure("plain, not a pattern: " + r.text, has(r, "if string.find(s, \".\", 1, true) ~= nil then"));
-        ensure("a key as its text: " + r.text, has(r, "if string.find(s, tostring(k), 1, true) ~= nil then"));
-        ensure("the empty text: " + r.text, has(r, "if string.find(s, \"\", 1, true) ~= nil then"));
-        ensure("its index in characters, ll's: " + r.text, has(r, "local at = (ll.SubStringIndex(s, \"x\") or 0) - 1"));
-        ensure("found by string.find alone: " + r.text, count(r, "SubStringIndex") == 1);
-        checksClean(r);
-    }
-
-    template<> template<>
-    void allsltoslua_object::test<77>()
-    {
-        set_test_name("a particle rule list written out as the ParticleParams table ll.ParticleSystem takes: each rule by the key the "
-                      "definitions give it, its value as the list had it, the flags' masks each true, a key to a line where the list had "
-                      "more than one");
-        const ALLSLToSLua::Result r = convert("integer gFlags = 3;\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    llParticleSystem([\n"
-                                              "        PSYS_PART_FLAGS, PSYS_PART_EMISSIVE_MASK | PSYS_PART_INTERP_COLOR_MASK,\n"
-                                              "        PSYS_PART_START_COLOR, <1, 0, 0>, PSYS_PART_START_ALPHA, 1,\n"
-                                              "        PSYS_SRC_PATTERN, PSYS_SRC_PATTERN_EXPLODE,\n"
-                                              "        PSYS_SRC_TEXTURE, NULL_KEY, PSYS_SRC_TARGET_KEY, llGetOwner()\n"
-                                              "    ]);\n"
-                                              "    llLinkParticleSystem(LINK_SET, [PSYS_PART_FLAGS, gFlags, PSYS_SRC_BURST_RATE, 0.1]);\n"
-                                              "    llLinkParticleSystem(2, [PSYS_PART_FLAGS, PSYS_PART_BOUNCE_MASK]);\n"
-                                              "    llParticleSystem([]);\n"
-                                              "} }\n");
-        ensure("a key to a line: " + r.text, has(r, "    ll.ParticleSystem({\n"
-                                                    "        emissive = true,\n"
-                                                    "        color_interp = true,\n"
-                                                    "        color_begin = vector(1, 0, 0),\n"
-                                                    "        alpha_begin = 1,\n"
-                                                    "        pattern = PSYS_SRC_PATTERN_EXPLODE,\n"
-                                                    "        texture = tostring(NULL_KEY),\n"
-                                                    "        target_key = ll.GetOwner(),\n"
-                                                    "    })\n"));
-        ensure("on one line as written; flags not of masks as they are: " + r.text,
-               has(r, "ll.LinkParticleSystem(LINK_SET, { flags = gFlags, burst_rate = 0.1 })") && has(r, "ll.LinkParticleSystem(2, { bounce = true })"));
-        ensure("no rules, as they were: " + r.text, has(r, "ll.ParticleSystem({})"));
+        const ALLSLToSLua::Result r = require_converted("integer gFlags = 3;\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    llParticleSystem([\n"
+                                                        "        PSYS_PART_FLAGS, PSYS_PART_EMISSIVE_MASK | PSYS_PART_INTERP_COLOR_MASK,\n"
+                                                        "        PSYS_PART_START_COLOR, <1, 0, 0>, PSYS_PART_START_ALPHA, 1,\n"
+                                                        "        PSYS_SRC_PATTERN, PSYS_SRC_PATTERN_EXPLODE,\n"
+                                                        "        PSYS_SRC_TEXTURE, NULL_KEY, PSYS_SRC_TARGET_KEY, llGetOwner()\n"
+                                                        "    ]);\n"
+                                                        "    llLinkParticleSystem(LINK_SET, [PSYS_PART_FLAGS, gFlags, PSYS_SRC_BURST_RATE, 0.1]);\n"
+                                                        "    llLinkParticleSystem(2, [PSYS_PART_FLAGS, PSYS_PART_BOUNCE_MASK]);\n"
+                                                        "    llParticleSystem([]);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a key to a line");
+        CHECK(has(r, "    ll.ParticleSystem({\n"
+                     "        emissive = true,\n"
+                     "        color_interp = true,\n"
+                     "        color_begin = vector(1, 0, 0),\n"
+                     "        alpha_begin = 1,\n"
+                     "        pattern = PSYS_SRC_PATTERN_EXPLODE,\n"
+                     "        texture = tostring(NULL_KEY),\n"
+                     "        target_key = ll.GetOwner(),\n"
+                     "    })\n"));
+        {
+            INFO("on one line as written; flags not of masks as they are");
+            CHECK(has(r, "ll.LinkParticleSystem(LINK_SET, { flags = gFlags, burst_rate = 0.1 })"));
+            CHECK(has(r, "ll.LinkParticleSystem(2, { bounce = true })"));
+        }
+        UNSCOPED_INFO("no rules, as they were");
+        CHECK(has(r, "ll.ParticleSystem({})"));
         const auto same = [&r](const std::string& lsl, const std::string& slua) {
             return std::find(r.same.begin(), r.same.end(), std::make_pair(lsl, slua)) != r.same.end();
         };
-        ensure("each constant the same word as its key", same("PSYS_PART_START_COLOR", "color_begin") && same("PSYS_PART_EMISSIVE_MASK", "emissive") &&
-                                                             same("PSYS_SRC_BURST_RATE", "burst_rate"));
-        checksClean(r);
+        {
+            INFO("each constant the same word as its key");
+            CHECK(same("PSYS_PART_START_COLOR", "color_begin"));
+            CHECK(same("PSYS_PART_EMISSIVE_MASK", "emissive"));
+            CHECK(same("PSYS_SRC_BURST_RATE", "burst_rate"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<78>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a media rule list as MediaParams with booleans and whitelist pieces", "[ALLSLToSLua]")
     {
-        set_test_name("a media rule list as MediaParams: TRUE and FALSE, 1 and 0, as booleans, a whitelist's text as its pieces where "
-                      "the serializer joins them back the same; a list where it would not, or a truth is no 1 or 0 written out");
-        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
-                                              "    integer on = llGetLinkNumber();\n"
-                                              "    llSetPrimMediaParams(0, [PRIM_MEDIA_AUTO_PLAY, TRUE, PRIM_MEDIA_AUTO_LOOP, 0, PRIM_MEDIA_CURRENT_URL, \"http://a.com\",\n"
-                                              "        PRIM_MEDIA_WIDTH_PIXELS, 512, PRIM_MEDIA_WHITELIST_ENABLE, 1, PRIM_MEDIA_WHITELIST, \"a.com,*.b.com,\"]);\n"
-                                              "    if (llSetLinkMedia(LINK_THIS, 1, [PRIM_MEDIA_HOME_URL, \"http://h\"]) == STATUS_OK) llOwnerSay(\"ok\");\n"
-                                              "    llSetPrimMediaParams(1, [PRIM_MEDIA_WHITELIST, \",a.com\"]);\n"
-                                              "    llSetPrimMediaParams(2, [PRIM_MEDIA_WHITELIST, \"a\\\\,b\"]);\n"
-                                              "    llSetPrimMediaParams(3, [PRIM_MEDIA_WHITELIST, \"\"]);\n"
-                                              "    llSetPrimMediaParams(4, [PRIM_MEDIA_AUTO_PLAY, on]);\n"
-                                              "    llSetPrimMediaParams(5, [PRIM_MEDIA_AUTO_ZOOM, 2]);\n"
-                                              "} }\n");
-        ensure("a table: " + r.text, has(r, "    ll.SetPrimMediaParams(0, {\n"
-                                            "        auto_play = true,\n"
-                                            "        auto_loop = false,\n"
-                                            "        current_url = \"http://a.com\",\n"
-                                            "        width = 512,\n"
-                                            "        whitelist_enable = true,\n"
-                                            "        whitelist = { \"a.com\", \"*.b.com\", \"\" },\n"
-                                            "    })\n"));
-        ensure("what it answers read: " + r.text, has(r, "if ll.SetLinkMedia(LINK_THIS, 1, { home_url = \"http://h\" }) == STATUS_OK then"));
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    integer on = llGetLinkNumber();\n"
+                                                        "    llSetPrimMediaParams(0, [PRIM_MEDIA_AUTO_PLAY, TRUE, PRIM_MEDIA_AUTO_LOOP, 0, PRIM_MEDIA_CURRENT_URL, \"http://a.com\",\n"
+                                                        "        PRIM_MEDIA_WIDTH_PIXELS, 512, PRIM_MEDIA_WHITELIST_ENABLE, 1, PRIM_MEDIA_WHITELIST, \"a.com,*.b.com,\"]);\n"
+                                                        "    if (llSetLinkMedia(LINK_THIS, 1, [PRIM_MEDIA_HOME_URL, \"http://h\"]) == STATUS_OK) llOwnerSay(\"ok\");\n"
+                                                        "    llSetPrimMediaParams(1, [PRIM_MEDIA_WHITELIST, \",a.com\"]);\n"
+                                                        "    llSetPrimMediaParams(2, [PRIM_MEDIA_WHITELIST, \"a\\\\,b\"]);\n"
+                                                        "    llSetPrimMediaParams(3, [PRIM_MEDIA_WHITELIST, \"\"]);\n"
+                                                        "    llSetPrimMediaParams(4, [PRIM_MEDIA_AUTO_PLAY, on]);\n"
+                                                        "    llSetPrimMediaParams(5, [PRIM_MEDIA_AUTO_ZOOM, 2]);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a table");
+        CHECK(has(r, "    ll.SetPrimMediaParams(0, {\n"
+                     "        auto_play = true,\n"
+                     "        auto_loop = false,\n"
+                     "        current_url = \"http://a.com\",\n"
+                     "        width = 512,\n"
+                     "        whitelist_enable = true,\n"
+                     "        whitelist = { \"a.com\", \"*.b.com\", \"\" },\n"
+                     "    })\n"));
+        UNSCOPED_INFO("what it answers read");
+        CHECK(has(r, "if ll.SetLinkMedia(LINK_THIS, 1, { home_url = \"http://h\" }) == STATUS_OK then"));
         // The join leaves a first piece of none out, escapes a \, and sends
         // no rule at all for no text.
-        ensure("a whitelist the join would change, a list: " + r.text,
-               has(r, "ll.SetPrimMediaParams(1, { PRIM_MEDIA_WHITELIST, \",a.com\" })") && has(r, "ll.SetPrimMediaParams(2, { PRIM_MEDIA_WHITELIST, \"a") &&
-                   has(r, "ll.SetPrimMediaParams(3, { PRIM_MEDIA_WHITELIST, \"\" })"));
-        ensure("a truth not written out as one, a list: " + r.text,
-               has(r, "ll.SetPrimMediaParams(4, { PRIM_MEDIA_AUTO_PLAY, on })") && has(r, "ll.SetPrimMediaParams(5, { PRIM_MEDIA_AUTO_ZOOM, 2 })"));
-        checksClean(r);
+        {
+            INFO("a whitelist the join would change, a list");
+            CHECK(has(r, "ll.SetPrimMediaParams(1, { PRIM_MEDIA_WHITELIST, \",a.com\" })"));
+            CHECK(has(r, "ll.SetPrimMediaParams(2, { PRIM_MEDIA_WHITELIST, \"a"));
+            CHECK(has(r, "ll.SetPrimMediaParams(3, { PRIM_MEDIA_WHITELIST, \"\" })"));
+        }
+        {
+            INFO("a truth not written out as one, a list");
+            CHECK(has(r, "ll.SetPrimMediaParams(4, { PRIM_MEDIA_AUTO_PLAY, on })"));
+            CHECK(has(r, "ll.SetPrimMediaParams(5, { PRIM_MEDIA_AUTO_ZOOM, 2 })"));
+        }
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<79>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: an HTTP rule list as HttpRequestParams with headers by name", "[ALLSLToSLua]")
     {
-        set_test_name("an HTTP rule list as HttpRequestParams: headers of names each once by name, said where the serializer's order "
-                      "by name is not the order written; the accepts in order; a list for a name twice, a name not written out, or a "
-                      "value moved past one that changes something");
-        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
-                                              "    string token = llGetObjectDesc();\n"
-                                              "    llHTTPRequest(\"https://x\", [HTTP_METHOD, \"POST\", HTTP_MIMETYPE, \"application/json\", HTTP_VERIFY_CERT, FALSE,\n"
-                                              "        HTTP_CUSTOM_HEADER, \"X-B\", token, HTTP_BODY_MAXLENGTH, 16384, HTTP_CUSTOM_HEADER, \"X-A\", \"two\",\n"
-                                              "        HTTP_ACCEPT, \"application/json\", HTTP_ACCEPT, \"text/plain\"], \"{}\");\n"
-                                              "} }\n");
-        ensure("a table: " + r.text, has(r, "    ll.HTTPRequest(\"https://x\", {\n"
-                                            "        method = \"POST\",\n"
-                                            "        mimetype = \"application/json\",\n"
-                                            "        verify_cert = false,\n"
-                                            "        custom_header = { [\"X-B\"] = token, [\"X-A\"] = \"two\" },\n"
-                                            "        max_body_length = 16384,\n"
-                                            "        accept = { \"application/json\", \"text/plain\" },\n"
-                                            "    }, \"{}\")\n"));
-        ensure("the headers' order said: " + r.text, noted(r, "SluaHeaderOrder") && has(r, "-- LSL: SLua passes ll.HTTPRequest a custom_header table's headers sorted by name"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    string token = llGetObjectDesc();\n"
+                                                        "    llHTTPRequest(\"https://x\", [HTTP_METHOD, \"POST\", HTTP_MIMETYPE, \"application/json\", HTTP_VERIFY_CERT, FALSE,\n"
+                                                        "        HTTP_CUSTOM_HEADER, \"X-B\", token, HTTP_BODY_MAXLENGTH, 16384, HTTP_CUSTOM_HEADER, \"X-A\", \"two\",\n"
+                                                        "        HTTP_ACCEPT, \"application/json\", HTTP_ACCEPT, \"text/plain\"], \"{}\");\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a table");
+        CHECK(has(r, "    ll.HTTPRequest(\"https://x\", {\n"
+                     "        method = \"POST\",\n"
+                     "        mimetype = \"application/json\",\n"
+                     "        verify_cert = false,\n"
+                     "        custom_header = { [\"X-B\"] = token, [\"X-A\"] = \"two\" },\n"
+                     "        max_body_length = 16384,\n"
+                     "        accept = { \"application/json\", \"text/plain\" },\n"
+                     "    }, \"{}\")\n"));
+        {
+            INFO("the headers' order said");
+            CHECK(noted(r, "SluaHeaderOrder"));
+            CHECK(has(r, "-- LSL: SLua passes ll.HTTPRequest a custom_header table's headers sorted by name"));
+        }
+        require_checks_clean(r);
 
-        const ALLSLToSLua::Result sorted = convert("default { touch_start(integer n) {\n"
-                                                   "    key id = llHTTPRequest(\"https://y\", [HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"B\", \"2\"], \"\");\n"
-                                                   "    llOwnerSay((string)id);\n"
-                                                   "} }\n");
-        ensure("in order by name, nothing said: " + sorted.text,
-               has(sorted, "local id = ll.HTTPRequest(\"https://y\", { custom_header = { [\"A\"] = \"1\", [\"B\"] = \"2\" } }, \"\")") &&
-                   !noted(sorted, "SluaHeaderOrder"));
-        checksClean(sorted);
+        const ALLSLToSLua::Result sorted = require_converted("default { touch_start(integer n) {\n"
+                                                             "    key id = llHTTPRequest(\"https://y\", [HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"B\", \"2\"], \"\");\n"
+                                                             "    llOwnerSay((string)id);\n"
+                                                             "} }\n");
+        CAPTURE(sorted.text);
+        {
+            INFO("in order by name, nothing said");
+            CHECK(has(sorted, "local id = ll.HTTPRequest(\"https://y\", { custom_header = { [\"A\"] = \"1\", [\"B\"] = \"2\" } }, \"\")"));
+            CHECK_FALSE(noted(sorted, "SluaHeaderOrder"));
+        }
+        require_checks_clean(sorted);
 
-        const ALLSLToSLua::Result lists = convert("integer gCount;\n"
-                                                  "string counted() { ++gCount; return (string)gCount; }\n"
-                                                  "default { touch_start(integer n) {\n"
-                                                  "    string token = llGetObjectDesc();\n"
-                                                  "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"A\", \"2\"], \"\");\n"
-                                                  "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, token, \"1\"], \"\");\n"
-                                                  "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_METHOD, \"GET\", HTTP_CUSTOM_HEADER, \"B\", counted()], \"\");\n"
-                                                  "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_CUSTOM_HEADER, \"B\", counted()], \"\");\n"
-                                                  "} }\n");
-        ensure("a name twice, a list: " + lists.text, has(lists, "ll.HTTPRequest(\"https://z\", { HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"A\", \"2\" }, \"\")"));
-        ensure("a name not written out, a list: " + lists.text, has(lists, "ll.HTTPRequest(\"https://z\", { HTTP_CUSTOM_HEADER, token, \"1\" }, \"\")"));
-        ensure("moved past another, a list: " + lists.text, has(lists, "{ HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_METHOD, \"GET\", HTTP_CUSTOM_HEADER, \"B\", counted() }"));
-        ensure("one after another, run in their order: " + lists.text, has(lists, "{ custom_header = { [\"A\"] = counted(), [\"B\"] = counted() } }"));
-        checksClean(lists);
+        const ALLSLToSLua::Result lists = require_converted("integer gCount;\n"
+                                                            "string counted() { ++gCount; return (string)gCount; }\n"
+                                                            "default { touch_start(integer n) {\n"
+                                                            "    string token = llGetObjectDesc();\n"
+                                                            "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"A\", \"2\"], \"\");\n"
+                                                            "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, token, \"1\"], \"\");\n"
+                                                            "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_METHOD, \"GET\", HTTP_CUSTOM_HEADER, \"B\", counted()], \"\");\n"
+                                                            "    llHTTPRequest(\"https://z\", [HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_CUSTOM_HEADER, \"B\", counted()], \"\");\n"
+                                                            "} }\n");
+        CAPTURE(lists.text);
+        UNSCOPED_INFO("a name twice, a list");
+        CHECK(has(lists, "ll.HTTPRequest(\"https://z\", { HTTP_CUSTOM_HEADER, \"A\", \"1\", HTTP_CUSTOM_HEADER, \"A\", \"2\" }, \"\")"));
+        UNSCOPED_INFO("a name not written out, a list");
+        CHECK(has(lists, "ll.HTTPRequest(\"https://z\", { HTTP_CUSTOM_HEADER, token, \"1\" }, \"\")"));
+        UNSCOPED_INFO("moved past another, a list");
+        CHECK(has(lists, "{ HTTP_CUSTOM_HEADER, \"A\", counted(), HTTP_METHOD, \"GET\", HTTP_CUSTOM_HEADER, \"B\", counted() }"));
+        UNSCOPED_INFO("one after another, run in their order");
+        CHECK(has(lists, "{ custom_header = { [\"A\"] = counted(), [\"B\"] = counted() } }"));
+        require_checks_clean(lists);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<80>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a rule list the table cannot say just so stays a list", "[ALLSLToSLua]")
     {
-        set_test_name("a rule list the table could not say just so stays a list: not written out, a key twice, a rule of another table "
-                      "or a number, a value of another shape, a rule with no value; flags that are not an | of masks each once, as they "
-                      "are; none at all without SLua's idioms");
         const char* const script = "list gRules = [PSYS_PART_MAX_AGE, 2.0];\n"
                                    "default { touch_start(integer n) {\n"
                                    "    llParticleSystem(gRules);\n"
@@ -2676,28 +3384,41 @@ namespace tut
                                    "    llLinkParticleSystem(2, [PSYS_PART_FLAGS, PSYS_PART_WIND_MASK | PSYS_PART_WIND_MASK]);\n"
                                    "    llLinkParticleSystem(3, [PSYS_PART_FLAGS, PSYS_PART_WIND_MASK | (PSYS_PART_BOUNCE_MASK | PSYS_PART_RIBBON_MASK)]);\n"
                                    "} }\n";
-        const ALLSLToSLua::Result r = convert(script);
-        ensure("not written out: " + r.text, has(r, "ll.ParticleSystem(gRules)"));
-        ensure("a key twice: " + r.text, has(r, "ll.ParticleSystem({ PSYS_PART_MAX_AGE, 2.0, PSYS_PART_MAX_AGE, 3.0 })"));
-        ensure("another table's rule: " + r.text, has(r, "ll.ParticleSystem({ PRIM_MEDIA_AUTO_PLAY, 1 })"));
-        ensure("a number for a rule: " + r.text, has(r, "ll.ParticleSystem({ 7, 2.0 })"));
-        ensure("a value of another shape: " + r.text, has(r, "ll.ParticleSystem({ PSYS_PART_START_ALPHA, vector(1, 0, 0) })"));
-        ensure("no value: " + r.text, has(r, "ll.ParticleSystem({ PSYS_PART_MAX_AGE })"));
-        ensure("flags as they are: " + r.text, has(r, "ll.LinkParticleSystem(1, { flags = PSYS_PART_WIND_MASK + PSYS_PART_BOUNCE_MASK })") &&
-                                                   has(r, "ll.LinkParticleSystem(2, { flags = bit32.bor(PSYS_PART_WIND_MASK, PSYS_PART_WIND_MASK) })"));
-        ensure("masks bracketed, each true: " + r.text, has(r, "ll.LinkParticleSystem(3, { wind = true, bounce = true, ribbon = true })"));
+        const ALLSLToSLua::Result r = require_converted(script);
+        CAPTURE(r.text);
+        UNSCOPED_INFO("not written out");
+        CHECK(has(r, "ll.ParticleSystem(gRules)"));
+        UNSCOPED_INFO("a key twice");
+        CHECK(has(r, "ll.ParticleSystem({ PSYS_PART_MAX_AGE, 2.0, PSYS_PART_MAX_AGE, 3.0 })"));
+        UNSCOPED_INFO("another table's rule");
+        CHECK(has(r, "ll.ParticleSystem({ PRIM_MEDIA_AUTO_PLAY, 1 })"));
+        UNSCOPED_INFO("a number for a rule");
+        CHECK(has(r, "ll.ParticleSystem({ 7, 2.0 })"));
+        UNSCOPED_INFO("a value of another shape");
+        CHECK(has(r, "ll.ParticleSystem({ PSYS_PART_START_ALPHA, vector(1, 0, 0) })"));
+        UNSCOPED_INFO("no value");
+        CHECK(has(r, "ll.ParticleSystem({ PSYS_PART_MAX_AGE })"));
+        {
+            INFO("flags as they are");
+            CHECK(has(r, "ll.LinkParticleSystem(1, { flags = PSYS_PART_WIND_MASK + PSYS_PART_BOUNCE_MASK })"));
+            CHECK(has(r, "ll.LinkParticleSystem(2, { flags = bit32.bor(PSYS_PART_WIND_MASK, PSYS_PART_WIND_MASK) })"));
+        }
+        UNSCOPED_INFO("masks bracketed, each true");
+        CHECK(has(r, "ll.LinkParticleSystem(3, { wind = true, bounce = true, ribbon = true })"));
         ALLSLToSLua::Options plain;
         plain.idioms                    = false;
         const ALLSLToSLua::Result lists = ALLSLToSLua::convert(script, plain);
-        ensure("no idioms, no tables: " + lists.text, has(lists, "ll.LinkParticleSystem(3, { PSYS_PART_FLAGS, ") && !has(lists, "wind = true"));
+        CAPTURE(lists.text);
+        {
+            INFO("no idioms, no tables");
+            CHECK(has(lists, "ll.LinkParticleSystem(3, { PSYS_PART_FLAGS, "));
+            CHECK_FALSE(has(lists, "wind = true"));
+        }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<81>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: every rule of the three tables matches the definitions' types", "[ALLSLToSLua]")
     {
-        set_test_name("every rule of the three tables at once: each key one the definitions' type has, every key the type has written, "
-                      "and strict under the grid's solver");
-        const ALLSLToSLua::Result r = convert(
+        const ALLSLToSLua::Result r = require_converted(
             "default { touch_start(integer n) {\n"
             "    key k = llGetOwner();\n"
             "    llParticleSystem([PSYS_PART_FLAGS, PSYS_PART_INTERP_COLOR_MASK | PSYS_PART_INTERP_SCALE_MASK | PSYS_PART_BOUNCE_MASK |\n"
@@ -2721,6 +3442,7 @@ namespace tut
             "        HTTP_VERBOSE_THROTTLE, FALSE, HTTP_CUSTOM_HEADER, \"X-A\", \"1\", HTTP_PRAGMA_NO_CACHE, TRUE, HTTP_USER_AGENT, \"me\",\n"
             "        HTTP_ACCEPT, \"text/plain\", HTTP_EXTENDED_ERROR, TRUE], \"\");\n"
             "} }\n");
+        CAPTURE(r.text);
         // The keys each table was written with, a line each.
         std::map<std::string, std::set<std::string>> written;
         {
@@ -2748,7 +3470,8 @@ namespace tut
         {
             const std::string text  = defs.str();
             const size_t      begin = text.find(std::string("export type ") + type + " = {");
-            ensure(std::string("the definitions have ") + type, begin != std::string::npos);
+            UNSCOPED_INFO("the definitions have " << type);
+            REQUIRE(begin != std::string::npos);
             const std::string block = text.substr(begin, text.find("\n}", begin) - begin);
             std::set<std::string> fields;
             std::istringstream    lines(block);
@@ -2772,10 +3495,12 @@ namespace tut
             {
                 unknown += fields.contains(key) ? "" : " " + key;
             }
-            ensure(std::string(type) + " has every key written:" + unknown + "\n" + r.text, unknown.empty());
-            ensure(std::string(type) + " written with every key it has:" + missing + "\n" + r.text, missing.empty());
+            UNSCOPED_INFO(type << " has every key written:" << unknown);
+            REQUIRE(unknown.empty());
+            UNSCOPED_INFO(type << " written with every key it has:" << missing);
+            REQUIRE(missing.empty());
         }
-        checksClean(r);
+        require_checks_clean(r);
         if (!newSolver)
         {
             std::string said;
@@ -2783,26 +3508,23 @@ namespace tut
             {
                 said += p.severity == ALScriptProblem::Severity::Error ? p.message + "\n" : std::string();
             }
-            ensure("strict:\n" + said + "---\n" + r.text, said.empty());
+            CAPTURE(said);
+            CHECK(said.empty());
         }
     }
 }
 
-namespace tut
+namespace
 {
-    template<> template<>
-    void allsltoslua_object::test<82>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a list written over several lines keeps its lines and comments", "[ALLSLToSLua]")
     {
-        set_test_name("a list the LSL wrote over several lines is written over the same lines, nested ones a level further in, each "
-                      "comment in it where it was; a comment after it on the line it ends trails that line; a list on one line, or in "
-                      "a line made inside an expression, stays on one");
-        const ALLSLToSLua::Result r = convert("list gColours = [\n"
-                                              "    // warm\n"
-                                              "    \"red\", \"orange\",\n"
-                                              "    /* cool */ \"blue\" // last\n"
-                                              "];\n"
-                                              "list gTwo = [1, 2,\n"
-                                              "             3]; // three\n"
+        const ALLSLToSLua::Result r = require_converted("list gColours = [\n"
+                                                        "    // warm\n"
+                                                        "    \"red\", \"orange\",\n"
+                                                        "    /* cool */ \"blue\" // last\n"
+                                                        "];\n"
+                                                        "list gTwo = [1, 2,\n"
+                                                        "             3]; // three\n"
                                               "default { touch_start(integer n) {\n"
                                               "       string activeRequest = llList2Json(JSON_OBJECT, [\n"
                                               "            \"fn\", \"SELECT\",\n"
@@ -2830,12 +3552,13 @@ namespace tut
                                               "           PSYS_SRC_PATTERN, PSYS_SRC_PATTERN_DROP\n"
                                               "       ]);\n"
                                               "} }\n");
-        ensure("a global's, its comments where they were: " + r.text,
-               has(r, "local gColours = {\n    -- warm\n    \"red\", \"orange\",\n    --[[ cool ]] \"blue\" -- last\n}\n"));
-        ensure("closed on the line it closed on, a comment after it trailing that: " + r.text,
-               has(r, "local gTwo = { 1, 2,\n    3 } -- three\n"));
-        ensure("Tapple's, as the LSL had it: " + r.text,
-               has(r, "    local activeRequest = ll.List2Json(JSON_OBJECT, {\n"
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a global's, its comments where they were");
+        CHECK(has(r, "local gColours = {\n    -- warm\n    \"red\", \"orange\",\n    --[[ cool ]] \"blue\" -- last\n}\n"));
+        UNSCOPED_INFO("closed on the line it closed on, a comment after it trailing that");
+        CHECK(has(r, "local gTwo = { 1, 2,\n    3 } -- three\n"));
+        UNSCOPED_INFO("Tapple's, as the LSL had it");
+        CHECK(has(r, "    local activeRequest = ll.List2Json(JSON_OBJECT, {\n"
                       "        \"fn\", \"SELECT\",\n"
                       "        \"radius\", 10,\n"
                       "        \"ima\", ll.List2Json(JSON_ARRAY, { \"Ungulate\" }),\n"
@@ -2848,47 +3571,55 @@ namespace tut
                       "        }),\n"
                       "        \"responders\", \"[]\"\n"
                       "    }) -- sent\n"));
-        ensure("each comment once: " + r.text, count(r, "only the owner") == 1 && count(r, "-- sent") == 1 && count(r, "-- first") == 1);
-        ensure("in a line made inside an expression, one line: " + r.text, has(r, "(function() m = { 3, 4 } return m end)()"));
-        ensure("in a condition: " + r.text, has(r, "    if table.find({ \"a\", -- first\n        \"b\" }"));
-        ensure("one written another way, its comment over it: " + r.text, has(r, "    -- none\n    ll.ParticleSystem({\n"));
-        checksClean(r);
+        {
+            INFO("each comment once");
+            CHECK(count(r, "only the owner") == 1);
+            CHECK(count(r, "-- sent") == 1);
+            CHECK(count(r, "-- first") == 1);
+        }
+        UNSCOPED_INFO("in a line made inside an expression, one line");
+        CHECK(has(r, "(function() m = { 3, 4 } return m end)()"));
+        UNSCOPED_INFO("in a condition");
+        CHECK(has(r, "    if table.find({ \"a\", -- first\n        \"b\" }"));
+        UNSCOPED_INFO("one written another way, its comment over it");
+        CHECK(has(r, "    -- none\n    ll.ParticleSystem({\n"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<83>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a detected event's count only declared where the body names it", "[ALLSLToSLua]")
     {
-        set_test_name("a detected event's count made of the detected table only where the body names it: none that nothing reads, which "
-                      "a lint would ask to take out");
-        const ALLSLToSLua::Result r = convert("selectHorse() {}\n"
-                                              "default {\n"
-                                              "    touch_start (integer num) {\n"
-                                              "        if (llDetectedKey(0) == llGetOwner()) {\n"
-                                              "            selectHorse();\n"
-                                              "        }\n"
-                                              "    }\n"
-                                              "    collision_start(integer n) { llOwnerSay((string)n); }\n"
-                                              "    sensor(integer found) { found = 0; }\n"
-                                              "}\n");
-        ensure("none that nothing reads: " + r.text,
-               has(r, "LLEvents:on(\"touch_start\", function(detected)\n    -- LSL: detected[n]") && !has(r, "local num"));
-        ensure("one read: " + r.text, has(r, "function(detected)\n    local n = #detected\n    print(tostring(n))\n"));
-        ensure("one set, which needs it there: " + r.text, has(r, "    local found = #detected\n    found = 0\n"));
+        const ALLSLToSLua::Result r = require_converted("selectHorse() {}\n"
+                                                        "default {\n"
+                                                        "    touch_start (integer num) {\n"
+                                                        "        if (llDetectedKey(0) == llGetOwner()) {\n"
+                                                        "            selectHorse();\n"
+                                                        "        }\n"
+                                                        "    }\n"
+                                                        "    collision_start(integer n) { llOwnerSay((string)n); }\n"
+                                                        "    sensor(integer found) { found = 0; }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        {
+            INFO("none that nothing reads");
+            CHECK(has(r, "LLEvents:on(\"touch_start\", function(detected)\n    -- LSL: detected[n]"));
+            CHECK_FALSE(has(r, "local num"));
+        }
+        UNSCOPED_INFO("one read");
+        CHECK(has(r, "function(detected)\n    local n = #detected\n    print(tostring(n))\n"));
+        UNSCOPED_INFO("one set, which needs it there");
+        CHECK(has(r, "    local found = #detected\n    found = 0\n"));
         // Unused, of what Luau says: only what the LSL itself never read.
         std::string unused;
         for (const ALScriptProblem& p : service.check(r.text))
         {
             unused += p.code == "LocalUnused" ? p.message + "\n" : std::string();
         }
-        ensure_equals("unused", unused, std::string("Variable 'found' is never used; prefix with '_' to silence\n"));
-        checksClean(r);
+        CHECK(unused == std::string("Variable 'found' is never used; prefix with '_' to silence\n"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<84>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: text where ll takes a key passed as it is with :: any and noted once", "[ALLSLToSLua]")
     {
-        set_test_name("text given where ll or llcompat takes a key is given as it is, as LSL's function took it, `:: any` for the type "
-                      "checker, said once; a UUID written out still a uuid; the script's own function's key still uuid()");
         const std::string lsl = "string gJson;\n"
                                 "integer mine(key who) { return who == llGetOwner(); }\n"
                                 "default { touch_start(integer n) {\n"
@@ -2897,39 +3628,85 @@ namespace tut
                                 "    llOwnerSay(llKey2Name(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"));\n"
                                 "    if (mine(llJsonGetValue(gJson, [\"owner\"]))) llOwnerSay(\"mine\");\n"
                                 "} }\n";
-        const ALLSLToSLua::Result r = convert(lsl);
-        ensure("Tapple's, as it is: " + r.text, has(r, "ll.Key2Name(ll.JsonGetValue(gJson, { \"selected\" }) :: any)"));
-        ensure("bracketed where it must be: " + r.text, has(r, "ll.Key2Name((\"a2e76fcd-9360-4f6d-a924-\" .. \"938f923df11d\") :: any)"));
-        ensure("a UUID written out, a uuid: " + r.text, has(r, "ll.Key2Name(uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"))"));
-        ensure("the script's own function's key, uuid(): " + r.text, has(r, "mine(uuid(ll.JsonGetValue(gJson, { \"owner\" })))") &&
-                                                                        noted(r, "SluaUuidText"));
-        ensure("said once: " + r.text, count(r, "-- LSL: SLua's ll takes a key as text") == 1);
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted(lsl);
+        CAPTURE(r.text);
+        UNSCOPED_INFO("Tapple's, as it is");
+        CHECK(has(r, "ll.Key2Name(ll.JsonGetValue(gJson, { \"selected\" }) :: any)"));
+        UNSCOPED_INFO("bracketed where it must be");
+        CHECK(has(r, "ll.Key2Name((\"a2e76fcd-9360-4f6d-a924-\" .. \"938f923df11d\") :: any)"));
+        UNSCOPED_INFO("a UUID written out, a uuid");
+        CHECK(has(r, "ll.Key2Name(uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"))"));
+        {
+            INFO("the script's own function's key, uuid()");
+            CHECK(has(r, "mine(uuid(ll.JsonGetValue(gJson, { \"owner\" })))"));
+            CHECK(noted(r, "SluaUuidText"));
+        }
+        UNSCOPED_INFO("said once");
+        CHECK(count(r, "-- LSL: SLua's ll takes a key as text") == 1);
+        require_checks_clean(r);
         if (!newSolver)
         {
             // ll's calls alone, strict.
-            const ALLSLToSLua::Result calls = convert("default { touch_start(integer n) {\n"
-                                                      "    llOwnerSay(llKey2Name(llJsonGetValue(\"{}\", [\"selected\"])));\n"
-                                                      "    llOwnerSay((string)llGetOwnerKey(\"a\" + (string)n));\n"
-                                                      "} }\n");
+            const ALLSLToSLua::Result calls = require_converted("default { touch_start(integer n) {\n"
+                                                                "    llOwnerSay(llKey2Name(llJsonGetValue(\"{}\", [\"selected\"])));\n"
+                                                                "    llOwnerSay((string)llGetOwnerKey(\"a\" + (string)n));\n"
+                                                                "} }\n");
             std::string said;
             for (const ALScriptProblem& p : service.check("--!strict\n" + calls.text))
             {
                 said += p.severity == ALScriptProblem::Severity::Error ? p.message + "\n" : std::string();
             }
-            ensure("strict:\n" + said + "---\n" + calls.text, said.empty() && calls.text.find(":: any") != std::string::npos);
+            CAPTURE(said, calls.text);
+            CHECK(said.empty());
+            CHECK(calls.text.find(":: any") != std::string::npos);
         }
 
         const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
-        ensure("llcompat's the same: " + close.text, close.converted && close.text.find(":: any)") != std::string::npos);
-        checksClean(close);
+        CAPTURE(close.text);
+        {
+            INFO("llcompat's the same");
+            CHECK(close.converted);
+            CHECK(close.text.find(":: any)") != std::string::npos);
+        }
+        require_checks_clean(close);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<86>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: deprecated calls noted with what to use; XorBase64Strings its own note", "[ALLSLToSLua]")
     {
-        set_test_name("a find's place compared with a whole number written out is compared in SLua's count, from 1 or nil, on either side: "
-                      "x == 1 where LSL said == 0; a place below -1 left as written, and one read as a number kept LSL's");
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    llMakeFire(10, 1.0, 1.0, 1.0, PI, \"\", ZERO_VECTOR);\n"
+                                                        "    llSoundPreload(\"boom\");\n"
+                                                        "    llSetPrimitiveParams([PRIM_GLOW, ALL_SIDES, 1.0]);\n"
+                                                        "    llOwnerSay(llXorBase64Strings(\"YQ==\", \"Yg==\"));\n"
+                                                        "    llTakeCamera(llGetOwner());\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        const auto named = [&r](const std::string& bare, const std::string& use) {
+            return std::any_of(r.notes.begin(), r.notes.end(), [&](const ALScriptProblem& p) {
+                return p.key == "SluaDeprecatedFor" && p.args.size() == 2 && p.args[0] == bare && p.args[1] == use;
+            });
+        };
+        {
+            INFO("each, for what it names");
+            CHECK(named("MakeFire", "ll.ParticleSystem"));
+            CHECK(named("SoundPreload", "ll.PreloadSound"));
+            CHECK(named("SetPrimitiveParams", "ll.SetLinkPrimitiveParamsFast"));
+            CHECK(named("TakeCamera", "ll.SetCameraParams"));
+        }
+        {
+            INFO("XorBase64Strings' own");
+            CHECK(noted(r, "SluaXorBase64Wrong"));
+            CHECK_FALSE(named("XorBase64Strings", "ll.XorBase64"));
+        }
+        UNSCOPED_INFO("said so");
+        CHECK(has(r, "-- LSL: SLua deprecates ll.MakeFire, for ll.ParticleSystem.\n"));
+        UNSCOPED_INFO("none said bare");
+        CHECK_FALSE(noted(r, "SluaDeprecated"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a find's place against a literal compared in SLua's count from 1", "[ALLSLToSLua]")
+    {
         const std::string lsl = "string P = \"cfg\";\n"
                                 "list L;\n"
                                 "check(string item) {\n"
@@ -2945,17 +3722,27 @@ namespace tut
                                 "    llOwnerSay((string)at);\n"
                                 "}\n"
                                 "default { touch_start(integer n) { check(\"x\"); } }\n";
-        const ALLSLToSLua::Result r = convert(lsl);
-        ensure("Tapple's: " + r.text, has(r, "if P ~= \"\" and ll.SubStringIndex(item, P) == 1 then"));
-        ensure("the number on the left: " + r.text, has(r, "if ll.SubStringIndex(item, P) == 1 then print(\"b\")"));
-        ensure("~=: " + r.text, has(r, "if ll.SubStringIndex(item, P) ~= 3 then"));
-        ensure("an order, nil read as LSL's -1: " + r.text, has(r, "if (ll.SubStringIndex(item, P) or 0) > 1 then"));
-        ensure("an order the other way round: " + r.text, has(r, "if (ll.SubStringIndex(item, P) or 0) > 4 then"));
-        ensure("below -1, as written: " + r.text, has(r, "if (ll.SubStringIndex(item, P) or 0) - 1 == -2 then"));
-        ensure("under a not: " + r.text, has(r, "if ll.SubStringIndex(item, P) ~= 1 then print(\"g\")"));
-        ensure("table.find's: " + r.text, has(r, "if table.find(L, item) == 1 then"));
-        ensure("a number, LSL's: " + r.text, has(r, "local at = (ll.SubStringIndex(item, P) or 0) - 1"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted(lsl);
+        CAPTURE(r.text);
+        UNSCOPED_INFO("Tapple's");
+        CHECK(has(r, "if P ~= \"\" and ll.SubStringIndex(item, P) == 1 then"));
+        UNSCOPED_INFO("the number on the left");
+        CHECK(has(r, "if ll.SubStringIndex(item, P) == 1 then print(\"b\")"));
+        UNSCOPED_INFO("~=");
+        CHECK(has(r, "if ll.SubStringIndex(item, P) ~= 3 then"));
+        UNSCOPED_INFO("an order, nil read as LSL's -1");
+        CHECK(has(r, "if (ll.SubStringIndex(item, P) or 0) > 1 then"));
+        UNSCOPED_INFO("an order the other way round");
+        CHECK(has(r, "if (ll.SubStringIndex(item, P) or 0) > 4 then"));
+        UNSCOPED_INFO("below -1, as written");
+        CHECK(has(r, "if (ll.SubStringIndex(item, P) or 0) - 1 == -2 then"));
+        UNSCOPED_INFO("under a not");
+        CHECK(has(r, "if ll.SubStringIndex(item, P) ~= 1 then print(\"g\")"));
+        UNSCOPED_INFO("table.find's");
+        CHECK(has(r, "if table.find(L, item) == 1 then"));
+        UNSCOPED_INFO("a number, LSL's");
+        CHECK(has(r, "local at = (ll.SubStringIndex(item, P) or 0) - 1"));
+        require_checks_clean(r);
 
         // table.find's alone, without SLua's ll: whether it found, against nil.
         ALLSLToSLua::Options idioms = ALLSLToSLua::Options::closeToLSL();
@@ -2967,59 +3754,71 @@ namespace tut
                                  "    if (llListFindList(L, [n]) == 2) llOwnerSay(\"third\");\n"
                                  "} }\n",
                                  idioms);
-        ensure("found, against nil: " + found.text, found.converted && has(found, "if table.find(L, n) == nil then") &&
-                                                        has(found, "if table.find(L, n) ~= nil then") && has(found, "if table.find(L, n) == 3 then"));
-        checksClean(found);
+        CAPTURE(found.text);
+        {
+            INFO("found, against nil");
+            CHECK(found.converted);
+            CHECK(has(found, "if table.find(L, n) == nil then"));
+            CHECK(has(found, "if table.find(L, n) ~= nil then"));
+            CHECK(has(found, "if table.find(L, n) == 3 then"));
+        }
+        require_checks_clean(found);
 
         const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
-        ensure("llcompat's, LSL's count: " + close.text, close.converted && has(close, "llcompat.SubStringIndex(item, P) == 0"));
-        checksClean(close);
+        CAPTURE(close.text);
+        {
+            INFO("llcompat's, LSL's count");
+            CHECK(close.converted);
+            CHECK(has(close, "llcompat.SubStringIndex(item, P) == 0"));
+        }
+        require_checks_clean(close);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<87>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: blank lines between statements kept singly and not at a block's ends", "[ALLSLToSLua]")
     {
-        set_test_name("a blank line between two statements or globals is kept, one for a run of them; none at a block's start or end, "
-                      "nor a second where a comment over the statement keeps its own");
-        const ALLSLToSLua::Result r = convert("integer a = 1;\n"
-                                              "integer b = 2;\n"
-                                              "\n"
-                                              "\n"
-                                              "integer c = 3;\n"
-                                              "integer preCheck(key avatar) {\n"
-                                              "\n"
-                                              "    // only allow my owner to request contents\n"
-                                              "    if (avatar != llGetOwner()) return FALSE;\n"
-                                              "\n"
-                                              "    return TRUE;\n"
-                                              "}\n"
-                                              "default {\n"
-                                              "    touch_start(integer n) {\n"
-                                              "        if (preCheck(llDetectedKey(0))) {\n"
-                                              "            llOwnerSay((string)a);\n"
-                                              "\n"
-                                              "            llOwnerSay((string)b);\n"
-                                              "\n"
-                                              "        }\n"
-                                              "\n"
-                                              "        // said apart\n"
-                                              "        llOwnerSay((string)c);\n"
-                                              "    }\n"
-                                              "}\n");
-        ensure("the globals: " + r.text, has(r, "local a = 1\nlocal b = 2\n\nlocal c = 3\n"));
-        ensure("Tapple's: " + r.text, has(r, "    -- only allow my owner to request contents\n    if avatar ~= ll.GetOwner() then return false end\n\n    return true\nend"));
-        ensure("none at a block's start: " + r.text, has(r, "(avatar)\n    -- only allow"));
-        ensure("in a block, none at its end: " + r.text, has(r, "        print(tostring(a))\n\n        print(tostring(b))\n    end\n"));
-        ensure("one over a comment kept apart: " + r.text, has(r, "    end\n\n    -- said apart\n    print(tostring(c))\n"));
-        ensure("never two: " + r.text, !has(r, "\n\n\n"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer a = 1;\n"
+                                                        "integer b = 2;\n"
+                                                        "\n"
+                                                        "\n"
+                                                        "integer c = 3;\n"
+                                                        "integer preCheck(key avatar) {\n"
+                                                        "\n"
+                                                        "    // only allow my owner to request contents\n"
+                                                        "    if (avatar != llGetOwner()) return FALSE;\n"
+                                                        "\n"
+                                                        "    return TRUE;\n"
+                                                        "}\n"
+                                                        "default {\n"
+                                                        "    touch_start(integer n) {\n"
+                                                        "        if (preCheck(llDetectedKey(0))) {\n"
+                                                        "            llOwnerSay((string)a);\n"
+                                                        "\n"
+                                                        "            llOwnerSay((string)b);\n"
+                                                        "\n"
+                                                        "        }\n"
+                                                        "\n"
+                                                        "        // said apart\n"
+                                                        "        llOwnerSay((string)c);\n"
+                                                        "    }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("the globals");
+        CHECK(has(r, "local a = 1\nlocal b = 2\n\nlocal c = 3\n"));
+        UNSCOPED_INFO("Tapple's");
+        CHECK(has(r, "    -- only allow my owner to request contents\n    if avatar ~= ll.GetOwner() then return false end\n\n    return true\nend"));
+        UNSCOPED_INFO("none at a block's start");
+        CHECK(has(r, "(avatar)\n    -- only allow"));
+        UNSCOPED_INFO("in a block, none at its end");
+        CHECK(has(r, "        print(tostring(a))\n\n        print(tostring(b))\n    end\n"));
+        UNSCOPED_INFO("one over a comment kept apart");
+        CHECK(has(r, "    end\n\n    -- said apart\n    print(tostring(c))\n"));
+        UNSCOPED_INFO("never two");
+        CHECK_FALSE(has(r, "\n\n\n"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<88>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: table braces spaced as asked as the formatter spaces them", "[ALLSLToSLua]")
     {
-        set_test_name("tables and table types spaced inside their braces as asked, as the formatter spaces them: StyLua's by default, "
-                      "Tapple's line; none where asked; an interpolated string's braces and {} never");
         const std::string lsl = "list gTwo = [1, 2,\n    3];\n"
                                 "default {\n"
                                 "    state_entry() { state two; }\n"
@@ -3034,20 +3833,35 @@ namespace tut
         ALLSLToSLua::Options typed;
         typed.types                 = true;
         const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, typed);
-        ensure("Tapple's: " + r.text, r.converted && has(r, "local params: { any } = ll.ParseStringKeepNulls(msg, { \"\\n\" }, {})"));
-        ensure("a rule table: " + r.text, has(r, "ll.SetPrimMediaParams(0, { auto_play = true, whitelist = { \"a.com\", \"b.com\" } })"));
-        ensure("the states' type: " + r.text, has(r, "local states: { [string]: { [string]: (...any) -> () } } = {}"));
-        ensure("over lines: " + r.text, has(r, "local gTwo: { any } = { 1, 2,\n    3 }\n"));
-        ensure("an interpolated string's: " + r.text, has(r, "`n={#params} {ll.DumpList2String({ vector(1, 2, 3) }, \"\")}`"));
-        checksClean(r);
+        CAPTURE(r.text);
+        {
+            INFO("Tapple's");
+            CHECK(r.converted);
+            CHECK(has(r, "local params: { any } = ll.ParseStringKeepNulls(msg, { \"\\n\" }, {})"));
+        }
+        UNSCOPED_INFO("a rule table");
+        CHECK(has(r, "ll.SetPrimMediaParams(0, { auto_play = true, whitelist = { \"a.com\", \"b.com\" } })"));
+        UNSCOPED_INFO("the states' type");
+        CHECK(has(r, "local states: { [string]: { [string]: (...any) -> () } } = {}"));
+        UNSCOPED_INFO("over lines");
+        CHECK(has(r, "local gTwo: { any } = { 1, 2,\n    3 }\n"));
+        UNSCOPED_INFO("an interpolated string's");
+        CHECK(has(r, "`n={#params} {ll.DumpList2String({ vector(1, 2, 3) }, \"\")}`"));
+        require_checks_clean(r);
 
         typed.braceSpaces              = false;
         const ALLSLToSLua::Result none = ALLSLToSLua::convert(lsl, typed);
-        ensure("none: " + none.text, none.converted && has(none, "local params: {any} = ll.ParseStringKeepNulls(msg, {\"\\n\"}, {})") &&
-                                         has(none, "ll.SetPrimMediaParams(0, {auto_play = true, whitelist = {\"a.com\", \"b.com\"}})") &&
-                                         has(none, "local states: {[string]: {[string]: (...any) -> ()}} = {}") &&
-                                         has(none, "local gTwo: {any} = {1, 2,\n    3}\n") && !has(none, "{ "));
-        checksClean(none);
+        CAPTURE(none.text);
+        {
+            INFO("none");
+            CHECK(none.converted);
+            CHECK(has(none, "local params: {any} = ll.ParseStringKeepNulls(msg, {\"\\n\"}, {})"));
+            CHECK(has(none, "ll.SetPrimMediaParams(0, {auto_play = true, whitelist = {\"a.com\", \"b.com\"}})"));
+            CHECK(has(none, "local states: {[string]: {[string]: (...any) -> ()}} = {}"));
+            CHECK(has(none, "local gTwo: {any} = {1, 2,\n    3}\n"));
+            CHECK_FALSE(has(none, "{ "));
+        }
+        require_checks_clean(none);
 
         // As the formatter would leave them, either way.
         for (bool spaces : { true, false })
@@ -3056,15 +3870,13 @@ namespace tut
             formatter.lua                  = true;
             formatter.braceSpaces          = spaces;
             const ALLSLToSLua::Result same = spaces ? r : none;
-            ensure_equals(spaces ? "formatted, spaced" : "formatted, none", ALScriptFormatter::format(same.text, formatter), same.text);
+            CAPTURE(spaces);
+            REQUIRE(ALScriptFormatter::format(same.text, formatter) == same.text);
         }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<89>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: converted SLua is as format on save leaves it with either brace spacing", "[ALLSLToSLua]")
     {
-        set_test_name("converted SLua is as format on save leaves it: a comment after an unbraced body trails it, after the line that "
-                      "opens it where the body is empty; what the LSL lined up, lined up; one line break at the end; either brace spacing");
         const std::string lsl = "integer CHANNEL    = 1;    // channel\n"
                                 "integer OWNER_ONLY = 0;    // owner\n"
                                 "float   TIMEOUT    = 2.5;  // seconds\n"
@@ -3095,34 +3907,218 @@ namespace tut
                                 "}\n";
         for (bool spaces : { true, false })
         {
+            CAPTURE(spaces);
             ALLSLToSLua::Options options;
             options.braceSpaces         = spaces;
             const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, options);
-            ensure("converted", r.converted);
-            ensure("each after its own: " + r.text, has(r, "        print(\"a\") -- after a\n    elseif") && has(r, "        print(\"b\") -- after b\n    else") &&
-                                                       has(r, "        print(\"c\") -- after c\n    end"));
-            ensure("an empty body's, after the line that opens it: " + r.text, has(r, " == 2 then -- an empty body\n    else\n        print(\"f\") -- after f\n"));
-            ensure("a loop's body's: " + r.text, has(r, "        n -= 1 -- after the step\n    end"));
-            ensure("between a block and its else, over what the else runs: " + r.text, has(r, "    else\n        -- over the else\n        print(\"e\")\n"));
-            ensure("lined up: " + r.text, has(r, "local CHANNEL    = 1   -- channel\nlocal OWNER_ONLY = 0   -- owner\nlocal TIMEOUT    = 2.5 -- seconds\n"));
-            ensure("one line break at the end: " + r.text, r.text.size() > 2 && r.text.compare(r.text.size() - 2, 2, "\n\n") != 0 && r.text.back() == '\n');
+            CAPTURE(r.text);
+            REQUIRE(r.converted);
+            {
+                INFO("each after its own");
+                REQUIRE(has(r, "        print(\"a\") -- after a\n    elseif"));
+                REQUIRE(has(r, "        print(\"b\") -- after b\n    else"));
+                REQUIRE(has(r, "        print(\"c\") -- after c\n    end"));
+            }
+            UNSCOPED_INFO("an empty body's, after the line that opens it");
+            REQUIRE(has(r, " == 2 then -- an empty body\n    else\n        print(\"f\") -- after f\n"));
+            UNSCOPED_INFO("a loop's body's");
+            REQUIRE(has(r, "        n -= 1 -- after the step\n    end"));
+            UNSCOPED_INFO("between a block and its else, over what the else runs");
+            REQUIRE(has(r, "    else\n        -- over the else\n        print(\"e\")\n"));
+            UNSCOPED_INFO("lined up");
+            REQUIRE(has(r, "local CHANNEL    = 1   -- channel\nlocal OWNER_ONLY = 0   -- owner\nlocal TIMEOUT    = 2.5 -- seconds\n"));
+            {
+                INFO("one line break at the end");
+                REQUIRE(r.text.size() > 2);
+                REQUIRE(r.text.compare(r.text.size() - 2, 2, "\n\n") != 0);
+                REQUIRE(r.text.back() == '\n');
+            }
             ALScriptFormatter::Options formatter;
             formatter.lua         = true;
             formatter.braceSpaces = spaces;
-            ensure_equals(spaces ? "formatted, spaced" : "formatted, none", ALScriptFormatter::format(r.text, formatter), r.text);
-            checksClean(r);
+            REQUIRE(ALScriptFormatter::format(r.text, formatter) == r.text);
+            require_checks_clean(r);
         }
     }
 
-    template<> template<>
-    void allsltoslua_object::test<95>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: the //* toggle with a word after its star as two SLua line comments", "[ALLSLToSLua]")
     {
-        set_test_name("a comment after an unbraced body, on the line it ends, trails the statement that ends that line: a then's, an "
-                      "elseif's, an else's, a loop's; an empty body's the line that opens it; a one-line if's, the whole if");
-        const ALLSLToSLua::Result r = convert("default { touch_start(integer n) {\n"
-                                              "    integer a; integer b;\n"
-                                              "    if (n == 1)\n"
-                                              "        llOwnerSay(\"a\"); // after a\n"
+        ALLSLToSLua::Options options;
+        options.types               = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert("//* OVERRIDE\n"
+                                                           "integer allowAttachedAO;\n"
+                                                           "//*/\n"
+                                                           "default { state_entry() { if (allowAttachedAO) llOwnerSay(\"on\"); } }\n",
+                                                           options);
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        UNSCOPED_INFO("the toggle");
+        CHECK(has(r, "\n---[[ OVERRIDE\nlocal allowAttachedAO: boolean = false\n--]]\n"));
+        UNSCOPED_INFO("the opener a line comment");
+        CHECK(require_comment_at(r.text, "---[[") == std::string("---[[ OVERRIDE"));
+        UNSCOPED_INFO("the closer one");
+        CHECK(require_comment_at(r.text, "--]]") == std::string("--]]"));
+        UNSCOPED_INFO("turned off");
+        CHECK(require_toggled(r.text, "---[[") == std::string("--[[ OVERRIDE\nlocal allowAttachedAO: boolean = false\n--]]"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: half a toggle: an opener only before a closer and openers share it", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result lone = require_converted("integer a;\n"
+                                                           "//* nothing closes this\n"
+                                                           "integer b;\n"
+                                                           "default { state_entry() { llOwnerSay((string)(a + b)); } }\n");
+        CAPTURE(lone.text);
+        {
+            INFO("a lone opener a comment with a star");
+            CHECK(has(lone, "\n--* nothing closes this\nlocal b = 0\n"));
+            CHECK_FALSE(has(lone, "---["));
+        }
+        require_checks_clean(lone);
+
+        const ALLSLToSLua::Result r = require_converted("//* not one */\n"
+                                                        "//**************\n"
+                                                        "integer c = 1;\n"
+                                                        "//* one\n"
+                                                        "integer d = 2;\n"
+                                                        "//* two\n"
+                                                        "integer e = 3;\n"
+                                                        "//*/ // both\n"
+                                                        "//*/\n"
+                                                        "default { state_entry() { llOwnerSay((string)(c + d + e)); } }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("closed on its line");
+        CHECK(has(r, "\n--* not one */\n"));
+        UNSCOPED_INFO("a rule of stars");
+        CHECK(has(r, "\n--**************\n"));
+        UNSCOPED_INFO("two openers and a closer, then one alone");
+        CHECK(has(r, "\n---[[ one\nlocal d = 2\n---[[ two\nlocal e = 3\n--]] -- both\n--]]\n"));
+        UNSCOPED_INFO("the first off");
+        CHECK(require_toggled(r.text, "---[[ one") == std::string("--[[ one\nlocal d = 2\n---[[ two\nlocal e = 3\n--]]"));
+        UNSCOPED_INFO("the second off");
+        CHECK(require_toggled(r.text, "---[[ two") == std::string("--[[ two\nlocal e = 3\n--]]"));
+        std::string off = r.text;
+        off.erase(off.find("---[[ one"), 1);
+        UNSCOPED_INFO("the closer's own comment after it, off");
+        CHECK(require_comment_at(off, "-- both") == std::string("-- both"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: the toggle the other way round as a block comment SLua can turn on", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("/* OVERRIDE\n"
+                                                        "integer allowAttachedAO;\n"
+                                                        "//*/\n"
+                                                        "//* A\n"
+                                                        "integer x = 1;\n"
+                                                        "/* B\n"
+                                                        "integer y = 2;\n"
+                                                        "//*/\n"
+                                                        "default { state_entry() { llOwnerSay((string)x); } }\n");
+        UNSCOPED_INFO("one block comment");
+        CHECK(require_comment_at(r.text, "--[[ OVERRIDE") == std::string("--[[ OVERRIDE\ninteger allowAttachedAO;\n--]]"));
+        // What it holds stays LSL: nothing says it is code.
+        std::string on = r.text;
+        on.insert(on.find("--[[ OVERRIDE"), "-");
+        UNSCOPED_INFO("turned on, the opener a line comment");
+        CHECK(require_comment_at(on, "---[[ OVERRIDE") == std::string("---[[ OVERRIDE"));
+        UNSCOPED_INFO("and the closer");
+        CHECK(require_comment_at(on, "--]]") == std::string("--]]"));
+        UNSCOPED_INFO("the opener over code off, to the closer of the one after it");
+        CHECK(require_toggled(r.text, "---[[ A") ==
+              std::string("--[[ A\nlocal x = 1\n\n--[[ B\ninteger y = 2;\n--]]"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a toggle's level is the fewest =s that nothing inside closes", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("//* OVERRIDE\n"
+                                                        "string s = \"]]\";\n"
+                                                        "//*/\n"
+                                                        "default { state_entry() { llOwnerSay(s); } }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("past a string's ]]");
+        CHECK(has(r, "\n---[=[ OVERRIDE\nlocal s = \"]]\"\n--]=]\n"));
+        CHECK(require_toggled(r.text, "---[=[") == std::string("--[=[ OVERRIDE\nlocal s = \"]]\"\n--]=]"));
+        require_checks_clean(r);
+
+        const ALLSLToSLua::Result shared = require_converted("//* A\n"
+                                                             "integer x = 1; /* one */\n"
+                                                             "/* B\n"
+                                                             "string s = \"]]\";\n"
+                                                             "//*/\n"
+                                                             "default { state_entry() { llOwnerSay((string)x); } }\n");
+        CAPTURE(shared.text);
+        {
+            INFO("one level for the pair");
+            CHECK(has(shared, "\n---[=[ A\nlocal x = 1 --[[ one ]]\n"));
+            CHECK(has(shared, "\n--[=[ B\nstring s = \"]]\";\n--]=]\n"));
+        }
+        UNSCOPED_INFO("the opener off");
+        CHECK(require_toggled(shared.text, "---[=[ A") ==
+              std::string("--[=[ A\nlocal x = 1 --[[ one ]]\n\n--[=[ B\nstring s = \"]]\";\n--]=]"));
+        require_checks_clean(shared);
+
+        std::string every = "// ";
+        for (char c = 1; c < ' '; ++c)
+        {
+            if (c != '\t' && c != '\n' && c != '\r')
+            {
+                every += c;
+            }
+        }
+        const ALLSLToSLua::Result unmarked = require_converted(every + "\ninteger y;\n//* A\ninteger x = 1;\n//*/\n"
+                                                                       "default { state_entry() { llOwnerSay((string)(x + y)); } }\n");
+        CAPTURE(unmarked.text);
+        UNSCOPED_INFO("paired still");
+        CHECK(has(unmarked, "\n---[[ A\nlocal x = 1\n--]]\n"));
+        UNSCOPED_INFO("no byte of its own left in");
+        CHECK(count(unmarked, std::string(1, '\x01')) == size_t(1));
+        require_checks_clean(unmarked);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a toggle after code or in a handler or at the top above the helpers", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    integer a = 1; //* A\n"
+                                              "    llOwnerSay((string)a); //*/\n"
+                                              "    //* DEBUG\n"
+                                              "    llOwnerSay(\"debug\");\n"
+                                              "    //*/\n"
+                                              "    llOwnerSay(\"done\");\n"
+                                              "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("after code");
+        CHECK(has(r, "\nlocal a = 1 ---[[ A\nprint(tostring(a)) --]]\n"));
+        UNSCOPED_INFO("off from it");
+        CHECK(require_toggled(r.text, "---[[ A") == std::string("--[[ A\nprint(tostring(a)) --]]"));
+        UNSCOPED_INFO("in a handler");
+        CHECK(has(r, "\n---[[ DEBUG\nprint(\"debug\")\n--]]\nprint(\"done\")\n"));
+        CHECK(require_toggled(r.text, "---[[ DEBUG") == std::string("--[[ DEBUG\nprint(\"debug\")\n--]]"));
+        require_checks_clean(r);
+
+        const ALLSLToSLua::Result top = require_converted("//* DEBUG\n"
+                                                          "\n"
+                                                          "vector v = <1, 2, 3>;\n"
+                                                          "//*/\n"
+                                                          "default { state_entry() { llOwnerSay((string)llVecNorm(v)); } }\n");
+        CAPTURE(top.text);
+        {
+            INFO("the helper over it");
+            CHECK(has(top, "local function vecNorm("));
+            CHECK(top.text.find("local function vecNorm(") < top.text.find("---[[ DEBUG"));
+        }
+        CHECK(require_toggled(top.text, "---[[ DEBUG") == std::string("--[[ DEBUG\nlocal v = vector(1, 2, 3)\n--]]"));
+        require_checks_clean(top);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a comment after an unbraced body trails the statement ending its line", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    integer a; integer b;\n"
+                                                        "    if (n == 1)\n"
+                                                        "        llOwnerSay(\"a\"); // after a\n"
                                               "    else if (n == 2)\n"
                                               "        llOwnerSay(\"b\"); // after b\n"
                                               "    else\n"
@@ -3137,47 +4133,557 @@ namespace tut
                                               "    while (a) ; // an empty loop\n"
                                               "    if (n == 5) llOwnerSay(\"h\"); // after h\n"
                                               "} }\n");
-        ensure("a then's, an elseif's, an else's: " + r.text,
-               has(r, "    if n == 1 then\n        print(\"a\") -- after a\n    elseif n == 2 then\n        print(\"b\") -- after b\n"
+        CAPTURE(r.text);
+        UNSCOPED_INFO("a then's, an elseif's, an else's");
+        CHECK(has(r, "    if n == 1 then\n        print(\"a\") -- after a\n    elseif n == 2 then\n        print(\"b\") -- after b\n"
                       "    else\n        print(\"c\") -- after c\n    end\n"));
-        ensure("an empty body's, the line that opens it: " + r.text,
-               has(r, " == 2 then -- empty\n    elseif b == 2 then -- empty too\n    else\n        a = true -- after a = 2\n    end\n"));
-        ensure("an if on one line inside another: " + r.text, has(r, "        if b ~= 0 then print(\"x\") end -- inner, one line\n"));
-        ensure("a loop's body's: " + r.text, has(r, "        n -= 1 -- after the step\n    end\n") && has(r, "    while a do -- an empty loop\n    end\n"));
-        ensure("a one-line if, as before: " + r.text, has(r, "    if n == 5 then print(\"h\") end -- after h\n"));
-        checksClean(r);
+        UNSCOPED_INFO("an empty body's, the line that opens it");
+        CHECK(has(r, " == 2 then -- empty\n    elseif b == 2 then -- empty too\n    else\n        a = true -- after a = 2\n    end\n"));
+        UNSCOPED_INFO("an if on one line inside another");
+        CHECK(has(r, "        if b ~= 0 then print(\"x\") end -- inner, one line\n"));
+        {
+            INFO("a loop's body's");
+            CHECK(has(r, "        n -= 1 -- after the step\n    end\n"));
+            CHECK(has(r, "    while a do -- an empty loop\n    end\n"));
+        }
+        UNSCOPED_INFO("a one-line if, as before");
+        CHECK(has(r, "    if n == 5 then print(\"h\") end -- after h\n"));
+        require_checks_clean(r);
     }
 
-    template<> template<>
-    void allsltoslua_object::test<96>()
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a float cut to an integer is math.modf bracketed where its values spread", "[ALLSLToSLua]")
     {
-        set_test_name("a float cut to an integer is math.modf's first value: bare where only its first is read anyway -- an operand, all "
-                      "of a value assigned -- and kept to it by brackets where its values would spread");
-        const ALLSLToSLua::Result r = convert("integer menuChannel;\n"
-                                              "vector gV;\n"
-                                              "integer cut(float f) { return (integer)f; }\n"
-                                              "default { touch_start(integer n) {\n"
-                                              "    float f = llFrand(10);\n"
-                                              "    menuChannel = (integer)llFrand(1000) - 10000;\n"
-                                              "    integer x = (integer)f;\n"
-                                              "    x = (integer)f;\n"
-                                              "    x += (integer)f;\n"
-                                              "    x = -(integer)f;\n"
-                                              "    if ((integer)f == 3) llOwnerSay((string)((integer)f));\n"
-                                              "    llOwnerSay(llList2CSV([(integer)f]));\n"
-                                              "    gV.z = (integer)f;\n"
-                                              "    llOwnerSay((string)(cut(f) + x + menuChannel) + (string)gV);\n"
-                                              "} }\n");
-        ensure("Tapple's: " + r.text, has(r, "menuChannel = math.modf(ll.Frand(1000)) - 10000\n"));
-        ensure("a local: " + r.text, has(r, "local x = math.modf(f)\n"));
-        ensure("assigned: " + r.text, has(r, "    x = math.modf(f)\n"));
-        ensure("added: " + r.text, has(r, "    x += math.modf(f)\n"));
-        ensure("its negative: " + r.text, has(r, "    x = -math.modf(f)\n"));
-        ensure("compared: " + r.text, has(r, "if math.modf(f) == 3 then"));
-        ensure("an argument: " + r.text, has(r, "print(tostring((math.modf(f))))"));
-        ensure("a list's item: " + r.text, has(r, "{ (math.modf(f)) }"));
-        ensure("returned: " + r.text, has(r, "return (math.modf(f))"));
-        ensure("a vector's part, an argument: " + r.text, has(r, "gV = vector(gV.x, gV.y, (math.modf(f)))"));
-        checksClean(r);
+        const ALLSLToSLua::Result r = require_converted("integer menuChannel;\n"
+                                                        "vector gV;\n"
+                                                        "integer cut(float f) { return (integer)f; }\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    float f = llFrand(10);\n"
+                                                        "    menuChannel = (integer)llFrand(1000) - 10000;\n"
+                                                        "    integer x = (integer)f;\n"
+                                                        "    x = (integer)f;\n"
+                                                        "    x += (integer)f;\n"
+                                                        "    x = -(integer)f;\n"
+                                                        "    if ((integer)f == 3) llOwnerSay((string)((integer)f));\n"
+                                                        "    llOwnerSay(llList2CSV([(integer)f]));\n"
+                                                        "    gV.z = (integer)f;\n"
+                                                        "    llOwnerSay((string)(cut(f) + x + menuChannel) + (string)gV);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("Tapple's");
+        CHECK(has(r, "menuChannel = math.modf(ll.Frand(1000)) - 10000\n"));
+        UNSCOPED_INFO("a local");
+        CHECK(has(r, "local x = math.modf(f)\n"));
+        UNSCOPED_INFO("assigned");
+        CHECK(has(r, "    x = math.modf(f)\n"));
+        UNSCOPED_INFO("added");
+        CHECK(has(r, "    x += math.modf(f)\n"));
+        UNSCOPED_INFO("its negative");
+        CHECK(has(r, "    x = -math.modf(f)\n"));
+        UNSCOPED_INFO("compared");
+        CHECK(has(r, "if math.modf(f) == 3 then"));
+        UNSCOPED_INFO("an argument");
+        CHECK(has(r, "print(tostring((math.modf(f))))"));
+        UNSCOPED_INFO("a list's item");
+        CHECK(has(r, "{ (math.modf(f)) }"));
+        UNSCOPED_INFO("returned");
+        CHECK(has(r, "return (math.modf(f))"));
+        UNSCOPED_INFO("a vector's part, an argument");
+        CHECK(has(r, "gV = vector(gV.x, gV.y, (math.modf(f)))"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a local whose Luau name would hide another is named apart", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("f1(string f2) {\n"
+                                                        "    llOwnerSay(f2);\n"
+                                                        "    f2();\n"
+                                                        "}\n"
+                                                        "\n"
+                                                        "f2() {\n"
+                                                        "    llOwnerSay(\"world\");\n"
+                                                        "}\n"
+                                                        "\n"
+                                                        "default { state_entry() {\n"
+                                                        "    f1(\"hello\");\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("Tapple's, the parameter named apart");
+        CHECK(has(r, "local function f1(f2_)\n    print(f2_)\n    f2()\nend\n"));
+        {
+            INFO("the function as it was");
+            CHECK(has(r, "local f2\n"));
+            CHECK(has(r, "function f2()\n"));
+        }
+        require_checks_clean(r);
+
+        const ALLSLToSLua::Result detected = require_converted("integer detected() {\n"
+                                                               "    return 5;\n"
+                                                               "}\n"
+                                                               "\n"
+                                                               "default\n"
+                                                               "{\n"
+                                                               "    touch_start(integer total_number)\n"
+                                                               "    {\n"
+                                                               "        string detected = \"fritz\";\n"
+                                                               "\n"
+                                                               "        llOwnerSay(llDetectedName(0));\n"
+                                                               "        llOwnerSay(detected);\n"
+                                                               "        llOwnerSay((string)(detected() * detected()));\n"
+                                                               "    }\n"
+                                                               "}\n");
+        CAPTURE(detected.text);
+        UNSCOPED_INFO("Tapple's detected, the function marked");
+        CHECK(has(detected, "local function detected_()"));
+        {
+            INFO("the local apart from it");
+            CHECK(has(detected, "local detected_2 = \"fritz\""));
+            CHECK(has(detected, "print(detected_2)"));
+        }
+        UNSCOPED_INFO("the function called");
+        CHECK(has(detected, "print(tostring(detected_() * detected_()))"));
+        require_checks_clean(detected);
+
+        const ALLSLToSLua::Result own = require_converted("integer fact(integer fact) {\n"
+                                                          "    if (fact <= 1) return 1;\n"
+                                                          "    return fact * fact(fact - 1);\n"
+                                                          "}\n"
+                                                          "string table = \"t\";\n"
+                                                          "string table_ = \"u\";\n"
+                                                          "f3(string f2) { llOwnerSay(f2); }\n"
+                                                          "f2() { llOwnerSay(\"f2\"); }\n"
+                                                          "f4() { f2(); string f2 = \"x\"; llOwnerSay(f2); }\n"
+                                                          "default { touch_start(integer n) {\n"
+                                                          "    integer was = 1;\n"
+                                                          "    integer k = was++ + was;\n"
+                                                          "    llOwnerSay(table + table_ + (string)(fact(n) + k));\n"
+                                                          "    f3(\"a\"); f4();\n"
+                                                          "} }\n");
+        CAPTURE(own.text);
+        {
+            INFO("a parameter named as its function");
+            CHECK(has(own, "local function fact(fact_)"));
+            CHECK(has(own, "return fact_ * fact(fact_ - 1)"));
+        }
+        {
+            INFO("a global the mark gave another's name");
+            CHECK(has(own, "local table_2 = \"t\"\n"));
+            CHECK(has(own, "local table_ = \"u\"\n"));
+            CHECK(has(own, "print(`{table_2}{table_}{fact(n) + k}`)"));
+        }
+        UNSCOPED_INFO("nothing hidden, nothing renamed");
+        CHECK(has(own, "local function f3(f2)\n    print(f2)\n"));
+        UNSCOPED_INFO("a call before the local, not in its reach");
+        CHECK(has(own, "    f2()\n    local f2 = \"x\"\n    print(f2)\n"));
+        UNSCOPED_INFO("what a step was, under a name the script does not have");
+        CHECK(has(own, "(function() local was2 = was; was += 1 return was2 end)() + was"));
+        require_checks_clean(own);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a state's handlers kept apart by blank lines only where the LSL had them", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() { state collect; } }\n"
+                                                        "state collect {\n"
+                                                        "    changed(integer change) {\n"
+                                                        "        if (change & CHANGED_INVENTORY) {\n"
+                                                        "            llOwnerSay(\"c\");\n"
+                                                        "        }\n"
+                                                        "    }\n"
+                                                        "\n"
+                                                        "    on_rez(integer param) {\n"
+                                                        "        llOwnerSay(\"r\");\n"
+                                                        "    }\n"
+                                                        "    touch_start(integer n) { llOwnerSay(\"t\"); }\n"
+                                                        "\n"
+                                                        "    // listening\n"
+                                                        "    listen(integer c, string name, key id, string msg) { llOwnerSay(msg); }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("Tapple's, apart");
+        CHECK(has(r, "        end\n    end,\n\n    on_rez = function(param)\n"));
+        UNSCOPED_INFO("together");
+        CHECK(has(r, "        print(\"r\")\n    end,\n    touch_start = function(detected)\n"));
+        UNSCOPED_INFO("one blank line over a comment over it");
+        CHECK(has(r, "    end,\n\n    -- listening\n    listen = function("));
+        UNSCOPED_INFO("none at the table's top");
+        CHECK(has(r, "states.collect = {\n    changed = function(change)\n"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: LSL's right-side-first order noted only where it could show", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("key gSender;\n"
+                                                        "string gCache;\n"
+                                                        "string myInfo() { return (string)llGetKey(); }\n"
+                                                        "string say() { llOwnerSay(\"x\"); return \"y\"; }\n"
+                                                        "string cached() { return gCache; }\n"
+                                                        "string fill() { gCache = \"z\"; return gCache; }\n"
+                                                        "string other() { return \"o\"; }\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    llOwnerSay(\"activeRequestor: \" + llKey2Name(gSender) + \"; llGetKey: \" + llKey2Name(myInfo()));\n"
+                                                        "    llOwnerSay(llKey2Name(gSender) + say());\n"
+                                                        "    llOwnerSay(cached() + fill());\n"
+                                                        "    llOwnerSay(other() + fill());\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        {
+            INFO("Tapple's, two sides that only read");
+            CHECK_FALSE(noted(r, "SluaRightFirst"));
+            CHECK_FALSE(noted(r, "SluaRightFirstWorld", "myInfo()"));
+        }
+        {
+            INFO("a call that changes the world, named with the other");
+            CHECK(noted(r, "SluaRightFirstWorld", "say()"));
+            CHECK(has(r, "-- LSL: LSL ran the right side of this before the left, and Luau runs the left first: say() may change what "
+                      "llKey2Name() does or finds outside the script.\n    print(ll.Key2Name(gSender) .. say())"));
+        }
+        {
+            INFO("a call that sets what the other's reads");
+            CHECK(noted(r, "SluaRightFirstCall", "fill()"));
+            CHECK(has(r, "fill() sets gCache, which the other side reads or sets too.\n    print(cached() .. fill())"));
+        }
+        UNSCOPED_INFO("noted twice, no more");
+        CHECK(count(r, "LSL ran the right side") == 2);
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: with keyTextAny off text for a key passes bare and the checker marks it", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "key inventorySender;\n"
+                                "string myInfo() { return (string)llGetKey(); }\n"
+                                "default { touch_start(integer n) {\n"
+                                "    llOwnerSay(\"activeRequestor: \" + llKey2Name(inventorySender) + \"; llGetKey: \" + llKey2Name(myInfo()));\n"
+                                "    llOwnerSay(llKey2Name(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"));\n"
+                                "} }\n";
+        ALLSLToSLua::Options o;
+        o.keyTextAny                = false;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        CHECK(r.converted);
+        {
+            INFO("as it is");
+            CHECK(has(r, "ll.Key2Name(myInfo()))"));
+            CHECK_FALSE(has(r, "myInfo() :: any"));
+        }
+        UNSCOPED_INFO("a UUID written out, still a uuid");
+        CHECK(has(r, "ll.Key2Name(uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\"))"));
+        {
+            INFO("the note with the ways");
+            CHECK(noted(r, "SluaKeyAsTextBare"));
+            CHECK_FALSE(noted(r, "SluaKeyAsText"));
+            CHECK(has(r, "`:: any` quiets it, uuid() stops the script on text that is no UUID"));
+        }
+        // What the checker marks as an error, each by its line.
+        const auto marked = [&](const std::string& slua) {
+            std::string said;
+            for (const ALScriptProblem& p : service.check(slua))
+            {
+                said += p.severity == ALScriptProblem::Severity::Error ? llformat("[%d] %s\n", p.line + 1, p.message.c_str()) : std::string();
+            }
+            return said;
+        };
+        // The line the text for a key is on, as marked says it.
+        const auto lineOf = [](const std::string& slua) {
+            const size_t at = slua.find("ll.Key2Name(myInfo())");
+            CAPTURE(slua);
+            REQUIRE(at != std::string::npos);
+            return llformat("[%d] ", static_cast<S32>(std::count(slua.begin(), slua.begin() + at, '\n')) + 1);
+        };
+        // Nonstrict, as the grid has it, takes an untyped function's answer
+        // for anything; typed, as Tapple converts, or strict, it is text.
+        // The old solver's: the new one's nonstrict marks only what must
+        // fail, and its strict cannot yet take LLEvents:on's handlers.
+        if (!newSolver)
+        {
+            o.types                         = true;
+            const ALLSLToSLua::Result typed = ALLSLToSLua::convert(lsl, o);
+            const std::string         said  = marked(typed.text);
+            {
+                INFO("typed, the text for a key marked, alone");
+                CAPTURE(said, typed.text);
+                CHECK(said.rfind(lineOf(typed.text), 0) == 0);
+                CHECK(std::count(said.begin(), said.end(), '\n') == 1);
+            }
+            const std::string strict = "--!strict\n" + r.text;
+            const std::string loud   = marked(strict);
+            {
+                INFO("strict, the same");
+                CAPTURE(loud, strict);
+                CHECK(loud.rfind(lineOf(strict), 0) == 0);
+                CHECK(std::count(loud.begin(), loud.end(), '\n') == 1);
+            }
+        }
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key given no text holds text as LSL's did; a uuid key compared as one", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("key gUser = \"\";\n"
+                                                        "default {\n"
+                                                        "    state_entry() {\n"
+                                                        "        key k = \"\";\n"
+                                                        "        llOwnerSay((string)(k == \"\"));\n"
+                                                        "    }\n"
+                                                        "    touch_start(integer n) {\n"
+                                                        "        if (gUser) llOwnerSay(\"busy\");\n"
+                                                        "        gUser = llDetectedKey(0);\n"
+                                                        "        llMessageLinked(LINK_SET, 0, \"\", gUser);\n"
+                                                        "        gUser = \"\";\n"
+                                                        "        llMessageLinked(LINK_SET, 0, \"\", gUser);\n"
+                                                        "        llOwnerSay(\"user: \" + (string)gUser);\n"
+                                                        "    }\n"
+                                                        "    link_message(integer s, integer num, string m, key id) {\n"
+                                                        "        if (id == \"\") llOwnerSay(\"nobody\");\n"
+                                                        "        if (id) llOwnerSay(\"someone\");\n"
+                                                        "        llOwnerSay(llList2CSV([id, gUser]));\n"
+                                                        "        key d;\n"
+                                                        "        if (d == \"\") llOwnerSay(\"no key yet\");\n"
+                                                        "        if (\"\" != d) llOwnerSay(\"some\");\n"
+                                                        "        if (d == \"a2e76fcd-9360-4f6d-a924-938f923df11d\") llOwnerSay(\"that one\");\n"
+                                                        "        if (d == \"none\") llOwnerSay(\"text\");\n"
+                                                        "        if (NULL_KEY != \"\") llOwnerSay(\"NULL_KEY has text\");\n"
+                                                        "    }\n"
+                                                        "}\n");
+        CAPTURE(r.text);
+        {
+            INFO("Tapple's, text");
+            CHECK(has(r, "local k = \"\""));
+            CHECK(has(r, "print(tostring(if k == \"\" then 1 else 0))"));
+        }
+        {
+            INFO("a global given no text, text");
+            CHECK(has(r, "local gUser = \"\""));
+            CHECK(has(r, "gUser = tostring(detected[1]:getKey())"));
+        }
+        UNSCOPED_INFO("sent as text, no text and all");
+        CHECK(count(r, "ll.MessageLinked(LINK_SET, 0, \"\", gUser)") == 2);
+        UNSCOPED_INFO("made text as it is");
+        CHECK(has(r, "print(\"user: \" .. gUser)"));
+        UNSCOPED_INFO("its truth as LSL's key's");
+        CHECK(has(r, "if (touuid(gUser) or NULL_KEY).istruthy then"));
+        {
+            INFO("the id, text");
+            CHECK(has(r, "if id == \"\" then"));
+            CHECK(has(r, "if (touuid(id) or NULL_KEY).istruthy then"));
+        }
+        {
+            INFO("keys held as text, in a list as text");
+            CHECK(has(r, "{ id, gUser }"));
+            CHECK_FALSE(has(r, "{ uuid("));
+        }
+        {
+            INFO("a uuid against no text, a uuid");
+            CHECK(has(r, "local d = NULL_KEY"));
+            CHECK(has(r, "if d == uuid(\"\") then"));
+            CHECK(has(r, "if uuid(\"\") ~= d then"));
+        }
+        UNSCOPED_INFO("a UUID written out");
+        CHECK(has(r, "if d == uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\") then"));
+        UNSCOPED_INFO("other text, as text");
+        CHECK(has(r, "if tostring(d) == \"none\" then"));
+        UNSCOPED_INFO("NULL_KEY, as LSL's text");
+        CHECK(has(r, "if tostring(NULL_KEY) ~= \"\" then"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: with uuidKeys off the script's own keys are held as text as in LSL", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "key gOwner;\n"
+                                "key pick() { return llGetOwner(); }\n"
+                                "integer mine(key who) { return who == gOwner; }\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        key k = \"\";\n"
+                                "        llOwnerSay((string)(k == \"\"));\n"
+                                "        gOwner = llGetOwner();\n"
+                                "        string s = llGetObjectDesc();\n"
+                                "        key cast = (key)s;\n"
+                                "        if (gOwner) llDialog(gOwner, \"hi\", [\"OK\"], -5);\n"
+                                "        if (gOwner != NULL_KEY && mine(pick())) llOwnerSay((string)cast + (string)((key)\"\"));\n"
+                                "        key odd = (key)\"not-a-uuid\";\n"
+                                "        list values = [odd, k, NULL_KEY];\n"
+                                "        llOwnerSay(llList2CSV(values) + llList2CSV([odd]));\n"
+                                "    }\n"
+                                "    listen(integer c, string n, key id, string m) {\n"
+                                "        if (id == gOwner) llOwnerSay(m);\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLToSLua::Options o;
+        o.uuidKeys                  = false;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        UNSCOPED_INFO("converted: " + (r.problems.empty() ? std::string() : r.problems.front().message));
+        CHECK(r.converted);
+        {
+            INFO("Tapple's");
+            CHECK(has(r, "local k: string = \"\"\n"));
+            CHECK(has(r, "print(tostring(if k == \"\" then 1 else 0))"));
+        }
+        {
+            INFO("a global, LSL's default");
+            CHECK(has(r, "local gOwner: string = \"\"\n"));
+            CHECK(has(r, "gOwner = tostring(ll.GetOwner())"));
+        }
+        UNSCOPED_INFO("what a function gives");
+        CHECK(has(r, "local function pick(): string\n    return tostring(ll.GetOwner())"));
+        {
+            INFO("a parameter");
+            CHECK(has(r, "local function mine(who: string): boolean"));
+            CHECK(has(r, "who == gOwner"));
+        }
+        {
+            INFO("a cast, the text as it is");
+            CHECK(has(r, "local cast: string = s\n"));
+            CHECK(has(r, "print(cast .. \"\")"));
+            CHECK_FALSE(has(r, "uuid(s)"));
+            CHECK_FALSE(has(r, "uuid(\"\")"));
+        }
+        UNSCOPED_INFO("its truth as LSL's");
+        CHECK(has(r, "if (touuid(gOwner) or NULL_KEY).istruthy then"));
+        UNSCOPED_INFO("given ll as it is");
+        CHECK(has(r, "ll.Dialog(gOwner :: any, \"hi\""));
+        UNSCOPED_INFO("against NULL_KEY, as text");
+        CHECK(has(r, "gOwner ~= tostring(NULL_KEY)"));
+        {
+            INFO("a handler's key, made text as it begins");
+            CHECK(has(r, "function(c: number, n: string, idKey: uuid, m: string)"));
+            CHECK(has(r, "local id: string = tostring(idKey)"));
+            CHECK(has(r, "if id == gOwner then"));
+        }
+        {
+            INFO("in a list, text as it is");
+            CHECK(has(r, "local values: { any } = { odd, k, tostring(NULL_KEY) }"));
+            CHECK_FALSE(has(r, "{ uuid("));
+        }
+        UNSCOPED_INFO("nothing said of NULL_KEY");
+        CHECK_FALSE(noted(r, "SluaKeyEmpty"));
+        require_checks_clean(r);
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        CAPTURE(close.text);
+        {
+            INFO("closeToLSL the same");
+            CHECK(close.converted);
+            CHECK(has(close, "local gOwner = \"\"\n"));
+            CHECK(has(close, "local cast = s\n"));
+        }
+        require_checks_clean(close);
+
+        const ALLSLToSLua::Result uuids = require_converted(lsl);
+        CAPTURE(uuids.text);
+        {
+            INFO("uuids by default");
+            CHECK(has(uuids, "local gOwner = NULL_KEY\n"));
+            CHECK(has(uuids, "local cast = uuid(s)"));
+        }
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key that may hold any text given on to a key held as text holds text", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "key driver = \"\";\n"
+                                "key gOwner = \"\";\n"
+                                "onDriverChange(key newDriver) {\n"
+                                "    driver = newDriver;\n"
+                                "    if (driver == \"\") {\n"
+                                "        llOwnerSay(\"no driver\");\n"
+                                "    } else {\n"
+                                "        llOwnerSay(\"driver\");\n"
+                                "    }\n"
+                                "}\n"
+                                "onStateChange(string value) {\n"
+                                "    onDriverChange(value);\n"
+                                "}\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        onStateChange(\"\");\n"
+                                "        string m = llGetObjectDesc();\n"
+                                "        key a = m;\n"
+                                "        key b = a;\n"
+                                "        driver = b;\n"
+                                "        key id = llGetSubString(m, 0, 35);\n"
+                                "        llGiveInventory(id, \"x\");\n"
+                                "        key owner = llGetOwner();\n"
+                                "        gOwner = owner;\n"
+                                "        llOwnerSay((string)owner);\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLToSLua::Options o;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("Tapple's: the parameter text, given the text as it is");
+            CHECK(has(r, "local driver: string = \"\"\n"));
+            CHECK(has(r, "local function onDriverChange(newDriver: string)"));
+            CHECK(has(r, "    driver = newDriver\n"));
+            CHECK(has(r, "if driver == \"\" then"));
+            CHECK(has(r, "    onDriverChange(value)\n"));
+            CHECK_FALSE(has(r, "uuid(value)"));
+        }
+        {
+            INFO("through another key");
+            CHECK(has(r, "local a: string = m\n"));
+            CHECK(has(r, "local b: string = a\n"));
+            CHECK(has(r, "driver = b\n"));
+        }
+        UNSCOPED_INFO("text not given on to text, a uuid");
+        CHECK(has(r, "local id: uuid = uuid(ll.GetSubString(m, 1, 36))"));
+        UNSCOPED_INFO("a key that holds a UUID given on to text, made text there");
+        CHECK(has(r, "local owner: uuid = ll.GetOwner()"));
+        CHECK(has(r, "gOwner = tostring(owner)"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: with uuidKeys off llList2Key's item is read as text as List2String reads it", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "list gMixed;\n"
+                                "default { state_entry() {\n"
+                                "    list l = [\"hello world\"];\n"
+                                "    string msg = llList2Key(l, 0);\n"
+                                "    llOwnerSay(msg);\n"
+                                "    key k = llList2Key(l, 0);\n"
+                                "    if (k) llOwnerSay((string)k);\n"
+                                "    gMixed = llParseString2List(llGetObjectDesc(), [\",\"], []) + [1];\n"
+                                "    llOwnerSay(llList2Key(gMixed, 0));\n"
+                                "} }\n";
+        ALLSLToSLua::Options o;
+        o.uuidKeys                  = false;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("Tapple's: the item's text, as LSL gave it");
+            CHECK(has(r, "local msg: string = l[1] or \"\"\n"));
+            CHECK(has(r, "local k: string = l[1] or \"\"\n"));
+            CHECK(has(r, "if (touuid(k) or NULL_KEY).istruthy then print(k) end"));
+            CHECK_FALSE(has(r, "List2Key("));
+        }
+        {
+            INFO("items that may be neither, read as List2String reads them, and said");
+            CHECK(has(r, "print(llcompat.List2String(gMixed, 0))"));
+            CHECK(noted(r, "SluaList2KeyText"));
+        }
+        require_checks_clean(r);
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        CAPTURE(close.text);
+        REQUIRE(close.converted);
+        {
+            INFO("closeToLSL: List2String's call, as Tapple wrote it");
+            CHECK(has(close, "local msg = llcompat.List2String(l, 0)\n"));
+            CHECK(has(close, "local k = llcompat.List2String(l, 0)\n"));
+            CHECK_FALSE(has(close, "List2Key("));
+        }
+        require_checks_clean(close);
+
+        const ALLSLToSLua::Result uuids = require_converted(lsl);
+        CAPTURE(uuids.text);
+        {
+            INFO("uuids by default: List2Key's uuid");
+            CHECK(has(uuids, "local msg = tostring(llcompat.List2Key(l, 0))"));
+            CHECK(has(uuids, "local k = llcompat.List2Key(l, 0)"));
+            CHECK_FALSE(noted(uuids, "SluaList2KeyText"));
+        }
     }
 }

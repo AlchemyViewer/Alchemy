@@ -7,8 +7,8 @@
  * shown, with the same GL the viewer runs on -- WGL on Windows, EGL on
  * Linux -- and where Linux has no display, SDL's offscreen driver.
  *
- * Standing the context up is the expensive part — TUT spins a fresh
- * fixture per test method, so a test that can share one takes the
+ * Standing the context up is the expensive part — Catch2 makes a fresh
+ * fixture per test case, so a test that can share one takes the
  * static-local instance behind sharedHeadlessGL() and keeps its own
  * state (font registry, atlas pages) in the fixture. A test that
  * needs a context of its own makes a HeadlessGL per test instead.
@@ -52,8 +52,16 @@
 #include "llwindow.h"
 #include "llwindowcallbacks.h"
 
+#include "fsyspath.h"
+#include "llfile.h"
+#include "lluuid.h"
+
+#include "alteststateguard.h"
+#include "altestteardown.h"
+
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -95,7 +103,7 @@ namespace ll_test
         ALFontShaping::clearCache();
     }
 
-    // RAII scope — calls resetFontState() in dtor. Embed in a TUT fixture
+    // RAII scope — calls resetFontState() in dtor. Embed in a fixture
     // struct to guarantee the shape cache is empty after every test,
     // regardless of how the test exited.
     struct FontStateScope
@@ -135,6 +143,58 @@ namespace ll_test
         std::string mDirPrefix;
         LLShaderMgr* mPrevious;
     };
+
+    // A shader tree on disk for programs built through LLGLSLShader::createShader, which reads its
+    // stage files as the viewer reads its own: <root>/class1/<path>, found by a TestShaderMgr given
+    // prefix(). Made empty in the system's temporary directory, and removed with the object.
+    class TestShaderDir
+    {
+    public:
+        TestShaderDir()
+        {
+            std::filesystem::path tmp = fsyspath(LLFile::tmpdir());
+            mRoot = tmp / fsyspath("llrender-gl-test-" + LLUUID::generateNewID().asString());
+            std::error_code ec;
+            std::filesystem::create_directories(mRoot / "class1", ec);
+        }
+
+        ~TestShaderDir()
+        {
+            std::error_code ec;
+            std::filesystem::remove_all(mRoot, ec);
+        }
+
+        // Write `source` to class1/<path>, making its folders. False if it could not be written.
+        bool write(const std::string& path, const std::string& source) const
+        {
+            const std::filesystem::path file = mRoot / "class1" / fsyspath(path);
+            std::error_code ec;
+            std::filesystem::create_directories(file.parent_path(), ec);
+            llofstream out(fsyspath(file).string(), std::ios::out | std::ios::binary);
+            out << source;
+            return out.good();
+        }
+
+        // What getShaderDirPrefix() returns: loadShaderFile appends the class number and the path.
+        std::string prefix() const
+        {
+            return fsyspath(mRoot / "class").string();
+        }
+
+        TestShaderDir(const TestShaderDir&)            = delete;
+        TestShaderDir& operator=(const TestShaderDir&) = delete;
+
+    private:
+        std::filesystem::path mRoot;
+    };
+
+    // Whether the context runs compute: what LLRender::sCompute needs, less the user's setting,
+    // which a test does not have.
+    inline bool contextHasCompute()
+    {
+        return gGLManager.mHasCompute
+            && gGLManager.mGLSLVersionMajor * 100 + gGLManager.mGLSLVersionMinor >= 430;
+    }
 
     // GL 3.3 core pass-through UI vertex shader. Same uniform / attribute
     // shape as indra/newview/app_settings/shaders/class1/interface/uiV.glsl:
@@ -263,7 +323,8 @@ namespace ll_test
     // A white texel where the viewer puts its white image, which an unbound
     // texture slot samples: what is drawn with no texture then comes out in
     // its own colour, as it does in the viewer, rather than black. Made once,
-    // on the first call; the context must be up.
+    // on the first call; the context must be up. A Catch2 binary releases it
+    // after the last case, before the shared context it was made in ends.
     inline void installWhiteTexture()
     {
         static LLPointer<LLImageGL> white;
@@ -272,6 +333,7 @@ namespace ll_test
             LLPointer<LLImageRaw> raw = new LLImageRaw(1, 1, 4);
             std::memset(raw->getData(), 0xFF, 4);
             white = new LLImageGL(raw, false);
+            ll_test::Teardown::add([] { white = nullptr; });
         }
         ALTextureSlot::sWhiteTexture = white->getTexName();
         // Bound once, so that the slot holds a texture: an unbind puts the
@@ -484,13 +546,25 @@ namespace ll_test
     // tests need, so each must leave the image, render and shader state as
     // it found it. Tests that make a HeadlessGL of their own per test end
     // the GL classes under it, and are never linked beside a caller of this.
+    //
+    // A Catch2 binary ends it after the last case, while APR and LLError are
+    // still up, rather than at static destruction. What making it changes --
+    // the context, the bound program, the matrices pushed, and whatever the
+    // driver chooses for the process -- is the state the guard compares with
+    // from then on, so the case that first asked is not blamed for it.
     inline HeadlessGL& sharedHeadlessGL()
     {
-        static HeadlessGL gl(/*needs_vbos=*/true,
-                             /*needs_imagegl=*/true,
-                             /*needs_llrender=*/true,
-                             /*needs_render=*/true);
-        return gl;
+        static HeadlessGL* gl = []
+        {
+            HeadlessGL* made = new HeadlessGL(/*needs_vbos=*/true,
+                                              /*needs_imagegl=*/true,
+                                              /*needs_llrender=*/true,
+                                              /*needs_render=*/true);
+            ll_test::Teardown::add([made] { delete made; });
+            ll_test::StateGuard::accept();
+            return made;
+        }();
+        return *gl;
     }
 
     // A test's hold on the shared context. It takes sharedHeadlessGL() as it
@@ -526,6 +600,7 @@ namespace ll_test
             }
             mClearColor = gGL.getClearColor();
             mReverseZ = LLRender::sReverseZ;
+            mCompute = LLRender::sCompute;
             mMatrixMode = gGL.getMatrixMode();
             mModelview = gGL.getModelviewMatrix();
             mProjection = gGL.getProjectionMatrix();
@@ -573,6 +648,8 @@ namespace ll_test
                 glClipControl(mClipOrigin, mClipDepthMode);
             }
             LLRender::sReverseZ = mReverseZ;
+            // The compute cases turn compute on where the context has it.
+            LLRender::sCompute = mCompute;
 
             gGL.setClearColor(mClearColor);
             gGL.matrixMode(LLRender::MM_TEXTURE0);
@@ -622,6 +699,7 @@ namespace ll_test
         GLint mClipDepthMode = GL_NEGATIVE_ONE_TO_ONE;
         LLColor4 mClearColor;
         bool mReverseZ = false;
+        bool mCompute = false;
         LLRender::eMatrixMode mMatrixMode = LLRender::MM_MODELVIEW;
         LLMatrix4a mModelview;
         LLMatrix4a mProjection;

@@ -63,26 +63,30 @@ target_link_libraries(
 target_precompile_headers(llcharacter REUSE_FROM llprecompiled)
 
 if(AL_BUILD_TESTS)
-  foreach(
-    test
-    lljoint
-    llpose
-    llcharacter
-    llmotioncontroller
-    llkeyframemotion
-    llmultigesture
-  )
-    al_add_test(${test} PROJECT llcharacter LIBRARIES llcharacter)
-  endforeach()
+  # The state guard's checks on what llcharacter keeps for the process, for
+  # every test binary that links it.
+  add_library(llcharacter_test_checks OBJECT tests/llcharacter_test_checks.cpp)
+  target_link_libraries(llcharacter_test_checks PRIVATE al::flags al_test_support llcharacter)
+  set_target_properties(llcharacter_test_checks PROPERTIES FOLDER "Tests/llcharacter")
 
-  # The translation table this parser reads is shipped by newview, and one it
-  # refuses stops every BVH upload, so the test reads the shipped file itself.
-  # The joint names a .bvh may use come from the shipped skeleton, and the
-  # root joint check will not pass without them, so the test reads it too.
-  al_add_test(
-    llbvhloader
+  # The translation table the BVH parser reads is shipped by newview, and one
+  # it refuses stops every BVH upload, so llbvhloader's tests read the shipped
+  # file itself. The joint names a .bvh may use come from the shipped
+  # skeleton, and the root joint check will not pass without them, so the
+  # tests read it too.
+  al_add_test_binary(
+    llcharacter_tests
     PROJECT llcharacter
+    SOURCES
+      tests/llbvhloader_test.cpp
+      tests/llcharacter_test.cpp
+      tests/lljoint_test.cpp
+      tests/llkeyframemotion_test.cpp
+      tests/llmotioncontroller_test.cpp
+      tests/llmultigesture_test.cpp
+      tests/llpose_test.cpp
     LIBRARIES llcharacter
+    SUPPORT llcharacter_test_checks
     DEFINES
       "AL_SHIPPED_ANIM_INI=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/app_settings/anim.ini\""
       "AL_SHIPPED_AVATAR_SKELETON=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/character/avatar_skeleton.xml\""

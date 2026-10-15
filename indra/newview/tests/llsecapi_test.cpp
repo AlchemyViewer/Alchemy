@@ -27,7 +27,7 @@
  */
 #include "../llviewerprecompiledheaders.h"
 #include "../llviewernetwork.h"
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 #include "../llsecapi.h"
 #include "../llsechandler_basic.h"
 #include "../../llxml/llcontrol.h"
@@ -79,9 +79,9 @@ void LLSecAPIBasicHandler::removeFromCredentialMap(const std::string& storage, c
 void LLSecAPIBasicHandler::removeCredentialMap(const std::string& storage, const std::string& grid) {}
 
 // -------------------------------------------------------------------------------------------
-// TUT
+// Tests
 // -------------------------------------------------------------------------------------------
-namespace tut
+namespace
 {
     // Test wrapper declaration : wrapping nothing for the moment
     struct secapiTest
@@ -95,39 +95,29 @@ namespace tut
         }
     };
 
-    // Tut templating thingamagic: test group, object and test instance
-    typedef test_group<secapiTest> secapiTestFactory;
-    typedef secapiTestFactory::object secapiTestObject;
-    tut::secapiTestFactory tut_secapi("LLSecAPI");
-
     // ---------------------------------------------------------------------------------------
     // Test functions
     // ---------------------------------------------------------------------------------------
-    // registration
-    template<> template<>
-    void secapiTestObject::test<1>()
+    TEST_CASE_METHOD(secapiTest, "LLSecAPI: getSecHandler finds registered handlers by name and no others", "[LLSecAPI]")
     {
         // retrieve an unknown handler
 
-        ensure("'Unknown' handler should be NULL", getSecHandler("unknown") == nullptr);
+        REQUIRE(getSecHandler("unknown") == nullptr);
         LLPointer<LLSecAPIHandler> test1_handler =  new LLSecAPIBasicHandler();
         registerSecHandler("sectest1", test1_handler);
-        ensure("'Unknown' handler should be NULL", getSecHandler("unknown") == nullptr);
+        REQUIRE(getSecHandler("unknown") == nullptr);
         LLPointer<LLSecAPIHandler> retrieved_test1_handler = getSecHandler("sectest1");
-        ensure("Retrieved sectest1 handler should be the same",
-               retrieved_test1_handler == test1_handler);
+        CHECK(retrieved_test1_handler == test1_handler);
 
         // insert a second handler
         LLPointer<LLSecAPIHandler> test2_handler =  new LLSecAPIBasicHandler();
         registerSecHandler("sectest2", test2_handler);
-        ensure("'Unknown' handler should be NULL", getSecHandler("unknown") == nullptr);
+        REQUIRE(getSecHandler("unknown") == nullptr);
         retrieved_test1_handler = getSecHandler("sectest1");
-        ensure("Retrieved sectest1 handler should be the same",
-               retrieved_test1_handler == test1_handler);
+        CHECK(retrieved_test1_handler == test1_handler);
 
         LLPointer<LLSecAPIHandler> retrieved_test2_handler = getSecHandler("sectest2");
-        ensure("Retrieved sectest1 handler should be the same",
-               retrieved_test2_handler == test2_handler);
+        CHECK(retrieved_test2_handler == test2_handler);
 
     }
 }

@@ -27,12 +27,10 @@
 #include "../llfocusmgr.h"
 #include "../llview.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
-    namespace
-    {
         struct TestView : public LLView
         {
             TestView(const LLView::Params& p) : LLView(p) {}
@@ -42,7 +40,6 @@ namespace tut
         struct TestFocusable : public LLFocusableElement
         {
         };
-    }
 
     struct llfocusmgr_data
     {
@@ -63,15 +60,10 @@ namespace tut
         }
     };
 
-    typedef test_group<llfocusmgr_data> llfocusmgr_test;
-    typedef llfocusmgr_test::object     llfocusmgr_object;
-    tut::llfocusmgr_test llfocusmgr_testgroup("llfocusmgr");
-
     // Keyboard focus on a view is found from every ancestor of it and from
     // no one else, and the view is answered as a view without a walk back
     // from the element.
-    template<> template<>
-    void llfocusmgr_object::test<1>()
+    TEST_CASE_METHOD(llfocusmgr_data, "llfocusmgr: keyboard focus on a view is found from its ancestors and no one else", "[llfocusmgr]")
     {
         std::unique_ptr<TestView> parent(view("parent"));
         TestView* child = view("child");
@@ -79,57 +71,55 @@ namespace tut
         std::unique_ptr<TestView> other(view("other"));
 
         gFocusMgr.setKeyboardFocus(child);
-        ensure("the element is the child", gFocusMgr.getKeyboardFocus() == child);
-        ensure("the view is the child", gFocusMgr.getKeyboardFocusView() == child);
-        ensure("a plain view is not a control", gFocusMgr.getKeyboardFocusCtrl() == nullptr);
-        ensure("the parent has it", gFocusMgr.childHasKeyboardFocus(parent.get()));
-        ensure("the child has it", gFocusMgr.childHasKeyboardFocus(child));
-        ensure("an unrelated view does not", !gFocusMgr.childHasKeyboardFocus(other.get()));
+        CHECK(gFocusMgr.getKeyboardFocus() == child);
+        CHECK(gFocusMgr.getKeyboardFocusView() == child);
+        UNSCOPED_INFO("a plain view is not a control");
+        CHECK(gFocusMgr.getKeyboardFocusCtrl() == nullptr);
+        CHECK(gFocusMgr.childHasKeyboardFocus(parent.get()));
+        CHECK(gFocusMgr.childHasKeyboardFocus(child));
+        CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(other.get()));
 
         gFocusMgr.removeKeyboardFocusWithoutCallback(child);
-        ensure("released: no element", gFocusMgr.getKeyboardFocus() == nullptr);
-        ensure("released: no view", gFocusMgr.getKeyboardFocusView() == nullptr);
-        ensure("released: the parent no longer has it", !gFocusMgr.childHasKeyboardFocus(parent.get()));
+        CHECK(gFocusMgr.getKeyboardFocus() == nullptr);
+        CHECK(gFocusMgr.getKeyboardFocusView() == nullptr);
+        CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(parent.get()));
     }
 
     // A focusable that is not a view holds focus, has no view, and no view
     // claims it.
-    template<> template<>
-    void llfocusmgr_object::test<2>()
+    TEST_CASE_METHOD(llfocusmgr_data, "llfocusmgr: a focusable that is not a view holds focus and no view claims it", "[llfocusmgr]")
     {
         std::unique_ptr<TestView> parent(view("parent"));
         TestFocusable element;
 
         gFocusMgr.setKeyboardFocus(&element);
-        ensure("the element has focus", gFocusMgr.getKeyboardFocus() == &element);
-        ensure("but there is no view", gFocusMgr.getKeyboardFocusView() == nullptr);
-        ensure("and no control", gFocusMgr.getKeyboardFocusCtrl() == nullptr);
-        ensure("no view has it", !gFocusMgr.childHasKeyboardFocus(parent.get()));
-        ensure("no accelerators to find", !gFocusMgr.keyboardFocusHasAccelerators());
+        CHECK(gFocusMgr.getKeyboardFocus() == &element);
+        CHECK(gFocusMgr.getKeyboardFocusView() == nullptr);
+        CHECK(gFocusMgr.getKeyboardFocusCtrl() == nullptr);
+        CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(parent.get()));
+        CHECK_FALSE(gFocusMgr.keyboardFocusHasAccelerators());
 
         gFocusMgr.setKeyboardFocus(nullptr);
-        ensure("released", gFocusMgr.getKeyboardFocus() == nullptr && gFocusMgr.getKeyboardFocusView() == nullptr);
+        CHECK(gFocusMgr.getKeyboardFocus() == nullptr);
+        CHECK(gFocusMgr.getKeyboardFocusView() == nullptr);
     }
 
-    // The view follows the element when focus moves.
-    template<> template<>
-    void llfocusmgr_object::test<3>()
+    TEST_CASE_METHOD(llfocusmgr_data, "llfocusmgr: the focus view follows the element when focus moves", "[llfocusmgr]")
     {
         std::unique_ptr<TestView> a(view("a"));
         std::unique_ptr<TestView> b(view("b"));
 
         gFocusMgr.setKeyboardFocus(a.get());
         gFocusMgr.setKeyboardFocus(b.get());
-        ensure("the element moved", gFocusMgr.getKeyboardFocus() == b.get());
-        ensure("the view moved with it", gFocusMgr.getKeyboardFocusView() == b.get());
-        ensure("the last focus is remembered", gFocusMgr.getLastKeyboardFocus() == a.get());
-        ensure("a no longer has it", !gFocusMgr.childHasKeyboardFocus(a.get()));
-        ensure("b has it", gFocusMgr.childHasKeyboardFocus(b.get()));
+        CHECK(gFocusMgr.getKeyboardFocus() == b.get());
+        CHECK(gFocusMgr.getKeyboardFocusView() == b.get());
+        CHECK(gFocusMgr.getLastKeyboardFocus() == a.get());
+        CHECK_FALSE(gFocusMgr.childHasKeyboardFocus(a.get()));
+        CHECK(gFocusMgr.childHasKeyboardFocus(b.get()));
     }
 
     // Mouse capture has the same shape, and a captor that dies lets go.
-    template<> template<>
-    void llfocusmgr_object::test<4>()
+    TEST_CASE_METHOD(llfocusmgr_data, "llfocusmgr: mouse capture is found from ancestors and a dying captor lets go", "[llfocusmgr]")
     {
         std::unique_ptr<TestView> parent(view("parent"));
         TestView* child = view("child");
@@ -137,22 +127,77 @@ namespace tut
         std::unique_ptr<TestView> other(view("other"));
 
         gFocusMgr.setMouseCapture(child);
-        ensure("the handler is the child", gFocusMgr.getMouseCapture() == child);
-        ensure("the view is the child", gFocusMgr.getMouseCaptureView() == child);
-        ensure("the parent has it", gFocusMgr.childHasMouseCapture(parent.get()));
-        ensure("an unrelated view does not", !gFocusMgr.childHasMouseCapture(other.get()));
+        CHECK(gFocusMgr.getMouseCapture() == child);
+        CHECK(gFocusMgr.getMouseCaptureView() == child);
+        CHECK(gFocusMgr.childHasMouseCapture(parent.get()));
+        CHECK_FALSE(gFocusMgr.childHasMouseCapture(other.get()));
 
         gFocusMgr.setMouseCapture(nullptr);
-        ensure("released: no handler", gFocusMgr.getMouseCapture() == nullptr);
-        ensure("released: no view", gFocusMgr.getMouseCaptureView() == nullptr);
+        CHECK(gFocusMgr.getMouseCapture() == nullptr);
+        CHECK(gFocusMgr.getMouseCaptureView() == nullptr);
 
         gFocusMgr.setMouseCapture(child);
         gFocusMgr.removeMouseCaptureWithoutCallback(child);
-        ensure("removed: no view", gFocusMgr.getMouseCaptureView() == nullptr);
+        CHECK(gFocusMgr.getMouseCaptureView() == nullptr);
 
         gFocusMgr.setMouseCapture(child);
         parent.reset();     // takes the child with it
-        ensure("a dead captor let go", gFocusMgr.getMouseCapture() == nullptr);
-        ensure("and took its view with it", gFocusMgr.getMouseCaptureView() == nullptr);
+        CHECK(gFocusMgr.getMouseCapture() == nullptr);
+        CHECK(gFocusMgr.getMouseCaptureView() == nullptr);
+    }
+
+    // A view that counts what it is told of its focus.
+    struct CountingView : public TestView
+    {
+        explicit CountingView(const LLView::Params& p) : TestView(p) {}
+        void onFocusLost() override { ++lost; TestView::onFocusLost(); }
+        S32 lost = 0;
+
+        static CountingView* make(const std::string& name)
+        {
+            LLView::Params p;
+            p.name = name;
+            p.rect = LLRect(0, 10, 10, 0);
+            return new CountingView(p);
+        }
+    };
+
+    // Focus taken without callbacks leaves nothing as having it: a view whose
+    // focus was taken so is not told later that it lost it, nor are the views
+    // above it, when focus goes somewhere else.
+    TEST_CASE_METHOD(llfocusmgr_data, "llfocusmgr: focus taken without callbacks tells no one later that they lost it", "[llfocusmgr]")
+    {
+        std::unique_ptr<CountingView> parent(CountingView::make("parent"));
+        CountingView* child = CountingView::make("child");
+        parent->addChild(child);
+        std::unique_ptr<TestView> other(view("other"));
+
+        gFocusMgr.setKeyboardFocus(child);
+        gFocusMgr.removeKeyboardFocusWithoutCallback(child);
+        gFocusMgr.setKeyboardFocus(other.get());
+        CHECK(child->lost == 0);
+        CHECK(parent->lost == 0);
+    }
+
+    // A view that died with focus leaves no trace in what the next change
+    // compares: focus moving between two children of one parent leaves the
+    // parent holding it, and the parent is not told it lost it.
+    TEST_CASE_METHOD(llfocusmgr_data, "llfocusmgr: after a view dies holding focus a parent keeps focus its children pass", "[llfocusmgr]")
+    {
+        {
+            std::unique_ptr<TestView> gone(view("gone"));
+            gFocusMgr.setKeyboardFocus(gone.get());
+        }
+
+        std::unique_ptr<CountingView> parent(CountingView::make("parent"));
+        TestView* first = view("first");
+        TestView* second = view("second");
+        parent->addChild(first);
+        parent->addChild(second);
+
+        gFocusMgr.setKeyboardFocus(first);
+        gFocusMgr.setKeyboardFocus(second);
+        CHECK(parent->lost == 0);
+        CHECK(gFocusMgr.childHasKeyboardFocus(parent.get()));
     }
 }

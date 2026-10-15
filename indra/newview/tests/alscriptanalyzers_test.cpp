@@ -26,9 +26,9 @@
 
 #include "../alscriptanalyzers.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
-namespace tut
+namespace
 {
     struct alscriptanalyzers_data
     {
@@ -46,47 +46,58 @@ namespace tut
         }
     };
 
-    typedef test_group<alscriptanalyzers_data> alscriptanalyzers_group;
-    typedef alscriptanalyzers_group::object    alscriptanalyzers_object;
-    alscriptanalyzers_group                    alscriptanalyzers_instance("alscriptanalyzers");
-
-    template<> template<>
-    void alscriptanalyzers_object::test<1>()
+    TEST_CASE_METHOD(alscriptanalyzers_data, "alscriptanalyzers: an LSL check reports its parse and a later weigh reports its own", "[alscriptanalyzers]")
     {
-        set_test_name("an LSL check says whether its text parsed; a weigh after it, which asks the compiler and not the service, says nothing of another text's");
         ALLSLAnalyzer                     lsl;
         const ALScriptAnalysis::Request   broken = request(ALScriptAnalysis::Kind::Check, "default { state_entry() { llSay(0, \"x\" } }\n");
         ALScriptAnalysis::Result          checked;
         lsl.answer(broken, *broken.text, setup, checked);
-        ensure("builtins loaded: " + checked.definitionsError, checked.definitionsError.empty());
-        ensure("the broken text did not parse", !checked.parsed);
+        UNSCOPED_INFO("builtins loaded: " << checked.definitionsError);
+        REQUIRE(checked.definitionsError.empty());
+        CHECK_FALSE(checked.parsed);
         ALScriptAnalysis::Request weighing = request(ALScriptAnalysis::Kind::Weigh, "default { state_entry() { llSay(0, \"x\"); } }\n");
         weighing.targets                   = { ALScriptWeight::Target::Mono };
         ALScriptAnalysis::Result weighed;
         lsl.answer(weighing, *weighing.text, setup, weighed);
-        ensure_equals("weighed", weighed.weights.size(), size_t(1));
-        ensure("not the check's parse", weighed.parsed);
+        REQUIRE(weighed.weights.size() == size_t(1));
+        UNSCOPED_INFO("not the check's parse");
+        CHECK(weighed.parsed);
     }
 
-    template<> template<>
-    void alscriptanalyzers_object::test<2>()
+    TEST_CASE_METHOD(alscriptanalyzers_data, "alscriptanalyzers: a shape outlines LSL states and events and untyped SLua functions", "[alscriptanalyzers]")
     {
-        set_test_name("a shape: what a text declares from its parse, LSL's states and events, SLua's functions with no types and nothing loaded for them");
         ALLSLAnalyzer                   lsl;
         const ALScriptAnalysis::Request shaped = request(ALScriptAnalysis::Kind::Shape, "go() {}\ndefault {\n  state_entry() { go(); }\n}\n");
         ALScriptAnalysis::Result        lsl_shape;
         lsl.answer(shaped, *shaped.text, setup, lsl_shape);
-        ensure_equals("LSL: the function, the state, its event", lsl_shape.outline.size(), size_t(3));
-        ensure("the event in its state", lsl_shape.outline[1].kind == ALScriptSymbolKind::State && lsl_shape.outline[2].name == "state_entry" &&
-                                             lsl_shape.outline[2].depth == 1);
-        ensure("nothing else answered", lsl_shape.problems.empty());
+        UNSCOPED_INFO("LSL: the function, the state, its event");
+        REQUIRE(lsl_shape.outline.size() == size_t(3));
+        {
+            INFO("the function first");
+            CHECK(lsl_shape.outline[0].kind == ALScriptSymbolKind::Function);
+            CHECK(lsl_shape.outline[0].name == "go");
+        }
+        {
+            INFO("the event in its state");
+            CHECK(lsl_shape.outline[1].kind == ALScriptSymbolKind::State);
+            CHECK(lsl_shape.outline[2].name == "state_entry");
+            CHECK(lsl_shape.outline[2].depth == 1);
+        }
+        UNSCOPED_INFO("nothing else answered");
+        CHECK(lsl_shape.problems.empty());
 
         ALLuauAnalyzer            luau;
         ALScriptAnalysis::Request slua = request(ALScriptAnalysis::Kind::Shape, "local function half(n: number)\n  return n / 2\nend\n");
         slua.lua                       = true;
         ALScriptAnalysis::Result luau_shape;
         luau.answer(slua, *slua.text, ALScriptAnalyzer::Setup(), luau_shape);
-        ensure("SLua: the function, untyped", luau_shape.outline.size() == 1 && luau_shape.outline[0].name == "half" && luau_shape.outline[0].detail.empty());
-        ensure("no definitions asked for", luau_shape.definitionsError.empty());
+        {
+            INFO("SLua: the function, untyped");
+            REQUIRE(luau_shape.outline.size() == 1);
+            CHECK(luau_shape.outline[0].name == "half");
+            CHECK(luau_shape.outline[0].detail.empty());
+        }
+        UNSCOPED_INFO("no definitions asked for");
+        CHECK(luau_shape.definitionsError.empty());
     }
 }

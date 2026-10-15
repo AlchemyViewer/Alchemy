@@ -209,6 +209,42 @@ private:
     S32 mPrev[4];
 };
 
+// Scoped stencil test: on, with the function, reference and read mask, the operations on a stencil
+// fail, a depth fail and a pass, and the write mask given. On exit the test goes back off and the
+// rest to GL's defaults, the write mask to every bit above all: a clear writes stencil only through
+// it. Scopes do not nest; the inner one's exit would leave the outer's test on at the defaults.
+class ALGLStencil
+{
+public:
+    ALGLStencil(GLenum func, GLint ref, GLuint read_mask, GLenum fail, GLenum depth_fail, GLenum pass, GLuint write_mask)
+    :   mTest(GL_STENCIL_TEST)
+    {
+        llassert(sOpen == 0);
+        ++sOpen;
+        gGL.flush();
+        glStencilFunc(func, ref, read_mask);
+        glStencilOp(fail, depth_fail, pass);
+        glStencilMask(write_mask);
+    }
+
+    ~ALGLStencil()
+    {
+        gGL.flush();
+        glStencilFunc(GL_ALWAYS, 0, ~0u);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        glStencilMask(~0u);
+        --sOpen;
+    }
+
+    ALGLStencil(const ALGLStencil&) = delete;
+    ALGLStencil& operator=(const ALGLStencil&) = delete;
+
+private:
+    LLGLEnable mTest;
+    // The scopes open, on the thread that draws: one at most.
+    static inline S32 sOpen = 0;
+};
+
 class LLGLSTracker
 {
 protected:

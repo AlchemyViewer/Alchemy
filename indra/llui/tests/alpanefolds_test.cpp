@@ -34,11 +34,11 @@
 
 #include "alheadlessui_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-namespace tut
+namespace
 {
     struct alpanefolds_data
     {
@@ -116,75 +116,88 @@ namespace tut
         }
     };
 
-    typedef test_group<alpanefolds_data> alpanefolds_test;
-    typedef alpanefolds_test::object     alpanefolds_object;
-    tut::alpanefolds_test alpanefolds_testgroup("alpanefolds");
-
     // A layout panel folds and has a size; a plain panel does neither, and
     // asking does nothing rather than something wrong.
-    template<> template<>
-    void alpanefolds_object::test<1>()
+    TEST_CASE_METHOD(alpanefolds_data, "alpanefolds: a layout panel folds and has a size; a plain panel does neither", "[alpanefolds]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Window w = build();
         ALPaneFolds folds;
         folds.bind(w.floater, panes());
 
-        ensure("the side is open", !folds.collapsed("side"));
+        UNSCOPED_INFO("the side is open");
+        CHECK_FALSE(folds.collapsed("side"));
         folds.toggle("side");
-        ensure("and folds", folds.collapsed("side"));
-        ensure("and its button says so", !w.fold->getToggleState());
-        ensure_equals("it has a size", folds.dim("side"), 200);
+        CHECK(folds.collapsed("side"));
+        UNSCOPED_INFO("its button says it is folded");
+        CHECK_FALSE(w.fold->getToggleState());
+        CHECK(folds.dim("side") == 200);
 
-        ensure("the page is never folded", !folds.collapsed("page"));
+        UNSCOPED_INFO("the page is never folded");
+        CHECK_FALSE(folds.collapsed("page"));
         folds.toggle("page");
-        ensure("nor can it be", !folds.collapsed("page"));
-        ensure_equals("and has no size", folds.dim("page"), 0);
+        UNSCOPED_INFO("nor can it be");
+        CHECK_FALSE(folds.collapsed("page"));
+        CHECK(folds.dim("page") == 0);
         w.floater->die();
     }
 
     // Either kind comes out into a window of its own and goes back, with
     // what it holds still where it was.
-    template<> template<>
-    void alpanefolds_object::test<2>()
+    TEST_CASE_METHOD(alpanefolds_data, "alpanefolds: either kind comes out into a window of its own and goes back whole", "[alpanefolds]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Window w = build();
         ALPaneFolds folds;
         folds.bind(w.floater, panes());
 
-        ensure("home to start", !folds.out("page") && folds.window("page") == nullptr);
+        {
+            INFO("home to start");
+            CHECK_FALSE(folds.out("page"));
+            CHECK(folds.window("page") == nullptr);
+        }
         folds.toggleOut("page");
-        ensure("out", folds.out("page"));
+        CHECK(folds.out("page"));
         LLFloater* window = folds.window("page");
-        ensure("in a window of its own", window != nullptr && window != w.floater);
-        ensure("with what it held", w.in_page->getParentByType<LLFloater>() == window);
-        ensure("and the page itself still on the window", w.page->getParent() == w.floater);
+        {
+            INFO("in a window of its own");
+            REQUIRE(window != nullptr);
+            CHECK(window != w.floater);
+        }
+        UNSCOPED_INFO("with what it held");
+        CHECK(w.in_page->getParentByType<LLFloater>() == window);
+        UNSCOPED_INFO("and the page itself still on the window");
+        CHECK(w.page->getParent() == w.floater);
 
         folds.toggleOut("side");
-        ensure("the layout panel comes out too", folds.out("side"));
+        UNSCOPED_INFO("the layout panel comes out too");
+        CHECK(folds.out("side"));
 
         folds.dockAll();
-        ensure("and both go home", !folds.out("page") && !folds.out("side"));
-        ensure("the button back under its page", w.in_page->getParentByType<LLFloater>() == w.floater);
+        {
+            INFO("and both go home");
+            CHECK_FALSE(folds.out("page"));
+            CHECK_FALSE(folds.out("side"));
+        }
+        UNSCOPED_INFO("the button back under its page");
+        CHECK(w.in_page->getParentByType<LLFloater>() == w.floater);
         w.floater->die();
     }
 
     // Written down: a fold and a size for the layout panel only, and for
     // both whether it is out and where its window was. Read back, a region
     // that was out comes out again where it was.
-    template<> template<>
-    void alpanefolds_object::test<3>()
+    TEST_CASE_METHOD(alpanefolds_data, "alpanefolds: a save writes folds and sizes for layout panels only and what is out", "[alpanefolds]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         LLSD state;
         {
@@ -193,14 +206,21 @@ namespace tut
             folds.bind(w.floater, panes());
             folds.toggleOut("page");
             LLFloater* window = folds.window("page");
+            REQUIRE(window != nullptr);
             window->setRect(LLRect(700, 500, 1000, 300));
             folds.save(state);
-            ensure("the side's fold is written", state.has("fold_side"));
-            ensure("and its size", state.has("dim_side"));
-            ensure("the page has no fold to write", !state.has("fold_page"));
-            ensure("nor a size", !state.has("dim_page"));
-            ensure("but it is written as out", state["out_page"].asBoolean());
-            ensure("with its window's rect", state.has("rect_page"));
+            UNSCOPED_INFO("the side's fold is written");
+            CHECK(state.has("fold_side"));
+            UNSCOPED_INFO("and its size");
+            CHECK(state.has("dim_side"));
+            UNSCOPED_INFO("the page has no fold to write");
+            CHECK_FALSE(state.has("fold_page"));
+            UNSCOPED_INFO("nor a size");
+            CHECK_FALSE(state.has("dim_page"));
+            UNSCOPED_INFO("but it is written as out");
+            CHECK(state["out_page"].asBoolean());
+            UNSCOPED_INFO("with its window's rect");
+            CHECK(state.has("rect_page"));
             w.floater->die();
         }
         {
@@ -208,11 +228,14 @@ namespace tut
             ALPaneFolds folds;
             folds.bind(w.floater, panes());
             folds.load(state);
-            ensure("read back, the page is out again", folds.out("page"));
+            UNSCOPED_INFO("read back, the page is out again");
+            CHECK(folds.out("page"));
             LLFloater* window = folds.window("page");
-            ensure("in a window", window != nullptr);
-            ensure_equals("as wide as it was", window->getRect().getWidth(), 300);
-            ensure("and the side is home", !folds.out("side"));
+            REQUIRE(window != nullptr);
+            UNSCOPED_INFO("as wide as it was");
+            CHECK(window->getRect().getWidth() == 300);
+            UNSCOPED_INFO("and the side is home");
+            CHECK_FALSE(folds.out("side"));
             w.floater->die();
         }
     }
@@ -220,48 +243,62 @@ namespace tut
     // the room it left: asked to unfold, the studio's own Show Problems,
     // it does not open that room as an empty band, and folding it puts it
     // back, folded. Its button says it shows while it is out.
-    template<> template<>
-    void alpanefolds_object::test<4>()
+    TEST_CASE_METHOD(alpanefolds_data, "alpanefolds: a region out in a window of its own shows though its room is folded", "[alpanefolds]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Window w = build();
         ALPaneFolds folds;
         folds.bind(w.floater, panes());
 
         folds.toggleOut("side");
-        ensure("out", folds.out("side"));
-        ensure("the room it left is folded", w.side->isCollapsed());
-        ensure("but the region is showing", !folds.collapsed("side"));
-        ensure("and its button says so", w.fold->getToggleState());
+        CHECK(folds.out("side"));
+        UNSCOPED_INFO("the room it left is folded");
+        CHECK(w.side->isCollapsed());
+        UNSCOPED_INFO("but the region is showing");
+        CHECK_FALSE(folds.collapsed("side"));
+        UNSCOPED_INFO("and its button says so");
+        CHECK(w.fold->getToggleState());
 
         folds.setCollapsed("side", false);
-        ensure("unfolding it leaves it out", folds.out("side"));
-        ensure("and the room it left folded", w.side->isCollapsed());
+        UNSCOPED_INFO("unfolding it leaves it out");
+        CHECK(folds.out("side"));
+        UNSCOPED_INFO("and the room it left folded");
+        CHECK(w.side->isCollapsed());
 
         folds.setCollapsed("side", true);
-        ensure("folding it puts it back", !folds.out("side"));
-        ensure("into its room", w.side->findChild<ALDockPanel>("side_pane", false) != nullptr);
-        ensure("folded", folds.collapsed("side") && w.side->isCollapsed());
-        ensure("and its button says that", !w.fold->getToggleState());
+        UNSCOPED_INFO("folding it puts it back");
+        CHECK_FALSE(folds.out("side"));
+        UNSCOPED_INFO("into its room");
+        REQUIRE(w.side->findChild<ALDockPanel>("side_pane", false) != nullptr);
+        {
+            INFO("folded");
+            CHECK(folds.collapsed("side"));
+            CHECK(w.side->isCollapsed());
+        }
+        UNSCOPED_INFO("and its button says that");
+        CHECK_FALSE(w.fold->getToggleState());
 
         folds.toggleOut("side");
         folds.toggle("side");
-        ensure("the button's own press does the same", !folds.out("side") && folds.collapsed("side"));
+        {
+            INFO("the button's own press does the same");
+            CHECK_FALSE(folds.out("side"));
+            CHECK(folds.collapsed("side"));
+        }
         w.floater->die();
     }
 
     // A region put back only because the viewer was quitting is written
     // down as out, so that the next session puts it out again; and where
     // the quit is called off, it goes out again now.
-    template<> template<>
-    void alpanefolds_object::test<5>()
+    TEST_CASE_METHOD(alpanefolds_data, "alpanefolds: a region put back only by quitting is saved as out and can go out again", "[alpanefolds]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Window w = build();
         ALPaneFolds folds;
@@ -269,33 +306,36 @@ namespace tut
 
         folds.toggleOut("page");
         LLFloater* window = folds.window("page");
-        ensure("in a window", window != nullptr);
+        REQUIRE(window != nullptr);
         window->closeFloater(true);
-        ensure("home", !folds.out("page"));
+        CHECK_FALSE(folds.out("page"));
 
         LLSD state;
         folds.save(state);
-        ensure("written as out all the same", state["out_page"].asBoolean());
+        UNSCOPED_INFO("written as out all the same");
+        CHECK(state["out_page"].asBoolean());
 
         folds.putBackOut();
-        ensure("the quit called off, it is out again", folds.out("page"));
+        UNSCOPED_INFO("the quit called off, it is out again");
+        CHECK(folds.out("page"));
         folds.dockAll();
         LLSD after;
         folds.save(after);
-        ensure("put back by hand, it is written as home", !after["out_page"].asBoolean());
+        UNSCOPED_INFO("put back by hand, it is written as home");
+        CHECK_FALSE(after["out_page"].asBoolean());
         folds.putBackOut();
-        ensure("and stays there", !folds.out("page"));
+        UNSCOPED_INFO("and stays there");
+        CHECK_FALSE(folds.out("page"));
         w.floater->die();
     }
 
     // In sight: shown up to its window, in no folded panel, its window not
     // minimized; out in a window of its own, whatever became of its room.
-    template<> template<>
-    void alpanefolds_object::test<6>()
+    TEST_CASE_METHOD(alpanefolds_data, "alpanefolds: inSight needs it shown up to an unminimized window and in no fold", "[alpanefolds]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Window          w = build();
         LLPanel::Params ip(LLUICtrlFactory::getDefaultParams<LLPanel>());
@@ -308,50 +348,67 @@ namespace tut
         gFloaterView->addChild(w.floater);
         w.floater->setVisible(true);
 
-        ensure("nothing is not", !ALPaneFolds::inSight(nullptr));
-        ensure("in the page", ALPaneFolds::inSight(w.in_page));
-        ensure("in the side", ALPaneFolds::inSight(in_side));
+        CHECK_FALSE(ALPaneFolds::inSight(nullptr));
+        CHECK(ALPaneFolds::inSight(w.in_page));
+        CHECK(ALPaneFolds::inSight(in_side));
         folds.toggle("side");
-        ensure("the side folded: not", !ALPaneFolds::inSight(in_side) && ALPaneFolds::inSight(w.in_page));
+        {
+            INFO("the side folded: not");
+            CHECK_FALSE(ALPaneFolds::inSight(in_side));
+            CHECK(ALPaneFolds::inSight(w.in_page));
+        }
         folds.toggleOut("side");
-        ensure("out in a window of its own: it is", folds.out("side") && ALPaneFolds::inSight(in_side));
+        {
+            INFO("out in a window of its own: it is");
+            CHECK(folds.out("side"));
+            CHECK(ALPaneFolds::inSight(in_side));
+        }
         folds.dockAll();
-        ensure("home again, as its fold says", ALPaneFolds::inSight(in_side) == !folds.collapsed("side"));
+        UNSCOPED_INFO("home again, as its fold says");
+        CHECK(ALPaneFolds::inSight(in_side) == !folds.collapsed("side"));
         folds.setCollapsed("side", true);
-        ensure("folded at home: not", !ALPaneFolds::inSight(in_side));
+        UNSCOPED_INFO("folded at home: not");
+        CHECK_FALSE(ALPaneFolds::inSight(in_side));
         folds.setCollapsed("side", false);
-        ensure("unfolded", ALPaneFolds::inSight(in_side));
+        CHECK(ALPaneFolds::inSight(in_side));
 
         w.page->setVisible(false);
-        ensure("its page hidden: not", !ALPaneFolds::inSight(w.in_page));
+        UNSCOPED_INFO("its page hidden: not");
+        CHECK_FALSE(ALPaneFolds::inSight(w.in_page));
         w.page->setVisible(true);
         w.floater->setMinimized(true);
-        ensure("the window minimized: not", !ALPaneFolds::inSight(w.in_page) && !ALPaneFolds::inSight(in_side));
+        {
+            INFO("the window minimized: not");
+            CHECK_FALSE(ALPaneFolds::inSight(w.in_page));
+            CHECK_FALSE(ALPaneFolds::inSight(in_side));
+        }
         w.floater->setMinimized(false);
-        ensure("restored", ALPaneFolds::inSight(w.in_page));
+        CHECK(ALPaneFolds::inSight(w.in_page));
         w.floater->setVisible(false);
-        ensure("the window hidden: not", !ALPaneFolds::inSight(w.in_page));
+        UNSCOPED_INFO("the window hidden: not");
+        CHECK_FALSE(ALPaneFolds::inSight(w.in_page));
         gFloaterView->removeChild(w.floater);
         w.floater->die();
     }
     // Whether the regions are the sizes given is said with nothing made to
     // say it, and says what comparing dims() would.
-    template<> template<>
-    void alpanefolds_object::test<7>()
+    TEST_CASE_METHOD(alpanefolds_data, "alpanefolds: dimsAre answers as comparing dims would", "[alpanefolds]")
     {
         if (!ui.ok())
         {
-            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         Window w = build();
         ALPaneFolds folds;
         folds.bind(w.floater, panes());
         const std::vector<S32> was = folds.dims();
-        ensure("the sizes they are", folds.dimsAre(was));
+        CHECK(folds.dimsAre(was));
         folds.setDim("side", 240);
-        ensure("not after one changes", !folds.dimsAre(was));
-        ensure("the sizes they are now", folds.dimsAre(folds.dims()));
-        ensure("nor fewer sizes than regions", !folds.dimsAre({}));
+        UNSCOPED_INFO("not after one changes");
+        CHECK_FALSE(folds.dimsAre(was));
+        CHECK(folds.dimsAre(folds.dims()));
+        UNSCOPED_INFO("nor fewer sizes than regions");
+        CHECK_FALSE(folds.dimsAre({}));
         w.floater->die();
     }
 }

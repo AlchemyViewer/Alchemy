@@ -30,6 +30,7 @@
 #include "../alscriptstudioweighing.h"
 
 #include "alpanefolds.h"
+#include "alscriptfixes.h"
 #include "alpanelist.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
@@ -40,7 +41,7 @@
 
 #include "alscriptstudio_fixture.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <map>
@@ -135,7 +136,7 @@ namespace
     }
 }
 
-namespace tut
+namespace
 {
     struct alscriptproblemspane_data
     {
@@ -149,11 +150,12 @@ namespace tut
         {
             if (!window.floater)
             {
-                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+                SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             // The tab as the skin built it.
             pane = window.find<ALScriptProblemsPane>("problems_tab");
-            ensure("the skin builds the tab as the pane", pane != nullptr);
+            UNSCOPED_INFO("the skin builds the tab as the pane");
+            REQUIRE(pane != nullptr);
             return *pane;
         }
 
@@ -225,30 +227,29 @@ namespace tut
                     return;
                 }
             }
-            fail("no row says " + message);
+            FAIL("no row says " + message);
         }
         void tick(const char* box, bool on)
         {
             LLCheckBoxCtrl* check = window.find<LLCheckBoxCtrl>(box);
+            CAPTURE(box);
+            REQUIRE(check);
             check->set(on);
             check->onCommit();
         }
         void pick(const char* combo, const std::string& value)
         {
             LLComboBox* box = window.find<LLComboBox>(combo);
-            ensure("offered: " + value, box->selectByValue(LLSD(value)));
+            CAPTURE(combo);
+            REQUIRE(box);
+            INFO("the combo offers " << value);
+            REQUIRE(box->selectByValue(LLSD(value)));
             box->onCommit();
         }
     };
-    typedef test_group<alscriptproblemspane_data> alscriptproblemspane_group;
-    typedef alscriptproblemspane_group::object    alscriptproblemspane_object;
-    alscriptproblemspane_group                    alscriptproblemspane_instance("ALScriptProblemsPane");
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<1>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: gathered problems come in order and fixes lapse once the text changes", "[ALScriptProblemsPane]")
     {
-        set_test_name("a tab's problems gathered: in order, each at its level, the compiler's under the analyzer's, and fixes only for the text they were made on");
         make();
         Doc& d = doc("door");
         using S = ALScriptProblem::Source;
@@ -282,16 +283,28 @@ namespace tut
         {
             messages.push_back(row.message);
         }
-        ensure_equals("six rows", made.rows.size(), size_t(6));
-        ensure_equals("the weight first, at no line", made.rows[0].origin, services.words("OriginWeight"));
-        ensure("the weight a warning, the studio's reckoning", made.rows[0].level == Doc::Level::Warning);
-        ensure_equals("then the compiler's own", made.rows[1].message, std::string("the compiler's own"));
-        ensure_equals("the lint with its name", made.rows[2].message, std::string("a local shadows another [LocalShadow]"));
-        ensure_equals("the analyzer's error, the compiler's on its line said once", made.rows[3].message, std::string("syntax error, unexpected"));
-        ensure_equals("the run-time error, how many times", made.rows[4].message, "Math Error " + services.words("RepeatedTimes", { { "[COUNT]", "3" } }));
-        ensure("a run-time error is an error", made.rows[4].level == Doc::Level::Error);
-        ensure_equals("the include's last", made.rows[5].fileName, std::string("lib.lsl"));
-        ensure_equals("the squiggles: the script's own", made.decorations.size(), size_t(4));
+        {
+            CAPTURE(messages);
+            REQUIRE(made.rows.size() == size_t(6));
+        }
+        UNSCOPED_INFO("the weight first, at no line");
+        CHECK(made.rows[0].origin == services.words("OriginWeight"));
+        UNSCOPED_INFO("the weight a warning, the studio's reckoning");
+        CHECK(made.rows[0].level == Doc::Level::Warning);
+        UNSCOPED_INFO("then the compiler's own");
+        CHECK(made.rows[1].message == std::string("the compiler's own"));
+        UNSCOPED_INFO("the lint with its name");
+        CHECK(made.rows[2].message == std::string("a local shadows another [LocalShadow]"));
+        UNSCOPED_INFO("the analyzer's error, the compiler's on its line said once");
+        CHECK(made.rows[3].message == std::string("syntax error, unexpected"));
+        UNSCOPED_INFO("the run-time error, how many times");
+        CHECK(made.rows[4].message == "Math Error " + services.words("RepeatedTimes", { { "[COUNT]", "3" } }));
+        UNSCOPED_INFO("a run-time error is an error");
+        CHECK(made.rows[4].level == Doc::Level::Error);
+        UNSCOPED_INFO("the include's last");
+        CHECK(made.rows[5].fileName == std::string("lib.lsl"));
+        UNSCOPED_INFO("the squiggles: the script's own");
+        REQUIRE(made.decorations.size() == size_t(4));
         const auto underline = [&](S32 line) {
             for (const ALCodeEditor::Decoration& each : made.decorations)
             {
@@ -303,32 +316,36 @@ namespace tut
             return ALCodeEditor::Decoration::Style::Background;
         };
         using Style = ALCodeEditor::Decoration::Style;
-        ensure("an error waved, a warning dashed, a run-time error waved",
-               underline(2) == Style::Squiggle && underline(4) == Style::Dashed && underline(8) == Style::Squiggle);
-        ensure("the run-time mark on its line",
-               std::find(made.marks.begin(), made.marks.end(), std::make_pair(S32(8), ALCodeEditor::Mark::Runtime)) != made.marks.end());
-        ensure("each level's mark", ALScriptProblemsPane::markOf(Doc::Level::Error) == ALCodeEditor::Mark::Error &&
-                                        ALScriptProblemsPane::markOf(Doc::Level::Warning) == ALCodeEditor::Mark::Warning &&
-                                        ALScriptProblemsPane::markOf(Doc::Level::Note) == ALCodeEditor::Mark::Note);
-        ensure_equals("the lint's line offers its fix", made.fixable.size(), size_t(1));
-        ensure("which changes the script", made.fixable[0] == std::make_pair(S32(4), true));
+        {
+            INFO("an error waved, a warning dashed, a run-time error waved");
+            CHECK(underline(2) == Style::Squiggle);
+            CHECK(underline(4) == Style::Dashed);
+            CHECK(underline(8) == Style::Squiggle);
+        }
+        UNSCOPED_INFO("the run-time mark on its line");
+        REQUIRE(std::find(made.marks.begin(), made.marks.end(), std::make_pair(S32(8), ALCodeEditor::Mark::Runtime)) != made.marks.end());
+        CHECK(ALScriptProblemsPane::markOf(Doc::Level::Error) == ALCodeEditor::Mark::Error);
+        CHECK(ALScriptProblemsPane::markOf(Doc::Level::Warning) == ALCodeEditor::Mark::Warning);
+        CHECK(ALScriptProblemsPane::markOf(Doc::Level::Note) == ALCodeEditor::Mark::Note);
+        UNSCOPED_INFO("the lint's line offers its fix");
+        REQUIRE(made.fixable.size() == size_t(1));
+        UNSCOPED_INFO("which changes the script");
+        CHECK(made.fixable[0] == std::make_pair(S32(4), true));
 
         // Typed in since the check: the fixes are of a text there is no
         // longer, and the compiler's error on the analyzer's line is its own
         // again.
         d.editor->setText("line 0\nline 1\n");
         made = gather(d);
-        ensure("no fix offered", made.fixable.empty());
-        ensure("the compiler's error said", std::any_of(made.rows.begin(), made.rows.end(), [](const Doc::Shown& row) { return row.message == "syntax error"; }));
-        ensure("nor the weight, weighed of the old text",
-               std::none_of(made.rows.begin(), made.rows.end(), [&](const Doc::Shown& row) { return row.origin == services.words("OriginWeight"); }));
+        REQUIRE(made.fixable.empty());
+        UNSCOPED_INFO("the compiler's error said");
+        CHECK(std::any_of(made.rows.begin(), made.rows.end(), [](const Doc::Shown& row) { return row.message == "syntax error"; }));
+        UNSCOPED_INFO("nor the weight, weighed of the old text");
+        CHECK(std::none_of(made.rows.begin(), made.rows.end(), [&](const Doc::Shown& row) { return row.origin == services.words("OriginWeight"); }));
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<2>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: the list follows its filters and scope and the boxes say the counts", "[ALScriptProblemsPane]")
     {
-        set_test_name("the list through its filters -- levels, origin, words -- and its scope, with the counts the boxes and the tab say");
         ALScriptProblemsPane& out = make();
         using S                   = ALScriptProblem::Source;
         using V                   = ALScriptProblem::Severity;
@@ -340,63 +357,110 @@ namespace tut
         gather(lamp);
         gather(door);
         out.fill(&door);
-        ensure_equals("the one in front's", shown(), std::string("|door error|door warning|door note"));
-        ensure_equals("three to list", out.held(), 3);
-        ensure("said on the tab", studio.counts > 0);
-        ensure_equals("counted on the box", window.find<LLCheckBoxCtrl>("problems_errors")->getLabel(),
-                      services.words("FilterErrorsCount", { { "[COUNT]", "1" } }));
+        UNSCOPED_INFO("the one in front's");
+        CHECK(shown() == std::string("|door error|door warning|door note"));
+        CHECK(out.held() == 3);
+        UNSCOPED_INFO("said on the tab");
+        CHECK(studio.counts > 0);
+        LLCheckBoxCtrl* errors = window.find<LLCheckBoxCtrl>("problems_errors");
+        REQUIRE(errors);
+        UNSCOPED_INFO("counted on the box");
+        CHECK(errors->getLabel() == services.words("FilterErrorsCount", { { "[COUNT]", "1" } }));
 
         tick("problems_errors", false);
-        ensure("the filter kept", studio.filtersKept == 1);
-        ensure_equals("no errors, and what is hidden said", shown(),
+        UNSCOPED_INFO("the filter kept");
+        CHECK(studio.filtersKept == 1);
+        UNSCOPED_INFO("no errors, and what is hidden said");
+        CHECK(shown() ==
                       "|door warning|door note|#" + services.counted("ProblemsHidden", 1));
         tick("problems_errors", true);
         pick("problems_origin", services.words("OriginLint"));
-        ensure_equals("the lint's alone", shown(), "|door warning|door note|#" + services.counted("ProblemsHidden", 1));
+        UNSCOPED_INFO("the lint's alone");
+        CHECK(shown() == "|door warning|door note|#" + services.counted("ProblemsHidden", 1));
         pick("problems_origin", "");
-        window.find<LLFilterEditor>("problems_filter")->setText(std::string("NOTE"));
-        window.find<LLFilterEditor>("problems_filter")->onCommit();
-        ensure_equals("the words, in either case", shown(), "|door note|#" + services.counted("ProblemsHidden", 2));
-        ensure("rows to show: nothing said over them", !out.list()->saysEmpty());
-        window.find<LLFilterEditor>("problems_filter")->setText(std::string());
-        window.find<LLFilterEditor>("problems_filter")->onCommit();
+        LLFilterEditor* filter = window.find<LLFilterEditor>("problems_filter");
+        REQUIRE(filter);
+        filter->setText(std::string("NOTE"));
+        filter->onCommit();
+        UNSCOPED_INFO("the words, in either case");
+        CHECK(shown() == "|door note|#" + services.counted("ProblemsHidden", 2));
+        UNSCOPED_INFO("rows to show: nothing said over them");
+        CHECK_FALSE(out.list()->saysEmpty());
+        filter->setText(std::string());
+        filter->onCommit();
 
         pick("problems_scope", "all");
-        ensure_equals("every script's, each under its name", shown(),
+        UNSCOPED_INFO("every script's, each under its name");
+        CHECK(shown() ==
                       "|#door.lsl   \xC2\xB7   " + services.counted("ProblemErrors", 1) + ", " + services.counted("ProblemWarnings", 1) + ", " +
                           services.counted("ProblemNotes", 1) + "|door error|door warning|door note|#lamp.lsl   \xC2\xB7   " +
                           services.counted("ProblemErrors", 1) + "|lamp error");
-        ensure_equals("four to list", out.held(), 4);
+        CHECK(out.held() == 4);
         // Another script's problems gathered again: listed, since every
         // one's are.
         lamp.check->analysis.push_back(problem(S::Lint, V::Warning, 7, "lamp warning"));
         gather(lamp);
-        ensure("the new one listed", shown().find("lamp warning") != std::string::npos);
+        UNSCOPED_INFO("the new one listed");
+        REQUIRE(shown().find("lamp warning") != std::string::npos);
         pick("problems_scope", "this");
-        ensure_equals("back to the one", shown(), std::string("|door error|door warning|door note"));
+        UNSCOPED_INFO("back to the one");
+        CHECK(shown() == std::string("|door error|door warning|door note"));
         gather(lamp);
-        ensure("another's gathered leaves the list alone", shown().find("lamp") == std::string::npos);
+        UNSCOPED_INFO("another's gathered leaves the list alone");
+        REQUIRE(shown().find("lamp") == std::string::npos);
 
         // Closed, it is let go of.
         out.closed("door");
-        ensure("forgotten", out.listedId().empty());
+        REQUIRE(out.listedId().empty());
         LLSD state;
         out.saveState(state);
-        ensure_equals("the scope kept", state["problem_scope"].asString(), std::string("this"));
+        UNSCOPED_INFO("the scope kept");
+        CHECK(state["problem_scope"].asString() == std::string("this"));
 
         // A script with nothing wrong with it says so where the rows would be.
         Doc& clean = doc("clean");
         gather(clean);
         out.fill(&clean);
-        ensure("nothing listed, said", out.list()->saysEmpty()
-                                           && out.list()->emptyWords() == services.words("NoProblemsIn", { { "[NAME]", "clean.lsl" } }));
+        {
+            INFO("nothing listed, said");
+            REQUIRE(out.list()->saysEmpty());
+            CHECK(out.list()->emptyWords() == services.words("NoProblemsIn", { { "[NAME]", "clean.lsl" } }));
+        }
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<3>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: sorted by source, the most pressing first, as the filter lists them", "[ALScriptProblemsPane]")
     {
-        set_test_name("the first error chosen and gone to, passing over the compiler's where asked; a row chosen goes to its place");
+        ALScriptProblemsPane& out = make();
+        using S                   = ALScriptProblem::Source;
+        using V                   = ALScriptProblem::Severity;
+        Doc& door                 = doc("door");
+        door.check->analysis      = { problem(S::Lint, V::Warning, 1, "a lint"), problem(S::Types, V::Error, 2, "a type"),
+                                      problem(S::Parser, V::Error, 3, "a parse") };
+        gather(door);
+        out.fill(&door);
+        out.list()->sortByColumnIndex(2, true);
+        UNSCOPED_INFO("Tapple's: the parser's, then the types', then the lint's");
+        CHECK(shown() == std::string("|a parse|a type|a lint"));
+        out.list()->sortByColumnIndex(2, false);
+        UNSCOPED_INFO("the other way, the other way round");
+        CHECK(shown() == std::string("|a lint|a type|a parse"));
+        LLComboBox* origins = window.find<LLComboBox>("problems_origin");
+        REQUIRE(origins);
+        std::vector<std::string> listed;
+        for (const LLScrollListItem* item : origins->getAllData())
+        {
+            listed.push_back(item->getValue().asString());
+        }
+        UNSCOPED_INFO("the filter in the same order, after any");
+        CHECK(listed == std::vector<std::string>{ "", services.words("OriginCompiler"), services.words("OriginParser"),
+                                                  services.words("OriginPreprocessor"), services.words("OriginRuntime"),
+                                                  services.words("OriginMigration"), services.words("OriginTypes"), services.words("OriginLint"),
+                                                  services.words("OriginOptimizer"), services.words("OriginWeight"),
+                                                  services.words("OriginDefinitions") });
+    }
+
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: selectFirstError and a chosen row go to the problem's place", "[ALScriptProblemsPane]")
+    {
         ALScriptProblemsPane& out = make();
         Doc&                  d   = doc("door");
         d.problems.push_back({ 1, 0, true, std::string(), "ERROR", "compiler first" });
@@ -405,30 +469,45 @@ namespace tut
         gather(d);
         out.fill(&d);
         out.selectFirstError(false);
-        ensure_equals("the first error, the compiler's", studio.chosen.back().line, 1);
-        ensure("taken to the script", studio.toEditor.back());
+        REQUIRE_FALSE(studio.chosen.empty());
+        UNSCOPED_INFO("the first error, the compiler's");
+        CHECK(studio.chosen.back().line == 1);
+        UNSCOPED_INFO("taken to the script");
+        REQUIRE(studio.toEditor.back());
         out.selectFirstError(true);
-        ensure_equals("the checkers' own", studio.chosen.back().line, 5);
-        ensure_equals("its stretch", studio.chosen.back().endColumn, 6);
+        UNSCOPED_INFO("the checkers' own");
+        CHECK(studio.chosen.back().line == 5);
+        CHECK(studio.chosen.back().endColumn == 6);
 
         choose("a warning before");
         out.choose(false);
-        ensure_equals("a row walked to", studio.chosen.back().line, 0);
-        ensure("the keyboard left in the list", !studio.toEditor.back());
-        ensure_equals("whose it is", studio.chosen.back().doc, std::string("door"));
+        UNSCOPED_INFO("a row walked to");
+        CHECK(studio.chosen.back().line == 0);
+        UNSCOPED_INFO("the keyboard left in the list");
+        REQUIRE_FALSE(studio.toEditor.back());
+        CHECK(studio.chosen.back().doc == std::string("door"));
 
         // The list's keys: return goes there to type, escape back to the
         // script without going.
-        ensure("return", out.list()->handleKeyHere(KEY_RETURN, MASK_NONE) && studio.chosen.back().line == 0 && studio.toEditor.back());
-        const size_t gone = studio.chosen.size();
-        ensure("escape", out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE) && services.reveals.back() && studio.chosen.size() == gone);
+        {
+            INFO("return");
+            CHECK(out.list()->handleKeyHere(KEY_RETURN, MASK_NONE));
+            CHECK(studio.chosen.back().line == 0);
+            REQUIRE(studio.toEditor.back());
+        }
+        const size_t gone     = studio.chosen.size();
+        const size_t revealed = services.reveals.size();
+        {
+            INFO("escape");
+            CHECK(out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+            REQUIRE(services.reveals.size() == revealed + 1);
+            REQUIRE(services.reveals.back());
+            REQUIRE(studio.chosen.size() == gone);
+        }
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<4>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: the menu offers only what the chosen problem allows and acts on it", "[ALScriptProblemsPane]")
     {
-        set_test_name("the menu offers what the chosen problem allows: its lint turned off or made an error, its fixes, every one of its kind");
         ALScriptProblemsPane& out = make();
         Doc&                  d   = doc("door");
         studio.lints.insert("LocalShadow");
@@ -447,51 +526,76 @@ namespace tut
         out.fill(&d);
 
         choose("no lint");
-        ensure("no lint to turn off", !out.enabled("off") && !out.enabled("error"));
-        ensure("copying always", out.enabled("copy") && out.enabled("copy_all"));
-        ensure("no run-time errors to let go of", !out.enabled("clear_runtime"));
-        ensure("of no kind, none to fix along with it", !out.fixShown("kind"));
+        {
+            INFO("no lint to turn off");
+            CHECK_FALSE(out.enabled("off"));
+            CHECK_FALSE(out.enabled("error"));
+        }
+        {
+            INFO("copying always");
+            CHECK(out.enabled("copy"));
+            CHECK(out.enabled("copy_all"));
+        }
+        UNSCOPED_INFO("no run-time errors to let go of");
+        CHECK_FALSE(out.enabled("clear_runtime"));
+        UNSCOPED_INFO("of no kind, none to fix along with it");
+        CHECK_FALSE(out.fixShown("kind"));
         out.act("fix_kind");
-        ensure("nor made", studio.kinds.empty());
-        ensure("Fix All, over two", out.fixShown("all"));
+        UNSCOPED_INFO("nor made");
+        REQUIRE(studio.kinds.empty());
+        UNSCOPED_INFO("Fix All, over two");
+        CHECK(out.fixShown("all"));
 
         choose("shadowed once [LocalShadow]");
-        ensure("its lint", out.enabled("off") && out.enabled("error"));
-        ensure("a warning", !out.lintIsError());
+        {
+            INFO("its lint");
+            CHECK(out.enabled("off"));
+            CHECK(out.enabled("error"));
+        }
+        UNSCOPED_INFO("a warning");
+        CHECK_FALSE(out.lintIsError());
         out.act("error");
-        ensure("made an error", out.lintIsError());
+        UNSCOPED_INFO("made an error");
+        CHECK(out.lintIsError());
         out.act("error");
-        ensure("and back", !out.lintIsError());
+        UNSCOPED_INFO("and back");
+        CHECK_FALSE(out.lintIsError());
         out.act("off");
-        ensure("turned off", studio.levels["LocalShadow"] == ALScriptLints::Level::Off);
+        CHECK(studio.levels["LocalShadow"] == ALScriptLints::Level::Off);
         out.act("settings");
-        ensure_equals("the settings", studio.settings, 1);
-        ensure("every one of its kind", out.fixShown("kind"));
+        CHECK(studio.settings == 1);
+        UNSCOPED_INFO("every one of its kind");
+        CHECK(out.fixShown("kind"));
         out.act("fix:0");
-        ensure_equals("its fix made", studio.fixed.size(), size_t(1));
-        ensure_equals("which", studio.fixed[0], std::string("door:Rename"));
+        UNSCOPED_INFO("its fix made");
+        REQUIRE(studio.fixed.size() == size_t(1));
+        CHECK(studio.fixed[0] == std::string("door:Rename"));
         out.act("fix_kind");
         out.act("fix_all");
-        ensure_equals("of its kind, then of all", studio.kinds.size(), size_t(2));
-        ensure_equals("by its kind", studio.kinds[0], std::string("door:shadow"));
-        ensure_equals("then every kind", studio.kinds[1], std::string("door:"));
+        UNSCOPED_INFO("of its kind, then of all");
+        REQUIRE(studio.kinds.size() == size_t(2));
+        CHECK(studio.kinds[0] == std::string("door:shadow"));
+        UNSCOPED_INFO("then every kind");
+        CHECK(studio.kinds[1] == std::string("door:"));
 
         out.act("copy_all");
-        ensure_equals("copied, and said", services.statuses.back(), services.counted("ProblemsCopied", 3));
+        REQUIRE_FALSE(services.statuses.empty());
+        UNSCOPED_INFO("copied, and said");
+        CHECK(services.statuses.back() == services.counted("ProblemsCopied", 3));
 
         d.runtime.push_back({ 1, -1, std::string(), "Math Error", 1 });
-        ensure("run-time errors to let go of", out.enabled("clear_runtime"));
+        UNSCOPED_INFO("run-time errors to let go of");
+        CHECK(out.enabled("clear_runtime"));
         out.act("clear_runtime");
-        ensure("let go of", d.runtime.empty());
-        ensure("and not recalled when it is opened again", studio.cleared == std::vector<std::string>{ d.id });
-        ensure_equals("and the tab's problems gathered again", studio.refreshed.size(), size_t(1));
+        REQUIRE(d.runtime.empty());
+        UNSCOPED_INFO("and not recalled when it is opened again");
+        CHECK(studio.cleared == std::vector<std::string>{ d.id });
+        UNSCOPED_INFO("and the tab's problems gathered again");
+        REQUIRE(studio.refreshed.size() == size_t(1));
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<5>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: a compiler error a line after the analyzer's is merged and dated after edits", "[ALScriptProblemsPane]")
     {
-        set_test_name("the compiler's error a line from the analyzer's is the same error said once; the compiler's said to be as of the last save once the text has changed");
         make();
         Doc& d = doc("door");
         using S = ALScriptProblem::Source;
@@ -507,8 +611,10 @@ namespace tut
         {
             messages.push_back(row.message);
         }
-        ensure("the one a line after said once", std::find(messages.begin(), messages.end(), "syntax error") == messages.end());
-        ensure("one further off kept", std::find(messages.begin(), messages.end(), "far from any") != messages.end());
+        UNSCOPED_INFO("the one a line after said once");
+        REQUIRE(std::find(messages.begin(), messages.end(), "syntax error") == messages.end());
+        UNSCOPED_INFO("one further off kept");
+        REQUIRE(std::find(messages.begin(), messages.end(), "far from any") != messages.end());
         // Typed in since the save: what the compiler said is of the text
         // as it was.
         d.editor->insertText("x");
@@ -518,14 +624,12 @@ namespace tut
         {
             marked |= row.message == "far from any " + services.words("CompilerAsSaved");
         }
-        ensure("as of the last save", marked);
+        UNSCOPED_INFO("as of the last save");
+        CHECK(marked);
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<6>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: an LSL lint shows its NOLINT name and an error no code number", "[ALScriptProblemsPane]")
     {
-        set_test_name("an LSL lint says its name, which a NOLINT comment turns it off by; an error says no number; the origins offer the weight");
         make();
         Doc& d = doc("door");
         using S = ALScriptProblem::Source;
@@ -544,17 +648,22 @@ namespace tut
             named |= row.message == "declared but never used [DeclaredButNotUsed]";
             numbered |= row.message.find("10002") != std::string::npos;
         }
-        ensure("the lint named", named);
-        ensure("the error no number", !numbered);
+        UNSCOPED_INFO("the lint named");
+        CHECK(named);
+        UNSCOPED_INFO("by the name a NOLINT comment turns it off by");
+        CHECK(ALScriptFixes::suppressed(unused, "integer x; // NOLINT(DeclaredButNotUsed)", "", false));
+        UNSCOPED_INFO("the error no number");
+        CHECK_FALSE(numbered);
         LLComboBox* origins = window.find<LLComboBox>("problems_origin");
-        ensure("the origins offer the weight", origins && origins->selectByValue(LLSD(services.words("OriginWeight"))));
+        {
+            INFO("the origins offer the weight");
+            REQUIRE(origins);
+            CHECK(origins->selectByValue(LLSD(services.words("OriginWeight"))));
+        }
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<7>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: code past four fifths of its limit warns what is left once optimized", "[ALScriptProblemsPane]")
     {
-        set_test_name("code past four fifths of its target's limit is a warning that says what is left to run in; not before the optimizer, nor under");
         make();
         Doc& d = doc("door");
         ALScriptWeight weight;
@@ -570,39 +679,43 @@ namespace tut
             return rows;
         };
         std::vector<Doc::Shown> rows = weights(gather(d));
-        ensure_equals("near: one row", rows.size(), size_t(1));
-        ensure("a warning", rows[0].level == Doc::Level::Warning);
-        ensure("what is left", rows[0].message == services.words("WeightNear", { { "[SIZE]", "14.0" }, { "[LIMIT]", "16" }, { "[LEFT]", "2.0" }, { "[TARGET]", "LSL (LSO)" } }));
+        UNSCOPED_INFO("near: one row");
+        REQUIRE(rows.size() == size_t(1));
+        CHECK(rows[0].level == Doc::Level::Warning);
+        UNSCOPED_INFO("what is left");
+        CHECK(rows[0].message == services.words("WeightNear", { { "[SIZE]", "14.0" }, { "[LIMIT]", "16" }, { "[LEFT]", "2.0" }, { "[TARGET]", "LSL (LSO)" } }));
         d.weighing->exact = false;
-        ensure("before the optimizer, nothing", weights(gather(d)).empty());
+        UNSCOPED_INFO("before the optimizer, nothing");
+        REQUIRE(weights(gather(d)).empty());
         d.weighing->exact            = true;
         d.weighing->weight->total    = 12 * 1024;
-        ensure("at three quarters, nothing", weights(gather(d)).empty());
+        UNSCOPED_INFO("at three quarters, nothing");
+        REQUIRE(weights(gather(d)).empty());
         d.weighing->weight->total    = 17 * 1024;
         rows = weights(gather(d));
-        ensure("over: the over row alone", rows.size() == 1 && rows[0].message.find("more than") != std::string::npos);
+        {
+            INFO("over: the over row alone");
+            REQUIRE(rows.size() == 1);
+            REQUIRE(rows[0].message.find("more than") != std::string::npos);
+        }
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<8>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: a problem in generated code is listed as such and not marked in the source", "[ALScriptProblemsPane]")
     {
-        set_test_name("a problem in code the preprocessor made is listed under that name, not marked on the source's line of its number");
         make();
         Doc& d = doc("door");
         ALScriptProblem made_here = problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "in a switch's jump table", Doc::GENERATED);
         d.check->analysis          = { made_here };
         d.check->analysisVersion   = d.editor->document().version();
         const ALScriptProblemsPane::Made made = gather(d);
-        ensure_equals("one row", made.rows.size(), size_t(1));
-        ensure_equals("named so", made.rows[0].fileName, services.words("InGeneratedCode"));
-        ensure("no mark, no squiggle", made.marks.empty() && made.decorations.empty());
+        REQUIRE(made.rows.size() == size_t(1));
+        CHECK(made.rows[0].fileName == services.words("InGeneratedCode"));
+        REQUIRE(made.marks.empty());
+        REQUIRE(made.decorations.empty());
     }
 
-    template<> template<>
-    void alscriptproblemspane_object::test<9>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: a checked script with no tab is listed after open ones and chosen by its item", "[ALScriptProblemsPane]")
     {
-        set_test_name("a script no tab holds, which an object's check reached, is listed after the open ones under its name, chosen by its item, and gives way to its tab");
         make();
         Doc& d            = doc("door");
         d.check->analysis = { problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "in the open one") };
@@ -622,10 +735,14 @@ namespace tut
         pane->showEveryScript();
         const std::string listed  = shown();
         const std::string heading = "#" + services.words("ProblemsChecked", { { "[NAME]", "hinge.lsl" }, { "[OBJECT]", "House" } });
-        ensure("the open one's, then the closed one's under its name and object: " + listed,
-               listed.find("in the open one") < listed.find(heading) && listed.find(heading) < listed.find("in the closed one") &&
-                   listed.find("in the closed one") != std::string::npos);
-        ensure_equals("counted with the rest", pane->held(), 2);
+        {
+            INFO("the open one's, then the closed one's under its name and object: " + listed);
+            CHECK(listed.find("in the open one") < listed.find(heading));
+            CHECK(listed.find(heading) < listed.find("in the closed one"));
+            REQUIRE(listed.find("in the closed one") != std::string::npos);
+        }
+        UNSCOPED_INFO("counted with the rest");
+        CHECK(pane->held() == 2);
 
         // Chosen by its item and name, with no tab.
         const std::vector<LLScrollListItem*> rows = list()->getAllData();
@@ -634,26 +751,40 @@ namespace tut
         {
             at = rows[i]->getValue()["owner"].asString().rfind("checked:", 0) == 0 ? static_cast<S32>(i) : at;
         }
-        ensure("a row of it", at >= 0);
+        UNSCOPED_INFO("a row of it");
+        REQUIRE(at >= 0);
         list()->selectNthItem(at);
         pane->choose(false);
-        ensure("chosen", !studio.chosen.empty());
+        REQUIRE_FALSE(studio.chosen.empty());
         const ALScriptProblemsPane::Place& place = studio.chosen.back();
-        ensure("by its item, with no tab", place.ref == closed && place.name == "hinge.lsl" && place.doc.empty() && place.line == 3);
+        {
+            INFO("by its item, with no tab");
+            CHECK(place.ref == closed);
+            CHECK(place.name == "hinge.lsl");
+            REQUIRE(place.doc.empty());
+            CHECK(place.line == 3);
+        }
 
         // Opened, its tab says; a new check lets the last one's go.
         pane->forgetChecked(closed);
-        ensure("given way", shown().find("in the closed one") == std::string::npos && pane->held() == 1);
+        {
+            INFO("given way");
+            REQUIRE(shown().find("in the closed one") == std::string::npos);
+            CHECK(pane->held() == 1);
+        }
         pane->checkedScript(closed, "hinge.lsl", false, { row }, "House");
-        ensure_equals("back", pane->checkedCount(), size_t(1));
+        UNSCOPED_INFO("back");
+        CHECK(pane->checkedCount() == size_t(1));
         pane->clearChecked();
-        ensure("let go of", pane->checkedCount() == 0 && shown().find("in the closed one") == std::string::npos);
+        {
+            INFO("let go of");
+            CHECK(pane->checkedCount() == 0);
+            REQUIRE(shown().find("in the closed one") == std::string::npos);
+        }
     }
 
-    template<> template<>
-    void alscriptproblemspane_object::test<10>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: a closed script's last recompile errors list beside its check until clean", "[ALScriptProblemsPane]")
     {
-        set_test_name("what a recompile's compiler said of a closed script is listed beside its check's rows, the last recompile's alone, and goes when it compiles clean");
         make();
         LLUUID object, item;
         object.generate();
@@ -669,67 +800,88 @@ namespace tut
         };
         pane->showEveryScript();
         pane->compiledScript(closed, "hinge.lsl", false, {}, "House");
-        ensure("clean, and nothing listed of it: nothing to list", pane->checkedCount() == 0);
+        UNSCOPED_INFO("clean, and nothing listed of it: nothing to list");
+        CHECK(pane->checkedCount() == 0);
 
         pane->checkedScript(closed, "hinge.lsl", false, { row("the check's", "Lint") }, "House");
         pane->compiledScript(closed, "hinge.lsl", false, { row("the compiler's", "Compiler") }, "House");
-        ensure("both listed", shown().find("the check's") != std::string::npos && shown().find("the compiler's") != std::string::npos);
-        ensure_equals("counted", pane->held(), 2);
+        REQUIRE(shown().find("the check's") != std::string::npos);
+        REQUIRE(shown().find("the compiler's") != std::string::npos);
+        CHECK(pane->held() == 2);
 
         pane->compiledScript(closed, "hinge.lsl", false, { row("again", "Compiler") }, "House");
-        ensure("the last recompile's alone", shown().find("the compiler's") == std::string::npos && shown().find("again") != std::string::npos);
+        {
+            INFO("the last recompile's alone");
+            REQUIRE(shown().find("the compiler's") == std::string::npos);
+            REQUIRE(shown().find("again") != std::string::npos);
+        }
         pane->compiledScript(closed, "hinge.lsl", false, {}, "House");
-        ensure("clean: the compiler's gone, the check's stay", shown().find("again") == std::string::npos && shown().find("the check's") != std::string::npos);
+        {
+            INFO("clean: the compiler's gone, the check's stay");
+            REQUIRE(shown().find("again") == std::string::npos);
+            REQUIRE(shown().find("the check's") != std::string::npos);
+        }
 
         // Recompiled alone, with no check: gone with its rows.
         LLUUID other;
         other.generate();
         const ALScriptRef lone(object, other);
         pane->compiledScript(lone, "latch.lsl", false, { row("latch", "Compiler") }, "House");
-        ensure_equals("listed", pane->checkedCount(), size_t(2));
+        CHECK(pane->checkedCount() == size_t(2));
         pane->compiledScript(lone, "latch.lsl", false, {}, "House");
-        ensure_equals("gone", pane->checkedCount(), size_t(1));
+        CHECK(pane->checkedCount() == size_t(1));
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<11>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: out of sight the pane counts at once but lists rows only when seen or chosen", "[ALScriptProblemsPane]")
     {
-        set_test_name("out of sight, the counts said at once and the rows listed once the list is seen, or once a row is to be chosen");
         ALScriptProblemsPane& out  = make();
         using S                    = ALScriptProblem::Source;
         using V                    = ALScriptProblem::Severity;
         LLTabContainer* tabs       = window.find<LLTabContainer>("bottom_tabs");
         Doc&            door       = doc("door");
         door.check->analysis       = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning") };
+        REQUIRE(tabs);
         tabs->selectTabByName("references_tab");
-        ensure("out of sight", !ALPaneFolds::inSight(&out));
+        CHECK_FALSE(ALPaneFolds::inSight(&out));
         const S32 said = studio.counts;
         gather(door);
-        ensure("counted, and said on the tab", out.held() == 2 && studio.counts > said);
-        ensure_equals("not listed", shown(), std::string());
+        {
+            INFO("counted, and said on the tab");
+            CHECK(out.held() == 2);
+            CHECK(studio.counts > said);
+        }
+        UNSCOPED_INFO("not listed");
+        CHECK(shown() == std::string());
         out.pump();
-        ensure_equals("nor while unseen", shown(), std::string());
+        UNSCOPED_INFO("nor while unseen");
+        CHECK(shown() == std::string());
         tabs->selectTabByName("problems_tab");
         out.pump();
-        ensure_equals("seen: listed", shown(), std::string("|door error|door warning"));
+        UNSCOPED_INFO("seen: listed");
+        CHECK(shown() == std::string("|door error|door warning"));
 
         tabs->selectTabByName("references_tab");
         door.check->analysis.push_back(problem(S::Parser, V::Error, 5, "a second error"));
         gather(door);
-        ensure("counted again, the rows as they were", out.held() == 3 && shown() == "|door error|door warning");
+        {
+            INFO("counted again, the rows as they were");
+            CHECK(out.held() == 3);
+            CHECK(shown() == "|door error|door warning");
+        }
         const size_t chosen = studio.chosen.size();
         out.selectFirstError(false);
-        ensure("a row to choose: listed first", shown().find("a second error") != std::string::npos);
-        ensure("and chosen", studio.chosen.size() == chosen + 1 && studio.chosen.back().line == 1);
+        UNSCOPED_INFO("a row to choose: listed first");
+        REQUIRE(shown().find("a second error") != std::string::npos);
+        {
+            INFO("and chosen");
+            REQUIRE(studio.chosen.size() == chosen + 1);
+            CHECK(studio.chosen.back().line == 1);
+        }
         tabs->selectTabByName("problems_tab");
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<12>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: a refill keeps matching rows and the selection and lists at most a thousand", "[ALScriptProblemsPane]")
     {
-        set_test_name("a refill keeps the rows that say the same, moved or not, and the row chosen; no more than a thousand listed, the rest counted");
         ALScriptProblemsPane& out = make();
         using S                   = ALScriptProblem::Source;
         using V                   = ALScriptProblem::Severity;
@@ -747,13 +899,17 @@ namespace tut
         door.check->analysis = { problem(S::Parser, V::Error, 1, "first"), problem(S::Lint, V::Warning, 3, "second") };
         gather(door);
         LLScrollListItem* second = row_saying("second");
-        ensure("listed", second != nullptr && second->getColumn(3)->getValue().asString().rfind("4:", 0) == 0);
+        REQUIRE(second != nullptr);
+        CHECK(second->getColumn(3)->getValue().asString().rfind("4:", 0) == 0);
         choose("second");
         door.check->analysis = { problem(S::Parser, V::Error, 2, "first"), problem(S::Lint, V::Warning, 4, "second") };
         gather(door);
-        ensure("moved a line: the same row", row_saying("second") == second);
-        ensure("where it is now", second->getColumn(3)->getValue().asString().rfind("5:", 0) == 0);
-        ensure("still chosen", list()->getFirstSelected() == second);
+        UNSCOPED_INFO("moved a line: the same row");
+        REQUIRE(row_saying("second") == second);
+        UNSCOPED_INFO("where it is now");
+        CHECK(second->getColumn(3)->getValue().asString().rfind("5:", 0) == 0);
+        UNSCOPED_INFO("still chosen");
+        CHECK(list()->getFirstSelected() == second);
 
         std::vector<ALScriptProblem> many;
         for (S32 i = 0; i < 1005; ++i)
@@ -762,20 +918,20 @@ namespace tut
         }
         door.check->analysis = many;
         gather(door);
-        ensure_equals("all counted", out.held(), 1005);
+        UNSCOPED_INFO("all counted");
+        CHECK(out.held() == 1005);
         S32 rows = 0;
         for (LLScrollListItem* item : list()->getAllData())
         {
             rows += item->getValue().has("heading") ? 0 : 1;
         }
-        ensure_equals("a thousand listed", rows, 1000);
-        ensure("the rest said", shown().find(services.counted("ProblemsUnlisted", 5)) != std::string::npos);
+        CHECK(rows == 1000);
+        UNSCOPED_INFO("the rest said");
+        REQUIRE(shown().find(services.counted("ProblemsUnlisted", 5)) != std::string::npos);
     }
 
-    template<> template<>
-    void alscriptproblemspane_object::test<13>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: showObject lists that object's open and checked scripts and no other's", "[ALScriptProblemsPane]")
     {
-        set_test_name("an object's check lists that object's scripts: its open ones and those it read, none of another object's open beside them");
         make();
         const LLUUID house = LLUUID::generateNewID();
         const LLUUID shed  = LLUUID::generateNewID();
@@ -803,32 +959,41 @@ namespace tut
         pane->checkedScript(closed, "hinge.lsl", false, { row }, "House");
         pane->showObject(house);
         std::string listed = shown();
-        ensure("the house's open scripts: " + listed, listed.find("the door's") != std::string::npos && listed.find("the lamp's") != std::string::npos);
-        ensure("and the one it read: " + listed, listed.find("the hinge's") != std::string::npos);
-        ensure("not the shed's: " + listed, listed.find("the bench's") == std::string::npos);
-        ensure_equals("counted as the house's", pane->held(), 3);
+        {
+            INFO("the house's open scripts: " + listed);
+            REQUIRE(listed.find("the door's") != std::string::npos);
+            REQUIRE(listed.find("the lamp's") != std::string::npos);
+        }
+        UNSCOPED_INFO("and the one it read: " + listed);
+        REQUIRE(listed.find("the hinge's") != std::string::npos);
+        UNSCOPED_INFO("not the shed's: " + listed);
+        REQUIRE(listed.find("the bench's") == std::string::npos);
+        UNSCOPED_INFO("counted as the house's");
+        CHECK(pane->held() == 3);
 
         // In front or not, the shed's script is not the house's.
         services.front = 2;
         pane->fill(&bench);
-        ensure("the shed's in front, still not listed", shown().find("the bench's") == std::string::npos);
+        UNSCOPED_INFO("the shed's in front, still not listed");
+        REQUIRE(shown().find("the bench's") == std::string::npos);
 
         // Every open script's lists them all; and it is what is kept.
         pane->showEveryScript();
         listed = shown();
-        ensure("every open one's: " + listed, listed.find("the bench's") != std::string::npos && listed.find("the door's") != std::string::npos);
+        {
+            INFO("every open one's: " + listed);
+            REQUIRE(listed.find("the bench's") != std::string::npos);
+            REQUIRE(listed.find("the door's") != std::string::npos);
+        }
         pane->showObject(house);
         LLSD state;
         pane->saveState(state);
-        ensure_equals("one object's is not kept", state["problem_scope"].asString(), std::string("all"));
+        UNSCOPED_INFO("one object's is not kept");
+        CHECK(state["problem_scope"].asString() == std::string("all"));
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<14>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: only LSL leftovers in a ported script are listed and counted as from LSL", "[ALScriptProblemsPane]")
     {
-        set_test_name("what a script moved from LSL is left with -- a converter's note, an LSL habit's lint, a call to llcompat -- listed as "
-                      "from LSL, counted, and the origin that lists them alone; not a performance lint, nor ll's own deprecation");
         make();
         Doc& d          = doc("door");
         d.language.lua  = true;
@@ -856,23 +1021,26 @@ namespace tut
         {
             if (row.migration)
             {
-                ensure_equals("said to be from LSL", row.origin, services.words("OriginMigration"));
+                UNSCOPED_INFO("said to be from LSL");
+                REQUIRE(row.origin == services.words("OriginMigration"));
                 from_lsl += row.message.substr(0, 4) + ";";
             }
         }
-        ensure_equals("the three", from_lsl, std::string("a no;a nu;llco;"));
+        UNSCOPED_INFO("the three");
+        CHECK(from_lsl == std::string("a no;a nu;llco;"));
         d.setShown(made.rows);
-        ensure_equals("counted", d.shownMigration, 3);
+        CHECK(d.shownMigration == 3);
         pane->showOrigin("OriginMigration");
         LLComboBox* origins = window.find<LLComboBox>("problems_origin");
-        ensure("listed alone", origins && origins->getValue().asString() == services.words("OriginMigration"));
+        {
+            INFO("listed alone");
+            REQUIRE(origins);
+            CHECK(origins->getValue().asString() == services.words("OriginMigration"));
+        }
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<15>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: only an LSL leftover's menu offers and makes the from-LSL fix", "[ALScriptProblemsPane]")
     {
-        set_test_name("the menu of a problem left from LSL offers what is left from LSL fixed, and makes it; another problem's does not");
         ALScriptProblemsPane& out = make();
         Doc&                  d   = doc("door");
         d.language.lua            = true;
@@ -886,53 +1054,71 @@ namespace tut
         gather(d);
         out.fill(&d);
         choose("shadowed [LocalShadow]");
-        ensure("not of another", !out.fixShown("migration"));
+        UNSCOPED_INFO("not of another");
+        CHECK_FALSE(out.fixShown("migration"));
         choose("reads nothing at 0 [SlZeroIndex]");
-        ensure("offered", out.fixShown("migration"));
+        CHECK(out.fixShown("migration"));
         out.act("fix_migration");
-        ensure("asked", !studio.kinds.empty() && studio.kinds.back() == "door:from LSL");
+        REQUIRE_FALSE(studio.kinds.empty());
+        CHECK(studio.kinds.back() == "door:from LSL");
     }
 
-    template <>
-    template <>
-    void alscriptproblemspane_object::test<16>()
+    TEST_CASE_METHOD(alscriptproblemspane_data, "ALScriptProblemsPane: a problem naming no line is listed and chosen at none and marked nowhere", "[ALScriptProblemsPane]")
     {
-        set_test_name("what names no line -- a compiler's line of no form it has, a run-time error of no place -- is listed at none, marked "
-                      "nowhere, and chosen at none, and gone to as the first error only where no error names a line; one that names a line, at it");
         ALScriptProblemsPane& out = make();
         Doc&                  d   = doc("door");
         d.problems.push_back({ -1, 0, false, std::string(), "ERROR", "the compiler's, nowhere" });
         d.problems.push_back({ 3, 0, false, std::string(), "WARN", "the compiler's, at 3" });
         d.runtime.push_back({ -1, -1, std::string(), "Stack-Heap Collision", 1 });
         const ALScriptProblemsPane::Made made = gather(d);
-        ensure_equals("all three", made.rows.size(), size_t(3));
-        ensure("at none, first", made.rows[0].line == -1 && made.rows[1].line == -1 && made.rows[2].line == 3);
-        ensure("a warning said WARN", made.rows[2].level == Doc::Level::Warning);
-        ensure("marked at its line alone", made.marks.size() == 1 && made.marks[0].first == 3);
-        ensure("waved at its line alone", made.decorations.size() == 1 && made.decorations[0].range.begin.line == 3);
+        REQUIRE(made.rows.size() == size_t(3));
+        {
+            INFO("at none, first");
+            CHECK(made.rows[0].line == -1);
+            CHECK(made.rows[1].line == -1);
+            CHECK(made.rows[2].line == 3);
+        }
+        UNSCOPED_INFO("a warning said WARN");
+        CHECK(made.rows[2].level == Doc::Level::Warning);
+        {
+            INFO("marked at its line alone");
+            REQUIRE(made.marks.size() == 1);
+            CHECK(made.marks[0].first == 3);
+        }
+        {
+            INFO("waved at its line alone");
+            REQUIRE(made.decorations.size() == 1);
+            CHECK(made.decorations[0].range.begin.line == 3);
+        }
         out.fill(&d);
         list()->updateSort();
         for (const LLScrollListItem* item : list()->getAllData())
         {
             const std::string message = item->getColumn(1)->getValue().asString();
             const std::string where   = item->getColumn(3)->getValue().asString();
-            ensure("where: " + message + " " + where, message == "the compiler's, at 3" ? where == "4" : where.empty());
+            CAPTURE(message, where);
+            REQUIRE((message == "the compiler's, at 3" ? where == "4" : where.empty()));
         }
         choose("the compiler's, nowhere");
         out.choose(false);
-        ensure_equals("chosen at none", studio.chosen.back().line, -1);
+        REQUIRE_FALSE(studio.chosen.empty());
+        UNSCOPED_INFO("chosen at none");
+        CHECK(studio.chosen.back().line == -1);
         choose("the compiler's, at 3");
         out.choose(false);
-        ensure_equals("chosen at its line", studio.chosen.back().line, 3);
+        UNSCOPED_INFO("chosen at its line");
+        CHECK(studio.chosen.back().line == 3);
 
         // The first error gone to: one at none, listed first, only where no
         // error names a line.
         out.selectFirstError(false);
-        ensure_equals("one at none, where no error is at a line", studio.chosen.back().line, -1);
+        UNSCOPED_INFO("one at none, where no error is at a line");
+        CHECK(studio.chosen.back().line == -1);
         d.problems.push_back({ 5, 0, false, std::string(), "ERROR", "the compiler's, at 5" });
         gather(d);
         out.fill(&d);
         out.selectFirstError(false);
-        ensure_equals("one at a line, past those at none", studio.chosen.back().line, 5);
+        UNSCOPED_INFO("one at a line, past those at none");
+        CHECK(studio.chosen.back().line == 5);
     }
 }

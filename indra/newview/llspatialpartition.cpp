@@ -1276,7 +1276,10 @@ class LLOctreeSelect : public LLOctreeCull
 {
 public:
     LLOctreeSelect(LLCamera* camera, std::vector<LLDrawable*>* results)
-        : LLOctreeCull(camera), mResults(results) { }
+        : LLOctreeCull(camera), mResults(results)
+    {
+        mNearFirst = false; // the selection is a set of drawables, in no order
+    }
 
     virtual bool earlyFail(LLViewerOctreeGroup* group) { return false; }
     virtual void preprocess(LLViewerOctreeGroup* group) { }
@@ -1481,11 +1484,9 @@ S32 LLSpatialPartition::cull(LLCamera &camera, bool do_occlusion)
         LLOctreeCullShadow culler(&camera);
         culler.traverse(mOctree);
     }
-    // Terrain in the main view, when an infinite projection no longer bounds it. Water is a flat plane drawn out
-    // to its stretch, so it is not held to the reach.
+    // Terrain in the main view, when an infinite projection no longer bounds it.
     else if (const F32 reach = ALFarPlane::terrainReach(LLViewerCamera::getInstance()->getProjectionFar());
-             mInfiniteFarClip && reach > 0.f && !gCubeSnapshot && &camera == LLViewerCamera::getInstance() &&
-             mPartitionType != LLViewerRegion::PARTITION_WATER && mPartitionType != LLViewerRegion::PARTITION_VOIDWATER)
+             mInfiniteFarClip && reach > 0.f && !gCubeSnapshot && &camera == LLViewerCamera::getInstance())
     {
         ALOctreeCullReach culler(&camera, reach);
         culler.traverse(mOctree);
@@ -1964,10 +1965,6 @@ void renderBoundingBox(LLDrawable* drawable, bool set_color = true)
                 case LLViewerObject::LL_VO_HUD_PART_GROUP:
                         gGL.diffuseColor4f(0,0,1,1); // blue
                         break;
-                case LLViewerObject::LL_VO_VOID_WATER:
-                case LLViewerObject::LL_VO_WATER:
-                        gGL.diffuseColor4f(0,0.5f,1,1); // medium blue
-                        break;
                 case LL_PCODE_LEGACY_TREE:
                         gGL.diffuseColor4f(0,0.5f,0,1); // dark green
                         break;
@@ -2193,7 +2190,6 @@ void renderNormals(LLDrawable *drawablep)
 
                 buf->setBuffer();
                 // *NOTE: The render type in the vertex shader is TRIANGLES, but gets converted to LINES in the geometry shader
-                // *NOTE: For terrain normal debug, this seems to also include vertices for water, which is technically not part of the terrain. Should fix that at some point.
                 buf->drawRange(LLRender::TRIANGLES, face.getGeomIndex(), face.getGeomIndex() + face.getGeomCount()-1, face.getIndicesCount(), face.getIndicesStart());
             }
             if (prev_shader)

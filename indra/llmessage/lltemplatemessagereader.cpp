@@ -27,7 +27,6 @@
 #include "linden_common.h"
 #include "lltemplatemessagereader.h"
 
-#include "llfasttimer.h"
 #include "llmessagebuilder.h"
 #include "llmessagetemplate.h"
 #include "llmath.h"

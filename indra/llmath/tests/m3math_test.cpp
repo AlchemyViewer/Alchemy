@@ -35,88 +35,69 @@
 #include "../llquaternion.h"
 #include "../v3dmath.h"
 
-#include "../test/lltut.h"
+#include <catch2/catch_test_macros.hpp>
 
 #if LL_WINDOWS
 // disable unreachable code warnings caused by usage of skip.
 #pragma warning(disable: 4702)
 #endif
 
-#if LL_WINDOWS
-// disable unreachable code warnings caused by usage of skip.
-#pragma warning(disable: 4702)
-#endif
-
-namespace tut
-{
 namespace
 {
-    struct m3math_test
-    {
-    };
-    typedef test_group<m3math_test> m3math_test_t;
-    typedef m3math_test_t::object m3math_test_object_t;
-    tut::m3math_test_t tut_m3math_test("m3math_h");
-}
-
     //test case for setIdentity() fn.
-    template<> template<>
-    void m3math_test_object_t::test<1>()
+    TEST_CASE("m3math_h: setIdentity makes the identity matrix", "[m3math_h]")
     {
         LLMatrix3 llmat3_obj;
         llmat3_obj.setIdentity();
-        ensure("LLMatrix3::setIdentity failed", 1.f == llmat3_obj.mMatrix[0][0] &&
-                    0.f == llmat3_obj.mMatrix[0][1] &&
-                    0.f == llmat3_obj.mMatrix[0][2] &&
-                    0.f == llmat3_obj.mMatrix[1][0] &&
-                    1.f == llmat3_obj.mMatrix[1][1] &&
-                    0.f == llmat3_obj.mMatrix[1][2] &&
-                    0.f == llmat3_obj.mMatrix[2][0] &&
-                    0.f == llmat3_obj.mMatrix[2][1] &&
-                    1.f == llmat3_obj.mMatrix[2][2]);
+        CHECK(llmat3_obj.mMatrix[0][0] == 1.f);
+        CHECK(llmat3_obj.mMatrix[0][1] == 0.f);
+        CHECK(llmat3_obj.mMatrix[0][2] == 0.f);
+        CHECK(llmat3_obj.mMatrix[1][0] == 0.f);
+        CHECK(llmat3_obj.mMatrix[1][1] == 1.f);
+        CHECK(llmat3_obj.mMatrix[1][2] == 0.f);
+        CHECK(llmat3_obj.mMatrix[2][0] == 0.f);
+        CHECK(llmat3_obj.mMatrix[2][1] == 0.f);
+        CHECK(llmat3_obj.mMatrix[2][2] == 1.f);
     }
 
     //test case for LLMatrix3& setZero() fn.
-    template<> template<>
-    void m3math_test_object_t::test<2>()
+    TEST_CASE("m3math_h: setZero clears every element", "[m3math_h]")
     {
         LLMatrix3 llmat3_obj;
         llmat3_obj.setZero();
 
-        ensure("LLMatrix3::setZero failed", 0.f == llmat3_obj.setZero().mMatrix[0][0] &&
-                    0.f == llmat3_obj.setZero().mMatrix[0][1] &&
-                    0.f == llmat3_obj.setZero().mMatrix[0][2] &&
-                    0.f == llmat3_obj.setZero().mMatrix[1][0] &&
-                    0.f == llmat3_obj.setZero().mMatrix[1][1] &&
-                    0.f == llmat3_obj.setZero().mMatrix[1][2] &&
-                    0.f == llmat3_obj.setZero().mMatrix[2][0] &&
-                    0.f == llmat3_obj.setZero().mMatrix[2][1] &&
-                    0.f == llmat3_obj.setZero().mMatrix[2][2]);
+        CHECK(llmat3_obj.setZero().mMatrix[0][0] == 0.f);
+        CHECK(llmat3_obj.setZero().mMatrix[0][1] == 0.f);
+        CHECK(llmat3_obj.setZero().mMatrix[0][2] == 0.f);
+        CHECK(llmat3_obj.setZero().mMatrix[1][0] == 0.f);
+        CHECK(llmat3_obj.setZero().mMatrix[1][1] == 0.f);
+        CHECK(llmat3_obj.setZero().mMatrix[1][2] == 0.f);
+        CHECK(llmat3_obj.setZero().mMatrix[2][0] == 0.f);
+        CHECK(llmat3_obj.setZero().mMatrix[2][1] == 0.f);
+        CHECK(llmat3_obj.setZero().mMatrix[2][2] == 0.f);
     }
 
     //test case for setRows(const LLVector3 &x_axis, const LLVector3 &y_axis, const LLVector3 &z_axis) fns.
-    template<> template<>
-    void m3math_test_object_t::test<3>()
+    TEST_CASE("m3math_h: setRows fills the matrix row by row", "[m3math_h]")
     {
         LLMatrix3 llmat3_obj;
         LLVector3 vect1(2, 1, 4);
         LLVector3 vect2(3, 5, 7);
         LLVector3 vect3(6, 9, 7);
         llmat3_obj.setRows(vect1, vect2, vect3);
-        ensure("LLVector3::setRows failed ", 2 == llmat3_obj.mMatrix[0][0] &&
-                        1 == llmat3_obj.mMatrix[0][1] &&
-                        4 == llmat3_obj.mMatrix[0][2] &&
-                        3 == llmat3_obj.mMatrix[1][0] &&
-                        5 == llmat3_obj.mMatrix[1][1] &&
-                        7 == llmat3_obj.mMatrix[1][2] &&
-                        6 == llmat3_obj.mMatrix[2][0] &&
-                        9 == llmat3_obj.mMatrix[2][1] &&
-                        7 == llmat3_obj.mMatrix[2][2]);
+        CHECK(llmat3_obj.mMatrix[0][0] == 2);
+        CHECK(llmat3_obj.mMatrix[0][1] == 1);
+        CHECK(llmat3_obj.mMatrix[0][2] == 4);
+        CHECK(llmat3_obj.mMatrix[1][0] == 3);
+        CHECK(llmat3_obj.mMatrix[1][1] == 5);
+        CHECK(llmat3_obj.mMatrix[1][2] == 7);
+        CHECK(llmat3_obj.mMatrix[2][0] == 6);
+        CHECK(llmat3_obj.mMatrix[2][1] == 9);
+        CHECK(llmat3_obj.mMatrix[2][2] == 7);
     }
 
     //test case for getFwdRow(), getLeftRow(), getUpRow() fns.
-    template<> template<>
-    void m3math_test_object_t::test<4>()
+    TEST_CASE("m3math_h: getFwdRow/getLeftRow/getUpRow return the rows set", "[m3math_h]")
     {
         LLMatrix3 llmat3_obj;
         LLVector3 vect1(2, 1, 4);
@@ -124,14 +105,13 @@ namespace
         LLVector3 vect3(6, 9, 7);
         llmat3_obj.setRows(vect1, vect2, vect3);
 
-        ensure("LLVector3::getFwdRow failed ", vect1 == llmat3_obj.getFwdRow());
-        ensure("LLVector3::getLeftRow failed ", vect2 == llmat3_obj.getLeftRow());
-        ensure("LLVector3::getUpRow failed ", vect3 == llmat3_obj.getUpRow());
+        CHECK(vect1 == llmat3_obj.getFwdRow());
+        CHECK(vect2 == llmat3_obj.getLeftRow());
+        CHECK(vect3 == llmat3_obj.getUpRow());
     }
 
     //test case for operator*(const LLMatrix3 &a, const LLMatrix3 &b)
-    template<> template<>
-    void m3math_test_object_t::test<5>()
+    TEST_CASE("m3math_h: operator* multiplies two matrices", "[m3math_h]")
     {
         LLMatrix3 llmat_obj1;
         LLMatrix3 llmat_obj2;
@@ -153,22 +133,20 @@ namespace
         llmat_obj2.setRows(llvec4, llvec5, llvec6);
         llmat_obj3.setRows(llvec7, llvec8, llvec9);
         llmat_obj3 = llmat_obj1 * llmat_obj2;
-        ensure("LLMatrix3::operator*(const LLMatrix3 &a, const LLMatrix3 &b) failed",
-                        50 == llmat_obj3.mMatrix[0][0] &&
-                        49 == llmat_obj3.mMatrix[0][1] &&
-                        39 == llmat_obj3.mMatrix[0][2] &&
-                        29 == llmat_obj3.mMatrix[1][0] &&
-                        45 == llmat_obj3.mMatrix[1][1] &&
-                        65 == llmat_obj3.mMatrix[1][2] &&
-                        94 == llmat_obj3.mMatrix[2][0] &&
-                        94 == llmat_obj3.mMatrix[2][1] &&
-                        86 == llmat_obj3.mMatrix[2][2]);
+        CHECK(llmat_obj3.mMatrix[0][0] == 50);
+        CHECK(llmat_obj3.mMatrix[0][1] == 49);
+        CHECK(llmat_obj3.mMatrix[0][2] == 39);
+        CHECK(llmat_obj3.mMatrix[1][0] == 29);
+        CHECK(llmat_obj3.mMatrix[1][1] == 45);
+        CHECK(llmat_obj3.mMatrix[1][2] == 65);
+        CHECK(llmat_obj3.mMatrix[2][0] == 94);
+        CHECK(llmat_obj3.mMatrix[2][1] == 94);
+        CHECK(llmat_obj3.mMatrix[2][2] == 86);
     }
 
 
     //test case for operator*(const LLVector3 &a, const LLMatrix3 &b)
-    template<> template<>
-    void m3math_test_object_t::test<6>()
+    TEST_CASE("m3math_h: operator* transforms an LLVector3 by a matrix", "[m3math_h]")
     {
 
         LLMatrix3 llmat_obj1;
@@ -184,12 +162,11 @@ namespace
 
         LLVector3 expected_result(30, 51, 53);
 
-        ensure("LLMatrix3::operator*(const LLVector3 &a, const LLMatrix3 &b) failed", res_vec == expected_result);
+        CHECK(res_vec == expected_result);
     }
 
     //test case for operator*(const LLVector3d &a, const LLMatrix3 &b)
-    template<> template<>
-    void m3math_test_object_t::test<7>()
+    TEST_CASE("m3math_h: operator* transforms an LLVector3d by a matrix", "[m3math_h]")
     {
         LLMatrix3 llmat_obj1;
         LLVector3d llvec3d1;
@@ -204,12 +181,11 @@ namespace
 
         LLVector3d expected_result(25, 30, 3);
 
-        ensure("LLMatrix3::operator*(const LLVector3 &a, const LLMatrix3 &b) failed", llvec3d1 == expected_result);
+        CHECK(llvec3d1 == expected_result);
     }
 
     // test case for operator==(const LLMatrix3 &a, const LLMatrix3 &b)
-    template<> template<>
-    void m3math_test_object_t::test<8>()
+    TEST_CASE("m3math_h: operator== and operator!= compare matrices", "[m3math_h]")
     {
         LLMatrix3 llmat_obj1;
         LLMatrix3 llmat_obj2;
@@ -220,15 +196,14 @@ namespace
 
         llmat_obj1.setRows(llvec1, llvec2, llvec3);
         llmat_obj2.setRows(llvec1, llvec2, llvec3);
-        ensure("LLMatrix3::operator==(const LLMatrix3 &a, const LLMatrix3 &b) failed", llmat_obj1 == llmat_obj2);
+        CHECK(llmat_obj1 == llmat_obj2);
 
         llmat_obj2.setRows(llvec2, llvec2, llvec3);
-        ensure("LLMatrix3::operator!=(const LLMatrix3 &a, const LLMatrix3 &b) failed", llmat_obj1 != llmat_obj2);
+        CHECK(llmat_obj1 != llmat_obj2);
     }
 
     //test case for quaternion() fn.
-    template<> template<>
-    void m3math_test_object_t::test<9>()
+    TEST_CASE("m3math_h: quaternion converts the matrix to a quaternion", "[m3math_h]")
     {
         LLMatrix3 llmat_obj1;
         LLQuaternion llmat_quat;
@@ -239,15 +214,14 @@ namespace
 
         llmat_obj1.setRows(llmat1, llmat2, llmat3);
         llmat_quat = llmat_obj1.quaternion();
-        ensure("LLMatrix3::quaternion failed ", is_approx_equal(-0.66666669f, llmat_quat.mQ[0]) &&
-                        is_approx_equal(-0.83333337f, llmat_quat.mQ[1]) &&
-                        is_approx_equal(0.0f, llmat_quat.mQ[2]) &&
-                        is_approx_equal(1.5f, llmat_quat.mQ[3]));
+        CHECK(is_approx_equal(-0.66666669f, llmat_quat.mQ[0]));
+        CHECK(is_approx_equal(-0.83333337f, llmat_quat.mQ[1]));
+        CHECK(is_approx_equal(0.0f, llmat_quat.mQ[2]));
+        CHECK(is_approx_equal(1.5f, llmat_quat.mQ[3]));
     }
 
     //test case for transpose() fn.
-    template<> template<>
-    void m3math_test_object_t::test<10>()
+    TEST_CASE("m3math_h: transpose swaps rows and columns", "[m3math_h]")
     {
         LLMatrix3 llmat_obj;
 
@@ -264,12 +238,11 @@ namespace
         LLMatrix3 expectedllmat_obj;
         expectedllmat_obj.setRows(resllvec1, resllvec2, resllvec3);
 
-        ensure("LLMatrix3::transpose failed ", llmat_obj == expectedllmat_obj);
+        CHECK(llmat_obj == expectedllmat_obj);
     }
 
     //test case for determinant() fn.
-    template<> template<>
-    void m3math_test_object_t::test<11>()
+    TEST_CASE("m3math_h: determinant of a singular matrix is zero", "[m3math_h]")
     {
         LLMatrix3 llmat_obj1;
 
@@ -277,12 +250,11 @@ namespace
         LLVector3 llvec2(3, 2, 1);
         LLVector3 llvec3(2, 2, 2);
         llmat_obj1.setRows(llvec1, llvec2, llvec3);
-        ensure("LLMatrix3::determinant failed ",  0.0f == llmat_obj1.determinant());
+        CHECK(llmat_obj1.determinant() == 0.0f);
     }
 
     //test case for orthogonalize() fn.
-    template<> template<>
-    void m3math_test_object_t::test<12>()
+    TEST_CASE("m3math_h: orthogonalize makes the rows orthonormal", "[m3math_h]")
     {
         LLMatrix3 llmat_obj;
 
@@ -290,26 +262,24 @@ namespace
         LLVector3 llvec2(1, 2, 0);
         LLVector3 llvec3(2, 4, 2);
 
-        skip("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
+        SKIP("This test fails depending on architecture. Need to fix comparison operation, is_approx_equal, to work on more than one platform.");
 
         llmat_obj.setRows(llvec1, llvec2, llvec3);
         llmat_obj.orthogonalize();
 
-        ensure("LLMatrix3::orthogonalize failed ",
-               is_approx_equal(0.19611614f, llmat_obj.mMatrix[0][0]) &&
-               is_approx_equal(0.78446454f, llmat_obj.mMatrix[0][1]) &&
-               is_approx_equal(0.58834841f, llmat_obj.mMatrix[0][2]) &&
-               is_approx_equal(0.47628204f, llmat_obj.mMatrix[1][0]) &&
-               is_approx_equal(0.44826545f, llmat_obj.mMatrix[1][1]) &&
-               is_approx_equal(-0.75644795f, llmat_obj.mMatrix[1][2]) &&
-               is_approx_equal(-0.85714286f, llmat_obj.mMatrix[2][0]) &&
-               is_approx_equal(0.42857143f, llmat_obj.mMatrix[2][1]) &&
-               is_approx_equal(-0.28571429f, llmat_obj.mMatrix[2][2]));
+        CHECK(is_approx_equal(0.19611614f, llmat_obj.mMatrix[0][0]));
+        CHECK(is_approx_equal(0.78446454f, llmat_obj.mMatrix[0][1]));
+        CHECK(is_approx_equal(0.58834841f, llmat_obj.mMatrix[0][2]));
+        CHECK(is_approx_equal(0.47628204f, llmat_obj.mMatrix[1][0]));
+        CHECK(is_approx_equal(0.44826545f, llmat_obj.mMatrix[1][1]));
+        CHECK(is_approx_equal(-0.75644795f, llmat_obj.mMatrix[1][2]));
+        CHECK(is_approx_equal(-0.85714286f, llmat_obj.mMatrix[2][0]));
+        CHECK(is_approx_equal(0.42857143f, llmat_obj.mMatrix[2][1]));
+        CHECK(is_approx_equal(-0.28571429f, llmat_obj.mMatrix[2][2]));
     }
 
     //test case for adjointTranspose() fn.
-    template<> template<>
-    void m3math_test_object_t::test<13>()
+    TEST_CASE("m3math_h: adjointTranspose gives the expected cofactors", "[m3math_h]")
     {
         LLMatrix3 llmat_obj;
 
@@ -320,22 +290,20 @@ namespace
         llmat_obj.setRows(llvec1, llvec2, llvec3);
         llmat_obj.adjointTranspose();
 
-        ensure("LLMatrix3::adjointTranspose failed ", 10 == llmat_obj.mMatrix[0][0] &&
-                        -45 == llmat_obj.mMatrix[1][0] &&
-                        30 == llmat_obj.mMatrix[2][0] &&
-                        -10 == llmat_obj.mMatrix[0][1] &&
-                        21 == llmat_obj.mMatrix[1][1] &&
-                        -12 == llmat_obj.mMatrix[2][1] &&
-                        0  == llmat_obj.mMatrix[0][2] &&
-                        3 == llmat_obj.mMatrix[1][2] &&
-                        -6 == llmat_obj.mMatrix[2][2]);
+        CHECK(llmat_obj.mMatrix[0][0] == 10);
+        CHECK(llmat_obj.mMatrix[1][0] == -45);
+        CHECK(llmat_obj.mMatrix[2][0] == 30);
+        CHECK(llmat_obj.mMatrix[0][1] == -10);
+        CHECK(llmat_obj.mMatrix[1][1] == 21);
+        CHECK(llmat_obj.mMatrix[2][1] == -12);
+        CHECK(llmat_obj.mMatrix[0][2] == 0);
+        CHECK(llmat_obj.mMatrix[1][2] == 3);
+        CHECK(llmat_obj.mMatrix[2][2] == -6);
     }
 
     /* TBD: Need to add test cases for getEulerAngles() and setRot() functions */
 
-    // The field-only operations of both matrices evaluate at compile time.
-    template<> template<>
-    void m3math_test_object_t::test<14>()
+    TEST_CASE("m3math_h: field-only operations of both matrices evaluate at compile time", "[m3math_h]")
     {
         constexpr LLMatrix3 product = []() constexpr
         {
@@ -401,6 +369,10 @@ namespace
         }();
         static_assert(sum.mMatrix[0][0] == 3.f && sum.mMatrix[0][1] == 0.f && sum.mMatrix[3][3] == 3.f);
 
-        ensure("compile-time matrices agree at run time", product.mMatrix[2][2] == 47.f && inverse.getTranslation().mV[2] == -3.f);
+        {
+            INFO("compile-time matrices agree at run time");
+            CHECK(product.mMatrix[2][2] == 47.f);
+            CHECK(inverse.getTranslation().mV[2] == -3.f);
+        }
     }
 }
