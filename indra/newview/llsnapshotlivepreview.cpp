@@ -339,6 +339,14 @@ void LLSnapshotLivePreview::draw()
         shadow_rect.stretch(BORDER_WIDTH);
         gl_drop_shadow(shadow_rect.mLeft, shadow_rect.mTop, shadow_rect.mRight, shadow_rect.mBottom, LLColor4(0.f, 0.f, 0.f, mNeedsFlash ? 0.f :0.5f), 10);
 
+        if (hasCutout())
+        {
+            // What a cutout leaves empty reads as empty, as the floater's
+            // thumbnail shows it, rather than as the frozen world behind it.
+            const S32 image_bottom = rect.mBottom + TOP_PANEL_HEIGHT;
+            gl_rect_2d_checkerboard(LLRect(rect.mLeft, image_bottom + rect.getHeight(), rect.mRight, image_bottom));
+        }
+
         LLColor4 image_color(1.f, 1.f, 1.f, 1.f);
         gGL.color4fv(image_color.mV);
         gGL.getTextureSlot(0)->bindSampled(getCurrentImage(), ALSamplers::AnisoClamp);
