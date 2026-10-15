@@ -820,8 +820,8 @@ void LLViewerTextureList::updateImages(F32 max_time)
     {
         using namespace LLStatViewer;
         sample(NUM_IMAGES, sNumImages);
-        sample(NUM_RAW_IMAGES, LLImageRaw::sRawImageCount);
-        sample(FORMATTED_MEM, F64Bytes(LLImageFormatted::sGlobalFormattedMemory));
+        sample(NUM_RAW_IMAGES, LLImageRaw::sRawImageCount.load(std::memory_order_relaxed));
+        sample(FORMATTED_MEM, F64Bytes(LLImageFormatted::sGlobalFormattedMemory.load(std::memory_order_relaxed)));
     }
 
     // make sure each call below gets at least its "fair share" of time

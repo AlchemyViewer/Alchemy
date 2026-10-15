@@ -707,7 +707,7 @@ void LLGLTexMemBar::draw()
                     LLAppViewer::getTextureFetch()->getNumRequests(), LLAppViewer::getTextureFetch()->getNumDeletes(),
                     LLAppViewer::getTextureCache()->getNumReads(), LLAppViewer::getTextureCache()->getNumWrites(),
                     LLLFSThread::sLocal->getPending(),
-                    LLImageRaw::sRawImageCount,
+                    LLImageRaw::sRawImageCount.load(std::memory_order_relaxed),
                     LLAppViewer::getTextureFetch()->getNumHTTPRequests(),
                     LLAppViewer::getImageDecodeThread()->getPending(),
                     gTextureList.mCreateTextureList.size());
