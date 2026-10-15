@@ -280,8 +280,7 @@ bool LLImageDXT::decode(LLImageRaw* raw_image, F32 time)
         return false;
     }
 
-    LLImageDataSharedLock lockIn(this);
-    LLImageDataLock lockOut(raw_image);
+    LLImageDataCopyLock lock(this, raw_image);
 
     S32 width = getWidth(), height = getHeight();
     S32 ncomponents = getComponents();

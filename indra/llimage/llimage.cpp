@@ -1193,8 +1193,7 @@ void LLImageRaw::composite( const LLImageRaw* src )
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(src, this);
 
     if (!validateSrcAndDst("LLImageRaw::composite", src, dst))
     {
@@ -1306,8 +1305,7 @@ void LLImageRaw::copyUnscaledAlphaMask( const LLImageRaw* src, const LLColor4U& 
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(src, this);
 
     if (!validateSrcAndDst("LLImageRaw::copyUnscaledAlphaMask", src, dst))
     {
@@ -1412,8 +1410,7 @@ void LLImageRaw::copy(const LLImageRaw* src)
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(src, this);
 
     if (!validateSrcAndDst("LLImageRaw::copy", src, dst))
     {
@@ -1553,8 +1550,7 @@ void LLImageRaw::copyScaled( const LLImageRaw* src )
 {
     LLImageRaw* dst = this;  // Just for clarity.
 
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(src, this);
 
     if (!validateSrcAndDst("LLImageRaw::copyScaled", src, dst))
     {
@@ -2010,8 +2006,7 @@ void LLImageRaw::addEmissiveScaled(LLImageRaw* src)
 
 bool LLImageRaw::validateSrcAndDst(std::string func, const LLImageRaw* src, const LLImageRaw* dst)
 {
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(dst);
+    LLImageDataCopyLock lock(src, dst);
 
     if (!src || !dst || src->isBufferInvalid() || dst->isBufferInvalid())
     {

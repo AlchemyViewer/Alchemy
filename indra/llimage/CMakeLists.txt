@@ -66,4 +66,7 @@ if(AL_BUILD_TESTS)
     UNIT llimageworker.cpp
     LIBRARIES llmath llcommon
   )
+
+  # The locks images are read and written under, over the library itself.
+  al_add_test_binary(llimage_tests PROJECT llimage SOURCES tests/llimage_test.cpp LIBRARIES llimage)
 endif()
