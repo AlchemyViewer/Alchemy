@@ -138,8 +138,7 @@ void LLCubeMap::initRawData(const std::vector<LLPointer<LLImageRaw> >& rawimages
     // Yes, I know that this is inefficient! - djs 08/08/02
     for (int i = 0; i < 6; i++)
     {
-        LLImageDataSharedLock lockIn(rawimages[i]);
-        LLImageDataLock lockOut(mRawImages[i]);
+        LLImageDataCopyLock lock(rawimages[i], mRawImages[i]);
 
         const U8 *sd = rawimages[i]->getData();
         U8 *td = mRawImages[i]->getData();

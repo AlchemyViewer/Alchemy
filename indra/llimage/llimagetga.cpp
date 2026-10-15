@@ -330,8 +330,7 @@ bool LLImageTGA::decode(LLImageRaw* raw_image, F32 decode_time)
 {
     llassert_always(raw_image);
 
-    LLImageDataSharedLock lockIn(this);
-    LLImageDataLock lockOut(raw_image);
+    LLImageDataCopyLock lock(this, raw_image);
 
     // Check to make sure that this instance has been initialized with data
     if (!getData() || (0 == getDataSize()))
@@ -649,8 +648,7 @@ bool LLImageTGA::encode(const LLImageRaw* raw_image, F32 encode_time)
 {
     llassert_always(raw_image);
 
-    LLImageDataSharedLock lockIn(raw_image);
-    LLImageDataLock lockOut(this);
+    LLImageDataCopyLock lock(raw_image, this);
 
     deleteData();
 
@@ -1068,8 +1066,7 @@ bool LLImageTGA::decodeAndProcess( LLImageRaw* raw_image, F32 domain, F32 weight
     // --+---Input--------------------------------
     //   |
 
-    LLImageDataSharedLock lockIn(this);
-    LLImageDataLock lockOut(raw_image);
+    LLImageDataCopyLock lock(this, raw_image);
 
     if (!getData() || (0 == getDataSize()))
     {

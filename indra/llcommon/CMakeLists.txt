@@ -347,6 +347,7 @@ if(AL_BUILD_TESTS)
       tests/llstreamtools_test.cpp
       tests/llstring_test.cpp
       tests/llstring_utf_test.cpp
+      tests/llthread_test.cpp
       tests/lltimer_test.cpp
       tests/lltrace_test.cpp
       tests/lltreeiterators_test.cpp
@@ -358,8 +359,8 @@ if(AL_BUILD_TESTS)
       tests/tuple_test.cpp
       tests/workqueue_test.cpp
     # The viewer's own patterns under Boost.Regex and under RE2, side by
-    # side, over the text each is run on.
-    BENCH_SOURCES tests/alregex_bench.cpp
+    # side, over the text each is run on; and the cost of its locks.
+    BENCH_SOURCES tests/alregex_bench.cpp tests/llmutex_bench.cpp
     SUPPORT llcommon_test_checks
     LIBRARIES llcommon
   )

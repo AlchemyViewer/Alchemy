@@ -65,12 +65,18 @@
 // static
 bool LLCoros::on_main_coro()
 {
-    if (!LLCoros::instanceExists() || LLCoros::getName().empty())
+    // Every LLMutex::lock() asks this in assert builds, so it takes no lock. getName()
+    // would: get_CoroData()'s wasDeleted() locks this singleton's slot, which put every
+    // thread's every mutex behind one lock. instanceExists() is lock-free, and false
+    // after deletion as well as before construction. A launched coroutine always has
+    // mCurrent set, with a non-empty name; a thread's main coroutine never does.
+    if (!LLCoros::instanceExists())
     {
         return true;
     }
 
-    return false;
+    const CoroData* current = instance().mCurrent.get();
+    return !current || current->mName.empty();
 }
 
 // static

@@ -876,8 +876,7 @@ void LLBumpImageList::onSourceStandardLoaded( bool success, LLViewerFetchedTextu
 
 void LLBumpImageList::generateNormalMapFromAlpha(LLImageRaw* src, LLImageRaw* nrm_image)
 {
-    LLImageDataSharedLock lockIn(src);
-    LLImageDataLock lockOut(nrm_image);
+    LLImageDataCopyLock lock(src, nrm_image);
 
     U8* nrm_data = nrm_image->getData();
     S32 resX = src->getWidth();
