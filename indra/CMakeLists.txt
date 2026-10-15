@@ -42,6 +42,13 @@ cmake_dependent_option(
   OFF
 )
 cmake_dependent_option(
+  AL_BUILD_FUZZERS
+  "Build the libFuzzer targets on LL's LSL compiler and VM: Clang, with address in AL_SANITIZERS; see doc/TESTING.md"
+  OFF
+  "AL_BUILD_TESTS"
+  OFF
+)
+cmake_dependent_option(
   AL_TEST_PER_CASE
   "Register a Catch2 binary's test cases one CTest entry each, found when ctest runs, in place of one entry a test file: for finding a failure that comes from order or shared state"
   OFF

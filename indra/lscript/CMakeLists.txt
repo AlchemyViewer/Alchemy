@@ -192,3 +192,51 @@ al_add_test_binary(
     "AL_ALSCRIPT_TEST_DIR=\"${INDRA_SOURCE_DIR}/alscript/tests\""
     "AL_LSCRIPT_REGRESSION_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/regressions\""
 )
+
+# fuzzers
+# libFuzzer on LL's compiler and VM, from what a script's author controls,
+# its source: lscript_fuzz_source takes the bytes as LSL, and
+# lscript_fuzz_program has them choose a well-typed script, which gets past
+# the parser to the code generation and the VM. lscript is built with
+# libFuzzer's coverage for them, whose hooks the sanitizer runtime answers
+# in lscript_tests. Each has a short run as a test: the program fuzzer over
+# inputs from a fixed seed, the source fuzzer over the scripts of alscript's
+# tests and the regression scripts (tests/regressions), each a fault one of
+# them found, which lscript_tests runs as well. doc/TESTING.md says how to
+# run them for longer.
+if(AL_BUILD_FUZZERS)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR NOT "address" IN_LIST AL_SANITIZERS)
+    message(FATAL_ERROR "AL_BUILD_FUZZERS needs Clang and address in AL_SANITIZERS")
+  endif()
+  target_compile_options(lscript PRIVATE -fsanitize=fuzzer-no-link)
+  foreach(fuzzer IN ITEMS source program)
+    add_executable(lscript_fuzz_${fuzzer} fuzz/allsofuzz${fuzzer}.cpp)
+    target_compile_options(lscript_fuzz_${fuzzer} PRIVATE -fsanitize=fuzzer)
+    target_link_options(lscript_fuzz_${fuzzer} PRIVATE -fsanitize=fuzzer)
+    target_link_libraries(
+      lscript_fuzz_${fuzzer}
+      PRIVATE al::flags lscript lscript_test_library llcommon llmath
+    )
+    set_target_properties(lscript_fuzz_${fuzzer} PROPERTIES FOLDER "Tests/lscript")
+  endforeach()
+
+  add_test(
+    NAME lscript_fuzz_program
+    COMMAND lscript_fuzz_program -runs=3000 -seed=1 -close_fd_mask=1
+  )
+  add_test(
+    NAME lscript_fuzz_source
+    COMMAND
+      lscript_fuzz_source -runs=0 -close_fd_mask=1 -dict=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/lsl.dict
+      ${INDRA_SOURCE_DIR}/alscript/tests/tailslide/scripts
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/regressions
+  )
+  set_tests_properties(
+    lscript_fuzz_program
+    lscript_fuzz_source
+    PROPERTIES
+      LABELS "lscript;fuzz"
+      ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+      FAIL_REGULAR_EXPRESSION "${AL_TEST_FAIL_REGULAR_EXPRESSION}"
+  )
+endif()
