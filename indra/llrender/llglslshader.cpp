@@ -124,11 +124,11 @@ namespace
         }
     }
 
-    void open_profile_record(LLGLSLShader* shader, bool bind)
+    void open_profile_record(LLGLSLShader& shader, bool bind)
     {
         ALQueryPool& queries = gGL.queries();
         ProfileRecord record;
-        record.mShader = shader;
+        record.mShader = &shader;
         record.mBind   = bind;
         record.mTime   = queries.beginSpan();
         if (sProfileStatistics)
@@ -138,7 +138,7 @@ namespace
         else
         {
             record.mSamples = queries.beginReserved(ALQueryKind::Samples);
-            if (gGLManager.canQueryPrimitives(shader->isTessellated()))
+            if (gGLManager.canQueryPrimitives(shader.isTessellated()))
             {
                 record.mPrimitives = queries.beginReserved(ALQueryKind::Primitives);
             }
@@ -610,7 +610,7 @@ void LLGLSLShader::placeProfileQuery()
         return;
     }
     endProfileQuery();
-    open_profile_record(this, true);
+    open_profile_record(*this, true);
 }
 
 //static
@@ -646,7 +646,7 @@ void LLGLSLShader::resumeProfileQuery(LLGLSLShader* shader)
 {
     if (shader && sProfileEnabled && sOpenRecord == NO_RECORD && on_main_thread())
     {
-        open_profile_record(shader, false);
+        open_profile_record(*shader, false);
     }
 }
 
