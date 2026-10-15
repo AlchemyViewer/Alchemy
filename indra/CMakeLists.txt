@@ -321,10 +321,17 @@ endif()
 # what they watch: Tracy replaces operator new and delete, and its queues and
 # Sentry's handler thread are their own synchronisation; Sentry's handler
 # takes the signals a sanitizer reports through. libwebrtc cannot be linked
-# sanitized. Before the feature flags below, so vcpkg installs none of them.
-# Windows builds ignore AL_SANITIZERS (00-Common.cmake).
+# sanitized. CEF cannot run sanitized: its prebuilt Chromium frees through
+# glibc's own __libc_free what glibc allocated through the sanitizer's
+# malloc, and its plugin process falls over at start. Before the feature
+# flags below, so vcpkg installs none of those that are features. Windows
+# builds ignore AL_SANITIZERS (00-Common.cmake).
 if(AL_SANITIZERS AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-  foreach(option IN ITEMS AL_USE_TRACY AL_USE_SENTRY AL_ENABLE_CRASH_REPORTING AL_USE_WEBRTC)
+  foreach(
+    option
+    IN
+    ITEMS AL_USE_TRACY AL_USE_SENTRY AL_ENABLE_CRASH_REPORTING AL_USE_WEBRTC AL_BUILD_CEF_PLUGIN
+  )
     if(${option})
       message(STATUS "${option} is off in a build with AL_SANITIZERS")
       set(${option} OFF)
