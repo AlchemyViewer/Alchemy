@@ -38,6 +38,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string_view>
+#include <vector>
 
 namespace
 {
@@ -174,10 +175,18 @@ namespace
         {
             // Read by character, as the text is: a letter past ASCII is one
             // letter, and without regard to case it folds as Unicode says.
+            // Boost's parser reads a character past the end of a set left
+            // open after a range, "[a-z", harmlessly for a pattern given as
+            // a string, which a nul ends: the characters are kept so too,
+            // and given as constant pointers, which Boost reads in place
+            // where it would copy what any other iterator reads.
             const char* begin = query.data();
             const char* end   = begin + query.size();
-            re = boost::make_u32regex(Characters(begin, begin, end), Characters(end, begin, end),
-                                      boost::u32regex::perl | (options.caseSensitive ? 0 : boost::u32regex::icase));
+            std::vector<UChar32> characters(Characters(begin, begin, end), Characters(end, begin, end));
+            characters.push_back(0);
+            const UChar32* first = characters.data();
+            re.assign(first, first + characters.size() - 1,
+                      boost::u32regex::perl | (options.caseSensitive ? 0 : boost::u32regex::icase));
             return true;
         }
         // A pattern that does not read, or ICU's collators not to be had
