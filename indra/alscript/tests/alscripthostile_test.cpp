@@ -150,6 +150,7 @@ namespace
                 CHECK(said->line == 4);
                 CHECK_FALSE(service.parsed());
                 CHECK(ALScriptWeigh::lso(deep).error == "it nests too deeply");
+                CHECK(ALScriptWeigh::lslLuau(deep).error == "it nests too deeply");
                 CHECK_FALSE(ALLSLToSLua::convert(deep).problems.empty());
 
                 const std::string shallow = chainOf(ALLSLDepth::LIMIT - 100);

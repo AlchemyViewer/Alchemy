@@ -652,6 +652,20 @@ namespace ALScriptWeigh
             return weight;
         }
         AL_SCRIPT_ENGINE_HELD;
+        // SLua's compiler parses the script with Tailslide and walks the
+        // tree itself, as deep as it goes: one deeper than the studio walks
+        // (allsldepth.h) is not handed to it.
+        {
+            const std::string             text(source);
+            Tailslide::ScopedScriptParser parser(nullptr);
+            bool                          deep = false;
+            ALLSLDepth::parse(parser, text.data(), static_cast<int>(text.size()), &deep);
+            if (deep)
+            {
+                weight.error = "it nests too deeply";
+                return weight;
+            }
+        }
         std::string asset;
         std::string lined;
         try
