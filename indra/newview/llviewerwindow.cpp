@@ -725,12 +725,6 @@ public:
 
             ypos += y_inc;
 
-            if (!LLOcclusionCullingGroup::sPendingQueries.empty())
-            {
-                addText(xpos,ypos, llformat("%d Queries pending", LLOcclusionCullingGroup::sPendingQueries.size()));
-                ypos += y_inc;
-            }
-
 
             addText(xpos,ypos, llformat("%d Avatars visible", LLVOAvatar::sNumVisibleAvatars));
 
@@ -2754,6 +2748,11 @@ void LLViewerWindow::shutdownGL()
 
     LLViewerTextureManager::cleanup() ;
     SUBSYSTEM_CLEANUP(LLImageGL) ;
+
+    // The UI images' recorded draws hold vertex buffers, which go back to the pool while
+    // there is still one, and a context to delete their names in. LLUIImageList's own
+    // cleanUp comes after the window is gone.
+    LLUIImage::cleanupClass();
 
     LL_INFOS() << "All textures and llimagegl images are destroyed!" << LL_ENDL ;
 

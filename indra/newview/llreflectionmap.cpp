@@ -43,11 +43,6 @@ LLReflectionMap::LLReflectionMap()
 
 LLReflectionMap::~LLReflectionMap()
 {
-    if (mOcclusionQuery)
-    {
-        gPipeline.mReflectionMapManager.recycleQuery(mOcclusionQuery);
-        mOcclusionQuery = 0;
-    }
 }
 
 void LLReflectionMap::update(U32 resolution, U32 face, bool force_dynamic, F32 near_clip, bool useClipPlane, LLPlane clipPlane)
@@ -428,7 +423,8 @@ bool LLReflectionMap::isRelevant() const
 void LLReflectionMap::doOcclusion(const LLVector4a& eye)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
-    if (LLGLSLShader::sProfileEnabled)
+    // Not while a shader profile holds the occlusion targets: the probe keeps what its last query said.
+    if (!gGL.queries().canBegin(ALQueryKind::Occlusion))
     {
         return;
     }
@@ -442,39 +438,37 @@ void LLReflectionMap::doOcclusion(const LLVector4a& eye)
     LLVector4a o;
     o.setSub(mOrigin, eye);
 
-    bool do_query = false;
-
     if (o.getLength3().getF32() < dist)
     { // eye is inside radius, don't attempt to occlude
-        mOccluded = false;
+        clearOcclusion();
         return;
     }
 
-    if (mOcclusionQuery == 0)
-    { // no query was previously issued, allocate one and issue
-        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - glGenQueries");
-        mOcclusionQuery = gPipeline.mReflectionMapManager.allocateQuery();
-        do_query = true;
-    }
-    else
-    { // query was previously issued, check it and only issue a new query
-        // if previous query is available
-        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - glGetQueryObject");
-        GLuint result = 0;
-        glGetQueryObjectuiv(mOcclusionQuery, GL_QUERY_RESULT_AVAILABLE, &result);
-
-        if (result > 0)
+    // One query at a time: the next is issued once the last has been read, or has expired unread.
+    ALQueryPool& queries = gGL.queries();
+    if (mOcclusionQuery.isValid())
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - query result");
+        U64 passed = 0;
+        const ALQueryPool::Status status = queries.result(mOcclusionQuery, passed);
+        if (status == ALQueryPool::Status::Pending)
         {
-            do_query = true;
-            glGetQueryObjectuiv(mOcclusionQuery, GL_QUERY_RESULT, &result);
-            mOccluded = result == 0;
+            return;
+        }
+        if (status == ALQueryPool::Status::Ready)
+        {
+            mOccluded = passed == 0;
         }
     }
 
-    if (do_query)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - push query");
-        glBeginQuery(GL_ANY_SAMPLES_PASSED, mOcclusionQuery);
+        ALQueryScope query(queries, ALQueryKind::Occlusion);
+        mOcclusionQuery = query.ticket();
+        if (!mOcclusionQuery.isValid())
+        {
+            return;
+        }
 
         LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
@@ -482,8 +476,6 @@ void LLReflectionMap::doOcclusion(const LLVector4a& eye)
         shader->uniform3f(LLShaderMgr::BOX_SIZE, mRadius, mRadius, mRadius);
 
         gPipeline.mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(LLViewerCamera::getInstance(), mOrigin));
-
-        glEndQuery(GL_ANY_SAMPLES_PASSED);
     }
 #endif
 }

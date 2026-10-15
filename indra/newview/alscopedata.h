@@ -58,7 +58,10 @@ class ALScopeData
 public:
     static constexpr S32 BIN_COUNT = 256;
 
-    enum EChannel
+    // Of a fixed type, so any S32 is an EChannel that validChannel() can turn
+    // away: without one, a value past what the channels need bits for is no
+    // value of the type at all, and loading it undefined.
+    enum EChannel : S32
     {
         CH_RED = 0,
         CH_GREEN,

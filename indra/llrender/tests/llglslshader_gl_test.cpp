@@ -37,6 +37,7 @@
 #include "../llglheaders.h"
 #include "../llglslshader.h"
 #include "../llimagegl.h"
+#include "../llrender.h"
 #include "../llrendertarget.h"
 #include "../llshadermgr.h"
 
@@ -2033,6 +2034,181 @@ namespace
         CHECK(units[0] == 0);
         UNSCOPED_INFO("its second at the next");
         CHECK(units[1] == 1);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A profile's draws: triangles over a small target, from no vertex arrays. Its program and target go here, and
+    // what the case changes of the context with mGL.
+    struct llglslshader_profile_data
+    {
+        ~llglslshader_profile_data()
+        {
+            if (mFBO)
+            {
+                glDeleteFramebuffers(1, &mFBO);
+            }
+            if (mColor)
+            {
+                glDeleteRenderbuffers(1, &mColor);
+            }
+            if (mVAO)
+            {
+                glDeleteVertexArrays(1, &mVAO);
+            }
+            if (mProgram)
+            {
+                glDeleteProgram(mProgram);
+            }
+        }
+
+        void setUp()
+        {
+            // Every triangle the same one, over the whole viewport.
+            const char* vertex =
+                "#version 400\n"
+                "void main()\n"
+                "{\n"
+                "    int v = gl_VertexID % 3;\n"
+                "    gl_Position = vec4(vec2((v << 1) & 2, v & 2) * 2.0 - 1.0, 0.0, 1.0);\n"
+                "}\n";
+            const char* fragment =
+                "#version 400\n"
+                "out vec4 frag_color;\n"
+                "void main() { frag_color = vec4(1.0); }\n";
+            const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, vertex);
+            const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, fragment);
+            REQUIRE(vs);
+            REQUIRE(fs);
+            mProgram = glCreateProgram();
+            glAttachShader(mProgram, vs);
+            glAttachShader(mProgram, fs);
+            glLinkProgram(mProgram);
+            glDeleteShader(vs);
+            glDeleteShader(fs);
+            GLint linked = GL_FALSE;
+            glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
+            REQUIRE(linked == GL_TRUE);
+
+            glGenVertexArrays(1, &mVAO);
+            glGenRenderbuffers(1, &mColor);
+            glBindRenderbuffer(GL_RENDERBUFFER, mColor);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, 8, 8);
+            glBindRenderbuffer(GL_RENDERBUFFER, 0);
+            glGenFramebuffers(1, &mFBO);
+            glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, mColor);
+            REQUIRE((U32)glCheckFramebufferStatus(GL_FRAMEBUFFER) == (U32)GL_FRAMEBUFFER_COMPLETE);
+            glViewport(0, 0, 8, 8);
+            glDisable(GL_SCISSOR_TEST);
+            glDisable(GL_DEPTH_TEST);
+        }
+
+        void drawTriangles(GLsizei count)
+        {
+            glUseProgram(mProgram);
+            glBindVertexArray(mVAO);
+            glDrawArrays(GL_TRIANGLES, 0, count * 3);
+            glBindVertexArray(0);
+        }
+
+        ll_test::SharedGLScope mGL;
+        GLuint mProgram = 0;
+        GLuint mVAO = 0;
+        GLuint mColor = 0;
+        GLuint mFBO = 0;
+    };
+
+    // A bind's triangles are the primitives its draws generate, counted as they are, whichever counters the profile
+    // takes: samples passed and primitives generated, or the pipeline statistics where the context has them.
+    TEST_CASE_METHOD(llglslshader_profile_data, "llglslshader_gl: a profile counts the triangles a bind draws", "[llglslshader_gl]")
+    {
+        setUp();
+        for (const bool count_samples : { true, false })
+        {
+            LLGLSLShader profile;
+            profile.clearStats();
+            LLGLSLShader::initProfile(count_samples);
+            profile.placeProfileQuery();
+            drawTriangles(6);
+            LLGLSLShader::endProfileQuery();
+            LLSD stats;
+            LLGLSLShader::finishProfile(stats);
+            INFO((count_samples ? "samples passed and primitives generated" : "the profile's own counters"));
+            CHECK(profile.mBinds == 1);
+            CHECK(profile.mTrianglesDrawn == 6);
+            CHECK(profile.mSamplesDrawn > 0);
+        }
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A render pass ends a bind's queries, as no query may cross one, and they count on in the next: the bind's draws
+    // on both sides are its own, and it is still one bind.
+    TEST_CASE_METHOD(llglslshader_profile_data, "llglslshader_gl: a render pass splits a bind's queries, not the bind", "[llglslshader_gl]")
+    {
+        setUp();
+        LLRenderTarget target;
+        REQUIRE(target.allocate(8, 8, GL_RGBA8));
+        for (const bool count_samples : { true, false })
+        {
+            LLGLSLShader profile;
+            profile.clearStats();
+            LLGLSLShader::initProfile(count_samples);
+            profile.placeProfileQuery();
+            drawTriangles(2);
+            target.bindTarget();
+            drawTriangles(3);
+            target.flush();
+            drawTriangles(1);
+            LLGLSLShader::endProfileQuery();
+            LLSD stats;
+            LLGLSLShader::finishProfile(stats);
+            INFO((count_samples ? "samples passed and primitives generated" : "the profile's own counters"));
+            CHECK(profile.mBinds == 1);
+            CHECK(profile.mTrianglesDrawn == 6);
+        }
+        target.release();
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A profile begun over one still open abandons it: the first's queries end and its targets go back to the frame,
+    // as abandonProfile() gives them back, reading nothing.
+    TEST_CASE_METHOD(llglslshader_profile_data, "llglslshader_gl: a profile left open is abandoned, its targets given back", "[llglslshader_gl]")
+    {
+        setUp();
+        ALQueryPool& queries = gGL.queries();
+        LLGLSLShader profile;
+        profile.clearStats();
+        LLGLSLShader::initProfile(true);
+        profile.placeProfileQuery();
+        drawTriangles(1);
+        LLGLSLShader::initProfile(true);
+        profile.placeProfileQuery();
+        drawTriangles(2);
+        LLSD stats;
+        LLGLSLShader::finishProfile(stats);
+        {
+            INFO("the second profile counted its own bind alone");
+            CHECK(profile.mBinds == 1);
+            CHECK(profile.mTrianglesDrawn == 2);
+        }
+        {
+            INFO("and every target is the frame's again");
+            CHECK(queries.canBegin(ALQueryKind::Occlusion));
+            CHECK(queries.canBegin(ALQueryKind::Primitives));
+        }
+
+        profile.clearStats();
+        LLGLSLShader::initProfile(true);
+        profile.placeProfileQuery();
+        drawTriangles(1);
+        LLGLSLShader::abandonProfile();
+        {
+            INFO("an abandoned profile reads nothing and gives its targets back");
+            CHECK_FALSE(LLGLSLShader::sProfileEnabled);
+            CHECK(profile.mBinds == 0);
+            CHECK(queries.canBegin(ALQueryKind::Occlusion));
+            CHECK(queries.canBegin(ALQueryKind::Primitives));
+        }
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }

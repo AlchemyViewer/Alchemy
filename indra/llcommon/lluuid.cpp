@@ -984,17 +984,6 @@ bool LLUUID::isNull() const
     return (a | b) == 0;
 }
 
-LLUUID::LLUUID(const char* in_string)
-{
-    if (!in_string || in_string[0] == 0)
-    {
-        setNull();
-        return;
-    }
-
-    set(in_string);
-}
-
 LLUUID::LLUUID(const std::string& in_string)
 {
     if (in_string.empty())

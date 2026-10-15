@@ -6180,6 +6180,13 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                     {
                         type = LLDrawPool::POOL_GLTF_PBR;
                     }
+                    else if (is_pbr && gltf_mat)
+                    {
+                        // Blended glTF. getPoolTypeFromTE returns 0 for PBR faces because their diffuse
+                        // texture slot is nulled above, so it never sees the blend mode. Without this the
+                        // face falls through to sPbrFaces instead of sAlphaFaces and loses its alpha ordering.
+                        type = LLDrawPool::POOL_ALPHA;
+                    }
                     else
                     if (type != LLDrawPool::POOL_ALPHA && force_simple)
                     {
@@ -6234,8 +6241,10 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                             {
                                 alpha = te->getColor().mV[3];
                             }
-                            if (alpha > 0.f || te->getGlow() > 0.f)
+                            if (alpha > 0.f || (!is_pbr && te->getGlow() > 0.f))
                             { //only treat as alpha in the pipeline if < 100% transparent
+                              //(glow keeps a transparent legacy face to draw its glow; a transparent GLTF face is
+                              //dropped whatever its glow, as Linden's viewer drops it)
                                 drawablep->setState(LLDrawable::HAS_ALPHA);
                                 add_face(sAlphaFaces, alpha_count, facep);
                             }
@@ -6248,8 +6257,10 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                             { //draw the transparent face for debugging purposes using a custom texture
                                 add_face(sAlphaFaces, alpha_count, facep);
                             }
-                            else if (vobj->isSelected())
-                            { // the selection outline draws it from its vertex buffer (LLVOVolume::isInvisibleFace)
+                            else if (vobj->isSelected() && LLVOVolume::isInvisibleFace(te))
+                            { // the selection outline draws it from its vertex buffer; a transparent GLTF face that
+                              // glows comes here too, and genDrawInfo, which does not count it invisible, would draw
+                              // it in the alpha pass
                                 add_face(sAlphaFaces, alpha_count, facep);
                             }
                         }
@@ -6268,26 +6279,8 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                             if (gltf_mat != nullptr || (te->getMaterialParams().notNull()))
                             {
                                 if (gltf_mat != nullptr)
-                                {
-                                    // In theory, we should never actually get here with alpha blending.
-                                    // How this is supposed to work is we check if the surface is alpha blended, and we assign it to the
-                                    // alpha draw pool. For rigged meshes, this apparently may not happen consistently. For now, just
-                                    // discard it here if the alpha is 0 (fully transparent) to achieve parity with blinn-phong materials in
-                                    // function.
-                                    bool should_render = true;
-                                    if (gltf_mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_BLEND)
-                                    {
-                                        if (gltf_mat->mBaseColor.mV[3] == 0.0f && !LLDrawPoolAlpha::sShowDebugAlpha)
-                                        {
-                                            // Kept while selected for the selection outline, which draws it from its
-                                            // vertex buffer; genDrawInfo puts it in a pass nothing else draws.
-                                            should_render = vobj->isSelected() && LLVOVolume::isInvisibleFace(te);
-                                        }
-                                    }
-                                    if (should_render)
-                                    {
-                                        add_face(sPbrFaces, pbr_count, facep);
-                                    }
+                                { // opaque or masked: a blended GLTF face is in the alpha pool
+                                    add_face(sPbrFaces, pbr_count, facep);
                                 }
                                 else
                                 {
@@ -7143,11 +7136,8 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 is_alpha |= blinn_phong_transparent;
             }
 
-            // A GLTF material's face blends whatever its pool, which rebuildGeom picks without the diffuse map it takes
-            // away from such a face.
-            if ((is_alpha || gltf_mat) && LLVOVolume::isInvisibleFace(te))
+            if (is_alpha && LLVOVolume::isInvisibleFace(te))
             { //100% transparent, whatever its material, don't render unless we're highlighting transparent
-                is_alpha = true;
                 // A reflection probe's volume is shown transparent only where RenderReflectionProbeShowTransparent
                 // says; a selected one is here for its selection outline alone, which draws it from its vertex buffer.
                 static LLCachedControl<bool> render_reflection_object(gSavedSettings, "RenderReflectionProbeShowTransparent", false);

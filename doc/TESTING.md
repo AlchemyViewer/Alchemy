@@ -88,6 +88,7 @@ The **state guard** compares a set of process facts after every case with what t
 - **An `LL_ERRS`** throws `ll_test::FatalError` in a test, so `REQUIRE_THROWS_AS(..., ll_test::FatalError)` checks one.
 - **A child process of the test's own making:** register it with `AL_TEST_HELPER(name)`, and launch the binary with `ll_test::Helper::argument(name)`. The main then runs only that helper.
 - **The running case's name:** `ll_test::currentTestName()`.
+- **Built with ThreadSanitizer:** `ll_test::THREAD_SANITIZER` (`altestsanitizer.h`). Its own call stack holds `THREAD_SANITIZER_FRAMES` frames, past which a process falls over with no report, so a case that recurses deeper on purpose is passed over under it.
 
 ## Binaries
 
@@ -138,6 +139,62 @@ namespace
 - **Setup goes before the `BENCHMARK`.** Catch2 calls the body many times: a warm-up, an estimate, then 100 samples. Each call must measure the same thing, so a body that changes what it measures puts it back, or alternates through a counter it captures: a character typed, then taken away.
 - **Keep the measured code's surroundings as the real code has them.** A kernel run over arrays in a static reloads their bounds for every element, since any store might have moved them. Give each call local views.
 - **Name each benchmark** for what one call covers: `"setAllDot3, 4,096 elements, cached"`. The comma rule is for case names; benchmark names are not test specs.
+
+## Sanitizers
+
+The tests also run under AddressSanitizer with UndefinedBehaviorSanitizer, and under ThreadSanitizer, on Linux with Clang. A tree is built for one or the other:
+
+```
+cmake -S indra --preset ninja-os-asan          # or ninja-os-tsan
+cmake --build build-Linux-ninja-os-asan --config RelWithDebInfo --target BUILD_TESTS
+ctest --test-dir build-Linux-ninja-os-asan -C RelWithDebInfo -LE benchmark --output-on-failure
+```
+
+- **CI:** the Sanitizers workflow runs every entry but the benchmarks, the combined runs included: ASan and UBSan on every pull request, ThreadSanitizer as well every night. It reports and never fails the run.
+- **A report fails its entry,** whatever the process's exit code. UBSan reports and carries on, and the process exits 0. Every sanitizer ends a report with a `SUMMARY:` line, which the entry fails on. A child process's report counts where its output is the entry's.
+- **Options:** each entry puts the build's `ASAN_OPTIONS`, `UBSAN_OPTIONS` or `TSAN_OPTIONS` before what the shell holds, so the shell's win: `ASAN_OPTIONS=detect_leaks=0 ctest ...` leaves leaks out. Timeouts are three times as long under ASan, ten times under ThreadSanitizer.
+- **Coroutines:** Boost.Context switches the coroutines' stacks, and tells ASan and ThreadSanitizer of each switch only when built for `ucontext` with `BOOST_USE_ASAN` or `BOOST_USE_TSAN`. The `-asan` and `-tsan` triplets build their ports so ([`alchemy-sanitizer.cmake`](../indra/cmake/triplets/alchemy-sanitizer.cmake)), and `llcoros.cpp` will not compile against any other. ASan still warns, once a process, that it does not fully support `swapcontext`; with the switches told it, the warning is expected.
+- **Leaks:** LeakSanitizer, ASan's own, looks for leaks as each process ends, and a leak fails the entry as any report does. What a library keeps for the process in its globals is not a leak, so the gl fixture (`llheadlessgl_fixture.h`) keeps every library loaded until the end (`LL::pinLoadedLibraries`, [`alsanitizer.h`](../indra/llcommon/alsanitizer.h)): SDL unloads the GL driver with its last window, and an unloaded library's globals hold nothing.
+- **Left out:** the SIMD assembly probe (`alsimd_asm_probe`), whose listing the sanitizers' checks fill past every ceiling. The harness's own entries whose case crashes on purpose (`CRASHES` in [`indra/test/CMakeLists.txt`](../indra/test/CMakeLists.txt)) leave the crash to Catch2's handler, whose replay they check: there the sanitizers do not take `SIGSEGV`, and ThreadSanitizer does not report the handler's allocations. Those options come after the shell's.
+- **Turned off:** Tracy, which replaces `operator new` and `delete`, Sentry, whose handler takes the signals a sanitizer reports through, WebRTC, and the CEF plugin: CEF's prebuilt Chromium frees through glibc's own `__libc_free` what glibc allocated through the sanitizer's `malloc`, and its process falls over at start.
+- **Suppressions** are in [`indra/test/sanitizers/`](../indra/test/sanitizers/), for code that is not ours: a port's headers, the system's GL driver. Each says what it hides and why it cannot be fixed here. A report in our own code is fixed, not suppressed, and one in a port the Alchemy registry carries is patched there, unless it is no fault, as SDL's PipeWire lock order is not. LL's LSL compiler in `indra/lscript` is the exception: it is a reference, never shipped, and may be suppressed where a fix would change what it does.
+- **The viewer** starts to the login screen and shuts down with no report under either. A sanitized tree builds it with `-DAL_BUILD_VIEWER=ON`, and it runs headless from the staged tree, in a profile of its own, quitting itself after a time (`QuitAfterSeconds`); give it the options and suppressions the tests have:
+
+  ```
+  cd build-Linux-ninja-os-asan/newview/RelWithDebInfo
+  env -u DISPLAY -u WAYLAND_DISPLAY SDL_VIDEO_DRIVER=offscreen LIBGL_ALWAYS_SOFTWARE=1 \
+      ALCHEMYNEXT_USER_DIR=/tmp/viewer-asan \
+      ASAN_OPTIONS=detect_leaks=1:check_initialization_order=1 \
+      LSAN_OPTIONS=suppressions=$PWD/../../../indra/test/sanitizers/lsan.supp \
+      UBSAN_OPTIONS=print_stacktrace=1:suppressions=$PWD/../../../indra/test/sanitizers/ubsan.supp \
+      bin/alchemy-bin --quitafter 30
+  ```
+
+  It reaches the login screen in seconds under ASan, a minute or two under ThreadSanitizer, whose run wants `TSAN_OPTIONS=suppressions=...tsan.supp` and a longer `--quitafter`. Like the gl fixture, a viewer LeakSanitizer checks keeps its libraries loaded once its window is made.
+
+## Fuzzing
+
+LL's LSL compiler and LSO VM (`indra/lscript`), and Script Studio's analysis of an LSL script (`indra/alscript`), take a script's source from whoever wrote it, pasted from anywhere, so they are fuzzed with libFuzzer from that source, in an ASan tree:
+
+```
+cmake -S indra --preset ninja-os-asan -DAL_BUILD_TESTS=ON -DAL_BUILD_FUZZERS=ON
+cmake --build build-Linux-ninja-os-asan --config RelWithDebInfo --target lscript_fuzz_source lscript_fuzz_program alscript_fuzz_lsl
+```
+
+- **`lscript_fuzz_source`** takes the bytes as LSL as they come, with the words and operators of [`lsl.dict`](../indra/lscript/fuzz/lsl.dict): the lexer, the parser and the type checker take most of what it makes. **`lscript_fuzz_program`** takes them as a run of choices that build a well-typed script, its operators drawn from LL's type checker and its calls from LL's library table, so nearly every input compiles and runs. Each compiles the script to LSO and to CIL and runs the LSO with the test library (`tests/allsolibrary.h`), `state_entry` and then an event of each kind its state handles, each capped in steps. `ALLSO_FUZZ_PRINT=1` prints each generated script and how its run ended. **`alscript_fuzz_lsl`** takes the bytes as LSL pasted into the editor and runs what the editor does with it, on the stack its analysis has: the preprocessor, the check and what a check asks besides (outline, semantic tokens, hints, the weights), the questions asked at a place, the formatter and the conversion to SLua.
+- **Built** only with Clang and `address` in `AL_SANITIZERS`: lscript and alscript get libFuzzer's coverage, whose hooks the sanitizer runtime answers in their test binaries (alscript then leaves out the shared precompiled header, which was not built with the coverage). Short runs are CTest entries (label `fuzz`): the program fuzzer over three thousand inputs from a fixed seed, and the two source fuzzers over Tailslide's test scripts and the regression scripts.
+- **A longer run** needs UBSan to stop on its first report, which the build's recovery would otherwise let pass unrecorded, and ASan's quarantine kept small, since the compiler's long operator chains churn enough freed memory for a quarantine to read as running out. Keep it bounded, a few workers whose memory limits together stay well under the machine's, and in one process group:
+
+  ```
+  cd <a scratch directory with corpus/ and artifacts/>
+  UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 ASAN_OPTIONS=halt_on_error=1:quarantine_size_mb=64 TMPDIR=/dev/shm \
+    timeout -k 30 1800 <tree>/lscript/RelWithDebInfo/lscript_fuzz_source -dict=<source>/indra/lscript/fuzz/lsl.dict \
+    -jobs=6 -workers=6 -rss_limit_mb=8192 -malloc_limit_mb=2048 -max_len=262144 -timeout=20 -close_fd_mask=1 -artifact_prefix=artifacts/ corpus
+  ```
+
+  `-fork` is not used: libFuzzer's fork-mode parent crashes merging a job's results. Under ASan a fuzzer's resident memory climbs over a long run while its live heap does not: the allocator keeps the pages of every large script it was given. Give the RSS limit room, `-rss_limit_mb=8192`, and hold each input to its own with `-malloc_limit_mb=2048`. `ALSCRIPT_FUZZ_STAGES`, a mask, runs only some of `alscript_fuzz_lsl`'s stages, in the order its source lists them, to find which a finding is in.
+- **A finding** is fixed in LL's code, keeping what LSO does, and its script kept in [`indra/lscript/tests/regressions/`](../indra/lscript/tests/regressions/), one `.lsl` file each, whose header says what the bug was and what comes of the script now: a `// expect fault: <fault>` line if its run ends in one, and a `// expect said: <text>` line for each thing it says, in order. An `// expect refused: <words>` line instead says LL's compiler refuses it with those words in what it says. `allsovm_test` runs every script there and holds it to its header, and `alscripthostile_test` runs each through the editor's analysis.
+- **Depth:** LL's compiler, Tailslide and the studio's passes walk a script's tree by recursion, and a chain of operators is as deep as it is long. LL's compiler runs on a thread whose stack holds the deepest script the grid takes, about 256 KiB of source (`allslreference.cpp`); the studio walks no tree deeper than `ALLSLDepth::LIMIT`, a thousand levels as Luau's parser has it, and says so of a script that goes deeper (`allsldepth.h`).
 
 ## Upstream tests
 

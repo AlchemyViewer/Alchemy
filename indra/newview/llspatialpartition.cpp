@@ -874,45 +874,6 @@ void LLSpatialGroup::rebound()
     }
 }
 
-void LLSpatialGroup::destroyGLState(bool keep_occlusion)
-{
-    setState(LLSpatialGroup::GEOM_DIRTY | LLSpatialGroup::IMAGE_DIRTY);
-
-    if (!keep_occlusion)
-    { //going to need a rebuild
-        gPipeline.markRebuild(this);
-    }
-
-    mLastUpdateTime = gFrameTimeSeconds;
-    mVertexBuffer = NULL;
-    mBufferMap.clear();
-
-    clearDrawMap();
-
-    if (!keep_occlusion)
-    {
-        releaseOcclusionQueryObjectNames();
-    }
-
-
-    for (LLSpatialGroup::element_iter i = getDataBegin(); i != getDataEnd(); ++i)
-    {
-        LLDrawable* drawable = (LLDrawable*)(*i)->getDrawable();
-        if(!drawable)
-        {
-            continue;
-        }
-        for (S32 j = 0; j < drawable->getNumFaces(); j++)
-        {
-            LLFace* facep = drawable->getFace(j);
-            if (facep)
-            {
-                facep->clearVertexBuffer();
-            }
-        }
-    }
-}
-
 //==============================================
 
 LLSpatialPartition::LLSpatialPartition(U32 data_mask, bool render_by_group, LLViewerRegion* regionp)

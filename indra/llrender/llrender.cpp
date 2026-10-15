@@ -105,7 +105,7 @@ U32 LLRender::sUICalls = 0;
 U32 LLRender::sUIVerts = 0;
 U32 LLRender::sDrawCalls = 0;
 U64 LLRender::sDrawElements = 0;
-U32 ALTextureSlot::sWhiteTexture = 0;
+std::atomic<U32> ALTextureSlot::sWhiteTexture = 0;
 F32 LLRender::sAnisotropicFilteringLevel = 0.f;
 bool LLRender::sGLCoreProfile = false;
 bool LLRender::sNsightDebugSupport = false;
@@ -537,6 +537,15 @@ void LLRender::shutdown()
         mMatricesUBOHash[i] = 0xFFFFFFFFu;
     }
     mMatricesUBOBound = false;
+
+    // Its queries and fences, which it deletes only while the context is up.
+    mQueries.release();
+}
+
+void LLRender::endFrame()
+{
+    mQueries.endFrame();
+    ALUniformBuffer::endFrame();
 }
 
 void LLRender::clearSamplers()

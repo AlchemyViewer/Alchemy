@@ -878,6 +878,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LSLDuplicateDeclaration">'[1]' is already declared, on line [2].</string>
 	<string name="LSLInvalidOperator">Invalid operator: [1] [2] [3].</string>
 	<string name="LSLWrongType">'[1]' is a [3], and cannot be used as a [2].</string>
+	<string name="LSLTooDeep">Nested more than [1] levels deep, too deep for Script Studio to analyze; the script still saves and compiles.</string>
 	<string name="LSLUndeclared">'[1]' is not declared.</string>
 	<string name="LSLUndeclaredWithSuggestion">'[1]' is not declared; did you mean '[2]'?</string>
 	<string name="LSLInvalidMember">'[2]' is not a member of '[1]'.</string>

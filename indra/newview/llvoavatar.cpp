@@ -1001,9 +1001,6 @@ void LLVOAvatar::markDead()
     {
         mVoiceVisualizer->markDead();
     }
-    // A dead avatar is never profiled again. Its query goes now, while the GL context is current: the last reference
-    // to the avatar, and with it the destructor, may come after the context has gone.
-    mGPUTimer.release();
     LLLoadedCallbackEntry::cleanUpCallbackList(&mCallbackTextureList) ;
     LLViewerObject::markDead();
 }
@@ -1276,17 +1273,6 @@ void LLVOAvatar::destroyGL()
     deleteCachedImages();
 
     resetImpostors();
-
-    // The profile timers' queries go while the context is current. An avatar can be marked dead, or destroyed, after
-    // the GL has shut down; its timer then has nothing left to delete. A pending time is dropped, and the next profile
-    // makes a new query.
-    for (LLCharacter* character : LLCharacter::sInstances)
-    {
-        if (LLVOAvatar* avatar = dynamic_cast<LLVOAvatar*>(character))
-        {
-            avatar->mGPUTimer.release();
-        }
-    }
 }
 
 //static
@@ -2868,6 +2854,8 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
         LL_INFOS() << "Warning!  Idle on dead avatar" << LL_ENDL;
         return;
     }
+
+    readProfileQuery();
 
     static LLCachedControl<bool> friends_only(gSavedSettings, "RenderAvatarFriendsOnly", false);
     if (friends_only()
@@ -12848,37 +12836,19 @@ void LLVOAvatar::placeProfileQuery()
     mGPUTimer.begin();
 }
 
-void LLVOAvatar::readProfileQuery(S32 retries)
+void LLVOAvatar::endProfileQuery()
 {
     mGPUTimer.end();
+}
 
+void LLVOAvatar::readProfileQuery()
+{
     U64 time_elapsed = 0;
-    if (mGPUTimer.poll(time_elapsed) || (--retries <= 0 && mGPUTimer.poll(time_elapsed, true)))
-    { // query available, readback result
+    if (mGPUTimer.poll(time_elapsed))
+    {
         mGPURenderTime = time_elapsed / 1000000.f;
 
         setDebugText(llformat("%d", (S32)(mGPURenderTime * 1000.f)));
-
-    }
-    else if (mGPUTimer.isPending())
-    {
-        // wait until next frame
-        const LLUUID id = getID();
-
-        LL::WorkQueue::getInstance("mainloop")->post([id, retries]
-        {
-            LLViewerObject* object = gObjectList.findObject(id);
-            if (object
-                && !object->isDead()
-                && object->isAvatar()) // probably excessive, pcode isn't supposed to change
-            {
-                LLVOAvatar* avatar = (LLVOAvatar*)object;
-                if (avatar)
-                {
-                    avatar->readProfileQuery(retries);
-                }
-            }
-        });
     }
 }
 

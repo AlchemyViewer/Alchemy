@@ -2278,6 +2278,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderShadowOcclusion</key>
+        <map>
+            <key>Comment</key>
+            <string>Occlusion culling for the sun's shadow cascades: a caster the sun cannot see past the casters nearer it is left out of the shadow map. Experimental; spot light shadows are never culled.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderShadowPCSSScale</key>
         <map>
             <key>Comment</key>

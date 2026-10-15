@@ -1770,6 +1770,19 @@ void unknown_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
     printf("Unknown arithmetic operation!\n");
 }
 
+// LSL's integers are 32-bit two's complement and wrap, as they did on the
+// grid's servers: worked unsigned, where a signed overflow is undefined.
+static S32 lsl_add(S32 a, S32 b) { return (S32)((U32)a + (U32)b); }
+static S32 lsl_sub(S32 a, S32 b) { return (S32)((U32)a - (U32)b); }
+static S32 lsl_mul(S32 a, S32 b) { return (S32)((U32)a * (U32)b); }
+static S32 lsl_neg(S32 a) { return (S32)(0U - (U32)a); }
+// A shift by its count's low five bits, as the grid's x86 shifted: a count
+// past 31, or below 0, is undefined in C++.
+static S32 lsl_shift_count(S32 count) { return count & 31; }
+// A float made an integer as the grid's x86 truncated it: one that does not
+// fit, NaN among them, is the least integer, where C++ leaves it undefined.
+static S32 lsl_float_to_integer(F32 f) { return f >= -2147483648.f && f < 2147483648.f ? (S32)f : S32_MIN; }
+
 void integer_integer_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
 {
     S32 lside = lscript_pop_int(buffer);
@@ -1779,19 +1792,19 @@ void integer_integer_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
     switch(opcode)
     {
     case LOPC_ADD:
-        result = lside + rside;
+        result = lsl_add(lside, rside);
         break;
     case LOPC_SUB:
-        result = lside - rside;
+        result = lsl_sub(lside, rside);
         break;
     case LOPC_MUL:
-        result = lside * rside;
+        result = lsl_mul(lside, rside);
         break;
     case LOPC_DIV:
         if (rside){
             if( ( rside == -1 ) || ( rside == (S32) 0xffffffff ) )//    division by -1 can have funny results: multiplication is OK: SL-31252
             {
-                result = -1 * lside;
+                result = lsl_mul(-1, lside);
             }
             else
             {
@@ -1850,10 +1863,10 @@ void integer_integer_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
         result = (lside || rside);
         break;
     case LOPC_SHL:
-        result = (lside << rside);
+        result = (lside << lsl_shift_count(rside));
         break;
     case LOPC_SHR:
-        result = (lside >> rside);
+        result = (lside >> lsl_shift_count(rside));
         break;
     default:
         break;
@@ -2917,7 +2930,7 @@ void integer_operation(U8 *buffer, LSCRIPTOpCodesEnum opcode)
     switch(opcode)
     {
     case LOPC_NEG:
-        result = -lside;
+        result = lsl_neg(lside);
         break;
     case LOPC_BITNOT:
         result = ~lside;
@@ -3444,7 +3457,7 @@ BOOL run_cast(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
             case LST_INTEGER:
                 {
                     F32 source = lscript_pop_float(buffer);
-                    S32 dest = (S32)source;
+                    S32 dest = lsl_float_to_integer(source);
                     lscript_push(buffer, dest);
                 }
                 break;
@@ -3857,7 +3870,11 @@ void lscript_stacktol_pop_variable(LLScriptLibData *data, U8 *buffer, char type)
     case LST_LIST:
         data->mType = LST_LIST;
         address = lscript_pop_int(buffer);
-        data->mListp = lsa_get_data(buffer, address, TRUE);
+        // A list in a list, which the heap refuses as nesting when the list
+        // is added. Its reference is let go and what was read of it freed:
+        // the element's mListp is the outer list's link, which run_stacktol
+        // sets over it.
+        delete lsa_get_data(buffer, address, TRUE);
         break;
     }
 }

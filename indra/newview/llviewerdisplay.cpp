@@ -798,6 +798,11 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         LLGLState::checkStates();
 
+        // The queries of the frames the GPU has finished, read just before the cull asks for them: as late as they can
+        // be, so that the GPU has had the mirrors and the geometry updates above to finish the last frame.
+        gGL.queries().retire();
+        gPipeline.readAttachmentTimes();
+
         static LLCullResult result;
         LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
         LLPipeline::sUnderWaterRender = LLViewerCamera::getInstance()->cameraUnderWater();
@@ -1070,11 +1075,11 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     stop_glerror();
 
-    // Close out the UBO streaming rings' per-frame counters (slices, wraps, GPU stalls) and let
-    // them resize. Here rather than in resetFrameStats(): a resize deletes and remaps a ring and
-    // invalidates every outstanding slice, which must land past this frame's draws, not before its
-    // heaviest passes. See ALUniformBuffer::endFrame.
-    ALUniformBuffer::endFrame();
+    // Fence the frame's queries, and close out the UBO streaming rings' per-frame counters (slices,
+    // wraps, GPU stalls) and let them resize. Here rather than in resetFrameStats(): a resize deletes
+    // and remaps a ring and invalidates every outstanding slice, which must land past this frame's
+    // draws, not before its heaviest passes. See ALUniformBuffer::endFrame.
+    gGL.endFrame();
 
     display_stats();
 

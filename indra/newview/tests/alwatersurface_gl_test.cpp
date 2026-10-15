@@ -33,7 +33,7 @@
 #include "../alwaterheightbake.h"
 #include "../alwaterstencil.h"
 
-#include "alsamplesquery.h"
+#include "alquerypool.h"
 
 #include "llgl.h"
 #include "llglheaders.h"
@@ -537,7 +537,7 @@ namespace
             mNoise = nullptr;
             mHeights = nullptr;
             mSlopes.release();
-            mQuery.release();
+            mQueries.release();
             mScene.release();
             mBehind.release();
         }
@@ -830,7 +830,7 @@ namespace
             mBehind.clear();
             mBehind.flush();
             {
-                ALSamplesQuery::Conditional if_water(mQuery);
+                ALConditionalRender if_water(mQueries, mQuery);
                 mBehind.bindTarget();
                 gGL.setClearColor(LLColor4::red);
                 mBehind.clear();
@@ -1408,7 +1408,8 @@ namespace
         LLGLSLShader           mColour;
         LLGLSLShader           mExclusion;
         LLGLSLShader           mField;
-        ALSamplesQuery         mQuery;
+        ALQueryPool            mQueries;
+        ALQueryTicket          mQuery;
         LLRenderTarget         mScene;
         LLRenderTarget         mBehind;
         LLPointer<LLImageGL>   mCellMap;
@@ -1750,9 +1751,9 @@ namespace
             {
                 LLGLDepthTest depth(GL_TRUE, GL_FALSE);
                 LLGLSColorMask no_color(false, false);
-                mQuery.begin();
+                mQuery = mQueries.begin(ALQueryKind::Occlusion);
                 drawField(true);
-                mQuery.end();
+                mQueries.end(mQuery);
             }
 
             UNSCOPED_INFO((gap ? "water through the gap clears the sky behind" : "water all hidden leaves it"));
@@ -1760,7 +1761,7 @@ namespace
             mBehind.release();
             tearDownWater();
             mField.unload();
-            mQuery.release();
+            mQueries.release();
         }
     }
 
@@ -2164,12 +2165,12 @@ namespace
             {
                 LLGLDepthTest depth(GL_TRUE, GL_FALSE);
                 LLGLSColorMask no_color(false, false);
-                mQuery.begin();
+                mQuery = mQueries.begin(ALQueryKind::Occlusion);
                 for (F32 raise : raises)
                 {
                     drawField(true, raise);
                 }
-                mQuery.end();
+                mQueries.end(mQuery);
             }
             mScene.flush();
             return conditionalClearRan();
@@ -2190,7 +2191,7 @@ namespace
         mScene.bindTarget();
         tearDownWater();
         mField.unload();
-        mQuery.release();
+        mQueries.release();
     }
 
     // Whatever order the waves' patches are drawn in, each is drawn once and in the same place, and the order a view

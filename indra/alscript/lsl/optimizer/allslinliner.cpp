@@ -33,6 +33,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
+#include "allsldepth.h"
 #include "allsleffects.h"
 #include "allslservice.h"
 #include "allsltraits.h"
@@ -1263,7 +1264,7 @@ namespace
     S32 inlineRound(std::string& text, ALSourceMap& map, ALScriptProblems& notes, const ALLSLInliner::Asked& asked, size_t& walked)
     {
         ScopedScriptParser parser(nullptr);
-        LSLScript*         script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+        LSLScript*         script = ALLSLDepth::parse(parser, text.data(), static_cast<int>(text.size()));
         if (!script || parser.logger.getErrors())
         {
             return 0;
@@ -1645,7 +1646,7 @@ namespace
         // what the last round left.
         {
             ScopedScriptParser check(nullptr);
-            LSLScript*         again = check.parseLSLBytes(made.data(), static_cast<int>(made.size()));
+            LSLScript*         again = ALLSLDepth::parse(check, made.data(), static_cast<int>(made.size()));
             if (again && !check.logger.getErrors())
             {
                 again->collectSymbols();

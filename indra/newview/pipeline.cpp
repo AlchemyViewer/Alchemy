@@ -1326,7 +1326,8 @@ void LLPipeline::releaseGLBuffers()
     mWaterPatchPrimitives.release();
     mWaterSurface.release();
     mDepthPyramid.release();
-    mSkyBehindQuery.release();
+    mSkyBehindQuery = {};
+    mAttachmentSpans.clear();
     mSkyBehindQueryFrame = 0;
 
     if (mNoiseMap)
@@ -3284,6 +3285,27 @@ void LLPipeline::doOcclusion(LLCamera& camera)
     LL_PROFILE_GPU_ZONE("doOcclusion");
     llassert(!gCubeSnapshot);
 
+    // Not while a shader profile holds the occlusion targets, which would refuse every box drawn for a query. The
+    // groups the cull marked to be asked are let go, so that the next cull marks them again: one left marked is never
+    // marked, and so never asked, again.
+    if (!gGL.queries().canBegin(ALQueryKind::Occlusion))
+    {
+        for (LLCullResult::sg_iterator iter = sCull->beginOcclusionGroups(); iter != sCull->endOcclusionGroups(); ++iter)
+        {
+            (*iter)->clearOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION);
+        }
+        // The object cache's are the world camera's, which a shadow pass leaves to the main one.
+        for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
+        {
+            LLVOCachePartition* vo_part = region->getVOCachePartition();
+            if (vo_part && LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD)
+            {
+                vo_part->resetOccluders();
+            }
+        }
+        return;
+    }
+
     if (sReflectionProbesEnabled && sUseOcclusion > 1 && !LLPipeline::sShadowRender && !gCubeSnapshot)
     {
         LLGLSColorMask color_mask(false, false);
@@ -4677,7 +4699,8 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
         }
     }
 
-    bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion && !LLGLSLShader::sProfileEnabled;
+    // doOcclusion() stands down itself while a shader profile holds the occlusion targets.
+    bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion;
 
     setupHWLights();
 
@@ -11877,10 +11900,10 @@ void LLPipeline::doAtmospherics()
             }
             {
                 ALWaterStencil::OnWater stencil;
-                std::optional<ALSamplesQuery::Conditional> if_water;
+                std::optional<ALConditionalRender> if_water;
                 if (mSkyBehindQueryFrame == gFrameCount)
                 {
-                    if_water.emplace(mSkyBehindQuery);
+                    if_water.emplace(gGL.queries(), mSkyBehindQuery);
                 }
                 apply_haze(*gHazeOnWaterProgram.selectVariant(), true);
             }
@@ -12290,16 +12313,16 @@ inline float sgn(float a)
     return (0.0F);
 }
 
-void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull)
+void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull, S32 occlusion)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("renderShadow");
 
     LLPipeline::sShadowRender = true;
 
-    // disable occlusion culling during shadow render
+    // Occlusion culling as the caller asks, by the shadow camera's own queries: none unless it does.
     U32 saved_occlusion = sUseOcclusion;
-    sUseOcclusion = 0;
+    sUseOcclusion = occlusion;
 
     // List of render pass types that use the prim volume as the shadow,
     // ignoring textures.
@@ -13042,6 +13065,32 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         static LLCachedControl<S32> sShadowCullMode(gSavedSettings, "RenderShadowCullMode", 0);
         bool have_union_cull = false;
         static LLCullResult sUnionShadowResult;
+
+        // Occlusion culling of the cascades' casters, where it is asked for: a caster the sun cannot see past the ones
+        // nearer it leaves no depth in a map. Not with the union cull, whose groups each cascade takes without their
+        // occlusion state, nor in probe captures, nor in a frame whose depth the main view does not trust either.
+        static LLCachedControl<bool> shadow_occlusion(gSavedSettings, "AlchemyRenderShadowOcclusion", false);
+        const S32 sun_occlusion =
+            shadow_occlusion() && no_occlusion.mUseOcclusion > 1 && sShadowCullMode() == 0 && !gCubeSnapshot ? 2 : 0;
+        if (!gCubeSnapshot)
+        {
+            // What the cascades' queries found holds along the direction they were asked: it is forgotten once that has
+            // turned by a degree, as it does at once from the sun to the moon or under an edit, and when the culling
+            // comes back on.
+            constexpr F32    TURNED = 0.99985f; // cos 1 degree
+            static bool      occluding = false;
+            static LLVector3 occluding_along;
+            if (sun_occlusion && (!occluding || occluding_along * lightDir < TURNED))
+            {
+                for (U32 j = 0; j < 4; ++j)
+                {
+                    LLOcclusionCullingGroup::forgetOcclusion(LLViewerCamera::CAMERA_SUN_SHADOW0 + j);
+                }
+                occluding_along = lightDir;
+            }
+            occluding = sun_occlusion != 0;
+        }
+
         if (sShadowCullMode() == 1 && !gCubeSnapshot)
         {
             LLCamera ucam = camera;
@@ -13495,7 +13544,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 {   // re-bucket the shared union cull down to this cascade's frustum
                     bucketShadowCull(sUnionShadowResult, shadow_cam, result[j]);
                 }
-                renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull);
+                renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull, sun_occlusion);
             }
 
             mRT->shadow[j].flush();
@@ -13718,13 +13767,8 @@ void LLPipeline::renderRiggedGroups(LLRenderPass* pass, U32 type, bool texture)
 
 void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
 {
-    if (gGLManager.mGLVersion < 3.25f)
-    { // profiling requires GL 3.3 or later
-        return;
-    }
-
-    if (!profile_attachments && avatar->isProfilePending())
-    { // the last profile's time is still on its way; another would throw it away
+    if (profile_attachments ? !mAttachmentSpans.empty() : avatar->isProfilePending())
+    { // the last profile's times are still on their way; another would throw them away
         return;
     }
 
@@ -13772,11 +13816,14 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
 
         avatar->mCPURenderTime = (F32)cpu_timer.getElapsedTimeF32() * 1000.f;
 
-        avatar->readProfileQuery(5); // allow up to 5 frames of latency
+        // read by the avatar's idleUpdate() once its frame has been
+        avatar->endProfileQuery();
     }
     else
     {
-        // profile attachments one at a time
+        // profile attachments one at a time, each in a span of gGL's pool, read by readAttachmentTimes() once their
+        // frame has been
+        ALQueryPool& queries = gGL.queries();
         LLVOAvatar::attachment_map_t::iterator iter;
         LLVOAvatar::attachment_map_t::iterator begin = avatar->mAttachmentPoints.begin();
         LLVOAvatar::attachment_map_t::iterator end = avatar->mAttachmentPoints.end();
@@ -13793,14 +13840,10 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
                 LLViewerObject* attached_object = attachment_iter->get();
                 if (attached_object)
                 {
-                    // use gDebugProgram to do the GPU queries
-                    gDebugProgram.clearStats();
-                    gDebugProgram.placeProfileQuery(true);
-
+                    ALQuerySpan span = queries.beginSpan();
                     generateImpostor(avatar, false, true, attached_object);
-                    gDebugProgram.readProfileQuery(true, true);
-
-                    attached_object->mGPURenderTime = gDebugProgram.mTimeElapsed / 1000000.f;
+                    queries.endSpan(span);
+                    mAttachmentSpans.emplace_back(attached_object, span);
                 }
             }
         }
@@ -13927,6 +13970,29 @@ void LLPipeline::clearSceneMap()
         mSceneMap.clear();
         mSceneMap.flush();
     }
+}
+
+void LLPipeline::readAttachmentTimes()
+{
+    if (mAttachmentSpans.empty())
+    {
+        return;
+    }
+    const ALQueryPool& queries = gGL.queries();
+    std::erase_if(mAttachmentSpans, [&queries](const auto& timed)
+    {
+        U64 nanoseconds = 0;
+        switch (queries.result(timed.second, nanoseconds))
+        {
+        case ALQueryPool::Status::Ready:
+            timed.first->mGPURenderTime = nanoseconds / 1000000.f;
+            return true;
+        case ALQueryPool::Status::Expired:
+            return true;
+        default:
+            return false;
+        }
+    });
 }
 
 void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool for_profile, LLViewerObject* specific_attachment)

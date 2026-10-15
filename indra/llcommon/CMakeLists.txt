@@ -23,6 +23,7 @@ target_sources(
     alparamtype.cpp
     alrecoverystore.cpp
     alregex.cpp
+    alsanitizer.cpp
     alsavehistory.cpp
     alwatchedfile.cpp
     apply.cpp
@@ -128,6 +129,7 @@ target_sources(
         alrandmap.h
         alrecoverystore.h
         alregex.h
+        alsanitizer.h
         alsavehistory.h
         alsimd.h
         alwatchedfile.h
@@ -393,43 +395,48 @@ if(AL_BUILD_TESTS)
   # flags and read by AlSimdAsmCheck.cmake for a table lookup, a call or a
   # function past its ceiling. Never under link-time optimisation, which
   # leaves the compiler nothing to list.
-  add_library(alsimd_asm_probe OBJECT tests/alsimd_asm_probe.cpp)
-  target_link_libraries(alsimd_asm_probe PRIVATE al::flags)
-  set_target_properties(
-    alsimd_asm_probe
-    PROPERTIES
-      FOLDER "Tests/llcommon"
-      INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO OFF
-      INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF
-  )
-  if(COMPILER_IS_MSVC)
-    # Visual Studio points /Fa at the object's directory itself; Ninja leaves
-    # it to cl, which writes the listing to the build tree's root.
-    target_compile_options(
+  # A sanitized tree's listing is the sanitizers' as much as the ops layer's:
+  # their checks are calls and instructions past every ceiling, and the
+  # unsanitized trees check the same source.
+  if(NOT AL_SANITIZING)
+    add_library(alsimd_asm_probe OBJECT tests/alsimd_asm_probe.cpp)
+    target_link_libraries(alsimd_asm_probe PRIVATE al::flags)
+    set_target_properties(
       alsimd_asm_probe
-      PRIVATE /FAs "/Fa$<PATH:GET_PARENT_PATH,$<TARGET_OBJECTS:alsimd_asm_probe>>/"
+      PROPERTIES
+        FOLDER "Tests/llcommon"
+        INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO OFF
+        INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF
     )
-    set(alsimd_asm_syntax masm)
-  elseif(COMPILER_IS_CLANG_CL)
-    target_compile_options(alsimd_asm_probe PRIVATE /clang:-save-temps=obj)
-    set(alsimd_asm_syntax gnu)
-  else()
-    target_compile_options(alsimd_asm_probe PRIVATE -save-temps=obj)
-    set(alsimd_asm_syntax gnu)
+    if(COMPILER_IS_MSVC)
+      # Visual Studio points /Fa at the object's directory itself; Ninja leaves
+      # it to cl, which writes the listing to the build tree's root.
+      target_compile_options(
+        alsimd_asm_probe
+        PRIVATE /FAs "/Fa$<PATH:GET_PARENT_PATH,$<TARGET_OBJECTS:alsimd_asm_probe>>/"
+      )
+      set(alsimd_asm_syntax masm)
+    elseif(COMPILER_IS_CLANG_CL)
+      target_compile_options(alsimd_asm_probe PRIVATE /clang:-save-temps=obj)
+      set(alsimd_asm_syntax gnu)
+    else()
+      target_compile_options(alsimd_asm_probe PRIVATE -save-temps=obj)
+      set(alsimd_asm_syntax gnu)
+    endif()
+    if(BUILD_TARGET_IS_ARM64)
+      set(alsimd_asm_arch arm64)
+    else()
+      set(alsimd_asm_arch x86)
+    endif()
+    add_test(
+      NAME alsimd_asm_probe
+      COMMAND
+        ${CMAKE_COMMAND} -DOBJECT=$<TARGET_OBJECTS:alsimd_asm_probe> -DSYNTAX=${alsimd_asm_syntax}
+        -DARCH=${alsimd_asm_arch} -DCOMPILER=${CMAKE_CXX_COMPILER_ID} -P
+        ${INDRA_SOURCE_DIR}/cmake/AlSimdAsmCheck.cmake
+    )
+    add_dependencies(BUILD_TESTS alsimd_asm_probe)
   endif()
-  if(BUILD_TARGET_IS_ARM64)
-    set(alsimd_asm_arch arm64)
-  else()
-    set(alsimd_asm_arch x86)
-  endif()
-  add_test(
-    NAME alsimd_asm_probe
-    COMMAND
-      ${CMAKE_COMMAND} -DOBJECT=$<TARGET_OBJECTS:alsimd_asm_probe> -DSYNTAX=${alsimd_asm_syntax}
-      -DARCH=${alsimd_asm_arch} -DCOMPILER=${CMAKE_CXX_COMPILER_ID} -P
-      ${INDRA_SOURCE_DIR}/cmake/AlSimdAsmCheck.cmake
-  )
-  add_dependencies(BUILD_TESTS alsimd_asm_probe)
 
   # No source outside the ops layer and the kernels names an intrinsic, so
   # nothing compiles on one architecture only.

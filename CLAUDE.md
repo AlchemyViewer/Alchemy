@@ -16,7 +16,7 @@ CMake with vcpkg for dependency management. The source root for CMake is `indra/
 - Rust only for the Velopack update client (`AL_USE_VELOPACK`), whose C API Corrosion builds from `indra/rust`
 - The .NET SDK (`dotnet tool restore`) only for Velopack installers, and on Linux `squashfs-tools` for the AppImage
 - Python 3 with `llsd` (`pip install -r requirements.txt`) only for the four tests that spawn a Python peer; without it they are registered disabled
-- Python 3 with `PyYAML` and `llsd`, plus bison and flex, only for LL's LSL compiler (`indra/lscript`, a test-only reference); without them it is left out
+- Python 3 with `PyYAML` and `llsd`, plus bison 3 and flex (on macOS Homebrew's: `brew install bison flex`), only for LL's LSL compiler (`indra/lscript`, a test-only reference); without them it is left out
 
 CMake files are formatted with gersemi (`.gersemirc` at the repo root): run `gersemi -i <files>` on any CMake file you edit.
 

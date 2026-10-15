@@ -305,7 +305,7 @@ bool LLDataPackerBinaryBuffer::packString(const std::string& value, const char *
     {
         htolememcpy(mCurBufferp, value.c_str(), MVT_VARIABLE, length);
     }
-    mCurBufferp += length;
+    advance(length);
     return true;
 }
 
@@ -321,7 +321,7 @@ bool LLDataPackerBinaryBuffer::unpackString(std::string& value, const char *name
 
     value = std::string((char*)mCurBufferp); // We already assume NULL termination calling strlen()
 
-    mCurBufferp += length;
+    advance(length);
     return true;
 }
 
@@ -336,12 +336,12 @@ bool LLDataPackerBinaryBuffer::packBinaryData(const U8 *value, S32 size, const c
     {
         htolememcpy(mCurBufferp, &size, MVT_S32, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     if (mWriteEnabled)
     {
         htolememcpy(mCurBufferp, value, MVT_VARIABLE, size);
     }
-    mCurBufferp += size;
+    advance(size);
     return true;
 }
 
@@ -371,7 +371,7 @@ bool LLDataPackerBinaryBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &
         return false;
     }
 
-    mCurBufferp += 4;
+    advance(4);
 
     if (!verifyLength(out_size, name))
     {
@@ -380,7 +380,7 @@ bool LLDataPackerBinaryBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &
     }
     S32 copy_size = llmin(out_size, value_size);
     htolememcpy(value, mCurBufferp, MVT_VARIABLE, copy_size);
-    mCurBufferp += out_size;
+    advance(out_size);
 
     if (value_size < out_size)
     {
@@ -402,7 +402,7 @@ bool LLDataPackerBinaryBuffer::packBinaryDataFixed(const U8 *value, S32 size, co
     {
         htolememcpy(mCurBufferp, value, MVT_VARIABLE, size);
     }
-    mCurBufferp += size;
+    advance(size);
     return true;
 }
 
@@ -414,7 +414,7 @@ bool LLDataPackerBinaryBuffer::unpackBinaryDataFixed(U8 *value, S32 size, const 
         return false;
     }
     htolememcpy(value, mCurBufferp, MVT_VARIABLE, size);
-    mCurBufferp += size;
+    advance(size);
     return true;
 }
 
@@ -430,7 +430,7 @@ bool LLDataPackerBinaryBuffer::packU8(const U8 value, const char *name)
     {
         *mCurBufferp = value;
     }
-    mCurBufferp++;
+    advance(1);
     return true;
 }
 
@@ -443,7 +443,7 @@ bool LLDataPackerBinaryBuffer::unpackU8(U8 &value, const char *name)
     }
 
     value = *mCurBufferp;
-    mCurBufferp++;
+    advance(1);
     return true;
 }
 
@@ -459,7 +459,7 @@ bool LLDataPackerBinaryBuffer::packU16(const U16 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_U16, 2);
     }
-    mCurBufferp += 2;
+    advance(2);
     return true;
 }
 
@@ -472,7 +472,7 @@ bool LLDataPackerBinaryBuffer::unpackU16(U16 &value, const char *name)
     }
 
     htolememcpy(&value, mCurBufferp, MVT_U16, 2);
-    mCurBufferp += 2;
+    advance(2);
     return true;
 }
 
@@ -484,7 +484,7 @@ bool LLDataPackerBinaryBuffer::packS16(const S16 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_S16, 2);
     }
-    mCurBufferp += 2;
+    advance(2);
     return success;
 }
 
@@ -496,7 +496,7 @@ bool LLDataPackerBinaryBuffer::unpackS16(S16 &value, const char *name)
     {
         htolememcpy(&value, mCurBufferp, MVT_S16, 2);
     }
-    mCurBufferp += 2;
+    advance(2);
     return success;
 }
 
@@ -511,7 +511,7 @@ bool LLDataPackerBinaryBuffer::packU32(const U32 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_U32, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -524,7 +524,7 @@ bool LLDataPackerBinaryBuffer::unpackU32(U32 &value, const char *name)
     }
 
     htolememcpy(&value, mCurBufferp, MVT_U32, 4);
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -540,7 +540,7 @@ bool LLDataPackerBinaryBuffer::packS32(const S32 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_S32, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -553,7 +553,7 @@ bool LLDataPackerBinaryBuffer::unpackS32(S32 &value, const char *name)
     }
 
     htolememcpy(&value, mCurBufferp, MVT_S32, 4);
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -569,7 +569,7 @@ bool LLDataPackerBinaryBuffer::packF32(const F32 value, const char *name)
     {
         htolememcpy(mCurBufferp, &value, MVT_F32, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -582,7 +582,7 @@ bool LLDataPackerBinaryBuffer::unpackF32(F32 &value, const char *name)
     }
 
     htolememcpy(&value, mCurBufferp, MVT_F32, 4);
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -598,7 +598,7 @@ bool LLDataPackerBinaryBuffer::packColor4(const LLColor4 &value, const char *nam
     {
         htolememcpy(mCurBufferp, value.mV, MVT_LLVector4, 16);
     }
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -611,7 +611,7 @@ bool LLDataPackerBinaryBuffer::unpackColor4(LLColor4 &value, const char *name)
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_LLVector4, 16);
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -627,7 +627,7 @@ bool LLDataPackerBinaryBuffer::packColor4U(const LLColor4U &value, const char *n
     {
         htolememcpy(mCurBufferp, value.mV, MVT_VARIABLE, 4);
     }
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -640,7 +640,7 @@ bool LLDataPackerBinaryBuffer::unpackColor4U(LLColor4U &value, const char *name)
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_VARIABLE, 4);
-    mCurBufferp += 4;
+    advance(4);
     return true;
 }
 
@@ -658,7 +658,7 @@ bool LLDataPackerBinaryBuffer::packVector2(const LLVector2 &value, const char *n
         htolememcpy(mCurBufferp, &value.mV[0], MVT_F32, 4);
         htolememcpy(mCurBufferp+4, &value.mV[1], MVT_F32, 4);
     }
-    mCurBufferp += 8;
+    advance(8);
     return true;
 }
 
@@ -672,7 +672,7 @@ bool LLDataPackerBinaryBuffer::unpackVector2(LLVector2 &value, const char *name)
 
     htolememcpy(&value.mV[0], mCurBufferp, MVT_F32, 4);
     htolememcpy(&value.mV[1], mCurBufferp+4, MVT_F32, 4);
-    mCurBufferp += 8;
+    advance(8);
     return true;
 }
 
@@ -688,7 +688,7 @@ bool LLDataPackerBinaryBuffer::packVector3(const LLVector3 &value, const char *n
     {
         htolememcpy(mCurBufferp, value.mV, MVT_LLVector3, 12);
     }
-    mCurBufferp += 12;
+    advance(12);
     return true;
 }
 
@@ -701,7 +701,7 @@ bool LLDataPackerBinaryBuffer::unpackVector3(LLVector3 &value, const char *name)
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_LLVector3, 12);
-    mCurBufferp += 12;
+    advance(12);
     return true;
 }
 
@@ -716,7 +716,7 @@ bool LLDataPackerBinaryBuffer::packVector4(const LLVector4 &value, const char *n
     {
         htolememcpy(mCurBufferp, value.mV, MVT_LLVector4, 16);
     }
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -729,7 +729,7 @@ bool LLDataPackerBinaryBuffer::unpackVector4(LLVector4 &value, const char *name)
     }
 
     htolememcpy(value.mV, mCurBufferp, MVT_LLVector4, 16);
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -744,7 +744,7 @@ bool LLDataPackerBinaryBuffer::packUUID(const LLUUID &value, const char *name)
     {
         htolememcpy(mCurBufferp, value.mData, MVT_LLUUID, 16);
     }
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 
@@ -757,7 +757,7 @@ bool LLDataPackerBinaryBuffer::unpackUUID(LLUUID &value, const char *name)
     }
 
     htolememcpy(value.mData, mCurBufferp, MVT_LLUUID, 16);
-    mCurBufferp += 16;
+    advance(16);
     return true;
 }
 

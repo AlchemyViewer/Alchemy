@@ -42,7 +42,7 @@
 #include "lldrawable.h"
 #include "aldepthpyramid.h"
 #include "alprimitiveplot.h"
-#include "alsamplesquery.h"
+#include "alquerypool.h"
 #include "alwatersurface.h"
 #include "altexture3d.h"
 #include "aluniformbuffer.h"
@@ -142,6 +142,9 @@ public:
     // perform a profile of the given avatar
     // if profile_attachments is true, run a profile for each attachment
     void profileAvatar(LLVOAvatar* avatar, bool profile_attachments = false);
+    // Gives each attachment a profile timed its GPU time once its frame has been read, waiting for nothing. Once a
+    // frame, after the pool retires.
+    void readAttachmentTimes();
 
     // generate an impostor for the given avatar
     //  preview_avatar - if true, a preview window render is being performed
@@ -472,7 +475,9 @@ public:
 
     void renderHighlight(const LLViewerObject* obj, F32 fade);
 
-    void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true);
+    // `occlusion` is the sUseOcclusion level the pass culls with: 0 for none, 2 to ask the shadow camera's own
+    // occlusion queries and draw them after the opaque casters.
+    void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true, S32 occlusion = 0);
     void renderSelectedFaces(const LLColor4& color);
     void renderHighlights();
     void renderDebug();
@@ -1070,9 +1075,12 @@ public:
     LLRenderTarget              mSkyBehind;
     U32                         mSkyBehindFrame = 0;
     // Whether any water was in front of the sky's depth when the sky pool drew: the sky behind is drawn only then, and
-    // the haze shades the water's pixels only then. Asked in mSkyBehindQueryFrame.
-    ALSamplesQuery              mSkyBehindQuery;
+    // the haze shades the water's pixels only then. An occlusion query of gGL's, asked in mSkyBehindQueryFrame.
+    ALQueryTicket               mSkyBehindQuery;
     U32                         mSkyBehindQueryFrame = 0;
+
+    // The attachments profileAvatar() timed, with their spans of gGL's pool, until readAttachmentTimes() has them.
+    std::vector<std::pair<LLPointer<LLViewerObject>, ALQuerySpan>> mAttachmentSpans;
 
     // The water's layout around the main camera and its map of cell heights, laid out at the start of each main frame.
     ALWaterSurface              mWaterSurface;

@@ -52,6 +52,7 @@
 #include "llwindow.h"
 #include "llwindowcallbacks.h"
 
+#include "alsanitizer.h"
 #include "fsyspath.h"
 #include "llfile.h"
 #include "lluuid.h"
@@ -65,6 +66,7 @@
 #include <iterator>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace ll_test
 {
@@ -434,6 +436,9 @@ namespace ll_test
             {
                 throw std::runtime_error("Failed to create the hidden window");
             }
+            // What the driver keeps for the process is still the driver's
+            // when LeakSanitizer looks at exit (alsanitizer.h).
+            LL::pinLoadedLibraries();
 
             installDebugMessageCallback();
 

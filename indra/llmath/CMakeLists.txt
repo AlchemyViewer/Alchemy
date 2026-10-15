@@ -140,6 +140,22 @@ if(AL_BUILD_TESTS)
     LIBRARIES llmath llcommon
   )
 
+  # The kernel test compares kernels, instantiated in it, bit for bit with each
+  # other and with the vector types' own operations. Built with the tree's
+  # reassociation and contraction, the compiler may round the same sum
+  # differently at each place it inlines it, and Clang's sanitizers move
+  # those places, so the file is built strict, where the same operations in
+  # the same order round the same. MSVC's /fp:fast does not reorder the
+  # intrinsics, and the file passes there as it is. Accuracy against a double
+  # reference, and the library's own entry built as the viewer has it, are
+  # checked to a tolerance.
+  if(NOT COMPILER_IS_MSVC AND NOT COMPILER_IS_CLANG_CL)
+    set_source_files_properties(
+      tests/alsimdkernels_test.cpp
+      PROPERTIES COMPILE_OPTIONS "-ffp-contract=off;-fno-associative-math;-fno-reciprocal-math"
+    )
+  endif()
+
   # llcommon's SIMD ops layer and the batch kernels again at each other
   # x86-64 tier, one binary a tier: code the linker folds across files would
   # otherwise run one tier's instructions in another's test. The tree's own

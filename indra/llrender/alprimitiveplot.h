@@ -25,14 +25,15 @@
 #pragma once
 
 #include "stdtypes.h"
+#include "alquerypool.h"
 
 /// The primitives a set of draws generates in a frame, summed and plotted as one Tracy track. Each span of draws between
-/// begin() and end() runs inside its own GL_PRIMITIVES_GENERATED query. plot(), once a frame before the frame's first
-/// span, reads the spans issued FRAMES - 1 frames before the last, by which point a GPU queuing a few frames behind has
-/// their results in, so the readback never waits on it: a frame whose results are not all in is left out of the track,
-/// and a frame that issued none plots 0. A frame with more spans than SPANS draws the rest uncounted. Nothing is issued
-/// without Tracy, while no profiler is connected, or while the shader profiler holds the query target for the programs
-/// it binds (LLGLSLShader::placeProfileQuery).
+/// begin() and end() runs inside its own Primitives query of gGL's pool. plot(), once a frame before the frame's first
+/// span, reads the spans issued FRAMES - 1 frames before the last, which the pool still holds: a frame whose results are
+/// not all in, or one a span of which the pool refused, is left out of the track, and a frame that issued none plots 0.
+/// A frame with more spans than SPANS draws the rest uncounted. Nothing is issued without Tracy, or while no profiler
+/// is connected, and a frame is left out while the pool holds the target, as a shader profile counting primitives
+/// generated holds it (LLGLSLShader::initProfile).
 class ALPrimitivePlot
 {
 public:
@@ -49,24 +50,24 @@ public:
     /// Ends the span begin() started, if it started one.
     void end();
 
-    /// Deletes the queries. Called while the context they were made in is current, before it goes.
+    /// Forgets the frames' spans, as the pool's queries go with the context.
     void release();
 
 private:
-    static constexpr U32 FRAMES = 4;
+    static constexpr U32 FRAMES = ALQueryPool::FRAMES;
     static constexpr U32 SPANS  = 8;
 
     // A frame's spans: counted when the frame could issue them, so that one which issued none plots 0.
     struct Frame
     {
-        U32  mQueries[SPANS] = {};
-        U32  mSpans          = 0;
-        bool mCounted        = false;
+        ALQueryTicket mQueries[SPANS];
+        U32           mSpans   = 0;
+        bool          mCounted = false;
     };
 
-    const char* mName;
-    bool        mTessellated;
-    Frame       mFrames[FRAMES];
-    U32         mFrame  = 0;
-    bool        mActive = false;
+    const char*   mName;
+    bool          mTessellated;
+    Frame         mFrames[FRAMES];
+    U32           mFrame = 0;
+    ALQueryTicket mOpen;
 };

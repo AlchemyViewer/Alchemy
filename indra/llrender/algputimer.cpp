@@ -26,13 +26,11 @@
 
 #include "algputimer.h"
 
-#include "llgl.h"
-#include "llglheaders.h"
 #include "llrender.h"
 
-ALGPUTimer::~ALGPUTimer()
+ALQueryPool& ALGPUTimer::pool() const
 {
-    release();
+    return mPool ? *mPool : gGL.queries();
 }
 
 bool ALGPUTimer::begin()
@@ -41,23 +39,16 @@ bool ALGPUTimer::begin()
     {
         return false;
     }
-    if (mQuery == 0)
-    {
-        glGenQueries(1, &mQuery);
-    }
-    // Draws still batched in gGL were issued before the span.
-    gGL.flush();
-    glBeginQuery(GL_TIME_ELAPSED, mQuery);
-    mOpen = true;
-    return true;
+    mSpan = pool().beginSpan();
+    mOpen = mSpan.isValid();
+    return mOpen;
 }
 
 void ALGPUTimer::end()
 {
     if (mOpen)
     {
-        gGL.flush();
-        glEndQuery(GL_TIME_ELAPSED);
+        pool().endSpan(mSpan);
         mOpen    = false;
         mPending = true;
     }
@@ -69,29 +60,21 @@ bool ALGPUTimer::poll(U64& nanoseconds, bool wait)
     {
         return false;
     }
-    if (!wait)
+    switch (pool().result(mSpan, nanoseconds))
     {
-        GLuint available = GL_FALSE;
-        glGetQueryObjectuiv(mQuery, GL_QUERY_RESULT_AVAILABLE, &available);
-        if (!available)
+    case ALQueryPool::Status::Ready:
+        mPending = false;
+        return true;
+    case ALQueryPool::Status::Expired:
+        mPending = false;
+        return false;
+    case ALQueryPool::Status::Pending:
+    default:
+        if (!wait)
         {
             return false;
         }
+        mPending = false;
+        return pool().wait(mSpan, nanoseconds);
     }
-    GLuint64 elapsed = 0;
-    glGetQueryObjectui64v(mQuery, GL_QUERY_RESULT, &elapsed);
-    nanoseconds = elapsed;
-    mPending    = false;
-    return true;
-}
-
-void ALGPUTimer::release()
-{
-    end();
-    if (mQuery != 0)
-    {
-        glDeleteQueries(1, &mQuery);
-        mQuery = 0;
-    }
-    mPending = false;
 }

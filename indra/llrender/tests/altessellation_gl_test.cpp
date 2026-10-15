@@ -401,20 +401,50 @@ namespace
         mInner = glGetUniformLocation(mProgram, "inner");
         setLevels(3, 3, 3, 3, 3, 3);
         LLGLSLShader profile;
-        profile.mFeatures.hasTessellatedTerrain = true;
+        profile.mShaderFiles.emplace_back("tessellated.glsl", GL_TESS_EVALUATION_SHADER);
         profile.clearStats();
-        LLGLSLShader::sProfileEnabled = true;
+        // Samples and primitives generated: the counters Apple's driver aborts this draw under.
+        LLGLSLShader::initProfile(true);
         profile.placeProfileQuery();
         const std::vector<U8> px = draw(kCCW);
-        const bool read = profile.readProfileQuery();
-        LLGLSLShader::sProfileEnabled = false;
-        const GLuint queries[] = { profile.mTimerQuery, profile.mSamplesQuery, profile.mPrimitivesQuery };
-        glDeleteQueries(3, queries);
-        UNSCOPED_INFO("profile read completed");
-        CHECK(read);
+        LLGLSLShader::endProfileQuery();
+        LLSD stats;
+        LLGLSLShader::finishProfile(stats);
         UNSCOPED_INFO("profiled terrain covers centre");
         CHECK(white(px, W / 2, H / 2));
         UNSCOPED_INFO("sample query still counts fragments");
+        CHECK(profile.mSamplesDrawn > 0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // Puts the Apple flag back however the case leaves.
+    struct AppleFlag
+    {
+        explicit AppleFlag(bool apple) : mHad(gGLManager.mIsApple) { gGLManager.mIsApple = apple; }
+        ~AppleFlag() { gGLManager.mIsApple = mHad; }
+
+        bool mHad;
+    };
+
+    // On Apple a profile counts no primitives generated for a program with a tessellation stage, whatever its features
+    // say -- the water's waves set none of terrain's -- and still counts its samples.
+    TEST_CASE_METHOD(altessellation_data, "ALTessellation: a profile on Apple counts no primitives of a tessellated program", "[ALTessellation]")
+    {
+        REQUIRE(mLinked);
+        setLevels(3, 3, 3, 3, 3, 3);
+        AppleFlag apple(true);
+        LLGLSLShader profile;
+        profile.mShaderFiles.emplace_back("waterTC.glsl", GL_TESS_CONTROL_SHADER);
+        profile.clearStats();
+        LLGLSLShader::initProfile(true);
+        profile.placeProfileQuery();
+        draw(kCCW);
+        LLGLSLShader::endProfileQuery();
+        LLSD stats;
+        LLGLSLShader::finishProfile(stats);
+        UNSCOPED_INFO("no primitives counted");
+        CHECK(profile.mTrianglesDrawn == 0);
+        UNSCOPED_INFO("samples still counted");
         CHECK(profile.mSamplesDrawn > 0);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }

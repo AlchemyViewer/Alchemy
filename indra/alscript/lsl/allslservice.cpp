@@ -31,6 +31,7 @@
 #include "alscriptengine.h"
 
 #include "almessagemap.h"
+#include "allsldepth.h"
 #include "allsllintpass.h"
 #include "allsltraits.h"
 #include "alscriptlexicon.h"
@@ -1187,7 +1188,7 @@ struct ALLSLService::Impl
         }
         parser = std::make_unique<Tailslide::ScopedScriptParser>(nullptr);
         text.assign(source);
-        script    = parser->parseLSLBytes(text.data(), static_cast<int>(text.size()));
+        script    = ALLSLDepth::parse(*parser, text.data(), static_cast<int>(text.size()));
         parsed    = script != nullptr && !parser->logger.getErrors();
         passesRan = false;
         if (script)
@@ -1283,7 +1284,7 @@ struct ALLSLService::Impl
         for (int attempt = 0; attempt < 8; ++attempt)
         {
             parser = std::make_unique<Tailslide::ScopedScriptParser>(nullptr);
-            if (Tailslide::LSLScript* script = parser->parseLSLBytes(copy.data(), static_cast<int>(copy.size())))
+            if (Tailslide::LSLScript* script = ALLSLDepth::parse(*parser, copy.data(), static_cast<int>(copy.size())))
             {
                 return script;
             }
@@ -1564,6 +1565,15 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
         if (code == Tailslide::E_SYNTAX_ERROR)
         {
             plainSyntaxError(source, problem, lexed, parser.context.builtins);
+        }
+        else if (ALLSLDepth::said(problem.message))
+        {
+            // A tree too deep to walk (allsldepth.h): said where it goes
+            // too deep, as the parser's, in the viewer's language.
+            problem.source = ALScriptProblem::Source::Parser;
+            problem.code.clear();
+            problem.key  = "LSLTooDeep";
+            problem.args = { std::to_string(ALLSLDepth::LIMIT) };
         }
         else if (ALMessageMap::lsl(static_cast<int>(code), problem.message, known))
         {

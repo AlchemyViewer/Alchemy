@@ -20,6 +20,60 @@ else()
   set(AL_TEST_ENVIRONMENT "")
 endif()
 
+# A sanitized build's runs. Each sanitizer's options are put before whatever
+# its variable already holds, so an option a developer sets in the shell
+# comes later and wins. LeakSanitizer, ASan's, looks for leaks as each
+# process ends. Catch2 installs a SIGSEGV
+# handler of its own to name the case that crashed, which would take the
+# report from ASan and TSan, so they keep theirs. A report fails the entry
+# whatever the process's exit code: UBSan reports and carries on, and a
+# process it reported in still exits 0. Every sanitizer ends a report with a
+# SUMMARY line, which the entry's output also holds for a child process whose
+# output is the test's. A sanitized run is slower, ThreadSanitizer's most of
+# all, and the timeouts are scaled to it. Suppressions are in test/sanitizers.
+#
+# AL_TEST_CRASH_ENVIRONMENT goes after that, for an entry whose case crashes
+# on purpose to check what the harness makes of a crash: there the sanitizers
+# leave SIGSEGV to Catch2's handler, and ThreadSanitizer does not report the
+# allocations that handler makes, as a crash's handler can hardly avoid.
+set(AL_TEST_SANITIZER_ENVIRONMENT "")
+set(AL_TEST_CRASH_ENVIRONMENT "")
+set(AL_TEST_FAIL_REGULAR_EXPRESSION "")
+set(AL_TEST_TIMEOUT_SCALE 1)
+if(AL_SANITIZING)
+  set(suppressions "${INDRA_SOURCE_DIR}/test/sanitizers")
+  set(AL_TEST_FAIL_REGULAR_EXPRESSION "SUMMARY: [A-Za-z]+Sanitizer: ")
+  if("undefined" IN_LIST AL_SANITIZERS)
+    list(
+      APPEND AL_TEST_SANITIZER_ENVIRONMENT
+      "UBSAN_OPTIONS=string_prepend:print_stacktrace=1:report_error_type=1:suppressions='${suppressions}/ubsan.supp':"
+    )
+    set(AL_TEST_TIMEOUT_SCALE 2)
+  endif()
+  if("address" IN_LIST AL_SANITIZERS)
+    list(
+      APPEND AL_TEST_SANITIZER_ENVIRONMENT
+      "ASAN_OPTIONS=string_prepend:detect_leaks=1:allow_user_segv_handler=0:check_initialization_order=1:"
+      "LSAN_OPTIONS=string_prepend:suppressions='${suppressions}/lsan.supp':print_suppressions=0:"
+    )
+    list(APPEND AL_TEST_CRASH_ENVIRONMENT "ASAN_OPTIONS=string_append::handle_segv=0")
+    set(AL_TEST_TIMEOUT_SCALE 3)
+  endif()
+  if("thread" IN_LIST AL_SANITIZERS)
+    list(
+      APPEND AL_TEST_SANITIZER_ENVIRONMENT
+      "TSAN_OPTIONS=string_prepend:allow_user_segv_handler=0:second_deadlock_stack=1:suppressions='${suppressions}/tsan.supp':"
+    )
+    list(
+      APPEND AL_TEST_CRASH_ENVIRONMENT
+      "TSAN_OPTIONS=string_append::handle_segv=0:report_signal_unsafe=0"
+    )
+    set(AL_TEST_TIMEOUT_SCALE 10)
+  endif()
+  list(APPEND AL_TEST_ENVIRONMENT ${AL_TEST_SANITIZER_ENVIRONMENT})
+  unset(suppressions)
+endif()
+
 # al_add_test_binary(<name> PROJECT <project> SOURCES <test file>... [UNIT <file>...]
 #                    [LIBRARIES <target>...] [SUPPORT <object library>...]
 #                    [INCLUDES <dir>...] [DEFINES <define>...] [ENVIRONMENT <VAR=value>...]
@@ -230,10 +284,13 @@ function(al_add_test_binary name)
       set(disabled TRUE)
     endif()
   endif()
+  math(EXPR timeout "${timeout} * ${AL_TEST_TIMEOUT_SCALE}")
 
   # The runs, each a prefix to its entries' names: the binary's own, and
-  # RERUN's of its files.
+  # RERUN's of its files. The entries registered here, as opposed to found
+  # per case, are gathered for the properties every one of them takes.
   set(prefixes ${target})
+  set(entries)
   if(arg_RERUN)
     list(APPEND prefixes ${target}_${arg_RERUN})
   endif()
@@ -293,8 +350,19 @@ function(al_add_test_binary name)
       # not the cases' Catch2 tags, so that -L and -LE choose alike either way.
       # The library path is DL_PATHS', and not AL_TEST_ENVIRONMENT's, whose
       # generator expressions a script written here would leave unevaluated.
+      # The sanitizers' options are set whole, not put before the shell's.
       set(case_script "${CMAKE_CURRENT_BINARY_DIR}/${prefix}_cases.cmake")
       set(case_properties "LABELS [==[${labels}]==]")
+      foreach(variable IN LISTS AL_TEST_SANITIZER_ENVIRONMENT)
+        string(REPLACE "=string_prepend:" "=" variable "${variable}")
+        list(APPEND run_environment "${variable}")
+      endforeach()
+      if(AL_TEST_FAIL_REGULAR_EXPRESSION)
+        string(
+          APPEND case_properties
+          " FAIL_REGULAR_EXPRESSION [==[${AL_TEST_FAIL_REGULAR_EXPRESSION}]==]"
+        )
+      endif()
       if(run_environment)
         string(APPEND case_properties " ENVIRONMENT [==[${run_environment}]==]")
       endif()
@@ -324,6 +392,7 @@ function(al_add_test_binary name)
         list(APPEND run_environment ${arg_RERUN_ENVIRONMENT})
       endif()
       foreach(stem IN LISTS run_stems)
+        list(APPEND entries ${prefix}/${stem})
         add_test(
           NAME ${prefix}/${stem}
           COMMAND ${arg_LAUNCHER} $<TARGET_FILE:${target}> "[#${stem}]~[.]" ${arguments}
@@ -351,10 +420,12 @@ function(al_add_test_binary name)
     # listing already needs the binary to start on any host. Disabled where
     # the files' entries are: a run starts its checks whatever it matches,
     # and a GL binary's make the context the host has none of.
+    math(EXPR stray_timeout "60 * ${AL_TEST_TIMEOUT_SCALE}")
     set(strays)
     foreach(stem IN LISTS stems)
       string(APPEND strays "~[#${stem}]")
     endforeach()
+    list(APPEND entries ${target}/stray_cases)
     add_test(
       NAME ${target}/stray_cases
       COMMAND
@@ -368,21 +439,27 @@ function(al_add_test_binary name)
         ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
         LABELS "${labels}"
         DISABLED ${disabled}
-        TIMEOUT 60
+        TIMEOUT ${stray_timeout}
     )
 
     list(LENGTH stems file_count)
     if(file_count GREATER 1)
-      # As long as the files take, but no longer than an hour: a hang, which
-      # the combined run is there to find, holds one CI row only so long.
+      # As long as the files take, but no longer than an hour, or three in a
+      # sanitized run: a hang, which the combined run is there to find, holds
+      # one CI row only so long, and the row's own limit is past that.
       math(EXPR combined_timeout "${timeout} * ${file_count}")
-      if(combined_timeout GREATER 3600)
-        set(combined_timeout 3600)
+      set(combined_cap 3600)
+      if(AL_TEST_TIMEOUT_SCALE GREATER 1)
+        set(combined_cap 10800)
+      endif()
+      if(combined_timeout GREATER combined_cap)
+        set(combined_timeout ${combined_cap})
       endif()
       set(combined_label "combined_pending;manual")
       if(arg_COMBINED)
         set(combined_label combined)
       endif()
+      list(APPEND entries ${target}/combined)
       add_test(
         NAME ${target}/combined
         COMMAND ${arg_LAUNCHER} $<TARGET_FILE:${target}> ${arguments}
@@ -411,6 +488,7 @@ function(al_add_test_binary name)
     set(bench_dir "${CMAKE_BINARY_DIR}/Testing/benchmarks")
     file(MAKE_DIRECTORY "${bench_dir}")
     foreach(stem IN LISTS bench_stems)
+      list(APPEND entries bench/${target}/${stem})
       add_test(
         NAME bench/${target}/${stem}
         COMMAND
@@ -431,6 +509,13 @@ function(al_add_test_binary name)
       )
     endforeach()
     add_dependencies(BUILD_BENCHMARKS ${target})
+  endif()
+
+  if(AL_TEST_FAIL_REGULAR_EXPRESSION AND entries)
+    set_tests_properties(
+      ${entries}
+      PROPERTIES FAIL_REGULAR_EXPRESSION "${AL_TEST_FAIL_REGULAR_EXPRESSION}"
+    )
   endif()
 
   add_dependencies(BUILD_TESTS ${target})

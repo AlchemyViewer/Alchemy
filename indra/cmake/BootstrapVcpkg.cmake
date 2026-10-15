@@ -49,11 +49,28 @@ if(EXISTS "${VCPKG_BOOTSTRAP}")
   endif()
 endif()
 
+# al_sanitizer_triplet_suffix(<result>)
+#   The suffix of the sanitizer triplet AL_SANITIZERS takes on Linux: -asan
+#   with AddressSanitizer, -tsan with ThreadSanitizer, empty with neither.
+#   UndefinedBehaviorSanitizer alone takes the ordinary ports: it checks only
+#   the code compiled for it, and needs nothing of them.
+function(al_sanitizer_triplet_suffix result)
+  set(suffix "")
+  if("address" IN_LIST AL_SANITIZERS)
+    set(suffix "-asan")
+  elseif("thread" IN_LIST AL_SANITIZERS)
+    set(suffix "-tsan")
+  endif()
+  set(${result} "${suffix}" PARENT_SCOPE)
+endfunction()
+
 # The triplet, unless the caller named one:
-# <arch>-<os>-alchemy[-clang][<tier>][-release]. -clang is Linux's, for a
-# viewer built with Clang. The tier follows AL_ISA_TIER on the platforms that
-# build ports per tier, and a single-configuration tree that is not Debug
-# takes the release-only ports.
+# <arch>-<os>-alchemy[-clang][<tier>][-asan|-tsan|-release]. -clang is Linux's,
+# for a viewer built with Clang. The tier follows AL_ISA_TIER on the platforms
+# that build ports per tier, and a single-configuration tree that is not Debug
+# takes the release-only ports. A Linux tree built with AddressSanitizer or
+# ThreadSanitizer takes the ports built for it, which are release-only and
+# built with Clang: see triplets/alchemy-sanitizer.cmake.
 get_property(LL_GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(NOT DEFINED VCPKG_TARGET_TRIPLET)
   include(${CMAKE_CURRENT_LIST_DIR}/AlchemyTarget.cmake)
@@ -137,11 +154,67 @@ if(NOT DEFINED VCPKG_TARGET_TRIPLET)
     set(triplet_release "-release")
   endif()
 
+  al_sanitizer_triplet_suffix(triplet_sanitizer)
+  if(triplet_system STREQUAL "Linux" AND triplet_sanitizer)
+    if(NOT triplet_compiler STREQUAL "-clang")
+      message(
+        FATAL_ERROR
+        "AL_SANITIZERS (${AL_SANITIZERS}) builds with Clang on Linux, as its ports are: "
+        "configure with CMAKE_C_COMPILER=clang and CMAKE_CXX_COMPILER=clang++, "
+        "as the ninja-os-asan and ninja-os-tsan presets do."
+      )
+    endif()
+    set(triplet_release "${triplet_sanitizer}")
+  endif()
+
   set(
     VCPKG_TARGET_TRIPLET
     "${triplet_arch}-${triplet_os}-alchemy${triplet_compiler}${triplet_tier}${triplet_release}"
   )
+  # The sanitizer triplets are written for the machines they are run on, not
+  # for every architecture and tier.
+  if(
+    triplet_sanitizer
+    AND NOT EXISTS "${CMAKE_SOURCE_DIR}/cmake/triplets/${VCPKG_TARGET_TRIPLET}.cmake"
+  )
+    message(
+      FATAL_ERROR
+      "AL_SANITIZERS (${AL_SANITIZERS}) takes the triplet ${VCPKG_TARGET_TRIPLET}, which "
+      "cmake/triplets does not have: write it as x64-linux-alchemy-clang-avx2${triplet_sanitizer}.cmake "
+      "is written, for this architecture and AL_ISA_TIER."
+    )
+  endif()
 endif()
+
+# A Linux tree built with AddressSanitizer or ThreadSanitizer links the ports
+# of a sanitizer triplet, built for the same sanitizer, and no tree else does:
+# their Boost.Context reports its fiber switches to that sanitizer's runtime.
+# Checked before project(), so a triplet named by hand is refused before
+# vcpkg builds its ports.
+function(al_vcpkg_check_triplet_sanitizer)
+  if(NOT VCPKG_TARGET_TRIPLET MATCHES "-linux-alchemy")
+    return()
+  endif()
+  al_sanitizer_triplet_suffix(wanted)
+  string(REGEX MATCH "-[at]san$" ports "${VCPKG_TARGET_TRIPLET}")
+  if(ports STREQUAL wanted)
+    return()
+  endif()
+  if(wanted)
+    message(
+      FATAL_ERROR
+      "AL_SANITIZERS (${AL_SANITIZERS}) needs the ports of a ${wanted} triplet, "
+      "but ${VCPKG_TARGET_TRIPLET} is not one. Leave VCPKG_TARGET_TRIPLET unset to have it chosen."
+    )
+  endif()
+  message(
+    FATAL_ERROR
+    "The ports of ${VCPKG_TARGET_TRIPLET} are built for a sanitizer (${ports}) "
+    "that AL_SANITIZERS does not build the viewer with: set it, or leave "
+    "VCPKG_TARGET_TRIPLET unset to have the triplet chosen."
+  )
+endfunction()
+al_vcpkg_check_triplet_sanitizer()
 
 # A Linux alchemy triplet names the compiler its ports were built with, and
 # the viewer has to be built with the same one. Called once project() has

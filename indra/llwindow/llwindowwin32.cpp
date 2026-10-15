@@ -603,6 +603,9 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
     }
 
     // Initialize the keyboard
+    // One keyboard for the process, a window made after another replacing
+    // the one before, which nothing else holds.
+    delete gKeyboard;
     gKeyboard = new LLKeyboardWin32();
     gKeyboard->setCallbacks(callbacks);
 
