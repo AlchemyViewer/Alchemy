@@ -32,7 +32,7 @@ namespace Tailslide
 {
     class LSLASTNode;
     class LSLScript;
-    class ScopedScriptParser;
+    struct ScopedScriptParser;
 }
 
 // Tailslide's trees are walked by recursion wherever they are read -- its
