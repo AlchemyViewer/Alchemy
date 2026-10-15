@@ -1,5 +1,6 @@
 # ThreadSanitizer suppressions for the tests of a sanitized build
-# (ALAddTestBinary.cmake gives the runs this file). One per line:
+# (ALAddTestBinary.cmake gives the runs this file), and for runs of its
+# viewer. One per line:
 #
 #   race:<function or source file>
 #   called_from_lib:<library>
@@ -22,3 +23,16 @@
 # inversions through the LLVM llvmpipe compiles with, and runs hang. Not a
 # bug to report: Mesa is not built for TSan.
 race:libgallium
+
+# SDL's PipeWire audio backend, from the Alchemy registry's sdl3: a
+# lock-order inversion between a device's lock and its stream's PipeWire
+# loop lock, which cannot deadlock. OpenPhysicalAudioDevice holds the
+# device lock while PIPEWIRE_OpenDevice takes the loop lock, and the loop's
+# thread, holding the loop lock, calls output_callback, which takes the
+# device lock. Each device has a loop of its own, and output_callback takes
+# the device lock only once the open has set PW_READY_FLAG_OPEN_COMPLETE
+# under the loop lock, writing silence until then; closing a device lets
+# its lock go before it stops the loop. So the one order is over before
+# the other begins, a protocol TSan's lock graph cannot see. Not patched:
+# SDL's locking is right, and a patch would only hide it from TSan.
+deadlock:SDL_pipewire.c
