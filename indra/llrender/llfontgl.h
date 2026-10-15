@@ -435,6 +435,11 @@ public:
     static F32 sHorizDPI;
     static F32 sScaleX;
     static F32 sScaleY;
+    // What a virtual pixel is divided by: the scale, or one while it is
+    // nothing -- unset, as before a window gives one -- so that a metric is
+    // the font's own pixels then, not infinite. As ALTextLayout takes it.
+    static F32 divisorX() { return sScaleX > 0.f ? sScaleX : 1.f; }
+    static F32 divisorY() { return sScaleY > 0.f ? sScaleY : 1.f; }
     static S32 sResolutionGeneration;
     // Set by markFontsXmlDirty(); consumed by initClass on the next call
     // to force the full-reload (re-parse) path even when overrides match.
