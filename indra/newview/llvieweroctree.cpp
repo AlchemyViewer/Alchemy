@@ -845,14 +845,14 @@ void LLOcclusionCullingGroup::releaseOcclusionQueryObjectName(GLuint name, U32 t
 
 U32 LLOcclusionCullingGroup::queryTarget() const
 {
-    // Conservative from 4.3: the GPU may answer from its coarse depth alone, erring only toward "visible", which costs
-    // at most a group drawn that the scene hid. Not the object cache's: a cache group seen has every object in it
-    // created, and its textures and meshes fetched (LLVOCachePartition::processOccluders).
-    if (gGLManager.mGLVersion >= 4.29f && mSpatialPartition->mPartitionType != LLViewerRegion::PARTITION_VO_CACHE)
+    // Conservative where the context has it: the GPU may answer from its coarse depth alone, erring only toward
+    // "visible", which costs at most a group drawn that the scene hid. Not the object cache's: a cache group seen has
+    // every object in it created, and its textures and meshes fetched (LLVOCachePartition::processOccluders).
+    if (gGLManager.mHasConservativeOcclusion && mSpatialPartition->mPartitionType != LLViewerRegion::PARTITION_VO_CACHE)
     {
         return GL_ANY_SAMPLES_PASSED_CONSERVATIVE;
     }
-    return gGLManager.mGLVersion >= 3.3f ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED;
+    return GL_ANY_SAMPLES_PASSED;
 }
 
 //=====================================

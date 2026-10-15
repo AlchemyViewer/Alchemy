@@ -13647,11 +13647,6 @@ void LLPipeline::renderRiggedGroups(LLRenderPass* pass, U32 type, bool texture)
 
 void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
 {
-    if (gGLManager.mGLVersion < 3.25f)
-    { // profiling requires GL 3.3 or later
-        return;
-    }
-
     if (!profile_attachments && avatar->isProfilePending())
     { // the last profile's time is still on its way; another would throw it away
         return;
