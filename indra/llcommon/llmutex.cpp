@@ -341,11 +341,43 @@ LLCondition::~LLCondition()
 {
 }
 
-void LLCondition::wait()
+LLCondition::Waiter::Waiter(LLCondition& condition) :
+    mCondition(condition),
+    mLock(condition.mMutex, std::defer_lock)
+{
+    // A wait gives the lock up while asleep, which would take it from under a caller
+    // that already held it.
+    llassert(!mCondition.isSelfLocked());
+    mLock.lock();
+    mCondition.mLockingThread.store(LLThread::currentID(), std::memory_order_relaxed);
+}
+
+LLCondition::Waiter::~Waiter()
+{
+    // Disowned before mLock unlocks, as unlock() does.
+    mCondition.mLockingThread.store(LLThread::id_t(), std::memory_order_relaxed);
+}
+
+void LLCondition::Waiter::sleep()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    std::unique_lock< std::mutex > lock(mMutex);
-    mCond.wait(lock);
+    // A predicate that re-locked has unlocked again by now.
+    llassert(mCondition.mCount == 0);
+    const LLThread::id_t self = mCondition.mLockingThread.load(std::memory_order_relaxed);
+    mCondition.mLockingThread.store(LLThread::id_t(), std::memory_order_relaxed);
+    mCondition.mCond.wait(mLock);
+    mCondition.mLockingThread.store(self, std::memory_order_relaxed);
+}
+
+bool LLCondition::Waiter::sleepUntil(const std::chrono::steady_clock::time_point& deadline)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    llassert(mCondition.mCount == 0);
+    const LLThread::id_t self = mCondition.mLockingThread.load(std::memory_order_relaxed);
+    mCondition.mLockingThread.store(LLThread::id_t(), std::memory_order_relaxed);
+    const std::cv_status status = mCondition.mCond.wait_until(mLock, deadline);
+    mCondition.mLockingThread.store(self, std::memory_order_relaxed);
+    return status == std::cv_status::no_timeout;
 }
 
 void LLCondition::signal()

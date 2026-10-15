@@ -1102,10 +1102,7 @@ void LLDeleteHistoryThread::run()
 }
 
 LLActionThread::LLActionThread(const std::string& name)
-    : LLThread(name),
-    mMutex(),
-    mRunCondition(),
-    mFinished(false)
+    : LLThread(name)
 {
 }
 
@@ -1115,24 +1112,12 @@ LLActionThread::~LLActionThread()
 
 void LLActionThread::waitFinished()
 {
-    mMutex.lock();
-    if (!mFinished)
-    {
-        mMutex.unlock();
-        mRunCondition.wait();
-    }
-    else
-    {
-        mMutex.unlock();
-    }
+    mFinished.wait();
 }
 
 void LLActionThread::setFinished()
 {
-    mMutex.lock();
-    mFinished = true;
-    mMutex.unlock();
-    mRunCondition.signal();
+    mFinished.set_all();
 }
 
 LLLoadHistoryThread::LLLoadHistoryThread(const std::string& file_name, std::list<LLSD>* messages, const LLSD& load_params)

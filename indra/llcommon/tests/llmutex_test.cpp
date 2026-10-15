@@ -21,11 +21,68 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
+#include <chrono>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
 namespace
 {
+    using namespace std::chrono_literals;
+
+    // Runs a body on a thread of its own and says whether it has returned. A body
+    // still blocked when the worker goes out of scope is a deadlock the test has
+    // already reported; its thread is detached rather than joined so the run ends.
+    class Worker
+    {
+    public:
+        template <typename FUNC>
+        explicit Worker(FUNC&& body)
+        : mThread([this, body = std::forward<FUNC>(body)]() mutable
+            {
+                body();
+                mDone = true;
+            })
+        {
+        }
+
+        ~Worker()
+        {
+            if (mDone)
+            {
+                mThread.join();
+            }
+            else
+            {
+                mThread.detach();
+            }
+        }
+
+        bool finishesWithin(std::chrono::milliseconds limit)
+        {
+            const auto deadline = std::chrono::steady_clock::now() + limit;
+            while (!mDone)
+            {
+                if (std::chrono::steady_clock::now() > deadline)
+                {
+                    return false;
+                }
+                std::this_thread::sleep_for(1ms);
+            }
+            return true;
+        }
+
+    private:
+        std::atomic<bool> mDone{false};
+        std::thread mThread;
+    };
+
+    // Long enough that a thread which could run has run; a body that has not
+    // returned by then is blocked.
+    constexpr auto BLOCKED = 50ms;
+    // Long enough that a thread which was released has finished.
+    constexpr auto RELEASED = 5s;
+
     struct llmutex_data
     {
         LLMutex mMutex;
@@ -202,5 +259,82 @@ namespace
         REQUIRE(ran);
         CHECK_FALSE(coro_main);
         CHECK(LLCoros::on_main_coro());
+    }
+
+    //------------------------------------------------------------------------
+    // LLCondition
+    //------------------------------------------------------------------------
+
+    struct llcondition_data
+    {
+        LLCondition mCond;
+    };
+
+    TEST_CASE_METHOD(llcondition_data, "llcondition: a predicate runs with the condition owned by its thread", "[llcondition]")
+    {
+        // The predicate reads state lock() guards, so it must be able to take the lock
+        // again as any other code on that thread could.
+        bool owned = false;
+        bool relocked = false;
+        const bool satisfied = mCond.waitFor(1ms, [&]()
+            {
+                owned = mCond.isSelfLocked();
+                if (owned)
+                {
+                    mCond.lock();
+                    relocked = true;
+                    mCond.unlock();
+                }
+                return true;
+            });
+
+        CHECK(satisfied);
+        UNSCOPED_INFO("the predicate's thread did not own the condition it held");
+        CHECK(owned);
+        CHECK(relocked);
+        CHECK_FALSE(mCond.isSelfLocked());
+        CHECK_FALSE(mCond.isLocked());
+    }
+
+    TEST_CASE_METHOD(llcondition_data, "llcondition: a wait that times out gives the lock back", "[llcondition]")
+    {
+        CHECK_FALSE(mCond.waitFor(1ms, []() { return false; }));
+        CHECK_FALSE(mCond.isSelfLocked());
+        CHECK_FALSE(mCond.isLocked());
+    }
+
+    TEST_CASE_METHOD(llcondition_data, "llcondition: a predicate that throws gives the lock back", "[llcondition]")
+    {
+        CHECK_THROWS_AS(mCond.wait([]() -> bool { throw std::runtime_error("predicate"); }), std::runtime_error);
+        CHECK_FALSE(mCond.isSelfLocked());
+        CHECK_FALSE(mCond.isLocked());
+    }
+
+    TEST_CASE_METHOD(llcondition_data, "llcondition: a waiter wakes owning the condition", "[llcondition]")
+    {
+        bool ready = false;
+        std::atomic<bool> owned_on_wake{false};
+        std::atomic<bool> owned_after{true};
+        Worker waiter([&]()
+            {
+                mCond.wait([&]()
+                    {
+                        owned_on_wake = mCond.isSelfLocked();
+                        return ready;
+                    });
+                owned_after = mCond.isSelfLocked();
+            });
+
+        CHECK_FALSE(waiter.finishesWithin(BLOCKED));
+        {
+            LLMutexLock lock(&mCond);
+            ready = true;
+        }
+        mCond.signal();
+
+        REQUIRE(waiter.finishesWithin(RELEASED));
+        CHECK(owned_on_wake);
+        CHECK_FALSE(owned_after);
+        CHECK_FALSE(mCond.isLocked());
     }
 }
