@@ -8,4 +8,5 @@
 # A suppression is for code that is not ours and that the tsan triplet cannot
 # build instrumented, such as the system's GL driver under the gl tests, and
 # says above it what it hides, why it cannot be fixed here, and where it was
-# reported upstream. A race in our own code is fixed, not listed.
+# reported upstream. A race in our own code is fixed, not listed, and one in
+# a port the Alchemy registry carries is patched there.
