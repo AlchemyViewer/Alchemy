@@ -49,6 +49,9 @@ LLWindowHeadless::LLWindowHeadless(LLWindowCallbacks* callbacks, const std::stri
     mPosition.mY = y;
 
     // Initialize a headless keyboard.
+    // One keyboard for the process, a window made after another replacing
+    // the one before, which nothing else holds.
+    delete gKeyboard;
     gKeyboard = new LLKeyboardHeadless();
     gKeyboard->setCallbacks(callbacks);
 }
