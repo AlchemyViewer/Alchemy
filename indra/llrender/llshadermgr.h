@@ -597,6 +597,8 @@ public:
 
         CROSS_FILTER_MAP,                   //  "crossFilterMap"       streak accumulator, composited in colorCorrect
 
+        CUTOUT_PREMULTIPLIED,               //  "uCutoutPremultiplied" 1 in a snapshot cutout frame: scene colour is premultiplied by coverage
+
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 

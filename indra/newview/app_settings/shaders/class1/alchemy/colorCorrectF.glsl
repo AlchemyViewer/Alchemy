@@ -34,6 +34,13 @@ out vec4 frag_color;
 // ---- Input ------------------------------------------------------------------
 uniform sampler2D diffuseRect;
 
+// 1 in a snapshot cutout frame, where the scene arrives premultiplied by the
+// coverage in its alpha: blended geometry was composited over black, and the
+// alpha channel holds coverage rather than glow. Grading and tonemapping act on
+// the surface's own colour, and the coverage goes back on at the end, so a lift
+// or a split tone never paints what is to be left empty.
+uniform float uCutoutPremultiplied;
+
 // Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
 // and bound at UB_ENVIRONMENT. Members are read by bare name. Declared unconditionally --
 // a block whose presence varied by define could not unify across co-attached units; only
@@ -142,6 +149,12 @@ void main()
     vec4 diff = texture(diffuseRect, vary_fragcoord);
 #endif
 
+    float cutout_coverage = clamp(diff.a, 0.0, 1.0);
+    if (uCutoutPremultiplied > 0.0)
+    {
+        diff.rgb = (cutout_coverage > 0.0) ? diff.rgb / cutout_coverage : vec3(0.0);
+    }
+
 #ifdef BLOOM_COMPOSITE
     // Additively composite the HDR bloom pyramid before exposure/tonemap so the
     // glow is rolled through the same exposure curve as the underlying scene.
@@ -222,6 +235,11 @@ void main()
 #endif
 
     diff.rgb = clamp(diff.rgb, vec3(0.0), vec3(1.0)); // We should always be 0-1 past this point
+
+    if (uCutoutPremultiplied > 0.0)
+    {
+        diff.rgb *= cutout_coverage;
+    }
 
 #ifdef DITHER
     // Post chain is 8-bit — dither before the first quantization rather than

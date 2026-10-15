@@ -9752,6 +9752,16 @@ Failed to save snapshot to [PATH]: Directory does not exist.
   </notification>
 
   <notification icon="notifytip.tga"
+    name="CutoutSnapshotSaved" type="notifytip">
+That snapshot was a cutout: only what Cutout is set to was drawn. It stays on until you uncheck Cutout in the snapshot window.
+  </notification>
+
+  <notification icon="notifytip.tga"
+    name="CutoutTargetMissing" type="notifytip">
+No snapshot was saved: what Cutout is set to is not in view. Turn the camera to it, pick it again, or uncheck Cutout in the snapshot window.
+  </notification>
+
+  <notification icon="notifytip.tga"
     name="SnapshotSavedToComputer" type="notifytip">
 Screenshot saved to:
     [FILEPATH]

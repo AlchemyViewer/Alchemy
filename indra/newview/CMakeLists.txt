@@ -141,10 +141,12 @@ if(AL_BUILD_VIEWER)
     alchattimestamp.cpp
     alcheatcodes.cpp
     alclassifieditem.cpp
+    alcolorpopover.cpp
     alcolorwheelctrl.cpp
     alcolorwheelmodel.cpp
     alcurveeditorctrl.cpp
     alcurvemodel.cpp
+    alcutoutimage.cpp
     aldaycyclelandmarks.cpp
     aldepthpyramid.cpp
     alderenderlist.cpp
@@ -168,7 +170,9 @@ if(AL_BUILD_VIEWER)
     alfloatersceneexplorerfilters.cpp
     alfloaterscopes.cpp
     alfloatertransactionlog.cpp
+    alrenderisolation.cpp
     alsceneexplorerpredicate.cpp
+    alsnapshotcutout.cpp
     alscopedata.cpp
     alscriptanalysis.cpp
     alscriptanalysislane.cpp
@@ -1015,10 +1019,12 @@ if(AL_BUILD_VIEWER)
     alchatcommand.h
     alchattimestamp.h
     alclassifieditem.h
+    alcolorpopover.h
     alcolorwheelctrl.h
     alcolorwheelmodel.h
     alcurveeditorctrl.h
     alcurvemodel.h
+    alcutoutimage.h
     aldaycyclelandmarks.h
     aldepthpyramid.h
     alderenderlist.h
@@ -1042,7 +1048,9 @@ if(AL_BUILD_VIEWER)
     alfloatersceneexplorerfilters.h
     alfloaterscopes.h
     alfloatertransactionlog.h
+    alrenderisolation.h
     alsceneexplorerpredicate.h
+    alsnapshotcutout.h
     alscopedata.h
     alscriptanalysis.h
     alscriptanalysislane.h
@@ -2530,6 +2538,7 @@ if(AL_BUILD_TESTS)
       tests/alcolorwheelmodel_test.cpp
       tests/alcrashreporter_test.cpp
       tests/alcurvemodel_test.cpp
+      tests/alcutoutimage_test.cpp
       tests/aldaycyclelandmarks_test.cpp
       tests/alfarplane_test.cpp
       tests/alfeedback_test.cpp
@@ -2605,6 +2614,7 @@ if(AL_BUILD_TESTS)
       alcolorwheelmodel.cpp
       alcrashreporter.cpp
       alcurvemodel.cpp
+      alcutoutimage.cpp
       aldaycyclelandmarks.cpp
       alfarplane.cpp
       alfeedback.cpp

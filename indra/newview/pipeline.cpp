@@ -53,6 +53,7 @@
 #include "llui.h"
 #include "llglheaders.h"
 #include "aldepthbounds.h"
+#include "alrenderisolation.h"
 #include "alsamplerstate.h"
 #include "aluniformbuffer.h"
 #include "alwhitebalancesolver.h"
@@ -319,6 +320,7 @@ bool    LLPipeline::sUseFarClip = true;
 bool    LLPipeline::sShadowRender = false;
 bool    LLPipeline::sRenderGlow = false;
 bool    LLPipeline::sImpostorRender = false;
+bool    LLPipeline::sCutoutRender = false;
 bool    LLPipeline::sUnderWaterRender = false;
 bool    LLPipeline::sTextureBindTest = false;
 bool    LLPipeline::sRenderAttachedLights = true;
@@ -337,6 +339,19 @@ bool    LLPipeline::sUseDepthTexture = false;
 bool    LLPipeline::sScopeCapture = false;
 bool    LLPipeline::sGradeBypass = false;
 U32     LLPipeline::sGradeBypassMask = 0;
+
+// static
+bool LLPipeline::isMainWorldPass()
+{
+    return !sShadowRender && !sImpostorRender && !sRenderingHUDs && !gCubeSnapshot
+        && LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD;
+}
+
+// static
+bool LLPipeline::suppressesLensAndPrintEffects()
+{
+    return gSnapshotNoPost || sCutoutRender;
+}
 
 // EventHost API LLPipeline listener.
 static LLPipelineListener sPipelineListener;
@@ -827,16 +842,7 @@ void LLPipeline::resizeScreenTexture()
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
         GLuint scaledResX = resX;
         GLuint scaledResY = resY;
-        if ( (RenderResolutionDivisor > 1) && (RenderResolutionDivisor < resX) && (RenderResolutionDivisor < resY) )
-        {
-            scaledResX /= RenderResolutionDivisor;
-            scaledResY /= RenderResolutionDivisor;
-        }
-        else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier != 1.f)
-        {
-            scaledResX = (GLuint)(scaledResX * RenderResolutionMultiplier);
-            scaledResY = (GLuint)(scaledResY * RenderResolutionMultiplier);
-        }
+        scaleToRenderResolution(scaledResX, scaledResY);
 // [/SL:KB]
 
 //      if (gResizeScreenTexture || (resX != mRT->screen.getWidth()) || (resY != mRT->screen.getHeight()))
@@ -859,6 +865,23 @@ bool LLPipeline::allocateScreenBuffer(U32 resX, U32 resY)
     eFBOStatus ret = doAllocateScreenBuffer(resX, resY);
 
     return ret == FBO_SUCCESS_FULLRES;
+}
+
+// static
+void LLPipeline::scaleToRenderResolution(U32& resX, U32& resY)
+{
+    if (RenderResolutionDivisor > 1 && RenderResolutionDivisor < resX && RenderResolutionDivisor < resY)
+    {
+        resX /= RenderResolutionDivisor;
+        resY /= RenderResolutionDivisor;
+    }
+// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
+    else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier != 1.f)
+    {
+        resX = (U32)(resX * RenderResolutionMultiplier);
+        resY = (U32)(resY * RenderResolutionMultiplier);
+    }
+// [/SL:KB]
 }
 
 
@@ -942,20 +965,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     mRT->width = resX;
     mRT->height = resY;
 
-    U32 res_mod = RenderResolutionDivisor;
-
-    if (res_mod > 1 && res_mod < resX && res_mod < resY)
-    {
-        resX /= res_mod;
-        resY /= res_mod;
-    }
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-    else if (RenderResolutionMultiplier > 0.f && RenderResolutionMultiplier != 1.f)
-    {
-        resX = (GLuint)(resX * RenderResolutionMultiplier);
-        resY = (GLuint)(resY * RenderResolutionMultiplier);
-    }
-// [/SL:KB]
+    scaleToRenderResolution(resX, resY);
 
     S32 shadow_detail = RenderShadowDetail;
     bool ssao = RenderDeferredSSAO;
@@ -3175,7 +3185,12 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result)
         }
     }
 
-    if (hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&
+    // Neither sky is part of a cutout's subject, and both come in here rather
+    // than through a partition the cutout's choke points see.
+    const bool cutout = cullingToCutoutSubject();
+
+    if (!cutout &&
+        hasRenderType(LLPipeline::RENDER_TYPE_SKY) &&
         gSky.mVOSkyp.notNull() &&
         gSky.mVOSkyp->mDrawable.notNull())
     {
@@ -3185,7 +3200,8 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result)
         stop_glerror();
     }
 
-    if (hasRenderType(LLPipeline::RENDER_TYPE_WL_SKY) &&
+    if (!cutout &&
+        hasRenderType(LLPipeline::RENDER_TYPE_WL_SKY) &&
         gPipeline.canUseWindLightShaders() &&
         gSky.mVOWLSkyp.notNull() &&
         gSky.mVOWLSkyp->mDrawable.notNull())
@@ -3215,8 +3231,12 @@ void LLPipeline::markNotCulled(LLSpatialGroup* group, LLCamera& camera)
     { //render by drawable
         sCull->pushDrawableGroup(group);
     }
-    else
+    else if (!cullingToCutoutSubject() || ALRenderIsolation::includes(group))
     {   //render by group
+        // A cutout frame's main pass draws only its subject's groups. The rest
+        // were marked visible above all the same: what one snapshot leaves out
+        // must not read as out of view to object-cache eviction, LOD or
+        // texture priority.
         sCull->pushVisibleGroup(group);
     }
 
@@ -3524,6 +3544,15 @@ void LLPipeline::markVisible(LLDrawable *drawablep, LLCamera& camera)
 {
     if(drawablep && !drawablep->isDead())
     {
+        if (cullingToCutoutSubject() && !ALRenderIsolation::includes(drawablep))
+        {
+            // Left out of a cutout's frame, but seen, for the same reason as in
+            // markNotCulled. A bridge culls its own octree here, and each of its
+            // groups is turned away there in turn.
+            drawablep->setVisible(camera);
+            return;
+        }
+
         if (drawablep->isSpatialBridge())
         {
             const LLDrawable* root = ((LLSpatialBridge*) drawablep)->mDrawable;
@@ -3930,6 +3959,13 @@ void LLPipeline::stateSort(LLDrawable* drawablep, LLCamera& camera)
     if (!drawablep
         || drawablep->isDead()
         || !hasRenderType(drawablep->getRenderType()))
+    {
+        return;
+    }
+
+    // markVisible turned everything else away; this is the backstop for
+    // anything that reaches the visible list some other way.
+    if (cullingToCutoutSubject() && !ALRenderIsolation::includes(drawablep))
     {
         return;
     }
@@ -4822,6 +4858,13 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     // do water haze just before pre water alpha
     U32 water_haze_pass = LLDrawPool::POOL_ALPHA_PRE_WATER;
 
+    // A cutout's coverage is seeded once every opaque pool has laid down its
+    // depth -- fullbright, shiny and alpha-masked fullbright draw here, after
+    // lighting, and would otherwise be left uncovered -- and before the first
+    // blended pool adds to it.
+    U32 cutout_seed_pass = LLDrawPool::POOL_ALPHA_PRE_WATER;
+    bool done_cutout_seed = !cullingToCutoutSubject();
+
     calcNearbyLights(camera);
     setupHWLights();
 
@@ -4841,6 +4884,12 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     done_atmospherics = done_atmospherics || low_detail_probe;
     done_water_haze   = done_water_haze || low_detail_probe;
 
+    // Underwater, the water haze is a full-screen pass, and it would fog the
+    // empty background of a cutout frame -- which then bleeds into whatever
+    // blended geometry is composited over it. Above water it has nothing to
+    // draw there, the water being left out.
+    done_water_haze = done_water_haze || cullingToCutoutSubject();
+
 
     while ( iter1 != mPools.end() )
     {
@@ -4858,6 +4907,12 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         { // do atmospherics against depth buffer before rendering alpha
             doAtmospherics();
             done_atmospherics = true;
+        }
+
+        if (cur_type >= cutout_seed_pass && !done_cutout_seed)
+        {
+            seedCutoutCoverageFromDepth();
+            done_cutout_seed = true;
         }
 
         if (cur_type >= water_haze_pass && !done_water_haze)
@@ -4928,6 +4983,11 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
         stop_glerror();
     }
 
+    if (!done_cutout_seed)
+    {
+        seedCutoutCoverageFromDepth();
+    }
+
     gGLLastMatrix = NULL;
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
@@ -4935,8 +4995,8 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     // An impostor is a billboard: baking selection highlights or debug geometry into its
     // texture freezes them there for the life of the impostor and replays them into the scene
     // G-buffer, which is not what either is for. They belong to the frame that draws the
-    // billboard, where they are already drawn.
-    if (!gCubeSnapshot && !sImpostorRender)
+    // billboard, where they are already drawn. Nor are they part of a cutout's subject.
+    if (!gCubeSnapshot && !sImpostorRender && !sCutoutRender)
     {
         // debug displays
         renderHighlights();
@@ -8185,7 +8245,7 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     static LLCachedControl<F32> lens_flare_occlusion_scale(gSavedSettings, "RenderLensFlareOcclusionScale", 1.f);
     static LLCachedControl<F32> lens_flare_fade_time(gSavedSettings, "RenderLensFlareFadeTime", 0.35f);
 
-    if (gSnapshotNoPost)
+    if (suppressesLensAndPrintEffects())
     {
         // A clean-plate render: colorCorrect zeroes the strength for this
         // frame, so hold the history rather than clear it, or the flare would
@@ -8433,7 +8493,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 // Pyramid needs at least 3 mips for the downsample/upsample chain
                 // to be meaningful; otherwise gate the signal to zero so a partial
                 // allocation doesn't leak an unfiltered mip into the scene.
-                const F32 strength_gate = (mRT->bloomMipCount >= 3) ? 1.0f : 0.0f;
+                // A cutout frame builds no pyramid, so what is in it is an
+                // earlier frame's.
+                const F32 strength_gate = (mRT->bloomMipCount >= 3 && !sCutoutRender) ? 1.0f : 0.0f;
                 shader->uniform1f(LLShaderMgr::BLOOM_STRENGTH,    llmax(bloom_strength(), 0.0f)    * strength_gate);
                 shader->uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f) * strength_gate);
                 const LLColor3& tint = halation_tint();
@@ -8455,7 +8517,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 // quadrant of mWaterDis, whose completeness says nothing about
                 // what is in it.
                 const bool streaks_live = mRT->crossFilterReady && mWaterDis.isComplete();
-                const F32  streaks      = (streaks_live && !gSnapshotNoPost)
+                const F32  streaks      = (streaks_live && !suppressesLensAndPrintEffects())
                                         ? llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH) * strength_gate
                                         : 0.f;
                 shader->uniform1f(LLShaderMgr::CROSS_STRENGTH, streaks);
@@ -8476,6 +8538,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         }
 
         shader->uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
+        shader->uniform1f(LLShaderMgr::CUTOUT_PREMULTIPLIED, sCutoutRender ? 1.f : 0.f);
 
         // The other half of the "No post-processing" contract. The grade is
         // gated where this pass's program is chosen and the print effects in
@@ -8483,7 +8546,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // aberration and the lens flare are applied *inside* this program, in
         // every variant including the no-post ones, so their strengths have to
         // be silenced here or a clean plate still carries both.
-        const bool clean_plate = gSnapshotNoPost;
+        const bool suppress_effects = suppressesLensAndPrintEffects();
         // The material preview renders through here too, inside the auxiliary
         // target pack. The flare state was measured for the world frame, so
         // only the main pack gets the flare; aberration is left as it was.
@@ -8502,7 +8565,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // strength (and pre-apply the 0.02 peak-offset scale), take the
         // reciprocal of falloff, and turn the angle into a (sin, cos) pair.
         // Saves one mul, one div, and one sincos per fragment.
-        F32 ca_strength = clean_plate ? 0.f : llclamp(chromatic_aberration_strength(), 0.f, 1.f);
+        F32 ca_strength = suppress_effects ? 0.f : llclamp(chromatic_aberration_strength(), 0.f, 1.f);
         F32 ca_falloff  = llclamp(chromatic_aberration_falloff(),  0.5f, 4.f);
         F32 ca_angle_rad = llclamp(chromatic_aberration_angle(), 0.f, 360.f) * 0.01745329252f;
         shader->uniform1f(LLShaderMgr::CA_AMOUNT, ca_strength * ca_strength * 0.02f);
@@ -8537,7 +8600,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
             // Zeroing the master strength both hits the shader's early-out and
             // skips the whole detail block below.
-            F32 strength = (clean_plate || !world_frame) ? 0.f : llclamp(lens_flare_strength(), 0.f, 1.f);
+            F32 strength = (suppress_effects || !world_frame) ? 0.f : llclamp(lens_flare_strength(), 0.f, 1.f);
             shader->uniform1f(LLShaderMgr::LENS_FLARE_STRENGTH, strength);
 
             if (strength > 0.f)
@@ -8601,7 +8664,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             static LLCachedControl<F32> lens_dirt_bloom(gSavedSettings, "RenderLensDirtBloomResponse", 1.f);
             static LLCachedControl<F32> lens_dirt_flare(gSavedSettings, "RenderLensDirtFlareResponse", 1.f);
 
-            const F32 dirt_strength = (clean_plate || !world_frame || !mLensDirtMap.isComplete())
+            const F32 dirt_strength = (suppress_effects || !world_frame || !mLensDirtMap.isComplete())
                                     ? 0.f
                                     : llclamp(lens_dirt_strength(), 0.f, 2.f);
 
@@ -10247,7 +10310,20 @@ void LLPipeline::renderFinalize()
 
     static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
     bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr();
-    if (hdr)
+
+    // A cutout frame measures nothing and leaves nothing behind. It is mostly
+    // empty, so metering it would brighten the subject, and the next live frame
+    // would reflect and meter a world with everything but the subject cut out.
+    // The last live frame's exposure serves, as it does for the scopes.
+    //
+    // Everything that spreads past a pixel is left out as well -- depth of
+    // field, bloom, glow, anti-aliasing and sharpening -- since each carries
+    // the subject's edge into what is to be left empty, where the coverage
+    // written after the frame (copyCutoutCoverageToAlpha) knows nothing of it.
+    // Edges come from rendering the cutout larger and averaging it down.
+    const bool cutout = sCutoutRender;
+
+    if (hdr && !cutout)
     {
         copyScreenSpaceReflections(&mRT->screen, &mSceneMap);
 
@@ -10265,7 +10341,11 @@ void LLPipeline::renderFinalize()
     // rather than the scene -- which is no use to a tool whose whole job is to
     // decide what the grade should be. It has to precede DoF for the same
     // reason: a sample from a defocused pixel describes the blur, not the scene.
-    serviceScenePixelProbe(&mRT->screen);
+    // Nor from a cutout, which describes one subject on nothing.
+    if (!cutout)
+    {
+        serviceScenePixelProbe(&mRT->screen);
+    }
 
     // Depth of field, in place on mRT->screen.
     //
@@ -10288,7 +10368,7 @@ void LLPipeline::renderFinalize()
     // SSR, luminance and exposure stay above deliberately: reflections keep
     // their detail, and a blur conserves mean energy so metering is unaffected.
     static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
-    if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot)
+    if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot && !cutout)
     {
         renderDoF();
 
@@ -10301,7 +10381,7 @@ void LLPipeline::renderFinalize()
         glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
     }
 
-    if (hdr)
+    if (hdr && !cutout)
     {
         // HDR bloom runs pre-tonemap against the linear scene buffer -- now the
         // defocused one. The pyramid is generated here; the additive composite
@@ -10325,7 +10405,7 @@ void LLPipeline::renderFinalize()
 
     // Legacy glow for non-HDR path.  In the HDR path, glow is extracted as part of the
     // bloom process and composited back in after tonemapping.
-    if (!hdr)
+    if (!hdr && !cutout)
     {
         generateGlow(&mRT->postPingMap);
     }
@@ -10333,12 +10413,14 @@ void LLPipeline::renderFinalize()
     LLRenderTarget* sourceBuffer = &mRT->postPingMap;
     LLRenderTarget* targetBuffer = &mRT->postPongMap;
 
-    if (RenderFSAAType == 1)
+    // Anti-aliasing and sharpening both spread past a pixel, so a cutout
+    // frame skips them (see above).
+    if (RenderFSAAType == 1 && !cutout)
     {
         applyFXAA(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
-    else if (RenderFSAAType == 2)
+    else if (RenderFSAAType == 2 && !cutout)
     {
         generateSMAABuffers(sourceBuffer);
         applySMAA(sourceBuffer, targetBuffer);
@@ -10346,13 +10428,13 @@ void LLPipeline::renderFinalize()
     }
 
     static LLCachedControl<F32> cas_sharpness(gSavedSettings, "RenderCASSharpness", 0.4f);
-    if (cas_sharpness > 0.0f && gCASProgram.isComplete())
+    if (cas_sharpness > 0.0f && gCASProgram.isComplete() && !cutout)
     {
         applyCAS(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
 
-    if (!hdr)
+    if (!hdr && !cutout)
     {
         combineGlow(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
@@ -10373,7 +10455,7 @@ void LLPipeline::renderFinalize()
     }
 // [/RLVa:KB]
 
-    if (RenderBufferVisualization > -1)
+    if (RenderBufferVisualization > -1 && !cutout)
     {
         switch (RenderBufferVisualization)
         {
@@ -10409,12 +10491,16 @@ void LLPipeline::renderFinalize()
 
     // Measure what is about to be presented. After every post pass, before
     // the vignette/grain/dither the final blit adds -- those are print
-    // effects, deliberately outside the measurement.
-    captureScopeSample(sourceBuffer);
+    // effects, deliberately outside the measurement. A cutout frame is not
+    // what the scopes describe.
+    if (!cutout)
+    {
+        captureScopeSample(sourceBuffer);
 
-    // Same point, same reason: a still and the scopes must agree about what a
-    // frame is, or the numbers will not describe the picture beside them.
-    captureReferenceStill(sourceBuffer);
+        // Same point, same reason: a still and the scopes must agree about what a
+        // frame is, or the numbers will not describe the picture beside them.
+        captureReferenceStill(sourceBuffer);
+    }
 
     // Present the screen target.
     {
@@ -10441,7 +10527,7 @@ void LLPipeline::renderFinalize()
         // Dither is not in the list on purpose. It is a quantisation aid rather
         // than a look, and an 8-bit PNG wants it whether or not the rest is
         // wanted.
-        const bool clean_plate = gSnapshotNoPost;
+        const bool suppress_effects = suppressesLensAndPrintEffects();
 
         // Lens distortion
         //
@@ -10466,7 +10552,7 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<LLVector3> distort_center(gSavedSettings, "RenderLensDistortionCenter", LLVector3(0.f, 0.f, 0.f));
         static LLCachedControl<LLVector3> distort_tangential(gSavedSettings, "RenderLensDistortionTangential", LLVector3(0.f, 0.f, 0.f));
 
-        const F32 distort = clean_plate ? 0.f : llclamp(distort_amount(), 0.f, 1.f);
+        const F32 distort = suppress_effects ? 0.f : llclamp(distort_amount(), 0.f, 1.f);
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::LENS_DISTORT_AMOUNT, distort);
 
         // Zeroing the master both hits the shader's early-out and skips the
@@ -10653,7 +10739,7 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<LLVector3> vignette_center(gSavedSettings, "RenderVignetteCenter", LLVector3(0.0f, 0.0f, 0.0f));
         static LLCachedControl<bool>      vignette_correct_aspect(gSavedSettings, "RenderVignetteCorrectAspect", false);
         static LLCachedControl<F32>       vignette_feather(gSavedSettings, "RenderVignetteFeather", 1.0f);
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_AMOUNT, clean_plate ? 0.0f : llclamp(vignette_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_AMOUNT, suppress_effects ? 0.0f : llclamp(vignette_amount(), 0.0f, 1.0f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_RADIUS, llclamp(vignette_radius(), 0.25f, 1.5f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SOFT, llclamp(vignette_soft(), 0.05f, 1.0f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SHAPE, llclamp(vignette_shape(), 0.0f, 1.0f));
@@ -10674,8 +10760,8 @@ void LLPipeline::renderFinalize()
         // CVD Compensation
         static LLCachedControl<S32> cvd_mode(gSavedSettings, "RenderCVDMode", 0);
         static LLCachedControl<F32> cvd_amount(gSavedSettings, "RenderCVDAmount", 0.0f);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::CVD_MODE, clean_plate ? 0 : llclamp(cvd_mode(), 0, 3));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::CVD_AMOUNT, clean_plate ? 0.0f : llclamp(cvd_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::CVD_MODE, suppress_effects ? 0 : llclamp(cvd_mode(), 0, 3));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::CVD_AMOUNT, suppress_effects ? 0.0f : llclamp(cvd_amount(), 0.0f, 1.0f));
 
         // Film Grain
         static LLCachedControl<bool>     film_grain_animated(gSavedSettings, "RenderFilmGrainAnimated", true);
@@ -10684,7 +10770,7 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<F32>      film_grain_size(gSavedSettings, "RenderFilmGrainSize", 1.0f);
         static LLCachedControl<F32>      film_grain_range(gSavedSettings, "RenderFilmGrainRange", 0.5f);
         static LLCachedControl<LLColor3> film_grain_tint(gSavedSettings, "RenderFilmGrainTint", LLColor3(1.0f, 1.0f, 1.0f));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_AMOUNT, clean_plate ? 0.0f : llclamp(film_grain_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_AMOUNT, suppress_effects ? 0.0f : llclamp(film_grain_amount(), 0.0f, 1.0f));
         gBlitWithEffectsProgram.uniform1i(LLShaderMgr::GRAIN_STYLE, llclamp(film_grain_style(), 0, 3));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_SIZE, llclamp(film_grain_size(), 1.0f, 8.0f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_RANGE, llclamp(film_grain_range(), 0.0f, 1.0f));
@@ -10700,7 +10786,7 @@ void LLPipeline::renderFinalize()
 
         // Previews
         static LLCachedControl<S32> preview_mode(gSavedSettings, "RenderEffectPreviewMode", 0);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::PREVIEW_MODE, clean_plate ? 0 : llclamp(preview_mode(), 0, 7));
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::PREVIEW_MODE, suppress_effects ? 0 : llclamp(preview_mode(), 0, 7));
 
         // Reference still. The mode is forced off unless a still actually
         // exists, which is what lets the shader read the sampler without
@@ -10710,7 +10796,7 @@ void LLPipeline::renderFinalize()
         // not a snapshot of the image.
         static LLCachedControl<S32> ref_wipe_mode(gSavedSettings, "RenderReferenceWipeMode", 0);
         static LLCachedControl<F32> ref_wipe_pos(gSavedSettings, "RenderReferenceWipePosition", 0.5f);
-        const S32 wipe_mode = (hasReferenceStill() && !clean_plate) ? llclamp(ref_wipe_mode(), 0, 2) : 0;
+        const S32 wipe_mode = (hasReferenceStill() && !suppress_effects) ? llclamp(ref_wipe_mode(), 0, 2) : 0;
         gBlitWithEffectsProgram.uniform1i(LLShaderMgr::REFERENCE_WIPE_MODE, wipe_mode);
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::REFERENCE_WIPE_POS, llclamp(ref_wipe_pos(), 0.f, 1.f));
         if (wipe_mode != 0)
@@ -10729,7 +10815,7 @@ void LLPipeline::renderFinalize()
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
-    if (hasRenderDebugMask(LLPipeline::RENDER_DEBUG_PHYSICS_SHAPES))
+    if (hasRenderDebugMask(LLPipeline::RENDER_DEBUG_PHYSICS_SHAPES) && !cutout)
     {
         renderPhysicsDisplay();
     }
@@ -11761,7 +11847,10 @@ void LLPipeline::doAtmospherics()
         }
 
         LLGLEnable blend(GL_BLEND);
-        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO, LLRender::BF_SOURCE_ALPHA);
+        // The haze dims the glow in the alpha as it dims what is lit. In a cutout frame the alpha is the subject's
+        // coverage, seeded before this pass, and haze in front of the subject leaves it no less covered.
+        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_SOURCE_ALPHA, LLRender::BF_ZERO,
+                      alphaWritesCoverage() ? LLRender::BF_ONE : LLRender::BF_SOURCE_ALPHA);
         // The caller's mask comes back for the pools drawn after the haze.
         LLGLSColorMask color_mask(true, true);
 
@@ -12681,24 +12770,6 @@ LLRenderTarget* LLPipeline::getSpotShadowTarget(U32 i)
     llassert(i < 2);
     return &mSpotShadow[i];
 }
-
-// helper class for disabling occlusion culling for the current stack frame
-class LLDisableOcclusionCulling
-{
-public:
-    S32 mUseOcclusion;
-
-    LLDisableOcclusionCulling()
-    {
-        mUseOcclusion = LLPipeline::sUseOcclusion;
-        LLPipeline::sUseOcclusion = 0;
-    }
-
-    ~LLDisableOcclusionCulling()
-    {
-        LLPipeline::sUseOcclusion = mUseOcclusion;
-    }
-};
 
 // Re-bucket a shared sun-shadow cull (produced by a single union octree walk) down to one
 // cascade: copy the union's visible/drawable groups whose object bounds intersect this
@@ -13794,6 +13865,113 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     }
 }
 
+void LLPipeline::drawFarPlaneQuad(U32 depth_func, const LLColor4* color)
+{
+    gGL.getTextureSlot(0)->unbind();
+
+    // Both directions auto-translate under reverse-Z (via LLGLDepthTest::remap),
+    // and the quad sits at the reverse-Z far plane (~0) instead of ~1.
+    LLGLDepthTest depth(GL_TRUE, GL_FALSE, depth_func);
+
+    gGL.flush();
+
+    gGL.pushMatrix();
+    gGL.loadIdentity();
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.pushMatrix();
+    gGL.loadIdentity();
+
+    // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
+    // consistent with the sunDisc/moon far pins.
+    const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
+
+    gDebugProgram.bind();
+
+    if (color)
+    {
+        gGL.diffuseColor4fv(color->mV);
+    }
+
+    gGL.begin(LLRender::TRIANGLES);
+    {
+        gGL.vertex3f(-1.f, -1.f, clip_plane);
+        gGL.vertex3f(1.f, -1.f, clip_plane);
+        gGL.vertex3f(1.f, 1.f, clip_plane);
+
+        gGL.vertex3f(-1.f, -1.f, clip_plane);
+        gGL.vertex3f(1.f, 1.f, clip_plane);
+        gGL.vertex3f(-1.f, 1.f, clip_plane);
+    }
+    gGL.end();
+    gGL.flush();
+
+    gDebugProgram.unbind();
+
+    gGL.popMatrix();
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.popMatrix();
+}
+
+void LLPipeline::seedCutoutCoverageFromDepth()
+{
+    LL_PROFILE_GPU_ZONE("cutout coverage seed");
+
+    LLGLDisable blend(GL_BLEND);
+
+    // Nothing covers the background, so it is cleared to nothing, colour and
+    // alpha both. Lighting left it the sky's emissive copy (magenta, with the
+    // emissive buffer on) or black; the blended geometry drawn over it next has
+    // to be composited over black for the colour to come out premultiplied by
+    // the coverage accumulated alongside it.
+    {
+        LLGLSColorMask mask(true, true);
+        drawFarPlaneQuad(GL_LEQUAL, &LLColor4::transparent);
+    }
+
+    // Opaque geometry covers its texel whole. The alpha pool's blend adds to
+    // this (alphaWritesCoverage), so a blended surface over opaque stays at 1
+    // and over the background becomes its own coverage.
+    {
+        LLGLSColorMask mask(false, true);
+        drawFarPlaneQuad(GL_GREATER, &LLColor4::white);
+    }
+}
+
+void LLPipeline::copyCutoutCoverageToAlpha()
+{
+    LL_PROFILE_GPU_ZONE("cutout coverage copy");
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    LLGLDisable blend(GL_BLEND);
+    LLGLSColorMask mask(false, true);
+
+    // Across the whole frame, sampled as the final blit sampled the colour, so
+    // the two agree texel for texel whatever the scene target's resolution.
+    const LLRect& rect = gViewerWindow->getWorldViewRectRaw();
+    glViewport(rect.mLeft, rect.mBottom, rect.getWidth(), rect.getHeight());
+
+    gCopyProgram.bind();
+    gCopyProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mRT->screen);
+    mScreenTriangleVB->setBuffer();
+    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+    gCopyProgram.unbind();
+}
+
+void LLPipeline::clearSceneMap()
+{
+    if (mSceneMap.isComplete())
+    {
+        // The depth clear value is the reverse-Z latch's far plane. Clears obey
+        // the write masks, so both are opened for it.
+        LLGLSColorMask mask(true, true);
+        LLGLDepthTest depth(GL_TRUE, GL_TRUE);
+        mSceneMap.bindTarget();
+        glClearColor(0.f, 0.f, 0.f, 0.f);
+        mSceneMap.clear();
+        mSceneMap.flush();
+    }
+}
+
 void LLPipeline::readAttachmentTimes()
 {
     if (mAttachmentSpans.empty())
@@ -14176,56 +14354,21 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
             // caller, so every morph preview after the first in a frame lost its background.
             LLGLSColorMask mask(visually_muted || too_complex, true);
 
-            gGL.getTextureSlot(0)->unbind();
-
-            // GL_GREATER auto-translates to LESS under reverse-Z (via LLGLDepthTest::remap), and
-            // the background fill sits at the reverse-Z far plane (~0) instead of ~1.
-            LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
-
-            gGL.flush();
-
-            gGL.pushMatrix();
-            gGL.loadIdentity();
-            gGL.matrixMode(LLRender::MM_PROJECTION);
-            gGL.pushMatrix();
-            gGL.loadIdentity();
-
-            // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
-            // consistent with the sunDisc/moon far pins.
-            const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
-
-            gDebugProgram.bind();
-
+            LLColor4 fill_color;
+            const LLColor4* fill = nullptr;
             if (visually_muted)
             {   // Visually muted avatar
-                LLColor4 muted_color(avatar->getMutedAVColor());
-                LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set solid color " << muted_color << LL_ENDL;
-                gGL.diffuseColor4fv( muted_color.mV );
+                fill_color = LLColor4(avatar->getMutedAVColor());
+                fill = &fill_color;
+                LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set solid color " << fill_color << LL_ENDL;
             }
             else if (!preview_avatar)
             { //grey muted avatar
+                fill = &LLColor4::pink;
                 LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set grey" << LL_ENDL;
-                gGL.diffuseColor4fv(LLColor4::pink.mV );
             }
 
-            gGL.begin(LLRender::TRIANGLES);
-            {
-                gGL.vertex3f(-1.f, -1.f, clip_plane);
-                gGL.vertex3f(1.f, -1.f, clip_plane);
-                gGL.vertex3f(1.f, 1.f, clip_plane);
-
-                gGL.vertex3f(-1.f, -1.f, clip_plane);
-                gGL.vertex3f(1.f, 1.f, clip_plane);
-                gGL.vertex3f(-1.f, 1.f, clip_plane);
-            }
-            gGL.end();
-            gGL.flush();
-
-            gDebugProgram.unbind();
-
-            gGL.popMatrix();
-            gGL.matrixMode(LLRender::MM_MODELVIEW);
-            gGL.popMatrix();
+            drawFarPlaneQuad(GL_GREATER, fill);
         }
     };
 

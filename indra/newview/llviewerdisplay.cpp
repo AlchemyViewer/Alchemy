@@ -1548,6 +1548,8 @@ bool setup_hud_matrices(const LLRect& screen_region)
     return true;
 }
 
+static void render_ui_over_world();
+
 void render_ui(F32 zoom_factor, int subfield)
 {
     LLPerfStats::RecordSceneTime T ( LLPerfStats::StatType_t::RENDER_UI ); // render time capture - Primary UI stat can have HUD time overlap (TODO)
@@ -1577,6 +1579,25 @@ void render_ui(F32 zoom_factor, int subfield)
     // apply gamma correction and post effects
     gPipeline.renderFinalize();
 
+    // A cutout frame is its subject and nothing else. Nothing drawn over the
+    // frame belongs to that, and the coverage the subject is lifted out by
+    // knows nothing of what would be drawn here.
+    if (!LLPipeline::sCutoutRender)
+    {
+        render_ui_over_world();
+    }
+
+    if (!gSnapshot)
+    {
+        LLViewerCamera::setCurrent(saved_camera);
+        gGL.popMatrix();
+    }
+}
+
+// Everything render_ui draws over the finished world frame: HUD elements and
+// attachments, the interface, and the debug text.
+static void render_ui_over_world()
+{
     {
         LLGLState::checkStates();
 
@@ -1631,12 +1652,6 @@ void render_ui(F32 zoom_factor, int subfield)
         gViewerWindow->setup2DRender();
         gViewerWindow->updateDebugText();
         gViewerWindow->drawDebugText();
-    }
-
-    if (!gSnapshot)
-    {
-        LLViewerCamera::setCurrent(saved_camera);
-        gGL.popMatrix();
     }
 }
 

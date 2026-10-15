@@ -132,6 +132,21 @@ bool LLToolObjPicker::handleHover(S32 x, S32 y, MASK mask)
 }
 
 
+// virtual
+bool LLToolObjPicker::handleKey(KEY key, MASK mask)
+{
+    // Escape puts the picker down having picked nothing, as a click on the
+    // interface does -- and not by way of Reset View, which would also throw
+    // away wherever the camera had been put.
+    if (key == KEY_ESCAPE && mask == MASK_NONE && hasMouseCapture())
+    {
+        mHitObjectID.setNull();
+        setMouseCapture(false);
+        return true;
+    }
+    return LLTool::handleKey(key, mask);
+}
+
 void LLToolObjPicker::onMouseCaptureLost()
 {
     if (mExitCallback)

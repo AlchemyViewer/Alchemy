@@ -27,6 +27,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "alcutoutimage.h"
 #include "llagent.h"
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
@@ -155,6 +156,53 @@ F32 LLSnapshotLivePreview::getImageAspect()
     return (mKeepAspectRatio ? ((F32)getRect().getWidth()) / ((F32)getRect().getHeight()) : ((F32)getWidth()) / ((F32)getHeight()));
 }
 
+void LLSnapshotLivePreview::setCutout(const std::optional<ALSnapshotCutout>& cutout)
+{
+    if (cutout == mCutout)
+    {
+        return;
+    }
+
+    // A new fill or format, with the same subject drawn the same way, lays
+    // the cutout already drawn over the fill again; a render already waiting
+    // for something else still happens.
+    const bool relay_only = cutout && mCutout && cutout->drawsSameAs(*mCutout) && mCutoutResolved.notNull()
+        && (getSnapshotUpToDate() || mCutoutRelayOnly);
+    mCutout = cutout;
+    if (!relay_only)
+    {
+        // Nothing is known of a cutout until it is drawn.
+        mCutoutDrawn = true;
+    }
+
+    // A little later rather than now: a colour dragged across the fill's
+    // wheel is many changes a second, and each is laid down and encoded anew.
+    constexpr F32 CUTOUT_CHANGE_DELAY = 0.25f;
+    updateSnapshot(true, true, CUTOUT_CHANGE_DELAY);
+    mCutoutRelayOnly = relay_only;
+}
+
+bool LLSnapshotLivePreview::layCutoutOverFill()
+{
+    if (!mCutout || mCutoutResolved.isNull())
+    {
+        return false;
+    }
+
+    LLPointer<LLImageRaw> image;
+    {
+        LLImageDataSharedLock lock(mCutoutResolved);
+        image = new LLImageRaw(mCutoutResolved->getData(), mCutoutResolved->getWidth(), mCutoutResolved->getHeight(),
+                               mCutoutResolved->getComponents());
+    }
+    if (image->isBufferInvalid() || !ALCutoutImage::layOverFill(*image, mCutout->mFill, mCutout->mKeepAlpha))
+    {
+        return false;
+    }
+    mPreviewImage = image;
+    return true;
+}
+
 void LLSnapshotLivePreview::updateSnapshot(bool new_snapshot, bool new_thumbnail, F32 delay)
 {
     LL_DEBUGS("Snapshot") << "updateSnapshot: mSnapshotUpToDate = " << getSnapshotUpToDate() << LL_ENDL;
@@ -170,6 +218,9 @@ void LLSnapshotLivePreview::updateSnapshot(bool new_snapshot, bool new_thumbnail
             mFallAnimTimer.start();
         }
         mSnapshotUpToDate = false;
+        // A new snapshot is a render, unless setCutout says after this that
+        // only the fill or the format changed.
+        mCutoutRelayOnly = false;
 
         // Update snapshot source rect depending on whether we keep the aspect ratio.
         LLRect& rect = mImageRect[mCurImageIndex];
@@ -287,6 +338,14 @@ void LLSnapshotLivePreview::draw()
         LLRect shadow_rect = rect;
         shadow_rect.stretch(BORDER_WIDTH);
         gl_drop_shadow(shadow_rect.mLeft, shadow_rect.mTop, shadow_rect.mRight, shadow_rect.mBottom, LLColor4(0.f, 0.f, 0.f, mNeedsFlash ? 0.f :0.5f), 10);
+
+        if (hasCutout())
+        {
+            // What a cutout leaves empty reads as empty, as the floater's
+            // thumbnail shows it, rather than as the frozen world behind it.
+            const S32 image_bottom = rect.mBottom + TOP_PANEL_HEIGHT;
+            gl_rect_2d_checkerboard(LLRect(rect.mLeft, image_bottom + rect.getHeight(), rect.mRight, image_bottom));
+        }
 
         LLColor4 image_color(1.f, 1.f, 1.f, 1.f);
         gGL.color4fv(image_color.mV);
@@ -477,8 +536,9 @@ bool LLSnapshotLivePreview::setThumbnailImageSize()
     {
         return false ;
     }
-    S32 width  = (mThumbnailSubsampled ? mPreviewImage->getWidth()  : gViewerWindow->getWindowWidthRaw());
-    S32 height = (mThumbnailSubsampled ? mPreviewImage->getHeight() : gViewerWindow->getWindowHeightRaw()) ;
+    const bool from_preview = thumbnailScaledFromPreview();
+    S32 width  = (from_preview ? mPreviewImage->getWidth()  : gViewerWindow->getWindowWidthRaw());
+    S32 height = (from_preview ? mPreviewImage->getHeight() : gViewerWindow->getWindowHeightRaw()) ;
 
     F32 aspect_ratio = ((F32)width) / ((F32)height);
 
@@ -499,7 +559,10 @@ bool LLSnapshotLivePreview::setThumbnailImageSize()
         mThumbnailWidth = ll_round((F32)max_height * aspect_ratio);
     }
 
-    if (mThumbnailWidth > width || mThumbnailHeight > height)
+    // A screen grab can be no bigger than the window, so a window smaller than
+    // the thumbnail skips updating it. One made from the preview is scaled,
+    // and a small preview -- a 128x128 texture -- is scaled up.
+    if (!from_preview && (mThumbnailWidth > width || mThumbnailHeight > height))
     {
         return false ;//if the window is too small, ignore thumbnail updating.
     }
@@ -526,6 +589,18 @@ bool LLSnapshotLivePreview::setThumbnailImageSize()
     mPreviewRect.set(left - 1, top + 1, right + 1, bottom - 1) ;
 
     return true ;
+}
+
+bool LLSnapshotLivePreview::thumbnailScaledFromPreview() const
+{
+    // A cutout's thumbnail is the cutout made smaller, not a render of its
+    // own: that would reallocate every screen buffer a second time for the
+    // same frame. Its shape is the cutout's, then, not the window's -- a
+    // square texture's preview drawn to the window's shape is stretched.
+    // Not before a cutout has been drawn, though: a preview made but never
+    // filled, by a cutout that failed, is 0x0 and has no shape to take.
+    return mThumbnailSubsampled
+        || (mCutout && mPreviewImage.notNull() && mPreviewImage->getWidth() > 0 && mPreviewImage->getHeight() > 0);
 }
 
 void LLSnapshotLivePreview::generateThumbnailImage(bool force_update)
@@ -563,15 +638,16 @@ void LLSnapshotLivePreview::generateThumbnailImage(bool force_update)
 
     LLPointer<LLImageRaw> raw = new LLImageRaw;
 
-    if (mThumbnailSubsampled)
+    if (thumbnailScaledFromPreview())
     {
         // The thumbnail is be a subsampled version of the preview (used in SL Share previews, i.e. Flickr, Twitter)
         raw->resize( mPreviewImage->getWidth(),
                      mPreviewImage->getHeight(),
                      mPreviewImage->getComponents());
         raw->copy(mPreviewImage);
-        // Scale to the thumbnail size
-        if (!raw->scale(mThumbnailWidth, mThumbnailHeight))
+        // Scale to the thumbnail size. Straight alpha, as a cutout's is, is
+        // scaled without averaging what its empty texels hold into its edges.
+        if (!ALCutoutImage::scaleStraightAlpha(*raw, mThumbnailWidth, mThumbnailHeight))
         {
             raw = NULL ;
         }
@@ -734,16 +810,31 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
             previewp->mPreviewImage = new LLImageRaw;
         }
 
-        previewp->mSnapshotActive = true;
+        // Only the cutout's fill or format changed: the cutout already drawn
+        // is laid down again, and nothing is rendered.
+        bool produced = false;
+        if (previewp->mCutoutRelayOnly)
+        {
+            previewp->mCutoutRelayOnly = false;
+            previewp->setImageScaled(false);
+            produced = previewp->layCutoutOverFill();
+        }
 
-        previewp->setVisible(false);
-        previewp->setEnabled(false);
+        if (!produced)
+        {
+            previewp->mSnapshotActive = true;
 
-        previewp->getWindow()->incBusyCount();
-        previewp->setImageScaled(false);
+            previewp->setVisible(false);
+            previewp->setEnabled(false);
 
-        // grab the raw image
-        if (gViewerWindow->rawSnapshot(
+            previewp->getWindow()->incBusyCount();
+            previewp->setImageScaled(false);
+
+            // A render replaces the cutout last drawn, whatever it draws.
+            previewp->mCutoutResolved = nullptr;
+
+            // grab the raw image
+            produced = gViewerWindow->rawSnapshot(
                 previewp->mPreviewImage,
                 previewp->getWidth(),
                 previewp->getHeight(),
@@ -755,7 +846,22 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
                 render_no_post,
                 render_balance,
                 previewp->mSnapshotBufferType,
-                previewp->getMaxImageSize()))
+                previewp->getMaxImageSize(),
+                previewp->mCutout ? &*previewp->mCutout : nullptr,
+                &previewp->mCutoutDrawn);
+
+            if (produced && previewp->mCutout)
+            {
+                // A cutout comes back resolved and not yet over its fill. It is
+                // kept that way, and the preview is a copy laid over the fill.
+                previewp->mCutoutResolved = previewp->mPreviewImage;
+                produced = previewp->layCutoutOverFill();
+            }
+
+            previewp->getWindow()->decBusyCount();
+        }
+
+        if (produced)
         {
             // Invalidate/delete any existing encoded image
             previewp->mPreviewImageEncoded = NULL;
@@ -777,7 +883,6 @@ bool LLSnapshotLivePreview::onIdle( void* snapshot_preview )
             previewp->setThumbnailImageSize();
             previewp->generateThumbnailImage(true) ;
         }
-        previewp->getWindow()->decBusyCount();
         previewp->setVisible(use_freeze_frame && previewp->mAllowFullScreenPreview); // only show fullscreen preview when in freeze frame mode
         previewp->mSnapshotActive = false;
         LL_DEBUGS("Snapshot") << "done creating snapshot" << LL_ENDL;
@@ -987,27 +1092,7 @@ LLPointer<LLImageFormatted> LLSnapshotLivePreview::getFormattedImage()
         LLSnapshotModel::ESnapshotFormat format = getSnapshotFormat();
         LL_DEBUGS("Snapshot") << "Encoding new image of format " << format << LL_ENDL;
 
-        switch (format)
-        {
-            case LLSnapshotModel::SNAPSHOT_FORMAT_PNG:
-                mFormattedImage = new LLImagePNG();
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_JPEG:
-                mFormattedImage = new LLImageJPEG(mSnapshotQuality);
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
-                mFormattedImage = new LLImageBMP();
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
-                mFormattedImage = new LLImageWebP();
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
-                mFormattedImage = new LLImageAVIF(mSnapshotQuality);
-                break;
-            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
-                mFormattedImage = new LLImageAVIF(100); // quality 100 == lossless
-                break;
-        }
+        mFormattedImage = createFormattedImage(format, mSnapshotQuality);
         if (mFormattedImage->encode(mPreviewImage, 0))
         {
             // We can update the data size precisely at that point
@@ -1115,6 +1200,28 @@ void LLSnapshotLivePreview::saveLocal(const snapshot_saved_signal_t::slot_type& 
 
     // Save the formatted image
     saveLocal(mFormattedImage, success_cb, failure_cb);
+}
+
+// static
+LLPointer<LLImageFormatted> LLSnapshotLivePreview::createFormattedImage(LLSnapshotModel::ESnapshotFormat format, S32 quality)
+{
+    switch (format)
+    {
+    case LLSnapshotModel::SNAPSHOT_FORMAT_PNG:
+        return new LLImagePNG();
+    case LLSnapshotModel::SNAPSHOT_FORMAT_JPEG:
+        return new LLImageJPEG(quality);
+    case LLSnapshotModel::SNAPSHOT_FORMAT_BMP:
+        return new LLImageBMP();
+    case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
+        return new LLImageWebP();
+    case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
+        return new LLImageAVIF(quality);
+    case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
+        return new LLImageAVIF(100); // quality 100 == lossless
+    }
+    LL_WARNS() << "Unknown local snapshot format: " << format << LL_ENDL;
+    return new LLImagePNG();
 }
 
 //Check if failed due to insufficient memory

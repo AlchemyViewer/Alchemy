@@ -68,7 +68,10 @@ void LLDrawPoolWater::prerender()
 
 S32 LLDrawPoolWater::getNumPostDeferredPasses()
 {
-    if (!gPipeline.mWaterSurface.exists())
+    // Nor in a cutout frame's main pass. The water is drawn from the field, not culled, so the cutout's cull cannot
+    // leave it out: drawn, it would cover a wading subject and lay its glint's glow into the coverage. With no pass
+    // here, the exclusion and the haze over the surface are not run either.
+    if (!gPipeline.mWaterSurface.exists() || LLPipeline::cullingToCutoutSubject())
     {
         return 0;
     }

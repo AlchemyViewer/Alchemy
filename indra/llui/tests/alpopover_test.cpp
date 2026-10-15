@@ -652,4 +652,52 @@ namespace
         }
         over->die();
     }
+
+    TEST_CASE_METHOD(alpopover_data, "alpopover: a popover opened from a window in a floater view of its own opens in that view where the window cannot cover it", "[alpopover]")
+    {
+        if (!ui.ok())
+        {
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        // A second floater view beside the global one, as the snapshot
+        // floater's is. Here it stands alone, as the fixture's global one
+        // does.
+        LLFloaterView::Params vp(LLUICtrlFactory::getDefaultParams<LLFloaterView>());
+        vp.name = "own view";
+        vp.rect = gFloaterView->getRect();
+        LLFloaterView* own = LLUICtrlFactory::create<LLFloaterView>(vp);
+
+        // Made in the global view, as every floater is, then moved, as the
+        // snapshot floater moves itself.
+        struct Home : public LLFloater
+        {
+            Home(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
+        };
+        LLFloater::Params fp(LLFloater::getDefaultParams());
+        fp.name = "home";
+        fp.rect = LLRect(100, 500, 500, 100);
+        fp.save_rect = false;
+        fp.save_visibility = false;
+        Home* home = new Home(fp);
+        own->addChild(home);
+        LLPanel* over = anchor();
+        home->addChild(over);
+
+        ALPopover* popover = ALPopover::show(over, content(160, 90));
+        REQUIRE(popover != nullptr);
+        UNSCOPED_INFO("in the view its home is in");
+        CHECK(popover->getParent() == own);
+
+        LLRect local;
+        own->screenRectToLocal(over->calcScreenRect(), &local);
+        UNSCOPED_INFO("left edges line up, in that view");
+        CHECK(popover->getRect().mLeft == local.mLeft);
+        UNSCOPED_INFO("and it hangs from the bottom of the control");
+        CHECK(popover->getRect().mTop == local.mBottom);
+
+        popover->closeFloater();
+        home->die();
+        own->die();
+    }
 }

@@ -93,6 +93,12 @@ bool FSPosingMotion::onUpdate(F64 time, U8* joint_mask)
         if (!joint)
             continue;
 
+        // A joint switched off in the poser keeps its state in the pose with no usage, so the blend ignores it and
+        // whatever else animates the joint (the eye motion moves mEyeLeft and mEyeRight every frame) carries it away
+        // from the target. Writing to that state trips LLJointState's usage assert.
+        if (!(jointPose.getJointState()->getUsage() & POSER_JOINT_STATE))
+            continue;
+
         currentRotation = joint->getRotation();
         currentPosition = joint->getPosition();
         currentScale = joint->getScale();

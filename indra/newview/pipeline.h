@@ -110,6 +110,11 @@ public:
     //returns true if full size buffer allocated, false if some other size is allocated
     bool allocateScreenBuffer(U32 resX, U32 resY);
 
+    /// The size of the screen targets allocateScreenBuffer() makes for a view of
+    /// @a resX by @a resY: RenderResolutionDivisor applied, or else
+    /// RenderResolutionMultiplier.
+    static void scaleToRenderResolution(U32& resX, U32& resY);
+
     typedef enum {
         FBO_SUCCESS_FULLRES = 0,
         FBO_SUCCESS_LOWRES,
@@ -146,6 +151,27 @@ public:
     //  for_profile - if true, a profile is being performed, do not update actual impostor
     //  specific_attachment - specific attachment to profile, or nullptr to profile entire avatar
     void generateImpostor(LLVOAvatar* avatar, bool preview_avatar = false, bool for_profile = false, LLViewerObject* specific_attachment = nullptr);
+
+    // A full-screen quad at the far plane, depth-tested against the bound
+    // target's depth and never writing it: GL_GREATER reaches every texel that
+    // geometry covers, GL_LEQUAL every texel that nothing does. Drawn with
+    // gDebugProgram in `color`, or in the current diffuse colour where it is
+    // null. Blend and colour mask are the caller's to set.
+    void drawFarPlaneQuad(U32 depth_func, const LLColor4* color = nullptr);
+
+    // A cutout frame's coverage, laid into the scene target's alpha once the
+    // opaque forward pools have drawn and before the blended ones, as an
+    // impostor bake lays its own: nothing over the background, colour and
+    // alpha both, and full coverage wherever opaque geometry sits.
+    void seedCutoutCoverageFromDepth();
+    // After the frame is finished: the scene target's alpha -- the cutout's
+    // coverage -- into the alpha of whatever is bound, colour untouched. The
+    // post chain carries no alpha a cutout could use (glow tags, FXAA luma,
+    // 2-bit ping-pong buffers), so it comes from the scene target directly.
+    void copyCutoutCoverageToAlpha();
+    // The screen-space reflection source emptied: no colour, depth at the far
+    // plane, so a march through it finds nothing.
+    void clearSceneMap();
 
     void bindScreenToTexture();
     void renderFinalize();
@@ -790,6 +816,8 @@ public:
     static bool             sDynamicLOD;
     static bool             sPickAvatar;
     static bool             sImpostorRender;
+    // Set for the frames of a snapshot cutout (ALRenderIsolation::Scope).
+    static bool             sCutoutRender;
     static bool             sUnderWaterRender;
     static bool             sRenderGlow;
     static bool             sTextureBindTest;
@@ -815,6 +843,23 @@ public:
     /// RenderColorGrade instead would mark the active Look dirty, and a key
     /// released at the wrong moment could save the comparison as the look.
     static bool             sGradeBypass;
+
+    /// The main camera's pass of a cutout frame: the one pass whose view is
+    /// cut down to the cutout's subject. Shadows, impostor bakes, probes and
+    /// HUDs in the same frame still see the whole world, which is what keeps
+    /// the subject lit where it stands.
+    static bool cullingToCutoutSubject() { return sCutoutRender && isMainWorldPass(); }
+
+    /// Whether the alpha channel accumulates coverage rather than glow: in an
+    /// impostor bake, and in a cutout frame's main pass. Blended geometry adds
+    /// its coverage and glow writes are left out.
+    static bool alphaWritesCoverage() { return sImpostorRender || cullingToCutoutSubject(); }
+
+    /// A frame without the lens and print effects: a "No post-processing"
+    /// snapshot, and every cutout frame, since each of those effects reaches
+    /// past the subject's edge into what is to be left empty. Grading is not
+    /// part of this -- only "No post-processing" drops the grade.
+    static bool suppressesLensAndPrintEffects();
 
     /// One bit per grading group, for comparing a single section against the
     /// rest of the grade rather than against nothing at all.
@@ -1430,6 +1475,29 @@ public:
     static S32 RenderHeroProbeUpdateRate;
     static S32 RenderHeroProbeConservativeUpdateMultiplier;
     static bool RenderAvatarCloth;
+
+private:
+    // The main camera's view of the world: not a shadow map, an impostor
+    // bake, the HUD or a probe's cube face.
+    static bool isMainWorldPass();
+};
+
+// Occlusion culling off for as long as this lives.
+class LLDisableOcclusionCulling
+{
+public:
+    S32 mUseOcclusion;
+
+    LLDisableOcclusionCulling()
+    {
+        mUseOcclusion = LLPipeline::sUseOcclusion;
+        LLPipeline::sUseOcclusion = 0;
+    }
+
+    ~LLDisableOcclusionCulling()
+    {
+        LLPipeline::sUseOcclusion = mUseOcclusion;
+    }
 };
 
 void render_bbox(const LLVector3 &min, const LLVector3 &max);

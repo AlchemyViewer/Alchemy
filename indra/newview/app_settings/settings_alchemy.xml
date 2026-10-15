@@ -277,6 +277,55 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALSnapshotCutout</key>
+        <map>
+            <key>Comment</key>
+            <string>Snapshots draw only the picked avatar or object and fill the rest with ALSnapshotCutoutFill. Applies to the snapshot floater and File &gt; Take Snapshot to Disk; off at every login.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSnapshotCutoutFill</key>
+        <map>
+            <key>Comment</key>
+            <string>What fills a cutout snapshot around its subject. Alpha 0 leaves it transparent, 1 fills it solid; formats without alpha (JPEG, BMP, postcards) always use the colour solid.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color4</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>ALSnapshotCutoutIncludeSeated</key>
+        <map>
+            <key>Comment</key>
+            <string>A cutout of an object includes the avatars sitting on it, and what they wear.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSnapshotCutoutSupersample</key>
+        <map>
+            <key>Comment</key>
+            <string>A cutout snapshot is rendered this many times larger each way and averaged down, which is where its smooth edges come from (1-4). Lowered automatically when the render would be too large.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
         <key>ALScriptPreprocCompress</key>
         <map>
             <key>Comment</key>
