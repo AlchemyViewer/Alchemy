@@ -39,6 +39,8 @@
 
 LLPounceable<LLMessageSystem*, LLPounceableStatic> gMessageSystem;
 
+#include "almessagesystem_stub.cpp"
+
 // What the test doubles below record, and the test's own helpers.
 namespace
 {
@@ -126,6 +128,7 @@ namespace
         {
             LLTemplateMessageDispatcherData()
             {
+                gMessageSystem = stubMessageSystem();
                 mMessageName = "MessageName";
                 gUdpDispatchWasCalled = false;
                 gClearRecvWasCalled = false;

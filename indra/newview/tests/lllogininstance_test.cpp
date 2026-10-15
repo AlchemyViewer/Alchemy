@@ -301,6 +301,11 @@ namespace
     {
         lllogininstance_data() : logininstance(LLLoginInstance::getInstance())
         {
+            // The grid manager the login asks for its URIs and grid, made
+            // with the stubbed constructor above: getInstance() is null
+            // until one is, and a member called through null undefined.
+            LLGridManager::createInstance();
+
             // Global initialization
             gLoginURI.clear();
             gLoginCreds.clear();
@@ -343,6 +348,7 @@ namespace
             // The login instance outlives the test: not left holding the
             // fixture's notifications once they are gone.
             logininstance->setNotificationsInterface(nullptr);
+            LLGridManager::deleteSingleton();
         }
 
         LLLoginInstance* logininstance;
