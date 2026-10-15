@@ -3274,9 +3274,11 @@ void LLPipeline::doOcclusion(LLCamera& camera)
         {
             (*iter)->clearOcclusionState(LLSpatialGroup::ACTIVE_OCCLUSION);
         }
+        // The object cache's are the world camera's, which a shadow pass leaves to the main one.
         for (LLViewerRegion* region : LLWorld::getInstance()->getRegionList())
         {
-            if (LLVOCachePartition* vo_part = region->getVOCachePartition())
+            LLVOCachePartition* vo_part = region->getVOCachePartition();
+            if (vo_part && LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD)
             {
                 vo_part->resetOccluders();
             }
@@ -12222,16 +12224,16 @@ inline float sgn(float a)
     return (0.0F);
 }
 
-void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull)
+void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull, S32 occlusion)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("renderShadow");
 
     LLPipeline::sShadowRender = true;
 
-    // disable occlusion culling during shadow render
+    // Occlusion culling as the caller asks, by the shadow camera's own queries: none unless it does.
     U32 saved_occlusion = sUseOcclusion;
-    sUseOcclusion = 0;
+    sUseOcclusion = occlusion;
 
     // List of render pass types that use the prim volume as the shadow,
     // ignoring textures.
@@ -12992,6 +12994,32 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         static LLCachedControl<S32> sShadowCullMode(gSavedSettings, "RenderShadowCullMode", 0);
         bool have_union_cull = false;
         static LLCullResult sUnionShadowResult;
+
+        // Occlusion culling of the cascades' casters, where it is asked for: a caster the sun cannot see past the ones
+        // nearer it leaves no depth in a map. Not with the union cull, whose groups each cascade takes without their
+        // occlusion state, nor in probe captures, nor in a frame whose depth the main view does not trust either.
+        static LLCachedControl<bool> shadow_occlusion(gSavedSettings, "AlchemyRenderShadowOcclusion", false);
+        const S32 sun_occlusion =
+            shadow_occlusion() && no_occlusion.mUseOcclusion > 1 && sShadowCullMode() == 0 && !gCubeSnapshot ? 2 : 0;
+        if (!gCubeSnapshot)
+        {
+            // What the cascades' queries found holds along the direction they were asked: it is forgotten once that has
+            // turned by a degree, as it does at once from the sun to the moon or under an edit, and when the culling
+            // comes back on.
+            constexpr F32    TURNED = 0.99985f; // cos 1 degree
+            static bool      occluding = false;
+            static LLVector3 occluding_along;
+            if (sun_occlusion && (!occluding || occluding_along * lightDir < TURNED))
+            {
+                for (U32 j = 0; j < 4; ++j)
+                {
+                    LLOcclusionCullingGroup::forgetOcclusion(LLViewerCamera::CAMERA_SUN_SHADOW0 + j);
+                }
+                occluding_along = lightDir;
+            }
+            occluding = sun_occlusion != 0;
+        }
+
         if (sShadowCullMode() == 1 && !gCubeSnapshot)
         {
             LLCamera ucam = camera;
@@ -13445,7 +13473,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 {   // re-bucket the shared union cull down to this cascade's frustum
                     bucketShadowCull(sUnionShadowResult, shadow_cam, result[j]);
                 }
-                renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull);
+                renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull, sun_occlusion);
             }
 
             mRT->shadow[j].flush();

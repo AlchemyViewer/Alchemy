@@ -449,7 +449,9 @@ public:
 
     void renderHighlight(const LLViewerObject* obj, F32 fade);
 
-    void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true);
+    // `occlusion` is the sUseOcclusion level the pass culls with: 0 for none, 2 to ask the shadow camera's own
+    // occlusion queries and draw them after the opaque casters.
+    void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true, S32 occlusion = 0);
     void renderSelectedFaces(const LLColor4& color);
     void renderHighlights();
     void renderDebug();

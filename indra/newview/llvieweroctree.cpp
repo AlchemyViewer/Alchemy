@@ -865,6 +865,15 @@ bool LLOcclusionCullingGroup::isOcclusionRetestDue()
         && gFrameCount - mOcclusionIssued[LLViewerCamera::sCurCameraID] >= mSpatialPartition->mLODPeriod;
 }
 
+U32 LLOcclusionCullingGroup::sOcclusionForgotten[LLViewerCamera::NUM_CAMERAS] = {};
+
+//static
+void LLOcclusionCullingGroup::forgetOcclusion(U32 camera)
+{
+    llassert(camera < LLViewerCamera::NUM_CAMERAS);
+    sOcclusionForgotten[camera] = gFrameCount;
+}
+
 bool LLOcclusionCullingGroup::isRecentlyVisible() const
 {
     const S32 MIN_VIS_FRAME_RANGE = 2;
@@ -1109,6 +1118,15 @@ bool LLOcclusionCullingGroup::checkOcclusion()
     if (LLPipeline::sUseOcclusion < 2) return false;  // 0 - NoOcclusion, 1 = ReadOnly, 2 = ModifyOcclusionState  TODO: DJH 11-2021 ENUM this
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_OCTREE;
+    const U32 camera = LLViewerCamera::sCurCameraID;
+    if (mOcclusionIssued[camera] < sOcclusionForgotten[camera]
+        && isOcclusionState(OCCLUDED | QUERY_PENDING | DISCARD_QUERY))
+    {   // what this camera found before forgetOcclusion() is let go: seen, and nothing out
+        mOcclusionQuery[camera] = {};
+        clearOcclusionState(OCCLUDED | QUERY_PENDING | DISCARD_QUERY);
+        return false;
+    }
+
     LLOcclusionCullingGroup* parent = (LLOcclusionCullingGroup*)getParent();
     if (parent && parent->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
     {   //if the parent has been marked as occluded, the child is implicitly occluded
@@ -1178,7 +1196,20 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
             bounds[0].add(*shift);
         }
 
-        if (earlyFail(camera, bounds))
+        // A shadow camera's map is fit to its cascade again each frame, and slides over the scene: a box partly beside it
+        // would count only the part inside, and a group found hidden there would stay hidden as the rest slid in. Only a
+        // box wholly inside the map is asked; the rest are taken as seen, as a box the camera is inside is.
+        bool beside_map = false;
+        if (LLPipeline::sShadowRender)
+        {
+            LLVector4a fudge;
+            fudge.splat(SG_OCCLUSION_FUDGE);
+            LLVector4a radius;
+            radius.setAdd(bounds[1], fudge);
+            beside_map = camera->AABBInFrustumNoFarClip(bounds[0], radius) != 2;
+        }
+
+        if (beside_map || earlyFail(camera, bounds))
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - early fail");
             setOcclusionState(LLOcclusionCullingGroup::DISCARD_QUERY);

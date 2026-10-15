@@ -310,6 +310,10 @@ public:
     /// more: for a cull that runs too seldom to meet needsUpdate().
     bool isOcclusionRetestDue();
 
+    /// Lets go of what `camera`'s queries have found so far, as when the view they were asked of has turned: a group
+    /// asked before now is taken as seen, its query out forgotten, when the camera next checks it.
+    static void forgetOcclusion(U32 camera);
+
     //virtual
     void handleChildAddition(const OctreeNode* parent, OctreeNode* child);
 
@@ -332,6 +336,9 @@ protected:
 
     LLViewerOctreePartition* mSpatialPartition;
     ALQueryTicket            mOcclusionQuery[LLViewerCamera::NUM_CAMERAS]; ///< from gGL's pool, while QUERY_PENDING
+
+private:
+    static U32 sOcclusionForgotten[LLViewerCamera::NUM_CAMERAS]; ///< the frame of each camera's forgetOcclusion()
 };
 
 class LLViewerOctreePartition
