@@ -32,6 +32,7 @@
 #include "llfloater.h"
 #include "llcharacter.h"
 #include "lltracerecording.h"
+#include "alquerypool.h"
 
 class LLCharacter;
 class LLRenderTarget;
@@ -89,7 +90,7 @@ private:
     LLRenderTarget*                         mFrames[2];
     LLRenderTarget*                         mDiff;
 
-    GLuint                                  mQueryObject; //used for glQuery
+    ALQueryTicket                           mQuery; //the diff's sample count, from gGL's pool
     F32                                     mDiffResult,  //aggregate results of mDiff.
                                             mDiffTolerance, //pixels are filtered out when R+G+B < mDiffTolerance
                                             mDiffPixelRatio; //ratio of pixels used for comparison against the original mDiff size along one dimension

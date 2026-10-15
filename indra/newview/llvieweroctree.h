@@ -38,6 +38,7 @@
 #include "llquaternion.h"
 #include "lloctree.h"
 #include "llviewercamera.h"
+#include "alquerypool.h"
 
 class LLViewerRegion;
 class LLViewerOctreeEntryData;
@@ -297,13 +298,17 @@ public:
 
     void setOcclusionState(U32 state, S32 mode = STATE_MODE_SINGLE);
     void clearOcclusionState(U32 state, S32 mode = STATE_MODE_SINGLE);
-    void checkOcclusion(); //read back last occlusion query (if any)
+    /// Reads back the last occlusion query, if any has come back. True where one has and found the group in view.
+    bool checkOcclusion();
     void doOcclusion(LLCamera* camera, const LLVector4a* shift = NULL); //issue occlusion query
     bool isOcclusionState(U32 state) const { return mOcclusionState[LLViewerCamera::sCurCameraID] & state; }
     U32  getOcclusionState() const { return mOcclusionState[LLViewerCamera::sCurCameraID];}
 
     bool needsUpdate();
     U32  getLastOcclusionIssuedTime();
+    /// Whether the current camera has no query of the group out, and asked its last a partition's update period ago or
+    /// more: for a cull that runs too seldom to meet needsUpdate().
+    bool isOcclusionRetestDue();
 
     //virtual
     void handleChildAddition(const OctreeNode* parent, OctreeNode* child);
@@ -312,18 +317,10 @@ public:
     bool isRecentlyVisible() const;
     bool isAnyRecentlyVisible() const;
 
-    /// Query names from a pool kept by the target they are begun with, which a name keeps for life: one begun with
-    /// a target may not be begun with another.
-    static U32 getNewOcclusionQueryObjectName(U32 target);
-    static void releaseOcclusionQueryObjectName(U32 name, U32 target);
-
-protected:
-    void releaseOcclusionQueryObjectNames();
-
 private:
     bool earlyFail(LLCamera* camera, const LLVector4a* bounds);
-    /// The target this group's queries are begun with, for its partition and the context.
-    U32  queryTarget() const;
+    /// What this group's queries count, for its partition.
+    ALQueryKind queryKind() const;
     /// Discards the pending queries of the groups below this one that its occlusion hid, as it is found visible.
     void discardStaleQueriesBelow();
 
@@ -334,12 +331,7 @@ protected:
     S32         mLODHash;
 
     LLViewerOctreePartition* mSpatialPartition;
-    U32                      mOcclusionQuery[LLViewerCamera::NUM_CAMERAS];
-    U32                      mOcclusionCheckCount[LLViewerCamera::NUM_CAMERAS];
-    U32                      mQueryTarget = 0; ///< queryTarget(), from the group's first query; its names' pool
-
-public:
-    static std::set<U32> sPendingQueries;
+    ALQueryTicket            mOcclusionQuery[LLViewerCamera::NUM_CAMERAS]; ///< from gGL's pool, while QUERY_PENDING
 };
 
 class LLViewerOctreePartition
