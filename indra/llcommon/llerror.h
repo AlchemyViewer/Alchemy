@@ -28,6 +28,7 @@
 #ifndef LL_LLERROR_H
 #define LL_LLERROR_H
 
+#include <atomic>
 #include <sstream>
 #include <string>
 #include <typeinfo>
@@ -234,8 +235,9 @@ namespace LLError
 #else // LL_LIBRARY_INCLUDE
         bool shouldLog()
         {
-            return mCached
-                    ? mShouldLog
+            const ECached cached = mCached.load(std::memory_order_relaxed);
+            return cached != UNDECIDED
+                    ? cached == LOGS
                     : Log::shouldLog(*this);
         }
             // this member function needs to be in-line for efficiency
@@ -256,8 +258,11 @@ namespace LLError
         std::string             mLocationString,
                                 mFunctionString,
                                 mTagString;
-        bool                    mCached,
-                                mShouldLog;
+        // What Log::shouldLog() last decided for the site, until the
+        // settings change. Every thread reaching the site reads it without
+        // the log's lock, and it is the decision alone, so relaxed suffices.
+        enum ECached : U8 { UNDECIDED, SILENT, LOGS };
+        std::atomic<ECached>    mCached;
 
         friend class Log;
     };

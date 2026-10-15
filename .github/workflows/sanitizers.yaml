@@ -1,0 +1,170 @@
+name: Sanitizers
+
+# The tests built and run under the sanitizers, on Linux x64 with Clang:
+# AddressSanitizer with UndefinedBehaviorSanitizer on every pull request,
+# ThreadSanitizer too in the nightly run. Every row is advisory: it reports
+# and never fails the run. See doc/TESTING.md.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Nightly, on the default branch.
+    - cron: "23 7 * * *"
+  pull_request:
+    # As the Build workflow's: everything but documentation and the GitHub
+    # files no build reads; later patterns win.
+    paths:
+      - "**"
+      - "!**/*.md"
+      - "!doc/**"
+      - "!LICENSE"
+      - "!.github/**"
+      - ".github/workflows/sanitizers.yaml"
+      - ".github/actions/**"
+
+permissions:
+  contents: read
+
+# A new push to a pull request supersedes the run in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.sanitizer }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # ThreadSanitizer runs many times slower than the tests do, so it
+        # waits for the nightly run, or one started by hand.
+        sanitizer: ${{ fromJSON(github.event_name == 'pull_request' && '["asan"]' || '["asan", "tsan"]') }}
+    runs-on: ubuntu-26.04
+    continue-on-error: true
+    timeout-minutes: ${{ matrix.sanitizer == 'tsan' && 340 || 180 }}
+    env:
+      BUILD_DIRECTORY: build-Linux-ninja-os-${{ matrix.sanitizer }}
+      # The tests that render on a hidden window, on Mesa's llvmpipe.
+      LIBGL_ALWAYS_SOFTWARE: 1
+      LOGFAIL: DEBUG
+      master_message_template_checkout: ${{ github.workspace }}/.master-message-template
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_BINARY_SOURCES: "clear"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Checkout master-message-template
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          repository: secondlife/master-message-template
+          path: .master-message-template
+
+      # The vcpkg binary cache in R2, as the Build workflow decides it: a
+      # protected ref writes it, which the nightly run on the default branch
+      # is, a same-repository pull request reads it, and nothing else uses it.
+      - name: Decide the vcpkg cache
+        id: cache
+        shell: bash
+        env:
+          R2_ENABLED: ${{ vars.VCPKG_R2_ENABLED }}
+          REF_PROTECTED: ${{ github.ref_protected }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          mode=
+          if [[ "$R2_ENABLED" == "true" && "$GITHUB_ACTOR" != "dependabot[bot]" ]]; then
+            if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+              if [[ "$PR_HEAD_REPO" == "$GITHUB_REPOSITORY" ]]; then
+                mode="read"
+              fi
+            elif [[ "$REF_PROTECTED" == "true" ]]; then
+              mode="readwrite"
+            fi
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+      - name: Set up the build
+        uses: ./.github/actions/setup-build
+        with:
+          r2-cache-mode: ${{ steps.cache.outputs.mode }}
+          r2-endpoint-url: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
+          r2-bucket: ${{ vars.VCPKG_R2_BUCKET }}
+          r2-access-key-id: ${{ steps.cache.outputs.mode == 'readwrite' && secrets.VCPKG_R2_ACCESS_KEY_ID || secrets.VCPKG_R2_READ_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ steps.cache.outputs.mode == 'readwrite' && secrets.VCPKG_R2_SECRET_ACCESS_KEY || secrets.VCPKG_R2_READ_SECRET_ACCESS_KEY }}
+
+      # The sanitizer presets build with Clang and lld, and the sanitizers'
+      # runtimes and llvm-symbolizer come with the image's LLVM.
+      - name: Install Clang
+        shell: bash
+        run: sudo apt install -y clang lld llvm libclang-rt-dev
+
+      # The preset turns the tests on and picks the sanitizer triplet, whose
+      # ports the cache holds once a protected run has built them.
+      - name: Configure
+        shell: bash
+        env:
+          SANITIZER: ${{ matrix.sanitizer }}
+        run: |
+          set -x
+          cmake -S indra --preset "ninja-os-$SANITIZER" \
+            -DVCPKG_INSTALL_OPTIONS=--clean-after-build \
+            -DAL_BUILD_VIEWER:BOOL=OFF \
+            -DAL_ENABLE_GL_TESTS:BOOL=ON \
+            "-DAL_TEMPLATE_VERIFIER_MASTER_URL=file://$master_message_template_checkout/message_template.msg"
+
+      - name: Build
+        shell: bash
+        run: cmake --build "$BUILD_DIRECTORY" --config RelWithDebInfo --target BUILD_TESTS --parallel "$(nproc)"
+
+      # Every entry but the benchmarks: the default run and each binary's run
+      # of all its files in one process, combined_pending or not. An entry
+      # fails on a sanitizer's report whatever its exit code.
+      - name: Test
+        shell: bash
+        run: |
+          ctest --test-dir "$BUILD_DIRECTORY" -C RelWithDebInfo -LE benchmark \
+            --parallel "$(nproc)" --output-on-failure \
+            --output-junit Testing/test-results.xml
+
+      # How many reports of each kind, from what CTest kept of every entry's
+      # output, for the burn-down.
+      - name: Summarize the reports
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          SANITIZER: ${{ matrix.sanitizer }}
+        run: |
+          log="$BUILD_DIRECTORY/Testing/Temporary/LastTest.log"
+          {
+            echo "### $SANITIZER"
+            if [[ ! -f "$log" ]]; then
+              echo "No test log: the tests did not run."
+              exit 0
+            fi
+            # A leak's summary gives its size where the others give their kind.
+            reports="$(grep -oE 'SUMMARY: [A-Za-z]+Sanitizer: [^ ]+( byte\(s\) leaked)?' "$log" |
+              sed -E 's/: [0-9]+ byte\(s\) leaked/: leak/' | sort | uniq -c | sort -rn || true)"
+            if [[ -z "$reports" ]]; then
+              echo "No sanitizer reports."
+            else
+              echo '```'
+              echo "$reports"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: "sanitizer-results-${{ matrix.sanitizer }}"
+          path: |
+            ${{ env.BUILD_DIRECTORY }}/Testing/test-results.xml
+            ${{ env.BUILD_DIRECTORY }}/Testing/Temporary/LastTest*.log
+          if-no-files-found: warn

@@ -73,4 +73,15 @@ if(AL_BUILD_TESTS)
       xui_overlay_check "${INDRA_SOURCE_DIR}/newview/skins"
       "${CMAKE_CURRENT_SOURCE_DIR}/xui_overlay_baseline.txt" --examples 0
   )
+  set_tests_properties(
+    xui_overlay_check
+    PROPERTIES ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+  )
+  # A sanitizer's report fails it, as it fails a test binary's entries.
+  if(AL_TEST_FAIL_REGULAR_EXPRESSION)
+    set_tests_properties(
+      xui_overlay_check
+      PROPERTIES FAIL_REGULAR_EXPRESSION "${AL_TEST_FAIL_REGULAR_EXPRESSION}"
+    )
+  endif()
 endif()

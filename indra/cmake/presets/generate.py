@@ -90,6 +90,20 @@ def fullopt(generator, display, platform=None, archs=(), platform_base=False, de
     return out
 
 
+def sanitizers(generator, display):
+    """The Linux presets that build with the sanitizers, open-source only:
+    AddressSanitizer with UndefinedBehaviorSanitizer, and ThreadSanitizer,
+    which cannot share a tree with AddressSanitizer. Clang and lld, since the
+    ports of the sanitizer triplets BootstrapVcpkg.cmake picks are built with
+    Clang. Tests on, for they are what a sanitized tree is run for."""
+    return [{'name': f'{generator}-os-{short}', 'displayName': f'{display} ({label})',
+             'inherits': [f'{generator}-os', 'linux', 'clang', 'lld'],
+             'cacheVariables': {'AL_SANITIZERS': sanitizers, 'AL_BUILD_TESTS': True}}
+            for short, label, sanitizers in [('asan', 'AddressSanitizer and UndefinedBehaviorSanitizer',
+                                             'address;undefined'),
+                                            ('tsan', 'ThreadSanitizer', 'thread')]]
+
+
 def toolchains(generator, display):
     """The Linux presets that pick the compiler, the linker or both: the
     open-source and the proprietary preset and their fullopt presets, once
@@ -149,6 +163,7 @@ GENERATORS = {
          'inherits': ['ninja', 'macos', 'macos-x64']},
         *fullopt('ninja', 'Ninja Multi-Config', 'macos', ARCHS, platform_base=True, default_config='Release'),
         *toolchains('ninja', 'Ninja Multi-Config'),
+        *sanitizers('ninja', 'Ninja Multi-Config'),
     ]),
     'xcode': ('macos', [
         {'name': 'xcode-os', 'displayName': 'Xcode',

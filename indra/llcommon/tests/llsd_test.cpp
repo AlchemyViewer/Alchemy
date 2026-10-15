@@ -42,26 +42,33 @@ namespace
         // LLSD's live count is back where it started once what the body made
         // is gone. Checked here rather than in a destructor, which is
         // noexcept: a failed REQUIRE there would end the process instead of
-        // failing the test.
+        // failing the test. A release for download keeps no counts
+        // (llsd::COUNTS_IMPLS), and there the body runs unchecked.
         template <typename BODY>
         void require_cleaned_up(BODY&& body)
         {
-            const U32 outstanding = llsd::outstandingCount();
+            [[maybe_unused]] const U32 outstanding = llsd::outstandingCount();
             body();
-            REQUIRE(llsd::outstandingCount() == outstanding);
+            if constexpr (llsd::COUNTS_IMPLS)
+            {
+                REQUIRE(llsd::outstandingCount() == outstanding);
+            }
         }
 
         // ...and the body allocated exactly as many LLSD values as expected.
         template <typename BODY>
-        void require_allocations(const std::string& what, U32 expectedAllocations, BODY&& body)
+        void require_allocations([[maybe_unused]] const std::string& what, [[maybe_unused]] U32 expectedAllocations, BODY&& body)
         {
-            const U32 outstanding = llsd::outstandingCount();
-            const U32 allocations = llsd::allocationCount();
+            [[maybe_unused]] const U32 outstanding = llsd::outstandingCount();
+            [[maybe_unused]] const U32 allocations = llsd::allocationCount();
             body();
-            INFO(what);
-            REQUIRE(llsd::allocationCount() - allocations ==
-                expectedAllocations);
-            REQUIRE(llsd::outstandingCount() == outstanding);
+            if constexpr (llsd::COUNTS_IMPLS)
+            {
+                INFO(what);
+                REQUIRE(llsd::allocationCount() - allocations ==
+                    expectedAllocations);
+                REQUIRE(llsd::outstandingCount() == outstanding);
+            }
         }
     } // anonymous namespace
 

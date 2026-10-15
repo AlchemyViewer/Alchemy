@@ -37,6 +37,7 @@ target_sources(
     lint/alscriptlintpass.cpp
     lint/alselenefilters.cpp
     lsl/allslconsts.cpp
+    lsl/allsldepth.cpp
     lsl/allsleffects.cpp
     lsl/allslexports.cpp
     lsl/allslservice.cpp
@@ -119,6 +120,7 @@ target_sources(
         lint/alscriptlintpass.h
         lint/alselenefilters.h
         lsl/allslconsts.h
+        lsl/allsldepth.h
         lsl/allsleffects.h
         lsl/allsleventtext.inc
         lsl/allslexports.h
@@ -188,7 +190,11 @@ target_include_directories(
 )
 
 target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide llmath PUBLIC llcommon)
-target_precompile_headers(alscript REUSE_FROM llprecompiled)
+# Not with the fuzzers, whose coverage flags the shared header was not
+# built with, which Clang refuses.
+if(NOT AL_BUILD_FUZZERS)
+  target_precompile_headers(alscript REUSE_FROM llprecompiled)
+endif()
 
 # The optimizer folds LSL's floats to what the VM gives and prints them so
 # that they read back as themselves: IEEE's arithmetic a step at a time, and
@@ -286,6 +292,7 @@ if(AL_BUILD_TESTS)
       tests/alscriptenvelope_test.cpp
       tests/alscriptfixes_test.cpp
       tests/alscriptformatter_test.cpp
+      tests/alscripthostile_test.cpp
       tests/alscriptjoblane_test.cpp
       tests/alscriptlexicon_test.cpp
       tests/alscriptlintpass_test.cpp
@@ -308,6 +315,7 @@ if(AL_BUILD_TESTS)
       ${definitions_defines}
       ${templates_define}
       "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
+      "AL_LSCRIPT_REGRESSION_DIR=\"${INDRA_SOURCE_DIR}/lscript/tests/regressions\""
     RERUN newsolver
     RERUN_SOURCES
       tests/alluaufragment_test.cpp
@@ -318,4 +326,43 @@ if(AL_BUILD_TESTS)
       tests/alscriptlintpass_test.cpp
     RERUN_ENVIRONMENT AL_TEST_LUAU_SOLVER=new
   )
+
+  # libFuzzer on Script Studio, from a script pasted into the editor:
+  # alscript_fuzz_lsl runs what a check, the editor's commands and the
+  # preprocessor run on one (fuzz/alscriptfuzzlsl.cpp), and
+  # alscript_fuzz_format formats one with options the input chooses
+  # (fuzz/alscriptfuzzformat.cpp). alscript is built with libFuzzer's
+  # coverage for them, whose hooks the sanitizer runtime answers in
+  # alscript_tests. Their short runs are tests, over Tailslide's test
+  # scripts and the regression scripts, lscript's and alscript's.
+  if(AL_BUILD_FUZZERS)
+    target_compile_options(alscript PRIVATE -fsanitize=fuzzer-no-link)
+    foreach(fuzzer IN ITEMS lsl format)
+      add_executable(alscript_fuzz_${fuzzer} fuzz/alscriptfuzz${fuzzer}.cpp)
+      target_compile_options(alscript_fuzz_${fuzzer} PRIVATE -fsanitize=fuzzer)
+      target_link_options(alscript_fuzz_${fuzzer} PRIVATE -fsanitize=fuzzer)
+      target_compile_definitions(alscript_fuzz_${fuzzer} PRIVATE ${definitions_defines})
+      target_link_libraries(
+        alscript_fuzz_${fuzzer}
+        PRIVATE al::flags alscript llcommon ll::slua ll::tailslide
+      )
+      set_target_properties(alscript_fuzz_${fuzzer} PROPERTIES FOLDER "Tests/alscript")
+      add_test(
+        NAME alscript_fuzz_${fuzzer}
+        COMMAND
+          alscript_fuzz_${fuzzer} -runs=0 -close_fd_mask=1 -max_len=262160
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/tailslide/scripts
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/regressions
+          ${INDRA_SOURCE_DIR}/lscript/tests/regressions
+      )
+    endforeach()
+    set_tests_properties(
+      alscript_fuzz_lsl
+      alscript_fuzz_format
+      PROPERTIES
+        LABELS "alscript;fuzz"
+        ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+        FAIL_REGULAR_EXPRESSION "${AL_TEST_FAIL_REGULAR_EXPRESSION}"
+    )
+  endif()
 endif()

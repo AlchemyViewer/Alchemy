@@ -30,6 +30,7 @@
 #include <functional>
 #include <iostream>
 #include <set>
+#include <type_traits>
 #include <vector>
 #include "stdtypes.h"
 #include "llpreprocessor.h"
@@ -64,7 +65,18 @@ public:
     {
         for (S32 i = 0; i < UUID_BYTES; ++i) mData[i] = bytes[i];
     }
-    explicit LLUUID(const char *in_string); // Convert from string.
+    // Convert from string. A literal is parsed as the program is compiled, so
+    // a constant made from one is constant-initialised: another file's
+    // statics, made before it would have been, read it whole rather than
+    // null, in whatever order the linker put the files. A string only the
+    // run time can read, or one it would warn of, is parsed there as ever.
+    explicit constexpr LLUUID(const char *in_string)
+    {
+        if (!std::is_constant_evaluated() || !parseLiteral(in_string))
+        {
+            set(in_string);
+        }
+    }
     explicit LLUUID(const std::string& in_string); // Convert from string.
     ~LLUUID() = default;
 
@@ -137,6 +149,56 @@ public:
     static bool parseUUID(const std::string& buf, LLUUID* value);
 
     U8 mData[UUID_BYTES] {};
+
+private:
+    // set's reading of a whole UUID string, for the compiler: false for
+    // anything else -- the old 35-character form, a bad digit -- which set
+    // reads, and warns of, at run time. Null and empty make the null UUID,
+    // as they do there.
+    constexpr bool parseLiteral(const char* in_string)
+    {
+        if (!in_string || !in_string[0])
+        {
+            return true;
+        }
+
+        S32 length = 0;
+        while (length < UUID_STR_SIZE + 1 && in_string[length])
+        {
+            ++length;
+        }
+        if (length != UUID_STR_SIZE)
+        {
+            return false;
+        }
+
+        auto nybble = [](char c) -> S32
+        {
+            return c >= '0' && c <= '9' ? c - '0'
+                 : c >= 'a' && c <= 'f' ? c - 'a' + 10
+                 : c >= 'A' && c <= 'F' ? c - 'A' + 10
+                 : -1;
+        };
+
+        // As set does, past the dashes without looking at them.
+        S32 pos = 0;
+        for (S32 i = 0; i < UUID_BYTES; ++i)
+        {
+            if (i == 4 || i == 6 || i == 8 || i == 10)
+            {
+                ++pos;
+            }
+            const S32 hi = nybble(in_string[pos]);
+            const S32 lo = nybble(in_string[pos + 1]);
+            if ((hi | lo) < 0)
+            {
+                return false;
+            }
+            mData[i] = (U8)((hi << 4) | lo);
+            pos += 2;
+        }
+        return true;
+    }
 };
 static_assert(std::is_trivially_copyable<LLUUID>::value, "LLUUID must be trivial copy");
 static_assert(std::is_trivially_move_assignable<LLUUID>::value, "LLUUID must be trivial move");

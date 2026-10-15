@@ -220,19 +220,6 @@ Luau::CheckResult ALLuauFrontend::checkWithModules(const Luau::FrontendOptions& 
     {
         modulePool = std::make_unique<ALLuauTaskPool>(ALLuauTaskPool::threadsWanted());
     }
-    // Luau tells its one internal error reporter the name of each module
-    // as it begins to check it, on whichever thread that is. Given room
-    // for the longest name it could be told first -- every module Luau
-    // can check is one it can read -- no thread's copy reallocates the
-    // string another is copying into or reading. The threads still race
-    // over its characters, so which name it holds is only as sure as their
-    // order: what nothing reads but the message of an internal error.
-    size_t longest = moduleName.size();
-    for (const auto& [name, text] : files.texts)
-    {
-        longest = std::max(longest, name.size());
-    }
-    frontend->iceHandler.moduleName.reserve(longest);
     frontend->queueModuleCheck(moduleName);
     const std::vector<Luau::ModuleName> checked =
         frontend->checkQueuedModules(options, [this](std::vector<std::function<void()>> tasks) { modulePool->run(std::move(tasks)); });

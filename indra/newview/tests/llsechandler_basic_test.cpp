@@ -762,7 +762,9 @@ namespace
         CHECK(llsd_cert["basicConstraints"]["CA"].asInteger() == 0);
 
         UNSCOPED_INFO("x509 is equal");
-        CHECK_FALSE(X509_cmp(mX509ChildCert, test_cert->getOpenSSLX509()));
+        X509* test_x509 = test_cert->getOpenSSLX509(); // a copy, which is ours to free
+        CHECK_FALSE(X509_cmp(mX509ChildCert, test_x509));
+        X509_free(test_x509);
     }
 
 
@@ -1292,9 +1294,13 @@ namespace
         // Single cert in the chain.
         X509_STORE_CTX *test_store = X509_STORE_CTX_new();
         X509_STORE_CTX_set_cert(test_store, mX509ChildCert);
-        X509_STORE_CTX_set0_untrusted(test_store, sk_X509_new_null());
+        // The context holds the untrusted stack without owning it: X509_STORE_CTX_free
+        // leaves it to us, and its certificates to the fixture.
+        STACK_OF(X509)* untrusted = sk_X509_new_null();
+        X509_STORE_CTX_set0_untrusted(test_store, untrusted);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
+        sk_X509_free(untrusted);
         REQUIRE(test_chain->size() == 1);
         X509* test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");
@@ -1305,10 +1311,12 @@ namespace
 
         test_store = X509_STORE_CTX_new();
         X509_STORE_CTX_set_cert(test_store, mX509ChildCert);
-        X509_STORE_CTX_set0_untrusted(test_store, sk_X509_new_null());
+        untrusted = sk_X509_new_null();
+        X509_STORE_CTX_set0_untrusted(test_store, untrusted);
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509IntermediateCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
+        sk_X509_free(untrusted);
         REQUIRE(test_chain->size() == 2);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");
@@ -1323,10 +1331,12 @@ namespace
 
         test_store = X509_STORE_CTX_new();
         X509_STORE_CTX_set_cert(test_store, mX509ChildCert);
-        X509_STORE_CTX_set0_untrusted(test_store, sk_X509_new_null());
+        untrusted = sk_X509_new_null();
+        X509_STORE_CTX_set0_untrusted(test_store, untrusted);
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509TestCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
+        sk_X509_free(untrusted);
         REQUIRE(test_chain->size() == 1);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");
@@ -1336,11 +1346,13 @@ namespace
         // cert + CA + nonrelated
         test_store = X509_STORE_CTX_new();
         X509_STORE_CTX_set_cert(test_store, mX509ChildCert);
-        X509_STORE_CTX_set0_untrusted(test_store, sk_X509_new_null());
+        untrusted = sk_X509_new_null();
+        X509_STORE_CTX_set0_untrusted(test_store, untrusted);
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509IntermediateCert);
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509TestCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
+        sk_X509_free(untrusted);
         REQUIRE(test_chain->size() == 2);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");
@@ -1354,11 +1366,13 @@ namespace
         // cert + intermediate + CA
         test_store = X509_STORE_CTX_new();
         X509_STORE_CTX_set_cert(test_store, mX509ChildCert);
-        X509_STORE_CTX_set0_untrusted(test_store, sk_X509_new_null());
+        untrusted = sk_X509_new_null();
+        X509_STORE_CTX_set0_untrusted(test_store, untrusted);
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509IntermediateCert);
         sk_X509_push(X509_STORE_CTX_get0_untrusted(test_store), mX509RootCert);
         test_chain = new LLBasicCertificateChain(test_store);
         X509_STORE_CTX_free(test_store);
+        sk_X509_free(untrusted);
         REQUIRE(test_chain->size() == 3);
         test_cert = (*test_chain)[0]->getOpenSSLX509();
         UNSCOPED_INFO("validate first element in store is expected cert");

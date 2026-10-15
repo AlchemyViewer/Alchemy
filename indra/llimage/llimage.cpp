@@ -808,7 +808,7 @@ U8* LLImageBase::allocateDataSize(S32 width, S32 height, S32 ncomponents, S32 si
 // LLImageRaw
 //---------------------------------------------------------------------------
 
-S32 LLImageRaw::sRawImageCount = 0;
+std::atomic<S32> LLImageRaw::sRawImageCount = 0;
 
 LLImageRaw::LLImageRaw()
     : LLImageBase()
@@ -2210,7 +2210,7 @@ bool LLImageRaw::createFromFile(const std::string &filename, bool j2c_lowest_mip
 //---------------------------------------------------------------------------
 
 //static
-S32 LLImageFormatted::sGlobalFormattedMemory = 0;
+std::atomic<S32> LLImageFormatted::sGlobalFormattedMemory = 0;
 
 LLImageFormatted::LLImageFormatted(S8 codec)
     : LLImageBase(),

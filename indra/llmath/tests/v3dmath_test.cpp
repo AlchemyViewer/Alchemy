@@ -284,9 +284,12 @@ namespace
         val1 = y1*z2 - y2*z1;
         val2 = z1*x2 -z2*x1;
         val3 = x1*y2-x2*y1;
-        CHECK(val1 == vec3Db.mdV[VX]);
-        CHECK(val2 == vec3Db.mdV[VY]);
-        CHECK(val3 == vec3Db.mdV[VZ]);
+        // Within the rounding of the larger product each takes the other
+        // from, which the library and this working of it may round
+        // differently.
+        CHECK_THAT(vec3Db.mdV[VX], ll_test::WithinRounding(val1, llmax(fabs(y1*z2), fabs(y2*z1))));
+        CHECK_THAT(vec3Db.mdV[VY], ll_test::WithinRounding(val2, llmax(fabs(z1*x2), fabs(z2*x1))));
+        CHECK_THAT(vec3Db.mdV[VZ], ll_test::WithinRounding(val3, llmax(fabs(x1*y2), fabs(x2*y1))));
 
         vec3D %= vec3Da;
         CHECK(is_approx_equal(vec3D.mdV[VX],vec3Db.mdV[VX]));
@@ -413,9 +416,12 @@ namespace
         val3 = z1 + (z2 - z1)* val;
         LLVector3d vec3Da(x1,y1,z1),vec3Db(x2,y2,z2);
         LLVector3d vec3d = lerp(vec3Da,vec3Db,val);
-        CHECK(val1 ==vec3d.mdV[VX]);
-        CHECK(val2 ==vec3d.mdV[VY]);
-        CHECK(val3 ==vec3d.mdV[VZ]);
+        // Within the rounding of the larger of the two terms each sums, which
+        // the library's lerp and this working of it may round differently.
+        auto terms = [&](F64 a, F64 b) { return llmax(fabs(a), fabs((b - a) * val)); };
+        CHECK_THAT(vec3d.mdV[VX], ll_test::WithinRounding(val1, terms(x1, x2)));
+        CHECK_THAT(vec3d.mdV[VY], ll_test::WithinRounding(val2, terms(y1, y2)));
+        CHECK_THAT(vec3d.mdV[VZ], ll_test::WithinRounding(val3, terms(z1, z2)));
     }
 
     TEST_CASE("v3dmath_h: clamp reports a component out of range", "[v3dmath_h]")

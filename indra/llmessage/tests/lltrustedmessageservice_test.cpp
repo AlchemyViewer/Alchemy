@@ -37,6 +37,8 @@
 
 LLPounceable<LLMessageSystem*, LLPounceableStatic> gMessageSystem;
 
+#include "almessagesystem_stub.cpp"
+
 // What the test doubles below record.
 namespace
 {
@@ -90,6 +92,7 @@ namespace
         {
             LLTrustedMessageServiceData()
             {
+                gMessageSystem = stubMessageSystem();
                 LLSD emptyLLSD;
                 lastLLSD = emptyLLSD;
                 lastMessageName = "uninitialised message name";

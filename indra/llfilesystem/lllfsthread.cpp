@@ -39,6 +39,7 @@ void LLLFSThread::initClass(bool local_is_threaded)
 {
     llassert(sLocal == NULL);
     sLocal = new LLLFSThread(local_is_threaded);
+    sLocal->start();
 }
 
 //static

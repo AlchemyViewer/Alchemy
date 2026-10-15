@@ -34,6 +34,7 @@
 #include "llsingleton.h"
 
 #include <functional>
+#include <mutex>
 
 // LLWatchdogEntry is the interface used by the tasks that
 // need to be watched.
@@ -77,10 +78,15 @@ public:
     void start(std::string_view state);
     void setTimeout(F32 d);
     void ping(std::string_view state);
+    // For the thread that pings it, the only one that changes the state.
     const std::string& getState() {return mPingState; }
-    std::string getLastState() const override { return mPingState; }
+    std::string getLastState() const override;
 
 private:
+    // The watched thread pings and the watchdog thread checks, and resets
+    // when it was itself held up: the timer, the timeout and the state are
+    // read and written under this.
+    mutable std::mutex mMutex;
     LLTimer mTimer;
     F32 mTimeout;
     std::string mPingState;

@@ -34,6 +34,7 @@
 #include "../m4math.h"
 #include "../llquaternion.h"
 #include "../v3dmath.h"
+#include "altestmatchers.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -214,10 +215,13 @@ namespace
 
         llmat_obj1.setRows(llmat1, llmat2, llmat3);
         llmat_quat = llmat_obj1.quaternion();
-        CHECK(is_approx_equal(-0.66666669f, llmat_quat.mQ[0]));
-        CHECK(is_approx_equal(-0.83333337f, llmat_quat.mQ[1]));
-        CHECK(is_approx_equal(0.0f, llmat_quat.mQ[2]));
-        CHECK(is_approx_equal(1.5f, llmat_quat.mQ[3]));
+        // Within the rounding of terms no larger than 5, the rows' differences
+        // the quaternion is worked from, which the tree's reciprocal and
+        // reordered arithmetic may round a step or two either way.
+        CHECK_THAT(llmat_quat.mQ[0], ll_test::WithinRounding(-0.66666669f, 5.f));
+        CHECK_THAT(llmat_quat.mQ[1], ll_test::WithinRounding(-0.83333337f, 5.f));
+        CHECK_THAT(llmat_quat.mQ[2], ll_test::WithinRounding(0.0f, 5.f));
+        CHECK_THAT(llmat_quat.mQ[3], ll_test::WithinRounding(1.5f, 5.f));
     }
 
     //test case for transpose() fn.

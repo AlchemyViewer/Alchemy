@@ -28,6 +28,7 @@
 
 #include "../lscript_execute.h"
 #include "../lscript_library.h"
+#include "allsovmrun.h"
 #include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -58,33 +59,6 @@ namespace
     {
         return text.find(part) != std::string::npos;
     }
-
-    // What a script said on a channel, as llSay's stand-in heard it.
-    std::vector<std::string> gSaid;
-    void heardSay(LLScriptLibData* retval, LLScriptLibData* args, const LLUUID& id)
-    {
-        gSaid.emplace_back(args[1].mString ? args[1].mString : "");
-    }
-
-    // A library function answered by a stand-in while this lives, and as it
-    // was after, however the test ends: the library is the process's.
-    struct StandIn
-    {
-        using exec_t = decltype(LLScriptLibraryFunction::mExecFunc);
-
-        StandIn(LLScriptLibraryFunction& function, exec_t by)
-            : mFunction(function),
-              mWas(function.mExecFunc)
-        {
-            mFunction.mExecFunc = by;
-        }
-        ~StandIn() { mFunction.mExecFunc = mWas; }
-        StandIn(const StandIn&)            = delete;
-        StandIn& operator=(const StandIn&) = delete;
-
-        LLScriptLibraryFunction& mFunction;
-        const exec_t             mWas;
-    };
 
     // Where LSO keeps the version, the top of memory and the default
     // state's handlers (gLSCRIPTRegisterAddresses).
@@ -246,29 +220,12 @@ namespace
 
     TEST_CASE("allslreference: LL's VM runs compiled state_entry code with a stand-in answering llSay", "[allslreference]")
     {
-        const std::string text = "integer g = 6;\n"
-                                 "integer twice(integer n) { return n * 2; }\n"
-                                 "default { state_entry() { llSay(0, (string)(twice(g) * 3 + 6)); } }\n";
-        const ALLSLReference::Result lso = ALLSLReference::compile(text, Target::LSO);
-        UNSCOPED_INFO("LSO: " + lso.messages);
-        REQUIRE(lso.ok);
-
-        // llSay is function 23: heard here for the run, as it was after.
-        gSaid.clear();
-        const char* error  = nullptr;
-        U32         events = 0;
-        {
-            const StandIn       heard(gScriptLibrary.mFunctions[23], heardSay);
-            LLScriptExecuteLSL2 vm(lso.image.data(), static_cast<U32>(lso.image.size()));
-            LLTimer             timer;
-            for (S32 quanta = 0; quanta < 100 && gSaid.empty() && !error; ++quanta)
-            {
-                vm.runQuanta(FALSE, LLUUID::null, &error, 1.f, events, timer);
-            }
-        }
-        CHECK_FALSE(error);
-        CHECK(events == (U32)1);
-        REQUIRE(gSaid.size() == (size_t)1);
-        CHECK(gSaid[0] == std::string("42"));
+        const ll_test_lso::Run run = ll_test_lso::runLSO("integer g = 6;\n"
+                                                         "integer twice(integer n) { return n * 2; }\n"
+                                                         "default { state_entry() { llSay(0, (string)(twice(g) * 3 + 6)); } }\n");
+        CHECK(run.error.empty());
+        CHECK(run.events == (U32)1);
+        REQUIRE(run.said.size() == (size_t)1);
+        CHECK(run.said[0] == std::string("42"));
     }
 }

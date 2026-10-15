@@ -523,7 +523,9 @@ namespace
     typedef std::vector<LLError::RecorderPtr> Recorders;
     typedef std::vector<LLError::CallSite*> CallSiteVector;
 
-    class SettingsConfig : public LLRefCount
+    // Held by every thread that logs, some of them without the log's lock,
+    // so counted atomically.
+    class SettingsConfig : public LLThreadSafeRefCount
     {
         friend class Globals;
 
@@ -557,7 +559,7 @@ namespace
     typedef LLPointer<SettingsConfig> SettingsConfigPtr;
 
     SettingsConfig::SettingsConfig()
-        : LLRefCount(),
+        : LLThreadSafeRefCount(),
         mDefaultLevel(LLError::LEVEL_DEBUG),
         mLogAlwaysFlush(true),
         mEnabledLogTypesMask(255),
@@ -674,8 +676,7 @@ namespace LLError
         mLine(line),
         mClassInfo(class_info),
         mFunction(function),
-        mCached(false),
-        mShouldLog(false),
+        mCached(UNDECIDED),
         mPrintOnce(printOnce),
         mTags(new const char* [tag_count]),
         mTagCount(tag_count)
@@ -730,7 +731,7 @@ namespace LLError
 
     void CallSite::invalidate()
     {
-        mCached = false;
+        mCached.store(UNDECIDED, std::memory_order_relaxed);
     }
 }
 
@@ -1418,9 +1419,10 @@ namespace LLError
             ? checkLevelMap(s->mTagLevelMap, site.mTags, site.mTagCount, compareLevel)
             : false);
 
-        site.mCached = true;
+        const bool should_log = site.mLevel >= compareLevel;
+        site.mCached.store(should_log ? CallSite::LOGS : CallSite::SILENT, std::memory_order_relaxed);
         g->addCallSite(site);
-        return site.mShouldLog = site.mLevel >= compareLevel;
+        return should_log;
     }
 
 

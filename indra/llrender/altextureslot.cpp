@@ -49,12 +49,12 @@ static const GLenum sGLTextureType[] =
     GL_TEXTURE_3D
 };
 
-U32 ALTextureSlot::sSamplerBinds  = 0;
-U32 ALTextureSlot::sSamplerSkips  = 0;
-U32 ALTextureSlot::sTextureBinds  = 0;
-U32 ALTextureSlot::sSamplerBindsFlushed = 0;
-U32 ALTextureSlot::sSamplerBindsSplitBatch = 0;
-U32 ALTextureSlot::sSamplerBindsShadowCycle = 0;
+thread_local U32 ALTextureSlot::sSamplerBinds  = 0;
+thread_local U32 ALTextureSlot::sSamplerSkips  = 0;
+thread_local U32 ALTextureSlot::sTextureBinds  = 0;
+thread_local U32 ALTextureSlot::sSamplerBindsFlushed = 0;
+thread_local U32 ALTextureSlot::sSamplerBindsSplitBatch = 0;
+thread_local U32 ALTextureSlot::sSamplerBindsShadowCycle = 0;
 
 ALTextureSlot::ALTextureSlot(S32 index)
     : mCurrTexType(TT_NONE),

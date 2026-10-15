@@ -289,9 +289,9 @@ void LLThread::threadRun()
     mRecorder = NULL;
 
     // We're done with the run function, this thread is done executing now.
-    //NB: we are using this flag to sync across threads...we really need memory barriers here
-    // Todo: add LLMutex per thread instead of flag?
-    // We are using "while (mStatus != STOPPED) {ms_sleep();}" everywhere.
+    // mStatus is atomic: a thread that reads it stopped, as shutdown() and
+    // "while (mStatus != STOPPED) {ms_sleep();}" do, sees all this one did
+    // before it.
     mStatus = STOPPED;
 }
 
@@ -525,10 +525,11 @@ void LLThread::setQuitting()
     }
 
     LLMutexLock lock(mRunCondition);
-    if (mStatus == RUNNING)
-    {
-        mStatus = QUITTING;
-    }
+    // Only a running thread is told to quit. The thread marks itself stopped
+    // without this lock as it ends, and a check then a store could mark it
+    // quitting after that, which shutdown() would wait out.
+    EThreadStatus running = RUNNING;
+    mStatus.compare_exchange_strong(running, QUITTING);
     // It's only safe to remove mRunCondition if all locked threads were notified
     mRunCondition->broadcast();
 }

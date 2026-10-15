@@ -33,6 +33,7 @@
 #include "lltrace.h"
 #include "lluuid.h"
 
+#include <atomic>
 #include <functional>
 #include <utility>
 
@@ -399,7 +400,9 @@ protected:
     void setDataAndSize(U8 *data, S32 width, S32 height, S8 components) ;
 
 public:
-    static S32 sRawImageCount;
+    // Counted on whichever thread makes or frees an image, the decode threads
+    // among them; read for the statistics only.
+    static std::atomic<S32> sRawImageCount;
 
 private:
     static bool validateSrcAndDst(std::string func, const LLImageRaw* src, const LLImageRaw* dst);
@@ -480,7 +483,8 @@ protected:
     S8 mLevels;         // Number of resolution levels in that image. Min is 1. 0 means unknown.
 
 public:
-    static S32 sGlobalFormattedMemory;
+    // As sRawImageCount.
+    static std::atomic<S32> sGlobalFormattedMemory;
 };
 
 #endif

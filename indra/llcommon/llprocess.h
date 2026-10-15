@@ -250,7 +250,9 @@ public:
     handle getProcessHandle() const;
     static handle isRunning(handle, const std::string& desc = "");
 
-    enum FILESLOT { STDIN = 0, STDOUT = 1, STDERR = 2, NSLOTS = 3 };
+    // Of a fixed type, so that a slot past these is still a FILESLOT the pipe
+    // getters can refuse with NoPipe.
+    enum FILESLOT : S32 { STDIN = 0, STDOUT = 1, STDERR = 2, NSLOTS = 3 };
 
     /// Exception thrown by getWritePipe(), getReadPipe() if you didn't ask to
     /// create a pipe at the corresponding FILESLOT.

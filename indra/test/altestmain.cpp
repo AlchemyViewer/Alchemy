@@ -105,8 +105,11 @@ namespace
 
         // LLTrace needs a master recorder before any thread records. Never
         // freed, as the TUT runner never freed it: static destructors that
-        // record would find it gone.
-        LLTrace::set_master_thread_recorder(new LLTrace::ThreadRecorder());
+        // record would find it gone. Kept here as well as by LLTrace, since
+        // an LLApp a test makes puts one of its own in its place, which would
+        // leave this one held by nothing, a leak to LeakSanitizer.
+        static LLTrace::ThreadRecorder* const sRecorder = new LLTrace::ThreadRecorder();
+        LLTrace::set_master_thread_recorder(sRecorder);
     }
 }
 

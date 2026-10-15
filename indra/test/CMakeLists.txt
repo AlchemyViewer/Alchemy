@@ -32,6 +32,7 @@ target_sources(
         altestlogreplay.h
         altestmatchers.h
         altestname.h
+        altestsanitizer.h
         alteststateguard.h
         altestteardown.h
         catch_and_store_what_in.h
@@ -65,7 +66,7 @@ al_add_test_binary(
 )
 
 function(al_expect_from_test_support name)
-  cmake_parse_arguments(PARSE_ARGV 1 arg "" "ARGS;EXIT;OUTPUT;REJECT" "")
+  cmake_parse_arguments(PARSE_ARGV 1 arg "CRASHES" "ARGS;EXIT;OUTPUT;REJECT" "")
   set(
     defines
     "-DEXE=$<TARGET_FILE:test_support_tests>"
@@ -83,16 +84,29 @@ function(al_expect_from_test_support name)
     COMMAND ${CMAKE_COMMAND} ${defines} -P ${CMAKE_CURRENT_SOURCE_DIR}/run_and_expect.cmake
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   )
+  # A case that CRASHES on purpose is the harness's handler's to report, not
+  # a sanitizer's.
+  set(modification ${AL_TEST_ENVIRONMENT})
+  if(arg_CRASHES)
+    list(APPEND modification ${AL_TEST_CRASH_ENVIRONMENT})
+  endif()
   # LOGTEST, if a developer has it set, would print every log line and blur
   # what LOGFAIL alone does.
   set_tests_properties(
     test_support_tests/${name}
     PROPERTIES
       ENVIRONMENT "LOGTEST=;LOGFAIL=DEBUG"
-      ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+      ENVIRONMENT_MODIFICATION "${modification}"
       LABELS test
       TIMEOUT 60
   )
+  # A sanitizer's report fails it, as it fails a test binary's entries.
+  if(AL_TEST_FAIL_REGULAR_EXPRESSION)
+    set_tests_properties(
+      test_support_tests/${name}
+      PROPERTIES FAIL_REGULAR_EXPRESSION "${AL_TEST_FAIL_REGULAR_EXPRESSION}"
+    )
+  endif()
 endfunction()
 
 al_expect_from_test_support(
@@ -141,12 +155,14 @@ if(WINDOWS)
 endif()
 al_expect_from_test_support(
   replay_on_crash
+  CRASHES
   ARGS "[.crash-replay]"
   EXIT nonzero
   OUTPUT "log of .a test case that logged, then crashes.*the line a crashing case logged"
 )
 al_expect_from_test_support(
   terminate_names_the_case
+  CRASHES
   ARGS "[.thread-errs]"
   EXIT nonzero
   OUTPUT "in test case .a test case whose thread hits an LL_ERRS..*an error off the main thread"

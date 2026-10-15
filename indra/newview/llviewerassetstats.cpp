@@ -34,6 +34,8 @@
 #include "llsdparam.h"
 #include "llsdutil.h"
 
+#include <cmath>
+
 /*
  * Classes and utility functions for per-thread and per-region
  * asset and experiential metrics to be aggregated grid-wide.
@@ -317,7 +319,10 @@ void LLViewerAssetStats::getStats(AssetStats& stats, bool compact_output)
         getStat(rec, r.get_other_http, EVACOtherHTTPGet, compact_output);
         getStat(rec, r.get_other_udp, EVACOtherUDPGet, compact_output);
 
-        S32 fps = (S32)rec.getLastValue(LLStatViewer::FPS_SAMPLE);
+        // NaN where the recording took no frame-rate sample, which no cast
+        // to an integer may be given.
+        const F64 last_fps = rec.getLastValue(LLStatViewer::FPS_SAMPLE);
+        S32 fps = std::isfinite(last_fps) ? (S32)last_fps : 0;
         if (!compact_output || fps != 0)
         {
             r.fps   .count(fps)
