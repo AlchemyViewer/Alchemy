@@ -185,10 +185,7 @@ void LLFloaterIMNearbyChatToastPanel::addMessage(LLSD& notification)
 {
     std::string     messageText = notification["message"].asString();       // UTF-8 line of text
 
-
-    std::string color_name = notification["text_color"].asString();
-
-    LLUIColor textColor = LLUIColorTable::instance().getColor(color_name);
+    const LLColor4 textColor(notification["text_color"]);
     F32 textAlpha = (F32)notification["color_alpha"].asReal();
 
     LLFontGL* messageFont = LLViewerChat::getChatFont();
@@ -251,9 +248,7 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
     int sType = notification["source"].asInteger();
     mSourceType = (EChatSourceType)sType;
 
-    std::string color_name = notification["text_color"].asString();
-
-    LLUIColor textColor = LLUIColorTable::instance().getColor(color_name);
+    const LLColor4 textColor(notification["text_color"]);
     F32 textAlpha = (F32)notification["color_alpha"].asReal();
 
     LLFontGL* messageFont = LLViewerChat::getChatFont();
@@ -275,7 +270,9 @@ void LLFloaterIMNearbyChatToastPanel::init(LLSD& notification)
         if (mSourceType == CHAT_SOURCE_AGENT || mSourceType == CHAT_SOURCE_OBJECT)
         {
             LLStyle::Params style_params_name;
-            style_params_name.color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+            style_params_name.color = notification.has("name_color")
+                ? LLUIColor(LLColor4(notification["name_color"]))
+                : LLUIColorTable::instance().getColor("HTMLLinkColor");
             style_params_name.font.name = LLFontGL::nameFromFont(messageFont);
             style_params_name.font.size = LLFontGL::sizeFromFont(messageFont);
 

@@ -24,6 +24,7 @@
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 
+class LLChat;
 class LLColor4;
 class LLUUID;
 class LLVOAvatar;
@@ -53,11 +54,24 @@ public:
         COLOR_MINIMAP
     } EColorType;
 
+    // IRC-style chat colours (AlchemyChatIRCColorsEnabled) give every other
+    // resident, friends included, a stable colour of their own, worked from
+    // their id: getAvatarColor answers it for COLOR_CHAT, and for
+    // COLOR_NAMETAG when AlchemyChatIRCColorNameTags is on too. You, staff,
+    // the muted and anyone RLV hides keep their colours.
     LLColor4 getAvatarColor(const LLUUID& id, LLColor4 default_color, EColorType color_type);
     // the same answer for an avatar that is in the scene, from what it
     // already caches about being a friend, muted or staff
     LLColor4 getAvatarColor(const LLVOAvatar* avatar, LLColor4 default_color, EColorType color_type);
-    std::string getAvatarColorName(const LLUUID& id, std::string_view color_name, EColorType color_type);
+
+    // The colour a speaker's name takes in chat under IRC-style colours, for
+    // the messages whose text takes that speaker's colour.
+    bool getChatNameColor(const LLChat& chat, LLColor4& color);
+
+    // the text and name colours IRC-style chat works from an id, whoever it
+    // is and whether or not the colours are on
+    static LLColor4 getIRCChatColor(const LLUUID& id);
+    static LLColor4 getIRCNameColor(const LLUUID& id);
 
 private:
     enum class EAvatarKind
@@ -76,4 +90,9 @@ private:
     // caller's colour alone
     static S32 colorIndex(EAvatarKind kind, EColorType color_type);
     LLColor4 colorForKind(EAvatarKind kind, LLColor4 default_color, EColorType color_type);
+
+    // whether IRC-style chat colours a kind when it is on, and then whether
+    // it does for a use, and the colour
+    static bool ircColored(EAvatarKind kind);
+    static bool ircColor(EAvatarKind kind, const LLUUID& id, EColorType color_type, LLColor4& color);
 };

@@ -30,6 +30,7 @@
 #include "llagentdata.h" // for gAgentID
 #include "llfloaterimnearbychathandler.h"
 
+#include "alavatargroups.h"
 #include "alchatbar.h"
 // [SL:KB] - Patch: Chat-NearbyToastWidth | Checked: 2010-11-10 (Catznip-2.4)
 #include "llchatentry.h"
@@ -924,12 +925,19 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
             if (RlvActions::isRlvEnabled())
                 chat["show_icon_tooltip"] = !chat_msg.mRlvNamesFiltered;
 // [/RLVa:KB]
-            std::string r_color_name = "White";
+            // The colours go as values: a speaker's own, under IRC-style
+            // chat colours, has no name in the colour table.
+            LLUIColor r_color = LLUIColorTable::instance().getColor("White");
             F32 r_color_alpha = 1.0f;
-            LLViewerChat::getChatColor( chat_msg, r_color_name, r_color_alpha);
+            LLViewerChat::getChatColor( chat_msg, r_color, r_color_alpha);
 
-            chat["text_color"] = r_color_name;
+            chat["text_color"] = r_color.get().getValue();
             chat["color_alpha"] = r_color_alpha;
+            LLColor4 name_color;
+            if (ALAvatarGroups::instance().getChatNameColor(chat_msg, name_color))
+            {
+                chat["name_color"] = name_color.getValue();
+            }
             chat["message"] = toast_msg;
             channel->addChat(chat);
         }
