@@ -108,8 +108,9 @@ static void handleUrl(const char* url_utf8);
 // to check. The second is LL's com.secondlife.ViewerAppAPIService, which
 // Linden Lab's viewer and other forks share: a link is handed to whichever
 // viewer holds it, so opening a secondlife:// link reaches the viewer that is
-// running rather than starting another. A viewer that cannot have it, because
-// another holds it, runs without it. The object path and interface are LL's.
+// running rather than starting another. A viewer that finds it held waits in
+// the bus's queue for it, as GDBus viewers do, and has it when the viewers
+// ahead of it quit. The object path and interface are LL's.
 #define VIEWERAPI_SERVICE        AL_VIEWER_APP_ID
 static_assert(sizeof(VIEWERAPI_SERVICE) - 1 <= 255, "A D-Bus name is at most 255 characters");
 #define VIEWERAPI_SHARED_SERVICE "com.secondlife.ViewerAppAPIService"
@@ -1017,16 +1018,16 @@ static const DBusObjectPathVTable sViewerApiVTable =
     nullptr
 };
 
-// Asks the bus for name without queueing, so we never silently wait behind an
-// existing owner. A name another process holds is no error to libdbus, only a
-// reply, so the reply is what says the name is ours. On failure, failure says
-// why.
-static bool acquireBusName(const char* name, std::string& failure)
+// Asks the bus for name with flags: DO_NOT_QUEUE for a name that must be ours
+// now, so we never silently wait behind an existing owner. A name another
+// process holds is no error to libdbus, only a reply, so the reply is what says
+// the name is ours. On failure, failure says why.
+static bool acquireBusName(const char* name, unsigned int flags, std::string& failure)
 {
     DBusError err;
     dbus_error_init(&err);
 
-    const int reply = dbus_bus_request_name(gDBusConn, name, DBUS_NAME_FLAG_DO_NOT_QUEUE, &err);
+    const int reply = dbus_bus_request_name(gDBusConn, name, flags, &err);
     if (dbus_error_is_set(&err))
     {
         failure = err.message;
@@ -1073,16 +1074,18 @@ bool LLAppViewerSDL::initSLURLHandler()
     // Claim the well-known service names. This channel's must be ours, as a
     // second viewer of this channel (AllowMultipleViewers) finds it held. LL's
     // is shared, so another viewer holding it is no failure: links reach that
-    // viewer, and this one stays reachable by its own name.
+    // viewer, and this one stays reachable by its own name. It is asked for in
+    // the queue, so it comes to this viewer in its turn as the viewers holding
+    // it quit; asked for with DO_NOT_QUEUE, it never would.
     std::string failure;
-    if (!acquireBusName(VIEWERAPI_SERVICE, failure))
+    if (!acquireBusName(VIEWERAPI_SERVICE, DBUS_NAME_FLAG_DO_NOT_QUEUE, failure))
     {
         LL_WARNS() << "Failed to acquire dbus name " << VIEWERAPI_SERVICE << ": " << failure << LL_ENDL;
         return false;
     }
-    if (!acquireBusName(VIEWERAPI_SHARED_SERVICE, failure))
+    if (!acquireBusName(VIEWERAPI_SHARED_SERVICE, 0, failure))
     {
-        LL_INFOS() << "Not taking dbus name " << VIEWERAPI_SHARED_SERVICE << ": " << failure << LL_ENDL;
+        LL_INFOS() << "Not the owner of dbus name " << VIEWERAPI_SHARED_SERVICE << ": " << failure << LL_ENDL;
     }
 
     return true;
@@ -1168,8 +1171,10 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
             return true;
         }
 
-        // No owner is ServiceUnknown for a name nothing can start, and
-        // NameHasNoOwner for one that has just gone.
+        // No owner is ServiceUnknown, from dbus-daemon and dbus-broker alike,
+        // since the call may start a service; NameHasNoOwner is the answer to
+        // one that may not. An owner that quits or times out without replying
+        // is NoReply, and may have taken the link, so it is not passed over.
         const bool no_owner = dbus_error_has_name(&err, DBUS_ERROR_SERVICE_UNKNOWN)
                            || dbus_error_has_name(&err, DBUS_ERROR_NAME_HAS_NO_OWNER);
         LL_INFOS() << "No running instance of " << service << " to hand off SLURL to: " << err.message << LL_ENDL;
