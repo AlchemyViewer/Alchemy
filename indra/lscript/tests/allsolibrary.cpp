@@ -152,11 +152,8 @@ namespace
         case LST_FLOATINGPOINT:
             return integerFrom(d.mFP);
         case LST_STRING:
-        {
-            const char* text = d.mString ? d.mString : "";
-            const bool  hex  = text[0] == '0' && (text[1] == 'x' || text[1] == 'X');
-            return (S32)(U32)std::strtoul(text, nullptr, hex ? 16 : 10);
-        }
+            // As the VM's own cast reads one, on every host alike.
+            return lscript_string_to_integer(d.mString);
         default:
             return 0;
         }

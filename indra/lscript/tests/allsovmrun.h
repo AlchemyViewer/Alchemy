@@ -148,12 +148,10 @@ namespace ll_test_lso
         }
     }
 
-    // The script compiled to LSO, state_entry run, and then each event added
-    // and run in turn, each until the VM settles, with the test library.
-    inline Run runLSO(const std::string& text, const std::vector<Event>& events = {})
+    // An LSO image run: state_entry, and then each event added and run in
+    // turn, each until the VM settles, with the test library.
+    inline Run runLSOImage(const std::vector<U8>& image, const std::vector<Event>& events = {})
     {
-        const std::vector<U8> image = compileLSO(text);
-
         Run run;
         gSaid.clear();
         {
@@ -175,5 +173,11 @@ namespace ll_test_lso
         run.said = std::move(gSaid);
         gSaid.clear();
         return run;
+    }
+
+    // The script compiled to LSO and run as above.
+    inline Run runLSO(const std::string& text, const std::vector<Event>& events = {})
+    {
+        return runLSOImage(compileLSO(text), events);
     }
 }

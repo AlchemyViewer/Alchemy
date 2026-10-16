@@ -526,7 +526,10 @@ void LLScriptSAIdentifier::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCom
     case LSCP_LIST_BUILD_SIMPLE:
         {
             mIdentifier->recurse(fp, tabs, tabsize, pass, ptype, prunearg, scope, type, basetype, count, chunk, heap, stacksize, entry, entrycount, ldata);
-            if (mNextp)
+            // An identifier the pass refused, unset or a list, made no
+            // entry, so the rest are built from nothing: the error is
+            // written, and the compile fails on it.
+            if (mNextp && *ldata)
             {
                 mNextp->recurse(fp, tabs, tabsize, pass, ptype, prunearg, scope, type, basetype, count, chunk, heap, stacksize, entry, entrycount, &(*ldata)->mListp);
             }
@@ -10718,8 +10721,12 @@ void LLScriptGlobalFunctions::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPT
         {
             entrycount = 0;
             mStatements->recurse(fp, tabs, tabsize, pass, ptype, prunearg, scope, type, basetype, count, chunk, heap, stacksize, mIdentifier->mScopeEntry, entrycount, NULL);
-            fprintf(fp, "Function Args: %s\n", mIdentifier->mScopeEntry->mFunctionArgs.mString);
-            fprintf(fp, "Local List: %s\n", mIdentifier->mScopeEntry->mLocals.mString);
+            // Either is null for a function with no parameters or no
+            // locals, as the event handler's print has it.
+            const char *function_args = mIdentifier->mScopeEntry->mFunctionArgs.mString;
+            fprintf(fp, "Function Args: %s\n", function_args?function_args:"");
+            const char *local_list = mIdentifier->mScopeEntry->mLocals.mString;
+            fprintf(fp, "Local List: %s\n", local_list?local_list:"");
             if (mIdentifier->mScopeEntry)
             {
                 mIdentifier->mScopeEntry->mSize = (S32)count;

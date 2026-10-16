@@ -316,14 +316,18 @@ public:
     }
     void removeEventType(LSCRIPTStateEventType type)
     {
-        for (std::list<LLScriptDataCollection*>::iterator it = mEventDataList.begin(), end_it = mEventDataList.end();
-            it != end_it;
-            ++it)
+        // erase gives the iterator after the one it took, which LL's then
+        // incremented a second time.
+        for (std::list<LLScriptDataCollection*>::iterator it = mEventDataList.begin(); it != mEventDataList.end();)
         {
             if ((*it)->mType == type)
             {
                 delete *it;
-                mEventDataList.erase(it);
+                it = mEventDataList.erase(it);
+            }
+            else
+            {
+                ++it;
             }
         }
     }
