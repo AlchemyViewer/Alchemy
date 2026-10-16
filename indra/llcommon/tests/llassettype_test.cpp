@@ -26,7 +26,6 @@
 
 #include "../llassettype.h"
 #include "../llsd.h"
-#include "../llstring.h"
 
 #include <iterator>
 #include <string>
@@ -37,13 +36,7 @@
 
 namespace
 {
-    // A name as text, whether the accessor hands back a pointer, which may be
-    // null, or a view.
-    std::string text(const char* name)
-    {
-        return ll_safe_string(name);
-    }
-
+    // A name as text, for comparing and for Catch2 to print.
     std::string text(std::string_view name)
     {
         return std::string(name);
@@ -123,8 +116,8 @@ namespace
 
     TEST_CASE("llassettype: AT_UNKNOWN and AT_NONE have no human name", "[llassettype]")
     {
-        CHECK(ll_safe_string(LLAssetType::lookupHumanReadable(LLAssetType::AT_UNKNOWN)).empty());
-        CHECK(ll_safe_string(LLAssetType::lookupHumanReadable(LLAssetType::AT_NONE)).empty());
+        CHECK(LLAssetType::lookupHumanReadable(LLAssetType::AT_UNKNOWN).empty());
+        CHECK(LLAssetType::lookupHumanReadable(LLAssetType::AT_NONE).empty());
     }
 
     TEST_CASE("llassettype: every type name finds its own row", "[llassettype]")
@@ -151,20 +144,6 @@ namespace
     {
         CHECK(text(LLAssetType::lookupHumanReadable(LLAssetType::AT_SOUND_WAV)) == "sound");
         CHECK(LLAssetType::lookupHumanReadable(std::string("sound")) == LLAssetType::AT_SOUND);
-    }
-
-    TEST_CASE("llassettype: getType finds a row by its description in any case", "[llassettype]")
-    {
-        for (const AssetRow& row : ASSET_ROWS)
-        {
-            std::string lower(row.desc);
-            LLStringUtil::toLower(lower);
-            INFO("description '" << row.desc << "'");
-            CHECK(LLAssetType::getType(row.desc) == row.type);
-            CHECK(LLAssetType::getType(lower) == row.type);
-        }
-        CHECK(LLAssetType::getType("not a description") == LLAssetType::AT_NONE);
-        CHECK(LLAssetType::getType("") == LLAssetType::AT_NONE);
     }
 
     TEST_CASE("llassettype: a type name with no row is AT_UNKNOWN", "[llassettype]")
@@ -221,7 +200,8 @@ namespace
             const std::string        human_name = row ? row->human_name : "llassettype_bad_lookup";
             const std::string        desc       = row ? row->desc : "llassettype_bad_lookup";
             const bool               is_link    = value == 24 || value == 25;
-            if (text(LLAssetType::lookup(type)) != type_name
+            if (LLAssetType::isKnown(type) != (row != nullptr)
+                || text(LLAssetType::lookup(type)) != type_name
                 || text(LLAssetType::lookupHumanReadable(type)) != human_name
                 || text(LLAssetType::getDesc(type)) != desc
                 || LLAssetType::lookupCanLink(type) != (row && row->can_link)

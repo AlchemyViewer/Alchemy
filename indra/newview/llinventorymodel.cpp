@@ -2708,7 +2708,7 @@ void LLInventoryModel::addItem(LLViewerInventoryItem* item)
             return;
         }
 
-        if (LLAssetType::lookup(item->getType()) == LLAssetType::BADLOOKUP)
+        if (!LLAssetType::isKnown(item->getType()))
         {
             if (item->getType() >= LLAssetType::AT_COUNT)
             {

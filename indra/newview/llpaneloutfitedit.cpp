@@ -127,7 +127,7 @@ std::string LLShopURLDispatcher::resolveURL(LLAssetType::EType asset_type, ESex 
 {
     const std::string prefix = "MarketplaceURL";
     const std::string sex_str = (sex == SEX_MALE) ? "Male" : "Female";
-    const std::string type_str = LLAssetType::lookup(asset_type);
+    const std::string_view type_str = LLAssetType::lookup(asset_type);
 
     std::string setting_name = prefix;
 

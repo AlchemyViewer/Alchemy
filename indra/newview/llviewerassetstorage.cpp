@@ -45,6 +45,8 @@
 #include "llstartup.h"
 #include "llworld.h"
 
+#include <fmt/format.h>
+
 ///----------------------------------------------------------------------------
 /// LLViewerAssetRequest
 ///----------------------------------------------------------------------------
@@ -639,9 +641,7 @@ void LLViewerAssetStorage::assetRequestCoro(
 
 std::string LLViewerAssetStorage::getAssetURL(const std::string& cap_url, const LLUUID& uuid, LLAssetType::EType atype)
 {
-    std::string type_name = LLAssetType::lookup(atype);
-    std::string url = cap_url + "/?" + type_name + "_id=" + uuid.asString();
-    return url;
+    return fmt::format("{}/?{}_id={}", cap_url, LLAssetType::lookup(atype), uuid.asString());
 }
 
 void LLViewerAssetStorage::logAssetStorageInfo()
