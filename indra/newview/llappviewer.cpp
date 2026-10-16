@@ -1895,6 +1895,10 @@ bool LLAppViewer::cleanup()
 
     LL_INFOS() << "Viewer disconnected" << LL_ENDL;
 
+    // No idle runs from here on. What waited for the next one goes now, while what its
+    // callable holds can still reach the singletons it was made beside.
+    gIdleCallbacks.deleteAllFunctions();
+
     if (gKeyboard)
     {
         gKeyboard->resetKeys();
