@@ -9436,8 +9436,18 @@ void handle_grab_baked_texture(EBakedTextureIndex baked_tex_index)
     const LLUUID folder_id = gInventory.findCategoryUUIDForType(LLFolderType::assetTypeToFolderType(asset_type));
     if(folder_id.notNull())
     {
-        std::string name;
-        name = "Baked " + LLAvatarAppearance::getDictionary()->getBakedTexture(baked_tex_index)->mNameCapitalized + " Texture";
+        // The bake's name as capitalized words: "upper_body" is "Upper Body".
+        std::string words(LLAvatarAppearance::getDictionary()->getBakedTexture(baked_tex_index)->mName);
+        LLStringUtil::replaceChar(words, '-', ' ');
+        LLStringUtil::replaceChar(words, '_', ' ');
+        for (size_t i = 0; i < words.size(); i++)
+        {
+            if (i == 0 || words[i - 1] == ' ')
+            {
+                words[i] = (char)toupper((unsigned char)words[i]);
+            }
+        }
+        std::string name = "Baked " + words + " Texture";
 
         LLUUID item_id;
         item_id.generate();

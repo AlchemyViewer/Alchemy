@@ -670,12 +670,12 @@ bool LLTexLayerInfo::parseXml(LLXmlTreeNode* node)
             /* if ("upper_shirt" == local_texture_name)
                 mLocalTexture = TEX_UPPER_SHIRT; */
             mLocalTexture = TEX_NUM_INDICES;
-            for (const LLAvatarAppearanceDictionary::Textures::value_type& dict_pair : LLAvatarAppearance::getDictionary()->getTextures())
+            for (const LLAvatarAppearanceDictionary::TextureEntry& dict_entry : LLAvatarAppearance::getDictionary()->getTextures())
             {
-                const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = dict_pair.second;
+                const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = &dict_entry;
                 if (local_texture_name == texture_dict->mName)
             {
-                    mLocalTexture = dict_pair.first;
+                    mLocalTexture = dict_entry.mIndex;
                     break;
             }
             }

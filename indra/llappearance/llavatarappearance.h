@@ -269,7 +269,7 @@ protected:
     avatar_joint_list_t                             mMeshLOD;
 
     // mesh entries and backed textures
-    static LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary* sAvatarDictionary;
+    static const LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary* const sAvatarDictionary;
 
 /**                    Meshes
  **                                                                            **

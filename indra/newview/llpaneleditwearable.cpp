@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llpaneleditwearable.h"
+#include "lldictionary.h"
 #include "llpanel.h"
 #include "llviewerwearable.h"
 #include "lluictrl.h"
