@@ -30,11 +30,30 @@
 
 #include "llsdjson.h"
 
+#include "llsdserialize.h"
 #include "llsdutil.h"
 #include "llerror.h"
 
 #include <cmath>
 #include <cstdlib>
+#include <utility>
+
+#include <simdutf.h>
+
+namespace
+{
+    // LLSD's Integer is 32 bits. A JSON integer past it keeps its magnitude
+    // as a Real rather than its low bits, which is all a narrowing gives.
+    template <typename T>
+    LLSD json_integer(T value)
+    {
+        if (std::in_range<LLSD::Integer>(value))
+        {
+            return LLSD(static_cast<LLSD::Integer>(value));
+        }
+        return LLSD(static_cast<LLSD::Real>(value));
+    }
+}
 
 //=========================================================================
 LLSD LlsdFromJson(const simdjson::dom::element& val)
@@ -47,10 +66,10 @@ LLSD LlsdFromJson(const simdjson::dom::element& val)
     case simdjson::dom::element_type::NULL_VALUE:
         break;
     case simdjson::dom::element_type::INT64:
-        result = LLSD(val.get_int64().value_unsafe());
+        result = json_integer(val.get_int64().value_unsafe());
         break;
     case simdjson::dom::element_type::UINT64:
-        result = LLSD(val.get_uint64().value_unsafe());
+        result = json_integer(val.get_uint64().value_unsafe());
         break;
     case simdjson::dom::element_type::DOUBLE:
         result = LLSD(val.get_double().value_unsafe());
@@ -121,8 +140,22 @@ LLSD LlsdFromJson(const simdjson::dom::element& val)
 static simdjson::dom::parser& json_parser()
 {
     thread_local simdjson::dom::parser parser;
+    if (parser.capacity() == 0)
+    {
+        // LlsdFromJson() recurses once per level, and the tree it builds is
+        // destroyed and formatted recursively, so documents nest no deeper
+        // than the LLSD parsers allow. The depth given the first allocation
+        // is the one the buffers keep as they grow.
+        constexpr size_t INITIAL_CAPACITY = 4 * 1024;
+        (void)parser.allocate(INITIAL_CAPACITY, LLSDParser::DEFAULT_MAX_DEPTH);
+    }
     return parser;
 }
+
+// The parser's buffers come to about fourteen times the largest document it
+// has seen, and are kept between calls. Past this the buffers are let go once
+// the document is converted, rather than held for the life of the thread.
+static constexpr size_t JSON_PARSER_KEEP_CAPACITY = 1024 * 1024;
 
 static bool llsd_from_parsed(simdjson::simdjson_result<simdjson::dom::element> parsed,
                              LLSD& out, std::string* errmsg)
@@ -136,10 +169,18 @@ static bool llsd_from_parsed(simdjson::simdjson_result<simdjson::dom::element> p
             *errmsg = simdjson::error_message(err);
         }
         out = LLSD();
-        return false;
     }
-    out = LlsdFromJson(root);
-    return true;
+    else
+    {
+        out = LlsdFromJson(root);
+    }
+
+    simdjson::dom::parser& parser = json_parser();
+    if (parser.capacity() > JSON_PARSER_KEEP_CAPACITY)
+    {
+        parser = simdjson::dom::parser();
+    }
+    return err == simdjson::SUCCESS;
 }
 
 bool LlsdFromJsonString(std::string_view json, LLSD& out, std::string* errmsg)
@@ -221,9 +262,19 @@ static void llsd_to_json(simdjson::builder::string_builder& dst, const LLSD& val
         break;
     }
     case LLSD::TypeBinary:
+    {
+        // JSON has no bytes; base64 in a string, as LLSD's XML carries them.
+        // A value is no reason to bring the viewer down.
+        const LLSD::Binary& bytes = val.asBinary();
+        std::string encoded(simdutf::base64_length_from_binary(bytes.size()), '\0');
+        simdutf::binary_to_base64((const char*)bytes.data(), bytes.size(), encoded.data());
+        dst.escape_and_append_with_quotes(encoded);
+        break;
+    }
     default:
-        LL_ERRS("LlsdToJson") << "Unsupported conversion to JSON from LLSD type ("
-                              << val.type() << ")." << LL_ENDL;
+        LL_WARNS("LlsdToJson") << "Unsupported conversion to JSON from LLSD type ("
+                               << val.type() << ")." << LL_ENDL;
+        dst.append_null();
         break;
     }
 }

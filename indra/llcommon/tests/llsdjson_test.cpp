@@ -28,6 +28,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "llsdjson.h"
+#include "llsdserialize.h"
 #include "llsdutil.h"
 #include "lldate.h"
 #include "lluri.h"
@@ -275,5 +276,67 @@ namespace
         std::string errmsg;
         REQUIRE_FALSE(LlsdFromJsonString(simdjson::padded_string(std::string("{")), out, &errmsg));
         CHECK_FALSE(errmsg.empty());
+    }
+
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: an integer past 32 bits keeps its magnitude as a Real", "[LlsdJson]")
+    {
+        // the ends of an Integer stay Integers
+        LLSD val = require_parse("2147483647");
+        CHECK(val.type() == LLSD::TypeInteger);
+        CHECK(val.asInteger() == std::numeric_limits<S32>::max());
+        val = require_parse("-2147483648");
+        CHECK(val.type() == LLSD::TypeInteger);
+        CHECK(val.asInteger() == std::numeric_limits<S32>::min());
+
+        // past them, not their low 32 bits
+        val = require_parse("4294967297");
+        CHECK(val.type() == LLSD::TypeReal);
+        CHECK(val.asReal() == 4294967297.0);
+        val = require_parse("-2147483649");
+        CHECK(val.type() == LLSD::TypeReal);
+        CHECK(val.asReal() == -2147483649.0);
+        val = require_parse("1760000000000");
+        CHECK(val.asReal() == 1760000000000.0);
+        // simdjson's unsigned type: past an int64
+        val = require_parse("18446744073709551615");
+        CHECK(val.type() == LLSD::TypeReal);
+        CHECK(val.asReal() == 18446744073709551615.0);
+    }
+
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: nesting is held to the LLSD parsers' default depth", "[LlsdJson]")
+    {
+        auto nested = [](size_t levels)
+        {
+            return std::string(levels, '[') + std::string(levels, ']');
+        };
+        require_parse(nested(LLSDParser::DEFAULT_MAX_DEPTH - 50));
+
+        LLSD out = LLSD::emptyMap();
+        std::string errmsg;
+        CHECK_FALSE(LlsdFromJsonString(nested(LLSDParser::DEFAULT_MAX_DEPTH + 50), out, &errmsg));
+        CHECK(out.isUndefined());
+        CHECK_FALSE(errmsg.empty());
+
+        // and the limit holds after the buffers are let go and grown again
+        const std::string big = "[\"" + std::string(2 * 1024 * 1024, 'x') + "\"]";
+        CHECK(require_parse(big)[0].asStringRef().size() == 2 * 1024 * 1024);
+        CHECK_FALSE(LlsdFromJsonString(nested(LLSDParser::DEFAULT_MAX_DEPTH + 50), out));
+        require_parse(nested(LLSDParser::DEFAULT_MAX_DEPTH - 50));
+    }
+
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: binary serializes as a base64 string", "[LlsdJson]")
+    {
+        CHECK(LlsdToJson(LLSD(LLSD::Binary{ 1, 2, 3 })) == "\"AQID\"");
+        CHECK(LlsdToJson(LLSD(LLSD::Binary())) == "\"\"");
+        LLSD map;
+        map["bytes"] = LLSD::Binary{ 0xFF };
+        CHECK(LlsdToJson(map) == "{\"bytes\":\"/w==\"}");
+    }
+
+    TEST_CASE_METHOD(llsdjson_data, "LlsdJson: a null C string parses as empty input", "[LlsdJson]")
+    {
+        LLSD out = LLSD::emptyMap();
+        CHECK_FALSE(LlsdFromJsonString((const char*)nullptr, out));
+        CHECK(out.isUndefined());
     }
 }
