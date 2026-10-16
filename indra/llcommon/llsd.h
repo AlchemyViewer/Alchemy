@@ -567,6 +567,10 @@ namespace llsd
     // Used by LLSD::ImplString to convert string type to real
     LLSD::Real string_to_real(std::string_view in_string);
 
+    // A real truncated toward zero as an Integer, where a cast would be undefined
+    // past the Integer's range: NaN is 0, and a real beyond either end is that end.
+    LL_COMMON_API LLSD::Integer real_to_integer(LLSD::Real value);
+
 /** @name Unit Testing Interface */
 //@{
     LL_COMMON_API void dumpStats(const LLSD&);  ///< Output information on object and usage
