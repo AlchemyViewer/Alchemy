@@ -56,7 +56,6 @@ uniform sampler2D brdfLut;
 // projected lighted params
 uniform mat4 proj_mat; //screen space to light space projector
 uniform vec3 proj_n; // projector normal
-uniform vec3 proj_p; //plane projection is emitting from (in screen space)
 uniform float proj_focus; // distance from plane to begin blurring
 uniform float proj_lod  ; // (number of mips in proj map)
 uniform float proj_range; // range between near clip and far clip plane of projection
@@ -375,38 +374,6 @@ vec4 texture2DLodSpecular(vec2 tc, float lod)
     ret *= clamp(d/edge, 0.0, 1.0);
 
     return ret;
-}
-
-// See: clipProjectedLightVars()
-vec3 getProjectedLightSpecularColor(vec3 pos, vec3 n )
-{
-    vec3 slit = vec3(0);
-    vec3 ref = reflect(normalize(pos), n);
-
-    //project from point pos in direction ref to plane proj_p, proj_n
-    vec3 pdelta = proj_p-pos;
-    float l_dist = length(pdelta);
-    float ds = dot(ref, proj_n);
-    if (ds < 0.0)
-    {
-        vec3 pfinal = pos + ref * dot(pdelta, proj_n)/ds;
-        vec4 stc = (proj_mat * vec4(pfinal.xyz, 1.0));
-        if (stc.z > 0.0)
-        {
-            stc /= stc.w;
-            slit = getProjectedLightDiffuseColor( l_dist, stc.xy ); // NOTE: Using diffuse due to texture2DLodSpecular() has extra: d *= min(1, d * (proj_lod - lod));
-        }
-    }
-    return slit; // specular light
-}
-
-vec3 getProjectedLightSpecularColor(float light_distance, vec2 projected_uv)
-{
-    float diff = clamp((light_distance - proj_focus)/proj_range, 0.0, 1.0);
-    float lod = diff * proj_lod;
-    vec4 plcol = getTexture2DLodDiffuse(projected_uv.xy, lod); // NOTE: Using diffuse due to texture2DLodSpecular() has extra: d *= min(1, d * (proj_lod - lod));
-
-    return color.rgb * plcol.rgb * plcol.a;
 }
 
 // Under an infinite projection the cleared far depth unprojects to w = 0. There w is 1 / view distance, so
