@@ -267,16 +267,11 @@ void main()
             }
         }
 
-        // Mirror reflection of the projector's own image (the legacy "Environment" value).
-        //
-        // Unlike the diffuse and Blinn-Phong terms above, this one took no part in the light's
-        // own geometry or in the material's specular colour: it was weighted only by the
-        // Environment value, so a material with a dim specular colour still reflected the
-        // projector at full strength, and it did so with no distance falloff. It now scales
-        // like the other specular contribution from this light (distance falloff and specular
-        // colour), is weighted by gloss since a blurrier lookup spreads the same light over
-        // a larger area, and is discarded where it cannot be a reflection of this light at
-        // all (surface facing away, or reflected ray pointing away from the projector plane).
+        // The legacy "Environment" mirror image of the projector's own picture. It is weighted
+        // by Environment alone, as the sky's reflection is (applyLegacyEnv): the specular colour
+        // tints the Blinn-Phong highlight above, not this, and glossiness already blurs and
+        // narrows it through the lookup's LOD. A mirror image does not dim with distance either.
+        // Only a surface facing the projector can reflect it.
         if (envIntensity > 0.0 && dot(n, l) > 0.0)
         {
             vec3 ref = reflect(normalize(pos), n);
@@ -287,14 +282,11 @@ void main()
 
             if (ds < 0.0)
             {
-                // Distance along the reflected ray to the plane; negative means the plane is
-                // behind the ray, where nothing can be reflected.
-                float ref_t = dot(pdelta, proj_n)/ds;
-                vec3 pfinal = pos + ref * ref_t;
+                vec3 pfinal = pos + ref * dot(pdelta, proj_n)/ds;
 
                 vec4 stc = (proj_mat * vec4(pfinal.xyz, 1.0));
 
-                if (ref_t > 0.0 && stc.z > 0.0)
+                if (stc.z > 0.0)
                 {
                     stc /= stc.w;
 
@@ -303,7 +295,13 @@ void main()
                         stc.x > 0.0 &&
                         stc.y > 0.0)
                     {
-                        final_color += color.rgb * texture2DLodSpecular(stc.xy, (1 - spec.a) * (proj_lod * 0.6)).rgb * shadow * envIntensity * dist_atten * spec.rgb * (0.25 + 0.75 * spec.a);
+                        // The light is drawn out to its radius widened by half again (size, from
+                        // pipeline.cpp) and clipped there. Faded across that margin, the image
+                        // keeps its full strength out to the radius the light was given and does
+                        // not end in a hard edge where the clip falls.
+                        float edge = 1.0 - smoothstep(2.0 / 3.0, 1.0, dist);
+
+                        final_color += color.rgb * texture2DLodSpecular(stc.xy, (1 - spec.a) * (proj_lod * 0.6)).rgb * shadow * envIntensity * edge;
                     }
                 }
             }
