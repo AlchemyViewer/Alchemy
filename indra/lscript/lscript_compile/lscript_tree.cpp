@@ -527,8 +527,9 @@ void LLScriptSAIdentifier::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCom
         {
             mIdentifier->recurse(fp, tabs, tabsize, pass, ptype, prunearg, scope, type, basetype, count, chunk, heap, stacksize, entry, entrycount, ldata);
             // An identifier the pass refused, unset or a list, made no
-            // entry, so the rest are built from nothing: the error is
-            // written, and the compile fails on it.
+            // entry: the error is written, and every recursion after it
+            // returns at once on it, but the rest are not pointed at a
+            // null entry's next either way.
             if (mNextp && *ldata)
             {
                 mNextp->recurse(fp, tabs, tabsize, pass, ptype, prunearg, scope, type, basetype, count, chunk, heap, stacksize, entry, entrycount, &(*ldata)->mListp);

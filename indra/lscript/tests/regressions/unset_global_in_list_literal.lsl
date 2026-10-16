@@ -1,7 +1,8 @@
-// LL's compiler, laying out a global list literal for LSO, made no entry
-// for a global it refused there, an unset one, and then built the entries
-// after it from where that entry's next pointer would have been, at an
-// offset from nothing. The refusal stands, and the rest are left unbuilt.
+// LL's compiler, laying out a global list literal for LSO, makes no entry
+// for a global it refuses there, an unset one, and pointed the entries
+// after it at that null entry's next, an offset from nothing. The error
+// returns every recursion after it before any is built there, and the
+// pointer is no longer taken either way; this holds the refusal.
 //
 // expect refused: Unitialized variables can't be included in lists
 
