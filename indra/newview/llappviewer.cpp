@@ -5594,10 +5594,11 @@ void LLAppViewer::idle()
     F32 qas = gSavedSettings.getF32("QuitAfterSeconds");
     if (qas > 0.f)
     {
-        if (gRenderStartTime.getElapsedTimeF32() > qas)
+        if (gRenderStartTime.getElapsedTimeF32() > qas && !mQuitRequested)
         {
             LL_INFOS() << "Quitting after " << qas << " seconds. See setting \"QuitAfterSeconds\"." << LL_ENDL;
-            LLAppViewer::instance()->forceQuit();
+            // As File > Quit does: in world, this logs out first.
+            requestQuit();
         }
     }
 
