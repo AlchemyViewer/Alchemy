@@ -26,6 +26,7 @@
 
 #include "../alenumtable.h"
 
+#include <array>
 #include <string_view>
 
 #include <catch2/catch_test_macros.hpp>
@@ -100,6 +101,27 @@ namespace
 
     using ScopedTable = ALEnumTable<SCOPED_ROWS, &ScopedRow::mKey>;
 
+    // Rows a function builds: a run of keys that share a name.
+    struct RunRow
+    {
+        ETestKey         mKey;
+        std::string_view mName;
+    };
+
+    consteval std::array<RunRow, 4> buildRun()
+    {
+        std::array<RunRow, 4> rows{};
+        for (S32 i = 0; i < 4; ++i)
+        {
+            rows[i] = { ETestKey(10 + i), i == 3 ? "last" : "run" };
+        }
+        return rows;
+    }
+
+    constexpr std::array<RunRow, 4> RUN_ROWS = buildRun();
+
+    using RunTable = ALEnumTable<RUN_ROWS, &RunRow::mKey>;
+
     // Every answer below is also a constant expression.
     static_assert(TestTable::find(TK_D)->mValue == 13);
     static_assert(TestTable::find(ETestKey(2)) == nullptr);
@@ -111,6 +133,8 @@ namespace
     static_assert(TestTable::rows().size() == 5);
     static_assert(PlainTable::find(PK_TWO)->mName == "two");
     static_assert(ScopedTable::find(EScopedKey::Three)->mName == "three");
+    static_assert(RunTable::findBy<&RunRow::mName>("run")->mKey == ETestKey(10));
+    static_assert(RunTable::rows().size() == 4);
 
     TEST_CASE("alenumtable: every key finds its own row", "[alenumtable]")
     {
@@ -175,6 +199,22 @@ namespace
         CHECK(TestTable::findBy<&TestRow::mAlias>("")->mKey == TK_NONE);
         CHECK(TestTable::findBy<&TestRow::mAlias>(std::string_view())->mKey == TK_NONE);
         CHECK(TestTable::findBy<&TestRow::mName>("") == nullptr);
+    }
+
+    TEST_CASE("alenumtable: a std::array of rows a function built is a table like any other", "[alenumtable]")
+    {
+        for (S32 i = 0; i < 4; ++i)
+        {
+            const RunRow* row = RunTable::find(ETestKey(10 + i));
+            REQUIRE(row != nullptr);
+            CHECK(row == &RUN_ROWS[i]);
+            CHECK(RunTable::indexOf(ETestKey(10 + i)) == std::size_t(i));
+        }
+        CHECK(RunTable::find(ETestKey(9)) == nullptr);
+        CHECK(RunTable::find(ETestKey(14)) == nullptr);
+        CHECK(RunTable::findBy<&RunRow::mName>("run") == &RUN_ROWS[0]);
+        CHECK(RunTable::findBy<&RunRow::mName>("last") == &RUN_ROWS[3]);
+        CHECK(RunTable::rows().data() == RUN_ROWS.data());
     }
 
     TEST_CASE("alenumtable: rows walks every row in key order and indexOf says where each is", "[alenumtable]")

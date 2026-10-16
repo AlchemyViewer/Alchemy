@@ -45,6 +45,24 @@ namespace ALEnumTableDetail
         using field_type = std::remove_cv_t<Field>;
     };
 
+    // The rows are a C array or a std::array, constant either way.
+    template <class T>
+    struct RowArray;
+
+    template <class Row, std::size_t N>
+    struct RowArray<const Row[N]>
+    {
+        using row_type = Row;
+        static constexpr std::size_t size = N;
+    };
+
+    template <class Row, std::size_t N>
+    struct RowArray<const std::array<Row, N>>
+    {
+        using row_type = Row;
+        static constexpr std::size_t size = N;
+    };
+
     template <class Key>
     constexpr long long keyValue(Key key) noexcept
     {
@@ -95,8 +113,8 @@ namespace ALEnumTableDetail
 } // namespace ALEnumTableDetail
 
 /**
- * Static functions over a constexpr array of rows, each row an aggregate with
- * an enum or integer key, named by KeyField:
+ * Static functions over a constexpr array of rows, a C array or a std::array,
+ * each row an aggregate with an enum or integer key, named by KeyField:
  *
  *     constexpr AssetRow ASSET_ROWS[] = { { AT_NONE, "-1" }, { AT_TEXTURE, "texture" } };
  *     using Assets = ALEnumTable<ASSET_ROWS, &AssetRow::mType>;
@@ -117,12 +135,13 @@ template <const auto& Rows, auto KeyField>
 class ALEnumTable
 {
     using Member = ALEnumTableDetail::MemberOf<decltype(KeyField)>;
+    using Array  = ALEnumTableDetail::RowArray<std::remove_reference_t<decltype(Rows)>>;
 
 public:
-    using row_type = std::remove_cv_t<std::remove_extent_t<std::remove_reference_t<decltype(Rows)>>>;
+    using row_type = typename Array::row_type;
     using key_type = typename Member::field_type;
 
-    static constexpr std::size_t ROW_COUNT = std::extent_v<std::remove_reference_t<decltype(Rows)>>;
+    static constexpr std::size_t ROW_COUNT = Array::size;
 
     /// What indexOf gives for a key no row has.
     static constexpr std::size_t npos = ROW_COUNT;
