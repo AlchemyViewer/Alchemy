@@ -80,10 +80,13 @@ public:
 // this is only OK because we only load/save via accessors below
 const S32 SIZEOF_SCRIPT_ALLOC_ENTRY = 7;
 
+// A header is written and read whole, so its last byte is bounded, not
+// its first: LL's bound let a header start up to the top of memory and
+// run seven bytes past the buffer.
 inline void alloc_entry2bytestream(U8 *buffer, S32 &offset, const LLScriptAllocEntry &entry)
 {
     if (  (offset < 0)
-        ||(offset > MAX_HEAP_SIZE))
+        ||(offset + SIZEOF_SCRIPT_ALLOC_ENTRY > MAX_HEAP_SIZE))
     {
         set_fault(buffer, LSRF_BOUND_CHECK_ERROR);
     }
@@ -98,7 +101,7 @@ inline void alloc_entry2bytestream(U8 *buffer, S32 &offset, const LLScriptAllocE
 inline void bytestream2alloc_entry(LLScriptAllocEntry &entry, U8 *buffer, S32 &offset)
 {
     if (  (offset < 0)
-        ||(offset > MAX_HEAP_SIZE))
+        ||(offset + SIZEOF_SCRIPT_ALLOC_ENTRY > MAX_HEAP_SIZE))
     {
         set_fault(buffer, LSRF_BOUND_CHECK_ERROR);
         reset_hp_to_safe_spot(buffer);

@@ -19,6 +19,7 @@
 
 #include "linden_common.h"
 
+#include "../lscript_alloc.h"
 #include "allsovmrun.h"
 #include "altestsanitizer.h"
 
@@ -603,5 +604,168 @@ namespace
                                 "5 él hélo 2 hXéllo hllo",
                                 "-2147483648 0.000000 2.000000 1024.000000 3 -2 2 ABC",
                                 "5.000000 <0.00000, 0.00000, 1.00000> 1 é233" });
+    }
+    // ---- what a review of the VM's memory found, each held here ------------
+
+    TEST_CASE("allsovm: a heap entry's header is bounded whole and the first block's split checks the stack first", "[allsovm]")
+    {
+        // The header's seven bytes lie within memory or are the fault: LL's
+        // bound let one start up to the top of memory, and a guard past it
+        // caught the seven bytes written there.
+        {
+            std::vector<U8> memory(TOP_OF_MEMORY + 16, 0xAB);
+            std::fill(memory.begin(), memory.begin() + TOP_OF_MEMORY, 0);
+            U8* buffer = memory.data();
+            set_register(buffer, LREG_TM, TOP_OF_MEMORY);
+            for (S32 at = TOP_OF_MEMORY - SIZEOF_SCRIPT_ALLOC_ENTRY + 1; at <= TOP_OF_MEMORY; ++at)
+            {
+                INFO("a header at " << at);
+                set_register(buffer, LREG_FR, 0);
+                S32 offset = at;
+                alloc_entry2bytestream(buffer, offset, LLScriptAllocEntry(5, LST_INTEGER));
+                CHECK(get_register(buffer, LREG_FR) == LSRF_BOUND_CHECK_ERROR);
+                set_register(buffer, LREG_FR, 0);
+                offset = at;
+                LLScriptAllocEntry entry;
+                bytestream2alloc_entry(entry, buffer, offset);
+                CHECK(get_register(buffer, LREG_FR) == LSRF_BOUND_CHECK_ERROR);
+            }
+            CHECK(std::all_of(memory.begin() + TOP_OF_MEMORY, memory.end(), [](U8 byte) { return byte == 0xAB; }));
+            set_register(buffer, LREG_FR, 0);
+            S32 offset = TOP_OF_MEMORY - SIZEOF_SCRIPT_ALLOC_ENTRY;
+            alloc_entry2bytestream(buffer, offset, LLScriptAllocEntry(5, LST_INTEGER));
+            UNSCOPED_INFO("the last place one fits");
+            CHECK(get_register(buffer, LREG_FR) == 0);
+            CHECK(offset == TOP_OF_MEMORY);
+        }
+
+        // The first block free and running under the stack, as a crafted
+        // state leaves it: the collision, with the stack as it was. LL's
+        // split wrote the data and the rest's header first, and raised the
+        // collision after.
+        {
+            std::vector<U8> memory(TOP_OF_MEMORY, 0);
+            U8*             buffer = memory.data();
+            const S32       hr = 1000, sp = 1100;
+            set_register(buffer, LREG_TM, TOP_OF_MEMORY);
+            set_register(buffer, LREG_HR, hr);
+            set_register(buffer, LREG_HP, hr + SIZEOF_SCRIPT_ALLOC_ENTRY);
+            set_register(buffer, LREG_SP, sp);
+            set_register(buffer, LREG_BP, sp);
+            lsa_create_heap(buffer + hr, TOP_OF_MEMORY - hr - SIZEOF_SCRIPT_ALLOC_ENTRY);
+            std::fill(memory.begin() + sp, memory.end(), 0xCD);
+            const std::string text(200, 's');
+            const S32         address = lsa_heap_add_data(buffer, new LLScriptLibData(text.c_str()), get_max_heap_size(buffer), TRUE);
+            CHECK(address == 0);
+            CHECK(get_register(buffer, LREG_FR) == LSRF_STACK_HEAP_COLLISION);
+            CHECK(std::all_of(memory.begin() + sp, memory.end(), [](U8 byte) { return byte == 0xCD; }));
+        }
+    }
+
+    TEST_CASE("allsovm: a string literal of about half of memory is said or is the collision, whichever its length leaves", "[allsovm]")
+    {
+        // The literal is in the code, and its copy on the heap lands against
+        // the top of memory somewhere in this range of lengths: each is said
+        // whole or is the collision, nothing else, and under a sanitizer
+        // nothing past the buffer.
+        bool said = false, collided = false;
+        for (size_t length = 8020; length <= 8160; ++length)
+        {
+            INFO("a literal of " << length);
+            const ll_test_lso::Run run = runLSO(entry("llSay(0, \"" + std::string(length, 'x') + "\");"));
+            if (run.error.empty())
+            {
+                REQUIRE(run.said.size() == 1);
+                CHECK(run.said[0].size() == length);
+                said = true;
+            }
+            else
+            {
+                CHECK(run.error == "Stack-Heap Collision");
+                CHECK(run.said.empty());
+                collided = true;
+            }
+        }
+        CHECK(said);
+        CHECK(collided);
+    }
+
+    TEST_CASE("allsovm: a list of one entry is false in a condition and one of two is true, as the grid's LSO has it", "[allsovm]")
+    {
+        // LL's own, pinned (BUG-230728): a list is true with two or more
+        // entries. Mono's is true with one. The function without parameters
+        // or locals is the compiler's print of either, once of nulls.
+        const ll_test_lso::Run run = runLSO(entry(R"lsl(
+            list none = [];
+            list one = [1];
+            list two = [1, 2];
+            if (none) llSay(0, "none"); else llSay(0, "!none");
+            if (one) llSay(0, "one"); else llSay(0, "!one");
+            if (two) llSay(0, "two"); else llSay(0, "!two");
+            while (one) llSay(0, "never");
+            if (one + [2]) llSay(0, "one + 1");
+            said();
+        )lsl", "said() { llSay(0, \"said\"); }\n"));
+        CHECK(run.error.empty());
+        CHECK(run.said == Said{ "!none", "!one", "two", "one + 1", "said" });
+    }
+
+    TEST_CASE("allsovm: a string past 32 bits casts to -1 on every host, in the VM's cast and the library's", "[allsovm]")
+    {
+        // As the grid's 32-bit strtoul read them: past 0xFFFFFFFF, -1
+        // whatever the sign; within it, wrapped; a negative made in 32 bits;
+        // hexadecimal only from a leading 0x. The optimizer folds them so.
+        const ll_test_lso::Run run = runLSO(entry(R"lsl(
+            llSay(0, (string)((integer)"4294967296") + " " + (string)((integer)"-4294967296") + " " + (string)((integer)"0x1FFFFFFFF") + " " + (string)((integer)"99999999999999999999"));
+            llSay(0, (string)((integer)"3000000000") + " " + (string)((integer)"-3000000000") + " " + (string)((integer)" 12abc") + " " + (string)((integer)"0x10") + " " + (string)((integer)"-0x10") + " " + (string)((integer)"-2147483648") + " " + (string)((integer)"- 5") + " " + (string)((integer)"+7"));
+            llSay(0, (string)llList2Integer(["4294967296"], 0) + " " + (string)llList2Integer(["-4294967296"], 0) + " " + (string)llList2Integer(["3000000000"], 0) + " " + (string)llList2Integer(["0x1FFFFFFFF"], 0) + " " + (string)llList2Integer(["-3000000000"], 0));
+        )lsl"));
+        CHECK(run.error.empty());
+        CHECK(run.said == Said{ "-1 -1 -1 -1", "-1294967296 1294967296 12 16 0 -2147483648 0 7", "-1 -1 -1294967296 -1 1294967296" });
+    }
+
+    TEST_CASE("allsovm: a list of many entries is let go without a frame an entry", "[allsovm]")
+    {
+        // Three hundred thousand entries, which LL's destructor let go by
+        // recursion, a frame an entry, past a megabyte of stack.
+        {
+            LLScriptLibData* list = new LLScriptLibData;
+            list->mType          = LST_LIST;
+            LLScriptLibData* tip = list;
+            for (S32 i = 0; i < 300000; ++i)
+            {
+                tip->mListp = new LLScriptLibData(i);
+                tip         = tip->mListp;
+            }
+            CHECK(list->getListLength() == 300000);
+            delete list;
+        }
+        // And the list llCSV2List makes of thousands of commas, which the
+        // heap has no room for: the collision, and the list let go.
+        const ll_test_lso::Run run = runLSO(entry(R"lsl(
+            string s = ",";
+            integer i;
+            for (i = 0; i < 12; ++i) s += s;
+            llSay(0, (string)llGetListLength(llCSV2List(s)));
+        )lsl"));
+        CHECK(run.error == "Stack-Heap Collision");
+        CHECK(run.said.empty());
+    }
+
+    TEST_CASE("allsovm: a function table entry pointing anywhere is the bound fault, not a read there", "[allsovm]")
+    {
+        // The entry is the image's: LL's bounded the entry's place a second
+        // time instead of the function's, and read at GFR plus the entry.
+        std::vector<U8> image = ll_test_lso::compileLSO("integer f() { return 1; }\ndefault { state_entry() { llSay(0, (string)f()); } }\n");
+        {
+            const ll_test_lso::Run whole = ll_test_lso::runLSOImage(image);
+            CHECK(whole.error.empty());
+            CHECK(whole.said == Said{ "1" });
+        }
+        S32 at = get_register(image.data(), LREG_GFR) + LSCRIPTDataSize[LST_INTEGER];
+        integer2bytestream(image.data(), at, 0x7FFF0000);
+        const ll_test_lso::Run crafted = ll_test_lso::runLSOImage(image);
+        CHECK(crafted.error == "Bounds Check Error");
+        CHECK(crafted.said.empty());
     }
 }
