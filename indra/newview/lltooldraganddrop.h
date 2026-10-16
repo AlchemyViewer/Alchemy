@@ -27,7 +27,6 @@
 #ifndef LL_TOOLDRAGANDDROP_H
 #define LL_TOOLDRAGANDDROP_H
 
-#include "lldictionary.h"
 #include "lltool.h"
 #include "llview.h"
 #include "lluuid.h"
@@ -302,24 +301,10 @@ public:
                                       EAcceptance* accept,
                                       const LLSD& dest = LLSD());
 
-    // Classes used for determining 3d drag and drop types.
+    // The implementation of a 3d drag and drop for a cargo type and a drop
+    // target: dad3dNULL where the type has none.
 private:
-    struct DragAndDropEntry : public LLDictionaryEntry
-    {
-        DragAndDropEntry(dragOrDrop3dImpl f_none,
-                         dragOrDrop3dImpl f_self,
-                         dragOrDrop3dImpl f_avatar,
-                         dragOrDrop3dImpl f_object,
-                         dragOrDrop3dImpl f_land);
-        dragOrDrop3dImpl mFunctions[DT_COUNT];
-    };
-    class LLDragAndDropDictionary : public LLSingleton<LLDragAndDropDictionary>,
-                                    public LLDictionary<EDragAndDropType, DragAndDropEntry>
-    {
-        LLSINGLETON(LLDragAndDropDictionary);
-    public:
-        dragOrDrop3dImpl get(EDragAndDropType dad_type, EDropTarget drop_target);
-    };
+    static dragOrDrop3dImpl dad3dFunction(EDragAndDropType dad_type, EDropTarget drop_target);
 };
 
 // utility functions
