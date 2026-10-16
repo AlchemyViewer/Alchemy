@@ -989,7 +989,8 @@ namespace
         }
 
         // The waves' program as the viewer links it for the patches, its wave layers hex-tiled as `hextile` says, and
-        // capturing the evaluation stage's `captured`: by default its points less the camera (`view`).
+        // capturing the evaluation stage's `captured`: by default its points less the camera (`view`); with none,
+        // nothing, as the viewer's program captures nothing.
         void setUpWavesCapture(const char* captured = "view", S32 hextile = 1)
         {
             std::map<std::string, std::string> defines = { { "WATER_HEXTILE", std::to_string(hextile) } };
@@ -1002,6 +1003,7 @@ namespace
                 { "environment/waterVaryingsV.glsl", GL_TESS_EVALUATION_SHADER },
                 { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
                 { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
+                { "windlight/atmosphericsVarsV.glsl", GL_TESS_EVALUATION_SHADER },
             };
             mWaves.mProgramObject = glCreateProgram();
             mWaves.mName = "waves (test)";
@@ -1017,8 +1019,11 @@ namespace
             UNSCOPED_INFO("fragment compiles");
             REQUIRE(fs != 0);
             mWaves.attachObject(fs);
-            const char* varyings[] = { captured };
-            glTransformFeedbackVaryings(mWaves.mProgramObject, 1, varyings, GL_INTERLEAVED_ATTRIBS);
+            if (captured)
+            {
+                const char* varyings[] = { captured };
+                glTransformFeedbackVaryings(mWaves.mProgramObject, 1, varyings, GL_INTERLEAVED_ATTRIBS);
+            }
             UNSCOPED_INFO("waves program links");
             REQUIRE(mWaves.mapAttributes());
             glDeleteShader(fs);
@@ -1985,7 +1990,8 @@ namespace
     // The waves' patches over one cell, as the evaluation stage emits them (transform feedback of `view`, the point
     // less the camera), at fractional levels over a big layer of sines: every point two patches share has one height,
     // and every point inside the cell is surrounded by triangles, so no edge holds a point only one side has. A patch
-    // outside the frustum emits nothing, and under a camera within A of the plane the surface stays flat.
+    // outside the frustum emits nothing, and under a camera within A of the plane the surface stays flat. Drawn, the
+    // patches cover each pixel of the cell once, and outside the frustum none.
     TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the waves' patches give a shared point one height and leave no gap", "[alwatersurface_gl]")
     {
         setUpWater(LLRenderTarget::DEPTH_FMT_24);
@@ -2016,10 +2022,10 @@ namespace
         // The patches over the camera's cell, texel (2, 2) of the map: global cell (1, 1), at LOW.
         constexpr F32 A = 2.f;
         constexpr S32 PATCHES = ALWaterField::PATCHES_PER_CELL * ALWaterField::PATCHES_PER_CELL;
-        const auto capture = [&](const LLVector3& eye, bool inside)
+        const S32 rect[4] = { 2, 2, 3, 3 };
+        const auto waves = [&](const LLVector3& eye, bool inside)
         {
             WaveDraw draw;
-            const S32 rect[4] = { 2, 2, 3, 3 };
             std::copy(std::begin(rect), std::end(rect), draw.mRect);
             draw.mEye = eye;
             draw.mAmp = 1.f;
@@ -2033,8 +2039,9 @@ namespace
                 draw.mPlanes[2] = 1.f;
                 draw.mPlanes[3] = 1000000.f;
             }
-            return tessellate(draw);
+            return draw;
         };
+        const auto capture = [&](const LLVector3& eye, bool inside) { return tessellate(waves(eye, inside)); };
 
         // Far above the cell, so the camera's fade leaves the waves whole.
         const LLVector3 high(484.f, 534.f, LOW + 200.f);
@@ -2099,13 +2106,22 @@ namespace
             const bool surrounded = s.mLeft < xy[0] && s.mRight > xy[0] && s.mBelow < xy[1] && s.mAbove > xy[1];
             open += (rim || surrounded) ? 0 : 1;
         }
-        UNSCOPED_INFO("a point two patches share has one height");
-        CHECK(split == 0);
-        UNSCOPED_INFO("no point inside the cell lies on an edge only one side has");
-        CHECK(open == 0);
+        // Apple's Metal-backed driver draws a tessellated program linked with feedback varyings through its CPU vertex
+        // path ("Fallback to SW vertex processing for EVAL_PROG TF"), not the Metal tessellator the viewer's programs,
+        // which capture nothing, are drawn through. That path's tessellator places a shared edge's points a 2^-16 step
+        // apart on its two sides, now and then gives a point two heights an ulp apart, and tessellates a patch whose
+        // outer levels are all 0. There the capture cannot see the seams or the cull the viewer gets, which are checked
+        // as drawn, below.
+        if (!gGLManager.mIsApple)
+        {
+            UNSCOPED_INFO("a point two patches share has one height");
+            CHECK(split == 0);
+            UNSCOPED_INFO("no point inside the cell lies on an edge only one side has");
+            CHECK(open == 0);
 
-        UNSCOPED_INFO("a patch outside the frustum emits nothing");
-        REQUIRE(capture(high, false).size() == (size_t)0);
+            UNSCOPED_INFO("a patch outside the frustum emits nothing");
+            REQUIRE(capture(high, false).size() == (size_t)0);
+        }
 
         // On a deck in waves: within A of the plane, over a corner the patches share.
         const LLVector3 deck(384.f, 384.f, LOW + 0.5f * A);
@@ -2131,6 +2147,53 @@ namespace
         CHECK(under);
         UNSCOPED_INFO("the waves stand away from it");
         CHECK(off > 0.1f);
+
+        // As drawn, through the program linked capturing nothing, as the viewer's is, onto a target a metre a pixel
+        // over the cell from straight above: the patches cover each of its pixels once, and outside the frustum none.
+        mWaves.unload();
+        setUpWavesCapture(nullptr);
+        const F32 side = mSquare.mV[VZ];
+        const S32 pixels = (S32)side;
+        const F32 x0 = mSquare.mV[VX] + (F32)rect[0] * side;
+        const F32 y0 = mSquare.mV[VY] + (F32)rect[1] * side;
+        LLRenderTarget target;
+        UNSCOPED_INFO("the cell's target allocates");
+        REQUIRE(target.allocate(pixels, pixels, GL_RGBA8, true, true, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
+                                LLRenderTarget::DEPTH_FMT_24));
+        target.bindTarget();
+        LLMatrix4a onto_cell;
+        onto_cell.setRow<0>(LLVector4a(2.f / side, 0.f, 0.f, 0.f));
+        onto_cell.setRow<1>(LLVector4a(0.f, 2.f / side, 0.f, 0.f));
+        onto_cell.setRow<2>(LLVector4a(0.f, 0.f, 0.f, 0.f));
+        onto_cell.setRow<3>(LLVector4a(-1.f - 2.f * x0 / side, -1.f - 2.f * y0 / side, 0.f, 1.f));
+        gGL.matrixMode(LLRender::MM_PROJECTION);
+        gGL.loadMatrix(onto_cell);
+        gGL.matrixMode(LLRender::MM_MODELVIEW);
+        gGL.loadIdentity();
+        // How many of the cell's pixels the patches cover other than `times` times.
+        const auto drawn = [&](bool inside, U8 times)
+        {
+            gGL.setClearColor(LLColor4::black);
+            target.clear();
+            {
+                LLGLDepthTest depth(GL_FALSE);
+                ALGLStencil count(GL_ALWAYS, 0, 0xFFu, GL_KEEP, GL_KEEP, GL_INCR, 0xFFu);
+                LLGLDisable cull(GL_CULL_FACE);
+                const WaveDraw draw = waves(high, inside);
+                bindWaves(draw);
+                drawPatches(draw);
+                LLGLSLShader::unbind();
+            }
+            std::vector<U8> counts((size_t)pixels * pixels);
+            glReadPixels(0, 0, pixels, pixels, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, counts.data());
+            return counts.size() - (size_t)std::count(counts.begin(), counts.end(), times);
+        };
+        UNSCOPED_INFO("drawn, the patches cover each pixel of the cell once");
+        CHECK(drawn(true, 1) == (size_t)0);
+        UNSCOPED_INFO("drawn, the patches outside the frustum cover none");
+        CHECK(drawn(false, 0) == (size_t)0);
+        target.flush();
+        target.release();
     }
 
     // The sky behind's query with waves: the field raised by A counts a crest over a wall the flat field misses, and
@@ -2668,9 +2731,9 @@ namespace
         tearDownWater();
     }
 
-    // The waves' program links with a fragment stage that reads the atmospherics' varyings, as the water's does: the
-    // waves' features attach atmosphericsVarsV to the evaluation stage, the stage before the fragment one, where it
-    // declares them.
+    // The waves' program links with a fragment stage that reads the atmospherics' varyings, as calculatesAtmospherics
+    // lets the water's: the waves' features attach atmosphericsVarsV to the evaluation stage, the stage before the
+    // fragment one, where it declares them, and water_varyings writes them, which Apple's linker requires as well.
     TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the waves' program links with a fragment stage reading the atmospherics' varyings", "[alwatersurface_gl]")
     {
         std::map<std::string, std::string> defines = { { "WATER_HEXTILE", "1" } };
