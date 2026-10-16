@@ -88,6 +88,13 @@ namespace
         // The text is the file's own at that place, rather than what a
         // macro made there.
         bool        verbatim = true;
+        // Where the text is the file's own only to a point -- a string the
+        // lexer rewrote (lslString), whose newlines are `\n` now -- how
+        // many bytes of it are: the stretch before the first of them,
+        // which maps as copied text does; the rest maps to the string's
+        // next line and is nobody's to edit through. -1 for a token the
+        // flag alone says of.
+        S32         verbatimBytes = -1;
         // A name the script declared `const` (ConstMarkers): a variable's,
         // or a function's.
         enum class Const : U8
@@ -288,7 +295,13 @@ namespace
     public:
         // Verbatim: every byte kept as written, for a reader that is not
         // the preprocessor -- no lines joined, no string rewritten.
-        Lexer(bool lua, S32 file, bool verbatim = false) : mLua(lua), mFile(file), mVerbatim(verbatim) {}
+        // Superseded: Options::superseded, looked at as the text is lexed
+        // -- a file is lexed whole before the engine reads a token of it,
+        // and an include may be as long as a file on disk is.
+        Lexer(bool lua, S32 file, bool verbatim = false, const std::atomic<bool>* superseded = nullptr)
+            : mLua(lua), mFile(file), mVerbatim(verbatim), mSuperseded(superseded)
+        {
+        }
 
         Tokens run(std::string_view text)
         {
@@ -302,14 +315,30 @@ namespace
                 ALLineBreaks::withLineFeeds(text, mUnixText);
                 text = mUnixText;
             }
-            mText   = text;
-            mPos    = 0;
-            mLine   = 0;
-            mColumn = 0;
-            mJoined = 0;
+            mText    = text;
+            mPos     = 0;
+            mLine    = 0;
+            mColumn  = 0;
+            mJoined  = 0;
+            mStopped = false;
+            mCounted = 0;
+            mLineHasToken  = false;
+            mLineDirective = false;
             mOut.clear();
             mSpacedJoins.clear();
-            while (mPos < mText.size())
+            // A byte order mark, which an editor may have saved a file
+            // with, is no token: it would stand first on the first line,
+            // ahead of an include guard or a `#pragma once` there, and a
+            // directive is a directive only first on its line. Passed over
+            // as a blank is, its bytes still counted, so that the columns
+            // of the line stay those of the file's text.
+            constexpr std::string_view BOM = "\xEF\xBB\xBF";
+            if (!mVerbatim && mText.substr(0, BOM.size()) == BOM)
+            {
+                mPos    = BOM.size();
+                mColumn = S32(BOM.size());
+            }
+            while (mPos < mText.size() && !mStopped)
             {
                 if (mLua)
                 {
@@ -323,6 +352,10 @@ namespace
             return std::move(mOut);
         }
 
+        // The run stopped short: no longer wanted, and the tokens are
+        // nobody's.
+        bool stopped() const { return mStopped; }
+
     private:
         char at(size_t i) const { return i < mText.size() ? mText[i] : '\0'; }
 
@@ -334,6 +367,7 @@ namespace
             mToken.line     = mLine;
             mToken.column   = mColumn;
             mToken.verbatim = true;
+            mToken.verbatimBytes = -1;
             mToken.hide = nullptr;
         }
 
@@ -353,7 +387,37 @@ namespace
             }
         }
 
-        void finish() { mOut.push_back(mToken); }
+        void finish()
+        {
+            noteOnLine(mToken.kind, mToken.text);
+            mOut.push_back(mToken);
+            if (mSuperseded && (++mCounted & 1023) == 0 && mSuperseded->load(std::memory_order_relaxed))
+            {
+                mStopped = true;
+            }
+        }
+
+        // What the line being lexed has had so far -- since the last
+        // newline not joined away -- kept as the tokens are made: whether
+        // a token that is no blank or comment, and whether that first one
+        // was what starts a directive. Read at every backslash and every
+        // `--#`, so kept rather than looked for back over the tokens: a
+        // directive joined over many lines emits no newline between them,
+        // and a look back over them all at each would cost the square of
+        // their number.
+        void noteOnLine(Kind kind, const std::string& text)
+        {
+            if (kind == Kind::Newline)
+            {
+                mLineHasToken  = false;
+                mLineDirective = false;
+            }
+            else if (!mLineHasToken && kind != Kind::Space && kind != Kind::Comment)
+            {
+                mLineHasToken  = true;
+                mLineDirective = kind == Kind::Punct && text == hashOf(mLua);
+            }
+        }
 
         // A backslash and a newline join two lines; both vanish, and the
         // newline that ends the joined line stands for them all, so that
@@ -395,18 +459,7 @@ namespace
         // Whether the line being lexed -- since the last newline not
         // joined away -- begins, past blanks and comments, with what starts
         // a directive.
-        bool onDirectiveLine() const
-        {
-            const Token* first = nullptr;
-            for (auto it = mOut.rbegin(); it != mOut.rend() && it->kind != Kind::Newline; ++it)
-            {
-                if (it->kind != Kind::Space && it->kind != Kind::Comment)
-                {
-                    first = &*it;
-                }
-            }
-            return first && first->kind == Kind::Punct && first->text == hashOf(mLua);
-        }
+        bool onDirectiveLine() const { return mLineDirective; }
 
     public:
         // Where a backslash was joined to its newline over blanks, by its
@@ -586,7 +639,9 @@ namespace
         // A string with newlines inside becomes one line with `\n` where
         // they were, and the newlines follow it, so that the lines keep
         // their numbers: Firestorm's quirk, kept because scripts have
-        // come to rely on it.
+        // come to rely on it. The token is then the file's own only up to
+        // the first of them (Token::verbatimBytes): past it, its columns
+        // are not the file's, and nothing may be edited through them.
         void lslString()
         {
             start(Kind::String);
@@ -613,7 +668,10 @@ namespace
                     take();
                     if (at(mPos) == '\n')
                     {
-                        ++newlines;
+                        if (newlines++ == 0)
+                        {
+                            mToken.verbatimBytes = S32(mToken.text.size() - 1);
+                        }
                         mToken.text.back() = '\\';
                         mToken.text += 'n';
                         ++mPos;
@@ -625,7 +683,10 @@ namespace
                 }
                 else if (c == '\n')
                 {
-                    ++newlines;
+                    if (newlines++ == 0)
+                    {
+                        mToken.verbatimBytes = S32(mToken.text.size());
+                    }
                     mToken.text += "\\n";
                     ++mPos;
                     ++mLine;
@@ -641,6 +702,10 @@ namespace
                     take();
                 }
             }
+            if (newlines > 0)
+            {
+                mToken.verbatim = false;
+            }
             finish();
             for (S32 i = 0; i < newlines; ++i)
             {
@@ -651,6 +716,7 @@ namespace
                 nl.line     = mLine - 1;
                 nl.column   = 0;
                 nl.verbatim = false;
+                noteOnLine(nl.kind, nl.text);
                 mOut.push_back(nl);
             }
         }
@@ -673,21 +739,7 @@ namespace
         }
 
         // Nothing but blanks and comments since the last newline.
-        bool lineStart() const
-        {
-            for (auto it = mOut.rbegin(); it != mOut.rend(); ++it)
-            {
-                if (it->kind == Kind::Newline)
-                {
-                    return true;
-                }
-                if (it->kind != Kind::Space && it->kind != Kind::Comment)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
+        bool lineStart() const { return !mLineHasToken; }
 
         // The name that starts at `from`, as far as a name goes.
         std::string_view wordAt(size_t from) const
@@ -870,12 +922,20 @@ namespace
         bool             mLua;
         S32              mFile;
         bool             mVerbatim;
+        const std::atomic<bool>* mSuperseded;
         S32              mInterpolating = 0;
         std::string_view mText;
         size_t           mPos    = 0;
         S32              mLine   = 0;
         S32              mColumn = 0;
         S32              mJoined = 0;
+        // The line's state, noteOnLine's.
+        bool             mLineHasToken  = false;
+        bool             mLineDirective = false;
+        // Tokens made, which the look at mSuperseded is made every so many
+        // of; and whether that look stopped the run.
+        size_t           mCounted = 0;
+        bool             mStopped = false;
         Token            mToken;
         Tokens           mOut;
         // The text with its line ends made LF, where it had others.
@@ -1157,6 +1217,9 @@ namespace
         // was said of the source, and nothing of the run compiled or
         // analysed.
         void overrun(const char* key, std::string_view text, const Token& at);
+        // The run is no longer wanted (Options::superseded): stopped
+        // where it stands, and nothing it made is anybody's.
+        void unwanted();
         // Whether a transform that descends into what the script nests --
         // a block, a loop's body, a switch in a switch, each a frame of
         // the machine's stack -- may go `depth` levels down; past the
@@ -1198,6 +1261,10 @@ namespace
 
         // -- expansion --
         void   handle(Token t);
+        // `defined` and its operand in a condition's tokens answered, 1 or
+        // 0, into `out`; false, said at the hash, where the operand is no
+        // name or its parenthesis is not closed.
+        bool   answerDefined(const Tokens& in, Tokens& out, const Token& hash);
         bool   expandDynamic(const Token& t, const Macro& m);
         bool   expandObject(const Token& t, const Macro& m);
         bool   expandFunction(const Token& t, const Macro& m);
@@ -1260,6 +1327,11 @@ namespace
         std::deque<Token>                       mPending;
         // Reading a list of tokens on its own, with no file behind it.
         bool                                    mIsolated = false;
+        // Expanding an #if's condition, where a `defined` a macro made is
+        // the operator still, and its operand a name asked after rather
+        // than expanded (GCC's reading of what C leaves undefined; what
+        // Firestorm's Wave does too).
+        bool                                    mInCondition = false;
         Tokens                                  mOut;
         Tokens*                                 mSink;
         bool                                    mUsedSwitches  = false;
@@ -1329,8 +1401,13 @@ namespace
         else
         {
             f->index = mResult.map.addFile(name, path);
-            Lexer lexer(mOptions.lua, f->index);
+            Lexer lexer(mOptions.lua, f->index, false, mOptions.superseded);
             f->lexed = std::make_shared<const Tokens>(lexer.run(text));
+            if (lexer.stopped())
+            {
+                unwanted();
+                return;
+            }
             for (const auto& [line, column] : lexer.spacedJoins())
             {
                 Token at;
@@ -1395,9 +1472,7 @@ namespace
             // No longer wanted: stopped where it stands, and said so.
             if (mOptions.superseded && (mRounds++ & 1023) == 0 && mOptions.superseded->load(std::memory_order_relaxed))
             {
-                mOverran           = true;
-                mResult.overran    = true;
-                mResult.superseded = true;
+                unwanted();
                 break;
             }
             if (!mPending.empty())
@@ -1522,6 +1597,13 @@ namespace
         problem(ALScriptProblem::Severity::Error, key, text, {}, at);
     }
 
+    void Engine::unwanted()
+    {
+        mOverran           = true;
+        mResult.overran    = true;
+        mResult.superseded = true;
+    }
+
     bool Engine::nest(S32 depth, const Token& at)
     {
         if (depth <= mOptions.nestingDepth)
@@ -1536,6 +1618,26 @@ namespace
 
     void Engine::handle(Token t)
     {
+        if (mInCondition && t.is(Kind::Ident, "defined"))
+        {
+            // The operand of a `defined` a macro made, let through as it
+            // stands -- blanks, a parenthesis, and the name -- so that
+            // it is the name that is asked after, not what it expands to.
+            emit(std::move(t));
+            Token n;
+            bool  paren = false;
+            while (next(n))
+            {
+                const bool more = n.blank() || (!paren && n.is(Kind::Punct, "("));
+                paren           = paren || n.is(Kind::Punct, "(");
+                emit(std::move(n));
+                if (!more)
+                {
+                    break;
+                }
+            }
+            return;
+        }
         if (t.kind == Kind::Ident && !t.hidden(t.text))
         {
             auto it = mMacros.find(t.text);
@@ -1651,8 +1753,22 @@ namespace
         size_t                                 from   = read.size();
         S32                                    depth  = 0;
         bool                                   closed = false;
+        // Where the list is left unterminated: at the macro's name, or at
+        // a directive that cut it short.
+        Token                                  where  = t;
         while (next(n))
         {
+            if (n.kind == Kind::Newline && mPending.empty() && !mIsolated && directiveAhead(*mFiles.back()))
+            {
+                // A directive on the line after is no argument's text:
+                // the list ends here, unterminated, said at the
+                // directive, which is then read as the directive it is
+                // rather than swallowed into the call.
+                const FileState& f = *mFiles.back();
+                where              = f.tokens()[skipSpace(f.tokens(), f.pos)];
+                read.push_back(std::move(n));
+                break;
+            }
             if (n.is(Kind::Punct, "("))
             {
                 ++depth;
@@ -1678,7 +1794,7 @@ namespace
         }
         if (!closed)
         {
-            problem(ALScriptProblem::Severity::Error, "PreprocUnterminatedArguments", "unterminated argument list invoking macro '[1]'", { m.name }, t);
+            problem(ALScriptProblem::Severity::Error, "PreprocUnterminatedArguments", "unterminated argument list invoking macro '[1]'", { m.name }, where);
             emit(t);
             for (Token& r : read)
             {
@@ -1922,11 +2038,12 @@ namespace
             {
                 return Tokens();
             }
-            Token& copy   = out.emplace_back(b);
-            copy.file     = site.file;
-            copy.line     = site.line;
-            copy.column   = site.column;
-            copy.verbatim = false;
+            Token& copy        = out.emplace_back(b);
+            copy.file          = site.file;
+            copy.line          = site.line;
+            copy.column        = site.column;
+            copy.verbatim      = false;
+            copy.verbatimBytes = -1;
         }
         if (!pastes)
         {
@@ -2602,23 +2719,21 @@ namespace
         return Expr(tokens, mOptions.lua, *this, hash, mOptions.expressionDepth).parse(ok);
     }
 
-    bool Engine::evalCondition(const Tokens& line, size_t at, const Token& hash)
+    bool Engine::answerDefined(const Tokens& in, Tokens& out, const Token& hash)
     {
-        // `defined` is answered before anything expands.
-        Tokens pre;
-        for (size_t i = at; i < line.size(); ++i)
+        for (size_t i = 0; i < in.size(); ++i)
         {
-            const Token& t = line[i];
+            const Token& t = in[i];
             if (t.kind == Kind::Ident && t.text == "defined")
             {
-                size_t j     = skipBlank(line, i + 1);
+                size_t j     = skipBlank(in, i + 1);
                 bool   paren = false;
-                if (j < line.size() && line[j].is(Kind::Punct, "("))
+                if (j < in.size() && in[j].is(Kind::Punct, "("))
                 {
                     paren = true;
-                    j     = skipBlank(line, j + 1);
+                    j     = skipBlank(in, j + 1);
                 }
-                if (j >= line.size() || line[j].kind != Kind::Ident)
+                if (j >= in.size() || in[j].kind != Kind::Ident)
                 {
                     problem(ALScriptProblem::Severity::Error, "PreprocDefinedNeedsName", "macro name missing after 'defined'", {}, hash);
                     return false;
@@ -2626,8 +2741,8 @@ namespace
                 size_t k = j;
                 if (paren)
                 {
-                    k = skipBlank(line, j + 1);
-                    if (k >= line.size() || !line[k].is(Kind::Punct, ")"))
+                    k = skipBlank(in, j + 1);
+                    if (k >= in.size() || !in[k].is(Kind::Punct, ")"))
                     {
                         problem(ALScriptProblem::Severity::Error, "PreprocDefinedNeedsClose", "missing ')' after 'defined'", {}, hash);
                         return false;
@@ -2635,15 +2750,37 @@ namespace
                 }
                 Token num = t;
                 num.kind  = Kind::Number;
-                num.text  = mMacros.count(line[j].text) ? "1" : "0";
-                pre.push_back(num);
+                num.text  = mMacros.count(in[j].text) ? "1" : "0";
+                out.push_back(num);
                 i = k;
                 continue;
             }
-            pre.push_back(t);
+            out.push_back(t);
+        }
+        return true;
+    }
+
+    bool Engine::evalCondition(const Tokens& line, size_t at, const Token& hash)
+    {
+        // `defined` is answered before anything expands, and again after:
+        // a macro may make one -- `#define HAS(m) defined(m)` -- which
+        // GCC and Firestorm's Wave evaluate, and so does this.
+        Tokens pre;
+        if (!answerDefined(Tokens(line.begin() + static_cast<std::ptrdiff_t>(std::min(at, line.size())), line.end()), pre, hash))
+        {
+            return false;
+        }
+        const bool in_condition = mInCondition;
+        mInCondition            = true;
+        const Tokens expanded   = expandAll(pre);
+        mInCondition            = in_condition;
+        Tokens post;
+        if (!answerDefined(expanded, post, hash))
+        {
+            return false;
         }
         bool ok = true;
-        S64  v  = evalExpression(expandAll(pre), hash, ok);
+        S64  v  = evalExpression(post, hash, ok);
         return ok && v != 0;
     }
 
@@ -3166,9 +3303,17 @@ namespace
         return std::string::npos;
     }
 
+    // The tokens from `from` to `to`; none where the stretch ends before
+    // it starts or past the end, as one bound worked out against another
+    // may leave it -- a half-typed statement's.
     Tokens slice(const Tokens& t, size_t from, size_t to)
     {
-        return Tokens(t.begin() + from, t.begin() + to);
+        to = std::min(to, t.size());
+        if (from >= to)
+        {
+            return Tokens();
+        }
+        return Tokens(t.begin() + static_cast<std::ptrdiff_t>(from), t.begin() + static_cast<std::ptrdiff_t>(to));
     }
 
     void append(Tokens& out, const Tokens& more)
@@ -3835,7 +3980,17 @@ namespace
             if (site.is(Kind::Ident, "do"))
             {
                 body_begin = i + 1;
-                body_end   = statementEnd(in, body_begin);
+                // The body ends within the loop, whose own end the caller
+                // bounded by what encloses it; a `do` without its tail --
+                // half typed, or its body running past the block -- is no
+                // loop, and said so, as a switch that is none is.
+                body_end          = std::min(statementEnd(in, body_begin), end);
+                const size_t tail = skipBlank(in, body_end);
+                if (tail >= end || !in[tail].is(Kind::Ident, "while"))
+                {
+                    mEngine.problem(ALScriptProblem::Severity::Error, "PreprocBadLoop", "ill formed do loop", {}, site);
+                    return slice(in, i, end);
+                }
             }
             else
             {
@@ -4160,10 +4315,15 @@ namespace
             {
                 return out;
             }
+            // The helper is no line of the script's: it maps nowhere, as
+            // SLua's module table does, so that nothing said of it is
+            // said of the script's first line, and the script's first
+            // line is not found in it.
             Tokens helper = Lexer(false, 0).run(LAZY_LIST_SET);
             for (Token& t : helper)
             {
                 t.verbatim = false;
+                t.file     = -1;
                 t.line     = 0;
                 t.column   = 0;
             }
@@ -5028,8 +5188,37 @@ namespace
             {
                 result.consts.push_back({ t.text, line, column, t.declared == Token::Const::Function });
             }
-            // What came from no file -- the module table -- maps nowhere.
-            if (t.kind != Kind::Newline && t.file >= 0)
+            // What came from no file -- the module table, the lazy lists'
+            // helper -- maps nowhere.
+            if (t.kind != Kind::Newline && t.file >= 0 && t.verbatimBytes >= 0)
+            {
+                // A string the lexer rewrote: the file's own up to its
+                // first newline, which maps as copied text does, and
+                // past it what the rewriting made, which maps to the
+                // string's next line, where the rest of it is, as a
+                // macro's product maps to its invocation -- a column in
+                // it is no column of the file's, and nothing may be
+                // edited through it.
+                ALSourceMap::Segment s;
+                s.outLine   = line;
+                s.outColumn = column;
+                s.length    = t.verbatimBytes;
+                s.file      = t.file;
+                s.line      = t.line;
+                s.column    = t.column;
+                s.verbatim  = true;
+                if (s.length > 0)
+                {
+                    result.map.add(s);
+                }
+                s.outColumn += s.length;
+                s.length   = S32(t.text.size()) - s.length;
+                s.line     = t.line + 1;
+                s.column   = 0;
+                s.verbatim = false;
+                result.map.add(s);
+            }
+            else if (t.kind != Kind::Newline && t.file >= 0)
             {
                 // A token over several lines -- a block comment, a long
                 // string -- is a segment on each of them, so that every
@@ -5612,7 +5801,10 @@ ALPreprocessor::Wanted ALPreprocessor::wanted(std::string_view text, bool lua, b
 // static
 size_t ALPreprocessor::directiveName(std::string_view line, bool lua)
 {
-    size_t at = line.find_first_not_of(" \t");
+    // A byte order mark ahead of a file's first line is no part of it,
+    // as the lexer has it.
+    constexpr std::string_view BOM = "\xEF\xBB\xBF";
+    size_t at = line.find_first_not_of(" \t", line.substr(0, BOM.size()) == BOM ? BOM.size() : 0);
     if (at == std::string_view::npos || line.compare(at, hashOf(lua).size(), hashOf(lua)) != 0)
     {
         return std::string_view::npos;
