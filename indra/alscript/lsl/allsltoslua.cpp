@@ -205,6 +205,43 @@ namespace
         return e.bare.empty() ? e : Expr{ e.bare, PRIMARY, e.boolean };
     }
 
+    // Whether Luau takes it as a statement: a call, and not one in
+    // brackets, `(f(x))`, which is a value.
+    bool callText(const Expr& e)
+    {
+        const std::string& text = e.text;
+        if (e.prec != PRIMARY || text.empty() || text.back() != ')')
+        {
+            return false;
+        }
+        if (text.front() != '(')
+        {
+            return true;
+        }
+        // Whether the bracket it opens with closes at its end.
+        int depth = 0;
+        for (size_t at = 0; at < text.size(); ++at)
+        {
+            const char c = text[at];
+            if (c == '"' || c == '\'')
+            {
+                for (++at; at < text.size() && text[at] != c; ++at)
+                {
+                    at += text[at] == '\\';
+                }
+            }
+            else if (c == '(')
+            {
+                ++depth;
+            }
+            else if (c == ')' && --depth == 0)
+            {
+                return at + 1 != text.size();
+            }
+        }
+        return false;
+    }
+
     // Pairs of words, looked for by views of them without a copy.
     struct PairLess
     {
@@ -1278,6 +1315,35 @@ namespace
                 for (LSLASTNode* next = node->getNext(); next; next = next->getNext())
                 {
                     after.push_back(next);
+                }
+                // And what of its loop Luau reads where the body's locals
+                // are still in reach, LSL's not: a do-while's check, after
+                // until, and a for's steps, after its body and at each
+                // continue.
+                for (LSLASTNode *up = node, *holder = node->getParent(); holder; up = holder, holder = holder->getParent())
+                {
+                    if (holder->getNodeSubType() == NODE_DO_STATEMENT)
+                    {
+                        if (node->getParent() == static_cast<LSLDoStatement*>(holder)->getBody())
+                        {
+                            after.push_back(static_cast<LSLDoStatement*>(holder)->getCheckExpr());
+                        }
+                        break;
+                    }
+                    if (holder->getNodeSubType() == NODE_FOR_STATEMENT)
+                    {
+                        auto* f = static_cast<LSLForStatement*>(holder);
+                        if (up == f->getBody() && !isNull(f->getIncrExprs()))
+                        {
+                            after.push_back(f->getIncrExprs());
+                        }
+                        break;
+                    }
+                    if (holder->getNodeSubType() == NODE_WHILE_STATEMENT || holder->getNodeType() == NODE_GLOBAL_FUNCTION ||
+                        holder->getNodeType() == NODE_EVENT_HANDLER)
+                    {
+                        break;
+                    }
                 }
                 apart(static_cast<LSLDeclaration*>(node)->getIdentifier(), after);
                 return;
@@ -2473,6 +2539,17 @@ namespace
         if (std::optional<Expr> test = bitTest(inner))
         {
             return *test;
+        }
+        // Text made a key, asked whether it is one, as LSL's (key)s: a uuid
+        // made of it, none where it is no UUID, which uuid() would stop the
+        // script on.
+        if (inner && inner->getNodeSubType() == NODE_TYPECAST_EXPRESSION && inner->getIType() == LST_KEY)
+        {
+            LSLExpression* text = static_cast<LSLTypecastExpression*>(inner)->getChildExpr();
+            if (slType(text) == LST_STRING)
+            {
+                return { "(touuid(" + value(text).text + ") or NULL_KEY).istruthy", PRIMARY, true };
+            }
         }
         Expr out = expr(e);
         if (out.boolean)
@@ -4263,9 +4340,15 @@ namespace
             case LST_INTEGER:
                 if (from == LST_FLOATINGPOINT)
                 {
-                    // Toward zero, as LSL cuts a float: math.modf's first
-                    // value, its whole part.
-                    return { "(math.modf(" + v.text + "))", PRIMARY, false, {}, "math.modf(" + v.text + ")" };
+                    // Toward zero, as LSL cuts a float, by bit32.s32, which
+                    // gives 0 where math.modf would give a -0 that tostring
+                    // writes, and LSL's -2147483648 for NaN and the
+                    // infinities. Past the 32-bit range it wraps, where LSL
+                    // gave -2147483648.
+                    noteOnce(e, "SluaFloatToInteger",
+                             "bit32.s32 cuts a float toward nought as LSL's (integer) did; one past the 32-bit range it wraps around, "
+                             "where LSL gave -2147483648.");
+                    return { "bit32.s32(" + v.text + ")" };
                 }
                 if (from == LST_STRING)
                 {
@@ -4762,7 +4845,10 @@ namespace
                     line("-- " + std::string(trait->name) + ", left out");
                     return;
                 }
-                line(expr(e).text);
+                // A call, as it is; one written as something else -- #l,
+                // a ^ b, an index -- in what Luau takes as a statement.
+                const Expr called = oneValue(expr(e));
+                line(callText(called) ? called.text : "local _ = " + called.text);
                 return;
             }
             case NODE_PRINT_EXPRESSION:
@@ -5393,6 +5479,12 @@ namespace
             return std::nullopt;
         }
         c.limit = test->getRHS();
+        // A whole number, which a strict check moves on by one: i < 2.5
+        // is no i <= 1.5.
+        if (c.limit->getIType() != LST_INTEGER)
+        {
+            return std::nullopt;
+        }
         // The step: ++ and -- either side, or += and -= a whole number.
         const LSLOperator op = static_cast<LSLExpression*>(incr)->getOperation();
         if (setBy(incr) != c.var)
@@ -7491,10 +7583,20 @@ namespace
             }
         });
         // What each key variable is given; each that is given text, until
-        // none more is.
+        // none more is. One declared with nothing holds LSL's "", no UUID,
+        // which a uuid cannot: uuid("") is NULL_KEY.
         std::vector<std::pair<LSLSymbol*, LSLExpression*>> given;
+        std::vector<LSLSymbol*>                            unset;
         const auto key = [&](LSLIdentifier* id, LSLExpression* init) {
-            if (id->getIType() == LST_KEY && id->getSymbol() && !isNull(init))
+            if (id->getIType() != LST_KEY || !id->getSymbol())
+            {
+                return;
+            }
+            if (isNull(init))
+            {
+                unset.push_back(id->getSymbol());
+            }
+            else
             {
                 given.emplace_back(id->getSymbol(), init);
             }
@@ -7572,7 +7674,8 @@ namespace
         // written out -- a variable's, a call's -- or given such a key.
         // Given on to a key held as text, uuid() would have made "" NULL_KEY
         // on the way, so such a key holds text too.
-        boost::unordered_flat_set<LSLSymbol*> loose;
+        boost::unordered_flat_set<LSLSymbol*> loose(unset.begin(), unset.end());
+        mTextKeys.insert(unset.begin(), unset.end());
         const auto loosely = [&](LSLExpression* e) {
             e = unbracketed(e);
             if (e && e->getIType() == LST_STRING)
