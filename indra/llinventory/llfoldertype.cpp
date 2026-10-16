@@ -240,10 +240,9 @@ LLFolderType::EType LLFolderType::assetTypeToFolderType(LLAssetType::EType asset
 }
 
 // static
-const std::string &LLFolderType::badLookup()
+std::string_view LLFolderType::badLookup()
 {
-    static const std::string sBadLookup = "llfoldertype_bad_lookup";
-    return sBadLookup;
+    return "llfoldertype_bad_lookup";
 }
 
 LLSD LLFolderType::getTypeNames()

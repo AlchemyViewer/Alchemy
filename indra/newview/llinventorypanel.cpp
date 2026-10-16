@@ -854,7 +854,7 @@ LLUUID LLInventoryPanel::getRootFolderID()
         {
             const LLFolderType::EType preferred_type = mParams.start_folder.type.isChosen()
                 ? mParams.start_folder.type
-                : LLViewerFolderType::lookupTypeFromNewCategoryName(mParams.start_folder.name);
+                : LLViewerFolderType::lookupTypeFromNewCategoryName(mParams.start_folder.name());
 
             if ("LIBRARY" == mParams.start_folder.name())
             {

@@ -28,6 +28,7 @@
 #define LL_LLVIEWERFOLDERTYPE_H
 
 #include <string>
+#include <string_view>
 #include "llfoldertype.h"
 
 // This class is similar to llfoldertype, but contains methods
@@ -35,16 +36,14 @@
 class LLViewerFolderType : public LLFolderType
 {
 public:
-    static const std::string&   lookupXUIName(EType folder_type); // name used by the UI
-    static LLFolderType::EType  lookupTypeFromXUIName(const std::string& name);
+    static std::string_view     lookupXUIName(EType folder_type); // name used by the UI
+    static LLFolderType::EType  lookupTypeFromXUIName(std::string_view name);
 
-    static const std::string&   lookupIconName(EType folder_type, bool is_open = false); // folder icon name
+    static std::string_view     lookupIconName(EType folder_type, bool is_open = false); // folder icon name
     static bool                 lookupIsQuietType(EType folder_type); // folder doesn't require UI update when changes have occured
     static bool                 lookupIsHiddenIfEmpty(EType folder_type); // folder is not displayed if empty
-    static const std::string&   lookupNewCategoryName(EType folder_type); // default name when creating new category
-    static LLFolderType::EType  lookupTypeFromNewCategoryName(const std::string& name); // default name when creating new category
-
-    static U64                  lookupValidFolderTypes(const std::string& item_name); // which folders allow an item of this type?
+    static std::string_view     lookupNewCategoryName(EType folder_type); // default name when creating new category
+    static LLFolderType::EType  lookupTypeFromNewCategoryName(std::string_view name); // default name when creating new category
 
 protected:
     LLViewerFolderType() {}

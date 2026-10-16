@@ -120,7 +120,7 @@ public:
     static LLAssetType::EType   folderTypeToAssetType(LLFolderType::EType folder_type);
     static LLFolderType::EType  assetTypeToFolderType(LLAssetType::EType asset_type);
 
-    static const std::string&   badLookup(); // error string when a lookup fails
+    static std::string_view     badLookup(); // error string when a lookup fails
 
     static LLSD getTypeNames();
 
