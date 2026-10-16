@@ -3663,6 +3663,9 @@ namespace
             INFO("the key still a key: " + text);
             CHECK_FALSE(in(text, "[\"a822ff2b"));
             CHECK(in(text, "(key)\"a822ff2b-ff02-461d-b45d-dcd10a2de0c2\""));
+        }
+    }
+
     TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a JSON literal nested past reason is left to the simulator, not read down the stack", "[allsloptimizer]")
     {
         const std::string deep(40000, '[');
