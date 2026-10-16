@@ -4761,7 +4761,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		[NAME]からのインベントリのオファーです。
 	</string>
 	<string name="bot_warning">
-		[NAME]とチャットしています。個人情報は共有しないでください。
+		ボット「[NAME]」とチャットしています。個人情報は共有しないでください。
 詳細は https://second.life/scripted-agents をご覧ください。
 	</string>
 	<string name="share_alert">
