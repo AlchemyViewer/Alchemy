@@ -196,4 +196,26 @@ namespace
             CHECK_FALSE(there(lists + "late.lock"));
         }
     }
+
+    TEST_CASE_METHOD(alscripttempfiles_data, "alscripttempfiles: a session whose lock cannot be taken lists nothing for a sweep to take", "[alscripttempfiles]")
+    {
+        // Its lock's path taken by a folder: the lock cannot be opened, so
+        // a list would be one no lock says is a running session's, and
+        // another session's sweep would take the copy while it is held.
+        std::error_code ec;
+        std::filesystem::create_directories(fsyspath(lists + "stuck.lock"), ec);
+        const std::string copy = ALScriptTempFiles::nameFor(temp, "Script", "1", false);
+        put(copy);
+        ALScriptTempFiles                         stuck(lists, "stuck");
+        std::shared_ptr<ALScriptTempFiles::Claim> held = stuck.claim(copy);
+        UNSCOPED_INFO("not listed");
+        CHECK_FALSE(there(lists + "stuck.list"));
+        ALScriptTempFiles sweeper(lists, "now");
+        UNSCOPED_INFO("so no sweep takes it");
+        CHECK(sweeper.sweep() == size_t(0));
+        CHECK(there(copy));
+        held.reset();
+        UNSCOPED_INFO("and it still goes with the last hold");
+        CHECK_FALSE(there(copy));
+    }
 }

@@ -26,14 +26,15 @@
 
 #include "almasterindex.h"
 
-#include "aldiskincludes.h"
 #include "alfilewrite.h"
 #include "alscriptenvelope.h"
 #include "alserialworker.h"
 #include "aluploadheader.h"
+#include "fsyspath.h"
 #include "llsdserialize.h"
 
 #include <condition_variable>
+#include <filesystem>
 #include <mutex>
 #include <sstream>
 
@@ -59,7 +60,8 @@ namespace
 // index's thread, with the file they go in -- the newest only, since each is
 // all of it -- and whether one is being written now, by the writer's thread
 // or by the index's. One write at a time, whichever thread makes it, so
-// that two never meet in the file put beside the index on the way.
+// that two never meet in the file put beside the index on the way. What
+// could not be written waits still, to be tried again.
 struct ALMasterIndex::Writer
 {
     struct Text
@@ -70,11 +72,15 @@ struct ALMasterIndex::Writer
     std::mutex              mutex;
     std::condition_variable changed;
     std::optional<Text>     waiting;
-    bool                    busy = false;
+    // Whether what waits is what a write of failed, kept for the next
+    // drain: the next change's, which is all of it and more, or a flush's.
+    bool                    failed = false;
+    bool                    busy   = false;
 
     // What waits written, and what comes meanwhile, on whichever thread
     // asks: one being written already by another is waited for first, so
-    // that all that was handed over is on the disk as this returns.
+    // that all that was handed over is on the disk as this returns. One
+    // that cannot be written is tried once here, said, and left waiting.
     void drain()
     {
         std::unique_lock<std::mutex> lock(mutex);
@@ -85,18 +91,41 @@ struct ALMasterIndex::Writer
             {
                 return;
             }
-            const Text one = std::move(*waiting);
+            Text one = std::move(*waiting);
             waiting.reset();
-            busy = true;
+            failed = false;
+            busy   = true;
             lock.unlock();
-            if (!ALFileWrite::whole(one.path, one.text, /*durable*/ true))
+            const bool wrote = ALFileWrite::whole(one.path, one.text, /*durable*/ true);
+            if (!wrote)
             {
-                LL_WARNS("ScriptMasters") << "Could not write " << one.path << LL_ENDL;
+                LL_WARNS("ScriptMasters") << "Could not write " << one.path << "; what changed is kept, to be written with the next change"
+                                          << LL_ENDL;
             }
             lock.lock();
             busy = false;
+            // Kept, unless newer came meanwhile, which carries all of it.
+            const bool kept = !wrote && !waiting;
+            if (kept)
+            {
+                waiting = std::move(one);
+                failed  = true;
+            }
             changed.notify_all();
+            if (kept)
+            {
+                return;
+            }
         }
+    }
+
+    // Whether what waits failed to be written: a write on its way waited
+    // for first, so that the answer is the write's.
+    bool unwritten()
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        changed.wait(lock, [this] { return !busy; });
+        return failed;
     }
 };
 
@@ -118,23 +147,41 @@ ALMasterIndex::~ALMasterIndex()
     flush();
 }
 
+ALMasterIndex::Read ALMasterIndex::readFile(ALMasterLinks& out) const
+{
+    std::string text;
+    if (!ALFileRead::whole(mPath, text, MAX_BYTES))
+    {
+        // Not there is nothing; there and not read is a file to keep.
+        std::error_code ec;
+        const bool      there = std::filesystem::exists(fsyspath(mPath), ec) || ec;
+        return there ? Read::Unreadable : Read::None;
+    }
+    LLSD               llsd;
+    std::istringstream in(text);
+    if (LLSDSerialize::fromXML(llsd, in) <= 0)
+    {
+        return Read::Garbage;
+    }
+    out = ALMasterLinks::fromLLSD(llsd);
+    return Read::Links;
+}
+
 void ALMasterIndex::read()
 {
-    // Read whole. What will not read is no links, said, and not written over
-    // until a link changes.
-    std::string text;
-    if (ALFileRead::whole(mPath, text, ALDiskIncludes::MAX_BYTES))
+    // Read whole. What is not an index is no links, said, and not written
+    // over until a link changes. What cannot be read at all is no links,
+    // said, and not written over until it reads (handOver).
+    switch (readFile(mLinks))
     {
-        LLSD               llsd;
-        std::istringstream in(text);
-        if (LLSDSerialize::fromXML(llsd, in) > 0)
-        {
-            mLinks = ALMasterLinks::fromLLSD(llsd);
-        }
-        else
-        {
-            LL_WARNS("ScriptMasters") << "Could not read " << mPath << "; no scripts are linked to files" << LL_ENDL;
-        }
+        case Read::None:
+        case Read::Links: break;
+        case Read::Garbage: LL_WARNS("ScriptMasters") << "Could not read " << mPath << "; no scripts are linked to files" << LL_ENDL; break;
+        case Read::Unreadable:
+            mUnread = true;
+            LL_WARNS("ScriptMasters") << mPath << " is there but could not be read -- held by another program, or past " << MAX_BYTES
+                                      << " bytes; its links are kept, and nothing is written over it until it reads" << LL_ENDL;
+            break;
     }
     // Orphans kept a while, for a script taken and rezzed again.
     if (mLinks.prune(LLDate::now()) > 0)
@@ -142,6 +189,26 @@ void ALMasterIndex::read()
         // Pruned again at the next read, should this be lost.
         changed(Write::Soon, Tell::No);
     }
+}
+
+bool ALMasterIndex::readAgain()
+{
+    ALMasterLinks fresh;
+    if (readFile(fresh) == Read::Unreadable)
+    {
+        return false;
+    }
+    // What the session linked over what the file holds: the newer. Garbage
+    // reads as nothing, and is written over, as it is when first read.
+    for (const ALMasterLink& one : mLinks.all())
+    {
+        fresh.put(one);
+    }
+    mLinks  = std::move(fresh);
+    mUnread = false;
+    // Whoever listens sees the file's links now.
+    tellSoon();
+    return true;
 }
 
 std::optional<ALMasterLink> ALMasterIndex::linkOf(const LLUUID& object, const LLUUID& item) const
@@ -298,23 +365,59 @@ bool ALMasterIndex::chosen(const LLUUID& object, const LLUUID& item, const std::
     return true;
 }
 
-bool ALMasterIndex::finished(const LLUUID& object, const LLUUID& item, const ALMasterLink& updated)
+bool ALMasterIndex::finished(const ALMasterLink& began, const ALMasterLink& updated)
 {
-    const ALMasterLink* was = mLinks.of(object, item);
+    const ALMasterLink* was = mLinks.of(began.object, began.item);
     if (!was)
     {
         return false;
     }
+    // Over the link as it is now, not the send's copy of it as it began: a
+    // send takes seconds, and what was done to the link meanwhile would go
+    // with the copy. What the send learned of the item holds whatever its
+    // master: its asset, and that it is gone. Its name too, unless it was
+    // renamed meanwhile, which is newer.
+    ALMasterLink now = *was;
+    const bool   moved = updated.object != began.object || updated.item != began.item;
+    now.object         = updated.object;
+    now.item           = updated.item;
+    now.base           = updated.base;
+    if (was->itemName == began.itemName)
+    {
+        now.itemName = updated.itemName;
+    }
+    if (ALMasterLinks::keyOf(was->master) == ALMasterLinks::keyOf(began.master))
+    {
+        // Of the master it sent: what went up, what the expansion read, and
+        // how the link stands. The target sent with, unless one was picked
+        // meanwhile for the next send.
+        now.hash          = updated.hash;
+        now.stamp         = updated.stamp;
+        now.uses          = updated.uses;
+        now.missed        = updated.missed;
+        now.state         = updated.state;
+        now.orphanedSince = updated.orphanedSince;
+        if (was->target == began.target)
+        {
+            now.target = updated.target;
+        }
+    }
+    else if (updated.state == ALMasterLink::State::Orphaned)
+    {
+        // Linked meanwhile to another master, whose link knows nothing of
+        // what went up; but the item gone is gone.
+        now.state         = updated.state;
+        now.orphanedSince = updated.orphanedSince;
+    }
     // Moved to another item, or come to stand otherwise, is what could not
     // be found again: written at once. What the send learned is written a
     // moment later, with the sends ending beside it.
-    const bool moved  = updated.object != object || updated.item != item;
-    const bool prompt = moved || updated.state != was->state || ALMasterLinks::keyOf(updated.master) != ALMasterLinks::keyOf(was->master);
+    const bool prompt = moved || now.state != was->state;
     if (moved)
     {
-        mLinks.remove(object, item);
+        mLinks.remove(began.object, began.item);
     }
-    mLinks.put(updated);
+    mLinks.put(std::move(now));
     changed(prompt ? Write::Now : Write::Soon, Tell::Now);
     return true;
 }
@@ -420,11 +523,25 @@ void ALMasterIndex::handOver()
     {
         return;
     }
+    // A file that could not be read is read again first, and not written
+    // over until it reads: the change waits, and is handed over with the
+    // next.
+    if (mUnread && !readAgain())
+    {
+        LL_WARNS("ScriptMasters") << "Not written: " << mPath << " is there but could not be read, and is kept as it is" << LL_ENDL;
+        return;
+    }
     mDirty = false;
     std::ostringstream out;
     LLSDSerialize::toPrettyXML(mLinks.toLLSD(), out);
     const std::lock_guard<std::mutex> lock(mWriter->mutex);
     mWriter->waiting = Writer::Text{ mPath, out.str() };
+    mWriter->failed  = false;
+}
+
+bool ALMasterIndex::dirty() const
+{
+    return mDirty || mWriter->unwritten();
 }
 
 void ALMasterIndex::post()

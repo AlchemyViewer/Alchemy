@@ -33,7 +33,48 @@
 #include "lluuid.h"
 #include "lscript_byteconvert.h"
 
+#include <cctype>
+#include <cstdlib>
+
 class LLScriptLibData;
+
+// A string read as an integer, as LL's cast and llList2Integer read it
+// with strtoul on the grid's 32-bit hosts: hexadecimal only from a
+// leading 0x, otherwise decimal, so never octal; a sign and the digits
+// after whatever leads them; the magnitude saturating at 0xFFFFFFFF,
+// which is -1 whatever the sign, as strtoul answers past its range; and
+// a negative one made in 32 bits. strtoul itself reads to 64 bits on
+// Linux and macOS, where "4294967296" came out 0, and to 32 on Windows.
+inline S32 lscript_string_to_integer(const char *text)
+{
+    if (!text)
+    {
+        return 0;
+    }
+    const int base = (text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) ? 16 : 10;
+    const char *p = text;
+    while (std::isspace((unsigned char)*p))
+    {
+        ++p;
+    }
+    const bool negative = *p == '-';
+    if (*p == '-' || *p == '+')
+    {
+        ++p;
+    }
+    // strtoull would take a space or a second sign here, which strtoul did not.
+    if (std::isspace((unsigned char)*p) || *p == '-' || *p == '+')
+    {
+        return 0;
+    }
+    const unsigned long long magnitude = std::strtoull(p, NULL, base);
+    if (magnitude > 0xFFFFFFFFull)
+    {
+        return -1;
+    }
+    const U32 value = (U32)magnitude;
+    return (S32)(negative ? 0u - value : value);
+}
 
 class LLScriptLibraryFunction
 {
@@ -419,7 +460,19 @@ public:
 
     ~LLScriptLibData()
     {
-        delete mListp;
+        // The list's entries are let go one after another here, not each
+        // by the one before it: a list of as many entries as llCSV2List
+        // makes of fourteen thousand commas would recurse a frame an
+        // entry, past a megabyte of stack.
+        LLScriptLibData *next = mListp;
+        mListp = NULL;
+        while (next)
+        {
+            LLScriptLibData *after = next->mListp;
+            next->mListp = NULL;
+            delete next;
+            next = after;
+        }
         delete [] mKey;
         delete [] mString;
     }

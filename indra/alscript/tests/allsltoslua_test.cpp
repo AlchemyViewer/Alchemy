@@ -1209,7 +1209,8 @@ namespace
         {
             INFO("compared as text");
             CHECK(has(r, "if id == DOMAIN then"));
-            CHECK(has(r, "if id == tostring(gOwner) then"));
+            // gOwner declared with nothing holds text, as LSL's "" did.
+            CHECK(has(r, "if id == gOwner then"));
         }
         {
             INFO("a key given the id, text");
@@ -1954,8 +1955,13 @@ namespace
             CHECK(has(r, "table.insert(params, n)"));
         }
         {
-            INFO("the null key");
-            CHECK(has(r, "local gSitter = NULL_KEY"));
+            // LSL's key declared with nothing holds "", not NULL_KEY, and
+            // is printed as no text; a uuid cannot hold it.
+            INFO("a key given nothing, no text");
+            CHECK(has(r, "local gSitter = \"\""));
+            CHECK(has(r, "{gSitter}`)"));
+            CHECK_FALSE(has(r, "tostring(gSitter)"));
+            CHECK_FALSE(has(r, "NULL_KEY"));
             CHECK_FALSE(has(r, "uuid(\"\")"));
         }
         {
@@ -3136,9 +3142,15 @@ namespace
         UNSCOPED_INFO("a float's");
         CHECK(has(r, "f /= 2"));
         {
+            // Nothing to say of a quotient or a remainder that is LSL's.
+            std::string said;
+            for (const ALScriptProblem& p : r.notes)
+            {
+                said += p.key + "\n";
+            }
             INFO("unnoted");
-            CHECK_FALSE(noted(r, "SluaIntegerDivision"));
-            CHECK_FALSE(noted(r, "SluaModulo"));
+            CAPTURE(said);
+            CHECK(r.notes.empty());
         }
         require_checks_clean(r);
         // Typed, each one a number to the checker, strict under the grid's
@@ -4161,7 +4173,7 @@ namespace
         require_checks_clean(r);
     }
 
-    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a float cut to an integer is math.modf bracketed where its values spread", "[ALLSLToSLua]")
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a float cut to an integer is bit32.s32, which gives 0 where math.modf gave -0", "[ALLSLToSLua]")
     {
         const ALLSLToSLua::Result r = require_converted("integer menuChannel;\n"
                                                         "vector gV;\n"
@@ -4180,25 +4192,29 @@ namespace
                                                         "} }\n");
         CAPTURE(r.text);
         UNSCOPED_INFO("Tapple's");
-        CHECK(has(r, "menuChannel = math.modf(ll.Frand(1000)) - 10000\n"));
+        CHECK(has(r, "menuChannel = bit32.s32(ll.Frand(1000)) - 10000\n"));
         UNSCOPED_INFO("a local");
-        CHECK(has(r, "local x = math.modf(f)\n"));
+        CHECK(has(r, "local x = bit32.s32(f)\n"));
         UNSCOPED_INFO("assigned");
-        CHECK(has(r, "    x = math.modf(f)\n"));
+        CHECK(has(r, "    x = bit32.s32(f)\n"));
         UNSCOPED_INFO("added");
-        CHECK(has(r, "    x += math.modf(f)\n"));
+        CHECK(has(r, "    x += bit32.s32(f)\n"));
         UNSCOPED_INFO("its negative");
-        CHECK(has(r, "    x = -math.modf(f)\n"));
+        CHECK(has(r, "    x = -bit32.s32(f)\n"));
         UNSCOPED_INFO("compared");
-        CHECK(has(r, "if math.modf(f) == 3 then"));
+        CHECK(has(r, "if bit32.s32(f) == 3 then"));
         UNSCOPED_INFO("an argument");
-        CHECK(has(r, "print(tostring((math.modf(f))))"));
+        CHECK(has(r, "print(tostring(bit32.s32(f)))"));
         UNSCOPED_INFO("a list's item");
-        CHECK(has(r, "{ (math.modf(f)) }"));
+        CHECK(has(r, "{ bit32.s32(f) }"));
         UNSCOPED_INFO("returned");
-        CHECK(has(r, "return (math.modf(f))"));
+        CHECK(has(r, "return bit32.s32(f)"));
         UNSCOPED_INFO("a vector's part, an argument");
-        CHECK(has(r, "gV = vector(gV.x, gV.y, (math.modf(f)))"));
+        CHECK(has(r, "gV = vector(gV.x, gV.y, bit32.s32(f))"));
+        UNSCOPED_INFO("math.modf nowhere: it cuts -0.5 to a -0 that tostring writes");
+        CHECK_FALSE(has(r, "math.modf"));
+        UNSCOPED_INFO("the wrap past 32 bits said");
+        CHECK(noted(r, "SluaFloatToInteger"));
         require_checks_clean(r);
     }
 
@@ -4344,7 +4360,7 @@ namespace
             INFO("a call that changes the world, named with the other");
             CHECK(noted(r, "SluaRightFirstWorld", "say()"));
             CHECK(has(r, "-- LSL: LSL ran the right side of this before the left, and Luau runs the left first: say() may change what "
-                      "llKey2Name() does or finds outside the script.\n    print(ll.Key2Name(gSender) .. say())"));
+                      "llKey2Name() does or finds outside the script.\n    print(ll.Key2Name(gSender :: any) .. say())"));
         }
         {
             INFO("a call that sets what the other's reads");
@@ -4358,7 +4374,7 @@ namespace
 
     TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: with keyTextAny off text for a key passes bare and the checker marks it", "[ALLSLToSLua]")
     {
-        const std::string lsl = "key inventorySender;\n"
+        const std::string lsl = "key inventorySender = NULL_KEY;\n"
                                 "string myInfo() { return (string)llGetKey(); }\n"
                                 "default { touch_start(integer n) {\n"
                                 "    llOwnerSay(\"activeRequestor: \" + llKey2Name(inventorySender) + \"; llGetKey: \" + llKey2Name(myInfo()));\n"
@@ -4447,8 +4463,10 @@ namespace
                                                         "        key d;\n"
                                                         "        if (d == \"\") llOwnerSay(\"no key yet\");\n"
                                                         "        if (\"\" != d) llOwnerSay(\"some\");\n"
-                                                        "        if (d == \"a2e76fcd-9360-4f6d-a924-938f923df11d\") llOwnerSay(\"that one\");\n"
-                                                        "        if (d == \"none\") llOwnerSay(\"text\");\n"
+                                                        "        if (d == NULL_KEY) llOwnerSay(\"null\");\n"
+                                                        "        key u = llGetOwner();\n"
+                                                        "        if (u == \"a2e76fcd-9360-4f6d-a924-938f923df11d\") llOwnerSay(\"that one\");\n"
+                                                        "        if (u == \"none\") llOwnerSay(\"text\");\n"
                                                         "        if (NULL_KEY != \"\") llOwnerSay(\"NULL_KEY has text\");\n"
                                                         "    }\n"
                                                         "}\n");
@@ -4480,15 +4498,19 @@ namespace
             CHECK_FALSE(has(r, "{ uuid("));
         }
         {
-            INFO("a uuid against no text, a uuid");
-            CHECK(has(r, "local d = NULL_KEY"));
-            CHECK(has(r, "if d == uuid(\"\") then"));
-            CHECK(has(r, "if uuid(\"\") ~= d then"));
+            // LSL's key declared with nothing holds "", which a uuid cannot:
+            // uuid("") is NULL_KEY, and d == NULL_KEY was FALSE.
+            INFO("a key given nothing, no text, against text as text");
+            CHECK(has(r, "local d = \"\""));
+            CHECK(has(r, "if d == \"\" then"));
+            CHECK(has(r, "if \"\" ~= d then"));
+            CHECK(has(r, "if d == tostring(NULL_KEY) then"));
+            CHECK_FALSE(has(r, "local d = NULL_KEY"));
         }
-        UNSCOPED_INFO("a UUID written out");
-        CHECK(has(r, "if d == uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\") then"));
-        UNSCOPED_INFO("other text, as text");
-        CHECK(has(r, "if tostring(d) == \"none\" then"));
+        UNSCOPED_INFO("a uuid key against a UUID written out, a uuid");
+        CHECK(has(r, "if u == uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\") then"));
+        UNSCOPED_INFO("against other text, as text");
+        CHECK(has(r, "if tostring(u) == \"none\" then"));
         UNSCOPED_INFO("NULL_KEY, as LSL's text");
         CHECK(has(r, "if tostring(NULL_KEY) ~= \"\" then"));
         require_checks_clean(r);
@@ -4581,8 +4603,10 @@ namespace
         const ALLSLToSLua::Result uuids = require_converted(lsl);
         CAPTURE(uuids.text);
         {
+            // A key declared with nothing holds LSL's "" either way, which
+            // no uuid holds.
             INFO("uuids by default");
-            CHECK(has(uuids, "local gOwner = NULL_KEY\n"));
+            CHECK(has(uuids, "local gOwner = \"\"\n"));
             CHECK(has(uuids, "local cast = uuid(s)"));
         }
     }
@@ -4695,5 +4719,173 @@ namespace
             CHECK(has(uuids, "local k = llcompat.List2Key(l, 0)"));
             CHECK_FALSE(noted(uuids, "SluaList2KeyText"));
         }
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: text cast to a key and asked whether it is one, touuid's", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "default { listen(integer c, string name, key id, string m) {\n"
+                                "    if ((key)m) llOwnerSay(\"a key\");\n"
+                                "    if ((key)llGetSubString(m, 1, -1)) llOwnerSay(\"after one\");\n"
+                                "} }\n";
+        const ALLSLToSLua::Result r = require_converted(lsl);
+        CAPTURE(r.text);
+        // LSL's (key)"hello" is FALSE; SLua's uuid("hello") stops the
+        // script.
+        UNSCOPED_INFO("a variable's text");
+        CHECK(has(r, "if (touuid(m) or NULL_KEY).istruthy then"));
+        UNSCOPED_INFO("a call's");
+        CHECK(has(r, "if (touuid(ll.GetSubString(m, 2, -1)) or NULL_KEY).istruthy then"));
+        UNSCOPED_INFO("no uuid() asked");
+        CHECK_FALSE(has(r, " uuid("));
+        CHECK_FALSE(has(r, "(uuid("));
+        require_checks_clean(r);
+
+        const ALLSLToSLua::Result close = ALLSLToSLua::convert(lsl, ALLSLToSLua::Options::closeToLSL());
+        CAPTURE(close.text);
+        REQUIRE(close.converted);
+        UNSCOPED_INFO("closeToLSL, the same");
+        CHECK(has(close, "if (touuid(m) or NULL_KEY).istruthy then"));
+        require_checks_clean(close);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key declared with nothing holds no text, as LSL's did, not NULL_KEY", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("key gTarget;\n"
+                                                        "default { touch_start(integer n) {\n"
+                                                        "    if (gTarget == NULL_KEY) llOwnerSay(\"null\");\n"
+                                                        "    else llOwnerSay(\"none yet: \" + (string)gTarget);\n"
+                                                        "    gTarget = llDetectedKey(0);\n"
+                                                        "    if (gTarget) llOwnerSay(\"set\");\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        UNSCOPED_INFO("held as text, no text");
+        CHECK(has(r, "local gTarget = \"\"\n"));
+        UNSCOPED_INFO("against NULL_KEY as text: FALSE, as LSL's");
+        CHECK(has(r, "if gTarget == tostring(NULL_KEY) then"));
+        UNSCOPED_INFO("printed as it is");
+        CHECK(has(r, "\"none yet: \" .. gTarget"));
+        UNSCOPED_INFO("a key given it, as text");
+        CHECK(has(r, "gTarget = tostring(detected[1]:getKey())"));
+        UNSCOPED_INFO("its truth as LSL's key's");
+        CHECK(has(r, "if (touuid(gTarget) or NULL_KEY).istruthy then"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a loop body's local is named apart from what its check or steps read after it", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("integer n = 0;\n"
+                                                        "integer i;\n"
+                                                        "default { state_entry() {\n"
+                                                        "    do { integer n = 1; llOwnerSay(\"once\"); } while (n);\n"
+                                                        "    do { integer k = 1; llOwnerSay((string)k); } while (n > 2);\n"
+                                                        "    for (i = 0; i < 3; i = i + 1) { integer i = 10; llOwnerSay((string)i); }\n"
+                                                        "    llOwnerSay((string)(n + i));\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        // Luau's until reads the body's locals, and so do the steps written
+        // at the end of the body; LSL's check and steps read the globals.
+        {
+            INFO("a do-while's: the global n read by until, not the body's");
+            CHECK(has(r, "local n_ = 1"));
+            CHECK_FALSE(has(r, "until not (n_"));
+            CHECK_FALSE(has(r, "until n_"));
+        }
+        UNSCOPED_INFO("one the check does not read keeps its name");
+        CHECK(has(r, "local k = 1"));
+        {
+            INFO("a for's: the global i stepped, not the body's");
+            CHECK(has(r, "local i_ = 10"));
+            CHECK(has(r, "print(tostring(i_))"));
+            CHECK(has(r, "i += 1"));
+        }
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a numeric for only to a whole limit; to a float, the while", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
+                                                        "    integer total;\n"
+                                                        "    integer i; for (i = 0; i < 2.5; ++i) total += i;\n"
+                                                        "    integer j; for (j = 3; j > 0.5; --j) total += j;\n"
+                                                        "    integer k; for (k = 0; k < 3; ++k) total += k;\n"
+                                                        "    llOwnerSay((string)total);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        // i < 2.5 runs 0, 1 and 2, where for i = 0, 2.5 - 1 stops at 1.
+        UNSCOPED_INFO("below a float");
+        CHECK(has(r, "while i < 2.5 do"));
+        UNSCOPED_INFO("above one");
+        CHECK(has(r, "while j > 0.5 do"));
+        UNSCOPED_INFO("no limit moved on by one");
+        CHECK_FALSE(has(r, "2.5 - 1"));
+        CHECK_FALSE(has(r, "0.5 + 1"));
+        UNSCOPED_INFO("a whole one, still numeric");
+        CHECK(has(r, "for k = 0, 2 do"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a call for nothing written as other than a call is kept as local _", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    list l = [1, 2]; string s = \"abc\"; float a = llFrand(2); float b = 3;\n"
+                                                        "    llGetListLength(l);\n"
+                                                        "    llPow(a, b);\n"
+                                                        "    llStringLength(s);\n"
+                                                        "    llListFindList(l, [2]);\n"
+                                                        "    llSubStringIndex(s, \"b\");\n"
+                                                        "    llList2String(l, 0);\n"
+                                                        "    llOwnerSay(s);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        // Luau takes only a call or an assignment as a statement.
+        UNSCOPED_INFO("a length");
+        CHECK(has(r, "local _ = #l\n"));
+        UNSCOPED_INFO("a power");
+        CHECK(has(r, "local _ = a ^ b\n"));
+        UNSCOPED_INFO("no line opens with what is no call");
+        CHECK_FALSE(has(r, "\n    #"));
+        CHECK_FALSE(has(r, "\n    a ^"));
+        CHECK_FALSE(has(r, "\n    ("));
+        CHECK_FALSE(has(r, "\n    l["));
+        UNSCOPED_INFO("a call, as it is");
+        CHECK(has(r, "\n    print(s)\n"));
+        require_checks_clean(r);
+    }
+
+    // A call in brackets is a value whatever its strings hold: a bracket in
+    // a template's text, or after an expression in it, closes nothing.
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a bracket in a template's text does not make a value a call", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    llStringLength(\"))\" + (string)n);\n"
+                                                        "    llStringLength(\"(\" + (string)n + \"})`)\");\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        CHECK(has(r, "local _ = (utf8.len(`)){n}`) :: number)\n"));
+        CHECK(has(r, "local _ = (utf8.len(`({n}})\\`)`) :: number)\n"));
+        UNSCOPED_INFO("no line opens with what is no call");
+        CHECK_FALSE(has(r, "\n    ("));
+        require_checks_clean(r);
+    }
+
+    // A value nothing reads is named apart from the script's own `_`, which
+    // `local _` would hide from the reads after it.
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a value nothing reads does not hide the script's own _", "[ALLSLToSLua]")
+    {
+        const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
+                                                        "    list l = [1, 2]; integer _ = 2;\n"
+                                                        "    llGetListLength(l);\n"
+                                                        "    llListen(n, \"\", \"\", \"\") + 1;\n"
+                                                        "    llOwnerSay((string)_);\n"
+                                                        "} }\n");
+        CAPTURE(r.text);
+        CHECK(has(r, "local _ = 2\n"));
+        UNSCOPED_INFO("a call written as other than one");
+        CHECK(has(r, "local _2 = #l\n"));
+        UNSCOPED_INFO("an expression for what it does");
+        CHECK(has(r, "local _2 = ll.Listen(n, "));
+        UNSCOPED_INFO("the script's _ read after them");
+        CHECK(has(r, "print(tostring(_))\n"));
+        require_checks_clean(r);
     }
 }

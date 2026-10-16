@@ -71,7 +71,6 @@ target_sources(
     luau/alluauservice.cpp
     luau/alluaushadowed.cpp
     luau/alluausharedstart.cpp
-    luau/alluautaskpool.cpp
     luau/alluautypes.cpp
     masters/almasterburst.cpp
     masters/almasterclock.cpp
@@ -158,7 +157,6 @@ target_sources(
         luau/alluauservice.h
         luau/alluaushadowed.h
         luau/alluausharedstart.h
-        luau/alluautaskpool.h
         luau/alluautypes.h
         masters/almasterburst.h
         masters/almasterclock.h
@@ -347,10 +345,16 @@ if(AL_BUILD_TESTS)
         PRIVATE al::flags alscript llcommon ll::slua ll::tailslide
       )
       set_target_properties(alscript_fuzz_${fuzzer} PROPERTIES FOLDER "Tests/alscript")
+      # libFuzzer writes the inputs it keeps into the first corpus directory
+      # it is given, so that is a scratch one in the build tree: the
+      # directories after it are the tests' own scripts, which other tests
+      # hold to exactly the files they have.
+      set(fuzz_corpus ${CMAKE_CURRENT_BINARY_DIR}/fuzz_corpus/${fuzzer})
+      file(MAKE_DIRECTORY ${fuzz_corpus})
       add_test(
         NAME alscript_fuzz_${fuzzer}
         COMMAND
-          alscript_fuzz_${fuzzer} -runs=0 -close_fd_mask=1 -max_len=262160
+          alscript_fuzz_${fuzzer} -runs=0 -close_fd_mask=1 -max_len=262160 ${fuzz_corpus}
           ${CMAKE_CURRENT_SOURCE_DIR}/tests/tailslide/scripts
           ${CMAKE_CURRENT_SOURCE_DIR}/tests/regressions
           ${INDRA_SOURCE_DIR}/lscript/tests/regressions

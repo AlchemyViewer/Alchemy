@@ -27,6 +27,7 @@
 
 #include "../preprocessor/alincludeidentity.h"
 #include "../preprocessor/alrequirenavigation.h"
+#include "altestlinks.h"
 #include "fsyspath.h"
 #include "llfile.h"
 
@@ -1376,21 +1377,33 @@ namespace ll_test
 
         // A configuration's folder reached through a link names its own
         // folder as it stands, and is let in so.
-        std::error_code ec;
-        fs::create_directory_symlink(s.root / "proj", s.root / "linked", ec);
-        if (!ec)
+        const auto reaches = [&](const std::string& link)
         {
-            const std::string             through = ALIncludeIdentity::ofFile(s.at("linked/main.luau"));
+            const std::string             through = ALIncludeIdentity::ofFile(s.at(link + "/main.luau"));
             const ALIncludeSearch::Asking linked{ through, true };
             ALPreprocessor::Include       reached;
             std::vector<std::string>      aliases;
-            {
-                INFO("through a link");
-                CHECK(search.resolve(ask("@own/util", true, through), reached, linked, loose, nullptr, false, &aliases) ==
-                                         ALPreprocessor::Found::Yes);
-                CHECK(reached.path == ALIncludeIdentity::ofFile(util));
-            }
+            CHECK(search.resolve(ask("@own/util", true, through), reached, linked, loose, nullptr, false, &aliases) ==
+                                     ALPreprocessor::Found::Yes);
+            CHECK(reached.path == ALIncludeIdentity::ofFile(util));
+        };
+#if LL_WINDOWS
+        {
+            // Windows' own link to a folder, which any user may make, so it
+            // is tried on every Windows machine, where a symlink may not be.
+            INFO("through a junction");
+            REQUIRE(!ll_test::createDirectoryJunction(s.root / "proj", s.root / "junction"));
+            reaches("junction");
         }
+#endif
+        std::error_code ec;
+        fs::create_directory_symlink(s.root / "proj", s.root / "linked", ec);
+        if (ec)
+        {
+            SKIP("no symlinks here: " << ec.message());
+        }
+        INFO("through a link");
+        reaches("linked");
     }
 
     TEST_CASE_METHOD(alincludesearch_data, "alincludesearch: why a require that reached a file found nothing or stopped at a config", "[alincludesearch]")

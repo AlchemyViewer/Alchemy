@@ -39,6 +39,7 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 
 namespace
 {
@@ -883,6 +884,49 @@ namespace
             problems = service.check("local n: number = \"s\"\n");
             UNSCOPED_INFO(which + "and checked in full: " + said(problems));
             REQUIRE((errors(problems) > 0 || use));
+
+            // A module the script requires, out of time with it: not kept
+            // as checked, so the next check runs it again and says again
+            // that it stopped, and one given time enough finds what the
+            // module's first check never reached.
+            service.setDocument("timed");
+            service.setConfig(ALLuauConfig());
+            ALLuauService::Modules modules;
+            std::string            module = "--!strict\n";
+            for (int i = 0; i < 50; ++i)
+            {
+                module += llformat("local v%d: number = %d\nprint(v%d)\n", i, i, i);
+            }
+            module += "local bad: number = \"x\"\nreturn {}\n";
+            modules.modules.push_back({ "disk:/lib/slow.luau", module });
+            modules.reaches.push_back({ "", "slow", "disk:/lib/slow.luau" });
+            service.setModules(modules);
+            const std::string requiring = "--!strict\nlocal slow = require(\"slow\")\nprint(slow)\n";
+            const auto        stopped   = [](const ALScriptProblems& found) {
+                return std::any_of(found.begin(), found.end(), [](const ALScriptProblem& problem) { return problem.key == "LuauCheckTimedOut"; });
+            };
+            service.setTimeLimit(1e-9);
+            for (const char* time : { "first", "second" })
+            {
+                const size_t before = service.modulesChecked();
+                problems            = service.check(requiring);
+                UNSCOPED_INFO(which + time + " check, the module and the script checked");
+                CHECK(service.modulesChecked() - before == size_t(2));
+                INFO(which + time + " check, said to have stopped: " + said(problems));
+                REQUIRE(stopped(problems));
+            }
+            service.setTimeLimit(0.0);
+            const size_t before = service.modulesChecked();
+            problems            = service.check(requiring);
+            UNSCOPED_INFO(which + "unlimited, the module checked again");
+            CHECK(service.modulesChecked() - before == size_t(2));
+            UNSCOPED_INFO(which + "not said to have stopped: " + said(problems));
+            CHECK_FALSE(stopped(problems));
+            UNSCOPED_INFO(which + "and the module's mistake at its end found: " + said(problems));
+            CHECK(std::any_of(problems.begin(), problems.end(), [](const ALScriptProblem& problem) {
+                return problem.file == "disk:/lib/slow.luau" && problem.line == 101 && problem.source == ALScriptProblem::Source::Types;
+            }));
+            service.setDocument("");
         }
         std::string why;
         service.setNewSolver(newSolver, why);
@@ -1947,7 +1991,7 @@ namespace
         service.setDocument("");
     }
 
-    TEST_CASE_METHOD(alluauservice_data, "alluauservice: several modules required are checked in parallel once each", "[alluauservice]")
+    TEST_CASE_METHOD(alluauservice_data, "alluauservice: several modules required are checked once each", "[alluauservice]")
     {
         UNSCOPED_INFO("definitions loaded: " + error);
         CHECK(loaded);
@@ -2473,5 +2517,85 @@ namespace
         REQUIRE(hover.found);
         UNSCOPED_INFO("a number: " + hover.label);
         REQUIRE(hover.label.find("number") != std::string::npos);
+    }
+
+    TEST_CASE_METHOD(alluauservice_data, "alluauservice: an action asked over a stretch past the line is held to the line", "[alluauservice]")
+    {
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
+        // A stretch reaching past the line's end is cut to it; one wholly
+        // past it, before its start, or on a line the text has not, is
+        // nothing to act on. Each answered, and nothing read past the text.
+        CHECK_NOTHROW(service.actions("local x = 1\n", 0, 0, 0, 40));
+        CHECK_NOTHROW(service.actions("local x = 1\n", 0, 20, 0, 40));
+        CHECK_NOTHROW(service.actions("local x = 1\n", 0, -3, 0, 2));
+        CHECK_NOTHROW(service.actions("local x = 1\n", 5, 0, 5, 3));
+        CHECK_NOTHROW(service.actions("local x = 1", 0, 6, 0, 400));
+    }
+
+    TEST_CASE_METHOD(alluauservice_data, "alluauservice: a module's require no longer traced reaches nothing once the modules are set again", "[alluauservice]")
+    {
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
+        service.setDocument("retraced");
+        service.setConfig(ALLuauConfig());
+        ALLuauService::Modules modules;
+        modules.modules.push_back({ "disk:/lib/a.luau", "--!strict\nlocal b = require(\"b\")\nreturn { n = b.n }\n" });
+        modules.modules.push_back({ "disk:/lib/b.luau", "--!strict\nreturn { n = 1 }\n" });
+        modules.reaches.push_back({ "", "a", "disk:/lib/a.luau" });
+        modules.reaches.push_back({ "disk:/lib/a.luau", "b", "disk:/lib/b.luau" });
+        service.setModules(modules);
+        const std::string script  = "--!strict\nlocal a = require(\"a\")\nprint(a.n)\n";
+        const auto        unknown = [](const ALScriptProblems& problems) {
+            return std::any_of(problems.begin(), problems.end(), [](const ALScriptProblem& p) {
+                return p.file == "disk:/lib/a.luau" && p.message.find("Unknown require") != std::string::npos;
+            });
+        };
+        ALScriptProblems problems = service.check(script);
+        UNSCOPED_INFO("traced, the module's require reaches its module: " + said(problems));
+        CHECK_FALSE(unknown(problems));
+        // The same modules, the module's own require no longer traced: it
+        // reaches nothing, as the script's own would.
+        modules.reaches.pop_back();
+        service.setModules(modules);
+        problems = service.check(script);
+        UNSCOPED_INFO("untraced, it reaches nothing: " + said(problems));
+        CHECK(unknown(problems));
+        service.setModules({});
+        service.setDocument("");
+    }
+
+    TEST_CASE_METHOD(alluauservice_data, "alluauservice: what the module check hook throws is a problem the check tells, from any thread", "[alluauservice]")
+    {
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
+        service.setDocument("hooked");
+        service.setConfig(ALLuauConfig());
+        // Two modules: a throw inside Luau's own check of either would
+        // leave that module unrecorded, or end the lane.
+        ALLuauService::Modules modules;
+        modules.modules.push_back({ "disk:/lib/one.luau", "return { n = 1 }\n" });
+        modules.modules.push_back({ "disk:/lib/two.luau", "return { n = 2 }\n" });
+        modules.reaches.push_back({ "", "one", "disk:/lib/one.luau" });
+        modules.reaches.push_back({ "", "two", "disk:/lib/two.luau" });
+        service.setModules(modules);
+        service.setModuleCheckedHook([](const std::string& module) { throw std::runtime_error("hook failed in " + module); });
+        const std::string script = "local one = require(\"one\")\nlocal two = require(\"two\")\nprint(one.n + two.n)\n";
+        const auto        failed = [](const ALScriptProblems& problems) {
+            return std::any_of(problems.begin(), problems.end(), [](const ALScriptProblem& p) {
+                return p.key == "LuauInternalError" && p.message.find("hook failed") != std::string::npos;
+            });
+        };
+        ALScriptProblems problems = service.check(script);
+        UNSCOPED_INFO("told as a problem of the script's: " + said(problems));
+        CHECK(failed(problems));
+        // Without the hook, the script is checked again whole, and is fine.
+        service.setModuleCheckedHook(nullptr);
+        problems = service.check(script);
+        UNSCOPED_INFO("and checked again, clean: " + said(problems));
+        CHECK_FALSE(failed(problems));
+        CHECK(errors(problems) == size_t(0));
+        service.setModules({});
+        service.setDocument("");
     }
 }

@@ -116,6 +116,54 @@ namespace
         return (!path.empty() && path.front() == '\\') || (path.size() >= 2 && path[0] == '/' && path[1] == '/') ||
                (path.size() >= 2 && letter(path[0]) && path[1] == ':');
     }
+
+    // Whether XML carries the text as it is: no control character but a tab
+    // or a newline. A return it carries, but reads back as a newline, so
+    // text with one is not carried as it is.
+    bool xmlCarries(std::string_view text)
+    {
+        for (const char c : text)
+        {
+            if (static_cast<unsigned char>(c) < 0x20 && c != '\t' && c != '\n')
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // A string the world or the disk gave, as the file carries it: as it
+    // is, or as its bytes where XML would not carry it. The XML formatter
+    // escapes only XML's own five characters, and a control character in a
+    // name -- an object's, which anyone may give -- would leave the whole
+    // file unreadable at the next start.
+    LLSD textOut(const std::string& text)
+    {
+        if (xmlCarries(text))
+        {
+            return LLSD(text);
+        }
+        const U8* bytes = reinterpret_cast<const U8*>(text.data());
+        return LLSD(LLSD::Binary(bytes, bytes + text.size()));
+    }
+
+    // Back: a string as it is, or the bytes one was written as. False, and
+    // `out` as it was, for anything else.
+    bool textIn(const LLSD& value, std::string& out)
+    {
+        if (value.isString())
+        {
+            out = value.asString();
+            return true;
+        }
+        if (value.isBinary())
+        {
+            const LLSD::Binary& bytes = value.asBinary();
+            out.assign(bytes.begin(), bytes.end());
+            return true;
+        }
+        return false;
+    }
 }
 
 // static
@@ -379,12 +427,12 @@ LLSD ALMasterLinks::toLLSD() const
         LLSD uses = LLSD::emptyArray();
         for (const std::string& use : link.uses)
         {
-            uses.append(use);
+            uses.append(textOut(use));
         }
         LLSD record;
         record["object"]      = link.object;
         record["item"]        = link.item;
-        record["master"]      = link.master;
+        record["master"]      = textOut(link.master);
         record["made"]        = wordOf(link.made, MADE_WORDS);
         record["lua"]         = link.lua;
         if (link.notecard)
@@ -405,9 +453,9 @@ LLSD ALMasterLinks::toLLSD() const
         {
             record["missed"] = true;
         }
-        record["object_name"] = link.objectName;
-        record["item_name"]   = link.itemName;
-        record["region_name"] = link.regionName;
+        record["object_name"] = textOut(link.objectName);
+        record["item_name"]   = textOut(link.itemName);
+        record["region_name"] = textOut(link.regionName);
         record["linked"]      = link.linked;
         record["state"]       = wordOf(link.state, STATE_WORDS);
         if (link.orphanedSince.notNull())
@@ -439,12 +487,8 @@ ALMasterLinks ALMasterLinks::fromLLSD(const LLSD& llsd)
             continue;
         }
         ALMasterLink link;
-        if (!keyIn(record["object"], link.object) || !keyIn(record["item"], link.item) || link.item.isNull() || !record["master"].isString())
-        {
-            continue;
-        }
-        link.master = record["master"].asString();
-        if (link.master.empty())
+        if (!keyIn(record["object"], link.object) || !keyIn(record["item"], link.item) || link.item.isNull() ||
+            !textIn(record["master"], link.master) || link.master.empty())
         {
             continue;
         }
@@ -474,16 +518,17 @@ ALMasterLinks ALMasterLinks::fromLLSD(const LLSD& llsd)
         {
             for (LLSD::array_const_iterator use = uses.beginArray(); use != uses.endArray(); ++use)
             {
-                if (use->isString() && !use->asString().empty())
+                std::string one;
+                if (textIn(*use, one) && !one.empty())
                 {
-                    link.uses.push_back(use->asString());
+                    link.uses.push_back(std::move(one));
                 }
             }
         }
-        link.missed        = record["missed"].asBoolean();
-        link.objectName    = record["object_name"].asString();
-        link.itemName      = record["item_name"].asString();
-        link.regionName    = record["region_name"].asString();
+        link.missed = record["missed"].asBoolean();
+        textIn(record["object_name"], link.objectName);
+        textIn(record["item_name"], link.itemName);
+        textIn(record["region_name"], link.regionName);
         link.linked        = record["linked"].asDate();
         link.orphanedSince = record["orphaned_since"].asDate();
         out.put(std::move(link));

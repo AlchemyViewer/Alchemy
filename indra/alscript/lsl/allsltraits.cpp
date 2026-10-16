@@ -153,9 +153,45 @@ bool ALLSLTraits::uuidConstant(std::string_view name)
 
 namespace
 {
+    // Whether a division or a remainder may stop the script: an integer's
+    // or a float's by nought is a Math Error, so one by anything but a
+    // constant other than nought may be. A vector's remainder is a cross
+    // product and a rotation's quotient a product, which never fail.
+    bool mayFault(Tailslide::LSLExpression* expr)
+    {
+        using namespace Tailslide;
+        if (expr->getNodeSubType() != NODE_BINARY_EXPRESSION || (expr->getOperation() != OP_DIV && expr->getOperation() != OP_MOD))
+        {
+            return false;
+        }
+        LSLASTNode* divisor = expr->getChild(1);
+        if (!divisor)
+        {
+            return true;
+        }
+        const LSLIType type = divisor->getIType();
+        if (type != LST_INTEGER && type != LST_FLOATINGPOINT)
+        {
+            return false;
+        }
+        LSLConstant* cv = divisor->getConstantValue();
+        if (!cv)
+        {
+            return true;
+        }
+        switch (cv->getNodeSubType())
+        {
+            case NODE_INTEGER_CONSTANT: return static_cast<LSLIntegerConstant*>(cv)->getValue() == 0;
+            case NODE_FLOAT_CONSTANT: return static_cast<LSLFloatConstant*>(cv)->getValue() == 0.0f;
+            default: return true;
+        }
+    }
+
     // What changes nothing: no assignment, no print, no call but to a
     // library function that changes nothing -- pure, or, where `reads`,
-    // one whose result is the only point of calling it.
+    // one whose result is the only point of calling it -- and no division
+    // that may stop the script, whose error is as much an effect as a
+    // print.
     bool quiet(Tailslide::LSLASTNode* node, bool reads)
     {
         using namespace Tailslide;
@@ -179,7 +215,7 @@ namespace
         if (node->getNodeType() == NODE_EXPRESSION)
         {
             auto* expr = static_cast<LSLExpression*>(node);
-            if (operation_mutates(expr->getOperation()))
+            if (operation_mutates(expr->getOperation()) || mayFault(expr))
             {
                 return false;
             }

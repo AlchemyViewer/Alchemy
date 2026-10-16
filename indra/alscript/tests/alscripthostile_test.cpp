@@ -39,6 +39,8 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace
@@ -69,6 +71,46 @@ namespace
     {
         std::ifstream in(path, std::ios::binary);
         return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    }
+
+    // A script's tokens but for its layout, which is all the formatter may
+    // change: no blanks or breaks, and a comment without the trailing
+    // blanks that go with its line's, nor the break the text ends with,
+    // which a comment left open at the end takes in.
+    using Tokens = std::vector<std::pair<ALPreprocessor::Token::Kind, std::string>>;
+    Tokens tokensOf(std::string_view text, bool lua)
+    {
+        using Kind = ALPreprocessor::Token::Kind;
+        Tokens out;
+        for (ALPreprocessor::Token& t : ALPreprocessor::tokenize(text, lua))
+        {
+            if (t.kind == Kind::Space || t.kind == Kind::Newline)
+            {
+                continue;
+            }
+            if (t.kind == Kind::Comment)
+            {
+                t.text.erase(t.text.find_last_not_of(" \t\r\n") + 1);
+            }
+            out.emplace_back(t.kind, std::move(t.text));
+        }
+        return out;
+    }
+
+    // Where two scripts' tokens first differ, said; or nothing.
+    std::string tokenDifference(const Tokens& was, const Tokens& now)
+    {
+        for (size_t i = 0; i < was.size() || i < now.size(); ++i)
+        {
+            if (i >= was.size() || i >= now.size() || was[i] != now[i])
+            {
+                const auto say = [](const Tokens& of, size_t at) {
+                    return at < of.size() ? "kind " + std::to_string(static_cast<int>(of[at].first)) + " `" + of[at].second + "`" : std::string("nothing");
+                };
+                return "token " + std::to_string(i) + " was " + say(was, i) + ", now " + say(now, i);
+            }
+        }
+        return std::string();
     }
 
     // What the editor runs on an LSL script as it is pasted in and checked,
@@ -187,10 +229,47 @@ namespace
                 options.lua                        = path.extension() == ".luau";
                 const std::string whole            = ALScriptFormatter::format(text, options);
                 CHECK(whole.size() <= 600 * text.size() + 4096);
+                // Only the layout changed, and the formatter's own layout
+                // is what it would write again.
+                CHECK(tokenDifference(tokensOf(text, options.lua), tokensOf(whole, options.lua)) == std::string());
+                CHECK(ALScriptFormatter::format(whole, options) == whole);
                 const std::vector<std::string> each = ALScriptFormatter::formatEach(text, options, 0, static_cast<S32>(lines) - 1);
                 CHECK(each.size() == lines);
                 ALScriptFormatter::formatLines(text, options, static_cast<S32>(lines / 3), static_cast<S32>(lines / 2));
                 CHECK(ALScriptFormatter::breaksInStrings(text, options.lua).size() == lines);
+            }
+        }
+    }
+
+    // The same of each of Tailslide's test scripts, which between them
+    // write every operator LSL has next to every other: the formatter
+    // changes nothing but the layout of any of them, as the editor's
+    // Format relies on, and formats what it wrote the same again.
+    TEST_CASE("alscripthostile: the formatter changes no token of Tailslide's scripts and formats its own output the same", "[alscripthostile]")
+    {
+        std::vector<std::filesystem::path> scripts;
+        for (const std::filesystem::directory_entry& item : std::filesystem::directory_iterator(AL_ALSCRIPT_TEST_DIR "/tailslide/scripts"))
+        {
+            if (item.path().extension() == ".lsl")
+            {
+                scripts.push_back(item.path());
+            }
+        }
+        std::sort(scripts.begin(), scripts.end());
+        REQUIRE_FALSE(scripts.empty());
+        ALScriptFormatter::Options narrow;
+        narrow.width = 60;
+        for (const std::filesystem::path& path : scripts)
+        {
+            INFO(path.filename().string());
+            const std::string text = bytesOf(path);
+            const Tokens      was  = tokensOf(text, false);
+            for (const ALScriptFormatter::Options& options : { ALScriptFormatter::Options(), narrow })
+            {
+                INFO("width " << options.width);
+                const std::string whole = ALScriptFormatter::format(text, options);
+                CHECK(tokenDifference(was, tokensOf(whole, false)) == std::string());
+                CHECK(ALScriptFormatter::format(whole, options) == whole);
             }
         }
     }

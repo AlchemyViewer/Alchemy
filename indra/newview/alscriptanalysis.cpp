@@ -35,7 +35,10 @@
 #include "alsaid.h"
 #include "lltrans.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include <algorithm>
+#include <mutex>
 #include <optional>
 
 namespace
@@ -187,6 +190,33 @@ std::string alScriptKeyedWords(const std::string& key, const std::vector<std::st
     static const std::string MISSING("\x01");
     const std::string&       text = alSaidTemplate(key, MISSING);
     return text == MISSING ? english : ALScriptProblem::fill(text, args);
+}
+
+std::string alScriptKeyedWordsAnyThread(const std::string& key, const std::vector<std::string>& args, const std::string& english)
+{
+    if (key.empty())
+    {
+        return ALScriptProblem::fill(english, args);
+    }
+    // alSaidTemplate's cache is the main thread's. The strings LLTrans
+    // reads them from are parsed once, at startup, and only read after,
+    // so its own lookup is safe from any thread; what it finds kept here,
+    // under a lock, for the several hundred notes a conversion may write.
+    static std::mutex lock;
+    static boost::unordered_flat_map<std::string, std::optional<std::string>, ll::string_hash, std::equal_to<>> found;
+    std::optional<std::string> text;
+    {
+        const std::lock_guard<std::mutex> held(lock);
+        auto                              it = found.find(key);
+        if (it == found.end())
+        {
+            std::string skin;
+            const bool  has = LLTrans::findString(skin, key);
+            it              = found.emplace(key, has ? std::optional<std::string>(std::move(skin)) : std::nullopt).first;
+        }
+        text = it->second;
+    }
+    return ALScriptProblem::fill(text ? *text : english, args);
 }
 
 std::string alScriptProblemWords(const ALScriptProblem& problem)

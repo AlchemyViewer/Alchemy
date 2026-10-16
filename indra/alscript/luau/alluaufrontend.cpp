@@ -106,23 +106,41 @@ Luau::FrontendOptions ALLuauFrontend::limited() const
     }
     options.cancellationToken = stop;
     // Each module as Luau checks it, for its lints: noted as the script's
-    // whose check it is, and nothing more, since it may be on a thread of
-    // the pool's.
+    // whose check it is.
+    // Nothing may leave it: what it throws, inside Luau's own check, would
+    // leave that module unrecorded. It is kept for the check to tell.
     options.customModuleCheck = [this, script = moduleName](const Luau::SourceModule& source, const Luau::Module&) {
-        const std::lock_guard<std::mutex> lock(checkedMutex);
-        std::vector<std::string>&         noted = checkedNow[script];
-        if (std::find(noted.begin(), noted.end(), source.name) == noted.end())
+        try
         {
-            noted.push_back(source.name);
+            std::vector<std::string>& noted = checkedNow[script];
+            if (std::find(noted.begin(), noted.end(), source.name) == noted.end())
+            {
+                noted.push_back(source.name);
+            }
+            if (moduleChecked)
+            {
+                moduleChecked(source.name);
+            }
+        }
+        catch (...)
+        {
+            if (!checkFailure)
+            {
+                checkFailure = std::current_exception();
+            }
         }
     };
     return options;
 }
 
+std::exception_ptr ALLuauFrontend::takeCheckFailure()
+{
+    return std::exchange(checkFailure, nullptr);
+}
+
 std::vector<std::string> ALLuauFrontend::takeChecked()
 {
-    const std::lock_guard<std::mutex> lock(checkedMutex);
-    const auto                        noted = checkedNow.find(moduleName);
+    const auto noted = checkedNow.find(moduleName);
     if (noted == checkedNow.end())
     {
         return std::vector<std::string>();
@@ -134,7 +152,6 @@ std::vector<std::string> ALLuauFrontend::takeChecked()
 
 void ALLuauFrontend::forgetChecked(const std::string& name)
 {
-    const std::lock_guard<std::mutex> lock(checkedMutex);
     checkedNow.erase(name);
 }
 
@@ -184,14 +201,6 @@ void ALLuauFrontend::sync(std::string_view source)
     }
 }
 
-void ALLuauFrontend::timedOut(const Luau::ModulePtr& module)
-{
-    if (module && module->timeout)
-    {
-        frontend->markDirty(moduleName);
-    }
-}
-
 bool ALLuauFrontend::stoppedIn(bool checked)
 {
     if (!checked || !stopRequested())
@@ -205,47 +214,23 @@ bool ALLuauFrontend::stoppedIn(bool checked)
 
 Luau::CheckResult ALLuauFrontend::checkWithModules(const Luau::FrontendOptions& options)
 {
-    // Autocomplete's module is the old solver's alone.
-    const bool autocomplete = options.forAutocomplete && solver == Luau::SolverMode::Old;
-    // Several modules the script requires, to be checked now: else as
-    // Luau's own check, which is the same on one thread. Its own, not
-    // every kept script's.
-    const auto   required = requiredBy.find(moduleName);
-    const size_t modules  = required == requiredBy.end() ? 0 : required->second.size();
-    if (modules < 2 || !frontend->isDirty(moduleName, autocomplete))
+    // One module at a time, on this thread, though Luau could hand the
+    // independent ones to threads of their own (checkQueuedModules): every
+    // module's check writes the module's name into the one
+    // InternalErrorReporter the front end has (Frontend::iceHandler, which
+    // both solvers take), and reads it back for the error that says it
+    // ran out of time or was stopped, so two checks at once write the same
+    // string. Luau gives a check no reporter of its own, so until it does
+    // a script that requires several large modules waits for them one
+    // after another.
+    Luau::CheckResult result = frontend->check(moduleName, options);
+    // One that ran out of time -- the script or a module it requires --
+    // is kept by Luau as checked, its types as far as it got: made
+    // dirty, with the script that requires it, so that the next check
+    // runs it again, and says again that it stopped while it does.
+    for (const Luau::ModuleName& name : result.timeoutHits)
     {
-        return frontend->check(moduleName, options);
-    }
-    if (!modulePool)
-    {
-        modulePool = std::make_unique<ALLuauTaskPool>(ALLuauTaskPool::threadsWanted());
-    }
-    frontend->queueModuleCheck(moduleName);
-    const std::vector<Luau::ModuleName> checked =
-        frontend->checkQueuedModules(options, [this](std::vector<std::function<void()>> tasks) { modulePool->run(std::move(tasks)); });
-    // What each module checked now found, as Luau's check reports it.
-    Luau::CheckResult              result;
-    Luau::FrontendModuleResolver& resolver = autocomplete ? frontend->moduleResolverForAutocomplete : frontend->moduleResolver;
-    for (const Luau::ModuleName& name : checked)
-    {
-        const Luau::ModulePtr module = resolver.getModule(name);
-        if (!module)
-        {
-            continue;
-        }
-        if (module->cancelled)
-        {
-            return Luau::CheckResult();
-        }
-        if (module->timeout)
-        {
-            result.timeoutHits.push_back(name);
-        }
-        result.errors.insert(result.errors.end(), module->errors.begin(), module->errors.end());
-        if (name == moduleName)
-        {
-            result.lintResult = module->lintResult;
-        }
+        frontend->markDirty(name);
     }
     return result;
 }
@@ -257,7 +242,6 @@ bool ALLuauFrontend::checkScript(Luau::CheckResult* result)
     if (dirty)
     {
         ++checks;
-        timedOut(frontend->moduleResolver.getModule(moduleName));
         // The new solver's base is this module.
         if (solver == Luau::SolverMode::New)
         {
@@ -308,7 +292,6 @@ Luau::ModulePtr ALLuauFrontend::queried(std::string_view source, bool completion
             return nullptr;
         }
         baseTexts[moduleName] = std::string(source);
-        timedOut(frontend->moduleResolverForAutocomplete.getModule(moduleName));
     }
     return frontend->moduleResolverForAutocomplete.getModule(moduleName);
 }

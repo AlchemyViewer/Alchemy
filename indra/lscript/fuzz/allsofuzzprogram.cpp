@@ -320,9 +320,13 @@ namespace
             {
                 text += wild() ? WILD[pick(std::size(WILD))] : PIECES[pick(std::size(PIECES))];
             }
+            // A long one now and then, and now and then one of about half
+            // of memory: the first allocation of a script with no global
+            // string or list, whose heap entry then lands against the top of
+            // memory, which the allocator's header bounds were once wrong by.
             if (chance(16))
             {
-                text += std::string(pick(512), 'x');
+                text += std::string(pick(2) ? pick(512) : 7800 + pick(600), 'x');
             }
             return text + "\"";
         }
@@ -349,7 +353,9 @@ namespace
             case LST_LIST:
             {
                 std::string text = "[";
-                for (size_t i = 0, n = pick(6); i < n; ++i)
+                // Long now and then: a list's heap entry is a pointer an
+                // element, and its C++ copy a node an element.
+                for (size_t i = 0, n = chance(16) ? pick(200) : pick(6); i < n; ++i)
                 {
                     Type element = anyType();
                     if (element == LST_LIST)
@@ -428,7 +434,7 @@ namespace
         std::string listInitializer(int depth)
         {
             std::string text = "[";
-            for (size_t i = 0, n = pick(6); i < n; ++i)
+            for (size_t i = 0, n = chance(16) ? pick(200) : pick(6); i < n; ++i)
             {
                 Type element = anyType();
                 if (element == LST_LIST)
@@ -883,7 +889,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     const ll_fuzz_lso::Outcome outcome = ll_fuzz_lso::compileAndRun(text);
     if (print)
     {
-        std::cerr << (outcome.compiled ? "--- ran: " + (outcome.fault.empty() ? std::string("no fault") : outcome.fault) + "\n"
+        std::cerr << (outcome.compiled ? "--- ran: " + (outcome.fault.empty() ? std::string("no fault") : outcome.fault) +
+                                             (outcome.capped ? " (steps ran out)" : "") + "\n"
                                        : "--- not compiled\n" + outcome.messages + "--- end\n");
     }
     return 0;

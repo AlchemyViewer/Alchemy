@@ -49,6 +49,13 @@ cmake_dependent_option(
   OFF
 )
 cmake_dependent_option(
+  AL_REQUIRE_LSCRIPT
+  "Fail to configure if LL's LSL compiler (indra/lscript) and its tests cannot be built, rather than leave them out; CI's test rows set it"
+  OFF
+  "AL_BUILD_TESTS"
+  OFF
+)
+cmake_dependent_option(
   AL_TEST_PER_CASE
   "Register a Catch2 binary's test cases one CTest entry each, found when ctest runs, in place of one entry a test file: for finding a failure that comes from order or shared state"
   OFF
@@ -544,10 +551,25 @@ add_subdirectory(template_verifier)
 
 add_subdirectory(dullahan)
 add_subdirectory(llprecompiled)
+# The fuzzers' flags are Clang's, and libFuzzer runs on AddressSanitizer:
+# said here, before alscript adds -fsanitize=fuzzer-no-link, which another
+# compiler would refuse as an unknown option in place of this.
+if(
+  AL_BUILD_FUZZERS
+  AND (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR NOT "address" IN_LIST AL_SANITIZERS)
+)
+  message(FATAL_ERROR "AL_BUILD_FUZZERS needs Clang and address in AL_SANITIZERS")
+endif()
 add_subdirectory(alscript)
 if(AL_BUILD_TESTS)
-  # LL's LSL compiler, restored as a reference for the script tests.
+  # LL's LSL compiler, restored as a reference for the script tests. Left
+  # out, with the configuration report saying what it lacks, unless the
+  # build is one that must have it.
   add_subdirectory(lscript)
+  if(AL_REQUIRE_LSCRIPT AND NOT TARGET lscript_tests)
+    get_property(lscript_status GLOBAL PROPERTY AL_LSCRIPT_STATUS)
+    message(FATAL_ERROR "AL_REQUIRE_LSCRIPT: LL's LSL compiler and its tests are ${lscript_status}")
+  endif()
 endif()
 add_subdirectory(llaudio)
 add_subdirectory(llappearance)

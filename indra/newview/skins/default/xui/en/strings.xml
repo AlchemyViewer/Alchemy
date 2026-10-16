@@ -617,6 +617,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocBadCase">cannot find ':' or '{' after case</string>
 	<string name="PreprocBadDirective">ill formed preprocessor directive '#[1]'</string>
 	<string name="PreprocBadInclude">ill formed #include directive</string>
+	<string name="PreprocBadLoop">ill formed do loop</string>
 	<string name="PreprocBadParameters">ill formed parameter list of macro '[1]'</string>
 	<string name="PreprocBadSwitch">ill formed switch statement</string>
 	<string name="PreprocSwitchValueRepeated">the switch's value is worked out again for each case: put it in a local first</string>
@@ -1175,6 +1176,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="SluaRightFirstSet">LSL ran the right side of this before the left, and Luau runs the left first: [1] is set on one side and read or set on the other.</string>
 	<string name="SluaRightFirstCall">LSL ran the right side of this before the left, and Luau runs the left first: [1] sets [2], which the other side reads or sets too.</string>
 	<string name="SluaBit32Signed">bit32 answers 0 to 4294967295, where LSL's integers were signed: bit32.s32 makes the answer LSL's where it could pass 2147483647 and is read as a number.</string>
+	<string name="SluaFloatToInteger">bit32.s32 cuts a float toward nought as LSL's (integer) did; one past the 32-bit range it wraps around, where LSL gave -2147483648.</string>
 	<string name="SluaHexSign">SLua reads [1] as [2], where LSL wrapped it to [3]: bit32 takes either the same, so it stays as written where only bit32 reads it, and is [3] where it is read as a number.</string>
 	<string name="SluaIntegerPast32Bits">LSL reads [1] as -1: past 0xFFFFFFFF, the most its 32 bits hold, a number stops there.</string>
 	<string name="SluaListCompare">LSL compares lists by their lengths alone, and != answers the difference of them.</string>

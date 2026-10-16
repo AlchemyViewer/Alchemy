@@ -184,7 +184,10 @@ public:
     // that is not a key, is passed over, and the rest read; a field it does
     // not have, or cannot be read, is left as a new link has it; a way of
     // making or a state not known -- one a later version wrote -- is read
-    // as the most careful there is, a hint's link, suspended.
+    // as the most careful there is, a hint's link, suspended. A string the
+    // world or the disk gave -- a master, a use, a name -- that XML would
+    // not carry, one with a control character in it, is written as its
+    // bytes, and read back from either.
     LLSD                 toLLSD() const;
     static ALMasterLinks fromLLSD(const LLSD& llsd);
 

@@ -1077,6 +1077,8 @@ BOOL run_dup(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         printf("[0x%X]\tDUP\n", offset);
     offset++;
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_INTEGER]))
+        return FALSE;
     S32 value = bytestream2integer(buffer, sp);
     lscript_push(buffer, value);
     return FALSE;
@@ -1088,6 +1090,8 @@ BOOL run_dups(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         printf("[0x%X]\tDUPS\n", offset);
     offset++;
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_INTEGER]))
+        return FALSE;
     S32 value = bytestream2integer(buffer, sp);
     lscript_push(buffer, value);
     lsa_increase_ref_count(buffer, value);
@@ -1100,6 +1104,8 @@ BOOL run_dupl(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         printf("[0x%X]\tDUPL\n", offset);
     offset++;
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_INTEGER]))
+        return FALSE;
     S32 value = bytestream2integer(buffer, sp);
     lscript_push(buffer, value);
     lsa_increase_ref_count(buffer, value);
@@ -1113,6 +1119,8 @@ BOOL run_dupv(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
     offset++;
     S32 sp = get_register(buffer, LREG_SP);
     LLVector3 value;
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_VECTOR]))
+        return FALSE;
     bytestream2vector(value, buffer, sp);
     lscript_push(buffer, value);
     return FALSE;
@@ -1125,6 +1133,8 @@ BOOL run_dupq(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
     offset++;
     S32 sp = get_register(buffer, LREG_SP);
     LLQuaternion value;
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_QUATERNION]))
+        return FALSE;
     bytestream2quaternion(value, buffer, sp);
     lscript_push(buffer, value);
     return FALSE;
@@ -1139,6 +1149,8 @@ BOOL run_store(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
     if (b_print)
         printf("0x%X\n", arg);
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_INTEGER]))
+        return FALSE;
     S32 value = bytestream2integer(buffer, sp);
     lscript_local_store(buffer, arg, value);
     return FALSE;
@@ -1153,6 +1165,8 @@ BOOL run_stores(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
     if (b_print)
         printf("0x%X\n", arg);
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_INTEGER]))
+        return FALSE;
     S32 value = bytestream2integer(buffer, sp);
 
     S32 address = lscript_local_get(buffer, arg);
@@ -1173,6 +1187,8 @@ BOOL run_storel(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
     if (b_print)
         printf("0x%X\n", arg);
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_INTEGER]))
+        return FALSE;
     S32 value = bytestream2integer(buffer, sp);
 
     S32 address = lscript_local_get(buffer, arg);
@@ -1194,6 +1210,8 @@ BOOL run_storev(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         printf("0x%X\n", arg);
     LLVector3 value;
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_VECTOR]))
+        return FALSE;
     bytestream2vector(value, buffer, sp);
     lscript_local_store(buffer, arg, value);
     return FALSE;
@@ -1209,6 +1227,8 @@ BOOL run_storeq(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         printf("0x%X\n", arg);
     LLQuaternion value;
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_QUATERNION]))
+        return FALSE;
     bytestream2quaternion(value, buffer, sp);
     lscript_local_store(buffer, arg, value);
     return FALSE;
@@ -1223,6 +1243,8 @@ BOOL run_storeg(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
     if (b_print)
         printf("0x%X\n", arg);
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_INTEGER]))
+        return FALSE;
     S32 value = bytestream2integer(buffer, sp);
     lscript_global_store(buffer, arg, value);
     return FALSE;
@@ -1237,6 +1259,8 @@ BOOL run_storegs(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
     if (b_print)
         printf("0x%X\n", arg);
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_INTEGER]))
+        return FALSE;
     S32 value = bytestream2integer(buffer, sp);
 
     S32 address = lscript_global_get(buffer, arg);
@@ -1258,6 +1282,8 @@ BOOL run_storegl(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
     if (b_print)
         printf("0x%X\n", arg);
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_INTEGER]))
+        return FALSE;
     S32 value = bytestream2integer(buffer, sp);
 
     S32 address = lscript_global_get(buffer, arg);
@@ -1280,6 +1306,8 @@ BOOL run_storegv(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         printf("0x%X\n", arg);
     LLVector3 value;
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_VECTOR]))
+        return FALSE;
     bytestream2vector(value, buffer, sp);
     lscript_global_store(buffer, arg, value);
     return FALSE;
@@ -1295,6 +1323,8 @@ BOOL run_storegq(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         printf("0x%X\n", arg);
     LLQuaternion value;
     S32 sp = get_register(buffer, LREG_SP);
+    if (!lscript_check_stack_read(buffer, sp, LSCRIPTDataSize[LST_QUATERNION]))
+        return FALSE;
     bytestream2quaternion(value, buffer, sp);
     lscript_global_store(buffer, arg, value);
     return FALSE;
@@ -3154,6 +3184,12 @@ BOOL run_jumpif(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         {
             if (safe_heap_check_address(buffer, address + SIZEOF_SCRIPT_ALLOC_ENTRY, 1))
             {
+                // LL's own: lsa_get_list_ptr gives the list's first entry
+                // and getListLength counts the entries after it, so a list
+                // is true here with two or more entries, and one of one is
+                // false, as the grid's LSO has it (BUG-230728, which Mono
+                // does not have: wiki.secondlife.com/wiki/If). Kept, as the
+                // optimizer and the weigher are held against the grid's.
                 LLScriptLibData *list = lsa_get_list_ptr(buffer, base_address, TRUE);
                 if (list && list->getListLength())
                 {
@@ -3289,6 +3325,8 @@ BOOL run_jumpnif(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         {
             if (safe_heap_check_address(buffer, address + SIZEOF_SCRIPT_ALLOC_ENTRY, 1))
             {
+                // A list of one entry is false, as in run_jumpif: LL's own,
+                // the grid's LSO's.
                 LLScriptLibData *list = lsa_get_list_ptr(buffer, base_address, TRUE);
                 if (!list || !list->getListLength())
                 {
@@ -3326,6 +3364,15 @@ BOOL run_state(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
         major_version = 2;
     }
 
+    // The state is the instruction's: one the table counts, or the fault,
+    // before the next state's handlers are read from wherever its row
+    // would be.
+    if (get_state_row(buffer, state, major_version) < 0)
+    {
+        set_fault(buffer, LSRF_BOUND_CHECK_ERROR);
+        return FALSE;
+    }
+
     S32 current_state = get_register(buffer, LREG_CS);
     if (state != current_state)
     {
@@ -3350,28 +3397,36 @@ BOOL run_call(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
 
     S32 minimum = get_register(buffer, LREG_GFR);
     S32 maximum = get_register(buffer, LREG_SR);
-    S32 lookup = minimum + func*4 + 4;
-    S32 function;
-
-    if (  (lookup >= minimum)
-        &&(lookup < maximum))
+    if (maximum > TOP_OF_MEMORY)
     {
-        function = bytestream2integer(buffer, lookup) + minimum;
-        if (  (lookup >= minimum)
-            &&(lookup < maximum))
-        {
-            offset = function;
-            offset += bytestream2integer(buffer, function);
-        }
-        else
-        {
-            set_fault(buffer, LSRF_BOUND_CHECK_ERROR);
-        }
+        maximum = TOP_OF_MEMORY;
     }
-    else
+
+    // In 64 bits: the function number is the instruction's, and its table
+    // entry's offset wraps. The entry is held to the table, and then the
+    // function it names, which LL's tested the entry for a second time: an
+    // entry of 0x7FFF0000 read at GFR and anything.
+    S64 lookup = (S64)minimum + (S64)func*4 + 4;
+    if (minimum < 0 || lookup < minimum || lookup + 4 > maximum)
     {
         set_fault(buffer, LSRF_BOUND_CHECK_ERROR);
+        return FALSE;
     }
+    S32 entry = (S32)lookup;
+    S64 function = (S64)bytestream2integer(buffer, entry) + minimum;
+    if (function < minimum || function + 4 > maximum)
+    {
+        set_fault(buffer, LSRF_BOUND_CHECK_ERROR);
+        return FALSE;
+    }
+    S32 start = (S32)function;
+    S64 target = function + bytestream2integer(buffer, start);
+    if (target < minimum || target > maximum)
+    {
+        set_fault(buffer, LSRF_BOUND_CHECK_ERROR);
+        return FALSE;
+    }
+    offset = (S32)target;
     return FALSE;
 }
 
@@ -3509,24 +3564,10 @@ BOOL run_cast(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
                             S32 size = toffset - string;
                             char *arg = new char[size];
                             bytestream2char(arg, buffer, string, size);
-                            // S32 length = strlen(arg);
-                            S32 dest;
-                            S32 base;
-
-                            // Check to see if this is a hexidecimal number.
-                            if (  (arg[0] == '0') &&
-                                  (arg[1] == 'x' || arg[1] == 'X') )
-                            {
-                                // Let strtoul do a hex conversion.
-                                base = 16;
-                            }
-                            else
-                            {
-                                // Force base-10, so octal is never used.
-                                base = 10;
-                            }
-
-                            dest = strtoul(arg, NULL, base);
+                            // As LL's strtoul read it on the grid's 32-bit
+                            // hosts: hexadecimal only from a leading 0x,
+                            // never octal, -1 past 0xFFFFFFFF.
+                            S32 dest = lscript_string_to_integer(arg);
 
                             lscript_push(buffer, dest);
                             delete [] arg;
@@ -3773,6 +3814,15 @@ BOOL run_stacktos(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
 {
     offset++;
     S32 length = lscript_pop_int(buffer);
+    // The length is the stack's, which LL's compiler never pushes: a byte
+    // at least, the string's end, and no more than memory holds; and the
+    // last byte popped is that end, which LL's strlen looked for past the
+    // copy. The pops stop on a fault, which leaves the copy unfinished.
+    if (get_register(buffer, LREG_FR) || length < 1 || length > TOP_OF_MEMORY)
+    {
+        set_fault(buffer, LSRF_BOUND_CHECK_ERROR);
+        return FALSE;
+    }
     S32 i;
     char *arg = new char[length];
     S32 fault;
@@ -3783,6 +3833,12 @@ BOOL run_stacktos(U8 *buffer, S32 &offset, BOOL b_print, const LLUUID &id)
             break;
 
         arg[length - i - 1] = lscript_pop_char(buffer);
+    }
+    if (get_register(buffer, LREG_FR) || arg[length - 1] != 0)
+    {
+        set_fault(buffer, LSRF_BOUND_CHECK_ERROR);
+        delete [] arg;
+        return FALSE;
     }
     S32 address = lsa_heap_add_data(buffer, new LLScriptLibData(arg), get_max_heap_size(buffer), TRUE);
     lscript_push(buffer, address);
@@ -4046,7 +4102,7 @@ void lscript_run(const std::string& filename, BOOL b_debug)
         // to check how to abort or error out gracefully
         // from this function. XXXTBD
     }
-    LLFILE* file = LLFile::fopen(filename, "r");  /* Flawfinder: ignore */
+    LLFILE* file = LLFile::fopen(filename, LLFILE_MODE("r"));  /* Flawfinder: ignore */
     if(file)
     {
         execute = new LLScriptExecuteLSL2(file);

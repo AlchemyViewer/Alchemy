@@ -26,6 +26,7 @@
 
 #include "../preprocessor/aldiskincludes.h"
 
+#include "altestlinks.h"
 #include "fsyspath.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -120,7 +121,7 @@ namespace
         REQUIRE(blessed.folders().size() == size_t(1));
     }
 
-    TEST_CASE("aldiskincludes: links followed before judging; only sensibly sized ordinary files read", "[aldiskincludes]")
+    TEST_CASE("aldiskincludes: a link is followed before judging, so one out of the folder is not read", "[aldiskincludes]")
     {
         Scratch           s;
         const std::string secret = s.write("private/secret.txt", "the author's own\n");
@@ -128,19 +129,33 @@ namespace
         ALDiskIncludes blessed;
         blessed.bless(s.at("lib"));
 
+#if LL_WINDOWS
+        // Windows' own link to a folder, which any user may make, so it is
+        // tried on every Windows machine, where a symlink may not be.
+        UNSCOPED_INFO("nor a file through a junction to a folder outside");
+        REQUIRE(!ll_test::createDirectoryJunction(s.root / "private", s.root / "lib" / "hatch"));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/hatch/secret.txt")));
+#endif
         std::error_code ec;
         fs::create_symlink(fsyspath(secret), s.root / "lib" / "innocent.lsl", ec);
-        if (!ec)
+        if (ec)
         {
-            UNSCOPED_INFO("a link out of the folder is not read");
-            REQUIRE_FALSE(blessed.admits(s.at("lib/innocent.lsl")));
+            SKIP("no symlinks here: " << ec.message());
         }
+        UNSCOPED_INFO("a link out of the folder is not read");
+        REQUIRE_FALSE(blessed.admits(s.at("lib/innocent.lsl")));
         fs::create_directory_symlink(s.root / "private", s.root / "lib" / "door", ec);
-        if (!ec)
-        {
-            UNSCOPED_INFO("nor a file through a linked folder");
-            REQUIRE_FALSE(blessed.admits(s.at("lib/door/secret.txt")));
-        }
+        REQUIRE(!ec);
+        UNSCOPED_INFO("nor a file through a linked folder");
+        REQUIRE_FALSE(blessed.admits(s.at("lib/door/secret.txt")));
+    }
+
+    TEST_CASE("aldiskincludes: only sensibly sized ordinary files are read", "[aldiskincludes]")
+    {
+        Scratch s;
+        s.write("lib/util.lsl", "x\n");
+        ALDiskIncludes blessed;
+        blessed.bless(s.at("lib"));
 
         const std::string big = s.write("lib/big.lsl", std::string(static_cast<size_t>(ALDiskIncludes::MAX_BYTES) + 1, 'x'));
         UNSCOPED_INFO("a file past the limit is not read");
@@ -527,5 +542,44 @@ namespace
         }
         UNSCOPED_INFO("which, as itself, it may name");
         CHECK(blessed.mayFromConfig(s.at("lib/net"), s.at("lib")));
+    }
+
+    TEST_CASE("aldiskincludes: a DOS device's name under a blessed folder is refused before the disk is asked", "[aldiskincludes]")
+    {
+#if LL_WINDOWS
+        // Windows opens CON, PRN, AUX, NUL, COM1 to COM9 and LPT1 to LPT9,
+        // and COM and LPT with a superscript one, two or three, as the
+        // device wherever the name stands in a path, extension or not, so
+        // even asking how such a path stands opens it. Nothing here can
+        // see that the disk was not asked -- NUL answers, and COM3 may
+        // wait on a port -- so this says only what is answered.
+        Scratch           s;
+        const std::string script = s.write("lib/a.lsl", "integer a;\n");
+        ALDiskIncludes    blessed;
+        blessed.bless(s.at("lib"));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/NUL")));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/nul.lsl")));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/COM3.lsl")));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/lpt1")));
+        REQUIRE_FALSE(blessed.admits(s.at("lib/con/a.lsl")));
+        REQUIRE_FALSE(blessed.mayFromConfig(s.at("lib/aux"), s.at("lib")));
+        // ¹, ² and ³ in UTF-8, as a path's string is.
+        for (const char* name : { "COM\xC2\xB9", "com\xC2\xB2.lsl", "COM\xC2\xB3", "LPT\xC2\xB9.lsl", "lpt\xC2\xB2", "LPT\xC2\xB3" })
+        {
+            INFO(name);
+            CHECK_FALSE(blessed.admits(s.at(std::string("lib/") + name)));
+            CHECK_FALSE(blessed.mayFromConfig(s.at(std::string("lib/") + name), s.at("lib")));
+        }
+        UNSCOPED_INFO("a file is still a file");
+        CHECK(blessed.admits(script).value_or("") == script);
+        // A name that only begins like one is a file.
+        const std::string console = s.write("lib/console.lsl", "integer c;\n");
+        CHECK(blessed.admits(console).value_or("") == console);
+        const std::string com = s.write("lib/com10.lsl", "integer c;\n");
+        CHECK(blessed.admits(com).value_or("") == com);
+        // Nor is a superscript past three a digit to Windows.
+        const std::string four = s.write("lib/com\xE2\x81\xB4.lsl", "integer c;\n");
+        CHECK(blessed.admits(four).value_or("") == four);
+#endif
     }
 }

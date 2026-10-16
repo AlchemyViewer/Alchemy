@@ -110,14 +110,30 @@ namespace ll_test_lso
         EventArgs             args;
     };
 
-    // What a run said, the fault that stopped it if one did, and how many
-    // events it handled.
+    // What a run said, the fault that stopped it if one did, how many
+    // events it handled, and whether it was stopped by the step cap instead
+    // of settling: a script that spins, which no test's should unless it
+    // says so.
     struct Run
     {
         std::vector<std::string> said;
         std::string              error;
         U32                      events = 0;
+        bool                     capped = false;
     };
+
+    // Whether a run that hits the step cap fails the test: it does, unless
+    // the test says the script spins.
+    enum class Spin
+    {
+        Fails,
+        Allowed
+    };
+
+    // How many of the VM's steps state_entry and each event after it get:
+    // more than any test's script needs, so reaching it is a script that
+    // never settles.
+    constexpr U32 SETTLE_STEPS = 1000000;
 
     // The script compiled to LSO, which REQUIREs that it compiles.
     inline std::vector<U8> compileLSO(const std::string& text)
@@ -131,49 +147,62 @@ namespace ll_test_lso
     // The VM run an instruction at a time until it is idle -- no handler
     // running, no state change pending, nothing queued, and no event raised
     // that the state handles (one it does not, such as a state_entry it has
-    // no handler for, stays raised) -- or has run a fault, or a million
-    // instructions have gone by, which no test's script needs. Not by
-    // runQuanta, which spins out the whole of its time slice once a fault
-    // stops the script.
-    inline void settle(LLScriptExecuteLSL2& vm, const char*& error, U32& events)
+    // no handler for, stays raised) -- or has run a fault, or SETTLE_STEPS
+    // instructions have gone by. Not by runQuanta, which spins out the whole
+    // of its time slice once a fault stops the script. True when the VM
+    // settled or faulted; false when the cap stopped it, which a test takes
+    // as a script that hangs unless it expects one.
+    [[nodiscard]] inline bool settle(LLScriptExecuteLSL2& vm, const char*& error, U32& events)
     {
-        for (U32 step = 0; step < 1000000 && !error; ++step)
+        for (U32 step = 0; step < SETTLE_STEPS && !error; ++step)
         {
             vm.runInstructions(FALSE, LLUUID::null, &error, events, 1.f);
             if (vm.isFinished() && !vm.isStateChangePending() && vm.getEventCount() == 0 &&
                 (vm.getCurrentEvents() & vm.getEventHandlers()) == 0)
             {
-                break;
+                return true;
             }
         }
+        return error != nullptr;
     }
 
-    // The script compiled to LSO, state_entry run, and then each event added
-    // and run in turn, each until the VM settles, with the test library.
-    inline Run runLSO(const std::string& text, const std::vector<Event>& events = {})
+    // An LSO image run: state_entry, and then each event added and run in
+    // turn, each until the VM settles, with the test library. A run the
+    // step cap stopped is capped, handles no later event, and fails the
+    // test unless spin says the script is expected to.
+    inline Run runLSOImage(const std::vector<U8>& image, const std::vector<Event>& events = {}, Spin spin = Spin::Fails)
     {
-        const std::vector<U8> image = compileLSO(text);
-
         Run run;
         gSaid.clear();
         {
             const TestLibrary   library;
             LLScriptExecuteLSL2 vm(image.data(), static_cast<U32>(image.size()));
             const char*         error = nullptr;
-            settle(vm, error, run.events);
+            run.capped                = !settle(vm, error, run.events);
             for (const Event& event : events)
             {
-                if (error)
+                if (error || run.capped)
                 {
                     break;
                 }
                 vm.addEvent(event.args.make(event.type));
-                settle(vm, error, run.events);
+                run.capped = !settle(vm, error, run.events);
             }
             run.error = error ? error : "";
         }
         run.said = std::move(gSaid);
         gSaid.clear();
+        if (spin == Spin::Fails)
+        {
+            INFO("the VM ran " << SETTLE_STEPS << " instructions without settling: the script hangs");
+            CHECK_FALSE(run.capped);
+        }
         return run;
+    }
+
+    // The script compiled to LSO and run as above.
+    inline Run runLSO(const std::string& text, const std::vector<Event>& events = {}, Spin spin = Spin::Fails)
+    {
+        return runLSOImage(compileLSO(text), events, spin);
     }
 }

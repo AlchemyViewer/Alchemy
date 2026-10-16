@@ -12,6 +12,7 @@ target_sources(
   PRIVATE
     altestfatal.cpp
     altesthelper.cpp
+    altestlinks.cpp
     altestlogreplay.cpp
     altestmain.cpp
     altestmatchers.cpp
@@ -29,6 +30,7 @@ target_sources(
         altestfailure.h
         altestfatal.h
         altesthelper.h
+        altestlinks.h
         altestlogreplay.h
         altestmatchers.h
         altestname.h

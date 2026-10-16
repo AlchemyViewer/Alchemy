@@ -25,6 +25,7 @@
 
 #include "linden_common.h"
 
+#include "alpreprocessor.h"
 #include "alscriptformatter.h"
 
 #include <fuzzer/FuzzedDataProvider.h>
@@ -35,6 +36,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace
@@ -51,13 +54,37 @@ namespace
             std::abort();
         }
     }
+
+    // A script's tokens but for its layout, which is all the formatter may
+    // change (alscriptformatter.h): no blanks or breaks, and a comment
+    // without the trailing blanks that go with its line's, nor the break
+    // the text ends with, which a comment left open at the end takes in.
+    std::vector<std::pair<ALPreprocessor::Token::Kind, std::string>> tokensOf(std::string_view text, bool lua)
+    {
+        using Kind = ALPreprocessor::Token::Kind;
+        std::vector<std::pair<Kind, std::string>> out;
+        for (ALPreprocessor::Token& t : ALPreprocessor::tokenize(text, lua))
+        {
+            if (t.kind == Kind::Space || t.kind == Kind::Newline)
+            {
+                continue;
+            }
+            if (t.kind == Kind::Comment)
+            {
+                t.text.erase(t.text.find_last_not_of(" \t\r\n") + 1);
+            }
+            out.emplace_back(t.kind, std::move(t.text));
+        }
+        return out;
+    }
 }
 
 // The input's last bytes choose the options and the lines asked for, the
-// rest is the script: formatted whole, line for line, a few lines alone,
-// and its strings' breaks found, as the studio's Format does on the main
-// thread. Longer than the about 256 KiB of source the grid takes is no
-// script.
+// rest is the script: formatted whole -- which changes nothing but the
+// layout, and which formatted again is itself -- line for line, a few
+// lines alone, and its strings' breaks found, as the studio's Format does
+// on the main thread. Longer than the about 256 KiB of source the grid
+// takes is no script.
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 {
     if (size > 262144 + 16)
@@ -80,6 +107,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 
     const std::string whole = ALScriptFormatter::format(text, options);
     require(whole.size() <= 600 * text.size() + 4096, "format wrote out far more than it was given");
+    require(tokensOf(whole, options.lua) == tokensOf(text, options.lua), "format changed a token, not only the layout");
+    require(ALScriptFormatter::format(whole, options) == whole, "format of what format wrote differs from it");
     const std::vector<std::string> each = ALScriptFormatter::formatEach(text, options, 0, static_cast<S32>(lines) - 1);
     require(each.size() == lines, "formatEach gave a line count other than the text's");
     const std::vector<std::string> some = ALScriptFormatter::formatEach(text, options, from, to);

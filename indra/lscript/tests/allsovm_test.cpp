@@ -19,17 +19,20 @@
 
 #include "linden_common.h"
 
+#include "../lscript_alloc.h"
 #include "allsovmrun.h"
 #include "altestsanitizer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -37,6 +40,7 @@ namespace
     using ll_test_lso::Event;
     using ll_test_lso::EventArgs;
     using ll_test_lso::runLSO;
+    using ll_test_lso::Spin;
     using Said = std::vector<std::string>;
 
     // A library function, by its name.
@@ -346,25 +350,29 @@ namespace
     // What a regression script's header says comes of it: the fault on its
     // "// expect fault: " line, none without one, and what it says on its
     // "// expect said: " lines, in order; or, with an "// expect refused: "
-    // line, that LL's compiler refuses it, saying that. A "// deeper than
-    // ThreadSanitizer follows" line says LL's compiler recurses on it past
+    // line, that LL's compiler refuses it, saying that. An "// expect spins"
+    // line says its run never settles, so that the step cap is what ends
+    // it, expected rather than a hang. A "// deeper than ThreadSanitizer
+    // follows" line says LL's compiler recurses on it past
     // ll_test::THREAD_SANITIZER_FRAMES, so that a ThreadSanitizer build
-    // passes it over.
+    // passes it over. A comment line that begins as an expectation --
+    // "expect" the first word after the slashes -- but is none of these is
+    // kept as unknown, so that a misspelt one fails the script rather than
+    // holding it to nothing.
     struct Expected
     {
-        std::string fault;
-        Said        said;
-        std::string refused;
-        bool        tooDeepForTsan = false;
+        std::string              fault;
+        Said                     said;
+        std::string              refused;
+        bool                     spins          = false;
+        bool                     tooDeepForTsan = false;
+        std::vector<std::string> unknown;
     };
 
     Expected expectedOf(const std::string& text)
     {
-        static const std::string FAULT   = "// expect fault:";
-        static const std::string SAID    = "// expect said:";
-        static const std::string REFUSED = "// expect refused:";
-        Expected                 expected;
-        size_t                   at = 0;
+        Expected expected;
+        size_t   at = 0;
         while (at < text.size())
         {
             size_t end = text.find('\n', at);
@@ -375,25 +383,123 @@ namespace
             {
                 line.pop_back();
             }
-            auto value = [&line](const std::string& prefix) { return line.substr(line.size() > prefix.size() ? prefix.size() + 1 : prefix.size()); };
-            if (line.starts_with(FAULT))
-            {
-                expected.fault = value(FAULT);
-            }
-            else if (line.starts_with(SAID))
-            {
-                expected.said.push_back(value(SAID));
-            }
-            else if (line.starts_with(REFUSED))
-            {
-                expected.refused = value(REFUSED);
-            }
-            else if (line == "// deeper than ThreadSanitizer follows")
+            if (line == "// deeper than ThreadSanitizer follows")
             {
                 expected.tooDeepForTsan = true;
+                continue;
+            }
+            // "//", spaces, "expect" as a word of its own in any case, then
+            // the kind up to the colon, and the value after the colon less
+            // the one space that follows it, as "// expect said:" alone is
+            // an empty line said.
+            std::string_view rest = line;
+            if (!rest.starts_with("//"))
+            {
+                continue;
+            }
+            rest.remove_prefix(2);
+            rest.remove_prefix(std::min(rest.find_first_not_of(' '), rest.size()));
+            auto lowered = [](std::string_view word)
+            {
+                std::string out(word);
+                for (char& c : out)
+                {
+                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                }
+                return out;
+            };
+            constexpr std::string_view EXPECT = "expect";
+            if (lowered(rest.substr(0, EXPECT.size())) != EXPECT ||
+                (rest.size() > EXPECT.size() && rest[EXPECT.size()] != ' ' && rest[EXPECT.size()] != ':'))
+            {
+                continue;
+            }
+            rest.remove_prefix(EXPECT.size());
+            rest.remove_prefix(std::min(rest.find_first_not_of(' '), rest.size()));
+            const size_t      colon = rest.find(':');
+            const std::string kind  = lowered(rest.substr(0, colon));
+            std::string_view  value = colon == std::string_view::npos ? std::string_view() : rest.substr(colon + 1);
+            if (value.starts_with(' '))
+            {
+                value.remove_prefix(1);
+            }
+            const bool valued = colon != std::string_view::npos;
+            if (kind == "fault" && valued)
+            {
+                expected.fault = std::string(value);
+            }
+            else if (kind == "said" && valued)
+            {
+                expected.said.emplace_back(value);
+            }
+            else if (kind == "refused" && valued)
+            {
+                expected.refused = std::string(value);
+            }
+            else if (kind == "spins" && !valued)
+            {
+                expected.spins = true;
+            }
+            else
+            {
+                expected.unknown.push_back(line);
             }
         }
         return expected;
+    }
+
+    std::string joined(const std::vector<std::string>& lines)
+    {
+        std::string out;
+        for (const std::string& line : lines)
+        {
+            out += (out.empty() ? "" : " | ") + line;
+        }
+        return out;
+    }
+
+    TEST_CASE("allsovm: a regression header's expectations are read and one misspelt is refused", "[allsovm]")
+    {
+        const Expected good = expectedOf("// What the bug was, which expects nothing of the reader.\n"
+                                         "//\n"
+                                         "// expect fault: Math Error\r\n"
+                                         "// expect said: before\n"
+                                         "// expect said:\n"
+                                         "// Expect said:  two spaces kept\n"
+                                         "// expect spins\n"
+                                         "// deeper than ThreadSanitizer follows\n"
+                                         "default { state_entry() { } }\n");
+        CHECK(good.fault == "Math Error");
+        CHECK(good.said == Said{ "before", "", " two spaces kept" });
+        CHECK(good.refused.empty());
+        CHECK(good.spins);
+        CHECK(good.tooDeepForTsan);
+        CHECK(good.unknown.empty());
+
+        const Expected bad = expectedOf("// expect fualt: Math Error\n"
+                                        "//expect said before\n"
+                                        "// expect: said\n"
+                                        "// expect spins: yes\n"
+                                        "//  expect refused: out of memory\n");
+        CHECK(bad.unknown == Said{ "// expect fualt: Math Error", "//expect said before", "// expect: said", "// expect spins: yes" });
+        CHECK(bad.refused == "out of memory");
+        CHECK(bad.fault.empty());
+        CHECK_FALSE(bad.spins);
+    }
+
+    TEST_CASE("allsovm: a script that never settles is a capped run and not a clean one", "[allsovm]")
+    {
+        const ll_test_lso::Run run = runLSO(entry(R"lsl(
+            llSay(0, "forever");
+            integer i;
+            while (TRUE) i++;
+        )lsl"),
+                                            { { LSTT_TOUCH_START, EventArgs().integer(1) } }, Spin::Allowed);
+        CHECK(run.capped);
+        CHECK(run.error.empty());
+        UNSCOPED_INFO("nothing more is sent to a script that spins");
+        CHECK(run.events == (U32)1);
+        CHECK(run.said == Said{ "forever" });
     }
 
     // Each script in tests/regressions: a fault the sanitizers found in LL's
@@ -418,6 +524,10 @@ namespace
             const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             REQUIRE_FALSE(text.empty());
             const Expected expected = expectedOf(text);
+            {
+                INFO("header lines that read as expectations but are none the runner knows: " << joined(expected.unknown));
+                CHECK(expected.unknown.empty());
+            }
             if (ll_test::THREAD_SANITIZER && expected.tooDeepForTsan)
             {
                 continue;
@@ -430,9 +540,12 @@ namespace
                 CHECK(lso.messages.find(expected.refused) != std::string::npos);
                 continue;
             }
-            const ll_test_lso::Run run = runLSO(text);
+            const ll_test_lso::Run run = runLSO(text, {}, Spin::Allowed);
             CHECK(run.error == expected.fault);
             CHECK(run.said == expected.said);
+            UNSCOPED_INFO((expected.spins ? "its header says it spins, so its run must be capped"
+                                          : "its run was capped: it never settles, which its header does not say"));
+            CHECK(run.capped == expected.spins);
         }
     }
 
@@ -549,7 +662,7 @@ namespace
         U32         events = 0;
         {
             LLScriptExecuteLSL2 first(image.data(), static_cast<U32>(image.size()));
-            ll_test_lso::settle(first, error, events);
+            REQUIRE(ll_test_lso::settle(first, error, events));
             REQUIRE_FALSE(error);
             REQUIRE(first.writeState(&saved, 0, 0) > 0);
         }
@@ -557,12 +670,12 @@ namespace
         CHECK(again.readState(saved) >= 0);
         delete[] saved;
         again.addEvent(EventArgs().integer(2).make(LSTT_TOUCH_START));
-        ll_test_lso::settle(again, error, events);
+        CHECK(ll_test_lso::settle(again, error, events));
 
         again.reset();
-        ll_test_lso::settle(again, error, events);
+        CHECK(ll_test_lso::settle(again, error, events));
         again.addEvent(EventArgs().integer(1).make(LSTT_TOUCH_START));
-        ll_test_lso::settle(again, error, events);
+        CHECK(ll_test_lso::settle(again, error, events));
 
         CHECK_FALSE(error);
         CHECK(ll_test_lso::gSaid == Said{ "7started5started<1.000000, 2.000000, 3.000000>",
@@ -603,5 +716,168 @@ namespace
                                 "5 él hélo 2 hXéllo hllo",
                                 "-2147483648 0.000000 2.000000 1024.000000 3 -2 2 ABC",
                                 "5.000000 <0.00000, 0.00000, 1.00000> 1 é233" });
+    }
+    // ---- what a review of the VM's memory found, each held here ------------
+
+    TEST_CASE("allsovm: a heap entry's header is bounded whole and the first block's split checks the stack first", "[allsovm]")
+    {
+        // The header's seven bytes lie within memory or are the fault: LL's
+        // bound let one start up to the top of memory, and a guard past it
+        // caught the seven bytes written there.
+        {
+            std::vector<U8> memory(TOP_OF_MEMORY + 16, 0xAB);
+            std::fill(memory.begin(), memory.begin() + TOP_OF_MEMORY, 0);
+            U8* buffer = memory.data();
+            set_register(buffer, LREG_TM, TOP_OF_MEMORY);
+            for (S32 at = TOP_OF_MEMORY - SIZEOF_SCRIPT_ALLOC_ENTRY + 1; at <= TOP_OF_MEMORY; ++at)
+            {
+                INFO("a header at " << at);
+                set_register(buffer, LREG_FR, 0);
+                S32 offset = at;
+                alloc_entry2bytestream(buffer, offset, LLScriptAllocEntry(5, LST_INTEGER));
+                CHECK(get_register(buffer, LREG_FR) == LSRF_BOUND_CHECK_ERROR);
+                set_register(buffer, LREG_FR, 0);
+                offset = at;
+                LLScriptAllocEntry entry;
+                bytestream2alloc_entry(entry, buffer, offset);
+                CHECK(get_register(buffer, LREG_FR) == LSRF_BOUND_CHECK_ERROR);
+            }
+            CHECK(std::all_of(memory.begin() + TOP_OF_MEMORY, memory.end(), [](U8 byte) { return byte == 0xAB; }));
+            set_register(buffer, LREG_FR, 0);
+            S32 offset = TOP_OF_MEMORY - SIZEOF_SCRIPT_ALLOC_ENTRY;
+            alloc_entry2bytestream(buffer, offset, LLScriptAllocEntry(5, LST_INTEGER));
+            UNSCOPED_INFO("the last place one fits");
+            CHECK(get_register(buffer, LREG_FR) == 0);
+            CHECK(offset == TOP_OF_MEMORY);
+        }
+
+        // The first block free and running under the stack, as a crafted
+        // state leaves it: the collision, with the stack as it was. LL's
+        // split wrote the data and the rest's header first, and raised the
+        // collision after.
+        {
+            std::vector<U8> memory(TOP_OF_MEMORY, 0);
+            U8*             buffer = memory.data();
+            const S32       hr = 1000, sp = 1100;
+            set_register(buffer, LREG_TM, TOP_OF_MEMORY);
+            set_register(buffer, LREG_HR, hr);
+            set_register(buffer, LREG_HP, hr + SIZEOF_SCRIPT_ALLOC_ENTRY);
+            set_register(buffer, LREG_SP, sp);
+            set_register(buffer, LREG_BP, sp);
+            lsa_create_heap(buffer + hr, TOP_OF_MEMORY - hr - SIZEOF_SCRIPT_ALLOC_ENTRY);
+            std::fill(memory.begin() + sp, memory.end(), 0xCD);
+            const std::string text(200, 's');
+            const S32         address = lsa_heap_add_data(buffer, new LLScriptLibData(text.c_str()), get_max_heap_size(buffer), TRUE);
+            CHECK(address == 0);
+            CHECK(get_register(buffer, LREG_FR) == LSRF_STACK_HEAP_COLLISION);
+            CHECK(std::all_of(memory.begin() + sp, memory.end(), [](U8 byte) { return byte == 0xCD; }));
+        }
+    }
+
+    TEST_CASE("allsovm: a string literal of about half of memory is said or is the collision, whichever its length leaves", "[allsovm]")
+    {
+        // The literal is in the code, and its copy on the heap lands against
+        // the top of memory somewhere in this range of lengths: each is said
+        // whole or is the collision, nothing else, and under a sanitizer
+        // nothing past the buffer.
+        bool said = false, collided = false;
+        for (size_t length = 8020; length <= 8160; ++length)
+        {
+            INFO("a literal of " << length);
+            const ll_test_lso::Run run = runLSO(entry("llSay(0, \"" + std::string(length, 'x') + "\");"));
+            if (run.error.empty())
+            {
+                REQUIRE(run.said.size() == 1);
+                CHECK(run.said[0].size() == length);
+                said = true;
+            }
+            else
+            {
+                CHECK(run.error == "Stack-Heap Collision");
+                CHECK(run.said.empty());
+                collided = true;
+            }
+        }
+        CHECK(said);
+        CHECK(collided);
+    }
+
+    TEST_CASE("allsovm: a list of one entry is false in a condition and one of two is true, as the grid's LSO has it", "[allsovm]")
+    {
+        // LL's own, pinned (BUG-230728): a list is true with two or more
+        // entries. Mono's is true with one. The function without parameters
+        // or locals is the compiler's print of either, once of nulls.
+        const ll_test_lso::Run run = runLSO(entry(R"lsl(
+            list none = [];
+            list one = [1];
+            list two = [1, 2];
+            if (none) llSay(0, "none"); else llSay(0, "!none");
+            if (one) llSay(0, "one"); else llSay(0, "!one");
+            if (two) llSay(0, "two"); else llSay(0, "!two");
+            while (one) llSay(0, "never");
+            if (one + [2]) llSay(0, "one + 1");
+            said();
+        )lsl", "said() { llSay(0, \"said\"); }\n"));
+        CHECK(run.error.empty());
+        CHECK(run.said == Said{ "!none", "!one", "two", "one + 1", "said" });
+    }
+
+    TEST_CASE("allsovm: a string past 32 bits casts to -1 on every host, in the VM's cast and the library's", "[allsovm]")
+    {
+        // As the grid's 32-bit strtoul read them: past 0xFFFFFFFF, -1
+        // whatever the sign; within it, wrapped; a negative made in 32 bits;
+        // hexadecimal only from a leading 0x. The optimizer folds them so.
+        const ll_test_lso::Run run = runLSO(entry(R"lsl(
+            llSay(0, (string)((integer)"4294967296") + " " + (string)((integer)"-4294967296") + " " + (string)((integer)"0x1FFFFFFFF") + " " + (string)((integer)"99999999999999999999"));
+            llSay(0, (string)((integer)"3000000000") + " " + (string)((integer)"-3000000000") + " " + (string)((integer)" 12abc") + " " + (string)((integer)"0x10") + " " + (string)((integer)"-0x10") + " " + (string)((integer)"-2147483648") + " " + (string)((integer)"- 5") + " " + (string)((integer)"+7"));
+            llSay(0, (string)llList2Integer(["4294967296"], 0) + " " + (string)llList2Integer(["-4294967296"], 0) + " " + (string)llList2Integer(["3000000000"], 0) + " " + (string)llList2Integer(["0x1FFFFFFFF"], 0) + " " + (string)llList2Integer(["-3000000000"], 0));
+        )lsl"));
+        CHECK(run.error.empty());
+        CHECK(run.said == Said{ "-1 -1 -1 -1", "-1294967296 1294967296 12 16 0 -2147483648 0 7", "-1 -1 -1294967296 -1 1294967296" });
+    }
+
+    TEST_CASE("allsovm: a list of many entries is let go without a frame an entry", "[allsovm]")
+    {
+        // Three hundred thousand entries, which LL's destructor let go by
+        // recursion, a frame an entry, past a megabyte of stack.
+        {
+            LLScriptLibData* list = new LLScriptLibData;
+            list->mType          = LST_LIST;
+            LLScriptLibData* tip = list;
+            for (S32 i = 0; i < 300000; ++i)
+            {
+                tip->mListp = new LLScriptLibData(i);
+                tip         = tip->mListp;
+            }
+            CHECK(list->getListLength() == 300000);
+            delete list;
+        }
+        // And the list llCSV2List makes of thousands of commas, which the
+        // heap has no room for: the collision, and the list let go.
+        const ll_test_lso::Run run = runLSO(entry(R"lsl(
+            string s = ",";
+            integer i;
+            for (i = 0; i < 12; ++i) s += s;
+            llSay(0, (string)llGetListLength(llCSV2List(s)));
+        )lsl"));
+        CHECK(run.error == "Stack-Heap Collision");
+        CHECK(run.said.empty());
+    }
+
+    TEST_CASE("allsovm: a function table entry pointing anywhere is the bound fault, not a read there", "[allsovm]")
+    {
+        // The entry is the image's: LL's bounded the entry's place a second
+        // time instead of the function's, and read at GFR plus the entry.
+        std::vector<U8> image = ll_test_lso::compileLSO("integer f() { return 1; }\ndefault { state_entry() { llSay(0, (string)f()); } }\n");
+        {
+            const ll_test_lso::Run whole = ll_test_lso::runLSOImage(image);
+            CHECK(whole.error.empty());
+            CHECK(whole.said == Said{ "1" });
+        }
+        S32 at = get_register(image.data(), LREG_GFR) + LSCRIPTDataSize[LST_INTEGER];
+        integer2bytestream(image.data(), at, 0x7FFF0000);
+        const ll_test_lso::Run crafted = ll_test_lso::runLSOImage(image);
+        CHECK(crafted.error == "Bounds Check Error");
+        CHECK(crafted.said.empty());
     }
 }

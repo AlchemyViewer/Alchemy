@@ -324,13 +324,13 @@ void ALScriptDiskMasters::send(const ALScriptRef& ref, ALMasterPlan::Send kind)
     }
 }
 
-void ALScriptDiskMasters::finished(const Outcome& outcome, const std::optional<ALMasterLink>& updated)
+void ALScriptDiskMasters::finished(const Outcome& outcome, const ALMasterLink& began, const std::optional<ALMasterLink>& updated)
 {
     // Unless let go of while it was on its way. Saved as another item, the
-    // link is that one's.
+    // link is that one's; changed meanwhile, it keeps what was done to it.
     if (ALMasterIndex* index = updated ? links() : nullptr)
     {
-        index->finished(outcome.ref.object, outcome.ref.item, *updated);
+        index->finished(began, *updated);
     }
     tell(outcome);
     startTurns(mQueue.finished(outcome.ref.id()));

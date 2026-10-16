@@ -74,6 +74,18 @@ namespace
             return envelope;
         }
 
+        // The header a save writes for an envelope as it stands: its hash
+        // is of the target, the source and the code, so one made before a
+        // field changed is no longer the envelope's.
+        static std::string hashedHeader(const ALScriptEnvelope& envelope)
+        {
+            ALUploadHeader fields;
+            fields.file = envelope.lua ? "net/door.luau" : "net/door.lsl";
+            fields.hash = ALUploadHeader::hashOf(envelope.compileTarget, envelope.source, envelope.expanded);
+            fields.date = "2026-10-07 14:03:11";
+            return fields.write(envelope.lua);
+        }
+
         static std::vector<std::string> linesOf(const std::string& asset)
         {
             std::vector<std::string> lines;
@@ -396,6 +408,7 @@ namespace
         // With no target line, it follows the date.
         ALScriptEnvelope untargeted = alscriptenvelope_data::made(false, true);
         untargeted.compileTarget.clear();
+        untargeted.header = hashedHeader(untargeted);
         std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(untargeted.wrap());
         {
             INFO("untargeted: the header taken");
@@ -420,6 +433,7 @@ namespace
         // the code's.
         ALScriptEnvelope twice = alscriptenvelope_data::made(false, true);
         twice.expanded         = twice.header + twice.expanded;
+        twice.header           = hashedHeader(twice);
         back                   = ALScriptEnvelope::parse(twice.wrap());
         {
             INFO("one header taken");
@@ -500,6 +514,45 @@ namespace
             REQUIRE(says.has_value());
             UNSCOPED_INFO("the hash again");
             REQUIRE(ALUploadHeader::hashOf(came->compileTarget, came->source, came->expanded) == says->hash);
+        }
+    }
+
+    TEST_CASE_METHOD(alscriptenvelope_data, "alscriptenvelope: a compiled half with nothing in it did not come of an expansion with something", "[alscriptenvelope]")
+    {
+        CHECK_FALSE(ALScriptEnvelope::compiledFrom("integer g;", "// x", false));
+        CHECK_FALSE(ALScriptEnvelope::compiledFrom("integer g;", "", false));
+        CHECK(ALScriptEnvelope::compiledFrom("// only this", "", false));
+        CHECK_FALSE(ALScriptEnvelope::compiledFrom("local n = 1", "-- x", true));
+    }
+
+    TEST_CASE_METHOD(alscriptenvelope_data, "alscriptenvelope: an author's banner shaped like a header is the code's, and ours is taken out", "[alscriptenvelope]")
+    {
+        for (const bool lua : { false, true })
+        {
+            CAPTURE(lua);
+            // A banner naming us at the top of the author's script, which
+            // the expansion begins with as the source does: not a header,
+            // since its hash is not of this envelope, or it has none.
+            for (const bool hashed : { true, false })
+            {
+                CAPTURE(hashed);
+                ALUploadHeader banner;
+                banner.file = "theirs/own.lsl";
+                banner.hash = hashed ? "xxh128:00000000000000000000000000000000" : "";
+                banner.date = "2026-01-01 00:00:00";
+                ALScriptEnvelope envelope = made(lua, false);
+                envelope.expanded         = banner.write(lua) + envelope.expanded;
+                const std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(envelope.wrap());
+                REQUIRE(back.has_value());
+                CHECK(back->header.empty());
+                CHECK(back->expanded == envelope.expanded);
+            }
+            // Ours, whose hash is of the envelope, comes out as before.
+            const ALScriptEnvelope                ours = made(lua, true);
+            const std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(ours.wrap());
+            REQUIRE(back.has_value());
+            CHECK(back->header == ours.header);
+            CHECK(back->expanded == ours.expanded);
         }
     }
 }

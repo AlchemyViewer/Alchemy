@@ -30,6 +30,7 @@
 #include "../lsl/optimizer/allsloptimizer.h"
 #include "../lsl/allslservice.h"
 #include "../lsl/allsltraits.h"
+#include "alteststateguard.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -1307,6 +1308,9 @@ namespace
         after.join();
         UNSCOPED_INFO("another, once it is out: nothing");
         CHECK(al_script_engine::clashes().load() == before + 1);
+        // The clash was this case's on purpose: the guard's check on the
+        // count, which names a case that clashed by mistake, takes it.
+        ll_test::StateGuard::accept("Tailslide's clashes");
     }
 
     TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: list literal sums bracket elements and stay literals where order shows", "[allsloptimizer]")
@@ -3576,5 +3580,159 @@ namespace
         CHECK(in(luau, "llSin(0.30000000447034836)"));
         UNSCOPED_INFO("a length no single is, which the simulator gives by a way not known, left: " + luau);
         CHECK(in(luau, "llVecMag("));
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: an inlined return converts as the return did to the function's type", "[allsloptimizer]")
+    {
+        // The return makes 3 a float, so half(3) / 2 is 1.5, not the 1 an
+        // integer's division gives; and makes "x" a key, false in a
+        // condition, where a string with something in it is true.
+        const std::string source = "float half(integer n)\n{\n    return n;\n}\n"
+                                   "key id(string s)\n{\n    return s;\n}\n"
+                                   "default\n{\n    touch_start(integer t)\n    {\n"
+                                   "        llOwnerSay((string)(half(3) / 2));\n"
+                                   "        if (id(\"x\"))\n        {\n            llOwnerSay(\"a key\");\n        }\n"
+                                   "    }\n}\n";
+        const ALLSLInliner::Result put = ALLSLInliner::run(source);
+        {
+            INFO("each cast to what its function returns: " + put.text);
+            CHECK(in(put.text, "(float)"));
+            CHECK(in(put.text, "(key)"));
+        }
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            o.inlining                = true;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            UNSCOPED_INFO("optimized: " + notes(r));
+            REQUIRE(r.optimized);
+            INFO("as written: " + r.text);
+            CHECK(in(r.text, "1.500000"));
+            CHECK_FALSE(in(r.text, "llOwnerSay(\"1\")"));
+            // The condition a key's, or settled as one's: false.
+            CHECK((in(r.text, "(key)") || !in(r.text, "llOwnerSay(\"a key\")")));
+        }
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a division that may be by nought is neither removed nor moved", "[allsloptimizer]")
+    {
+        const std::string source = wrap("", "        integer d = (integer)llFrand(2);\n"
+                                            "        integer q = 100 / d;\n"
+                                            "        float f = 1.0 / llFrand(1);\n"
+                                            "        integer m = 7 % d;\n"
+                                            "        integer kept = 100 / 4;\n"
+                                            "        llOwnerSay(\"done\");\n");
+        const std::string moved = wrap("", "        integer d = (integer)llFrand(2);\n"
+                                           "        integer q = 100 / d;\n"
+                                           "        llOwnerSay(\"before\");\n"
+                                           "        llOwnerSay((string)q);\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
+        {
+            const std::string text = require_optimized(source, target);
+            {
+                INFO("each that may stop the script stays: " + text);
+                CHECK(in(text, "100 / "));
+                CHECK(in(text, " / llFrand(1)"));
+                CHECK(in(text, "7 % "));
+            }
+            {
+                INFO("one by a constant other than nought is folded and goes: " + text);
+                CHECK_FALSE(in(text, "kept"));
+                CHECK_FALSE(in(text, "100 / 4"));
+                CHECK_FALSE(in(text, "25"));
+            }
+            const std::string after = require_optimized(moved, target);
+            INFO("the division before what was said before it: " + after);
+            const size_t divides = after.find("100 / ");
+            const size_t says    = after.find("\"before\"");
+            REQUIRE(divides != std::string::npos);
+            REQUIRE(says != std::string::npos);
+            CHECK(divides < says);
+        }
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a folded list holding a key is left a call since a literal makes it a string", "[allsloptimizer]")
+    {
+        const std::string source = wrap("", "        list l = llList2List([(key)\"a822ff2b-ff02-461d-b45d-dcd10a2de0c2\", 1], 0, 0);\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            l = [];\n        }\n"
+                                            "        llOwnerSay((string)llGetListEntryType(l, 0));\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
+        {
+            const std::string text = require_optimized(source, target);
+            INFO("the key still a key: " + text);
+            CHECK_FALSE(in(text, "[\"a822ff2b"));
+            CHECK(in(text, "(key)\"a822ff2b-ff02-461d-b45d-dcd10a2de0c2\""));
+        }
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a JSON literal nested past reason is left to the simulator, not read down the stack", "[allsloptimizer]")
+    {
+        const std::string deep(40000, '[');
+        const std::string source = wrap("", "        string t = llJsonValueType(\"" + deep + "\", []);\n        string v = llJsonGetValue(\"" + deep + "\", [0]);\n"
+                                            "        if (llFrand(1) < 0.5)\n        {\n            t = v = \"\";\n        }\n        llSay(0, t + v);\n");
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        UNSCOPED_INFO("optimized: " + notes(r));
+        CHECK(r.optimized);
+        CHECK(in(r.text, "llJsonValueType("));
+        CHECK(in(r.text, "llJsonGetValue("));
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: a list literal of many hundreds of elements stays one rather than a sum too deep to walk", "[allsloptimizer]")
+    {
+        std::string elements;
+        for (int i = 1; i <= 1100; ++i)
+        {
+            elements += (i > 1 ? ", " : "") + std::to_string(i);
+        }
+        ALLSLOptimizer::Options lso = options();
+        lso.target                  = ALLSLOptimizer::Target::LSO;
+        const ALLSLOptimizer::Result r =
+            ALLSLOptimizer::run(wrap("", "        list l = [" + elements + "];\n        integer i = (integer)llFrand(1100);\n        llSay(0, (string)llList2Integer(l, i));\n"), lso);
+        UNSCOPED_INFO("optimized: " + notes(r));
+        CHECK(r.optimized);
+        CHECK_FALSE(has(r, "please report it"));
+        CHECK(in(r.text, "[1, 2, 3"));
+        CHECK_FALSE(in(r.text, "(list)1 + 2"));
+        // A short one is a sum there still.
+        const ALLSLOptimizer::Result s =
+            ALLSLOptimizer::run(wrap("", "        integer i = (integer)llFrand(3);\n        list l = [1, 2, 3];\n        llSay(0, (string)llList2Integer(l, i));\n"), lso);
+        UNSCOPED_INFO("short: " + s.text);
+        CHECK(in(s.text, "(list)1 + 2 + 3"));
+    }
+
+    TEST_CASE_METHOD(allsloptimizer_data, "allsloptimizer: ways the same or ending the same keep a state change under the if in a function", "[allsloptimizer]")
+    {
+        const std::string source = "f(integer x)\n{\n    if (x) state other;\n    else state other;\n}\n"
+                                   "g(integer x)\n{\n    if (x)\n    {\n        llOwnerSay(\"a\");\n        state other;\n    }\n"
+                                   "    else\n    {\n        llOwnerSay(\"b\");\n        state other;\n    }\n}\n"
+                                   "default\n{\n    state_entry()\n    {\n        f(1);\n        g(1);\n    }\n"
+                                   "    touch_start(integer n)\n    {\n        f(n);\n        g(n);\n        if (n) state other;\n        else state other;\n    }\n}\n"
+                                   "state other\n{\n    state_entry()\n    {\n    }\n}\n";
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        UNSCOPED_INFO("optimized: " + notes(r));
+        CHECK(r.optimized);
+        ALLSLService service;
+        for (const ALScriptProblem& p : service.check(r.text))
+        {
+            UNSCOPED_INFO("what was written compiles: " + p.message + "\n" + r.text);
+            REQUIRE(p.severity != ALScriptProblem::Severity::Error);
+        }
+        const auto body = [&r](const char* head) {
+            const size_t at = r.text.find(std::string(head) + "\n{");
+            return at == std::string::npos ? std::string() : r.text.substr(at, r.text.find("\n}", at) - at);
+        };
+        UNSCOPED_INFO("f keeps its if, its ways the same: " + r.text);
+        CHECK(body("f(integer x)").find("if (") != std::string::npos);
+        UNSCOPED_INFO("g keeps its if, its ways ending the same: " + r.text);
+        CHECK(body("g(integer x)").find("if (") != std::string::npos);
+        CHECK(body("g(integer x)").find("state other;") != std::string::npos);
+        const size_t touch = r.text.find("touch_start(");
+        {
+            INFO("an event changes state as it likes: its if goes: " + r.text);
+            REQUIRE(touch != std::string::npos);
+            CHECK(r.text.find("if (", touch) == std::string::npos);
+            CHECK(r.text.find("state other;", touch) != std::string::npos);
+        }
     }
 } // anonymous namespace

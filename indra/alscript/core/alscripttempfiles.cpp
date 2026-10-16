@@ -96,7 +96,7 @@ struct ALScriptTempFiles::State
 
     void list(const std::string& path)
     {
-        if (!written.insert(path).second)
+        if (written.contains(path))
         {
             return;
         }
@@ -108,6 +108,16 @@ struct ALScriptTempFiles::State
             fs::create_directories(fsyspath(lists), ec);
             lock.open(lockPath(), LLFile::out | LLFile::trunc | LLFile::exclusive, ec);
         }
+        if (!lock)
+        {
+            // Without the lock, nothing is listed: a copy listed by a
+            // session that holds no lock is one another's sweep takes
+            // away while this one still has it.
+            LL_WARNS_ONCE("ScriptTempFiles") << "Could not take the session's lock " << lockPath() << ": " << ec.message()
+                                              << "; its copies are not listed for a sweep" << LL_ENDL;
+            return;
+        }
+        written.insert(path);
         LLFile out;
         if (out.open(listPath(), LLFile::out | LLFile::app, ec) == 0)
         {

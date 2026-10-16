@@ -108,6 +108,9 @@ namespace
             // A case leaves no thread inside Tailslide, where the next
             // case's would count as a second thread in at once.
             ll_test::StateGuard::add("Tailslide's engine", engineOwner);
+            // Nor has it put a second thread in while one was in: the count
+            // grows with each clash, and names the case whose it was.
+            ll_test::StateGuard::add("Tailslide's clashes", [] { return std::to_string(al_script_engine::clashes().load()); });
             // A case that loads builtins of its own says so: they stay for
             // every case after it.
             ll_test::StateGuard::add("Tailslide's builtins", builtinCount);
