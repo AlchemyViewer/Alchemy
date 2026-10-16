@@ -766,6 +766,19 @@ namespace
         {
             return false;
         }
+        // A return turns an integer into a float, a string into a key: in
+        // place of the call, the expression is cast to what the function
+        // returns, for `(3) / 2` not to be an integer's division.
+        const LSLIType returned = sym->getType() ? sym->getType()->getIType() : LST_NULL;
+        const char*    cast     = nullptr;
+        if (expr->getIType() != returned)
+        {
+            cast = typeWord(returned);
+            if (!cast)
+            {
+                return false;
+            }
+        }
         // Several calls: only where marked, or small enough that the
         // expression costs about what the call did.
         if (!last && !is_marked && nodesOf(expr).size() > 8)
@@ -966,8 +979,8 @@ namespace
         }
         std::sort(renames.begin(), renames.end(), [](const Rename& a, const Rename& b) { return a.begin < b.begin; });
         Block block = renamedText(lines, beginOf(expr), endOf(expr), renames);
-        block.front().insert(block.front().begin(), Piece{ "(", beginOf(call), false });
-        block.back().push_back(Piece{ ")", endOf(call), false });
+        block.front().insert(block.front().begin(), Piece{ cast ? "((" + std::string(cast) + ")(" : std::string("("), beginOf(call), false });
+        block.back().push_back(Piece{ cast ? "))" : ")", endOf(call), false });
         out.edit     = Edit{ beginOf(call), endOf(call), std::move(block) };
         out.before   = std::move(before);
         out.note     = noteAt(call, last ? "InlinerPutExpressionOnce" : "InlinerPutExpression",

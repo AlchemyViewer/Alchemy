@@ -112,7 +112,9 @@ public:
 
     // What an expression can be dropped, or read at another time, without
     // losing anything: no assignment, no call but to a function the
-    // definitions call pure, no print. A null node is nothing.
+    // definitions call pure, no print, and no division or remainder that
+    // may be a Math Error, by anything but a constant other than nought.
+    // A null node is nothing.
     static bool sideEffectFree(Tailslide::LSLASTNode* node);
     // What an expression can be dropped without losing anything, though
     // not read at another time: as sideEffectFree, but a call may also be
