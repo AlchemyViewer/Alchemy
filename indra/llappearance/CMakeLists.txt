@@ -73,3 +73,12 @@ target_include_directories(
   PRIVATE $<TARGET_PROPERTY:llui,INTERFACE_INCLUDE_DIRECTORIES>
 )
 target_precompile_headers(llappearance REUSE_FROM llprecompiled)
+
+if(AL_BUILD_TESTS)
+  al_add_test_binary(
+    llappearance_tests
+    PROJECT llappearance
+    SOURCES tests/llavatarappearancedefines_test.cpp tests/llwearabletype_test.cpp
+    LIBRARIES llappearance
+  )
+endif()

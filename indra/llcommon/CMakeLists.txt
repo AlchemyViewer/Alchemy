@@ -318,6 +318,7 @@ if(AL_BUILD_TESTS)
       tests/classic_callback_test.cpp
       tests/commonmisc_test.cpp
       tests/lazyeventapi_test.cpp
+      tests/llassettype_test.cpp
       tests/llbase64_test.cpp
       tests/llcallbacklist_test.cpp
       tests/llcond_test.cpp
