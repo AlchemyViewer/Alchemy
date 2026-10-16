@@ -4001,7 +4001,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
         static const LLUIColor user_chat_color = LLUIColorTable::instance().getColor("UserChatColor");
         static const LLUIColor agent_chat_color = LLUIColorTable::instance().getColor("AgentChatColor");
-        LLColor4 new_chat = ALAvatarGroups::instance().getAvatarColor(this, isSelf() ? agent_chat_color : user_chat_color, ALAvatarGroups::COLOR_CHAT);
+        LLColor4 new_chat = ALAvatarGroups::instance().getAvatarColor(this, isSelf() ? user_chat_color : agent_chat_color, ALAvatarGroups::COLOR_CHAT);
         LLColor4 normal_chat = lerp(new_chat, LLColor4(0.8f, 0.8f, 0.8f, 1.f), 0.7f);
         LLColor4 old_chat = lerp(normal_chat, LLColor4(0.6f, 0.6f, 0.6f, 1.f), 0.7f);
 
