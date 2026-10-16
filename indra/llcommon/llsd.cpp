@@ -133,9 +133,12 @@ public:
         }
         else
         {
+            // Built before the old value goes: value may live inside it, as
+            // in sd = sd["key"].asStringRef().
+            Impl* fresh = new ImplT(std::forward<V>(value));
             sd.releaseValue();
             sd.mData.impl = nullptr;
-            reset(sd.mData.impl, new ImplT(std::forward<V>(value)));
+            reset(sd.mData.impl, fresh);
             sd.mType = type;
         }
     }
@@ -499,6 +502,8 @@ namespace
         return (index < mData.size()) ? mData[index] : LLSD();
     }
 
+    // Growing the vector moves its elements, so a v that is one of them is
+    // taken out before the resize: a.set(5, a[0]).
     void ImplArray::set(size_t i, const LLSD& v)
     {
         NEGATIVE_EXIT(i);
@@ -506,7 +511,10 @@ namespace
 
         if (index >= mData.size())
         {
+            LLSD keep(v);
             mData.resize(index + 1);
+            mData[index] = std::move(keep);
+            return;
         }
 
         mData[index] = v;
@@ -519,7 +527,10 @@ namespace
 
         if (index >= mData.size())
         {
+            LLSD keep(std::move(v));
             mData.resize(index + 1);
+            mData[index] = std::move(keep);
+            return;
         }
 
         mData[index] = std::move(v);
@@ -534,8 +545,9 @@ namespace
         {
             // beyond the end: pad with undefined so v lands at index, rather
             // than double-shifting and leaving a trailing undefined element
+            LLSD keep(v);
             mData.resize(index);
-            mData.push_back(v);
+            mData.push_back(std::move(keep));
         }
         else
         {
@@ -550,8 +562,9 @@ namespace
 
         if (index >= mData.size()) // tbd - sanity check limit for index ?
         {
+            LLSD keep(std::move(v));
             mData.resize(index);
-            mData.push_back(std::move(v));
+            mData.push_back(std::move(keep));
         }
         else
         {
@@ -667,9 +680,10 @@ ImplMap& LLSD::Impl::mutableMap(LLSD& sd)
         }
         return *m;
     }
+    // allocated before the old value goes, so a bad_alloc leaves sd whole
+    ImplMap* im = new ImplMap;
     sd.releaseValue();
     sd.mData.impl = nullptr;
-    ImplMap* im = new ImplMap;
     reset(sd.mData.impl, im);
     sd.mType = LLSD::TypeMap;
     return *im;
@@ -688,9 +702,10 @@ ImplArray& LLSD::Impl::mutableArray(LLSD& sd)
         }
         return *a;
     }
+    // allocated before the old value goes, so a bad_alloc leaves sd whole
+    ImplArray* ia = new ImplArray;
     sd.releaseValue();
     sd.mData.impl = nullptr;
-    ImplArray* ia = new ImplArray;
     reset(sd.mData.impl, ia);
     sd.mType = LLSD::TypeArray;
     return *ia;
@@ -813,11 +828,15 @@ void LLSD::assign(LLSD&& other)
 {
     if (this != &other)
     {
-        releaseValue();
-        mData = other.mData;
-        mType = other.mType;
+        // take other's value before releasing ours: other may live inside
+        // it, as in sd = std::move(sd["key"])
+        const Data d = other.mData;
+        const Type t = other.mType;
         other.mData.impl = nullptr;
         other.mType = TypeUndefined;
+        releaseValue();
+        mData = d;
+        mType = t;
     }
 }
 
