@@ -803,9 +803,8 @@ bool LLAppViewer::init()
     // Start of the application
     //
 
-    // initialize the LLSettingsType translation bridge.
+    // the translation bridge LLWearableType reads its labels through
     LLTranslationBridge::ptr_t trans = std::make_shared<LLUITranslationBridge>();
-    LLSettingsType::initParamSingleton(trans);
 
     // initialize SSE options
     LLVector4a::initClass();

@@ -144,7 +144,7 @@ std::string LLResourceUploadInfo::getAssetTypeString() const
 
 std::string LLResourceUploadInfo::getInventoryTypeString() const
 {
-    return LLInventoryType::lookup(mInventoryType);
+    return std::string(LLInventoryType::lookup(mInventoryType));
 }
 
 LLSD LLResourceUploadInfo::generatePostBody()

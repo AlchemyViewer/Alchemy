@@ -33,6 +33,7 @@
 #include "../llfoldertype.h"
 #include "../llinventory.h"
 #include "../llinventorytype.h"
+#include "../llinventorysettings.h"
 #include <catch2/catch_test_macros.hpp>
 #include "../test/namedtempfile.h"
 
@@ -150,7 +151,7 @@ namespace
 
     TEST_CASE("LLInventory: LLInventoryType::lookup maps a type to its name", "[LLInventory]")
     {
-        static std::string retType =  LLInventoryType::lookup(LLInventoryType::IT_CALLINGCARD);
+        static std::string retType(LLInventoryType::lookup(LLInventoryType::IT_CALLINGCARD));
         CHECK(retType == "callcard");
 
         retType = LLInventoryType::lookup(LLInventoryType::IT_LANDMARK);
@@ -160,7 +161,7 @@ namespace
 
     TEST_CASE("LLInventory: lookupHumanReadable gives a type's display name", "[LLInventory]")
     {
-        static std::string retType =  LLInventoryType::lookupHumanReadable(LLInventoryType::IT_CALLINGCARD);
+        static std::string retType(LLInventoryType::lookupHumanReadable(LLInventoryType::IT_CALLINGCARD));
         CHECK(retType == "calling card");
 
         retType =  LLInventoryType::lookupHumanReadable(LLInventoryType::IT_LANDMARK);
@@ -542,6 +543,51 @@ namespace
             INFO("position " << i);
             CHECK(names[i].asString() == expected[i]);
         }
+    }
+
+    TEST_CASE("LLInventory: every settings type gives its default name and icon, and any other gives ST_INVALID's", "[LLInventory]")
+    {
+        struct SettingsRow
+        {
+            int                        value;
+            const char*                default_name;
+            LLInventoryType::EIconName icon;
+        };
+        const SettingsRow rows[] = {
+            { -1,  "New Settings", LLInventoryType::ICONNAME_SETTINGS },
+            { 0,   "New Sky",      LLInventoryType::ICONNAME_SETTINGS_SKY },
+            { 1,   "New Water",    LLInventoryType::ICONNAME_SETTINGS_WATER },
+            { 2,   "New Day",      LLInventoryType::ICONNAME_SETTINGS_DAY },
+            { 255, "New Settings", LLInventoryType::ICONNAME_SETTINGS },
+        };
+        for (const SettingsRow& row : rows)
+        {
+            const LLSettingsType::type_e type = LLSettingsType::type_e(row.value);
+            INFO("settings type " << row.value);
+            CHECK(LLSettingsType::getDefaultName(type) == row.default_name);
+            CHECK(LLSettingsType::getIconName(type) == row.icon);
+        }
+
+        std::vector<std::string> wrong;
+        for (int value = 3; value < 255; ++value)
+        {
+            const LLSettingsType::type_e type = LLSettingsType::type_e(value);
+            if (LLSettingsType::getDefaultName(type) != "New Settings"
+                || LLSettingsType::getIconName(type) != LLInventoryType::ICONNAME_SETTINGS)
+            {
+                wrong.push_back(std::to_string(value));
+            }
+        }
+        CHECK(wrong == std::vector<std::string>());
+    }
+
+    TEST_CASE("LLInventory: fromInventoryFlags reads the settings type from the flags' low byte", "[LLInventory]")
+    {
+        CHECK(LLSettingsType::fromInventoryFlags(0x00000000) == LLSettingsType::ST_SKY);
+        CHECK(LLSettingsType::fromInventoryFlags(0x00000001) == LLSettingsType::ST_WATER);
+        CHECK(LLSettingsType::fromInventoryFlags(0x00000002) == LLSettingsType::ST_DAYCYCLE);
+        CHECK(LLSettingsType::fromInventoryFlags(0x12345602) == LLSettingsType::ST_DAYCYCLE);
+        CHECK(LLSettingsType::fromInventoryFlags(0x000000ff) == LLSettingsType::ST_INVALID);
     }
 
 //*****class LLInventoryItem*****//
