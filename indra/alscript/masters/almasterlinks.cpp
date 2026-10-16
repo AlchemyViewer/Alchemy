@@ -117,9 +117,9 @@ namespace
                (path.size() >= 2 && letter(path[0]) && path[1] == ':');
     }
 
-    // Whether XML carries the text as it is. It carries no control
-    // character but a tab, a newline and a return, and reads a return back
-    // as a newline.
+    // Whether XML carries the text as it is: no control character but a tab
+    // or a newline. A return it carries, but reads back as a newline, so
+    // text with one is not carried as it is.
     bool xmlCarries(std::string_view text)
     {
         for (const char c : text)
