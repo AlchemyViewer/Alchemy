@@ -883,6 +883,49 @@ namespace
             problems = service.check("local n: number = \"s\"\n");
             UNSCOPED_INFO(which + "and checked in full: " + said(problems));
             REQUIRE((errors(problems) > 0 || use));
+
+            // A module the script requires, out of time with it: not kept
+            // as checked, so the next check runs it again and says again
+            // that it stopped, and one given time enough finds what the
+            // module's first check never reached.
+            service.setDocument("timed");
+            service.setConfig(ALLuauConfig());
+            ALLuauService::Modules modules;
+            std::string            module = "--!strict\n";
+            for (int i = 0; i < 50; ++i)
+            {
+                module += llformat("local v%d: number = %d\nprint(v%d)\n", i, i, i);
+            }
+            module += "local bad: number = \"x\"\nreturn {}\n";
+            modules.modules.push_back({ "disk:/lib/slow.luau", module });
+            modules.reaches.push_back({ "", "slow", "disk:/lib/slow.luau" });
+            service.setModules(modules);
+            const std::string requiring = "--!strict\nlocal slow = require(\"slow\")\nprint(slow)\n";
+            const auto        stopped   = [](const ALScriptProblems& found) {
+                return std::any_of(found.begin(), found.end(), [](const ALScriptProblem& problem) { return problem.key == "LuauCheckTimedOut"; });
+            };
+            service.setTimeLimit(1e-9);
+            for (const char* time : { "first", "second" })
+            {
+                const size_t before = service.modulesChecked();
+                problems            = service.check(requiring);
+                UNSCOPED_INFO(which + time + " check, the module and the script checked");
+                CHECK(service.modulesChecked() - before == size_t(2));
+                INFO(which + time + " check, said to have stopped: " + said(problems));
+                REQUIRE(stopped(problems));
+            }
+            service.setTimeLimit(0.0);
+            const size_t before = service.modulesChecked();
+            problems            = service.check(requiring);
+            UNSCOPED_INFO(which + "unlimited, the module checked again");
+            CHECK(service.modulesChecked() - before == size_t(2));
+            UNSCOPED_INFO(which + "not said to have stopped: " + said(problems));
+            CHECK_FALSE(stopped(problems));
+            UNSCOPED_INFO(which + "and the module's mistake at its end found: " + said(problems));
+            CHECK(std::any_of(problems.begin(), problems.end(), [](const ALScriptProblem& problem) {
+                return problem.file == "disk:/lib/slow.luau" && problem.line == 101 && problem.source == ALScriptProblem::Source::Types;
+            }));
+            service.setDocument("");
         }
         std::string why;
         service.setNewSolver(newSolver, why);
@@ -1947,7 +1990,7 @@ namespace
         service.setDocument("");
     }
 
-    TEST_CASE_METHOD(alluauservice_data, "alluauservice: several modules required are checked in parallel once each", "[alluauservice]")
+    TEST_CASE_METHOD(alluauservice_data, "alluauservice: several modules required are checked once each", "[alluauservice]")
     {
         UNSCOPED_INFO("definitions loaded: " + error);
         CHECK(loaded);

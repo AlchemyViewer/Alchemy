@@ -71,7 +71,6 @@ target_sources(
     luau/alluauservice.cpp
     luau/alluaushadowed.cpp
     luau/alluausharedstart.cpp
-    luau/alluautaskpool.cpp
     luau/alluautypes.cpp
     masters/almasterburst.cpp
     masters/almasterclock.cpp
@@ -158,7 +157,6 @@ target_sources(
         luau/alluauservice.h
         luau/alluaushadowed.h
         luau/alluausharedstart.h
-        luau/alluautaskpool.h
         luau/alluautypes.h
         masters/almasterburst.h
         masters/almasterclock.h

@@ -24,7 +24,6 @@
 
 #pragma once
 
-#include "alluautaskpool.h"
 #include "alscriptlintpass.h"
 
 #include "llstl.h"
@@ -35,7 +34,6 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -103,7 +101,6 @@ struct ALLuauFrontend
 
     // What takeChecked takes, as the check's hook fills it: by the script
     // whose check it was, each module once.
-    mutable std::mutex checkedMutex;
     mutable boost::unordered_flat_map<std::string, std::vector<std::string>, ll::string_hash, std::equal_to<>> checkedNow;
 
     ScriptResolver                  files;
@@ -198,11 +195,6 @@ struct ALLuauFrontend
     // configuration is told as it is made.
     void sync(std::string_view source);
 
-    // A check that ran out of time answers what it found by then, and is
-    // not kept as the text's: asked again, perhaps with longer, it runs
-    // again.
-    void timedOut(const Luau::ModulePtr& module);
-
     // A check stopped part way: Luau keeps none of what it found, and
     // neither module is the text's. One not made, its module kept from
     // before, was not stopped.
@@ -213,22 +205,18 @@ struct ALLuauFrontend
     // Whether it was checked now, and so could have been stopped.
     bool checkScript(Luau::CheckResult* result = nullptr);
 
-    // The script checked as Luau's check does, what it reports the same --
-    // each module checked now, the script's lints -- but where it needs
-    // several of its modules checked, each on a thread of the pool's as
-    // soon as the modules it requires are: a first look at a script that
-    // requires several large modules waits for the longest of them, not
-    // for all of them one after another.
+    // The script checked as Luau's check does, with each module it needs
+    // checked now, one after another. A check that ran out of time -- the
+    // script's or a module's -- answers what it found by then, and is not
+    // kept as the text's: asked again, perhaps with longer, it runs again.
     Luau::CheckResult checkWithModules(const Luau::FrontendOptions& options);
-    std::unique_ptr<ALLuauTaskPool> modulePool;
 
-    // The modules the script's checks checked, as Luau checked each -- on
-    // whichever thread it was -- for what is told of them beyond their
-    // errors: their lints. Every check of the script's own module, a
-    // question's as much as a check's, and one stopped part way: kept
-    // until taken, so that the check that tells them tells each, however
-    // the questions before it went. Taken, which empties the script's;
-    // forgotten with a script let go of.
+    // The modules the script's checks checked, as Luau checked each, for
+    // what is told of them beyond their errors: their lints. Every check
+    // of the script's own module, a question's as much as a check's, and
+    // one stopped part way: kept until taken, so that the check that tells
+    // them tells each, however the questions before it went. Taken, which
+    // empties the script's; forgotten with a script let go of.
     std::vector<std::string> takeChecked();
     void                     forgetChecked(const std::string& name);
 
