@@ -11320,7 +11320,7 @@ void LLScriptScript::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompilePa
 
             // now, put it all together and spit it out
             // we need
-            LLFILE* bcfp = LLFile::fopen(mBytecodeDest, "wb");      /*Flawfinder: ignore*/
+            LLFILE* bcfp = LLFile::fopen(mBytecodeDest, LLFILE_MODE("wb"));      /*Flawfinder: ignore*/
 
             code->build(fp, bcfp);
             fclose(bcfp);
@@ -11330,7 +11330,7 @@ void LLScriptScript::recurse(LLFILE *fp, S32 tabs, S32 tabsize, LSCRIPTCompilePa
         break;
     case LSCP_EMIT_CIL_ASSEMBLY:
         {
-            LLFILE *bcfp = LLFile::fopen(mBytecodeDest, "wb");
+            LLFILE *bcfp = LLFile::fopen(mBytecodeDest, LLFILE_MODE("wb"));
 
             // Output dependencies.
             fprintf(bcfp, ".assembly extern mscorlib {.ver 1:0:5000:0}\n");

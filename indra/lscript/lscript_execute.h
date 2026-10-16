@@ -346,7 +346,7 @@ public:
     {
         S32 offset = 0;
         // number in linked list
-        S32 number = mEventDataList.size();
+        S32 number = (S32)mEventDataList.size();
         integer2bytestream(dest, offset, number);
         for (std::list<LLScriptDataCollection*>::iterator it = mEventDataList.begin(), end_it = mEventDataList.end();
             it != end_it;
@@ -475,7 +475,7 @@ public:
     virtual S32 getVersion() const {return get_register(mBuffer, LREG_VN);}
     virtual void deleteAllEvents() {delete_and_clear(mEventData.mEventDataList);}
     virtual void addEvent(LLScriptDataCollection* event);
-    virtual U32 getEventCount() {return mEventData.mEventDataList.size();}
+    virtual U32 getEventCount() {return (U32)(mEventData.mEventDataList.size());}
     virtual void removeEventType(LSCRIPTStateEventType event_type);
     virtual S32 getFaults() {return get_register(mBuffer, LREG_FR);}
     virtual void setFault(LSCRIPTRunTimeFaults fault) {set_fault(mBuffer, fault);}
