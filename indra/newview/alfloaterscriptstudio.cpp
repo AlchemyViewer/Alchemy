@@ -8251,20 +8251,58 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.keepComments  = gSavedSettings.getBOOL("ALScriptConvertKeepComments");
     // Its tables' braces as the formatter writes them.
     options.braceSpaces   = gSavedSettings.getBOOL("ALScriptFormatBraceSpaces");
-    // Its notes, and its comments, in the skin's words.
-    options.words = alScriptKeyedWords;
-    const std::string   source    = doc.editor->wholeText();
-    ALLSLToSLua::Result converted = ALLSLToSLua::convert(source, options);
-    bool                expanded  = false;
-    if (!converted.converted && doc.expanded.valid && doc.expanded.text && !doc.expanded.text->empty() && *doc.expanded.text != source)
+    // Its notes, and its comments, in the skin's words, read where it is
+    // written.
+    options.words = alScriptKeyedWordsAnyThread;
+    const auto                         source = std::make_shared<const std::string>(doc.editor->wholeText());
+    std::shared_ptr<const std::string> expansion;
+    if (doc.expanded.valid && doc.expanded.text && !doc.expanded.text->empty() && *doc.expanded.text != *source)
     {
-        ALLSLToSLua::Result again = ALLSLToSLua::convert(*doc.expanded.text, options);
-        if (again.converted)
-        {
-            converted = std::move(again);
-            expanded  = true;
-        }
+        expansion = doc.expanded.text;
     }
+    // Tailslide parses it and resolves it against the builtins, which are
+    // the process's and which a check of any script on the lane writes:
+    // so on that lane, after whatever check is on it, and never beside one.
+    const auto                converted = std::make_shared<ALLSLToSLua::Result>();
+    const auto                expanded  = std::make_shared<bool>(false);
+    const LLHandle<LLFloater> handle    = getHandle();
+    const std::string         id        = doc.id;
+    ALScriptAnalysis::instance().runEngine(
+        [source, expansion, options, converted, expanded]() {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("convert to slua job");
+            try
+            {
+                *converted = ALLSLToSLua::convert(*source, options);
+                if (!converted->converted && expansion)
+                {
+                    ALLSLToSLua::Result again = ALLSLToSLua::convert(*expansion, options);
+                    if (again.converted)
+                    {
+                        *converted = std::move(again);
+                        *expanded  = true;
+                    }
+                }
+            }
+            catch (const std::exception& e)
+            {
+                *converted = ALLSLToSLua::Result();
+                ALScriptProblem why;
+                why.severity = ALScriptProblem::Severity::Error;
+                why.message  = e.what();
+                converted->problems.push_back(std::move(why));
+            }
+        },
+        [handle, id, source, expansion, converted, expanded]() {
+            ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+            if (Doc* doc = studio ? studio->findDoc(id) : nullptr)
+            {
+                studio->convertedToSLua(*doc, *expanded ? *expansion : *source, *expanded, *converted);
+            }
+        });
+}
+
+void ALFloaterScriptStudio::convertedToSLua(Doc& doc, const std::string& lsl, bool expanded, const ALLSLToSLua::Result& converted)
+{
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     if (!converted.converted)
@@ -8281,7 +8319,6 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     // scripts folder, as a new script is made there. Opened with the SLua
     // put in unsaved, and set beside the LSL once it has loaded.
     const std::string         name     = getString("ConvertName", args);
-    const std::string         lsl      = expanded ? *doc.expanded.text : source;
     const std::string         text     = converted.text;
     // Each stretch beside the SLua written of it, with the words the SLua
     // says otherwise -- llSay as ll.Say, != as ~= -- taken as the same in

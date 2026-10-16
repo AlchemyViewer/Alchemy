@@ -54,6 +54,7 @@
 #include "alscriptstudiowords.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptnavigation.h"
+#include "allsltoslua.h"
 #include "alscriptlookup.h"
 #include "alscriptobjectcheck.h"
 #include "alscriptrecompile.h"
@@ -465,8 +466,11 @@ private:
     // An LSL tab written again as SLua (ALLSLToSLua) in a new SLua script
     // beside it -- in the prim the LSL is in, or the inventory's scripts
     // folder for one in the inventory -- its text put in unsaved and set
-    // beside the LSL; the LSL script left as it is.
+    // beside the LSL; the LSL script left as it is. Written on Tailslide's
+    // lane, which the script's checks are on too, and finished here once
+    // it is back, if its tab is still open.
     void convertToSLua(Doc& doc);
+    void convertedToSLua(Doc& doc, const std::string& lsl, bool expanded, const ALLSLToSLua::Result& converted);
     // A script written as SLua into a prim, waited for until the prim lists
     // it: by the id the region gave, or by its name where it gave none, as
     // one of that name that was not there before.
