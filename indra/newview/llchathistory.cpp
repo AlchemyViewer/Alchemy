@@ -1376,11 +1376,12 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
     LLUIColor txt_color = LLUIColorTable::instance().getColor("White");
     LLUIColor name_color = LLUIColorTable::instance().getColor("ChatHeaderDisplayNameColor"); // <alchemy/>
     LLViewerChat::getChatColor(chat, txt_color, alpha);
-    const bool irc_name_color = chat.mSourceType == CHAT_SOURCE_AGENT
-        && chat.mFromID.notNull()
-        && chat.mFromID != gAgentID
-        && chat.mFromName != SYSTEM_FROM
-        && ALAvatarGroups::instance().getIRCNameColor(chat, name_color);
+    LLColor4 irc_name;
+    const bool irc_name_color = ALAvatarGroups::instance().getChatNameColor(chat, irc_name);
+    if (irc_name_color)
+    {
+        name_color = irc_name;
+    }
 
     LLFontGL* fontp = LLViewerChat::getChatFont();
     std::string font_name = LLFontGL::nameFromFont(fontp);
@@ -1506,11 +1507,6 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                 static LLUIColor link_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
                 link_params.color = link_color;
                 link_params.readonly_color = link_color;
-                if (irc_name_color)
-                {
-                    link_params.color = name_color;
-                    link_params.readonly_color = name_color;
-                }
                 link_params.is_link = true;
                 link_params.link_href = url;
 
@@ -1550,8 +1546,8 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                 link_params.overwriteFrom(LLStyleMap::instance().lookupAgent(chat.mFromID));
                 if (irc_name_color)
                 {
-                    // Keep our dimmed name color instead of letting the agent
-                    // SLURL re-parse to the default HTMLLinkColor link style.
+                    // Keep the speaker's name colour instead of letting the
+                    // agent SLURL re-parse to the default HTMLLinkColor link style.
                     link_params.use_default_link_style = false;
                     link_params.color = name_color;
                     link_params.readonly_color = name_color;

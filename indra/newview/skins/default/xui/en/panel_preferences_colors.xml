@@ -834,7 +834,7 @@
     layout="topleft"
     left="40"
     name="irc_chat_colors_enabled"
-    tool_tip="Colors other people's local chat by a stable per-avatar color. Your own, system, object and owner-say messages keep the colors set above."
+    tool_tip="Colors what other people say, in nearby chat and conversations, by a color of their own that never changes. Your own messages, Lindens, and system, object and owner-say messages keep the colors set above."
     top_pad="12"
     width="440"/>
    <check_box
@@ -846,11 +846,12 @@
     layout="topleft"
     left="40"
     name="irc_chat_colors_name_tags"
-    tool_tip="Overwrites each other person's floating name tag with the same per-avatar color used for their chat."
+    tool_tip="Colors each other person's name tag with the color of their name in chat. Muted people and Lindens keep their name tag colors."
     top_pad="4"
     width="440"/>
    <slider
     control_name="AlchemyChatIRCAgentSaturation"
+    enabled_control="AlchemyChatIRCColorsEnabled"
     decimal_digits="2"
     follows="left|top"
     height="16"
@@ -867,6 +868,7 @@
     width="300"/>
    <slider
     control_name="AlchemyChatIRCAgentLightness"
+    enabled_control="AlchemyChatIRCColorsEnabled"
     decimal_digits="2"
     follows="left|top"
     height="16"
@@ -883,6 +885,7 @@
     width="300"/>
    <slider
     control_name="AlchemyChatIRCNameLightness"
+    enabled_control="AlchemyChatIRCColorsEnabled"
     decimal_digits="2"
     follows="left|top"
     height="16"
@@ -907,7 +910,7 @@
     name="irc_preview_label"
     top_pad="8"
     width="300">
-     Compact Chat Preview:
+     Compact chat preview:
    </text>
    <text_editor
     follows="left|top"
@@ -926,7 +929,7 @@
     track_bottom="false"
     top_pad="10"
     width="437"
-    tool_tip="Live preview of how local chat will look with the colors and settings above."/>
+    tool_tip="How chat looks in the compact style with the colors and settings above."/>
    </panel>
  </tab_container>
 </panel>

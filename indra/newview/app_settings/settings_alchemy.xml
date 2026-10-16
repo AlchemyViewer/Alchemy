@@ -1649,7 +1649,7 @@
         <key>AlchemyChatIRCColorsEnabled</key>
         <map>
             <key>Comment</key>
-            <string>Use IRC-style deterministic colors for local chat names and text.</string>
+            <string>Give each other resident's chat text and name, in nearby chat and conversations, a color of their own worked from their id. You, Lindens and the muted keep their chat colors.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1660,7 +1660,7 @@
         <key>AlchemyChatIRCColorNameTags</key>
         <map>
             <key>Comment</key>
-            <string>Overwrite each other agent's name tag with their IRC-style per-agent chat color.</string>
+            <string>With AlchemyChatIRCColorsEnabled, color each other resident's name tag with the color of their name in chat.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

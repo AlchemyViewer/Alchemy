@@ -4263,10 +4263,7 @@ LLColor4 LLVOAvatar::getNameTagColor(bool is_friend)
 #endif
     static LLUIColor name_tag_match = LLUIColorTable::instance().getColor("NameTagMatch");
     LLColor4 color_name = name_tag_match;
-    if (!ALAvatarGroups::instance().getIRCNameTagColor(getID(), color_name))
-    {
-        color_name = ALAvatarGroups::instance().getAvatarColor(this, color_name, ALAvatarGroups::COLOR_NAMETAG);
-    }
+    color_name = ALAvatarGroups::instance().getAvatarColor(this, color_name, ALAvatarGroups::COLOR_NAMETAG);
 
     return color_name;
 }

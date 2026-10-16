@@ -42,6 +42,8 @@
 
 #include <boost/signals2/connection.hpp>
 
+#include <optional>
+
 class LLConversationLogObserver;
 class LLPanelPreference;
 class LLPanelLCD;
@@ -410,14 +412,25 @@ public:
     void draw() override;
 
 private:
-    void updatePreview();
+    // what the preview was last laid out from
+    struct PreviewInputs
+    {
+        U32  mColorGeneration;
+        bool mIRCColors;
+        F32  mSaturation;
+        F32  mLightness;
+        F32  mNameLightness;
+        bool mShowTime;
+        bool mShowSeconds;
+        bool mUse24Hour;
+
+        bool operator==(const PreviewInputs&) const = default;
+    };
+
+    void updatePreview(const PreviewInputs& inputs);
 
     LLTextEditor* mPreviewEditor = nullptr;
-
-    // Signature of the colors/settings the preview depends on. The chat-color
-    // swatches commit straight into LLUIColorTable (no settings signal), so
-    // draw() polls this and re-renders only when it actually changes.
-    std::string mPreviewSignature;
+    std::optional<PreviewInputs> mPreviewInputs;
 };
 
 class LLPanelPreferenceControls final : public LLPanelPreference, public LLKeyBindResponderInterface
