@@ -46,7 +46,6 @@ target_sources(
     lldate.cpp
     lldeadmantimer.cpp
     lldependencies.cpp
-    lldictionary.cpp
     llerror.cpp
     llevent.cpp
     lleventapi.cpp
@@ -165,7 +164,6 @@ target_sources(
         lldefs.h
         lldependencies.h
         lldepthstack.h
-        lldictionary.h
         lldoubledispatch.h
         llendianswizzle.h
         llerror.h
