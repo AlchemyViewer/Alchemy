@@ -4027,6 +4027,22 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
                 }
 // [/SL:KB]
 
+                // Block vehicle / seat kills sent by the outgoing simulator during region crossings
+                if ( regionp && (regionp != gAgent.getRegion()) &&
+                     isAgentAvatarValid() && gAgentAvatarp->isSitting() )
+                {
+                    LLViewerObject* rootp = objectp->getRootEdit();
+                    if (rootp && (gAgentAvatarp->getRoot() == rootp))
+                    {
+                        if (objectp == rootp)
+                        {
+                            LL_INFOS("Avatar") << "Ignoring vehicle kill from outgoing region " << regionp->getName()
+                                << " for seated root object " << rootp->getID() << LL_ENDL;
+                        }
+                        continue;
+                    }
+                }
+
             // Display green bubble on kill
             if ( gShowObjectUpdates )
             {
