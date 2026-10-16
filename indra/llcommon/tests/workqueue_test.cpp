@@ -163,6 +163,43 @@ namespace
         CHECK(alpha == "abc");
     }
 
+    // Counts its copies. A copy made as work is posted stays with the thread that
+    // posted it, and goes there while the queue's thread uses the original: an LLSD's
+    // count of its owners is no atomic, so the two would race on it.
+    struct CopyCount
+    {
+        int* mCopies;
+        explicit CopyCount(int* copies): mCopies(copies) {}
+        CopyCount(const CopyCount& other): mCopies(other.mCopies) { ++*mCopies; }
+        CopyCount(CopyCount&& other) noexcept: mCopies(other.mCopies) {}
+        CopyCount& operator=(const CopyCount& other) { mCopies = other.mCopies; ++*mCopies; return *this; }
+        CopyCount& operator=(CopyCount&& other) noexcept { mCopies = other.mCopies; return *this; }
+    };
+
+    TEST_CASE_METHOD(workqueue_data, "workqueue: posting moves the work in, and postTo its result back", "[workqueue]")
+    {
+        int copies = 0;
+        CopyCount held(&copies);
+        queue.post([held = std::move(held)]() {});
+        CHECK(copies == 0);
+        queue.runOne();
+
+        // The worker's thread hands its result to the caller's queue, keeping no copy.
+        // (A schedule copies what it pops, on the thread popping it.)
+        WorkSchedule main("main");
+        auto qptr = WorkSchedule::getInstance("queue");
+        bool called = false;
+        copies = 0;
+        main.postTo(
+            qptr,
+            [&copies](){ return CopyCount(&copies); },
+            [&called](CopyCount){ called = true; });
+        qptr->runOne();
+        CHECK(copies == 0);
+        main.runOne();
+        CHECK(called);
+    }
+
     TEST_CASE_METHOD(workqueue_data, "workqueue: postTo with void work still runs the callback", "[workqueue]")
     {
         WorkSchedule main("main");
