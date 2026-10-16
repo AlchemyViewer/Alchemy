@@ -321,18 +321,25 @@ vec4 getTexture2DLodDiffuse(vec2 tc, float lod)
     return ret;
 }
 
-// lit     This is set by the caller: if (nl > 0.0) { lit = attenuation * nl * noise; }
+// A projector's ambiance: a fill without a direction, for the surfaces its beam does not reach.
+//   da      the signed facing, dot(n, l) -- not nl, which calcHalfVectors floors above zero
+//   lit     the direct light the pixel already took from the beam; the fill tops it up to 1
 // Uses:
 //   color   Projected spotlight color
-vec3 getProjectedLightAmbiance(float amb_da, float attenuation, float lit, float nl, float noise, vec2 projected_uv)
+vec3 getProjectedLightAmbiance(float da, float attenuation, float lit, vec2 projected_uv)
 {
     vec4 amb_plcol = getTexture2DLodAmbient(projected_uv, proj_lod);
     vec3 amb_rgb   = amb_plcol.rgb * amb_plcol.a;
 
-    amb_da += proj_ambiance;
-    amb_da += (nl*nl*0.5+0.5) * proj_ambiance;
-    amb_da *= attenuation * noise;
-    amb_da = min(amb_da, 1.0-lit);
+    // The half-Lambert term wraps over every facing. Taken on lit faces only, as the pre-PBR
+    // shaders had it, it stepped by half the ambiance at the terminator and drew a hard line
+    // round every shape the projector filled.
+    float amb_da = proj_ambiance * (1.0 + (da*0.5 + 0.5) + (da*da*0.5 + 0.5));
+    amb_da *= attenuation;
+
+    // lit reaches 2 on the legacy path, where calcLegacyDistanceAttenuation peaks, and a
+    // negative fill would take light away from the beam it only tops up.
+    amb_da = clamp(amb_da, 0.0, max(1.0 - lit, 0.0));
 
     return (amb_da * color.rgb * amb_rgb);
 }
