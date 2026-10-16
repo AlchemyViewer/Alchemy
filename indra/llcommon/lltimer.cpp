@@ -556,13 +556,19 @@ bool is_daylight_savings()
 {
     time_t now = time(NULL);
 
-    // Internal buffer to local server time
-    struct tm* internal_time = localtime(&now);
+    // Local server time, in a buffer of this call's own: localtime() shares libc's one
+    // buffer with every thread's gmtime(), the log's among them.
+    struct tm internal_time;
+#if LL_WINDOWS
+    localtime_s(&internal_time, &now);
+#else
+    localtime_r(&now, &internal_time);
+#endif
 
     // tm_isdst > 0  =>  daylight savings
     // tm_isdst = 0  =>  not daylight savings
     // tm_isdst < 0  =>  can't tell
-    return (internal_time->tm_isdst > 0);
+    return (internal_time.tm_isdst > 0);
 }
 
 
@@ -583,8 +589,15 @@ struct tm* utc_to_pacific_time(time_t utc_time, bool pacific_daylight_time)
     // for 5 AM UTC -> 10 PM PDT of the previous day.
     utc_time -= S32SecondsImplicit(pacific_offset_hours);
 
-    // Internal buffer to PST/PDT (see above)
-    struct tm* internal_time = gmtime(&utc_time);
+    // PST/PDT (see above), in a buffer of this thread's own rather than gmtime()'s, which
+    // every thread's gmtime() and localtime() share.
+    static thread_local struct tm pacific_time;
+#if LL_WINDOWS
+    gmtime_s(&pacific_time, &utc_time);
+#else
+    gmtime_r(&utc_time, &pacific_time);
+#endif
+    struct tm* internal_time = &pacific_time;
 
     /*
     // Don't do this, this won't correctly tell you if daylight savings is active in CA or not.

@@ -32,6 +32,7 @@
 
 #include "llsdtraits.h"
 #include "llstring.h"
+#include <limits>
 
 using std::fpclassify;
 
@@ -279,6 +280,22 @@ namespace
             v = " ";        require_conversions("space", v, true, 0, 0.0, " ");
             v = "\n";       require_conversions("newline", v, true, 0, 0.0, "\n");
         });
+    }
+
+    TEST_CASE("LLSD(new): a real past an Integer's range converts to the nearer end", "[LLSD_new]")
+    {
+        // A cast would be undefined there, and NaN has no nearer end.
+        constexpr LLSD::Integer lowest = std::numeric_limits<LLSD::Integer>::min();
+        constexpr LLSD::Integer highest = std::numeric_limits<LLSD::Integer>::max();
+        CHECK(LLSD(4294967295.0).asInteger() == highest);
+        CHECK(LLSD(2147483647.9).asInteger() == highest);
+        CHECK(LLSD(-2147483648.9).asInteger() == lowest);
+        CHECK(LLSD(-1e20).asInteger() == lowest);
+        CHECK(LLSD(std::numeric_limits<LLSD::Real>::infinity()).asInteger() == highest);
+        CHECK(LLSD(std::numeric_limits<LLSD::Real>::quiet_NaN()).asInteger() == 0);
+        CHECK(LLSD(-2.5).asInteger() == -2);
+        CHECK(LLSD("1e10").asInteger() == highest);
+        CHECK(LLSD(LLDate(1e12)).asInteger() == highest);
     }
 
     template<class T>

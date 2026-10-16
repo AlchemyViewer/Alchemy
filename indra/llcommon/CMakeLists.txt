@@ -319,6 +319,7 @@ if(AL_BUILD_TESTS)
       tests/commonmisc_test.cpp
       tests/lazyeventapi_test.cpp
       tests/llbase64_test.cpp
+      tests/llcallbacklist_test.cpp
       tests/llcond_test.cpp
       tests/lldate_test.cpp
       tests/lldeadmantimer_test.cpp

@@ -304,8 +304,10 @@ void LLVolumeImplFlexible::updateRenderRes()
 #if 1 //optimal approximation of previous behavior that doesn't rely on atan2
     F32 app_angle = mVO->getScale().mV[2]/drawablep->mDistanceWRTCamera;
 
-    // Rendering sections increases with visible angle on the screen
-    mRenderRes = (S32) (12.f*app_angle);
+    // Rendering sections increases with visible angle on the screen. At no distance yet
+    // the angle is infinite, or NaN with no height, and either is the most there are.
+    F32 sections = 12.f*app_angle;
+    mRenderRes = sections < (F32)FLEXIBLE_OBJECT_MAX_SECTIONS ? (S32)sections : FLEXIBLE_OBJECT_MAX_SECTIONS;
 #else //legacy behavior
     //number of segments only cares about z axis
     F32 app_angle = ll_round((F32) atan2( mVO->getScale().mV[2]*2.f, drawablep->mDistanceWRTCamera) * RAD_TO_DEG, 0.01f);
@@ -359,9 +361,10 @@ void LLVolumeImplFlexible::doIdleUpdate()
                 // Note: Flexies afar will be rarely updated, closer ones will be updated more frequently.
                 // But frequency differences are extremely noticeable, so consider modifying update factor,
                 // or at least clamping value a bit more from both sides.
-                U32 update_period = (U32) (llmax((S32) (LLViewerCamera::getInstance()->getScreenPixelArea()*0.01f/(pixel_area*(sUpdateFactor+1.f))),0)+1);
-                // MAINT-1890 Clamp the update period to ensure that the update_period is no greater than 32 frames
-                update_period = llclamp(update_period, 1U, 32U);
+                F32 period = LLViewerCamera::getInstance()->getScreenPixelArea()*0.01f/(pixel_area*(sUpdateFactor+1.f));
+                // MAINT-1890 Clamp the update period to ensure that the update_period is no greater than 32 frames.
+                // Clamped as a real: a far flexi's period is past any integer, and NaN with no pixel area.
+                U32 update_period = period < 31.f ? (U32)llmax(period, 0.f) + 1 : 32U;
 
                 // We control how fast flexies update, buy splitting updates among frames
                 U64 virtual_frame_num = (U64)(LLFrameTimer::getUptimeSeconds() / SEC_PER_FLEXI_FRAME);

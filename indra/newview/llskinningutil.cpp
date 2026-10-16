@@ -35,6 +35,11 @@
 #include "llvolume.h"
 #include "llrigginginfo.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
+#include <memory>
+#include <mutex>
+
 #define DEBUG_SKINNING  LL_DEBUG
 
 void dump_avatar_and_skin_state(const std::string& reason, LLVOAvatar *avatar, const LLMeshSkinInfo *skin)
@@ -237,6 +242,95 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
         }
     }
     alsimd::skin_blend(weights, mat, max_joints, final_mat);
+}
+
+namespace
+{
+    // What initJointNums would find on the avatar the numbers were published from:
+    // getJoint(name), aliases included, and getJoint(num), each to the joint's number.
+    struct PublishedJointNums
+    {
+        boost::unordered_flat_map<std::string, S32> mByName;
+        boost::unordered_flat_map<S32, S32> mByNum;
+    };
+
+    std::mutex sPublishedJointNumsMutex;
+    std::shared_ptr<const PublishedJointNums> sPublishedJointNums;
+
+    void collect_joint_nums(LLJoint* joint, PublishedJointNums& nums, LLVOAvatar* avatar)
+    {
+        // Depth first and the first of a name kept, as LLJoint::findJoint finds it.
+        nums.mByName.try_emplace(joint->getName(), joint->getJointNum());
+        if (LLJoint* by_num = avatar->getJoint(joint->getJointNum()))
+        {
+            nums.mByNum.try_emplace(joint->getJointNum(), by_num->getJointNum());
+        }
+        for (LLJoint* child : joint->mChildren)
+        {
+            collect_joint_nums(child, nums, avatar);
+        }
+    }
+}
+
+void LLSkinningUtil::publishJointNums(LLVOAvatar* avatar)
+{
+    auto nums = std::make_shared<PublishedJointNums>();
+    if (LLJoint* root = avatar->getRootJoint())
+    {
+        collect_joint_nums(root, *nums, avatar);
+    }
+    // getJoint(name) looks an alias's canonical name up in place of the alias.
+    for (const auto& [alias, canonical] : avatar->getJointAliases())
+    {
+        auto found = nums->mByName.find(canonical);
+        if (found != nums->mByName.end())
+        {
+            nums->mByName[alias] = found->second;
+        }
+        else
+        {
+            nums->mByName.erase(alias);
+        }
+    }
+
+    std::lock_guard lock(sPublishedJointNumsMutex);
+    sPublishedJointNums = std::move(nums);
+}
+
+bool LLSkinningUtil::initJointNumsFromPublished(LLMeshSkinInfo* skin)
+{
+    std::shared_ptr<const PublishedJointNums> nums;
+    {
+        std::lock_guard lock(sPublishedJointNumsMutex);
+        nums = sPublishedJointNums;
+    }
+    if (!nums)
+    {
+        return false;
+    }
+
+    if (!skin->mJointNumsInitialized)
+    {
+        for (U32 j = 0; j < skin->mJointNames.size(); ++j)
+        {
+            // As initJointNums: by name until a number is known, and a number checked.
+            S32 num = 0;
+            if (skin->mJointNums[j] == -1)
+            {
+                auto found = nums->mByName.find(skin->mJointNames[j]);
+                num = found != nums->mByName.end() ? found->second : 0;
+            }
+            else
+            {
+                auto found = nums->mByNum.find(skin->mJointNums[j]);
+                num = found != nums->mByNum.end() ? found->second : 0;
+            }
+            skin->mJointNums[j] = num;
+            llassert(skin->mJointNums[j] >= 0);
+        }
+        skin->mJointNumsInitialized = true;
+    }
+    return true;
 }
 
 void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)

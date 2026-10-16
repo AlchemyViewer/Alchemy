@@ -2751,8 +2751,10 @@ void LLViewerWindow::shutdownGL()
 
     // The UI images' recorded draws hold vertex buffers, which go back to the pool while
     // there is still one, and a context to delete their names in. LLUIImageList's own
-    // cleanUp comes after the window is gone.
+    // cleanUp comes after the window is gone. The sphere is a global, so its buffer would
+    // otherwise go at exit, after the pool.
     LLUIImage::cleanupClass();
+    gSphere.cleanupGL();
 
     LL_INFOS() << "All textures and llimagegl images are destroyed!" << LL_ENDL ;
 

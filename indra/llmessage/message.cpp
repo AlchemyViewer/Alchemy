@@ -1131,7 +1131,9 @@ S32 LLMessageSystem::bufferInboundPacket()
     {
         const char* data = pkt.getData();
         LLCircuitData* cdp = mCircuitInfo.findCircuit(pkt.getHost());
-        TPACKETID recv_packet_id = ntohl(*((U32*)(&data[1])));
+        U32 packet_id_nbo;
+        memcpy(&packet_id_nbo, &data[1], sizeof(packet_id_nbo)); // after the flags byte, so unaligned
+        TPACKETID recv_packet_id = ntohl(packet_id_nbo);
 
         // Harvest piggybacked ACKs for outbound messages from the packet tail of this inbound message
         if (cdp && (data[0] & LL_ACK_FLAG))

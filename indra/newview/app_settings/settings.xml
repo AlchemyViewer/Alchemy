@@ -7384,7 +7384,7 @@
     <key>QuitAfterSeconds</key>
     <map>
       <key>Comment</key>
-      <string>The duration allowed before quitting.</string>
+      <string>The duration allowed before quitting, from startup or, once in world, from arriving there. In world the viewer logs out first, as File > Quit does, and quits without the logout if it has not finished a minute later.</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

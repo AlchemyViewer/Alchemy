@@ -204,6 +204,7 @@ void LLConversationLogFriendObserver::changed(U32 mask)
 /************************************************************************/
 
 LLConversationLog::LLConversationLog() :
+    mFriendObserver(nullptr),
     mAvatarNameCacheConnection(),
     mLoggingEnabled(false)
 {
@@ -217,7 +218,14 @@ LLConversationLog::~LLConversationLog()
         {
             LLIMMgr::instance().removeSessionObserver(this);
         }
+    }
+    // The tracker deletes the observers it still has when it goes, at exit; one taken
+    // back from it is its owner's to delete.
+    if (mFriendObserver)
+    {
         LLAvatarTracker::instance().removeObserver(mFriendObserver);
+        delete mFriendObserver;
+        mFriendObserver = nullptr;
     }
     if (mAvatarNameCacheConnection.connected())
     {
@@ -235,8 +243,11 @@ void LLConversationLog::enableLogging(S32 log_mode)
         LLIMMgr::instance().addSessionObserver(this);
         mNewMessageSignalConnection = LLIMModel::instance().addNewMsgCallback(boost::bind(&LLConversationLog::onNewMessageReceived, this, _1));
 
-        mFriendObserver = new LLConversationLogFriendObserver;
-        LLAvatarTracker::instance().addObserver(mFriendObserver);
+        if (!mFriendObserver)
+        {
+            mFriendObserver = new LLConversationLogFriendObserver;
+            LLAvatarTracker::instance().addObserver(mFriendObserver);
+        }
     }
     else
     {
@@ -244,7 +255,12 @@ void LLConversationLog::enableLogging(S32 log_mode)
 
         LLIMMgr::instance().removeSessionObserver(this);
         mNewMessageSignalConnection.disconnect();
-        LLAvatarTracker::instance().removeObserver(mFriendObserver);
+        if (mFriendObserver)
+        {
+            LLAvatarTracker::instance().removeObserver(mFriendObserver);
+            delete mFriendObserver;
+            mFriendObserver = nullptr;
+        }
     }
 
     notifyObservers();

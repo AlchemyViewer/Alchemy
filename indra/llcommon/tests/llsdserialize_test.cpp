@@ -50,6 +50,7 @@ typedef U32 uint32_t;
 #include "wrapllerrs.h"
 #include <functional>
 #include <memory>
+#include <limits>
 
 typedef std::function<void(const LLSD& data, std::ostream& str)> FormatterFunction;
 typedef std::function<bool(std::istream& istr, LLSD& data, llssize max_bytes)> ParserFunction;
@@ -679,6 +680,23 @@ namespace
             "</map></llsd>",
             v,
             static_cast<S32>(v.size()) + 1);
+    }
+
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: an integer past an S32 keeps its low 32 bits", "[llsd_XML_parsing]")
+    {
+        // As sscanf("%d") read it, through glibc's strtol: a server writes a U32 out as
+        // its unsigned value, and 4294967295 means -1.
+        constexpr S32 lowest = std::numeric_limits<S32>::min();
+        constexpr S32 highest = std::numeric_limits<S32>::max();
+        require_parse("U32 max", "<llsd><integer>4294967295</integer></llsd>", LLSD(-1), 1);
+        require_parse("S32 max + 1", "<llsd><integer>2147483648</integer></llsd>", LLSD(lowest), 1);
+        require_parse("S32 min - 1", "<llsd><integer>-2147483649</integer></llsd>", LLSD(highest), 1);
+        // past a long long, saturated first, as strtol does
+        require_parse("past a long long", "<llsd><integer>99999999999999999999</integer></llsd>", LLSD(-1), 1);
+        require_parse("below a long long", "<llsd><integer>-99999999999999999999</integer></llsd>", LLSD(0), 1);
+        // a real, truncated, and past an S32 its nearer end
+        require_parse("real past an S32", "<llsd><integer>.5e10</integer></llsd>", LLSD(highest), 1);
+        require_parse("NaN", "<llsd><integer>nan</integer></llsd>", LLSD(0), 1);
     }
 
     TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: html inside maps and arrays is skipped", "[llsd_XML_parsing]")

@@ -223,7 +223,7 @@ namespace
         // std::istringstream::operator>>(int&), which would not consume the
         // ".23" portion.
 
-        return (int)asReal();
+        return llsd::real_to_integer(asReal());
     }
 
     LLSD::Real ImplString::asReal() const
@@ -914,8 +914,8 @@ LLSD::Integer LLSD::asInteger() const
     {
     case TypeBoolean:   return mData.b ? 1 : 0;
     case TypeInteger:   return mData.i;
-    case TypeReal:      return !std::isnan(mData.r) ? (Integer)mData.r : 0;
-    case TypeDate:      return (Integer)mData.r;
+    case TypeReal:      return llsd::real_to_integer(mData.r);
+    case TypeDate:      return llsd::real_to_integer(mData.r);
     case TypeUndefined: return 0;
     default:            return mData.impl->asInteger();
     }
@@ -1327,6 +1327,25 @@ LLSD::Real string_to_real(std::string_view in_string)
     LLSD::Real v = 0.0;
     auto [ptr, ec] = fast_float::from_chars(first, last, v);
     return (ptr == last && ec == std::errc()) ? v : 0.0;
+}
+
+LLSD::Integer real_to_integer(LLSD::Real value)
+{
+    constexpr LLSD::Integer lowest = std::numeric_limits<LLSD::Integer>::min();
+    constexpr LLSD::Integer highest = std::numeric_limits<LLSD::Integer>::max();
+    if (std::isnan(value))
+    {
+        return 0;
+    }
+    if (value <= (LLSD::Real)lowest)
+    {
+        return lowest;
+    }
+    if (value >= (LLSD::Real)highest)
+    {
+        return highest;
+    }
+    return (LLSD::Integer)value;
 }
 
 #if !defined(LL_RELEASE_FOR_DOWNLOAD)

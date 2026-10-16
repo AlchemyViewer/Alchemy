@@ -276,7 +276,9 @@ static void FAUDIOCALL wind_on_buffer_end(FAudioVoiceCallback* cb, void*)
     auto* self = static_cast<LLAudioEngine_FAudio::WindVoiceCallback*>(cb);
     if (self && self->engine)
     {
-        self->engine->mWindQueueDepth.fetch_sub(1, std::memory_order_relaxed);
+        // Released: the mixer has finished reading the chunk, which updateWind frees on
+        // seeing the count drop.
+        self->engine->mWindQueueDepth.fetch_sub(1, std::memory_order_release);
     }
 }
 static void FAUDIOCALL wind_on_loop_end(FAudioVoiceCallback*, void*) {}
@@ -1118,7 +1120,8 @@ void LLAudioEngine_FAudio::updateWind(LLVector3 wind_vec, F32 camera_altitude)
     // OnBufferEnd in submission (FIFO) order, decrementing mWindQueueDepth;
     // our deque size mirrors that.
     {
-        const int depth = mWindQueueDepth.load(std::memory_order_relaxed);
+        // Acquired, so the mixer's reads of a chunk come before it is freed here.
+        const int depth = mWindQueueDepth.load(std::memory_order_acquire);
         while (static_cast<int>(mWindChunks.size()) > depth)
         {
             mWindChunks.pop_front();
@@ -1193,9 +1196,10 @@ static void FAUDIOCALL channel_on_pass_end(FAudioVoiceCallback*) {}
 static void FAUDIOCALL channel_on_stream_end(FAudioVoiceCallback* cb)
 {
     auto* self = static_cast<LLAudioChannelFAudio::ChannelCallback*>(cb);
-    if (self && self->owner)
+    LLAudioChannelFAudio* owner = self ? self->owner.load(std::memory_order_acquire) : nullptr;
+    if (owner)
     {
-        self->owner->mFinished.store(true, std::memory_order_relaxed);
+        owner->mFinished.store(true, std::memory_order_relaxed);
     }
 }
 static void FAUDIOCALL channel_on_buffer_start(FAudioVoiceCallback*, void*) {}
@@ -1203,9 +1207,10 @@ static void FAUDIOCALL channel_on_buffer_end(FAudioVoiceCallback*, void*) {}
 static void FAUDIOCALL channel_on_loop_end(FAudioVoiceCallback* cb, void*)
 {
     auto* self = static_cast<LLAudioChannelFAudio::ChannelCallback*>(cb);
-    if (self && self->owner)
+    LLAudioChannelFAudio* owner = self ? self->owner.load(std::memory_order_acquire) : nullptr;
+    if (owner)
     {
-        self->owner->mLoopCount.fetch_add(1, std::memory_order_relaxed);
+        owner->mLoopCount.fetch_add(1, std::memory_order_relaxed);
     }
 }
 static void FAUDIOCALL channel_on_voice_error(FAudioVoiceCallback*, void*, uint32_t) {}

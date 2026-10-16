@@ -1843,6 +1843,24 @@ bool LLAppViewer::cleanup()
     velopack_cleanup();
 #endif
 
+    // Finish what the workers have in flight before anything they finish with is torn down.
+    // The General pool and the LLImageGL thread drain as they close, replying to the main
+    // loop's queue, which no frame services any more, and the uploads then publish once the
+    // GPU has done with them: one last frame's worth. Left unrun, the references those
+    // replies hold -- on a texture being uploaded or having its alpha analysed, a material's
+    // asset, an HTTP response -- are never let go.
+    if (mGeneralThreadPool)
+    {
+        mGeneralThreadPool->close();
+    }
+    if (LLImageGLThread::instanceExists())
+    {
+        LLImageGLThread::instance().close();
+    }
+    gMainloopWork.runPending();
+    LLImageGL::finishUploads();
+    gMainloopWork.runPending();
+
     //ditch LLVOAvatarSelf instance
     gAgentAvatarp = NULL;
 
@@ -1894,6 +1912,10 @@ bool LLAppViewer::cleanup()
     LLViewerCamera::deleteSingleton();
 
     LL_INFOS() << "Viewer disconnected" << LL_ENDL;
+
+    // No idle runs from here on. What waited for the next one goes now, while what its
+    // callable holds can still reach the singletons it was made beside.
+    gIdleCallbacks.deleteAllFunctions();
 
     if (gKeyboard)
     {
@@ -5594,10 +5616,21 @@ void LLAppViewer::idle()
     F32 qas = gSavedSettings.getF32("QuitAfterSeconds");
     if (qas > 0.f)
     {
-        if (gRenderStartTime.getElapsedTimeF32() > qas)
+        // The logout waits on any modal dialog and on each floater that asks before it closes,
+        // which a run quitting itself has nobody to answer: past this, it quits without one.
+        constexpr F32 QUIT_AFTER_LOGOUT_SECONDS = 60.f;
+        const F32 elapsed = gRenderStartTime.getElapsedTimeF32();
+        if (elapsed > qas && !mQuitRequested)
         {
             LL_INFOS() << "Quitting after " << qas << " seconds. See setting \"QuitAfterSeconds\"." << LL_ENDL;
-            LLAppViewer::instance()->forceQuit();
+            // As File > Quit does: in world, this logs out first.
+            requestQuit();
+        }
+        else if (elapsed > qas + QUIT_AFTER_LOGOUT_SECONDS && mQuitRequested && !isQuitting())
+        {
+            LL_WARNS() << "The logout \"QuitAfterSeconds\" asked for has not finished in "
+                       << QUIT_AFTER_LOGOUT_SECONDS << " seconds; quitting without it." << LL_ENDL;
+            forceQuit();
         }
     }
 

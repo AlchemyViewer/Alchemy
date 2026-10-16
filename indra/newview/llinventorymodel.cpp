@@ -1769,6 +1769,24 @@ void LLInventoryModel::updateCategory(const LLViewerInventoryCategory* cat, U32 
     }
     else
     {
+        // addCategory() leaves the Meshes folder out, and nothing shows it. What it holds still
+        // needs a place, or updateItem() takes it for lost and moves it to Lost And Found on the
+        // server. The folder is never found again to update, so its arrays are made once:
+        // made again on the next update, they would lose the first.
+        if (cat->getPreferredType() == LLFolderType::FT_MESH)
+        {
+            const LLUUID& mesh_id = cat->getUUID();
+            if (mParentChildCategoryTree.find(mesh_id) == mParentChildCategoryTree.end())
+            {
+                mParentChildCategoryTree[mesh_id] = new cat_array_t;
+            }
+            if (mParentChildItemTree.find(mesh_id) == mParentChildItemTree.end())
+            {
+                mParentChildItemTree[mesh_id] = new item_array_t;
+            }
+            return;
+        }
+
         // add this category
         LLPointer<LLViewerInventoryCategory> new_cat = new LLViewerInventoryCategory(cat->getOwnerID());
         new_cat->copyViewerCategory(cat);

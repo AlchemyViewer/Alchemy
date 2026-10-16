@@ -396,8 +396,10 @@ void RlvRenameOnWearObserver::done()
 {
     gInventory.removeObserver(this);
 
-    // We shouldn't be messing with inventory items during LLInventoryModel::notifyObservers()
-    doOnIdleOneTime(boost::bind(&RlvRenameOnWearObserver::doneIdle, this));
+    // We shouldn't be messing with inventory items during LLInventoryModel::notifyObservers().
+    // The idle call owns the observer from here, so it goes whether or not the call runs.
+    std::shared_ptr<RlvRenameOnWearObserver> self(this);
+    doOnIdleOneTime([self]() { self->doneIdle(); });
 }
 
 // Checked: 2010-03-14 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
@@ -407,7 +409,6 @@ void RlvRenameOnWearObserver::doneIdle()
     if ( (RlvSettings::getEnableSharedWear()) || (!RlvSettings::getSharedInvAutoRename()) || (LLStartUp::getStartupState() < STATE_STARTED) ||
          (!isAgentAvatarValid()) || ((pRlvRoot = RlvInventory::instance().getSharedRoot()) == NULL) )
     {
-        delete this;
         return;
     }
 
@@ -487,8 +488,6 @@ void RlvRenameOnWearObserver::doneIdle()
         }
     }
     gInventory.notifyObservers();
-
-    delete this;
 }
 
 // Checked: 2012-03-22 (RLVa-1.4.6) | Added: RLVa-1.4.6

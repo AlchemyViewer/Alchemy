@@ -763,6 +763,7 @@ void LLOutfitGallery::moveRowPanel(LLPanel* stack, int left, int bottom)
 LLOutfitGallery::~LLOutfitGallery()
 {
     delete mOutfitGalleryMenu;
+    delete mSortMenu;
 
     while (!mUnusedRowPanels.empty())
     {

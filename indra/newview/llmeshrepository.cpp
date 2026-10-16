@@ -2499,13 +2499,14 @@ EMeshProcessingResult LLMeshRepoThread::lodReceived(const LLVolumeParams& mesh_p
                     skin_info = iter->second;
                 }
             }
-            if (skin_info.notNull() && isAgentAvatarValid())
+            if (skin_info.notNull())
             {
                 for (S32 i = 0; i < num_faces; ++i)
                 {
-                    // NOTE: no need to lock gAgentAvatarp as the state being checked is not changed after initialization
+                    // Only a frozen skin is in mSkinMap, its joint numbers resolved, so no
+                    // avatar is asked for them.
                     LLVolumeFace& face = volume->getVolumeFace(i);
-                    LLSkinningUtil::updateRiggingInfo(skin_info, gAgentAvatarp, face);
+                    LLSkinningUtil::updateRiggingInfo(skin_info, nullptr, face);
                 }
             }
 
@@ -2558,10 +2559,11 @@ bool LLMeshRepoThread::skinInfoReceived(const LLUUID& mesh_id, U8* data, S32 dat
         LLPointer<LLMeshSkinInfo> info = nullptr;
         info = new LLMeshSkinInfo(mesh_id, skin);
 
-        if (isAgentAvatarValid() && gAgentAvatarp->mInitFlags != 0)
-        { // joint numbers are consistent inside LLVOAvatar and animations, but inconsistent inside meshes,
-            // generate a map of mesh joint numbers to LLVOAvatar joint numbers
-            LLSkinningUtil::initJointNums(info, gAgentAvatarp);
+        // joint numbers are consistent inside LLVOAvatar and animations, but inconsistent inside meshes,
+        // generate a map of mesh joint numbers to LLVOAvatar joint numbers: from the numbers the
+        // agent's skeleton published, since the avatar is the main thread's to read
+        if (LLSkinningUtil::initJointNumsFromPublished(info))
+        {
             info->mFrozen = true;
         }
 

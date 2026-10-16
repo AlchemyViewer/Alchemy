@@ -28,6 +28,7 @@
 #include "llsdserialize_xml.h"
 
 #include <charconv>
+#include <limits>
 #include <deque>
 #include <iostream>
 #include <string_view>
@@ -1369,6 +1370,19 @@ void LLSDXMLParser::Impl::endElement(Element element)
                 {   // the common case: a plain decimal integer
                     value = i;
                 }
+                else if (ec == std::errc::result_out_of_range)
+                {
+                    // sscanf("%d") read past an int as glibc's strtol does, into a long
+                    // that saturates, and kept its low 32 bits: 4294967295 is -1, which
+                    // is what a server writing out a U32 means by it.
+                    long long wide;
+                    if (std::from_chars(first, last, wide).ec == std::errc::result_out_of_range)
+                    {
+                        wide = *first == '-' ? std::numeric_limits<long long>::min()
+                                             : std::numeric_limits<long long>::max();
+                    }
+                    value = static_cast<S32>(static_cast<U32>(wide));
+                }
                 else
                 {
                     // This must treat "1.23" not as an error, but as a number, which is
@@ -1377,7 +1391,7 @@ void LLSDXMLParser::Impl::endElement(Element element)
                     // ".23" portion.
 
                     // Utilizes implementation used internally by LLSD::ImplString::asInteger
-                    value = (int)llsd::string_to_real(content);
+                    value = llsd::real_to_integer(llsd::string_to_real(content));
                 }
             }
             break;

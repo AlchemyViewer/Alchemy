@@ -1950,7 +1950,6 @@ LLProfile::~LLProfile()
 }
 
 
-S32 LLVolume::sNumMeshPoints = 0;
 
 LLVolume::LLVolume(const LLVolumeParams &params, const F32 detail, const bool generate_single_face, const bool is_unique)
     : mParams(params)
@@ -2011,7 +2010,6 @@ void LLVolume::genTangents(S32 face)
 
 LLVolume::~LLVolume()
 {
-    sNumMeshPoints -= mMesh.size();
     delete mPathp;
 
     delete mProfilep;
@@ -2077,9 +2075,7 @@ bool LLVolume::generate()
         S32 sizeS = mPathp->mPath.size();
         S32 sizeT = mProfilep->mProfile.size();
 
-        sNumMeshPoints -= mMesh.size();
         mMesh.resize(sizeT * sizeS);
-        sNumMeshPoints += mMesh.size();
 
         //generate vertex positions
 
@@ -3265,9 +3261,7 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
         LL_WARNS() << "sculpt bad mesh size " << sizeS << " " << sizeT << LL_ENDL;
     }
 
-    sNumMeshPoints -= mMesh.size();
     mMesh.resize(sizeS * sizeT);
-    sNumMeshPoints += mMesh.size();
 
     //generate vertex positions
     if (!data_is_empty)

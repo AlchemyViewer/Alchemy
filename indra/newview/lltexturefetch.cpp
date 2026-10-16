@@ -536,7 +536,8 @@ private:
         SHOULD_WRITE = 2
     };
 
-    e_state mState;
+    // Changed under the work mutex; read without it by getRequestFinished and the debugger.
+    std::atomic<e_state> mState;
     void setState(e_state new_state);
     LLViewerRegion* getRegion();
 
@@ -940,6 +941,10 @@ LLTextureFetchWorker::LLTextureFetchWorker(LLTextureFetch* fetcher,
 {
     mType = host.isOk() ? LLImageBase::TYPE_AVATAR_BAKE : LLImageBase::TYPE_NORMAL;
 //  LL_INFOS(LOG_TXT) << "Create: " << mID << " mHost:" << host << " Discard=" << discard << LL_ENDL;
+    // The fetch thread may start on the work as soon as it is added, and doWork takes the
+    // work mutex before it reads anything: hold it until the desired discard is set too,
+    // as setDesiredDiscard's callers do.
+    LLMutexLock lock(&mWorkMutex);                                      // +Mw
     if (!mFetcher->mDebugPause)
     {
         addWork(0);
@@ -1924,9 +1929,16 @@ bool LLTextureFetchWorker::doWork(S32 param)
             return doWork(param);
         }
 
-        LLImageDataSharedLock lock(mFormattedImage);
-
-        S32 datasize = mFormattedImage->getDataSize();
+        // Locked to read the data and its size, and let go before the cache's own lock is
+        // taken: the cache finishes a read under that one and then locks the image it fills.
+        // The write that follows reads the data later, on the cache's thread, unlocked either way.
+        U8* data;
+        S32 datasize;
+        {
+            LLImageDataSharedLock lock(mFormattedImage);
+            data = mFormattedImage->getData();
+            datasize = mFormattedImage->getDataSize();
+        }
         if(mFileSize < datasize)//This could happen when http fetching and sim fetching mixed.
         {
             if(mHaveAllData)
@@ -1950,7 +1962,7 @@ bool LLTextureFetchWorker::doWork(S32 param)
         // fetcher is working
         mCacheWriteTimer.reset();
         mCacheWriteHandle = mFetcher->mTextureCache->writeToCache(mID,
-                                                                  mFormattedImage->getData(), datasize,
+                                                                  data, datasize,
                                                                   mFileSize, mRawImage, mDecodedDiscard, responder);
         // fall through
     }
@@ -2546,6 +2558,14 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, bool threaded, bool qa_mod
 
 LLTextureFetch::~LLTextureFetch()
 {
+    // A texture that outlives the fetcher, as one LLWearableList holds does (see
+    // ~LLViewerFetchedTexture), never asks for its worker to be deleted, and with the
+    // thread stopped nothing else will.
+    for (const auto& [id, worker] : mRequestMap)
+    {
+        worker->scheduleDelete();
+    }
+    mRequestMap.clear();
     clearDeleteList();
 
     while (! mCommands.empty())

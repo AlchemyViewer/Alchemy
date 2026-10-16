@@ -305,6 +305,34 @@ bool LL::WorkQueue::post(const Work& callable)
     }
 }
 
+bool LL::WorkQueue::post(Work&& callable)
+{
+    try
+    {
+        return mQueue.pushIfOpen(std::move(callable));
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLCoros") << "Bad memory allocation in WorkQueue::post" << LL_ENDL;
+        return false;
+    }
+}
+
+bool LL::WorkQueue::tryPost(Work&& callable)
+{
+    try
+    {
+        return mQueue.tryPush(std::move(callable));
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLCoros") << "Bad memory allocation in WorkQueue::tryPost" << LL_ENDL;
+        return false;
+    }
+}
+
 bool LL::WorkQueue::tryPost(const Work& callable)
 {
     try
@@ -394,6 +422,26 @@ bool LL::WorkSchedule::tryPost(const Work& callable)
 bool LL::WorkSchedule::tryPost(const Work& callable, const TimePoint& time)
 {
     return mQueue.tryPush(TimedWork(time, callable));
+}
+
+bool LL::WorkSchedule::post(Work&& callable)
+{
+    return post(std::move(callable), TimePoint::clock::now());
+}
+
+bool LL::WorkSchedule::post(Work&& callable, const TimePoint& time)
+{
+    return mQueue.pushIfOpen(TimedWork(time, std::move(callable)));
+}
+
+bool LL::WorkSchedule::tryPost(Work&& callable)
+{
+    return tryPost(std::move(callable), TimePoint::clock::now());
+}
+
+bool LL::WorkSchedule::tryPost(Work&& callable, const TimePoint& time)
+{
+    return mQueue.tryPush(TimedWork(time, std::move(callable)));
 }
 
 LL::WorkSchedule::Work LL::WorkSchedule::pop_()

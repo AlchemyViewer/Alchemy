@@ -41,6 +41,7 @@
 #include "lllocaltextureobject.h"
 #include "llnotificationsutil.h"
 #include "llselectmgr.h"
+#include "llskinningutil.h"
 #include "lltoolgrab.h" // for needsRenderBeam
 #include "lltoolmgr.h" // for needsRenderBeam
 #include "lltoolmorph.h"
@@ -240,7 +241,8 @@ void LLVOAvatarSelf::initInstance()
     doPeriodically(update_avatar_rez_metrics, 5.0);
     doPeriodically(boost::bind(&LLVOAvatarSelf::checkStuckAppearance, this), 30.0);
 
-    initAllJoints(); // mesh thread uses LLVOAvatarSelf as a joint source
+    initAllJoints();
+    LLSkinningUtil::publishJointNums(this); // the mesh thread's joint source
 
     mInitFlags |= 1<<2;
 }
