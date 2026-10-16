@@ -84,8 +84,15 @@ void LLExperienceLog::handleExperienceMessage(LLSD& message)
     time(&now);
     char daybuf[16];/* Flawfinder: ignore */
     char time_of_day[16];/* Flawfinder: ignore */
-    strftime(daybuf, 16, "%Y-%m-%d", localtime(&now));
-    strftime(time_of_day, 16, " %H:%M:%S", localtime(&now));
+    // localtime() shares libc's one buffer with every thread's gmtime(), the log's among them.
+    struct tm local;
+#if LL_WINDOWS
+    localtime_s(&local, &now);
+#else
+    localtime_r(&now, &local);
+#endif
+    strftime(daybuf, 16, "%Y-%m-%d", &local);
+    strftime(time_of_day, 16, " %H:%M:%S", &local);
     message["Time"] = time_of_day;
 
     std::string day = daybuf;

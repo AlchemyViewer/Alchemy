@@ -1545,9 +1545,17 @@ namespace LLError
         const size_t BUF_SIZE = 64;
         char time_str[BUF_SIZE];    /* Flawfinder: ignore */
 
+        // Logged from any thread: gmtime() would share libc's one buffer with every other
+        // thread's gmtime() and localtime().
+        struct tm utc;
+#if LL_WINDOWS
+        gmtime_s(&utc, &now);
+#else
+        gmtime_r(&now, &utc);
+#endif
         auto chars = strftime(time_str, BUF_SIZE,
                                   "%Y-%m-%dT%H:%M:%SZ",
-                                  gmtime(&now));
+                                  &utc);
 
         return chars ? time_str : "time error";
     }
