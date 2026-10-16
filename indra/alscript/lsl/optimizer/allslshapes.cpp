@@ -299,10 +299,17 @@ namespace
             return false;
         }
 
+        // The most elements a literal written as a sum may have: the sum
+        // nests an element deeper for each, where the literal is one node,
+        // and a tree deeper than ALLSLDepth::LIMIT is one no pass may walk,
+        // which would refuse the whole run. A literal of more stays one.
+        static constexpr size_t MOST_SUMMED = 256;
+
         bool visit(LSLListExpression* expr) override
         {
             visitChildren(expr);
-            if (mStage != Stage::Lists || !options.listadd || !mCosts.listAsSum || expr->getNumChildren() == 0)
+            if (mStage != Stage::Lists || !options.listadd || !mCosts.listAsSum || expr->getNumChildren() == 0 ||
+                expr->getNumChildren() > MOST_SUMMED)
             {
                 return false;
             }

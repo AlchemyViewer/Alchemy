@@ -1132,4 +1132,68 @@ namespace
         UNSCOPED_INFO("and still answers for its own text");
         CHECK(service.parsed());
     }
+
+    TEST_CASE_METHOD(allslservice_data, "allslservice: an action asked before a line's start or past its end is held to the line", "[allslservice]")
+    {
+        CHECK(loaded);
+        const std::string script = "default\n{\n    state_entry()\n    {\n        llSay(0, (string)(1 + 2));\n    }\n}\n";
+        CHECK_NOTHROW(service.actions(script, 4, -1, 4, 5));
+        CHECK_NOTHROW(service.actions(script, 4, 0, 4, 400));
+        CHECK_NOTHROW(service.actions(script, 40, 0, 40, 4));
+    }
+
+    TEST_CASE_METHOD(allslservice_data, "allslservice: an undeclared name is changed only to one of the kind its place looks up", "[allslservice]")
+    {
+        CHECK(loaded);
+        const std::string script = "integer helper(integer n) { return n; }\n"
+                                   "integer count;\n"
+                                   "default\n{\n    touch_start(integer total)\n    {\n"
+                                   "        touch_strt(1);\n"
+                                   "        helpr(2);\n"
+                                   "        cont = 3;\n"
+                                   "    }\n}\n";
+        const ALScriptProblems problems = service.check(script);
+        const auto             fixesOf  = [&problems](const std::string& name) {
+            std::string out;
+            for (const ALScriptProblem& problem : problems)
+            {
+                if (problem.key == "LSLUndeclared" && problem.args.size() == 1 && problem.args[0] == name)
+                {
+                    for (const ALScriptFix& fix : problem.fixes)
+                    {
+                        out += "'" + fix.title + "' ";
+                    }
+                }
+            }
+            return out;
+        };
+        UNSCOPED_INFO("said: " + said(problems));
+        UNSCOPED_INFO("a call is not changed to the handler it is in: " + fixesOf("touch_strt"));
+        CHECK(fixesOf("touch_strt").find("touch_start") == std::string::npos);
+        UNSCOPED_INFO("a call is changed to a function: " + fixesOf("helpr"));
+        CHECK(fixesOf("helpr").find("to 'helper'") != std::string::npos);
+        UNSCOPED_INFO("a variable to a variable: " + fixesOf("cont"));
+        CHECK(fixesOf("cont").find("to 'count'") != std::string::npos);
+    }
+
+    TEST_CASE_METHOD(allslservice_data, "allslservice: a label declared after a jump is offered at the jump", "[allslservice]")
+    {
+        CHECK(loaded);
+        // The caret in the jump's name, the label on a later line. (Without
+        // the jump's semicolon Tailslide's own recovery takes the label's
+        // line with the jump's, and no scope rule can offer what is not in
+        // the tree.)
+        const std::string script = "default\n{\n    state_entry()\n    {\n        integer i;\n        jump don;\n        @done;\n        integer later;\n        i = later;\n    }\n}\n";
+        std::string       names;
+        for (const ALScriptCompletion& c : service.symbols(script, 5, 16))
+        {
+            names += " " + c.text;
+        }
+        names += " ";
+        UNSCOPED_INFO("offered:" + names);
+        CHECK(names.find(" done ") != std::string::npos);
+        UNSCOPED_INFO("a local declared after the caret is not");
+        CHECK(names.find(" later ") == std::string::npos);
+        CHECK(names.find(" i ") != std::string::npos);
+    }
 }

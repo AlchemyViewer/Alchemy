@@ -66,9 +66,14 @@ namespace
         {
             if (!tKept.stack.sp || tKept.bytes != bytes)
             {
+                // Let go of before the new one is made, and forgotten
+                // then: a stack that cannot be made (bad_alloc) leaves
+                // none kept, not the old one's dangling pointer.
                 if (tKept.stack.sp)
                 {
                     tKept.maker.deallocate(tKept.stack);
+                    tKept.stack = ctx::stack_context();
+                    tKept.bytes = 0;
                 }
                 tKept.maker = ctx::protected_fixedsize_stack(bytes);
                 tKept.stack = tKept.maker.allocate();
@@ -90,8 +95,10 @@ void alScriptOnLargeStack(const std::function<void()>& work, std::size_t bytes)
     }
     // Guarded at its end, so that running off it is a fault where it
     // happens rather than a write over whatever lies beyond.
+    // Counted as on it only once the fiber, and so its stack, is made:
+    // making the stack can fail (bad_alloc), and a count left raised then
+    // would run every later job of this thread's on its native stack.
     std::exception_ptr failed;
-    ++tKept.depth;
     ctx::fiber         deep(std::allocator_arg, KeptStack{ bytes },
                             [&](ctx::fiber&& back)
                             {
@@ -107,6 +114,7 @@ void alScriptOnLargeStack(const std::function<void()>& work, std::size_t bytes)
                                 }
                                 return std::move(back);
                             });
+    ++tKept.depth;
     std::move(deep).resume();
     --tKept.depth;
     if (failed)

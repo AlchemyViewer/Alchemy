@@ -144,4 +144,32 @@ namespace
         UNSCOPED_INFO("and one inside it");
         CHECK(nested == 3000);
     }
+
+    TEST_CASE("alscriptstack: a stack that cannot be made leaves the thread able to make the next", "[alscriptstack]")
+    {
+        // Sixty-four terabytes: refused where the OS counts what it
+        // commits. The job after it must still run on a kept stack --
+        // deeper than the thread's own -- rather than be counted as on one
+        // already and run on the thread's.
+        int  first = -1, huge = -1, after = -1;
+        bool refused = false;
+        std::thread worker([&]() {
+            alScriptOnLargeStack([&]() { first = descend(100); });
+            try
+            {
+                alScriptOnLargeStack([&]() { huge = 1; }, std::size_t(1) << 46);
+            }
+            catch (const std::bad_alloc&)
+            {
+                refused = true;
+            }
+            alScriptOnLargeStack([&]() { after = descend(8000); });
+        });
+        worker.join();
+        CHECK(first == 100);
+        UNSCOPED_INFO(std::string("the huge one ") + (refused ? "refused" : "granted"));
+        CHECK((refused || huge == 1));
+        UNSCOPED_INFO("the next on a stack of its own, all the way down");
+        CHECK(after == 8000);
+    }
 }

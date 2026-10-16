@@ -107,14 +107,35 @@ Luau::FrontendOptions ALLuauFrontend::limited() const
     options.cancellationToken = stop;
     // Each module as Luau checks it, for its lints: noted as the script's
     // whose check it is.
+    // Nothing may leave it: what it throws, inside Luau's own check, would
+    // leave that module unrecorded. It is kept for the check to tell.
     options.customModuleCheck = [this, script = moduleName](const Luau::SourceModule& source, const Luau::Module&) {
-        std::vector<std::string>& noted = checkedNow[script];
-        if (std::find(noted.begin(), noted.end(), source.name) == noted.end())
+        try
         {
-            noted.push_back(source.name);
+            std::vector<std::string>& noted = checkedNow[script];
+            if (std::find(noted.begin(), noted.end(), source.name) == noted.end())
+            {
+                noted.push_back(source.name);
+            }
+            if (moduleChecked)
+            {
+                moduleChecked(source.name);
+            }
+        }
+        catch (...)
+        {
+            if (!checkFailure)
+            {
+                checkFailure = std::current_exception();
+            }
         }
     };
     return options;
+}
+
+std::exception_ptr ALLuauFrontend::takeCheckFailure()
+{
+    return std::exchange(checkFailure, nullptr);
 }
 
 std::vector<std::string> ALLuauFrontend::takeChecked()

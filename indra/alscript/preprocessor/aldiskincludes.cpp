@@ -45,10 +45,43 @@ namespace
 {
     namespace fs = std::filesystem;
 
+    // Whether any part of a path is one of DOS's device names -- CON, PRN,
+    // AUX, NUL, COM1 to COM9, LPT1 to LPT9, with or without an extension
+    // -- which Windows opens as the device wherever the part stands, so
+    // that even asking how such a path stands opens it. Elsewhere, no
+    // name is a device.
+    bool deviceName(const std::string& path)
+    {
+#if LL_WINDOWS
+        for (const fs::path& part : fsyspath(path))
+        {
+            std::string stem = fsyspath(part).string();
+            stem.erase(std::min(stem.find_first_of(".:"), stem.size()));
+            while (!stem.empty() && stem.back() == ' ')
+            {
+                stem.pop_back();
+            }
+            for (char& c : stem)
+            {
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
+            if (stem == "CON" || stem == "PRN" || stem == "AUX" || stem == "NUL" ||
+                (stem.size() == 4 && (stem.compare(0, 3, "COM") == 0 || stem.compare(0, 3, "LPT") == 0) && stem[3] >= '1' && stem[3] <= '9'))
+            {
+                return true;
+            }
+        }
+#else
+        (void)path;
+#endif
+        return false;
+    }
+
     // A path with every link followed, or nothing where it is not there.
+    // A device is asked nothing of.
     std::optional<fs::path> real(const std::string& path)
     {
-        if (path.empty())
+        if (path.empty() || deviceName(path))
         {
             return std::nullopt;
         }
@@ -102,11 +135,15 @@ namespace
     // which Windows passes on as it is, `\??\UNC\host\share` a share --
     // which asking anything of sends who asks to wherever it names. Those
     // as written on every platform; on Windows, whatever the path's root
-    // parses as but a drive.
+    // parses as but a drive, and a path with a device's name in it.
     bool elsewhere(const std::string& path)
     {
         const auto separator = [](char c) { return c == '/' || c == '\\'; };
         if (path.size() >= 2 && separator(path[0]) && separator(path[1]))
+        {
+            return true;
+        }
+        if (deviceName(path))
         {
             return true;
         }

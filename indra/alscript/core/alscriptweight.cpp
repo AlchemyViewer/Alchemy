@@ -1812,7 +1812,8 @@ namespace
                 const size_t paren = line.find('(');
                 const size_t space = paren == std::string::npos ? std::string::npos : line.rfind(' ', paren);
                 std::string  name  = space == std::string::npos ? std::string() : line.substr(space + 1, paren - space - 1);
-                const size_t close = line.find(')', paren);
+                // A line cut before its closing bracket counts to its end.
+                const size_t close = paren == std::string::npos ? std::string::npos : std::min(line.find(')', paren), line.size());
                 const size_t args  = paren == std::string::npos || close == paren + 1 ? 0 : std::count(line.begin() + paren, line.begin() + close, ',') + 1;
                 const size_t head  = 14 + name.size() + 1 + 4 + args * (6 + 8) + 12;
                 if (name == ".ctor")

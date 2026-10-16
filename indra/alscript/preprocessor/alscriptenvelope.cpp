@@ -257,10 +257,20 @@ std::optional<ALScriptEnvelope> ALScriptEnvelope::parse(std::string_view asset)
     takeTarget(rest, lead, envelope.compileTarget);
     // An upload header, ours or the plugin's, is kept apart from the code,
     // so that the code reads the same whenever and by whom it went up.
+    // Ours is one only where its hash is of this envelope: an author's own
+    // banner at the top of their script, which the expansion begins with
+    // as the source does, is the code's, and stays in it.
     const std::string_view before = rest;
-    if (ALUploadHeader::take(rest, envelope.lua))
+    if (const std::optional<ALUploadHeader> header = ALUploadHeader::take(rest, envelope.lua))
     {
-        envelope.header.assign(before.substr(0, before.size() - rest.size()));
+        if (!header->ours || header->hash == ALUploadHeader::hashOf(envelope.compileTarget, envelope.source, rest))
+        {
+            envelope.header.assign(before.substr(0, before.size() - rest.size()));
+        }
+        else
+        {
+            rest = before;
+        }
     }
     envelope.expanded = std::string(rest);
     return envelope;
@@ -406,6 +416,12 @@ bool ALScriptEnvelope::compiledFrom(std::string_view expansion, std::string_view
     {
         // Nothing optimizes SLua: the same tokens, or not.
         return std::equal(made.begin(), made.end(), kept.begin(), kept.end(), same);
+    }
+    // Nothing kept of an expansion that says something is not what an
+    // optimizer leaves: it keeps the parts that run.
+    if (kept.empty())
+    {
+        return made.empty();
     }
     // Each part kept is the next of the expansion's that is the same to the
     // token; the ones passed over are what an optimizer left out.
