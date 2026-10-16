@@ -319,6 +319,53 @@ namespace
         check.copyFrom(stream, 0, 0, WORDS * sizeof(U32));
         UNSCOPED_INFO("the GPU sees the stream's upload");
         CHECK(readAll(check) == words);
+        UNSCOPED_INFO("a coherent map has nothing to flush");
+        stream.flushMapped(0, WORDS * sizeof(U32));
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A FLUSH_EXPLICIT STREAM store is mapped where persistent maps resolve, its storage taking no flush bit and its
+    // map no coherence; the GPU sees an upload into it, which flushes its own range, and a write into the map once
+    // flushMapped has published that range.
+    TEST_CASE_METHOD(algpubuffer_data, "algpubuffer_gl: a FLUSH_EXPLICIT STREAM store's writes reach the GPU once flushed", "[algpubuffer_gl]")
+    {
+        const bool persistent = glBufferStorage != nullptr;
+        ALGPUBuffer stream;
+        ALGPUBuffer check;
+        REQUIRE(stream.allocate(WORDS * sizeof(U32), ALGPUBuffer::STREAM | ALGPUBuffer::FLUSH_EXPLICIT, nullptr,
+                                "flushed stream (test)"));
+        REQUIRE(check.allocate(WORDS * sizeof(U32), 0, nullptr, "check (test)"));
+        CHECK(stream.getFlags() == U32(ALGPUBuffer::STREAM | ALGPUBuffer::FLUSH_EXPLICIT));
+        UNSCOPED_INFO("mapped where persistent maps resolve");
+        CHECK((stream.getMapped() != nullptr) == persistent);
+
+        std::vector<U32> expected = pattern(WORDS, 500u);
+        stream.upload(0, expected.data(), expected.size() * sizeof(U32));
+        check.copyFrom(stream, 0, 0, WORDS * sizeof(U32));
+        UNSCOPED_INFO("the GPU sees the upload");
+        CHECK(readAll(check) == expected);
+
+        if (U8* const map = stream.getMapped())
+        {
+            GLint storage = 0;
+            GLint access  = 0;
+            glBindBuffer(GL_COPY_READ_BUFFER, stream.getGLName());
+            glGetBufferParameteriv(GL_COPY_READ_BUFFER, GL_BUFFER_STORAGE_FLAGS, &storage);
+            glGetBufferParameteriv(GL_COPY_READ_BUFFER, GL_BUFFER_ACCESS_FLAGS, &access);
+            glBindBuffer(GL_COPY_READ_BUFFER, 0);
+            UNSCOPED_INFO("stored for persistent writes, not coherent");
+            CHECK(storage == GLint(GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT));
+            UNSCOPED_INFO("mapped for persistent writes flushed explicitly");
+            CHECK(access == GLint(GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT));
+
+            const std::vector<U32> middle = pattern(8, 9000u);
+            memcpy(map + 16 * sizeof(U32), middle.data(), middle.size() * sizeof(U32));
+            stream.flushMapped(16 * sizeof(U32), middle.size() * sizeof(U32));
+            std::copy(middle.begin(), middle.end(), expected.begin() + 16);
+            check.copyFrom(stream, 0, 0, WORDS * sizeof(U32));
+            UNSCOPED_INFO("the GPU sees the flushed range");
+            CHECK(readAll(check) == expected);
+        }
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 

@@ -215,6 +215,8 @@ if(AL_BUILD_TESTS)
   #   by the matrices the draw syncs;
   # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its
   #   lifetime, and the readback and stream rings;
+  # - ALUniformBuffer's persistently mapped rings: the store each makes, how
+  #   it is mapped, and what the GPU reads where a slice is bound;
   # - ALGPUTimer: one span timed at a time, as timestamps and as Elapsed
   #   queries;
   # - ALQueryPool: each kind's names kept to its target, a held target
@@ -239,6 +241,7 @@ if(AL_BUILD_TESTS)
       tests/alquerypool_gl_test.cpp
       tests/alrenderstate_gl_test.cpp
       tests/altessellation_gl_test.cpp
+      tests/aluniformbuffer_gl_test.cpp
       tests/alwindowsdlheadless_test.cpp
       tests/llfontgl_test.cpp
       tests/llfonttextcache_test.cpp
