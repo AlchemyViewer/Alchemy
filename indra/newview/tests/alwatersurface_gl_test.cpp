@@ -1002,6 +1002,7 @@ namespace
                 { "environment/waterVaryingsV.glsl", GL_TESS_EVALUATION_SHADER },
                 { "environment/waterSurface.glsl", GL_TESS_EVALUATION_SHADER },
                 { "deferred/hexLatticeUtil.glsl", GL_TESS_EVALUATION_SHADER },
+                { "windlight/atmosphericsVarsV.glsl", GL_TESS_EVALUATION_SHADER },
             };
             mWaves.mProgramObject = glCreateProgram();
             mWaves.mName = "waves (test)";
@@ -2668,9 +2669,9 @@ namespace
         tearDownWater();
     }
 
-    // The waves' program links with a fragment stage that reads the atmospherics' varyings, as the water's does: the
-    // waves' features attach atmosphericsVarsV to the evaluation stage, the stage before the fragment one, where it
-    // declares them.
+    // The waves' program links with a fragment stage that reads the atmospherics' varyings, as calculatesAtmospherics
+    // lets the water's: the waves' features attach atmosphericsVarsV to the evaluation stage, the stage before the
+    // fragment one, where it declares them, and water_varyings writes them, which Apple's linker requires as well.
     TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the waves' program links with a fragment stage reading the atmospherics' varyings", "[alwatersurface_gl]")
     {
         std::map<std::string, std::string> defines = { { "WATER_HEXTILE", "1" } };
