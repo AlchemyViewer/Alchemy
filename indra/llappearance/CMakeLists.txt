@@ -79,6 +79,8 @@ if(AL_BUILD_TESTS)
     llappearance_tests
     PROJECT llappearance
     SOURCES tests/llavatarappearancedefines_test.cpp tests/llwearabletype_test.cpp
+    # The dictionary lookups LLVOAvatar::updateTextures makes for every texture entry.
+    BENCH_SOURCES tests/llavatarappearancedefines_bench.cpp
     LIBRARIES llappearance
   )
 endif()
